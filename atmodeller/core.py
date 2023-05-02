@@ -45,7 +45,7 @@ def get_molar_masses() -> dict:
     return mass_d
 
 
-class OxygenFugacity:
+class _OxygenFugacity:
     """log10 oxygen fugacity as a function of temperature.
 
     Args:
@@ -53,11 +53,11 @@ class OxygenFugacity:
     """
 
     def __init__(self, model: str = "oneill"):
-        self.callmodel = getattr(self, model)
+        self._callmodel = getattr(self, model)
 
     def __call__(self, temperature: float, fo2_shift: float = 0) -> float:
         """log10 of fo2."""
-        return self.callmodel(temperature) + fo2_shift
+        return self._callmodel(temperature) + fo2_shift
 
     def fischer(self, temperature: float) -> float:
         """Fischer et al. (2011) IW."""
@@ -81,16 +81,16 @@ class ModifiedKeq:
 
     Args:
         keq_model: Equilibrium model to use. Options are give below __call__.
-        fo2_model: fo2 model to use. See class OxygenFugacity for options.
+        fo2_model: fo2 model to use. See class _OxygenFugacity for options.
     """
 
     def __init__(self, keq_model: str, fo2_model: str = "oneill"):
-        self.fo2 = OxygenFugacity(fo2_model)
-        self.callmodel = getattr(self, keq_model)
+        self.fo2: _OxygenFugacity = _OxygenFugacity(fo2_model)
+        self._callmodel = getattr(self, keq_model)
 
     def __call__(self, temperature: float, fo2_shift: float = 0) -> float:
         fo2: float = self.fo2(temperature, fo2_shift)
-        keq, fo2_stoich = self.callmodel(temperature)
+        keq, fo2_stoich = self._callmodel(temperature)
         geq: float = 10 ** (keq - fo2_stoich * fo2)
         return geq
 
@@ -125,7 +125,7 @@ class Solubility:
     """
 
     def __init__(self, composition: str):
-        self.callmodel = getattr(self, composition)
+        self._callmodel = getattr(self, composition)
 
     def power_law(self, pressure: float, constant: float, exponent: float) -> float:
         """Solubility power law."""
@@ -133,7 +133,7 @@ class Solubility:
 
     def __call__(self, pressure: float, *args) -> float:
         """Dissolved concentration in ppmw in the melt."""
-        return self.callmodel(pressure, *args)
+        return self._callmodel(pressure, *args)
 
 
 class SolubilityH2O(Solubility):
@@ -203,16 +203,23 @@ class SolubilityN2(Solubility):
 
 
 def get_partial_pressures(
-    oxidised_pressures_in: tuple[float, float, float],
+    solution_pressures_in: tuple[float, float, float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> dict[str, float]:
-    """Get a dictionary of all the species partial pressures, using only the oxidised species (plus
-    diatomic nitrogen) as input."""
+    """Get a dictionary of all the species partial pressures.
 
+    Args:
+        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        fo2_shift: Shift relative to the fO2 buffer.
+        global_d: The global dictionary of parameters.
+
+    Returns:
+        A dictionary of all the species and their partial pressures.
+    """
     # We only need to know p_h2O, p_co2, and p_n2, since reduced species can be directly determined
     # from equilibrium chemistry.
-    p_h2o, p_co2, p_n2 = oxidised_pressures_in
+    p_h2o, p_co2, p_n2 = solution_pressures_in
 
     # Populate the oxidised species immediately from the input.
     p_d: dict[str, float] = {}
@@ -241,13 +248,22 @@ def get_partial_pressures(
 
 
 def get_total_pressure(
-    oxidised_pressures_in: tuple[float, float, float],
+    solution_pressures_in: tuple[float, float, float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> float:
-    """Sum partial pressures of each species to get the total pressure."""
+    """Sum partial pressures of each species to get the total pressure.
+
+    Args:
+        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        fo2_shift: Shift relative to the fO2 buffer.
+        global_d: The global dictionary of parameters.
+
+    Returns:
+        The total pressure.
+    """
     p_d: dict[str, float] = get_partial_pressures(
-        oxidised_pressures_in, fo2_shift, global_d
+        solution_pressures_in, fo2_shift, global_d
     )
     pressure_total: float = sum(p_d.values())
 
@@ -255,20 +271,27 @@ def get_total_pressure(
 
 
 def atmosphere_mass(
-    oxidised_pressures_in: tuple[float, float, float],
+    solution_pressures_in: tuple[float, float, float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> dict[str, float]:
-    """Atmospheric mass of species and totals for H, C, and N."""
+    """Atmospheric mass of species and totals for H, C, and N.
 
+    Args:
+        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        fo2_shift: Shift relative to the fO2 buffer.
+        global_d: The global dictionary of parameters.
+
+    Returns:
+        A dictionary of the masses of H, C, and N.
+    """
     mass_d: dict[str, float] = global_d["molar_mass_d"]
     p_d: dict[str, float] = get_partial_pressures(
-        oxidised_pressures_in, fo2_shift, global_d
+        solution_pressures_in, fo2_shift, global_d
     )
     mu_atm: float = atmosphere_mean_molar_mass(
-        oxidised_pressures_in, fo2_shift, global_d
+        solution_pressures_in, fo2_shift, global_d
     )
-
     mass_atm_d: dict[str, float] = {}
     for key, value in p_d.items():
         # 1.0E5 because pressures are in bar.
@@ -298,19 +321,28 @@ def atmosphere_mass(
 
 
 def atmosphere_mean_molar_mass(
-    oxidised_pressures_in: tuple[float, float, float],
+    solution_pressures_in: tuple[float, float, float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> float:
-    """Mean molar mass of the atmosphere."""
+    """Mean molar mass of the atmosphere.
+
+    Args:
+        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        fo2_shift: Shift relative to the fO2 buffer.
+        global_d: The global dictionary of parameters.
+
+    Returns:
+        Mean molar mass of the atmosphere.
+    """
 
     mass_d: dict[str, float] = global_d["molar_mass_d"]
 
     p_d: dict[str, float] = get_partial_pressures(
-        oxidised_pressures_in, fo2_shift, global_d
+        solution_pressures_in, fo2_shift, global_d
     )
     pressure_total: float = get_total_pressure(
-        oxidised_pressures_in, fo2_shift, global_d
+        solution_pressures_in, fo2_shift, global_d
     )
 
     mu_atm: float = 0
@@ -321,30 +353,45 @@ def atmosphere_mean_molar_mass(
     return mu_atm
 
 
-def dissolved_mass(pin, fo2_shift, global_d):
-    """Volatile masses in the (molten) mantle"""
+def dissolved_mass(
+    solution_pressures_in: tuple[float, float, float],
+    fo2_shift: float,
+    global_d: dict[str, Any],
+):
+    """Volatile masses in the molten mantle.
 
-    mass_int_d = {}
+    Args:
+        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        fo2_shift: Shift relative to the fO2 buffer.
+        global_d: The global dictionary of parameters.
 
-    p_d = get_partial_pressures(pin, fo2_shift, global_d)
+    Returns:
+        A dictionary of the species and their mass that is dissolved in the melt (molten mantle).
+    """
 
-    prefactor = 1e-6 * global_d["mantle_mass"] * global_d["mantle_melt_fraction"]
-    mass_d = global_d["molar_mass_d"]
+    mass_int_d: dict[str, float] = {}
+
+    p_d: dict[str, float] = get_partial_pressures(
+        solution_pressures_in, fo2_shift, global_d
+    )
+
+    prefactor: float = 1e-6 * global_d["mantle_mass"] * global_d["mantle_melt_fraction"]
+    mass_d: dict[str, float] = global_d["molar_mass_d"]
 
     # H2O
-    sol_H2O = SolubilityH2O()  # gets the default solubility model
-    ppmw_H2O = sol_H2O(p_d["H2O"])
-    mass_int_d["H2O"] = prefactor * ppmw_H2O
+    sol_h2o = SolubilityH2O()  # Gets the default solubility model.
+    ppmw_h2o = sol_h2o(p_d["H2O"])
+    mass_int_d["H2O"] = prefactor * ppmw_h2o
 
     # CO2
-    sol_CO2 = SolubilityCO2()  # gets the default solubility model
-    ppmw_CO2 = sol_CO2(p_d["CO2"], global_d["temperature"])
-    mass_int_d["CO2"] = prefactor * ppmw_CO2
+    sol_co2 = SolubilityCO2()  # Gets the default solubility model.
+    ppmw_co2 = sol_co2(p_d["CO2"], global_d["temperature"])
+    mass_int_d["CO2"] = prefactor * ppmw_co2
 
     # N2
-    sol_N2 = SolubilityN2()  # gets the default solubility model
-    ppmw_N2 = sol_N2(p_d["N2"])
-    mass_int_d["N2"] = prefactor * ppmw_N2
+    sol_n2 = SolubilityN2()  # Gets the default solubility model.
+    ppmw_n2 = sol_n2(p_d["N2"])
+    mass_int_d["N2"] = prefactor * ppmw_n2
 
     # now get totals of H, C, N
     mass_int_d["H"] = mass_int_d["H2O"] * (mass_d["H2"] / mass_d["H2O"])
@@ -354,33 +401,39 @@ def dissolved_mass(pin, fo2_shift, global_d):
     return mass_int_d
 
 
-def func(pin, fo2_shift, global_d, mass_target_d):
-    """Function to compute the residual of the mass balance"""
+def mass_residual_objective_func(
+    solution_pressures_in: tuple[float, float, float],
+    fo2_shift: float,
+    global_d: dict[str, Any],
+    mass_target_d: dict[str, float],
+) -> list[float]:
+    """Computes the residual of the volatile mass balance for H, C, and N.
 
-    # pin has three pressures in bar expressed as a tuple
-    pH2O, pCO2, pN2 = pin
+    Args:
+        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2).
+        fo2_shift: Shift relative to the fO2 buffer.
+        global_d: The global dictionary of parameters.
+        mass_target_d: A dictionary of the target masses for H, C, and N.
 
-    # dict of molar masses
-    mass_d = global_d["molar_mass_d"]
+    Returns:
+        A list of the mass residuals for H, C, and N.
+    """
+    mass_atm_d = atmosphere_mass(solution_pressures_in, fo2_shift, global_d)
+    mass_int_d = dissolved_mass(solution_pressures_in, fo2_shift, global_d)
 
-    # get atmospheric masses
-    mass_atm_d = atmosphere_mass(pin, fo2_shift, global_d)
+    # Compute residuals.
+    all_residuals: list[float] = []
+    for volatile in ["H", "C", "N"]:
+        # Absolute residual.
+        residual: float = (
+            mass_atm_d[volatile] + mass_int_d[volatile] - mass_target_d[volatile]
+        )
+        # If target is not zero, compute relative residual.
+        if mass_target_d[volatile]:
+            residual /= mass_target_d[volatile]
+        all_residuals.append(residual)
 
-    # get (molten) mantle masses
-    mass_int_d = dissolved_mass(pin, fo2_shift, global_d)
-
-    # compute residuals
-    res_l = []
-    for vol in ["H", "C", "N"]:
-        # absolute residual
-        res = mass_atm_d[vol] + mass_int_d[vol] - mass_target_d[vol]
-        # if target is not zero, compute relative residual
-        # otherwise, zero target is already solved with zero pressures
-        if mass_target_d[vol]:
-            res /= mass_target_d[vol]
-        res_l.append(res)
-
-    return res_l
+    return all_residuals
 
 
 def get_initial_pressures(target_d):
@@ -419,7 +472,10 @@ def equilibrium_atmosphere(N_ocean_moles, CH_ratio, fo2_shift, global_d, Nitroge
     while ier != 1:
         x0 = get_initial_pressures(target_d)
         sol, info, ier, msg = fsolve(
-            func, x0, args=(fo2_shift, global_d, target_d), full_output=True
+            mass_residual_objective_func,
+            x0,
+            args=(fo2_shift, global_d, target_d),
+            full_output=True,
         )
         count += 1
         # sometimes, a solution exists with negative pressures, which
@@ -433,7 +489,7 @@ def equilibrium_atmosphere(N_ocean_moles, CH_ratio, fo2_shift, global_d, Nitroge
 
     p_d = get_partial_pressures(sol, fo2_shift, global_d)
     # get residuals for output
-    res_l = func(sol, fo2_shift, global_d, target_d)
+    res_l = mass_residual_objective_func(sol, fo2_shift, global_d, target_d)
 
     # for convenience, add inputs to same dict
     p_d["N_ocean_moles"] = N_ocean_moles
