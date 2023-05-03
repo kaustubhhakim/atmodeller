@@ -9,9 +9,9 @@ import time
 from typing import Any
 
 from atmodeller.core import (
+    GlobalParameters,
     equilibrium_atmosphere,
     equilibrium_atmosphere_monte_carlo,
-    get_global_parameters,
 )
 
 logger: logging.Logger = logging.getLogger("atmodeller")
@@ -70,13 +70,13 @@ def main():
         equilibrium_atmosphere_monte_carlo(kwargs["nitrogen"])
     else:
         logger.info("Running a single solve")
-        global_d = get_global_parameters()
+        global_parameters: GlobalParameters = GlobalParameters()
         n_ocean_moles: float = kwargs["oceans"]
         ch_ratio: float = kwargs["ch_ratio"]
         fo2_shift: float = kwargs["fo2_shift"]
         nitrogen_ppmw: float = kwargs["nitrogen"]
         p_d: dict[str, float] = equilibrium_atmosphere(
-            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw, global_d
+            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw, global_parameters
         )
         logger.info(pprint.pformat(p_d))
 
