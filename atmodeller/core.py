@@ -2,7 +2,7 @@
 
 import csv
 import logging
-from typing import Any
+from typing import Any, Iterable
 
 import numpy as np
 from scipy.optimize import fsolve
@@ -11,7 +11,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 def get_global_parameters() -> dict:
-    """Global parameters in SI units."""
+    """Global parameters in SI units.
+
+    Returns:
+        A dictionary of the parameters.
+    """
     global_d: dict[str, Any] = {}
     global_d["mantle_mass"] = 4.208261222595111e24  # kg
     global_d["mantle_melt_fraction"] = 1.0  # Fraction of mantle that is molten.
@@ -26,7 +30,11 @@ def get_global_parameters() -> dict:
 
 
 def get_molar_masses() -> dict:
-    """Molar masses of atoms and molecules in kg/mol."""
+    """Molar masses of atoms and molecules in kg/mol.
+
+    Returns:
+        A dictionary of the molar masses.
+    """
     mass_d: dict[str, Any] = {}
     # Atoms are all given in g/mol, then converted before return at end of this function.
     mass_d["H"] = 1.0079
@@ -49,7 +57,7 @@ class _OxygenFugacity:
     """log10 oxygen fugacity as a function of temperature.
 
     Args:
-        model: Iron-wustite (IW) model to use. Either 'oneill' or 'fischer'.
+        model: Iron-wustite (IW) model to use. Either 'oneill' or 'fischer'. Defaults to 'oneill'.
     """
 
     def __init__(self, model: str = "oneill"):
@@ -81,7 +89,7 @@ class ModifiedKeq:
 
     Args:
         keq_model: Equilibrium model to use. Options are give below __call__.
-        fo2_model: fo2 model to use. See class _OxygenFugacity for options.
+        fo2_model: fo2 model to use. See class _OxygenFugacity for options. Defaults to 'oneill'.
     """
 
     def __init__(self, keq_model: str, fo2_model: str = "oneill"):
@@ -94,7 +102,7 @@ class ModifiedKeq:
         geq: float = 10 ** (keq - fo2_stoich * fo2)
         return geq
 
-    # For the methods below, the second argument returns the stoichiometry of O2.
+    # For the methods below, the second entry in the tuple is the stoichiometry of O2.
 
     def schaefer_ch4(self, temperature: float) -> tuple[float, float]:
         """Schaefer log10Keq for CO2 + 2H2 = CH4 + fo2."""
@@ -140,7 +148,7 @@ class SolubilityH2O(Solubility):
     """H2O solubility models.
 
     Args:
-        composition: Melt composition.
+        composition: Melt composition. Options are give below __init__. Defaults to 'peridotite'.
     """
 
     def __init__(self, composition: str = "peridotite"):
@@ -171,7 +179,7 @@ class SolubilityCO2(Solubility):
     """CO2 solubility models.
 
     Args:
-        composition: Melt composition.
+        composition: Melt composition. Options are give below __init__. Defaults to 'basalt_dixon'.
     """
 
     def __init__(self, composition: str = "basalt_dixon"):
@@ -190,7 +198,7 @@ class SolubilityN2(Solubility):
     """N2 solubility models.
 
     Args:
-        composition: Melt composition.
+        composition: Melt composition. Options are give below __init__. Defaults to 'libourel'.
     """
 
     def __init__(self, composition: str = "libourel"):
@@ -203,25 +211,25 @@ class SolubilityN2(Solubility):
 
 
 def get_partial_pressures(
-    solution_pressures_in: tuple[float, float, float],
+    solution_pressures_in: Iterable[float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> dict[str, float]:
     """Get a dictionary of all the species partial pressures.
 
     Args:
-        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        solution_pressures_in: The solution pressures (e.g. H2O, CO2, and N2).
         fo2_shift: Shift relative to the fO2 buffer.
         global_d: The global dictionary of parameters.
 
     Returns:
         A dictionary of all the species and their partial pressures.
     """
-    # We only need to know p_h2O, p_co2, and p_n2, since reduced species can be directly determined
-    # from equilibrium chemistry.
+    # We only need to know p_h2O, p_co2, and p_n2, since other (reduced) species can be directly
+    # determined from equilibrium chemistry.
     p_h2o, p_co2, p_n2 = solution_pressures_in
 
-    # Populate the oxidised species immediately from the input.
+    # Populate the solution species immediately from the input.
     p_d: dict[str, float] = {}
     p_d["H2O"] = p_h2o
     p_d["CO2"] = p_co2
@@ -248,14 +256,14 @@ def get_partial_pressures(
 
 
 def get_total_pressure(
-    solution_pressures_in: tuple[float, float, float],
+    solution_pressures_in: Iterable[float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> float:
     """Sum partial pressures of each species to get the total pressure.
 
     Args:
-        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        solution_pressures_in: The solution pressures (e.g. H2O, CO2, and N2).
         fo2_shift: Shift relative to the fO2 buffer.
         global_d: The global dictionary of parameters.
 
@@ -271,14 +279,14 @@ def get_total_pressure(
 
 
 def atmosphere_mass(
-    solution_pressures_in: tuple[float, float, float],
+    solution_pressures_in: Iterable[float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> dict[str, float]:
     """Atmospheric mass of species and totals for H, C, and N.
 
     Args:
-        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        solution_pressures_in: The solution pressures (e.g. H2O, CO2, and N2).
         fo2_shift: Shift relative to the fO2 buffer.
         global_d: The global dictionary of parameters.
 
@@ -321,14 +329,14 @@ def atmosphere_mass(
 
 
 def atmosphere_mean_molar_mass(
-    solution_pressures_in: tuple[float, float, float],
+    solution_pressures_in: Iterable[float],
     fo2_shift: float,
     global_d: dict[str, Any],
 ) -> float:
     """Mean molar mass of the atmosphere.
 
     Args:
-        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        solution_pressures_in: The solution pressures (e.g. H2O, CO2, and N2).
         fo2_shift: Shift relative to the fO2 buffer.
         global_d: The global dictionary of parameters.
 
@@ -354,14 +362,14 @@ def atmosphere_mean_molar_mass(
 
 
 def dissolved_mass(
-    solution_pressures_in: tuple[float, float, float],
+    solution_pressures_in: Iterable[float],
     fo2_shift: float,
     global_d: dict[str, Any],
-):
+) -> dict[str, float]:
     """Volatile masses in the molten mantle.
 
     Args:
-        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2)
+        solution_pressures_in: The solution pressures (e.g. H2O, CO2, and N2).
         fo2_shift: Shift relative to the fO2 buffer.
         global_d: The global dictionary of parameters.
 
@@ -402,7 +410,7 @@ def dissolved_mass(
 
 
 def mass_residual_objective_func(
-    solution_pressures_in: tuple[float, float, float],
+    solution_pressures_in: Iterable[float],
     fo2_shift: float,
     global_d: dict[str, Any],
     mass_target_d: dict[str, float],
@@ -410,7 +418,7 @@ def mass_residual_objective_func(
     """Computes the residual of the volatile mass balance for H, C, and N.
 
     Args:
-        solution_pressures_in: A tuple of the solution pressures (e.g. H2O, CO2, and N2).
+        solution_pressures_in: The solution pressures (e.g. H2O, CO2, and N2).
         fo2_shift: Shift relative to the fO2 buffer.
         global_d: The global dictionary of parameters.
         mass_target_d: A dictionary of the target masses for H, C, and N.
@@ -418,8 +426,12 @@ def mass_residual_objective_func(
     Returns:
         A list of the mass residuals for H, C, and N.
     """
-    mass_atm_d = atmosphere_mass(solution_pressures_in, fo2_shift, global_d)
-    mass_int_d = dissolved_mass(solution_pressures_in, fo2_shift, global_d)
+    mass_atm_d: dict[str, float] = atmosphere_mass(
+        solution_pressures_in, fo2_shift, global_d
+    )
+    mass_int_d: dict[str, float] = dissolved_mass(
+        solution_pressures_in, fo2_shift, global_d
+    )
 
     # Compute residuals.
     all_residuals: list[float] = []
@@ -436,108 +448,138 @@ def mass_residual_objective_func(
     return all_residuals
 
 
-def get_initial_pressures(target_d):
-    """Get initial guesses of partial pressures"""
+def get_initial_pressures(target_d) -> tuple[float, float, float]:
+    """Initial guesses of partial pressures for H2O, CO2, and N2.
 
-    # all bar
-    pH2O = 1 * np.random.random_sample()  # H2O less soluble than CO2
-    pCO2 = 10 * np.random.random_sample()  # just a guess
-    pN2 = 10 * np.random.random_sample()
+    Args:
+        target_d: The target masses for H, C, and N.
 
+    Returns:
+        A tuple of the pressures in bar for H2O, CO2, and N2.
+    """
+
+    # All units are bar.
+    # These are just a guess, mostly from the simple observation that H2O is less soluble than CO2.
+    # If the target mass is zero, then the pressure must also be exactly zero.
     if target_d["H"] == 0:
-        pH2O = 0
+        ph2o: float = 0
+    else:
+        ph2o = np.random.random_sample()
     if target_d["C"] == 0:
-        pCO2 = 0
+        pco2: float = 0
+    else:
+        pco2 = 10 * np.random.random_sample()
     if target_d["N"] == 0:
-        pN2 = 0
+        pn2: float = 0
+    else:
+        pn2 = 10 * np.random.random_sample()
 
-    return pH2O, pCO2, pN2
+    return ph2o, pco2, pn2
 
 
-def equilibrium_atmosphere(N_ocean_moles, CH_ratio, fo2_shift, global_d, Nitrogen):
-    """Calculate equilibrium chemistry of the atmosphere"""
+def equilibrium_atmosphere(
+    n_ocean_moles: float,
+    ch_ratio: float,
+    fo2_shift: float,
+    nitrogen_ppmw: float,
+    global_d: dict[str, Any],
+) -> dict[str, float]:
+    """Calculates the equilibrium chemistry of the atmosphere with mass balance.
 
-    mass_d = global_d["molar_mass_d"]
+    Args:
+        n_ocean_moles: Number of Earth oceans.
+        ch_ratio: C/H ratio by mass.
+        fo2_shift: fO2 shift relative to the chosen buffer.
+        nitrogen_ppmw: Target mass of nitrogen.
+        global_d: The global dictionary of parameters.
 
-    H_kg = N_ocean_moles * global_d["ocean_moles"] * mass_d["H2"]
-    C_kg = CH_ratio * H_kg
-    N_kg = Nitrogen * 1.0e-6 * global_d["mantle_mass"]
-    target_d = {"H": H_kg, "C": C_kg, "N": N_kg}
+    Returns:
+        A dictionary of the solution and input parameters.
+    """
 
-    count = 0
-    ier = 0
-    # could in principle result in an infinite loop, if randomising
-    # the ic never finds the physical solution (but in practice,
-    # this doesn't seem to happen)
+    mass_d: dict[str, float] = global_d["molar_mass_d"]
+
+    h_kg: float = n_ocean_moles * global_d["ocean_moles"] * mass_d["H2"]
+    c_kg: float = ch_ratio * h_kg
+    n_kg: float = nitrogen_ppmw * 1.0e-6 * global_d["mantle_mass"]
+    target_d: dict[str, float] = {"H": h_kg, "C": c_kg, "N": n_kg}
+
+    count: int = 0
+    ier: int = 0
+    initial_pressures: tuple[float, float, float] = (
+        0,
+        0,
+        0,
+    )  # Initialise only for the linter/typing.
+    sol: np.ndarray = np.array([0, 0, 0])  # Initialise only for the linter/typing.
+    # Below could in theory result in an infinite loop, if randomising the initial condition never
+    # finds the physical solution, but in practice this doesn't seem to happen.
     while ier != 1:
-        x0 = get_initial_pressures(target_d)
-        sol, info, ier, msg = fsolve(
+        initial_pressures = get_initial_pressures(target_d)
+        sol, _, ier, _ = fsolve(
             mass_residual_objective_func,
-            x0,
+            initial_pressures,
             args=(fo2_shift, global_d, target_d),
             full_output=True,
         )
         count += 1
-        # sometimes, a solution exists with negative pressures, which
-        # is clearly non-physical.  Here, assert we must have positive
-        # pressures.
+        # Sometimes, a solution exists with negative pressures, which is clearly non-physical.
+        # Assert we must have positive pressures and restart the solve if needs be.
         if any(sol < 0):
-            # if any negative pressures, report ier!=1
+            # If any negative pressures, report ier!=1 which means a solution has not been found.
             ier = 0
 
-    logger.info(f"Randomised initial conditions= {count}")
+    logger.info("Randomised initial conditions = %d", count)
 
-    p_d = get_partial_pressures(sol, fo2_shift, global_d)
-    # get residuals for output
-    res_l = mass_residual_objective_func(sol, fo2_shift, global_d, target_d)
+    p_d: dict[str, float] = get_partial_pressures(sol, fo2_shift, global_d)
+    all_residuals: list[float] = mass_residual_objective_func(
+        sol, fo2_shift, global_d, target_d
+    )
 
-    # for convenience, add inputs to same dict
-    p_d["N_ocean_moles"] = N_ocean_moles
-    p_d["CH_ratio"] = CH_ratio
+    p_d["N_ocean_moles"] = n_ocean_moles
+    p_d["CH_ratio"] = ch_ratio
     p_d["fo2_shift"] = fo2_shift
-    # for debugging/checking, add success initial condition
-    # that resulted in a converged solution with positive pressures
-    p_d["pH2O_0"] = x0[0]
-    p_d["pCO2_0"] = x0[1]
-    p_d["pN2_0"] = x0[2]
-    # also for debugging/checking, report residuals
-    p_d["res_H"] = res_l[0]
-    p_d["res_C"] = res_l[1]
-    p_d["res_N"] = res_l[2]
+    p_d["pH2O_initial"] = initial_pressures[0]
+    p_d["pCO2_initial"] = initial_pressures[1]
+    p_d["pN2_initial"] = initial_pressures[2]
+    p_d["H_mass_residual"] = all_residuals[0]
+    p_d["C_mass_residual"] = all_residuals[1]
+    p_d["N_mass_residual"] = all_residuals[2]
 
     return p_d
 
 
-def equilibrium_atmosphere_MC(Nitrogen):
-    """Monte Carlo"""
+def equilibrium_atmosphere_monte_carlo(nitrogen_ppmw: float):
+    """Monte Carlo simulation to produce realisations of atmospheric conditions.
 
-    NN = 10
-    N_ocean_moles_l = np.random.uniform(1, 10, NN)
-    CH_ratio_l = np.random.uniform(0.1, 1, NN)
-    fo2_shift_l = np.random.uniform(-4, 4, NN)
-    global_d = get_global_parameters()
+    Args:
+        nitrogen_ppmw: Nitrogen mass concentration in ppmw.
+    """
+    number: int = (
+        100  # Number of realisations. Could be made an input parameter instead.
+    )
+    # Other parameters are normally distributed between bounds as given below.
+    n_ocean_moles_a: np.ndarray = np.random.uniform(1, 10, number)
+    ch_ratio_a: np.ndarray = np.random.uniform(0.1, 1, number)
+    fo2_shift_a: np.ndarray = np.random.uniform(-4, 4, number)
+    global_d: dict[str, Any] = get_global_parameters()
 
-    out_l = []
+    out: list[dict[str, float]] = []
 
-    for ii in range(NN):
-        logging.info(f"Simulation number= {ii}")
-        N_ocean_moles = N_ocean_moles_l[ii]
-        CH_ratio = CH_ratio_l[ii]
-        fo2_shift = fo2_shift_l[ii]
-        p_d = equilibrium_atmosphere(
-            N_ocean_moles, CH_ratio, fo2_shift, global_d, Nitrogen
+    for realisation in range(number):
+        logger.info("Realisation number = %d", realisation)
+        n_ocean_moles: float = n_ocean_moles_a[realisation]
+        ch_ratio: float = ch_ratio_a[realisation]
+        fo2_shift: float = fo2_shift_a[realisation]
+        p_d: dict[str, float] = equilibrium_atmosphere(
+            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw, global_d
         )
-        out_l.append(p_d)
+        out.append(p_d)
 
-    filename = "equilibrium_atmosphere_MC.csv"
-    write_output(filename, out_l)
-
-
-def write_output(filename, out_l):
-    """Write output (list of dictionaries) to a CSV"""
-
-    fieldnames = list(out_l[0].keys())
-    with open(filename, "w", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    filename: str = "equilibrium_atmosphere_monte_carlo.csv"
+    logger.info("Writing output to: %s", filename)
+    fieldnames: list[str] = list(out[0].keys())
+    with open(filename, "w", newline="", encoding="utf-8") as csvfile:
+        writer: csv.DictWriter = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(out_l)
+        writer.writerows(out)

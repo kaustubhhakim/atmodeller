@@ -6,10 +6,11 @@ import argparse
 import logging
 import pprint
 import time
+from typing import Any
 
 from atmodeller.core import (
     equilibrium_atmosphere,
-    equilibrium_atmosphere_MC,
+    equilibrium_atmosphere_monte_carlo,
     get_global_parameters,
 )
 
@@ -22,7 +23,9 @@ def main():
     logger.info("Started")
     start: float = time.time()
 
-    parser = argparse.ArgumentParser(description="Atmosphere modeller")
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        description="Atmosphere modeller"
+    )
     parser.add_argument(
         "-f",
         "--fo2_shift",
@@ -60,26 +63,26 @@ def main():
     )  # 2.8 is the mantle value of N in ppmw
 
     args = parser.parse_args()
-    kwargs = vars(args)
+    kwargs: dict[str, Any] = vars(args)
 
     if args.monte_carlo:
         logger.info("Running a Monte Carlo simulation")
-        equilibrium_atmosphere_MC(kwargs["nitrogen"])
+        equilibrium_atmosphere_monte_carlo(kwargs["nitrogen"])
     else:
         logger.info("Running a single solve")
         global_d = get_global_parameters()
-        n_ocean_moles = kwargs["oceans"]
-        ch_ratio = kwargs["ch_ratio"]
-        fo2_shift = kwargs["fo2_shift"]
-        nitrogen = kwargs["nitrogen"]
-        p_d = equilibrium_atmosphere(
-            n_ocean_moles, ch_ratio, fo2_shift, global_d, nitrogen
+        n_ocean_moles: float = kwargs["oceans"]
+        ch_ratio: float = kwargs["ch_ratio"]
+        fo2_shift: float = kwargs["fo2_shift"]
+        nitrogen_ppmw: float = kwargs["nitrogen"]
+        p_d: dict[str, float] = equilibrium_atmosphere(
+            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw, global_d
         )
         logger.info(pprint.pformat(p_d))
 
     end: float = time.time()
-    runtime: int = int(round(end - start, 0))
-    logger.info("Execution time (seconds) = %d", runtime)
+    runtime: float = round(end - start, 1)
+    logger.info("Execution time (seconds) = %0.1f", runtime)
     logger.info("Finished")
 
 
