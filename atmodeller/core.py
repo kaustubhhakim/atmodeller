@@ -8,7 +8,8 @@ from typing import Iterable
 import numpy as np
 from scipy.optimize import fsolve
 
-from atmodeller.solubility import BasaltDixonCO2, LibourelN2, ModifiedKeq, PeridotiteH2O
+from atmodeller.reaction import ModifiedKeq
+from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger(__name__)
 
