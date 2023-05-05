@@ -8,7 +8,7 @@ from typing import Iterable
 import numpy as np
 from scipy.optimize import fsolve
 
-from atmodeller.reaction import ModifiedKeq
+from atmodeller.reaction import JanafC, JanafH, SchaeferCH4
 from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -78,18 +78,21 @@ def get_partial_pressures(
     p_d["N2"] = p_n2
 
     # p_h2 from equilibrium chemistry.
-    keq: ModifiedKeq = ModifiedKeq("janaf_h")
-    gamma: float = keq(global_parameters.temperature, fo2_shift)
+    gamma: float = JanafH().modified_equilibrium_constant(
+        temperature=global_parameters.temperature, fo2_shift=fo2_shift
+    )
     p_d["H2"] = gamma * p_h2o
 
     # p_co from equilibrium chemistry.
-    keq = ModifiedKeq("janaf_c")
-    gamma = keq(global_parameters.temperature, fo2_shift)
+    gamma = JanafC().modified_equilibrium_constant(
+        temperature=global_parameters.temperature, fo2_shift=fo2_shift
+    )
     p_d["CO"] = gamma * p_co2
 
     if global_parameters.is_CH4 is True:
-        keq = ModifiedKeq("schaefer_ch4")
-        gamma = keq(global_parameters.temperature, fo2_shift)
+        gamma = SchaeferCH4().modified_equilibrium_constant(
+            temperature=global_parameters.temperature, fo2_shift=fo2_shift
+        )
         p_d["CH4"] = gamma * p_co2 * p_d["H2"] ** 2.0
     else:
         p_d["CH4"] = 0

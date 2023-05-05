@@ -2,28 +2,38 @@
 
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 import numpy as np
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+
 class _OxygenFugacity(ABC):
     """Oxygen fugacity base class."""
 
     @abstractmethod
-    def _buffer(self, temperature: float):
-        """Log10(fO2) of the buffer in terms of temperature."""
+    def _buffer(self, *, temperature: float) -> float:
+        """Log10(fO2) of the buffer in terms of temperature.
+
+        Args:
+            temperature: Temperature.
+
+        Returns:
+            oxygen_fugacity of the buffer.
+        """
         raise NotImplementedError
 
-    def __call__(self, temperature: float, fo2_shift: float = 0) -> float:
+    def __call__(self, *, temperature: float, fo2_shift: float = 0) -> float:
         """log10 of fo2."""
-        return self._buffer(temperature) + fo2_shift
+        return self._buffer(temperature=temperature) + fo2_shift
 
 
 class IronWustiteBufferOneill(_OxygenFugacity):
     """Iron-wustite buffer from O'Neill and Eggin (2002)."""
 
-    def _buffer(self, temperature: float) -> float:
+    def _buffer(self, *, temperature: float) -> float:
+        """See base class."""
         buffer: float = (
             2
             * (
@@ -39,47 +49,130 @@ class IronWustiteBufferOneill(_OxygenFugacity):
 class IronWustiteBufferFischer(_OxygenFugacity):
     """Iron-wustite buffer from Fischer et al. (2011)."""
 
-    def _buffer(self, temperature: float) -> float:
+    def _buffer(self, *, temperature: float) -> float:
+        """See base class."""
         buffer: float = 6.94059 - 28.1808 * 1e3 / temperature
         return buffer
 
 
-class ModifiedKeq:
-    """Modified equilibrium constant, i.e. includes fo2.
+@dataclass
+class _EquilibriumConstant:
+    """Parameters that define the equilibrium constant for a reaction."""
 
-    Args:
-        keq_model: Equilibrium model to use. Options are give below __call__.
-        fo2_model: fo2 model to use. See class _OxygenFugacity for options. Defaults to 'oneill'.
-    """
+    temperature_factor: float
+    constant: float
+    fo2_stoichiometry: float
+    oxygen_fugacity: _OxygenFugacity = field(default_factory=IronWustiteBufferOneill)
 
-    def __init__(self, keq_model: str):
-        self.fo2: _OxygenFugacity = IronWustiteBufferOneill()
-        self._callmodel = getattr(self, keq_model)
+    def fo2_log10(self, *, temperature: float, fo2_shift: float = 0) -> float:
+        """Oxygen fugacity.
 
-    def __call__(self, temperature: float, fo2_shift: float = 0) -> float:
-        fo2: float = self.fo2(temperature, fo2_shift)
-        keq, fo2_stoich = self._callmodel(temperature)
-        geq: float = 10 ** (keq - fo2_stoich * fo2)
-        return geq
+        Args:
+            temperature: Temperature.
+            fo2_shift: log10 shift relative to the buffer.
 
-    # For the methods below, the second entry in the tuple is the stoichiometry of O2.
+        Returns:
+            Log10 of the oxygen fugacity.
+        """
+        return self.oxygen_fugacity(temperature=temperature, fo2_shift=fo2_shift)
 
-    def schaefer_ch4(self, temperature: float) -> tuple[float, float]:
-        """Schaefer log10Keq for CO2 + 2H2 = CH4 + fo2."""
-        return (-16276 / temperature - 5.4738, 1)
+    def equilibrium_constant_log10(self, *, temperature: float) -> float:
+        """Log10 of the equilibrium constant.
 
-    def schaefer_c(self, temperature: float) -> tuple[float, float]:
-        """Schaefer log10Keq for CO2 = CO + 0.5 fo2."""
-        return (-14787 / temperature + 4.5472, 0.5)
+        Args:
+            temperature: Temperature.
 
-    def schaefer_h(self, temperature: float) -> tuple[float, float]:
-        """Schaefer log10Keq for H2O = H2 + 0.5 fo2."""
-        return (-12794 / temperature + 2.7768, 0.5)
+        Returns:
+            Log10 of the equilibrium constant of the reaction.
+        """
+        return self.temperature_factor / temperature + self.constant
 
-    def janaf_c(self, temperature: float) -> tuple[float, float]:
-        """JANAF log10Keq, 1500 < K < 3000 for CO2 = CO + 0.5 fo2."""
-        return (-14467.511400133637 / temperature + 4.348135473316284, 0.5)
+    def equilibrium_constant(self, *, temperature: float) -> float:
+        """Equilibrium constant.
 
-    def janaf_h(self, temperature: float) -> tuple[float, float]:
-        """JANAF log10Keq, 1500 < K < 3000 for H2O = H2 + 0.5 fo2."""
-        return (-13152.477779978302 / temperature + 3.038586383273608, 0.5)
+        Args:
+            temperature: Temperature.
+
+        Returns:
+            The equilibrium constant of the reaction.
+        """
+        return 10 ** self.equilibrium_constant_log10(temperature=temperature)
+
+    def modified_equilibrium_constant_log10(
+        self, *, temperature: float, fo2_shift: float
+    ) -> float:
+        """Log10 of the 'modified' equilibrium constant, which includes oxygen fugacity.
+
+        Args:
+            temperature: Temperature.
+            fo2_shift: log10 shift relative to the buffer.
+
+        Returns:
+            Log10 of the 'modified' equilibrium constant.
+        """
+        return self.equilibrium_constant_log10(
+            temperature=temperature
+        ) - self.fo2_stoichiometry * self.fo2_log10(
+            temperature=temperature, fo2_shift=fo2_shift
+        )
+
+    def modified_equilibrium_constant(
+        self, *, temperature: float, fo2_shift: float
+    ) -> float:
+        """The 'modified' equilibrium constant, which includes oxygen fugacity.
+
+        Args:
+            temperature: Temperature.
+            fo2_shift: log10 shift relative to the buffer.
+
+        Returns:
+            The 'modified' equilibrium constant.
+        """
+        return 10.0 ** self.modified_equilibrium_constant_log10(
+            temperature=temperature, fo2_shift=fo2_shift
+        )
+
+
+@dataclass
+class JanafC(_EquilibriumConstant):
+    """JANAF log10Keq, 1500 < K < 3000 for CO2 = CO + 0.5 fo2."""
+
+    temperature_factor: float = -14467.511400133637
+    constant: float = 4.348135473316284
+    fo2_stoichiometry: float = 0.5
+
+
+@dataclass
+class SchaeferC(_EquilibriumConstant):
+    """Schaefer log10Keq for CO2 = CO + 0.5 fo2."""
+
+    temperature_factor: float = -14787
+    constant: float = 4.5472
+    fo2_stoichiometry: float = 0.5
+
+
+@dataclass
+class SchaeferCH4(_EquilibriumConstant):
+    """Schaefer log10Keq for CO2 + 2H2 = CH4 + fo2."""
+
+    temperature_factor: float = -16276
+    constant: float = -5.4738
+    fo2_stoichiometry: float = 1
+
+
+@dataclass
+class JanafH(_EquilibriumConstant):
+    """JANAF log10Keq, 1500 < K < 3000 for H2O = H2 + 0.5 fo2."""
+
+    temperature_factor: float = -13152.477779978302
+    constant: float = 3.038586383273608
+    fo2_stoichiometry: float = 0.5
+
+
+@dataclass
+class SchaeferH(_EquilibriumConstant):
+    """Schaefer log10Keq for H2O = H2 + 0.5 fo2."""
+
+    temperature_factor: float = -12794
+    constant: float = 2.7768
+    fo2_stoichiometry: float = 0.5

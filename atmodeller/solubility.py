@@ -7,6 +7,7 @@ import numpy as np
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+
 class _Solubility(ABC):
     """Solubility base class."""
 

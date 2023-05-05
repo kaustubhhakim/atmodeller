@@ -8,8 +8,11 @@ import pprint
 import time
 from typing import Any
 
-from atmodeller.core import (GlobalParameters, equilibrium_atmosphere,
-                             equilibrium_atmosphere_monte_carlo)
+from atmodeller.core import (
+    GlobalParameters,
+    equilibrium_atmosphere,
+    equilibrium_atmosphere_monte_carlo,
+)
 
 logger: logging.Logger = logging.getLogger("atmodeller")
 
