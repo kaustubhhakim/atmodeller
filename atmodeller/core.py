@@ -13,7 +13,8 @@ from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-GRAVITATIONAL_CONSTANT: float = 6.6743e-11
+# Module constants.
+GRAVITATIONAL_CONSTANT: float = 6.6743e-11  # SI units.
 OCEAN_MOLES: float = (
     7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
 )
@@ -21,7 +22,15 @@ OCEAN_MOLES: float = (
 
 @dataclass(kw_only=True)
 class InteriorAtmosphereSystem:
-    """An interior-atmosphere system."""
+    """An interior-atmosphere system.
+
+    Args:
+        mantle_mass: Mass of the planetary mantle. Defaults to Earth.
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to all molten.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
+            Earth.
+        planetary_radius: Radius of the planet. Defaults to Earth.
+    """
 
     mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
     mantle_melt_fraction: float = 1.0  # Completely molten
@@ -30,32 +39,32 @@ class InteriorAtmosphereSystem:
     _fo2_shift: float = field(init=False)  # fo2 shift in log0 units.
     _surface_temperature: float = field(init=False)  # K
     # pylint: disable=invalid-name
-    _is_CH4: bool = False
+    _is_CH4: bool = field(init=False)
     molar_masses: MolarMasses = field(init=False, default_factory=MolarMasses)
     planetary_mass: float = field(init=False)
     surface_gravity: float = field(init=False)
     _solution: Iterable[float] = field(init=False)  # To store the solution.
-    _pressures: dict[str, float] = field(
-        init=False, default_factory=dict
-    )  # Species pressures in the atmosphere.
-    atmospheric_mass: dict[str, float] = field(
-        init=False, default_factory=dict
-    )  # Species mass in the atmosphere
-    interior_mass: dict[str, float] = field(
-        init=False, default_factory=dict
-    )  # Species mass in the interior
+    # Species pressures in the atmosphere.
+    _pressures: dict[str, float] = field(init=False, default_factory=dict)
+    # Species mass in the atmosphere and the interior.
+    atmospheric_mass: dict[str, float] = field(init=False, default_factory=dict)
+    interior_mass: dict[str, float] = field(init=False, default_factory=dict)
 
     def __post_init__(self):
         self.planetary_mass = self.mantle_mass / (1 - self.core_mass_fraction)
         self.surface_gravity = (
             GRAVITATIONAL_CONSTANT * self.planetary_mass / self.planetary_radius**2
         )
+        logger.info("Mantle mass (kg) = %s", self.mantle_mass)
+        logger.info("Mantle melt fraction = %s", self.mantle_melt_fraction)
+        logger.info("Core mass fraction = %s", self.core_mass_fraction)
+        logger.info("Planetary radius (m) = %s", self.planetary_radius)
         logger.info("Planetary mass (kg) = %s", self.planetary_mass)
         logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
 
     @property
     def pressures(self) -> dict[str, float]:
-        """Returns pressures."""
+        """Returns pressures of all species."""
         return self._pressures
 
     def _set_partial_pressures(self):
@@ -101,7 +110,7 @@ class InteriorAtmosphereSystem:
         return mu_atm
 
     def _set_species_mass_in_atmosphere(self):
-        """Atmospheric mass of species and totals for H, C, and N."""
+        """Sets atmospheric mass of species and totals for H, C, and N."""
         masses: MolarMasses = self.molar_masses
         mass_atm: dict[str, float] = self.atmospheric_mass
         for species, partial_pressure in self.pressures.items():
@@ -131,7 +140,7 @@ class InteriorAtmosphereSystem:
         mass_atm["N"] = mass_atm["N2"]
 
     def _set_species_mass_in_interior(self):
-        """Interior mass of species and totals for H, C, and N."""
+        """Sets interior mass of species and totals for H, C, and N."""
 
         masses: MolarMasses = self.molar_masses
         mass_int: dict[str, float] = self.interior_mass
@@ -197,7 +206,6 @@ class InteriorAtmosphereSystem:
         Returns:
             A tuple of the pressures in bar for H2O, CO2, and N2.
         """
-
         # All units are bar.
         # These are just a guess, mostly from the simple observation that H2O is less soluble than
         # CO2. If the target mass is zero, then the pressure must also be exactly zero.
@@ -224,23 +232,27 @@ class InteriorAtmosphereSystem:
         nitrogen_ppmw: float,
         fo2_shift: float = 0,
         temperature: float = 2000,
+        is_CH4: bool = False,
     ) -> dict[str, float]:
         """Calculates the equilibrium chemistry of the atmosphere with mass balance.
 
         Args:
             n_ocean_moles: Number of Earth oceans.
             ch_ratio: C/H ratio by mass.
-            fo2_shift: fO2 shift relative to the chosen buffer.
-            nitrogen_ppmw: Target mass of nitrogen.
+            fo2_shift: fO2 shift relative to the iron-wustite buffer.
+            nitrogen_ppmw: Mantle concentration of nitrogen.
             fo2_shift: Log10 fo2 shift.
-            temperature: surface temperature.
+            temperature: Surface temperature.
+            is_CH4: Include CH4.
 
         Returns:
             A dictionary of the solution and input parameters.
         """
-
-        self._surface_temperature = temperature
+        # Store on object so other methods can access these parameters.
         self._fo2_shift = fo2_shift
+        self._surface_temperature = temperature
+        self._is_CH4 = is_CH4
+
         masses: MolarMasses = self.molar_masses
         h_kg: float = n_ocean_moles * OCEAN_MOLES * masses.H2
         c_kg: float = ch_ratio * h_kg
@@ -273,7 +285,7 @@ class InteriorAtmosphereSystem:
                 # found.
                 ier = 0
 
-        logger.info("Randomised initial conditions = %d", count)
+        logger.info("Number of randomised initial conditions = %d", count)
 
         all_residuals: list[float] = self._mass_residual_objective_func(sol, target_d)
         output: dict[str, float] = self.pressures.copy()
