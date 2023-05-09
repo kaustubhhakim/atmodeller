@@ -8,31 +8,10 @@ from typing import Iterable
 import numpy as np
 from scipy.optimize import fsolve
 
-from atmodeller.reaction import JanafC, JanafH, SchaeferCH4
+from atmodeller.reaction import IvtanthermoCH4, JanafC, JanafH, MolarMasses
 from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass
-class MolarMasses:
-    """Molar masses of atoms and molecules in kg/mol."""
-
-    # Define atoms here.
-    # pylint: disable=invalid-name
-    H: float = 1.0079e-3
-    O: float = 15.9994e-3
-    C: float = 12.0107e-3
-    N: float = 14.0067e-3
-
-    def __post_init__(self):
-        # Define molecules here.
-        self.H2: float = self.H * 2
-        self.H2O: float = self.H * 2 + self.O
-        self.CO: float = self.C + self.O
-        self.CO2: float = self.C + 2 * self.O
-        self.CH4: float = self.C + self.H * 4
-        self.N2: float = self.N * 2
 
 
 @dataclass(frozen=True)
@@ -90,7 +69,7 @@ def get_partial_pressures(
     p_d["CO"] = gamma * p_co2
 
     if global_parameters.is_CH4 is True:
-        gamma = SchaeferCH4().modified_equilibrium_constant(
+        gamma = IvtanthermoCH4().modified_equilibrium_constant(
             temperature=global_parameters.temperature, fo2_shift=fo2_shift
         )
         p_d["CH4"] = gamma * p_co2 * p_d["H2"] ** 2.0
