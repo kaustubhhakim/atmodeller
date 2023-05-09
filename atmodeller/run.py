@@ -8,11 +8,7 @@ import pprint
 import time
 from typing import Any
 
-from atmodeller.core import (
-    GlobalParameters,
-    equilibrium_atmosphere,
-    equilibrium_atmosphere_monte_carlo,
-)
+from atmodeller.core import InteriorAtmosphereSystem
 
 logger: logging.Logger = logging.getLogger("atmodeller")
 
@@ -61,29 +57,37 @@ def main():
         type=float,
         default=2.8,
     )  # 2.8 is the mantle value of N in ppmw
-
+    parser.add_argument("-t", "--test", help="Test", action="store_true")
     args = parser.parse_args()
     kwargs: dict[str, Any] = vars(args)
 
     if args.monte_carlo:
         logger.info("Running a Monte Carlo simulation")
-        equilibrium_atmosphere_monte_carlo(kwargs["nitrogen"])
+        # equilibrium_atmosphere_monte_carlo(kwargs["nitrogen"])
     else:
         logger.info("Running a single solve")
-        global_parameters: GlobalParameters = GlobalParameters()
         n_ocean_moles: float = kwargs["oceans"]
         ch_ratio: float = kwargs["ch_ratio"]
         fo2_shift: float = kwargs["fo2_shift"]
         nitrogen_ppmw: float = kwargs["nitrogen"]
-        p_d: dict[str, float] = equilibrium_atmosphere(
-            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw, global_parameters
-        )
+        interior_atmos = InteriorAtmosphereSystem()
+        p_d: dict[str, float] = interior_atmos.equilibrium_atmosphere(
+            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw)
         logger.info(pprint.pformat(p_d))
+
+    if args.test:
+        test()
 
     end: float = time.time()
     runtime: float = round(end - start, 1)
     logger.info("Execution time (seconds) = %0.1f", runtime)
     logger.info("Finished")
+
+
+def test():
+    logger.info("Running test")
+    interior_atmos = InteriorAtmosphereSystem()
+    print(interior_atmos.surface_gravity)
 
 
 if __name__ == "__main__":
