@@ -71,23 +71,18 @@ def main():
         fo2_shift: float = kwargs["fo2_shift"]
         nitrogen_ppmw: float = kwargs["nitrogen"]
         interior_atmos = InteriorAtmosphereSystem()
-        p_d: dict[str, float] = interior_atmos.equilibrium_atmosphere(
-            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw)
+        p_d: dict[str, float] = interior_atmos.solve(
+            n_ocean_moles=n_ocean_moles,
+            ch_ratio=ch_ratio,
+            fo2_shift=fo2_shift,
+            nitrogen_ppmw=nitrogen_ppmw,
+        )
         logger.info(pprint.pformat(p_d))
-
-    if args.test:
-        test()
 
     end: float = time.time()
     runtime: float = round(end - start, 1)
     logger.info("Execution time (seconds) = %0.1f", runtime)
     logger.info("Finished")
-
-
-def test():
-    logger.info("Running test")
-    interior_atmos = InteriorAtmosphereSystem()
-    print(interior_atmos.surface_gravity)
 
 
 if __name__ == "__main__":
