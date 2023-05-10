@@ -13,6 +13,7 @@ class _Solubility(ABC):
 
     def power_law(self, pressure: float, constant: float, exponent: float) -> float:
         """Power law. Pressure in bar and returns ppmw."""
+        # print(pressure, constant, exponent)
         return constant * pressure**exponent
 
     @abstractmethod

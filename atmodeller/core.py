@@ -1,6 +1,5 @@
 """Core classes and functions."""
 
-import csv
 import logging
 from dataclasses import dataclass, field
 from typing import Iterable
@@ -51,16 +50,17 @@ class InteriorAtmosphereSystem:
     interior_mass: dict[str, float] = field(init=False, default_factory=dict)
 
     def __post_init__(self):
+        logger.info("Creating a new interior-atmosphere system")
         self.planetary_mass = self.mantle_mass / (1 - self.core_mass_fraction)
         self.surface_gravity = (
             GRAVITATIONAL_CONSTANT * self.planetary_mass / self.planetary_radius**2
         )
-        logger.info("Mantle mass (kg) = %s", self.mantle_mass)
-        logger.info("Mantle melt fraction = %s", self.mantle_melt_fraction)
-        logger.info("Core mass fraction = %s", self.core_mass_fraction)
-        logger.info("Planetary radius (m) = %s", self.planetary_radius)
-        logger.info("Planetary mass (kg) = %s", self.planetary_mass)
-        logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
+        logger.info("    Mantle mass (kg) = %s", self.mantle_mass)
+        logger.info("    Mantle melt fraction = %s", self.mantle_melt_fraction)
+        logger.info("    Core mass fraction = %s", self.core_mass_fraction)
+        logger.info("    Planetary radius (m) = %s", self.planetary_radius)
+        logger.info("    Planetary mass (kg) = %s", self.planetary_mass)
+        logger.info("    Surface gravity (m/s^2) = %s", self.surface_gravity)
 
     @property
     def pressures(self) -> dict[str, float]:
@@ -252,6 +252,13 @@ class InteriorAtmosphereSystem:
         self._fo2_shift = fo2_shift
         self._surface_temperature = temperature
         self._is_CH4 = is_CH4
+        logger.info("Solving the mass balance with the following parameters:")
+        logger.info("    n_ocean_moles = %s", n_ocean_moles)
+        logger.info("    C/H mass ratio = %s", ch_ratio)
+        logger.info("    nitrogen ppmw = %s", nitrogen_ppmw)
+        logger.info("    log10(fo2) shift = %s", self._fo2_shift)
+        logger.info("    surface temperature = %s", self._surface_temperature)
+        logger.info("    is_CH4 = %s", self._is_CH4)
 
         masses: MolarMasses = self.molar_masses
         h_kg: float = n_ocean_moles * OCEAN_MOLES * masses.H2
@@ -285,10 +292,14 @@ class InteriorAtmosphereSystem:
                 # found.
                 ier = 0
 
-        logger.info("Number of randomised initial conditions = %d", count)
+        logger.debug("Number of randomised initial conditions = %d", count)
 
         all_residuals: list[float] = self._mass_residual_objective_func(sol, target_d)
         output: dict[str, float] = self.pressures.copy()
+
+        logger.info("Solution is:")
+        for species, pressure in self.pressures.items():
+            logger.info("    %s pressure (bar) = %f", species, pressure)
 
         output["n_ocean_moles"] = n_ocean_moles
         output["ch_ratio"] = ch_ratio
@@ -301,40 +312,3 @@ class InteriorAtmosphereSystem:
         output["N_mass_residual"] = all_residuals[2]
 
         return output
-
-
-# TODO: Convert to use new class
-def equilibrium_atmosphere_monte_carlo(nitrogen_ppmw: float):
-    """Monte Carlo simulation to produce realisations of atmospheric conditions.
-
-    Args:
-        nitrogen_ppmw: Nitrogen mass concentration in ppmw.
-    """
-    number: int = (
-        100  # Number of realisations. Could be made an input parameter instead.
-    )
-    # Other parameters are normally distributed between bounds as given below.
-    n_ocean_moles_a: np.ndarray = np.random.uniform(1, 10, number)
-    ch_ratio_a: np.ndarray = np.random.uniform(0.1, 1, number)
-    fo2_shift_a: np.ndarray = np.random.uniform(-4, 4, number)
-    global_parameters: GlobalParameters = GlobalParameters()
-
-    out: list[dict[str, float]] = []
-
-    for realisation in range(number):
-        logger.info("Realisation number = %d", realisation)
-        n_ocean_moles: float = n_ocean_moles_a[realisation]
-        ch_ratio: float = ch_ratio_a[realisation]
-        fo2_shift: float = fo2_shift_a[realisation]
-        p_d: dict[str, float] = equilibrium_atmosphere(
-            n_ocean_moles, ch_ratio, fo2_shift, nitrogen_ppmw, global_parameters
-        )
-        out.append(p_d)
-
-    filename: str = "equilibrium_atmosphere_monte_carlo.csv"
-    logger.info("Writing output to: %s", filename)
-    fieldnames: list[str] = list(out[0].keys())
-    with open(filename, "w", newline="", encoding="utf-8") as csvfile:
-        writer: csv.DictWriter = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(out)
