@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from atmodeller.core import InteriorAtmosphereSystem
+from atmodeller.reaction import ReactionNetwork
 
 logger: logging.Logger = logging.getLogger("atmodeller")
 
@@ -79,6 +80,19 @@ def main():
         monte_carlo_simulation(kwargs, interior_atmos_system)
     else:
         single_solve(kwargs, interior_atmos_system)
+
+    if args.test:
+        molecules = [
+            "C",
+            "H2",
+            "O2",
+            "CH4",
+            "H2O",
+            "CO",
+            "CO2",
+        ]  # original order.
+        # molecules = list(reversed(molecules))
+        reaction_network: ReactionNetwork = ReactionNetwork(molecules)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)

@@ -1,8 +1,10 @@
 """Oxygen fugacity buffers and gas phase reactions."""
 
 import logging
+import pprint
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -240,443 +242,429 @@ class MolarMasses:
         self.SO2: float = self.S + 2 * self.O
 
 
-# TODO: Below is code written by Laura Murzakhmetov that needs incorporating into the code.
-
-
 class ReactionNetwork:
-    """This class does the Gaussian Elimination to determine the minimal set of reactions to
-    describe the atmosphere. The reaction dictionary outputted is unique, since the class will
-    always produce reactions where the last elements in the list, are the once beeing produced
-    (having a stochometric coef of 1). This allows easy calculation, for a variety of input
-    pressure combinations, without making the calculations different or more complicated.
+    """Determines the necessary (formation) reactions to solve a chemical network.
+
+    Args:
+        molecules: A list of molecules.
     """
 
-    # The possible elements the class regognizes (others must be included)
+    # Elements that can be included in the molecules argument. Ordered by atomic mass.
+    possible_elements: tuple[str, ...] = ("H", "He", "C", "N", "O", "Si", "P", "S")
 
-    possible_elements = ["C", "H", "O", "N", "He", "S", "P", "Si"]
+    def __init__(self, molecules: list[str]):
+        self.molecules: list[str] = sorted(molecules, key=self.molecule_complexity)
+        logger.info("Molecules = %s", self.molecules)
+        self.number_molecules: int = len(molecules)
+        self.elements, self.number_elements = self.find_elements()
+        self.number_reactions: int = self.number_molecules - self.number_elements
+        self.molecule_matrix: np.ndarray = self.find_matrix()
+        self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
+        logger.info("reactions = \n%s", self.reactions)
+        # TODO: Laura included this but I don't think it is actually used anywhere.
+        # self.deltaN = self.get_deltaN()
 
-    def __init__(self, molecules):
-        self.molecules = molecules
-        self.num_mol = len(molecules)
+    def molecule_complexity(self, molecule: str) -> tuple[Any, ...]:
+        """A key sorter to sort the molecules in order of complexity, starting with atoms.
 
-        self.elements, self.num_e = self.find_elements()
+        The order ensures that the Gaussian elimination returns formation reactions, i.e. the
+        preference of the reaction stoichiometry is given to the first atoms/molecules in
+        `self.molecules`.
 
-        self.mol_matrix = self.find_matrix()
+        Args:
+            molecule: The name of the molecule.
 
-        self.gauss_elimated_matrix, self.stoch_reaction_matrix = self.gaussElim()
-
-        self.num_r, self.stoch_matrix, self.reaction_d = self.GetEqReactions()
-
-        self.deltaN = self.get_deltaN()
-
-    def find_elements(self):
+        Returns:
+            A tuple with the sorting criteria.
         """
-        Finds the All Elements metioned in the Molecule vector
-        returns:
-            elements = array of all elements
-            num_e = number of elements
-        """
-        possible_elements = ["C", "H", "O", "N", "He", "S", "P", "Si"]
+        # Rule 1: Single capital letters first.
+        if len(molecule) == 1 and molecule.isupper():
+            return (0, molecule)
 
-        molecules = self.molecules
-        num_mol = len(molecules)
-        mol_str = "".join(molecules)  # .join('')
-        elements = []
-        num_e = 0
-        # FIND ALL ELEMENTS
-        for element in possible_elements:
-            found = mol_str.find(element)
-            if found + 1:
+        # Rule 2: Single capital letters followed by a lowercase letter.
+        if len(molecule) == 2 and molecule[0].isupper() and molecule[1].islower():
+            return (1, molecule)
+
+        # Rule 3: Single capital letters followed by a number.
+        if len(molecule) == 2 and molecule[0].isupper() and molecule[1].isdigit():
+            return (2, molecule)
+
+        # Rule 4: Single capital letters followed by a lowercase letter and a number.
+        if (
+            len(molecule) == 3
+            and molecule[0].isupper()
+            and molecule[1].islower()
+            and molecule[2].isdigit()
+        ):
+            return (3, molecule)
+
+        # Rule 5: All other cases ordered by total length of the string and alphabetical.
+        return (4, len(molecule), molecule)
+
+    def find_elements(self) -> tuple[list, int]:
+        """Determines the elements that compose the molecules.
+
+        Returns:
+            A tuple: (list of elements, number of elements).
+        """
+        molecules_string: str = "".join(self.molecules)
+        elements: list[str] = []
+        for element in self.possible_elements:
+            found: int = molecules_string.find(element)
+            if found != -1:  # Substring exists inside the string.
                 elements.append(element)
-                num_e += 1
-        return elements, num_e
 
-    def find_matrix(self):
-        """
-        Creates a Matrix containing the number of each element in a molecules by counting.
-        """
-        # Create Matrix by Counting the Number of each element
-        matrix = np.zeros((self.num_mol, self.num_e))
+        return elements, len(elements)
 
-        for i in range(self.num_mol):
-            mol = self.molecules[i]
-            for k in range(self.num_e):
-                element = self.elements[k]
-                found = mol.find(element)
-                if (
-                    found + 1
-                ):  # if that element is in the molecule, determine the number the molecule occurs in the molecule
-                    num = 1
+    def find_matrix(self) -> np.ndarray:
+        """Creates a matrix where molecules (rows) are split into their element counts (columns).
+
+        Returns:
+            For example, self.molecules = ['CO2', 'H2O'] would return:
+                [[0, 1, 2],
+                 [2, 0, 1]]
+            where the columns represent the elements H, C, and O, respectively.
+        """
+        matrix: np.ndarray = np.zeros((self.number_molecules, self.number_elements))
+        for molecule_index, molecule in enumerate(self.molecules):
+            for element_index, element in enumerate(self.elements):
+                found: int = molecule.find(element)
+                if found != -1:  # Substring exists inside the string.
                     try:
-                        next_char = mol[found + len(element)]
-                    except:
-                        matrix[i, k] = num
+                        # Character after the element.
+                        character: str = molecule[found + len(element)]
+                    except IndexError:
+                        # No character (end of the molecule) so the count must be unity.
+                        count: int = 1
                     else:
-                        if next_char in "0123456789":
-                            num = int(next_char)
-                    matrix[i, k] = num
+                        try:
+                            count = int(character)
+                        except ValueError:
+                            # Character is not an int so it must be the next element instead.
+                            count = 1
+                    matrix[molecule_index, element_index] = count
         return matrix
 
-    def permutate(self, a, i, k):
-        a[[i, k]] = a[[k, i]]
-        return a
+    def partial_gaussian_elimination(self) -> np.ndarray:
+        """Performs a partial gaussian elimination to determine the required reactions.
 
-    def order_diag(self, a, c, num_e):
-        # Sort Coloumns: least entries, more important!
-        a_sq = a[:num_e]
-        a_sq_T = np.transpose(a_sq)
-        num_entries = [[i, np.count_nonzero(a_sq_T[i])] for i in range(num_e)]
-        num_entries = sorted(num_entries, key=lambda num_entry: num_entry[1])
-        order = [num_entries[i][0] for i in range(num_e)]
-        num_entries2 = [[i, np.count_nonzero(a_sq[i])] for i in range(num_e)]
-        num_entries2 = sorted(num_entries2, key=lambda num_entry: num_entry[1])
-        order2 = [num_entries[i][0] for i in range(num_e)]
-        # Now Permutate the entries, starting with the most important
-        for i in order:
-            # print(i, a[i,:])
-            for k in order2:
-                if a[i, k] != 0:
-                    if k == i:
-                        break
+        A copy of `self.molecule_matrix` is first (partially) reduced to row echelon form by
+        forward elimination, and then subsequently (partially) reduced to reduced row echelon form
+        by backward substitution. Applying the same operations to the identity matrix (as part of
+        the augmented matrix) reveals r reactions, where r = number of molecules - number of
+        elements. These reactions are given in the last r rows of the reduced matrix. Due to the
+        ordering of `self.molecules`, these reactions are given in terms of atoms or simple
+        molecules to stay connected to formation reactions.
 
-                    elif k != i:  # if k=i,then row already in perfect position
-                        a = self.permutate(a, i, k)
-                        c = self.permutate(c, i, k)
-                        break
-        return a, c
-
-    def gaussElim(self):
+        Returns:
+            A matrix of the reactions.
         """
-        Input:
-            a: Matrix of Elemental Composition
-            b: Array of Molecules
+        matrix1: np.ndarray = self.molecule_matrix
+        matrix2: np.ndarray = np.eye(self.number_molecules)
+        augmented_matrix: np.ndarray = np.hstack((matrix1, matrix2))
+        logger.debug("augmented_matrix = \n%s", augmented_matrix)
 
-        Output:
-            a: Gaussian Eliminated Matrix
-            b: Array of Molecules
-            c: Stochiometric Reaction Matrix
-        """
+        # Forward elimination.
+        for i in range(self.number_elements):  # Note only over the number of elements.
+            # Check if the pivot element is zero.
+            if augmented_matrix[i, i] == 0:
+                # Swap rows to get a non-zero pivot element.
+                nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
+                augmented_matrix[[i, nonzero_row]] = augmented_matrix[[nonzero_row, i]]
 
-        a = self.mol_matrix
+            # Perform row operations to eliminate values below the pivot.
+            for j in range(i + 1, self.number_molecules):
+                ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
+                augmented_matrix[j] -= ratio * augmented_matrix[i]
+        logger.debug(
+            "augmented_matrix after forward elimination = \n%s", augmented_matrix
+        )
 
-        num_mol = len(a)  # number of molecules
-        num_e = len(a[0])  # number of elements
-        c = np.eye(num_mol)  # stochiometric matrix
+        # Backward substitution.
+        for i in range(self.number_elements - 1, -1, -1):
+            # Normalize the pivot row.
+            augmented_matrix[i] /= augmented_matrix[i, i]
+            # Eliminate values above the pivot.
+            for j in range(i - 1, -1, -1):
+                if augmented_matrix[j, i] != 0:
+                    ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
+                    augmented_matrix[j] -= ratio * augmented_matrix[i]
+        logger.debug(
+            "augmented_matrix after backward substitution = \n%s", augmented_matrix
+        )
 
-        # Elimination phase
-        # No Longer Standard Molecules first!
-        # Order the First num_e rows, so that we do not have non-zero entries
+        reduced_matrix1 = augmented_matrix[:, : matrix1.shape[1]]
+        reaction_matrix = augmented_matrix[self.number_elements :, matrix1.shape[1] :]
+        logger.debug("reduced_matrix1 = \n%s", reduced_matrix1)
+        logger.debug("reaction_matrix = \n%s", reaction_matrix)
 
-        a, c = self.order_diag(a, c, num_e)
-        for k in range(0, num_e):  # rows: 0,1,2
-            assert a[k, k] != 0.0
-            for i in range(k + 1, num_mol):
-                if a[i, k] != 0.0:
-                    # if not null define λ
-                    lam = a[i, k] / a[k, k]
-                    # we calculate the new row of the matrix
-                    a[i, :] = a[i, :] - lam * a[k, :]
+        return reaction_matrix
 
-                    # we update c
-                    c[i, :] = c[i, :] - lam * c[k, :]
-
-        # Backward elimination -> Getting the diagonal matrix.
-        for k in range(num_e - 1, -1, -1):  # 2,1,0
-            assert a[k, k] != 0.0
-            for i in range(k - 1, -1, -1):
-                #
-                # if not null define λ
-                if a[i, k] != 0:
-                    lam = a[i, k] / a[k, k]
-
-                    a[i, :] = a[i, :] - lam * a[k, :]
-
-                    # Update vector c.
-                    c[i, :] = c[i, :] - lam * c[k, :]
-
-        # Divide to have everywhere one.
-        for k in range(0, num_e):
-            lam = a[k, k]
-            a[k, :] /= lam
-            # Update vector c.
-            c[k, :] /= lam
-
-        return a, c
-
-    def GetEqReactions(self):
-        num_r = self.num_mol - self.num_e
-        mol = self.molecules
-        c = self.stoch_reaction_matrix
-        stoch_matrix = c[self.num_e :]
-
-        # Create empty reaction dictionary
-        reaction_d = {}
-
-        # Go threw each reaction line
-
-        for r in range(num_r):
-            r_str = ""
-            e_str, p_str = "", ""
-            # Go threw each molecule
-            for m in range(self.num_mol):
-                coeff = stoch_matrix[r, m]
-                if coeff < 0:  # molecule is educt
-                    e_str += str(abs(coeff)) + " " + str(mol[m]) + " + "
-
+    @property
+    def reactions(self) -> str:
+        """The reactions as a (dictionary) string."""
+        reactions: dict[int, str] = {}
+        for reaction_index in range(self.number_reactions):
+            reactants: str = ""
+            products: str = ""
+            for molecule_index, molecule in enumerate(self.molecules):
+                coeff: float = self.reaction_matrix[reaction_index, molecule_index]
+                if coeff < 0:
+                    reactants += f"{abs(coeff)} {molecule} + "
                 elif coeff > 0:
-                    p_str += str(coeff) + " " + str(mol[m]) + " + "
+                    products += f"{coeff} {molecule} + "
+            reactants = reactants[: int(len(reactants) - 3)] # Removes the extra + at the end.
+            products = products[: int(len(products) - 3)] # Removes the extra + at the end.
+            reaction: str = f"{reactants} = {products}"
+            reactions[reaction_index] = reaction
+        reactions_str: str = pprint.pformat(reactions)
 
-            e_str = e_str[: int(len(e_str) - 3)]
-            p_str = p_str[: int(len(p_str) - 3)]
-            r_str = e_str + " = " + p_str
+        return reactions_str
 
-            reaction_d[r] = r_str
-
-        return num_r, stoch_matrix, reaction_d
-
-    def get_deltaN(self):
-        """
-        To calculate the K_p from K_c, we have to know how the pressure changes.
-        """
-        delta_n = np.zeros(self.num_r)
-        for m, mol in enumerate(self.molecules):
-            if mol != "C":  # BECAUSE C NOT IN GASPHASE
-                for r in range(self.num_r):
-                    delta_n[r] += self.stoch_matrix[r, m]
-        return delta_n
-
-
-data_file = "dictionary.dat"
+    # TODO: Laura included this but I don't think it is actually used anywhere.
+    # def get_deltaN(self):
+    #     """
+    #     To calculate the K_p from K_c, we have to know how the pressure changes.
+    #     """
+    #     delta_n = np.zeros(self.number_reactions)
+    #     for m, mol in enumerate(self.molecules):
+    #         if mol != "C":  # BECAUSE C NOT IN GASPHASE
+    #             for r in range(self.number_reactions):
+    #                 delta_n[r] += self.reaction_matrix[r, m]
+    #     return delta_n
 
 
-class GibbsEnergys(ReactionNetwork, parameters):
-
-    """
-    This class calculates the reaction equilibrium constants K_eq,r of the reactions from the class Reaction Network.
-    The class calculates the K_eq,r from the formation equilibrium constants K_eq,f from the molecules in the reaction.
-    K_eq,f is calculated from a datebase in the formate K_eq,f = a + b/T, where a and b are from the dictionar.
-    And
-
-    """
-
-    def __init__(self, molecules):
-        # Since we need the stochometric matrix, we inhertit the reaction network
-        ReactionNetwork.__init__(self, molecules)
-        parameters.__init__(self)
-
-        self.T = self.global_d["temperature"]  # Kelvin
-
-        # Calculate the Equilibrium Constant for the formation reactions
-        self.df_FormationEnergies = self.get_FormationEnergies_csv(data_file)
-        self.log_K_f = self.get_logK_f()
-
-        self.log_K_r = self.get_K_r()
-        self.K_r = 10**self.log_K_r
-
-    def get_FormationEnergies_csv(self, data_file):
-        """
-        Function finds the csv part describing the Formation Energies of the Molecules
-        and subscribes them with and saves them in a dataframe, which will be called G_form
-        """
-        with open(data_file) as f:
-            lines = f.readlines()
-            num_lines = len(lines)
-            for k, line in zip(range(num_lines + 1), lines):
-                if line == "FORMATION ENERGIES\n":
-                    start_line = k
-                    break
-
-            for k, line in zip(
-                range(start_line, num_lines + 1), lines[start_line : num_lines + 1]
-            ):
-                if line == "END\n":
-                    end_line = k
-                    break
-
-        range_to_skip = list(range(0, start_line + 1)) + list(
-            range(end_line, num_lines + 1)
-        )
-        df_form = pd.read_csv(
-            data_file, skiprows=range_to_skip, error_bad_lines=False, comment="#"
-        )
-        return df_form
-
-    def get_logK_f(self):
-        """
-        Here the dictionary would be accesed to get the formation energies for all molecules in J/mol.
-        """
-        T = self.T
-        df = self.df_FormationEnergies
-        log_K_f = {}  # empty dictionary
-        for mol in self.molecules:
-            y = df.loc[df["SPECIES"] == mol]
-            a, b = float(y["a"]), float(y["b"])
-            log_K_f[mol] = a + b / T
-
-        return log_K_f
-
-    def get_K_r(self):
-        """
-        Here the Gibb's Energies of the independent equilibrium reaction (descibed in stoch_matrix)
-        in the gas phase of the Earth's atmosphere are calculated from the formation energies (G_f)
-        of the molecules present in the atmosphere (molecules).
-        The values are saved and can be accesed in the vector G_r[num_reaction].
-        """
-
-        log_K_r = np.zeros(self.num_r)
-
-        for r in range(self.num_r):
-            for i, mol in enumerate(self.molecules):
-                key = self.molecules[i]
-                log_K_r[r] += self.stoch_matrix[r, i] * self.log_K_f[key]
-        return log_K_r
+# data_file = "dictionary.dat"
 
 
-class OxygenFugacity(parameters):
-    """log10 oxygen fugacity as a function of temperature"""
+# class GibbsEnergys(ReactionNetwork, parameters):
 
-    def __init__(self, model="oneill"):
-        parameters.__init__(self)
-        self.T = self.global_d["temperature"]  # Kelvin
+#     """
+#     This class calculates the reaction equilibrium constants K_eq,r of the reactions from the class Reaction Network.
+#     The class calculates the K_eq,r from the formation equilibrium constants K_eq,f from the molecules in the reaction.
+#     K_eq,f is calculated from a datebase in the formate K_eq,f = a + b/T, where a and b are from the dictionar.
+#     And
 
-        self.callmodel = getattr(self, model)
+#     """
 
-    def __call__(self, fO2_shift=0):
-        """Return log10 fO2"""
-        """ self.callmodel(T) = self.oneill(T)"""
+#     def __init__(self, molecules):
+#         # Since we need the stochometric matrix, we inhertit the reaction network
+#         ReactionNetwork.__init__(self, molecules)
+#         parameters.__init__(self)
 
-        return self.callmodel(self.T) + fO2_shift
+#         self.T = self.global_d["temperature"]  # Kelvin
 
-    def fischer(self, T):
-        """Fischer et al. (2011) IW"""
-        # in cases where callmodel = fischer or
-        # model = 'fischer'
-        return 6.94059 - 28.1808 * 1e3 / self.T
+#         # Calculate the Equilibrium Constant for the formation reactions
+#         self.df_FormationEnergies = self.get_FormationEnergies_csv(data_file)
+#         self.log_K_f = self.get_logK_f()
 
-    def oneill(self, T):
-        """O'Neill and Eggin (2002) IW"""
-        return (
-            2
-            * (-244118 + 115.559 * self.T - 8.474 * self.T * np.log(self.T))
-            / (np.log(10) * 8.31441 * self.T)
-        )
+#         self.log_K_r = self.get_K_r()
+#         self.K_r = 10**self.log_K_r
+
+#     def get_FormationEnergies_csv(self, data_file):
+#         """
+#         Function finds the csv part describing the Formation Energies of the Molecules
+#         and subscribes them with and saves them in a dataframe, which will be called G_form
+#         """
+#         with open(data_file) as f:
+#             lines = f.readlines()
+#             num_lines = len(lines)
+#             for k, line in zip(range(num_lines + 1), lines):
+#                 if line == "FORMATION ENERGIES\n":
+#                     start_line = k
+#                     break
+
+#             for k, line in zip(
+#                 range(start_line, num_lines + 1), lines[start_line : num_lines + 1]
+#             ):
+#                 if line == "END\n":
+#                     end_line = k
+#                     break
+
+#         range_to_skip = list(range(0, start_line + 1)) + list(
+#             range(end_line, num_lines + 1)
+#         )
+#         df_form = pd.read_csv(
+#             data_file, skiprows=range_to_skip, error_bad_lines=False, comment="#"
+#         )
+#         return df_form
+
+#     def get_logK_f(self):
+#         """
+#         Here the dictionary would be accesed to get the formation energies for all molecules in J/mol.
+#         """
+#         T = self.T
+#         df = self.df_FormationEnergies
+#         log_K_f = {}  # empty dictionary
+#         for mol in self.molecules:
+#             y = df.loc[df["SPECIES"] == mol]
+#             a, b = float(y["a"]), float(y["b"])
+#             log_K_f[mol] = a + b / T
+
+#         return log_K_f
+
+#     def get_K_r(self):
+#         """
+#         Here the Gibb's Energies of the independent equilibrium reaction (descibed in stoch_matrix)
+#         in the gas phase of the Earth's atmosphere are calculated from the formation energies (G_f)
+#         of the molecules present in the atmosphere (molecules).
+#         The values are saved and can be accesed in the vector G_r[num_reaction].
+#         """
+
+#         log_K_r = np.zeros(self.num_r)
+
+#         for r in range(self.num_r):
+#             for i, mol in enumerate(self.molecules):
+#                 key = self.molecules[i]
+#                 log_K_r[r] += self.stoch_matrix[r, i] * self.log_K_f[key]
+#         return log_K_r
 
 
-class Atmosphere(GibbsEnergys):
-    def __init__(self, molecules, fO2_model="oneill"):
-        self.molecules = molecules
-        # self.mass_d = self.global_d['molar_mass_d']
+# class OxygenFugacity(parameters):
+#     """log10 oxygen fugacity as a function of temperature"""
 
-        # gettin oxgen fugactiy from model defined above (here also oneill)
-        self.fO2 = OxygenFugacity(fO2_model)
+#     def __init__(self, model="oneill"):
+#         parameters.__init__(self)
+#         self.T = self.global_d["temperature"]  # Kelvin
 
-        # Default Values
-        self.p_0 = 1
+#         self.callmodel = getattr(self, model)
 
-    def Set_p0(self, p_0):
-        self.p_0 = p_0
-        return 0
+#     def __call__(self, fO2_shift=0):
+#         """Return log10 fO2"""
+#         """ self.callmodel(T) = self.oneill(T)"""
 
-    def Fix_fd(self, f_d):
-        self.Fixed_fd = f_d
-        self.fixed_mols = list(f_d.keys())
+#         return self.callmodel(self.T) + fO2_shift
 
-        self.unfixed_mols = []
-        for mol in self.molecules:
-            if mol not in self.fixed_mols:
-                self.unfixed_mols.append(mol)
+#     def fischer(self, T):
+#         """Fischer et al. (2011) IW"""
+#         # in cases where callmodel = fischer or
+#         # model = 'fischer'
+#         return 6.94059 - 28.1808 * 1e3 / self.T
 
-        # print('Molecules with fixed fugacities:' ,self.fixed_mols)
-        # print('Molecules with variable fugacities:' ,self.unfixed_mols)
+#     def oneill(self, T):
+#         """O'Neill and Eggin (2002) IW"""
+#         return (
+#             2
+#             * (-244118 + 115.559 * self.T - 8.474 * self.T * np.log(self.T))
+#             / (np.log(10) * 8.31441 * self.T)
+#         )
 
-        for mol, f in f_d.items():
-            if mol == "C":
-                try:
-                    assert f == 1
-                except:
-                    # print('Fugacity of',mol,'must be fixed to: 1.')
-                    f_d["C"] = 1
-                    continue
-            # print('Fugacity of',mol,'is fixed to: ',f)
-        return 0
 
-    def Calculate(self, f_d, **fO2_shift):
-        if fO2_shift:
-            fO2_shift = fO2_shift["fO2_shift"]
-            log_fO2 = self.fO2(fO2_shift=fO2_shift)
-            f_O2 = 10**log_fO2
-            f_d["O2"] = f_O2
+# class Atmosphere(GibbsEnergys):
+#     def __init__(self, molecules, fO2_model="oneill"):
+#         self.molecules = molecules
+#         # self.mass_d = self.global_d['molar_mass_d']
 
-        self.Fix_fd(f_d)
-        self.molecules = self.fixed_mols + self.unfixed_mols
-        GibbsEnergys.__init__(self, self.molecules)
+#         # gettin oxgen fugactiy from model defined above (here also oneill)
+#         self.fO2 = OxygenFugacity(fO2_model)
 
-        for r in range(self.num_r):
-            "Every reaction that produces a non standart molecule"
-            mol = self.molecules[self.num_e + r]  # molecules that is produced
+#         # Default Values
+#         self.p_0 = 1
 
-            p_ = self.K_r[r]
+#     def Set_p0(self, p_0):
+#         self.p_0 = p_0
+#         return 0
 
-            f_d_calc = {}
-            f_d_calc = self.Fixed_fd
-            # p_d['C']=0
-            reaction_array = self.stoch_matrix[r]
+#     def Fix_fd(self, f_d):
+#         self.Fixed_fd = f_d
+#         self.fixed_mols = list(f_d.keys())
 
-            for i, f in enumerate(self.Fixed_fd.values()):
-                exponent = reaction_array[i] * (-1)
-                p_ *= f**exponent
+#         self.unfixed_mols = []
+#         for mol in self.molecules:
+#             if mol not in self.fixed_mols:
+#                 self.unfixed_mols.append(mol)
 
-            f_d_calc[mol] = p_
+#         # print('Molecules with fixed fugacities:' ,self.fixed_mols)
+#         # print('Molecules with variable fugacities:' ,self.unfixed_mols)
 
-        p_d_calc = {}
-        p_d_calc = f_d
-        p_d_calc["C"] = 0
-        p_tot_calc = sum(p_d_calc.values())
-        # Add a Function that creates a csv file?
+#         for mol, f in f_d.items():
+#             if mol == "C":
+#                 try:
+#                     assert f == 1
+#                 except:
+#                     # print('Fugacity of',mol,'must be fixed to: 1.')
+#                     f_d["C"] = 1
+#                     continue
+#             # print('Fugacity of',mol,'is fixed to: ',f)
+#         return 0
 
-        return p_tot_calc, p_d_calc
+#     def Calculate(self, f_d, **fO2_shift):
+#         if fO2_shift:
+#             fO2_shift = fO2_shift["fO2_shift"]
+#             log_fO2 = self.fO2(fO2_shift=fO2_shift)
+#             f_O2 = 10**log_fO2
+#             f_d["O2"] = f_O2
 
-    def Calc_Mu_Atm(self, p_d):
-        """Mean molar mass of the atmosphere"""
-        ptot = sum(p_d.values())
-        mu_atm = 0
-        for key, value in p_d.items():
-            mu_atm += self.mass_d[key] * value
-        mu_atm /= ptot
+#         self.Fix_fd(f_d)
+#         self.molecules = self.fixed_mols + self.unfixed_mols
+#         GibbsEnergys.__init__(self, self.molecules)
 
-        return mu_atm
+#         for r in range(self.num_r):
+#             "Every reaction that produces a non standart molecule"
+#             mol = self.molecules[self.number_elements + r]  # molecules that is produced
 
-    def MassMol_Atm(self, mu_atm, key, p):
-        factor = 4.0 * np.pi * self.global_d["planetary_radius"] ** 2
-        factor *= 1 / (mu_atm * self.global_d["little_g"])
-        mu_i = self.mass_d[key]
-        # print(type(mu_i))
-        m_i = mu_i * p * factor
-        return m_i
+#             p_ = self.K_r[r]
 
-    def Calc_Mass(self, p_d):
-        mu_atm = self.Calc_Mu_Atm(p_d)
-        mass_atm_d = {}
-        for key, p in p_d.items():
-            mass_atm_d[key] = self.MassMol_Atm(mu_atm, key, p)
+#             f_d_calc = {}
+#             f_d_calc = self.Fixed_fd
+#             # p_d['C']=0
+#             reaction_array = self.stoch_matrix[r]
 
-        mol_matrix = self.find_matrix()
+#             for i, f in enumerate(self.Fixed_fd.values()):
+#                 exponent = reaction_array[i] * (-1)
+#                 p_ *= f**exponent
 
-        for element, line in zip(self.elements, np.transpose(mol_matrix)):
-            mass_atm_d[element] = 0
-            for mol, num in zip(self.molecules, line):
-                if num != 0:
-                    mass_atm_d[element] += mass_atm_d[mol] / self.mass_d[mol] * num
-            mass_atm_d[element] *= self.mass_d[element]
-        self.m_d = mass_atm_d
-        return mass_atm_d
+#             f_d_calc[mol] = p_
 
-    def Calc_md(self, p_scaled_fixed):
-        sol = self.Get_Scaled_Solution(p_scaled_fixed)
-        self.scaled_pd = sol
-        p_d_ = self.Calc_Real_p_d(sol)
-        self.p_d = p_d_
+#         p_d_calc = {}
+#         p_d_calc = f_d
+#         p_d_calc["C"] = 0
+#         p_tot_calc = sum(p_d_calc.values())
+#         # Add a Function that creates a csv file?
 
-        m_atm_d = self.Calc_Mass(p_d_)
+#         return p_tot_calc, p_d_calc
 
-        return m_atm_d
+#     def Calc_Mu_Atm(self, p_d):
+#         """Mean molar mass of the atmosphere"""
+#         ptot = sum(p_d.values())
+#         mu_atm = 0
+#         for key, value in p_d.items():
+#             mu_atm += self.mass_d[key] * value
+#         mu_atm /= ptot
+
+#         return mu_atm
+
+#     def MassMol_Atm(self, mu_atm, key, p):
+#         factor = 4.0 * np.pi * self.global_d["planetary_radius"] ** 2
+#         factor *= 1 / (mu_atm * self.global_d["little_g"])
+#         mu_i = self.mass_d[key]
+#         # print(type(mu_i))
+#         m_i = mu_i * p * factor
+#         return m_i
+
+#     def Calc_Mass(self, p_d):
+#         mu_atm = self.Calc_Mu_Atm(p_d)
+#         mass_atm_d = {}
+#         for key, p in p_d.items():
+#             mass_atm_d[key] = self.MassMol_Atm(mu_atm, key, p)
+
+#         mol_matrix = self.find_matrix()
+
+#         for element, line in zip(self.elements, np.transpose(mol_matrix)):
+#             mass_atm_d[element] = 0
+#             for mol, num in zip(self.molecules, line):
+#                 if num != 0:
+#                     mass_atm_d[element] += mass_atm_d[mol] / self.mass_d[mol] * num
+#             mass_atm_d[element] *= self.mass_d[element]
+#         self.m_d = mass_atm_d
+#         return mass_atm_d
+
+#     def Calc_md(self, p_scaled_fixed):
+#         sol = self.Get_Scaled_Solution(p_scaled_fixed)
+#         self.scaled_pd = sol
+#         p_d_ = self.Calc_Real_p_d(sol)
+#         self.p_d = p_d_
+
+#         m_atm_d = self.Calc_Mass(p_d_)
+
+#         return m_atm_d
