@@ -96,7 +96,9 @@ def main():
         # molecules = list(reversed(molecules))  # Flip order to show it doesn;t matter.
         reaction_network: ReactionNetwork = ReactionNetwork(molecules)
         reaction_network.solve(
-            temperature=2000, input_pressures={"CO2": 9.449818, "H2O": 0.378342}
+            temperature=2000,
+            input_pressures={"CO2": 9.449818, "H2O": 0.378342},
+            fo2_shift=0,
         )
 
     end: float = time.time()

@@ -512,6 +512,7 @@ class ReactionNetwork:
         *,
         temperature: float,
         input_pressures: dict[str, float],
+        oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
     ) -> dict[str, float]:
         """Solves the reaction network to determine the partial pressures of all species.
@@ -520,34 +521,53 @@ class ReactionNetwork:
 
         Args:
             temperature: Temperature.
-            fo2_shift: log10 fo2 shift from the buffer.
             input_pressures: A dictionary of {molecule: partial pressure} that should be imposed.
-                In the current format, fO2 is automatically included as a constraint and does not
-                need to be specified in the input.
+            oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
+                only used if the number of `input_pressures` is one less than the required number.
+            fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if the
+                number of `input_parameters` is one less than the required number.
 
         Returns:
             A dictionary of all the molecules and their partial pressures.
         """
-        logger.info("Solving the system")
-        number: int = len(
-            list(key for key in input_pressures.keys() if key in self.molecules)
-        )
-
-        constraints: int = (
-            self.number_elements - 1
-        )  # Minus one because fO2 is currently always imposed.
-        if number != constraints:
-            raise ValueError(
-                f"You must specify pressures for {constraints} species. Select from {self.molecules}"
-            )
+        logger.info("Solving the reaction network")
+        input_pressures = {
+            molecule: pressure
+            for molecule, pressure in input_pressures.items()
+            if molecule in self.molecules
+        }
+        input_number: int = len(list(input_pressures.keys()))
+        constraints: int = self.number_elements
 
         for molecule, pressure in input_pressures.items():
             input_pressures[molecule] = np.log10(pressure)  # Note log10.
+
+        if input_number == constraints - 1:
+            # Missing one constraint, so we impose oxygen fugacity.
+            logger.info(
+                "Adding fO2 as an additional constraint using %s with fO2_shift = %f",
+                oxygen_fugacity.__class__.__name__,
+                fo2_shift,
+            )
+            input_pressures["O2"] = oxygen_fugacity(
+                temperature=temperature, fo2_shift=fo2_shift
+            )
+        elif input_number != constraints:
+            raise ValueError(
+                f"You must specify pressures for at least {constraints-1} species. Select from {self.molecules}"
+            )
+
+        # for molecule, pressure in input_pressures.items():
+        #    input_pressures[molecule] = np.log10(pressure)  # Note log10.
         # Add fO2 as an enforced constraint. This can be easily relaxed in the future.
-        input_pressures["O2"] = self.oxygen_fugacity(
-            temperature=temperature, fo2_shift=fo2_shift
-        )
-        logger.info("input pressures (log10) = %s", input_pressures)
+        # input_pressures["O2"] = self.oxygen_fugacity(
+        #    temperature=temperature, fo2_shift=fo2_shift
+        # )
+        # input_pressures["O2"] = oxygen_fugacity(
+        #    temperature=temperature, fo2_shift=fo2_shift
+        # )
+
+        logger.info("Input pressures (log10) = %s", input_pressures)
 
         # Build coefficient matrix and RHS vector.
         logger.info("Building coefficient matrix and RHS vector")
@@ -558,7 +578,10 @@ class ReactionNetwork:
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
         for reaction_index in range(self.number_reactions):
             logger.info(
-                "    Reaction %d: %s", reaction_index, self.reactions[reaction_index]
+                "    Row %02d: Reaction %d: %s",
+                reaction_index,
+                reaction_index,
+                self.reactions[reaction_index],
             )
             # Gibb's reaction is log10 of the equilibrium constant.
             rhs[reaction_index] = self.get_reaction_gibbs(
@@ -567,10 +590,13 @@ class ReactionNetwork:
 
         # Defined pressures (including fo2 as prescribed by the buffer).
         for index, (molecule, pressure) in enumerate(input_pressures.items()):
+            row_index: int = self.number_reactions + index
             molecule_index: int = self.molecules.index(molecule)
-            logger.info("    Found %s at index = %d", molecule, molecule_index)
-            coeff[self.number_reactions + index, molecule_index] = 1
-            rhs[self.number_reactions + index] = pressure
+            logger.info(
+                "    Row %02d: Setting %s partial pressure", row_index, molecule
+            )
+            coeff[row_index, molecule_index] = 1
+            rhs[row_index] = pressure
 
         logger.debug("Coefficient matrix = \n%s", coeff)
         logger.debug("RHS vector = \n%s", rhs)
