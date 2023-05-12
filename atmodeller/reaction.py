@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-import pandas as pd
+from scipy import linalg
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -71,7 +71,8 @@ class IronWustiteBufferFischer(_OxygenFugacity):
         buffer: float = 6.94059 - 28.1808 * 1e3 / temperature
         return buffer
 
-
+# TODO: Once the chemical network approach has been tested and verified, the approach below will 
+# have been superseded.
 @dataclass
 class _Reaction:
     """A gas phase reaction.
@@ -210,6 +211,8 @@ class IvtanthermoH(_Reaction):
     constant: float = 2.7768
     fo2_stoichiometry: float = 0.5
 
+# TODO: Once the chemical network approach has been tested and verified, the approach above will
+# have been superseded.
 
 @dataclass
 class MolarMasses:
@@ -242,6 +245,30 @@ class MolarMasses:
         self.SO2: float = self.S + 2 * self.O
 
 
+# TODO: Relate to JANAF table data and clean up docstring.
+@dataclass(frozen=True)
+class FormationEnergies:
+    """Formation energies.
+
+    log(K) = a + b/T
+
+    In the future we could use the Shomate equation to calculate the equilibrium of the gas phase
+    reactions.
+    """
+
+    # Want to use molecule names therefore pylint: disable=invalid-name
+    o2: tuple[float, float] = (0, 0)
+    h2: tuple[float, float] = (0, 0)
+    n2: tuple[float, float] = (0, 0)
+    c: tuple[float, float] = (0, 0)
+    ch4: tuple[float, float] = (-5.830593406593403, 4829.778021978013)
+    co: tuple[float, float] = (4.319791208791205, 6291.105494505501)
+    co2: tuple[float, float] = (-0.02843296703296885, 20755.79560439561)
+    h2o: tuple[float, float] = (-3.039756043956043, 13156.501098901097)
+    # TODO: Commented out by Laura so check values.
+    # nh3: tuple[float, float] = (-45.9, 192.77)
+
+
 class ReactionNetwork:
     """Determines the necessary (formation) reactions to solve a chemical network.
 
@@ -253,14 +280,19 @@ class ReactionNetwork:
     possible_elements: tuple[str, ...] = ("H", "He", "C", "N", "O", "Si", "P", "S")
 
     def __init__(self, molecules: list[str]):
-        self.molecules: list[str] = sorted(molecules, key=self.molecule_complexity)
+        # TODO: Maybe in the end with formation energies you don't care about reordering the
+        # atoms/molecules after all.
+        # self.molecules: list[str] = sorted(molecules, key=self.molecule_complexity)
+        self.molecules: list[str] = molecules
         logger.info("Molecules = %s", self.molecules)
         self.number_molecules: int = len(molecules)
         self.elements, self.number_elements = self.find_elements()
         self.number_reactions: int = self.number_molecules - self.number_elements
         self.molecule_matrix: np.ndarray = self.find_matrix()
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
-        logger.info("reactions = \n%s", self.reactions)
+        self.formation_energies: FormationEnergies = FormationEnergies()
+        self.oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill()
+        logger.info("reactions = \n%s", pprint.pformat(self.reactions))
         # TODO: Laura included this but I don't think it is actually used anywhere.
         # self.deltaN = self.get_deltaN()
 
@@ -401,8 +433,8 @@ class ReactionNetwork:
         return reaction_matrix
 
     @property
-    def reactions(self) -> str:
-        """The reactions as a (dictionary) string."""
+    def reactions(self) -> dict[int, str]:
+        """The reactions as a dictionary."""
         reactions: dict[int, str] = {}
         for reaction_index in range(self.number_reactions):
             reactants: str = ""
@@ -413,13 +445,150 @@ class ReactionNetwork:
                     reactants += f"{abs(coeff)} {molecule} + "
                 elif coeff > 0:
                     products += f"{coeff} {molecule} + "
-            reactants = reactants[: int(len(reactants) - 3)] # Removes the extra + at the end.
-            products = products[: int(len(products) - 3)] # Removes the extra + at the end.
+            reactants = reactants[
+                : int(len(reactants) - 3)
+            ]  # Removes the extra + at the end.
+            products = products[
+                : int(len(products) - 3)
+            ]  # Removes the extra + at the end.
             reaction: str = f"{reactants} = {products}"
             reactions[reaction_index] = reaction
-        reactions_str: str = pprint.pformat(reactions)
+        # reactions_str: str = pprint.pformat(reactions)
 
-        return reactions_str
+        return reactions
+
+    def get_formation_energy(self, *, molecule: str, temperature: float) -> float:
+        """Gets the formation energy of a molecule.
+
+        Args:
+            molcule: Name of the molecule.
+            temperature: Temperature.
+
+        Returns:
+            The formation energy of the molecule in J/mol.
+        """
+        constant, temp_factor = getattr(self.formation_energies, molecule.casefold())
+        return constant + temp_factor / temperature
+
+    def get_reaction_gibbs(self, *, reaction_index: int, temperature: float) -> float:
+        """Gets the Gibb's energy of a reaction.
+
+        Args:
+            reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
+            temperature: Temperature.
+
+        Returns:
+            The Gibb's energy of the reaction.
+        """
+        gibbs: float = 0
+        for molecule_index, molecule in enumerate(self.molecules):
+            gibbs += self.reaction_matrix[
+                reaction_index, molecule_index
+            ] * self.get_formation_energy(molecule=molecule, temperature=temperature)
+        return gibbs
+
+    def get_reaction_equilibrium_constant(
+        self, *, reaction_index: int, temperature: float
+    ) -> float:
+        """Gets the equilibrium constant of a reaction.
+
+        Args:
+            reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
+            temperature: Temperature.
+
+        Returns:
+            The equilibrium constant of the reaction.
+        """
+        equilibrium_constant: float = 10 ** self.get_reaction_gibbs(
+            reaction_index=reaction_index, temperature=temperature
+        )
+        return equilibrium_constant
+
+    def solve(
+        self,
+        *,
+        temperature: float,
+        input_pressures: dict[str, float],
+        fo2_shift: float = 0,
+    ) -> dict[str, float]:
+        """Solves the reaction network to determine the partial pressures of all molecules.
+
+        Args:
+            temperature: Temperature.
+            fo2_shift: log10 fo2 shift from the buffer.
+            input_pressures: A dictionary of {molecule: partial pressure} that should be imposed.
+                In the current format, fO2 is automatically included as a constraint and does not
+                need to be specified in the input.
+
+        Returns:
+            A dictionary of all the molecules and their partial pressures.
+        """
+        logger.info('Solving the system')
+        number: int = len(
+            list(key for key in input_pressures.keys() if key in self.molecules)
+        )
+
+        constraints: int = (
+            self.number_elements - 1
+        )  # Minus one because fO2 is currently always imposed.
+        if number != constraints:
+            raise ValueError(
+                f"You must specify pressures for {constraints} species. Select from {self.molecules}"
+            )
+
+        for molecule, pressure in input_pressures.items():
+            input_pressures[molecule] = np.log10(pressure)  # Note log10.
+        # Add fO2 as an enforced constraint. This can be easily relaxed in the future.
+        input_pressures["O2"] = self.oxygen_fugacity(
+            temperature=temperature, fo2_shift=fo2_shift
+        )
+        logger.info("input pressures (log10) = %s", input_pressures)
+
+        # Build coefficient matrix and RHS vector.
+        logger.info("Building coefficient matrix and RHS vector")
+        coeff: np.ndarray = np.zeros((self.number_molecules, self.number_molecules))
+        rhs: np.ndarray = np.zeros(self.number_molecules)
+
+        # Reaction contribution.
+        coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
+        for reaction_index in range(self.number_reactions):
+            logger.info(
+                "    Reaction %d: %s", reaction_index, self.reactions[reaction_index]
+            )
+            # Gibb's reaction is log10 of the equilibrium constant.
+            rhs[reaction_index] = self.get_reaction_gibbs(
+                reaction_index=reaction_index, temperature=temperature
+            )
+
+        # Input pressures (including fo2 as prescribed by the buffer).
+        for index, (molecule, pressure) in enumerate(input_pressures.items()):
+            molecule_index: int = self.molecules.index(molecule)
+            logger.info("    Found %s at index = %d", molecule, molecule_index)
+            coeff[self.number_reactions + index, molecule_index] = 1
+            rhs[self.number_reactions + index] = pressure
+
+        logger.debug("Coefficient matrix = \n%s", coeff)
+        logger.debug("RHS vector = \n%s", rhs)
+
+        solution: np.ndarray = linalg.solve(coeff, rhs)
+        logger.debug("Solution = \n%s", solution)
+        pressures: np.ndarray = 10.0**solution
+
+        output: dict[str, float] = {
+            molecule: pressure
+            for (molecule, pressure) in zip(self.molecules, pressures)
+        }
+
+        logger.info("Solution is:")
+        for species, pressure in sorted(output.items()):
+            logger.info("    %s pressure (bar) = %f", species, pressure)
+
+        return output
+
+        # TODO: C (a solid) is always given a pressure (fugacity) of unity. To check and document.
+        # if "C" in input_pressures:
+        #     input_pressures["C"] = 1  # TODO: Sets activity to unit. Valid?
+        # logger.info("Input pressures = %s", input_pressures)
 
     # TODO: Laura included this but I don't think it is actually used anywhere.
     # def get_deltaN(self):
@@ -432,239 +601,3 @@ class ReactionNetwork:
     #             for r in range(self.number_reactions):
     #                 delta_n[r] += self.reaction_matrix[r, m]
     #     return delta_n
-
-
-# data_file = "dictionary.dat"
-
-
-# class GibbsEnergys(ReactionNetwork, parameters):
-
-#     """
-#     This class calculates the reaction equilibrium constants K_eq,r of the reactions from the class Reaction Network.
-#     The class calculates the K_eq,r from the formation equilibrium constants K_eq,f from the molecules in the reaction.
-#     K_eq,f is calculated from a datebase in the formate K_eq,f = a + b/T, where a and b are from the dictionar.
-#     And
-
-#     """
-
-#     def __init__(self, molecules):
-#         # Since we need the stochometric matrix, we inhertit the reaction network
-#         ReactionNetwork.__init__(self, molecules)
-#         parameters.__init__(self)
-
-#         self.T = self.global_d["temperature"]  # Kelvin
-
-#         # Calculate the Equilibrium Constant for the formation reactions
-#         self.df_FormationEnergies = self.get_FormationEnergies_csv(data_file)
-#         self.log_K_f = self.get_logK_f()
-
-#         self.log_K_r = self.get_K_r()
-#         self.K_r = 10**self.log_K_r
-
-#     def get_FormationEnergies_csv(self, data_file):
-#         """
-#         Function finds the csv part describing the Formation Energies of the Molecules
-#         and subscribes them with and saves them in a dataframe, which will be called G_form
-#         """
-#         with open(data_file) as f:
-#             lines = f.readlines()
-#             num_lines = len(lines)
-#             for k, line in zip(range(num_lines + 1), lines):
-#                 if line == "FORMATION ENERGIES\n":
-#                     start_line = k
-#                     break
-
-#             for k, line in zip(
-#                 range(start_line, num_lines + 1), lines[start_line : num_lines + 1]
-#             ):
-#                 if line == "END\n":
-#                     end_line = k
-#                     break
-
-#         range_to_skip = list(range(0, start_line + 1)) + list(
-#             range(end_line, num_lines + 1)
-#         )
-#         df_form = pd.read_csv(
-#             data_file, skiprows=range_to_skip, error_bad_lines=False, comment="#"
-#         )
-#         return df_form
-
-#     def get_logK_f(self):
-#         """
-#         Here the dictionary would be accesed to get the formation energies for all molecules in J/mol.
-#         """
-#         T = self.T
-#         df = self.df_FormationEnergies
-#         log_K_f = {}  # empty dictionary
-#         for mol in self.molecules:
-#             y = df.loc[df["SPECIES"] == mol]
-#             a, b = float(y["a"]), float(y["b"])
-#             log_K_f[mol] = a + b / T
-
-#         return log_K_f
-
-#     def get_K_r(self):
-#         """
-#         Here the Gibb's Energies of the independent equilibrium reaction (descibed in stoch_matrix)
-#         in the gas phase of the Earth's atmosphere are calculated from the formation energies (G_f)
-#         of the molecules present in the atmosphere (molecules).
-#         The values are saved and can be accesed in the vector G_r[num_reaction].
-#         """
-
-#         log_K_r = np.zeros(self.num_r)
-
-#         for r in range(self.num_r):
-#             for i, mol in enumerate(self.molecules):
-#                 key = self.molecules[i]
-#                 log_K_r[r] += self.stoch_matrix[r, i] * self.log_K_f[key]
-#         return log_K_r
-
-
-# class OxygenFugacity(parameters):
-#     """log10 oxygen fugacity as a function of temperature"""
-
-#     def __init__(self, model="oneill"):
-#         parameters.__init__(self)
-#         self.T = self.global_d["temperature"]  # Kelvin
-
-#         self.callmodel = getattr(self, model)
-
-#     def __call__(self, fO2_shift=0):
-#         """Return log10 fO2"""
-#         """ self.callmodel(T) = self.oneill(T)"""
-
-#         return self.callmodel(self.T) + fO2_shift
-
-#     def fischer(self, T):
-#         """Fischer et al. (2011) IW"""
-#         # in cases where callmodel = fischer or
-#         # model = 'fischer'
-#         return 6.94059 - 28.1808 * 1e3 / self.T
-
-#     def oneill(self, T):
-#         """O'Neill and Eggin (2002) IW"""
-#         return (
-#             2
-#             * (-244118 + 115.559 * self.T - 8.474 * self.T * np.log(self.T))
-#             / (np.log(10) * 8.31441 * self.T)
-#         )
-
-
-# class Atmosphere(GibbsEnergys):
-#     def __init__(self, molecules, fO2_model="oneill"):
-#         self.molecules = molecules
-#         # self.mass_d = self.global_d['molar_mass_d']
-
-#         # gettin oxgen fugactiy from model defined above (here also oneill)
-#         self.fO2 = OxygenFugacity(fO2_model)
-
-#         # Default Values
-#         self.p_0 = 1
-
-#     def Set_p0(self, p_0):
-#         self.p_0 = p_0
-#         return 0
-
-#     def Fix_fd(self, f_d):
-#         self.Fixed_fd = f_d
-#         self.fixed_mols = list(f_d.keys())
-
-#         self.unfixed_mols = []
-#         for mol in self.molecules:
-#             if mol not in self.fixed_mols:
-#                 self.unfixed_mols.append(mol)
-
-#         # print('Molecules with fixed fugacities:' ,self.fixed_mols)
-#         # print('Molecules with variable fugacities:' ,self.unfixed_mols)
-
-#         for mol, f in f_d.items():
-#             if mol == "C":
-#                 try:
-#                     assert f == 1
-#                 except:
-#                     # print('Fugacity of',mol,'must be fixed to: 1.')
-#                     f_d["C"] = 1
-#                     continue
-#             # print('Fugacity of',mol,'is fixed to: ',f)
-#         return 0
-
-#     def Calculate(self, f_d, **fO2_shift):
-#         if fO2_shift:
-#             fO2_shift = fO2_shift["fO2_shift"]
-#             log_fO2 = self.fO2(fO2_shift=fO2_shift)
-#             f_O2 = 10**log_fO2
-#             f_d["O2"] = f_O2
-
-#         self.Fix_fd(f_d)
-#         self.molecules = self.fixed_mols + self.unfixed_mols
-#         GibbsEnergys.__init__(self, self.molecules)
-
-#         for r in range(self.num_r):
-#             "Every reaction that produces a non standart molecule"
-#             mol = self.molecules[self.number_elements + r]  # molecules that is produced
-
-#             p_ = self.K_r[r]
-
-#             f_d_calc = {}
-#             f_d_calc = self.Fixed_fd
-#             # p_d['C']=0
-#             reaction_array = self.stoch_matrix[r]
-
-#             for i, f in enumerate(self.Fixed_fd.values()):
-#                 exponent = reaction_array[i] * (-1)
-#                 p_ *= f**exponent
-
-#             f_d_calc[mol] = p_
-
-#         p_d_calc = {}
-#         p_d_calc = f_d
-#         p_d_calc["C"] = 0
-#         p_tot_calc = sum(p_d_calc.values())
-#         # Add a Function that creates a csv file?
-
-#         return p_tot_calc, p_d_calc
-
-#     def Calc_Mu_Atm(self, p_d):
-#         """Mean molar mass of the atmosphere"""
-#         ptot = sum(p_d.values())
-#         mu_atm = 0
-#         for key, value in p_d.items():
-#             mu_atm += self.mass_d[key] * value
-#         mu_atm /= ptot
-
-#         return mu_atm
-
-#     def MassMol_Atm(self, mu_atm, key, p):
-#         factor = 4.0 * np.pi * self.global_d["planetary_radius"] ** 2
-#         factor *= 1 / (mu_atm * self.global_d["little_g"])
-#         mu_i = self.mass_d[key]
-#         # print(type(mu_i))
-#         m_i = mu_i * p * factor
-#         return m_i
-
-#     def Calc_Mass(self, p_d):
-#         mu_atm = self.Calc_Mu_Atm(p_d)
-#         mass_atm_d = {}
-#         for key, p in p_d.items():
-#             mass_atm_d[key] = self.MassMol_Atm(mu_atm, key, p)
-
-#         mol_matrix = self.find_matrix()
-
-#         for element, line in zip(self.elements, np.transpose(mol_matrix)):
-#             mass_atm_d[element] = 0
-#             for mol, num in zip(self.molecules, line):
-#                 if num != 0:
-#                     mass_atm_d[element] += mass_atm_d[mol] / self.mass_d[mol] * num
-#             mass_atm_d[element] *= self.mass_d[element]
-#         self.m_d = mass_atm_d
-#         return mass_atm_d
-
-#     def Calc_md(self, p_scaled_fixed):
-#         sol = self.Get_Scaled_Solution(p_scaled_fixed)
-#         self.scaled_pd = sol
-#         p_d_ = self.Calc_Real_p_d(sol)
-#         self.p_d = p_d_
-
-#         m_atm_d = self.Calc_Mass(p_d_)
-
-#         return m_atm_d

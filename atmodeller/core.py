@@ -298,7 +298,7 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = self.pressures.copy()
 
         logger.info("Solution is:")
-        for species, pressure in self.pressures.items():
+        for species, pressure in sorted(self.pressures.items()):
             logger.info("    %s pressure (bar) = %f", species, pressure)
 
         output["n_ocean_moles"] = n_ocean_moles

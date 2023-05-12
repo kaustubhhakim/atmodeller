@@ -82,8 +82,10 @@ def main():
         single_solve(kwargs, interior_atmos_system)
 
     if args.test:
+        logger.info("Running test to solve the system using a chemical network")
+        # Testing the new reaction network approach
         molecules = [
-            "C",
+            # "C",  # Not in the gas phase. # TODO: When is C required?  Or never?
             "H2",
             "O2",
             "CH4",
@@ -91,8 +93,11 @@ def main():
             "CO",
             "CO2",
         ]  # original order.
-        # molecules = list(reversed(molecules))
+        # molecules = list(reversed(molecules))  # Flip order to show it doesn;t matter.
         reaction_network: ReactionNetwork = ReactionNetwork(molecules)
+        reaction_network.solve(
+            temperature=2000, input_pressures={"CO2": 9.449818, "H2O": 0.378342}
+        )
 
     end: float = time.time()
     runtime: float = round(end - start, 1)
