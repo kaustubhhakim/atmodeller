@@ -71,7 +71,8 @@ class IronWustiteBufferFischer(_OxygenFugacity):
         buffer: float = 6.94059 - 28.1808 * 1e3 / temperature
         return buffer
 
-# TODO: Once the chemical network approach has been tested and verified, the approach below will 
+
+# TODO: Once the chemical network approach has been tested and verified, the approach below will
 # have been superseded.
 @dataclass
 class _Reaction:
@@ -211,8 +212,10 @@ class IvtanthermoH(_Reaction):
     constant: float = 2.7768
     fo2_stoichiometry: float = 0.5
 
+
 # TODO: Once the chemical network approach has been tested and verified, the approach above will
 # have been superseded.
+
 
 @dataclass
 class MolarMasses:
@@ -292,7 +295,7 @@ class ReactionNetwork:
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
         self.formation_energies: FormationEnergies = FormationEnergies()
         self.oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill()
-        logger.info("reactions = \n%s", pprint.pformat(self.reactions))
+        logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
         # TODO: Laura included this but I don't think it is actually used anywhere.
         # self.deltaN = self.get_deltaN()
 
@@ -389,7 +392,7 @@ class ReactionNetwork:
         molecules to stay connected to formation reactions.
 
         Returns:
-            A matrix of the reactions.
+            A matrix of the reaction stoichiometry.
         """
         matrix1: np.ndarray = self.molecule_matrix
         matrix2: np.ndarray = np.eye(self.number_molecules)
@@ -511,7 +514,9 @@ class ReactionNetwork:
         input_pressures: dict[str, float],
         fo2_shift: float = 0,
     ) -> dict[str, float]:
-        """Solves the reaction network to determine the partial pressures of all molecules.
+        """Solves the reaction network to determine the partial pressures of all species.
+
+        Applies the law of mass action.
 
         Args:
             temperature: Temperature.
@@ -523,7 +528,7 @@ class ReactionNetwork:
         Returns:
             A dictionary of all the molecules and their partial pressures.
         """
-        logger.info('Solving the system')
+        logger.info("Solving the system")
         number: int = len(
             list(key for key in input_pressures.keys() if key in self.molecules)
         )
@@ -549,7 +554,7 @@ class ReactionNetwork:
         coeff: np.ndarray = np.zeros((self.number_molecules, self.number_molecules))
         rhs: np.ndarray = np.zeros(self.number_molecules)
 
-        # Reaction contribution.
+        # Reactions.
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
         for reaction_index in range(self.number_reactions):
             logger.info(
@@ -560,7 +565,7 @@ class ReactionNetwork:
                 reaction_index=reaction_index, temperature=temperature
             )
 
-        # Input pressures (including fo2 as prescribed by the buffer).
+        # Defined pressures (including fo2 as prescribed by the buffer).
         for index, (molecule, pressure) in enumerate(input_pressures.items()):
             molecule_index: int = self.molecules.index(molecule)
             logger.info("    Found %s at index = %d", molecule, molecule_index)
