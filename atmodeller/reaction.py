@@ -517,11 +517,15 @@ class ReactionNetwork:
     ) -> dict[str, float]:
         """Solves the reaction network to determine the partial pressures of all species.
 
-        Applies the law of mass action.
+        Applies the law of mass action. To solve the reaction network requires that:
+            `self.number_molecules` = `self.number_reactions` + number of input pressures.
+        If the number of input pressures is one less than required, then oxygen fugacity is by
+        default imposed as the final constraint.
 
         Args:
             temperature: Temperature.
-            input_pressures: A dictionary of {molecule: partial pressure} that should be imposed.
+            input_pressures: A dictionary of {molecule: partial pressure} that should be imposed,
+                where each molecule should be in the network (i.e. in `self.molecules`).
             oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
                 only used if the number of `input_pressures` is one less than the required number.
             fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if the
