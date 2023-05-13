@@ -522,6 +522,14 @@ class ReactionNetwork:
         If the number of input pressures is one less than required, then oxygen fugacity is by
         default imposed as the final constraint.
 
+        We solve for the log10 of the partial pressures of each species. Operating in log10 space
+        has two advantages: 1) The dynamic range of the partial pressures is reduced, for example
+        fO2 is typically very small compared to other pressures in the system, and 2) In log10
+        space the reaction network can be expressed as a linear system which is trivial to solve.
+
+        One could of course use a different log space (natural log), but log10 is chosen because
+        the formation reactions are expressed in terms of log10 as well as the oxygen fugacity.
+
         Args:
             temperature: Temperature.
             input_pressures: A dictionary of {molecule: partial pressure} that should be imposed,
