@@ -1,2 +1,2 @@
 # atmodeller
-Lightweight Python script for computing the partitioning of volatiles between a planetary atmosphere and its interior
+A lightweight Python package for computing the partitioning of volatiles between a planetary atmosphere and its interior

@@ -264,10 +264,10 @@ class FormationEnergies:
     h2: tuple[float, float] = (0, 0)
     n2: tuple[float, float] = (0, 0)
     c: tuple[float, float] = (0, 0)
-    ch4: tuple[float, float] = (-5.830593406593403, 4829.778021978013)
-    co: tuple[float, float] = (4.319791208791205, 6291.105494505501)
-    co2: tuple[float, float] = (-0.02843296703296885, 20755.79560439561)
-    h2o: tuple[float, float] = (-3.039756043956043, 13156.501098901097)
+    ch4: tuple[float, float] = (-5.830066176470588, 4829.067647058815)
+    co: tuple[float, float] = (4.319860294117643, 6286.120588235306)
+    co2: tuple[float, float] = (-0.028289705882357442, 20753.870588235302)
+    h2o: tuple[float, float] = (-3.0385132352941198, 13152.698529411768)
     # TODO: Commented out by Laura so check values.
     # nh3: tuple[float, float] = (-45.9, 192.77)
 
@@ -299,6 +299,7 @@ class ReactionNetwork:
         # TODO: Laura included this but I don't think it is actually used anywhere.
         # self.deltaN = self.get_deltaN()
 
+    # Using formation energies it is actually not necessary to reorder the array.
     def molecule_complexity(self, molecule: str) -> tuple[Any, ...]:
         """A key sorter to sort the molecules in order of complexity, starting with atoms.
 
