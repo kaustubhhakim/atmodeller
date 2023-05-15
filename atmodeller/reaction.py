@@ -11,6 +11,8 @@ from scipy import linalg
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+from atmodeller import GAS_CONSTANT
+
 
 class _OxygenFugacity(ABC):
     """Oxygen fugacity base class."""
@@ -461,34 +463,59 @@ class ReactionNetwork:
 
         return reactions
 
-    def get_formation_energy(self, *, molecule: str, temperature: float) -> float:
-        """Gets the formation energy of a molecule.
+    def get_formation_equilibrium_constant(
+        self, *, molecule: str, temperature: float
+    ) -> float:
+        """Gets the formation equilibrium constant (log Kf in the JANAF tables) of a molecule.
 
         Args:
-            molcule: Name of the molecule.
+            molecule: Name of the molecule.
             temperature: Temperature.
 
         Returns:
-            The formation energy of the molecule in J/mol.
+            The formation equilibrium constant.
         """
         constant, temp_factor = getattr(self.formation_energies, molecule.casefold())
         return constant + temp_factor / temperature
 
-    def get_reaction_gibbs(self, *, reaction_index: int, temperature: float) -> float:
-        """Gets the Gibb's energy of a reaction.
+    def get_reaction_log10_equilibrium_constant(
+        self, *, reaction_index: int, temperature: float
+    ) -> float:
+        """Gets the log10 of the reaction equilibrium constant.
 
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
             temperature: Temperature.
 
         Returns:
-            The Gibb's energy of the reaction.
+            log10 of the reaction equilibrium constant.
         """
-        gibbs: float = 0
+        equilibrium_constant: float = 0
         for molecule_index, molecule in enumerate(self.molecules):
-            gibbs += self.reaction_matrix[
+            equilibrium_constant += self.reaction_matrix[
                 reaction_index, molecule_index
-            ] * self.get_formation_energy(molecule=molecule, temperature=temperature)
+            ] * self.get_formation_equilibrium_constant(
+                molecule=molecule, temperature=temperature
+            )
+        return equilibrium_constant
+
+    def get_reaction_gibbs_energy_of_formation(
+        self, *, reaction_index: int, temperature: float
+    ) -> float:
+        """Gets the Gibb's free energy of formation for a reaction.
+
+        Args:
+            reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
+            temperature: Temperature.
+
+        Returns:
+            The Gibb's free energy of the reaction.
+        """
+        gibbs: float = -self.get_reaction_log10_equilibrium_constant(
+            reaction_index=reaction_index, temperature=temperature
+        )
+        gibbs *= np.log(10) * GAS_CONSTANT * temperature
+
         return gibbs
 
     def get_reaction_equilibrium_constant(
@@ -503,8 +530,11 @@ class ReactionNetwork:
         Returns:
             The equilibrium constant of the reaction.
         """
-        equilibrium_constant: float = 10 ** self.get_reaction_gibbs(
-            reaction_index=reaction_index, temperature=temperature
+        equilibrium_constant: float = (
+            10
+            ** self.get_reaction_log10_equilibrium_constant(
+                reaction_index=reaction_index, temperature=temperature
+            )
         )
         return equilibrium_constant
 
@@ -597,7 +627,7 @@ class ReactionNetwork:
                 self.reactions[reaction_index],
             )
             # Gibb's reaction is log10 of the equilibrium constant.
-            rhs[reaction_index] = self.get_reaction_gibbs(
+            rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
                 reaction_index=reaction_index, temperature=temperature
             )
 

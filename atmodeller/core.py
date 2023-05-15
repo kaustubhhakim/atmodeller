@@ -12,11 +12,7 @@ from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-# Module constants.
-GRAVITATIONAL_CONSTANT: float = 6.6743e-11  # SI units.
-OCEAN_MOLES: float = (
-    7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
-)
+from atmodeller import GRAVITATIONAL_CONSTANT, OCEAN_MOLES
 
 
 @dataclass(kw_only=True)
