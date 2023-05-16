@@ -8,7 +8,7 @@ import numpy as np
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class _Solubility(ABC):
+class Solubility(ABC):
     """Solubility base class."""
 
     def power_law(self, pressure: float, constant: float, exponent: float) -> float:
@@ -25,7 +25,7 @@ class _Solubility(ABC):
         return self._solubility(pressure, *args)
 
 
-class AnorthiteDiopsideH2O(_Solubility):
+class AnorthiteDiopsideH2O(Solubility):
     """Newcombe et al. (2017)."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
@@ -33,7 +33,7 @@ class AnorthiteDiopsideH2O(_Solubility):
         return self.power_law(pressure, 727, 0.5)
 
 
-class PeridotiteH2O(_Solubility):
+class PeridotiteH2O(Solubility):
     """Sossi et al. (2022)."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
@@ -41,7 +41,7 @@ class PeridotiteH2O(_Solubility):
         return self.power_law(pressure, 534, 0.5)
 
 
-class BasaltDixonH2O(_Solubility):
+class BasaltDixonH2O(Solubility):
     """Dixon et al. (1995) refit by Paolo Sossi."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
@@ -49,7 +49,7 @@ class BasaltDixonH2O(_Solubility):
         return self.power_law(pressure, 965, 0.5)
 
 
-class BasaltWilsonH2O(_Solubility):
+class BasaltWilsonH2O(Solubility):
     """Hamilton (1964) and Wilson and Head (1981)."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
@@ -57,7 +57,7 @@ class BasaltWilsonH2O(_Solubility):
         return self.power_law(pressure, 215, 0.7)
 
 
-class LunarGlassH2O(_Solubility):
+class LunarGlassH2O(Solubility):
     """Newcombe et al. (2017)."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
@@ -65,7 +65,7 @@ class LunarGlassH2O(_Solubility):
         return self.power_law(pressure, 683, 0.5)
 
 
-class BasaltDixonCO2(_Solubility):
+class BasaltDixonCO2(Solubility):
     """Dixon et al. (1995)."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
@@ -76,7 +76,7 @@ class BasaltDixonCO2(_Solubility):
         return ppmw
 
 
-class LibourelN2(_Solubility):
+class LibourelN2(Solubility):
     """Libourel et al. (2003)."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:

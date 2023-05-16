@@ -8,7 +8,8 @@ import numpy as np
 from scipy.optimize import fsolve
 
 from atmodeller.reaction import IvtanthermoCH4, JanafC, JanafH, MolarMasses
-from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O
+from atmodeller.solubility import (BasaltDixonCO2, LibourelN2, PeridotiteH2O,
+                                   Solubility)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -308,3 +309,148 @@ class InteriorAtmosphereSystem:
         output["N_mass_residual"] = all_residuals[2]
 
         return output
+
+
+# DJB new classes below here.
+
+
+@dataclass(kw_only=True)
+class PlanetProperties:
+    """The properties of a planet.
+
+    Default values are the fully molten Earth.
+
+    Args:
+        mantle_mass: Mass of the planetary mantle. Defaults to Earth.
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to all molten.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
+            Earth.
+        surface_radius: Radius of the planetary surface. Defaults to Earth.
+        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
+    """
+
+    mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
+    mantle_melt_fraction: float = 1.0  # Completely molten
+    core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
+    surface_radius: float = 6371000.0  # m, Earth's radius
+    surface_temperature: float = 2000.0  # K
+    surface_gravity: float = field(init=False)
+
+    def __post_init__(self):
+        logger.info("Creating a new planet")
+        self.planetary_mass = self.mantle_mass / (1 - self.core_mass_fraction)
+        self.surface_gravity = (
+            GRAVITATIONAL_CONSTANT * self.planetary_mass / self.surface_radius**2
+        )
+        logger.info("Mantle mass (kg) = %s", self.mantle_mass)
+        logger.info("Mantle melt fraction = %s", self.mantle_melt_fraction)
+        logger.info("Core mass fraction = %s", self.core_mass_fraction)
+        logger.info("Planetary radius (m) = %s", self.surface_radius)
+        logger.info("Planetary mass (kg) = %s", self.planetary_mass)
+        logger.info("Surface temperature (K) = %f", self.surface_temperature)
+        logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
+
+
+class Molecule:
+    """Defines a molecule and how it partitions into the atmosphere and a solid phase."""
+
+    def __init__(
+        self,
+        name: str,
+        solubility: Solubility,
+        solid_melt_distribution_coefficient: float,
+    ):
+        self.name: str = name
+        self.solubility: Solubility = solubility
+        self.solid_melt_distribution_coefficient: float = (
+            solid_melt_distribution_coefficient
+        )
+        masses: MolarMasses = MolarMasses()
+        self.molar_mass: float = getattr(masses, self.name.casefold())
+        self.planet: PlanetProperties = PlanetProperties()
+
+    def mass_in_atmosphere(
+        self, *, partial_pressure_bar: float, atmosphere_mean_molar_mass: float
+    ) -> float:
+        """Mass in the atmosphere.
+
+        Args:
+            partial_pressure_bar: Partial pressure in bar.
+            atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
+
+        Returns:
+            Mass in the atmosphere.
+        """
+        mass: float = partial_pressure_bar * 1e5 / self.planet.surface_gravity
+        mass *= 4.0 * np.pi * self.planet.surface_radius**2
+        mass *= self.molar_mass / atmosphere_mean_molar_mass
+
+        return mass
+
+    def mass_in_melt(self, *, partial_pressure_bar: float) -> float:
+        """Mass in the molten interior.
+
+        Args:
+            partial_pressure_bar: Partial pressure in bar.
+
+        Returns:
+            Mass in the molten interior.
+        """
+        prefactor: float = (
+            1e-6 * self.planet.mantle_mass * self.planet.mantle_melt_fraction
+        )
+        ppmw_in_melt: float = self.solubility(
+            partial_pressure_bar, self.planet.surface_temperature
+        )
+        mass: float = prefactor * ppmw_in_melt
+
+        return mass
+
+    def mass_in_solid(self, *, partial_pressure_bar: float) -> float:
+        """Mass in the solid interior.
+
+        Args:
+            partial_pressure_bar: Partial pressure in bar.
+
+        Returns:
+            Mass in the solid interior.
+        """
+        prefactor: float = (
+            1e-6 * self.planet.mantle_mass * (1 - self.planet.mantle_melt_fraction)
+        )
+        ppmw_in_melt: float = self.solubility(
+            partial_pressure_bar, self.planet.surface_temperature
+        )
+        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
+        mass: float = prefactor * ppmw_in_solid
+
+        return mass
+
+    def mass(
+        self, *, partial_pressure_bar: float, atmosphere_mean_molar_mass: float
+    ) -> float:
+        """Total mass.
+
+        Args:
+            partial_pressure_bar: Partial pressure in bar.
+            atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
+
+        Returns:
+            Total mass.
+        """
+        mass_in_atmosphere: float = self.mass_in_atmosphere(
+            partial_pressure_bar=partial_pressure_bar,
+            atmosphere_mean_molar_mass=atmosphere_mean_molar_mass,
+        )
+        mass_in_melt: float = self.mass_in_melt(
+            partial_pressure_bar=partial_pressure_bar
+        )
+        mass_in_solid: float = self.mass_in_solid(
+            partial_pressure_bar=partial_pressure_bar
+        )
+        total_mass: float = mass_in_atmosphere + mass_in_melt + mass_in_solid
+
+        return total_mass
+
+    # TODO: Functions that break up the molecule into its elements and returns the mass for
+    # each element, ideally in each reservoir.
