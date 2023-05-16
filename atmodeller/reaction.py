@@ -11,8 +11,7 @@ from scipy import linalg, optimize
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-from atmodeller import (GAS_CONSTANT, TEMPERATURE_JANAF_HIGH,
-                        TEMPERATURE_JANAF_LOW)
+from atmodeller import GAS_CONSTANT, TEMPERATURE_JANAF_HIGH, TEMPERATURE_JANAF_LOW
 
 
 class _OxygenFugacity(ABC):
@@ -768,7 +767,7 @@ class MassBalance(ReactionNetwork):
         fo2_shift: float = 0,
     ) -> dict[str, float]:
         """Solve the non-linear equation set.
-        
+
         TODO: Currently just solves the reaction network numerically using Ax-b=0. Now need to
         include mass balance constraints.
         """
