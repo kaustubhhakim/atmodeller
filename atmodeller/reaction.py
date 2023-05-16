@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from scipy import linalg
+from scipy import linalg, optimize
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -767,8 +767,11 @@ class MassBalance(ReactionNetwork):
         oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
     ) -> dict[str, float]:
-        """Solve the non-linear equation set."""
-
+        """Solve the non-linear equation set.
+        
+        TODO: Currently just solves the reaction network numerically using Ax-b=0. Now need to
+        include mass balance constraints.
+        """
         logger.info("Solving the mass balance network")
 
         # TODO: In practice we will use mass balance constraints for at least H and C to provide
@@ -784,9 +787,14 @@ class MassBalance(ReactionNetwork):
             temperature=temperature, input_pressures=input_pressures
         )
 
-        # TODO: Swap this out to instead form a non-linear system and solve it numerically.  Then
-        # can add in mass balance constraints.
-        solution: np.ndarray = linalg.solve(coeff_matrix, rhs)
+        def func(solution: np.ndarray) -> np.ndarray:
+            """Express the reaction network as Ax-b=0 for the non-linear solver."""
+            lhs: np.ndarray = coeff_matrix.dot(solution) - rhs
+            return lhs
+
+        x0: np.ndarray = np.ones(len(self.molecules))
+        solution, _, ier, _ = optimize.fsolve(func, x0, full_output=True)
+        logger.debug("ier = %s", ier)
         logger.debug("Solution = \n%s", solution)
         pressures: np.ndarray = 10.0**solution
 
