@@ -11,7 +11,8 @@ from scipy import linalg
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-from atmodeller import GAS_CONSTANT
+from atmodeller import (GAS_CONSTANT, TEMPERATURE_JANAF_HIGH,
+                        TEMPERATURE_JANAF_LOW)
 
 
 class _OxygenFugacity(ABC):
@@ -250,12 +251,14 @@ class MolarMasses:
         self.SO2: float = self.S + 2 * self.O
 
 
-# TODO: Relate to JANAF table data and clean up docstring.
 @dataclass(frozen=True)
-class FormationEnergies:
-    """Formation energies.
+class FormationEquilibriumConstants:
+    """Formation equilibrium constants.
 
-    log(K) = a + b/T
+    These parameters result from a linear fit in temperature space to the log Kf column in the
+    JANAF data tables for a given molecule. See the jupyter notebook in 'janaf'.
+
+    log10(Kf) = a + b/T
 
     In the future we could use the Shomate equation to calculate the equilibrium of the gas phase
     reactions.
@@ -285,21 +288,35 @@ class ReactionNetwork:
     possible_elements: tuple[str, ...] = ("H", "He", "C", "N", "O", "Si", "P", "S")
 
     def __init__(self, molecules: list[str]):
-        # TODO: Maybe in the end with formation energies you don't care about reordering the
-        # atoms/molecules after all.
-        # self.molecules: list[str] = sorted(molecules, key=self.molecule_complexity)
-        self.molecules: list[str] = molecules
+        self.formation_energies: FormationEquilibriumConstants = (
+            FormationEquilibriumConstants()
+        )
+        self.molecules: list[str] = self._check_molecules_input(molecules=molecules)
         logger.info("Molecules = %s", self.molecules)
         self.number_molecules: int = len(molecules)
         self.elements, self.number_elements = self.find_elements()
         self.number_reactions: int = self.number_molecules - self.number_elements
         self.molecule_matrix: np.ndarray = self.find_matrix()
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
-        self.formation_energies: FormationEnergies = FormationEnergies()
         self.oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
         # TODO: Laura included this but I don't think it is actually used anywhere.
         # self.deltaN = self.get_deltaN()
+
+    def _check_molecules_input(self, *, molecules: list[str]) -> list[str]:
+        """Check user molecule input.
+
+        Args:
+            molecules: A list of molecules.
+        """
+        for molecule in molecules:
+            if not hasattr(self.formation_energies, molecule.casefold()):
+                raise ValueError(f"Formation energy of '{molecule}' is unknown")
+
+        # TODO: Decide whether to sort or not. Algorithmically it is not required.
+        # molecules = sorted(molecules, key=self.molecule_complexity)
+
+        return list(molecules)
 
     # Using formation energies it is actually not necessary to reorder the array.
     def molecule_complexity(self, molecule: str) -> tuple[Any, ...]:
@@ -538,6 +555,126 @@ class ReactionNetwork:
         )
         return equilibrium_constant
 
+    def get_coefficient_matrix_and_rhs(
+        self,
+        *,
+        temperature: float,
+        input_pressures: dict[str, float],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Builds the coefficient matrix and the RHS.
+
+        Args:
+            temperature: Temperature.
+            input_pressures: A dictionary of {molecule: partial pressure} that should be imposed,
+                where each molecule should be in the network (i.e. in `self.molecules`).
+
+        Returns:
+            A dictionary of all the molecules and their partial pressures.
+        """
+
+        # for molecule, pressure in input_pressures.items():
+        #    input_pressures[molecule] = np.log10(pressure)  # Note log10.
+        # Add fO2 as an enforced constraint. This can be easily relaxed in the future.
+        # input_pressures["O2"] = self.oxygen_fugacity(
+        #    temperature=temperature, fo2_shift=fo2_shift
+        # )
+        # input_pressures["O2"] = oxygen_fugacity(
+        #    temperature=temperature, fo2_shift=fo2_shift
+        # )
+
+        logger.info("Input pressures (log10) = %s", input_pressures)
+
+        # Build coefficient matrix and RHS vector.
+        coeff: np.ndarray = np.zeros((self.number_molecules, self.number_molecules))
+        rhs: np.ndarray = np.zeros(self.number_molecules)
+
+        # Reactions.
+        coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
+        for reaction_index in range(self.number_reactions):
+            logger.info(
+                "Row %02d: Reaction %d: %s",
+                reaction_index,
+                reaction_index,
+                self.reactions[reaction_index],
+            )
+            # Gibb's reaction is log10 of the equilibrium constant.
+            rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
+                reaction_index=reaction_index, temperature=temperature
+            )
+
+        # Defined pressures (including fo2 as prescribed by the buffer).
+        for index, (molecule, pressure) in enumerate(input_pressures.items()):
+            row_index: int = self.number_reactions + index
+            molecule_index: int = self.molecules.index(molecule)
+            logger.info("Row %02d: Setting %s partial pressure", row_index, molecule)
+            coeff[row_index, molecule_index] = 1
+            rhs[row_index] = pressure
+
+        logger.debug("Coefficient matrix = \n%s", coeff)
+        logger.debug("RHS vector = \n%s", rhs)
+
+        return coeff, rhs
+
+    def set_input_pressures(
+        self,
+        *,
+        temperature: float,
+        input_pressures: dict[str, float],
+        oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
+        fo2_shift: float = 0,
+    ) -> dict[str, float]:
+        """Sets the input pressures.
+
+        This takes a list of input pressures and adds an extra pressure constraint (fO2) if
+        required to close the system of equations. It also converts the pressures to log10.
+
+        Args:
+            temperature: Temperature.
+            input_pressures: A dictionary of {molecule: partial pressure} that should be imposed,
+                where each molecule should be in the network (i.e. in `self.molecules`).
+            oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
+                only used if the number of `input_pressures` is one less than the required number.
+            fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if the
+                number of `input_parameters` is one less than the required number.
+
+        Returns:
+            A dictionary of all the molecules and their partial pressures.
+        """
+        if (temperature <= TEMPERATURE_JANAF_LOW) or (
+            temperature >= TEMPERATURE_JANAF_HIGH
+        ):
+            msg: str = "Temperature must be in the range {TEMPERATURE_JANAF_LOW} K to "
+            msg += f"{TEMPERATURE_JANAF_HIGH} K"
+            raise ValueError(msg)
+
+        input_pressures = {
+            molecule: pressure
+            for molecule, pressure in input_pressures.items()
+            if molecule in self.molecules
+        }
+        input_number: int = len(list(input_pressures.keys()))
+        constraints: int = self.number_elements
+
+        for molecule, pressure in input_pressures.items():
+            input_pressures[molecule] = np.log10(pressure)
+
+        if input_number == constraints - 1:
+            # Missing one constraint, so we impose oxygen fugacity.
+            logger.info(
+                "Adding fO2 as an additional constraint using %s with fO2_shift = %f",
+                oxygen_fugacity.__class__.__name__,
+                fo2_shift,
+            )
+            input_pressures["O2"] = oxygen_fugacity(
+                temperature=temperature, fo2_shift=fo2_shift
+            )
+        elif input_number != constraints:
+            raise ValueError(
+                f"You must specify pressures for at least {constraints-1} species. Select from {self.molecules}"
+            )
+
+        return input_pressures
+
     def solve(
         self,
         *,
@@ -574,77 +711,19 @@ class ReactionNetwork:
             A dictionary of all the molecules and their partial pressures.
         """
         logger.info("Solving the reaction network")
-        input_pressures = {
-            molecule: pressure
-            for molecule, pressure in input_pressures.items()
-            if molecule in self.molecules
-        }
-        input_number: int = len(list(input_pressures.keys()))
-        constraints: int = self.number_elements
 
-        for molecule, pressure in input_pressures.items():
-            input_pressures[molecule] = np.log10(pressure)  # Note log10.
+        input_pressures = self.set_input_pressures(
+            temperature=temperature,
+            input_pressures=input_pressures,
+            oxygen_fugacity=oxygen_fugacity,
+            fo2_shift=fo2_shift,
+        )
 
-        if input_number == constraints - 1:
-            # Missing one constraint, so we impose oxygen fugacity.
-            logger.info(
-                "Adding fO2 as an additional constraint using %s with fO2_shift = %f",
-                oxygen_fugacity.__class__.__name__,
-                fo2_shift,
-            )
-            input_pressures["O2"] = oxygen_fugacity(
-                temperature=temperature, fo2_shift=fo2_shift
-            )
-        elif input_number != constraints:
-            raise ValueError(
-                f"You must specify pressures for at least {constraints-1} species. Select from {self.molecules}"
-            )
+        coeff_matrix, rhs = self.get_coefficient_matrix_and_rhs(
+            temperature=temperature, input_pressures=input_pressures
+        )
 
-        # for molecule, pressure in input_pressures.items():
-        #    input_pressures[molecule] = np.log10(pressure)  # Note log10.
-        # Add fO2 as an enforced constraint. This can be easily relaxed in the future.
-        # input_pressures["O2"] = self.oxygen_fugacity(
-        #    temperature=temperature, fo2_shift=fo2_shift
-        # )
-        # input_pressures["O2"] = oxygen_fugacity(
-        #    temperature=temperature, fo2_shift=fo2_shift
-        # )
-
-        logger.info("Input pressures (log10) = %s", input_pressures)
-
-        # Build coefficient matrix and RHS vector.
-        logger.info("Building coefficient matrix and RHS vector")
-        coeff: np.ndarray = np.zeros((self.number_molecules, self.number_molecules))
-        rhs: np.ndarray = np.zeros(self.number_molecules)
-
-        # Reactions.
-        coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
-        for reaction_index in range(self.number_reactions):
-            logger.info(
-                "    Row %02d: Reaction %d: %s",
-                reaction_index,
-                reaction_index,
-                self.reactions[reaction_index],
-            )
-            # Gibb's reaction is log10 of the equilibrium constant.
-            rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
-                reaction_index=reaction_index, temperature=temperature
-            )
-
-        # Defined pressures (including fo2 as prescribed by the buffer).
-        for index, (molecule, pressure) in enumerate(input_pressures.items()):
-            row_index: int = self.number_reactions + index
-            molecule_index: int = self.molecules.index(molecule)
-            logger.info(
-                "    Row %02d: Setting %s partial pressure", row_index, molecule
-            )
-            coeff[row_index, molecule_index] = 1
-            rhs[row_index] = pressure
-
-        logger.debug("Coefficient matrix = \n%s", coeff)
-        logger.debug("RHS vector = \n%s", rhs)
-
-        solution: np.ndarray = linalg.solve(coeff, rhs)
+        solution: np.ndarray = linalg.solve(coeff_matrix, rhs)
         logger.debug("Solution = \n%s", solution)
         pressures: np.ndarray = 10.0**solution
 
@@ -675,3 +754,49 @@ class ReactionNetwork:
     #             for r in range(self.number_reactions):
     #                 delta_n[r] += self.reaction_matrix[r, m]
     #     return delta_n
+
+
+class MassBalance(ReactionNetwork):
+    """Class to build and solve the non-linear system of equations."""
+
+    def solve(
+        self,
+        *,
+        temperature: float,
+        input_pressures: dict[str, float],
+        oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
+        fo2_shift: float = 0,
+    ) -> dict[str, float]:
+        """Solve the non-linear equation set."""
+
+        logger.info("Solving the mass balance network")
+
+        # TODO: In practice we will use mass balance constraints for at least H and C to provide
+        # two closure conditions. The third closure condition can still be imposed fO2.
+        input_pressures = self.set_input_pressures(
+            temperature=temperature,
+            input_pressures=input_pressures,
+            oxygen_fugacity=oxygen_fugacity,
+            fo2_shift=fo2_shift,
+        )
+
+        coeff_matrix, rhs = self.get_coefficient_matrix_and_rhs(
+            temperature=temperature, input_pressures=input_pressures
+        )
+
+        # TODO: Swap this out to instead form a non-linear system and solve it numerically.  Then
+        # can add in mass balance constraints.
+        solution: np.ndarray = linalg.solve(coeff_matrix, rhs)
+        logger.debug("Solution = \n%s", solution)
+        pressures: np.ndarray = 10.0**solution
+
+        output: dict[str, float] = {
+            molecule: pressure
+            for (molecule, pressure) in zip(self.molecules, pressures)
+        }
+
+        logger.info("Solution is:")
+        for species, pressure in sorted(output.items()):
+            logger.info("    %s pressure (bar) = %f", species, pressure)
+
+        return output
