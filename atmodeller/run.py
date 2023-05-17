@@ -13,7 +13,6 @@ import numpy as np
 
 from atmodeller.core import (InteriorAtmosphereSystem,
                              InteriorAtmosphereSystemNew, Molecule)
-from atmodeller.reaction import MassBalance, ReactionNetwork
 from atmodeller.solubility import BasaltDixonCO2, NoSolubility, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger("atmodeller")
@@ -89,43 +88,6 @@ def main():
     if args.test:
         logger.info("Running test to solve the system using a chemical network")
         # Testing the new reaction network approach
-        molecules = [
-            # "C",  # Not in the gas phase. # TODO: When is C required?  Or never?
-            "H2",
-            "O2",
-            "CH4",
-            "H2O",
-            "CO",
-            "CO2",
-        ]  # original order.
-        # molecules = list(reversed(molecules))  # Flip order to show it doesn;t matter.
-        reaction_network: ReactionNetwork = ReactionNetwork(molecules)
-        reaction_network.solve(
-            temperature=2000,
-            input_pressures={"CO2": 9.449818, "H2O": 0.378342},
-            fo2_shift=0,
-        )
-
-    if args.mass_balance:
-        logger.info("Running test to solve the system using mass balance")
-        # Testing the new reaction network approach
-        molecules = [
-            # "C",  # Not in the gas phase. # TODO: When is C required?  Or never?
-            "H2",
-            "O2",
-            "CH4",
-            "H2O",
-            "CO",
-            "CO2",
-        ]  # original order.
-        # molecules = list(reversed(molecules))  # Flip order to show it doesn;t matter.
-        mass_balance: ReactionNetwork = MassBalance(molecules)
-        mass_balance.solve(
-            temperature=2000,
-            input_pressures={"CO2": 9.449818, "H2O": 0.378342},
-            fo2_shift=0,
-        )
-
         molecules_new: list[Molecule] = [
             Molecule("H2O", PeridotiteH2O(), 0),
             Molecule("H2", NoSolubility(), 0),
@@ -136,6 +98,31 @@ def main():
         ]
         system: InteriorAtmosphereSystemNew = InteriorAtmosphereSystemNew(
             molecules=molecules_new
+        )
+        system._reaction_network.solve(
+            temperature=2000,
+            input_pressures={"CO2": 9.449818, "H2O": 0.378342},
+            fo2_shift=0,
+        )
+
+    if args.mass_balance:
+        logger.info("Running test to solve the system using mass balance")
+        # Testing the new reaction network approach
+        molecules_new: list[Molecule] = [
+            Molecule("H2O", PeridotiteH2O(), 0),
+            Molecule("H2", NoSolubility(), 0),
+            Molecule("CO", NoSolubility(), 0),
+            Molecule("CO2", BasaltDixonCO2(), 0),
+            Molecule("CH4", NoSolubility(), 0),
+            Molecule("O2", NoSolubility(), 0),
+        ]
+        system: InteriorAtmosphereSystemNew = InteriorAtmosphereSystemNew(
+            molecules=molecules_new
+        )
+        system._reaction_network.solve(
+            temperature=2000,
+            input_pressures={"CO2": 9.449818, "H2O": 0.378342},
+            fo2_shift=0,
         )
 
     end: float = time.time()

@@ -29,6 +29,8 @@ class NoSolubility(Solubility):
     """No solubility."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
+        del pressure
+        del temperature
         return 0.0
 
 
