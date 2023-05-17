@@ -11,8 +11,10 @@ from typing import Any
 
 import numpy as np
 
-from atmodeller.core import InteriorAtmosphereSystem
+from atmodeller.core import (InteriorAtmosphereSystem,
+                             InteriorAtmosphereSystemNew, Molecule)
 from atmodeller.reaction import MassBalance, ReactionNetwork
+from atmodeller.solubility import BasaltDixonCO2, NoSolubility, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger("atmodeller")
 
@@ -122,6 +124,18 @@ def main():
             temperature=2000,
             input_pressures={"CO2": 9.449818, "H2O": 0.378342},
             fo2_shift=0,
+        )
+
+        molecules_new: list[Molecule] = [
+            Molecule("H2O", PeridotiteH2O(), 0),
+            Molecule("H2", NoSolubility(), 0),
+            Molecule("CO", NoSolubility(), 0),
+            Molecule("CO2", BasaltDixonCO2(), 0),
+            Molecule("CH4", NoSolubility(), 0),
+            Molecule("O2", NoSolubility(), 0),
+        ]
+        system: InteriorAtmosphereSystemNew = InteriorAtmosphereSystemNew(
+            molecules=molecules_new
         )
 
     end: float = time.time()

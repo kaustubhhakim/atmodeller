@@ -11,7 +11,8 @@ from scipy import linalg, optimize
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-from atmodeller import GAS_CONSTANT, TEMPERATURE_JANAF_HIGH, TEMPERATURE_JANAF_LOW
+from atmodeller import (GAS_CONSTANT, TEMPERATURE_JANAF_HIGH,
+                        TEMPERATURE_JANAF_LOW)
 
 
 class _OxygenFugacity(ABC):
@@ -264,16 +265,16 @@ class FormationEquilibriumConstants:
     """
 
     # Want to use molecule names therefore pylint: disable=invalid-name
-    o2: tuple[float, float] = (0, 0)
-    h2: tuple[float, float] = (0, 0)
-    n2: tuple[float, float] = (0, 0)
-    c: tuple[float, float] = (0, 0)
-    ch4: tuple[float, float] = (-5.830066176470588, 4829.067647058815)
-    co: tuple[float, float] = (4.319860294117643, 6286.120588235306)
-    co2: tuple[float, float] = (-0.028289705882357442, 20753.870588235302)
-    h2o: tuple[float, float] = (-3.0385132352941198, 13152.698529411768)
+    C: tuple[float, float] = (0, 0)
+    CH4: tuple[float, float] = (-5.830066176470588, 4829.067647058815)
+    CO: tuple[float, float] = (4.319860294117643, 6286.120588235306)
+    CO2: tuple[float, float] = (-0.028289705882357442, 20753.870588235302)
+    H2: tuple[float, float] = (0, 0)
+    H2O: tuple[float, float] = (-3.0385132352941198, 13152.698529411768)
+    N2: tuple[float, float] = (0, 0)
+    O2: tuple[float, float] = (0, 0)
     # TODO: Commented out by Laura so check values.
-    # nh3: tuple[float, float] = (-45.9, 192.77)
+    # NH3: tuple[float, float] = (-45.9, 192.77)
 
 
 class ReactionNetwork:
@@ -287,6 +288,7 @@ class ReactionNetwork:
     possible_elements: tuple[str, ...] = ("H", "He", "C", "N", "O", "Si", "P", "S")
 
     def __init__(self, molecules: list[str]):
+        # TODO: Eventually remove and get from MoleculeProperties instead?
         self.formation_energies: FormationEquilibriumConstants = (
             FormationEquilibriumConstants()
         )
@@ -302,6 +304,7 @@ class ReactionNetwork:
         # TODO: Laura included this but I don't think it is actually used anywhere.
         # self.deltaN = self.get_deltaN()
 
+    # TODO: Won't be required when using new Molecule class.
     def _check_molecules_input(self, *, molecules: list[str]) -> list[str]:
         """Check user molecule input.
 
@@ -309,7 +312,7 @@ class ReactionNetwork:
             molecules: A list of molecules.
         """
         for molecule in molecules:
-            if not hasattr(self.formation_energies, molecule.casefold()):
+            if not hasattr(self.formation_energies, molecule):
                 raise ValueError(f"Formation energy of '{molecule}' is unknown")
 
         # TODO: Decide whether to sort or not. Algorithmically it is not required.
@@ -479,6 +482,7 @@ class ReactionNetwork:
 
         return reactions
 
+    # Now also moved into Molecule class.
     def get_formation_equilibrium_constant(
         self, *, molecule: str, temperature: float
     ) -> float:
@@ -491,7 +495,7 @@ class ReactionNetwork:
         Returns:
             The formation equilibrium constant.
         """
-        constant, temp_factor = getattr(self.formation_energies, molecule.casefold())
+        constant, temp_factor = getattr(self.formation_energies, molecule)
         return constant + temp_factor / temperature
 
     def get_reaction_log10_equilibrium_constant(

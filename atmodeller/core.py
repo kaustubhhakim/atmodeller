@@ -7,7 +7,8 @@ from typing import Iterable
 import numpy as np
 from scipy.optimize import fsolve
 
-from atmodeller.reaction import IvtanthermoCH4, JanafC, JanafH, MolarMasses
+from atmodeller.reaction import (FormationEquilibriumConstants, IvtanthermoCH4,
+                                 JanafC, JanafH, MolarMasses, ReactionNetwork)
 from atmodeller.solubility import (BasaltDixonCO2, LibourelN2, PeridotiteH2O,
                                    Solubility)
 
@@ -59,6 +60,7 @@ class InteriorAtmosphereSystem:
         logger.info("    Planetary mass (kg) = %s", self.planetary_mass)
         logger.info("    Surface gravity (m/s^2) = %s", self.surface_gravity)
 
+    # Moved to new interior atmosphere system
     @property
     def pressures(self) -> dict[str, float]:
         """Returns pressures of all species."""
@@ -92,11 +94,13 @@ class InteriorAtmosphereSystem:
         else:
             self._pressures["CH4"] = 0
 
+    # Moved to new interior atmosphere system
     @property
     def _atmospheric_total_pressure(self) -> float:
         """Total atmospheric pressure."""
         return sum(self.pressures.values())
 
+    # Moved to new interior atmosphere system
     @property
     def _atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere."""
@@ -351,23 +355,42 @@ class PlanetProperties:
         logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
 
 
+@dataclass
 class Molecule:
-    """Defines a molecule and how it partitions into the atmosphere and a solid phase."""
+    """Defines a molecule and its properties.
 
-    def __init__(
-        self,
-        name: str,
-        solubility: Solubility,
-        solid_melt_distribution_coefficient: float,
-    ):
-        self.name: str = name
-        self.solubility: Solubility = solubility
-        self.solid_melt_distribution_coefficient: float = (
-            solid_melt_distribution_coefficient
-        )
+    Args:
+        name: Chemical formula of the molecule.
+        solubility: Solubility law.
+        solid_melt_distribution_coefficient: Distribution coefficient. Defaults to 0.
+        planet: Planet properties. Defaults to a fully molten Earth.
+    """
+
+    name: str
+    solubility: Solubility
+    solid_melt_distribution_coefficient: float = 0
+    planet: PlanetProperties = field(default_factory=PlanetProperties)
+
+    def __post_init__(self):
         masses: MolarMasses = MolarMasses()
-        self.molar_mass: float = getattr(masses, self.name.casefold())
-        self.planet: PlanetProperties = PlanetProperties()
+        self.molar_mass: float = getattr(masses, self.name)
+        formation_constants: FormationEquilibriumConstants = (
+            FormationEquilibriumConstants()
+        )
+        self.formation_constants: tuple[float, float] = getattr(
+            formation_constants, self.name
+        )
+
+    def get_formation_equilibrium_constant(self, *, temperature: float) -> float:
+        """Gets the formation equilibrium constant (log Kf) in the JANAF tables.
+
+        Args:
+            temperature: Temperature.
+
+        Returns:
+            The formation equilibrium constant.
+        """
+        return self.formation_constants[0] + self.formation_constants[1] / temperature
 
     def mass_in_atmosphere(
         self, *, partial_pressure_bar: float, atmosphere_mean_molar_mass: float
@@ -454,3 +477,38 @@ class Molecule:
 
     # TODO: Functions that break up the molecule into its elements and returns the mass for
     # each element, ideally in each reservoir.
+
+
+@dataclass(kw_only=True)
+class InteriorAtmosphereSystemNew:
+    """An interior-atmosphere system.  NEW."""
+
+    molecules: list[Molecule]
+    planet: PlanetProperties = field(default_factory=PlanetProperties)
+    _pressures: np.ndarray = field(init=False)
+    _reaction_network: ReactionNetwork = field(init=False)
+
+    def __post_init__(self):
+        logger.info("Creating a new interior-atmosphere system")
+        self._pressures = np.zeros(len(self.molecules))
+        # self._reaction_network = ReactionNetwork(molecules=self.molecules)
+
+    @property
+    def pressures(self) -> np.ndarray:
+        """Returns pressures."""
+        return self._pressures
+
+    @property
+    def atmospheric_total_pressure(self) -> float:
+        """Total atmospheric pressure."""
+        return sum(self.pressures)
+
+    @property
+    def atmospheric_mean_molar_mass(self) -> float:
+        """Mean molar mass of the atmosphere."""
+        mu_atmosphere: float = 0
+        for index, molecule in enumerate(self.molecules):
+            mu_atmosphere += molecule.molar_mass * self.pressures[index]
+        mu_atmosphere /= self.atmospheric_total_pressure
+
+        return mu_atmosphere

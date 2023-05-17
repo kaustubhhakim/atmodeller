@@ -25,6 +25,13 @@ class Solubility(ABC):
         return self._solubility(pressure, *args)
 
 
+class NoSolubility(Solubility):
+    """No solubility."""
+
+    def _solubility(self, pressure: float, temperature: float) -> float:
+        return 0.0
+
+
 class AnorthiteDiopsideH2O(Solubility):
     """Newcombe et al. (2017)."""
 
