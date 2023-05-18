@@ -278,7 +278,7 @@ class FormationEquilibriumConstants:
 
 
 # Some of below migrated into core.  Still need to migrate non-linear mass balance solver.
-# class ReactionNetwork:
+# class ReactionNetworkOld:
 #     """Determines the necessary (formation) reactions to solve a chemical network.
 
 #     Args:
@@ -760,7 +760,7 @@ class FormationEquilibriumConstants:
 #     #     return delta_n
 
 
-# class MassBalance(ReactionNetwork):
+# class MassBalance(ReactionNetworkOld):
 #     """Class to build and solve the non-linear system of equations."""
 
 #     def solve(

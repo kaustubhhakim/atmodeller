@@ -11,8 +11,8 @@ from typing import Any
 
 import numpy as np
 
-from atmodeller.core import (InteriorAtmosphereSystem,
-                             InteriorAtmosphereSystemNew, Molecule)
+from atmodeller.core import (Constraint, InteriorAtmosphereSystem,
+                             InteriorAtmosphereSystemOld, Molecule)
 from atmodeller.solubility import BasaltDixonCO2, NoSolubility, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger("atmodeller")
@@ -77,7 +77,7 @@ def main():
     args = parser.parse_args()
     kwargs: dict[str, Any] = vars(args)
 
-    interior_atmos_system = InteriorAtmosphereSystem()
+    interior_atmos_system = InteriorAtmosphereSystemOld()
 
     if args.monte_carlo:
         logger.info("Running a Monte Carlo simulation")
@@ -96,14 +96,14 @@ def main():
             Molecule("CH4", NoSolubility(), 0),
             Molecule("O2", NoSolubility(), 0),
         ]
-        system: InteriorAtmosphereSystemNew = InteriorAtmosphereSystemNew(
+        system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
             molecules=molecules_new
         )
-        system._reaction_network.solve(
-            temperature=2000,
-            input_pressures={"CO2": 9.449818, "H2O": 0.378342},
-            fo2_shift=0,
-        )
+        # system._reaction_network.solve(
+        #    temperature=2000,
+        #    input_pressures={"CO2": 9.449818, "H2O": 0.378342},
+        #    fo2_shift=0,
+        # )
 
     if args.mass_balance:
         logger.info("Running test to solve the system using mass balance")
@@ -116,13 +116,17 @@ def main():
             Molecule("CH4", NoSolubility(), 0),
             Molecule("O2", NoSolubility(), 0),
         ]
-        system: InteriorAtmosphereSystemNew = InteriorAtmosphereSystemNew(
+        system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
             molecules=molecules_new
         )
-        system._reaction_network.solve(
+
+        constraints: list[Constraint] = [
+            Constraint(species="CO2", value=9.449818, field="pressure"),
+            Constraint(species="H2O", value=0.378342, field="pressure"),
+        ]
+        system.solve(
+            constraints,
             temperature=2000,
-            input_pressures={"CO2": 9.449818, "H2O": 0.378342},
-            fo2_shift=0,
         )
 
     end: float = time.time()
@@ -132,7 +136,7 @@ def main():
 
 
 def single_solve(
-    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystem
+    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystemOld
 ) -> dict[str, float]:
     """Solve an atmosphere-interior system.
 
@@ -159,7 +163,7 @@ def single_solve(
 
 
 def monte_carlo_simulation(
-    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystem
+    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystemOld
 ):
     """Monte Carlo simulation to produce realisations of atmospheric conditions.
 

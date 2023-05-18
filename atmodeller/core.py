@@ -22,7 +22,7 @@ from atmodeller import (GAS_CONSTANT, GRAVITATIONAL_CONSTANT, OCEAN_MOLES,
 
 
 @dataclass(kw_only=True)
-class InteriorAtmosphereSystem:
+class InteriorAtmosphereSystemOld:
     """An interior-atmosphere system.
 
     Args:
@@ -368,14 +368,20 @@ class Molecule:
         solubility: Solubility law.
         solid_melt_distribution_coefficient: Distribution coefficient. Defaults to 0.
         planet: Planet properties. Defaults to a fully molten Earth.
+
+    Attributes:
+        elements: The elements and their counts in the molecule.
+        formation_constants: The constants for computing the formation equilibrium constant.
     """
 
     name: str
     solubility: Solubility
     solid_melt_distribution_coefficient: float = 0
     planet: PlanetProperties = field(default_factory=PlanetProperties)
+    elements: dict[str, int] = field(init=False)
 
     def __post_init__(self):
+        self.elements = self._count_elements()
         masses: MolarMasses = MolarMasses()
         self.molar_mass: float = getattr(masses, self.name)
         formation_constants: FormationEquilibriumConstants = (
@@ -384,6 +390,38 @@ class Molecule:
         self.formation_constants: tuple[float, float] = getattr(
             formation_constants, self.name
         )
+
+    def _count_elements(self) -> dict[str, int]:
+        """Count the number of atoms.
+
+        Returns:
+            A dictionary of the elements and their counts.
+        """
+        element_count: dict[str, int] = {}
+        current_element: str = ""
+        current_count: str = ""
+
+        for char in self.name:
+            if char.isupper():
+                if current_element != "":
+                    count = int(current_count) if current_count else 1
+                    element_count[current_element] = (
+                        element_count.get(current_element, 0) + count
+                    )
+                    current_count = ""
+                current_element = char
+            elif char.islower():
+                current_element += char
+            elif char.isdigit():
+                current_count += char
+
+        if current_element != "":
+            count: int = int(current_count) if current_count else 1
+            element_count[current_element] = (
+                element_count.get(current_element, 0) + count
+            )
+
+        return element_count
 
     def get_formation_equilibrium_constant(self, *, temperature: float) -> float:
         """Gets the formation equilibrium constant (log Kf) in the JANAF tables.
@@ -483,19 +521,25 @@ class Molecule:
     # each element, ideally in each reservoir.
 
 
-class ReactionNetwork2:
+@dataclass(kw_only=True)
+class Constraint:
+    """A constraint to apply to the system of equations."""
+
+    species: str
+    value: float
+    field: str
+
+
+class ReactionNetwork:
     """Determines the necessary (formation) reactions to solve a chemical network.
 
     Args:
         molecules: A list of molecules.
     """
 
-    # Elements that can be included in the molecules argument. Ordered by atomic mass.
-    possible_elements: tuple[str, ...] = ("H", "He", "C", "N", "O", "Si", "P", "S")
-
     def __init__(self, molecules: list[Molecule]):
         self.molecules: list[Molecule] = molecules
-        logger.info("Molecules = %s", self.molecules)
+        logger.info("Molecules = %s", [molecule.name for molecule in self.molecules])
         self.number_molecules: int = len(molecules)
         self.elements, self.number_elements = self.find_elements()
         self.number_reactions: int = self.number_molecules - self.number_elements
@@ -503,61 +547,6 @@ class ReactionNetwork2:
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
         self.oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
-        # TODO: Laura included this but I don't think it is actually used anywhere.
-        # self.deltaN = self.get_deltaN()
-
-    # def _check_molecules_input(self, *, molecules: list[str]) -> list[str]:
-    #     """Check user molecule input.
-
-    #     Args:
-    #         molecules: A list of molecules.
-    #     """
-    #     for molecule in molecules:
-    #         if not hasattr(self.formation_energies, molecule):
-    #             raise ValueError(f"Formation energy of '{molecule}' is unknown")
-
-    #     # TODO: Decide whether to sort or not. Algorithmically it is not required.
-    #     # molecules = sorted(molecules, key=self.molecule_complexity)
-
-    #     return list(molecules)
-
-    # Using formation energies it is actually not necessary to reorder the array.
-    # def molecule_complexity(self, molecule: str) -> tuple[Any, ...]:
-    #     """A key sorter to sort the molecules in order of complexity, starting with atoms.
-
-    #     The order ensures that the Gaussian elimination returns formation reactions, i.e. the
-    #     preference of the reaction stoichiometry is given to the first atoms/molecules in
-    #     `self.molecules`.
-
-    #     Args:
-    #         molecule: The name of the molecule.
-
-    #     Returns:
-    #         A tuple with the sorting criteria.
-    #     """
-    #     # Rule 1: Single capital letters first.
-    #     if len(molecule) == 1 and molecule.isupper():
-    #         return (0, molecule)
-
-    #     # Rule 2: Single capital letters followed by a lowercase letter.
-    #     if len(molecule) == 2 and molecule[0].isupper() and molecule[1].islower():
-    #         return (1, molecule)
-
-    #     # Rule 3: Single capital letters followed by a number.
-    #     if len(molecule) == 2 and molecule[0].isupper() and molecule[1].isdigit():
-    #         return (2, molecule)
-
-    #     # Rule 4: Single capital letters followed by a lowercase letter and a number.
-    #     if (
-    #         len(molecule) == 3
-    #         and molecule[0].isupper()
-    #         and molecule[1].islower()
-    #         and molecule[2].isdigit()
-    #     ):
-    #         return (3, molecule)
-
-    #     # Rule 5: All other cases ordered by total length of the string and alphabetical.
-    #     return (4, len(molecule), molecule)
 
     def find_elements(self) -> tuple[list, int]:
         """Determines the elements that compose the molecules.
@@ -565,14 +554,12 @@ class ReactionNetwork2:
         Returns:
             A tuple: (list of elements, number of elements).
         """
-        molecules_string: str = "".join([molecule.name for molecule in self.molecules])
         elements: list[str] = []
-        for element in self.possible_elements:
-            found: int = molecules_string.find(element)
-            if found != -1:  # Substring exists inside the string.
-                elements.append(element)
+        for molecule in self.molecules:
+            elements.extend(list(molecule.elements.keys()))
+        elements_unique: list[str] = list(set(elements))
 
-        return elements, len(elements)
+        return elements_unique, len(elements_unique)
 
     def find_matrix(self) -> np.ndarray:
         """Creates a matrix where molecules (rows) are split into their element counts (columns).
@@ -581,26 +568,16 @@ class ReactionNetwork2:
             For example, self.molecules = ['CO2', 'H2O'] would return:
                 [[0, 1, 2],
                  [2, 0, 1]]
-            where the columns represent the elements H, C, and O, respectively.
+            if the columns represent the elements H, C, and O, respectively.
         """
         matrix: np.ndarray = np.zeros((self.number_molecules, self.number_elements))
         for molecule_index, molecule in enumerate(self.molecules):
             for element_index, element in enumerate(self.elements):
-                found: int = molecule.name.find(element)
-                if found != -1:  # Substring exists inside the string.
-                    try:
-                        # Character after the element.
-                        character: str = molecule.name[found + len(element)]
-                    except IndexError:
-                        # No character (end of the molecule) so the count must be unity.
-                        count: int = 1
-                    else:
-                        try:
-                            count = int(character)
-                        except ValueError:
-                            # Character is not an int so it must be the next element instead.
-                            count = 1
-                    matrix[molecule_index, element_index] = count
+                try:
+                    count: int = molecule.elements[element]
+                except KeyError:
+                    count = 0
+                matrix[molecule_index, element_index] = count
         return matrix
 
     def partial_gaussian_elimination(self) -> np.ndarray:
@@ -610,9 +587,7 @@ class ReactionNetwork2:
         forward elimination, and then subsequently (partially) reduced to reduced row echelon form
         by backward substitution. Applying the same operations to the identity matrix (as part of
         the augmented matrix) reveals r reactions, where r = number of molecules - number of
-        elements. These reactions are given in the last r rows of the reduced matrix. Due to the
-        ordering of `self.molecules`, these reactions are given in terms of atoms or simple
-        molecules to stay connected to formation reactions.
+        elements. These reactions are given in the last r rows of the reduced matrix.
 
         Returns:
             A matrix of the reaction stoichiometry.
@@ -651,8 +626,10 @@ class ReactionNetwork2:
             "augmented_matrix after backward substitution = \n%s", augmented_matrix
         )
 
-        reduced_matrix1 = augmented_matrix[:, : matrix1.shape[1]]
-        reaction_matrix = augmented_matrix[self.number_elements :, matrix1.shape[1] :]
+        reduced_matrix1: np.ndarray = augmented_matrix[:, : matrix1.shape[1]]
+        reaction_matrix: np.ndarray = augmented_matrix[
+            self.number_elements :, matrix1.shape[1] :
+        ]
         logger.debug("reduced_matrix1 = \n%s", reduced_matrix1)
         logger.debug("reaction_matrix = \n%s", reaction_matrix)
 
@@ -667,37 +644,18 @@ class ReactionNetwork2:
             products: str = ""
             for molecule_index, molecule in enumerate(self.molecules):
                 coeff: float = self.reaction_matrix[reaction_index, molecule_index]
-                if coeff < 0:
-                    reactants += f"{abs(coeff)} {molecule} + "
-                elif coeff > 0:
-                    products += f"{coeff} {molecule} + "
-            reactants = reactants[
-                : int(len(reactants) - 3)
-            ]  # Removes the extra + at the end.
-            products = products[
-                : int(len(products) - 3)
-            ]  # Removes the extra + at the end.
+                if coeff != 0:
+                    if coeff < 0:
+                        reactants += f"{abs(coeff)} {molecule.name} + "
+                    else:
+                        products += f"{coeff} {molecule.name} + "
+
+            reactants = reactants.rstrip(" + ")  # Removes the extra + at the end.
+            products = products.rstrip(" + ")  # Removes the extra + at the end.
             reaction: str = f"{reactants} = {products}"
             reactions[reaction_index] = reaction
-        # reactions_str: str = pprint.pformat(reactions)
 
         return reactions
-
-    # # Now also moved into Molecule class.
-    # def get_formation_equilibrium_constant(
-    #     self, *, molecule: str, temperature: float
-    # ) -> float:
-    #     """Gets the formation equilibrium constant (log Kf in the JANAF tables) of a molecule.
-
-    #     Args:
-    #         molecule: Name of the molecule.
-    #         temperature: Temperature.
-
-    #     Returns:
-    #         The formation equilibrium constant.
-    #     """
-    #     constant, temp_factor = getattr(self.formation_energies, molecule)
-    #     return constant + temp_factor / temperature
 
     def get_reaction_log10_equilibrium_constant(
         self, *, reaction_index: int, temperature: float
@@ -774,6 +732,7 @@ class ReactionNetwork2:
             A dictionary of all the molecules and their partial pressures.
         """
 
+        # TODO: Might still be necessary for non-linear system with mass constraints?
         # for molecule, pressure in input_pressures.items():
         #    input_pressures[molecule] = np.log10(pressure)  # Note log10.
         # Add fO2 as an enforced constraint. This can be easily relaxed in the future.
@@ -819,23 +778,22 @@ class ReactionNetwork2:
 
         return coeff, rhs
 
-    def set_input_pressures(
+    def get_input_pressures(
         self,
         *,
+        constraints: list[Constraint],
         temperature: float,
-        input_pressures: dict[str, float],
         oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
     ) -> dict[str, float]:
-        """Sets the input pressures.
+        """Gets the input pressures.
 
-        This takes a list of input pressures and adds an extra pressure constraint (fO2) if
+        This takes a list of constrained pressures and adds an extra pressure constraint (fO2) if
         required to close the system of equations. It also converts the pressures to log10.
 
         Args:
+            constraints: Constraints for the system of equations. Must all have field=pressure.
             temperature: Temperature.
-            input_pressures: A dictionary of {molecule: partial pressure} that should be imposed,
-                where each molecule should be in the network (i.e. in `self.molecules`).
             oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
                 only used if the number of `input_pressures` is one less than the required number.
             fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if the
@@ -844,25 +802,21 @@ class ReactionNetwork2:
         Returns:
             A dictionary of all the molecules and their partial pressures.
         """
-        if (temperature <= TEMPERATURE_JANAF_LOW) or (
-            temperature >= TEMPERATURE_JANAF_HIGH
-        ):
-            msg: str = "Temperature must be in the range {TEMPERATURE_JANAF_LOW} K to "
-            msg += f"{TEMPERATURE_JANAF_HIGH} K"
-            raise ValueError(msg)
+        if not all([constraint.field == "pressure" for constraint in constraints]):
+            raise ValueError("All constraints must have field = pressure")
 
         input_pressures = {
-            molecule: pressure
-            for molecule, pressure in input_pressures.items()
-            if molecule in [molecule.name for molecule in self.molecules]
+            constraint.species: constraint.value
+            for constraint in constraints
+            if constraint.species in [molecule.name for molecule in self.molecules]
         }
         input_number: int = len(list(input_pressures.keys()))
-        constraints: int = self.number_elements
+        constraints_number: int = self.number_elements
 
         for molecule, pressure in input_pressures.items():
             input_pressures[molecule] = np.log10(pressure)
 
-        if input_number == constraints - 1:
+        if input_number == constraints_number - 1:
             # Missing one constraint, so we impose oxygen fugacity.
             logger.info(
                 "Adding fO2 as an additional constraint using %s with fO2_shift = %f",
@@ -873,9 +827,8 @@ class ReactionNetwork2:
                 temperature=temperature, fo2_shift=fo2_shift
             )
         elif input_number != constraints:
-            print(input_pressures)
             raise ValueError(
-                f"You must specify pressures for at least {constraints-1} species. Select from {self.molecules}"
+                f"You must specify pressures for at least {constraints_number-1} species. Select from {self.molecules}"
             )
 
         return input_pressures
@@ -883,8 +836,8 @@ class ReactionNetwork2:
     def solve(
         self,
         *,
+        constraints: list[Constraint],
         temperature: float,
-        input_pressures: dict[str, float],
         oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
     ) -> dict[str, float]:
@@ -904,6 +857,7 @@ class ReactionNetwork2:
         the formation reactions are expressed in terms of log10 as well as the oxygen fugacity.
 
         Args:
+            constraints: Constraints for the system of equations.
             temperature: Temperature.
             input_pressures: A dictionary of {molecule: partial pressure} that should be imposed,
                 where each molecule should be in the network (i.e. in `self.molecules`).
@@ -917,9 +871,9 @@ class ReactionNetwork2:
         """
         logger.info("Solving the reaction network")
 
-        input_pressures = self.set_input_pressures(
+        input_pressures = self.get_input_pressures(
+            constraints=constraints,
             temperature=temperature,
-            input_pressures=input_pressures,
             oxygen_fugacity=oxygen_fugacity,
             fo2_shift=fo2_shift,
         )
@@ -940,46 +894,40 @@ class ReactionNetwork2:
         }
 
         logger.info("Solution is:")
-        for species, pressure in sorted(output.items()):
-            logger.info("    %s pressure (bar) = %f", species, pressure)
+        for species, pressure in output.items():
+            logger.info("%s pressure (bar) = %f", species, pressure)
 
         return output
 
-        # TODO: C (a solid) is always given a pressure (fugacity) of unity. To check and document.
-        # if "C" in input_pressures:
-        #     input_pressures["C"] = 1  # TODO: Sets activity to unit. Valid?
-        # logger.info("Input pressures = %s", input_pressures)
-
-    # TODO: Laura included this but I don't think it is actually used anywhere.
-    # def get_deltaN(self):
-    #     """
-    #     To calculate the K_p from K_c, we have to know how the pressure changes.
-    #     """
-    #     delta_n = np.zeros(self.number_reactions)
-    #     for m, mol in enumerate(self.molecules):
-    #         if mol != "C":  # BECAUSE C NOT IN GASPHASE
-    #             for r in range(self.number_reactions):
-    #                 delta_n[r] += self.reaction_matrix[r, m]
-    #     return delta_n
-
 
 @dataclass(kw_only=True)
-class InteriorAtmosphereSystemNew:
-    """An interior-atmosphere system.  NEW."""
+class InteriorAtmosphereSystem:
+    """An interior-atmosphere system."""
 
     molecules: list[Molecule]
     planet: PlanetProperties = field(default_factory=PlanetProperties)
     _pressures: np.ndarray = field(init=False)  # Align with order in self.molecules.
-    _reaction_network: ReactionNetwork2 = field(init=False)
+    _reaction_network: ReactionNetwork = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating a new interior-atmosphere system")
+        self.molecules.sort(key=self.molecule_sorter)
         self._pressures = np.zeros(len(self.molecules))
-        self._reaction_network = ReactionNetwork2(molecules=self.molecules)
+        self._reaction_network = ReactionNetwork(molecules=self.molecules)
+
+    def molecule_sorter(self, molecule: Molecule) -> tuple[int, str]:
+        """Sorter for the molecules.
+
+        Sorts first by molecule complexity and second by molecule name.
+
+        Arg:
+            molecule: Molecule.
+        """
+        return (sum(molecule.elements.values()), molecule.name)
 
     @property
     def pressures(self) -> np.ndarray:
-        """Returns pressures."""
+        """Pressures."""
         return self._pressures
 
     @property
@@ -997,15 +945,51 @@ class InteriorAtmosphereSystemNew:
 
         return mu_atmosphere
 
-    def solve(self, *args, **kwargs):
-        """Solve the system.
+    def solve(
+        self,
+        constraints: list[Constraint],
+        *,
+        temperature: float,
+        oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
+        fo2_shift: float = 0,
+    ):
+        """Solves the system.
 
         Depending on the user-input, this can operate with only pressure constraints, only
         mass constraints, or a combination of both.
+
+        Args:
+            constraints: Constraints for the system of equations.
+            temperature: float,
+            input_pressures: dict[str, float],
+            oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
+            fo2_shift: float = 0,
+
+        Returns:
+            A dictionary of all the molecules and their partial pressures.
         """
-        # If pressure constraints only, use all, or add fO2 as an additional final constraint.
 
-        # If element mass constraints, solve non-linear problem with fO2 as the final additional
-        # constraint.
+        if (temperature <= TEMPERATURE_JANAF_LOW) or (
+            temperature >= TEMPERATURE_JANAF_HIGH
+        ):
+            msg: str = "Temperature must be in the range {TEMPERATURE_JANAF_LOW} K to "
+            msg += f"{TEMPERATURE_JANAF_HIGH} K"
+            raise ValueError(msg)
 
-        pass
+        # If pressure constraints only
+        if all([constraint.field == "pressure" for constraint in constraints]):
+            # Can just solve a (linear) reaction network.
+            logger.info(
+                "Pressure constraints only so solving a linear reaction network."
+            )
+            self._reaction_network.solve(
+                constraints=constraints,
+                temperature=temperature,
+                oxygen_fugacity=oxygen_fugacity,
+                fo2_shift=fo2_shift,
+            )
+
+        else:
+            # TODO: if mass constraints, solve non-linear problem with fO2 as the final additional
+            # constraint.
+            print("Need to solve non-linear system.")
