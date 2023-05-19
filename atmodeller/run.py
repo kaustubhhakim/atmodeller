@@ -71,9 +71,6 @@ def main():
         default=10,
     )
     parser.add_argument("-t", "--test", help="Test", action="store_true")
-    parser.add_argument(
-        "-b", "--mass_balance", help="Mass balance test", action="store_true"
-    )
     args = parser.parse_args()
     kwargs: dict[str, Any] = vars(args)
 
@@ -86,8 +83,8 @@ def main():
         single_solve(kwargs, interior_atmos_system)
 
     if args.test:
-        logger.info("Running test to solve the system using a chemical network")
-        # Testing the new reaction network approach
+        logger.info("Running test to solve the system with applied constraints")
+
         molecules_new: list[Molecule] = [
             Molecule("H2O", PeridotiteH2O(), 0),
             Molecule("H2", NoSolubility(), 0),
@@ -99,35 +96,12 @@ def main():
         system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
             molecules=molecules_new
         )
-        # system._reaction_network.solve(
-        #    temperature=2000,
-        #    input_pressures={"CO2": 9.449818, "H2O": 0.378342},
-        #    fo2_shift=0,
-        # )
-
-    if args.mass_balance:
-        logger.info("Running test to solve the system using mass balance")
-        # Testing the new reaction network approach
-        molecules_new: list[Molecule] = [
-            Molecule("H2O", PeridotiteH2O(), 0),
-            Molecule("H2", NoSolubility(), 0),
-            Molecule("CO", NoSolubility(), 0),
-            Molecule("CO2", BasaltDixonCO2(), 0),
-            Molecule("CH4", NoSolubility(), 0),
-            Molecule("O2", NoSolubility(), 0),
-        ]
-        system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-            molecules=molecules_new
-        )
-
+        # Test using only pressure constraints.
         constraints: list[Constraint] = [
             Constraint(species="CO2", value=9.449818, field="pressure"),
             Constraint(species="H2O", value=0.378342, field="pressure"),
         ]
-        system.solve(
-            constraints,
-            temperature=2000,
-        )
+        system.solve(constraints, temperature=2000, include_fO2=True)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)
