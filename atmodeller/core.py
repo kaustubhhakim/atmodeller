@@ -3,7 +3,8 @@
 import logging
 import pprint
 from dataclasses import dataclass, field
-from typing import Iterable
+from functools import wraps
+from typing import Callable, Iterable, Optional
 
 import numpy as np
 from scipy import linalg
@@ -42,7 +43,7 @@ class InteriorAtmosphereSystemOld:
     # pylint: disable=invalid-name
     _is_CH4: bool = field(init=False)
     molar_masses: MolarMasses = field(init=False, default_factory=MolarMasses)
-    planetary_mass: float = field(init=False)
+    planet_mass: float = field(init=False)
     surface_gravity: float = field(init=False)
     _solution: Iterable[float] = field(init=False)  # To store the solution.
     # Species pressures in the atmosphere.
@@ -53,15 +54,15 @@ class InteriorAtmosphereSystemOld:
 
     def __post_init__(self):
         logger.info("Creating a new interior-atmosphere system")
-        self.planetary_mass = self.mantle_mass / (1 - self.core_mass_fraction)
+        self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
         self.surface_gravity = (
-            GRAVITATIONAL_CONSTANT * self.planetary_mass / self.planetary_radius**2
+            GRAVITATIONAL_CONSTANT * self.planet_mass / self.planetary_radius**2
         )
         logger.info("    Mantle mass (kg) = %s", self.mantle_mass)
         logger.info("    Mantle melt fraction = %s", self.mantle_melt_fraction)
         logger.info("    Core mass fraction = %s", self.core_mass_fraction)
         logger.info("    Planetary radius (m) = %s", self.planetary_radius)
-        logger.info("    Planetary mass (kg) = %s", self.planetary_mass)
+        logger.info("    Planetary mass (kg) = %s", self.planet_mass)
         logger.info("    Surface gravity (m/s^2) = %s", self.surface_gravity)
 
     # Moved to new interior atmosphere system
@@ -319,9 +320,6 @@ class InteriorAtmosphereSystemOld:
         return output
 
 
-# DJB new classes below here.
-
-
 @dataclass(kw_only=True)
 class PlanetProperties:
     """The properties of a planet.
@@ -335,6 +333,15 @@ class PlanetProperties:
             Earth.
         surface_radius: Radius of the planetary surface. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
+
+    Attributes:
+        mantle_mass
+        mantle_melt_fraction
+        core_mass_fraction
+        surface_radius
+        surface_temperature
+        surface_gravity
+        planet_mass
     """
 
     mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
@@ -342,21 +349,47 @@ class PlanetProperties:
     core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
     surface_radius: float = 6371000.0  # m, Earth's radius
     surface_temperature: float = 2000.0  # K
+    planet_mass: float = field(init=False)
     surface_gravity: float = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating a new planet")
-        self.planetary_mass = self.mantle_mass / (1 - self.core_mass_fraction)
+        self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
         self.surface_gravity = (
-            GRAVITATIONAL_CONSTANT * self.planetary_mass / self.surface_radius**2
+            GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
         )
         logger.info("Mantle mass (kg) = %s", self.mantle_mass)
         logger.info("Mantle melt fraction = %s", self.mantle_melt_fraction)
         logger.info("Core mass fraction = %s", self.core_mass_fraction)
         logger.info("Planetary radius (m) = %s", self.surface_radius)
-        logger.info("Planetary mass (kg) = %s", self.planetary_mass)
+        logger.info("Planetary mass (kg) = %s", self.planet_mass)
         logger.info("Surface temperature (K) = %f", self.surface_temperature)
         logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
+
+
+def _mass_decorator(func) -> Callable:
+    """A decorator to return the mass of either the molecule or one of its elements."""
+
+    @wraps(func)
+    def mass_wrapper(self: "Molecule", element: Optional[str] = None, **kwargs)->float:
+        """Wrapper for mass.
+        
+        Args:
+            element: Returns the mass of this element. Defaults to None to return the molecule
+                mass.
+            **kwargs: Catches keyword arguments to forward to func.
+
+        Returns:
+            Mass of either the molecule or element.
+        """
+        mass: float = func(self, **kwargs)
+        if element is not None:
+            element_mass: float = self.element_masses.get(element, 0)
+            mass *= element_mass / self.molar_mass
+
+        return mass
+
+    return mass_wrapper
 
 
 @dataclass
@@ -370,8 +403,14 @@ class Molecule:
         planet: Planet properties. Defaults to a fully molten Earth.
 
     Attributes:
+        name: Chemical formula of the molecule.
+        solubility: Solubility law.
+        solid_melt_distribution_coefficient: Distribution coefficient.
+        planet: Planet properties.
         elements: The elements and their counts in the molecule.
+        element_masses: The elements and their masses in the molecule.
         formation_constants: The constants for computing the formation equilibrium constant.
+        molar_mass: Molar mass of the molecule.
     """
 
     name: str
@@ -379,17 +418,21 @@ class Molecule:
     solid_melt_distribution_coefficient: float = 0
     planet: PlanetProperties = field(default_factory=PlanetProperties)
     elements: dict[str, int] = field(init=False)
+    element_masses: dict[str, float] = field(init=False)
+    formation_constants: tuple[float, float] = field(init=False)
+    molar_mass: float = field(init=False)
 
     def __post_init__(self):
-        self.elements = self._count_elements()
         masses: MolarMasses = MolarMasses()
-        self.molar_mass: float = getattr(masses, self.name)
+        self.elements = self._count_elements()
+        self.element_masses = {
+            key: value * getattr(masses, key) for key, value in self.elements.items()
+        }
+        self.molar_mass = getattr(masses, self.name)
         formation_constants: FormationEquilibriumConstants = (
             FormationEquilibriumConstants()
         )
-        self.formation_constants: tuple[float, float] = getattr(
-            formation_constants, self.name
-        )
+        self.formation_constants = getattr(formation_constants, self.name)
 
     def _count_elements(self) -> dict[str, int]:
         """Count the number of atoms.
@@ -430,37 +473,51 @@ class Molecule:
             temperature: Temperature.
 
         Returns:
-            The formation equilibrium constant.
+            The formation equilibrium constant at the specified temperature.
         """
         return self.formation_constants[0] + self.formation_constants[1] / temperature
 
+    @_mass_decorator
     def mass_in_atmosphere(
-        self, *, partial_pressure_bar: float, atmosphere_mean_molar_mass: float
+        self,
+        *,
+        partial_pressure_bar: float,
+        atmosphere_mean_molar_mass: float,
+        element: Optional[str] = None,
     ) -> float:
         """Mass in the atmosphere.
 
         Args:
             partial_pressure_bar: Partial pressure in bar.
             atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
+            element: Returns the mass for an element. Defaults to None to return the molecule mass.
+               This argument is used by the @_mass_decorator.
 
         Returns:
-            Mass in the atmosphere.
+            Mass of the molecule (element=None) or element (element=element) in the atmosphere.
         """
+        del element
         mass: float = partial_pressure_bar * 1e5 / self.planet.surface_gravity
         mass *= 4.0 * np.pi * self.planet.surface_radius**2
         mass *= self.molar_mass / atmosphere_mean_molar_mass
 
         return mass
 
-    def mass_in_melt(self, *, partial_pressure_bar: float) -> float:
+    @_mass_decorator
+    def mass_in_melt(
+        self, *, partial_pressure_bar: float, element: Optional[str] = None
+    ) -> float:
         """Mass in the molten interior.
 
         Args:
             partial_pressure_bar: Partial pressure in bar.
+            element: Returns the mass for an element. Defaults to None to return the molecule mass.
+               This argument is used by the @_mass_decorator.
 
         Returns:
-            Mass in the molten interior.
+            Mass of the molecule (element=None) or element (element=element) in the melt.
         """
+        del element
         prefactor: float = (
             1e-6 * self.planet.mantle_mass * self.planet.mantle_melt_fraction
         )
@@ -471,15 +528,21 @@ class Molecule:
 
         return mass
 
-    def mass_in_solid(self, *, partial_pressure_bar: float) -> float:
+    @_mass_decorator
+    def mass_in_solid(
+        self, *, partial_pressure_bar: float, element: Optional[str] = None
+    ) -> float:
         """Mass in the solid interior.
 
         Args:
             partial_pressure_bar: Partial pressure in bar.
+            element: Returns the mass for an element. Defaults to None to return the molecule mass.
+               This argument is used by the @_mass_decorator.
 
         Returns:
-            Mass in the solid interior.
+            Mass of the molecule (element=None) or element (element=element) in the solid.
         """
+        del element
         prefactor: float = (
             1e-6 * self.planet.mantle_mass * (1 - self.planet.mantle_melt_fraction)
         )
@@ -492,33 +555,37 @@ class Molecule:
         return mass
 
     def mass(
-        self, *, partial_pressure_bar: float, atmosphere_mean_molar_mass: float
+        self,
+        *,
+        partial_pressure_bar: float,
+        atmosphere_mean_molar_mass: float,
+        element: Optional[str] = None,
     ) -> float:
         """Total mass.
 
         Args:
             partial_pressure_bar: Partial pressure in bar.
             atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
+            element: Returns the mass for an element. Defaults to None to return the molecule mass.
+               This argument is used by the @_mass_decorator.
 
         Returns:
-            Total mass.
+            Total mass of the molecule (element=None) or element (element=element).
         """
         mass_in_atmosphere: float = self.mass_in_atmosphere(
             partial_pressure_bar=partial_pressure_bar,
             atmosphere_mean_molar_mass=atmosphere_mean_molar_mass,
+            element=element,
         )
         mass_in_melt: float = self.mass_in_melt(
-            partial_pressure_bar=partial_pressure_bar
+            partial_pressure_bar=partial_pressure_bar, element=element
         )
         mass_in_solid: float = self.mass_in_solid(
-            partial_pressure_bar=partial_pressure_bar
+            partial_pressure_bar=partial_pressure_bar, element=element
         )
         total_mass: float = mass_in_atmosphere + mass_in_melt + mass_in_solid
 
         return total_mass
-
-    # TODO: Functions that break up the molecule into its elements and returns the mass for
-    # each element, ideally in each reservoir.
 
 
 @dataclass(kw_only=True)
@@ -723,7 +790,7 @@ class ReactionNetwork:
         temperature: float,
         oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
-        include_fo2: bool = False,
+        fo2_constraint: bool = False,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Builds the coefficient matrix and the RHS.
 
@@ -731,10 +798,10 @@ class ReactionNetwork:
             constraints: Constraints for the system of equations.
             temperature: Temperature.
             oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
-                only used if `include_fo2` is True.
+                only used if `fo2_constraint` is True.
             fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if
-                `include_fo2` is True.
-            include_fO2: Include fo2 as a constraint. Defaults to False.
+                `fo2_constraint` is True.
+            fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
 
         Returns:
             A dictionary of all the molecules and their partial pressures.
@@ -743,19 +810,19 @@ class ReactionNetwork:
             constraint for constraint in constraints if constraint.field == "pressure"
         ]
 
-        if include_fo2:
+        if fo2_constraint:
             logger.info(
-                "Adding fO2 as an additional constraint using %s with fO2_shift = %f",
+                "Adding fO2 as an additional constraint using %s with fO2_shift = %0.2f",
                 oxygen_fugacity.__class__.__name__,
                 fo2_shift,
             )
             fo2: float = 10 ** oxygen_fugacity(
                 temperature=temperature, fo2_shift=fo2_shift
             )
-            fo2_constraint: Constraint = Constraint(
+            constraint: Constraint = Constraint(
                 species="O2", value=fo2, field="pressure"
             )
-            pressure_constraints.append(fo2_constraint)
+            pressure_constraints.append(constraint)
 
         number_pressure_constraints: int = len(pressure_constraints)
         nrows: int = number_pressure_constraints + self.number_reactions
@@ -807,7 +874,7 @@ class ReactionNetwork:
         temperature: float,
         oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
-        include_fO2: bool = False,
+        fo2_constraint: bool = False,
     ) -> dict[str, float]:
         """Solves the reaction network to determine the partial pressures of all species.
 
@@ -825,10 +892,10 @@ class ReactionNetwork:
             constraints: Constraints for the system of equations.
             temperature: Temperature.
             oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
-                only used if `include_fo2` is True.
+                only used if `fo2_constraint` is True.
             fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if
-                `include_fo2` is True.
-            include_fO2: Include fo2 as a constraint. Defaults to False.
+                `fo2_constraint` is True.
+            fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
 
         Returns:
             A dictionary of all the molecules and their partial pressures.
@@ -840,7 +907,7 @@ class ReactionNetwork:
             temperature=temperature,
             oxygen_fugacity=oxygen_fugacity,
             fo2_shift=fo2_shift,
-            include_fo2=include_fO2,
+            fo2_constraint=fo2_constraint,
         )
 
         if len(rhs) != self.number_molecules:
@@ -869,12 +936,14 @@ class InteriorAtmosphereSystem:
 
     molecules: list[Molecule]
     planet: PlanetProperties = field(default_factory=PlanetProperties)
+    molecule_names: list[str] = field(init=False)
     _pressures: np.ndarray = field(init=False)  # Align with order in self.molecules.
     _reaction_network: ReactionNetwork = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating a new interior-atmosphere system")
         self.molecules.sort(key=self.molecule_sorter)
+        self.molecule_names: list[str] = [molecule.name for molecule in self.molecules]
         self._pressures = np.zeros(len(self.molecules))
         self._reaction_network = ReactionNetwork(molecules=self.molecules)
 
@@ -915,7 +984,7 @@ class InteriorAtmosphereSystem:
         temperature: float,
         oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
-        include_fO2: bool = False,
+        fo2_constraint: bool = False,
     ):
         """Solves the system.
 
@@ -926,10 +995,10 @@ class InteriorAtmosphereSystem:
             constraints: Constraints for the system of equations.
             temperature: float,
             oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
-                only used if `include_fo2` is True.
+                only used if `fo2_constraint` is True.
             fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if
-                `include_fo2` is True.
-            include_fO2: Include fo2 as a constraint. Defaults to False.
+                `fo2_constraint` is True.
+            fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
 
         Returns:
             A dictionary of all the molecules and their partial pressures.
@@ -946,14 +1015,14 @@ class InteriorAtmosphereSystem:
         if all([constraint.field == "pressure" for constraint in constraints]):
             # Can just solve a (linear) reaction network.
             logger.info(
-                "Pressure constraints only so solving a linear reaction network."
+                "Pressure constraints only so attempting to solve a linear reaction network."
             )
             self._reaction_network.solve(
                 constraints=constraints,
                 temperature=temperature,
                 oxygen_fugacity=oxygen_fugacity,
                 fo2_shift=fo2_shift,
-                include_fO2=include_fO2,
+                fo2_constraint=fo2_constraint,
             )
 
         else:

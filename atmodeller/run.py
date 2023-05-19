@@ -101,7 +101,21 @@ def main():
             Constraint(species="CO2", value=9.449818, field="pressure"),
             Constraint(species="H2O", value=0.378342, field="pressure"),
         ]
-        system.solve(constraints, temperature=2000, include_fO2=True)
+        system.solve(constraints, temperature=2000, fo2_constraint=True)
+
+        CO = system.molecules[4]
+        print(CO.name)
+        # CO.mass_in_atmosphere()
+        a = CO.mass_in_atmosphere(
+            partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
+        )  # , element="O"
+        # )
+        b = CO.mass(
+            partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
+        )  # , element="O"
+        #     )
+        print(a)
+        print(b)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)
