@@ -10,16 +10,26 @@ import numpy as np
 from scipy import linalg
 from scipy.optimize import fsolve
 
-from atmodeller.reaction import (FormationEquilibriumConstants,
-                                 IronWustiteBufferOneill, IvtanthermoCH4,
-                                 JanafC, JanafH, MolarMasses, _OxygenFugacity)
-from atmodeller.solubility import (BasaltDixonCO2, LibourelN2, PeridotiteH2O,
-                                   Solubility)
+from atmodeller.reaction import (
+    FormationEquilibriumConstants,
+    IronWustiteBufferOneill,
+    IvtanthermoCH4,
+    JanafC,
+    JanafH,
+    MolarMasses,
+    _OxygenFugacity,
+)
+from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O, Solubility
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-from atmodeller import (GAS_CONSTANT, GRAVITATIONAL_CONSTANT, OCEAN_MOLES,
-                        TEMPERATURE_JANAF_HIGH, TEMPERATURE_JANAF_LOW)
+from atmodeller import (
+    GAS_CONSTANT,
+    GRAVITATIONAL_CONSTANT,
+    OCEAN_MOLES,
+    TEMPERATURE_JANAF_HIGH,
+    TEMPERATURE_JANAF_LOW,
+)
 
 
 @dataclass(kw_only=True)
@@ -65,7 +75,6 @@ class InteriorAtmosphereSystemOld:
         logger.info("    Planetary mass (kg) = %s", self.planet_mass)
         logger.info("    Surface gravity (m/s^2) = %s", self.surface_gravity)
 
-    # Moved to new interior atmosphere system
     @property
     def pressures(self) -> dict[str, float]:
         """Returns pressures of all species."""
@@ -99,13 +108,11 @@ class InteriorAtmosphereSystemOld:
         else:
             self._pressures["CH4"] = 0
 
-    # Moved to new interior atmosphere system
     @property
     def _atmospheric_total_pressure(self) -> float:
         """Total atmospheric pressure."""
         return sum(self.pressures.values())
 
-    # Moved to new interior atmosphere system
     @property
     def _atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere."""
@@ -271,6 +278,7 @@ class InteriorAtmosphereSystemOld:
         c_kg: float = ch_ratio * h_kg
         n_kg: float = nitrogen_ppmw * 1.0e-6 * self.mantle_mass
         target_d: dict[str, float] = {"H": h_kg, "C": c_kg, "N": n_kg}
+        logger.info("target_d = %s", target_d)
 
         count: int = 0
         ier: int = 0
@@ -386,8 +394,7 @@ def _mass_decorator(func) -> Callable:
         """
         mass: float = func(self, **kwargs)
         if element is not None:
-            element_mass: float = self.element_masses.get(element, 0)
-            mass *= element_mass / self.molar_mass
+            mass *= self.element_masses.get(element, 0) / self.molar_mass
 
         return mass
 
@@ -989,9 +996,9 @@ class InteriorAtmosphereSystem:
             fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if
                 `fo2_constraint` is True.
             fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
-            fsolve: Use fsolve to solve the system of equations. Defaults to None, which means to
-                auto select depending if the system is linear or not (which depends on the applied
-                constraints).
+            use_fsolve: Use fsolve to solve the system of equations. Defaults to None, which means
+                to auto select depending if the system is linear or not (which depends on the
+                applied constraints).
         """
 
         if (temperature <= TEMPERATURE_JANAF_LOW) or (
@@ -1000,6 +1007,8 @@ class InteriorAtmosphereSystem:
             msg: str = "Temperature must be in the range {TEMPERATURE_JANAF_LOW} K to "
             msg += f"{TEMPERATURE_JANAF_HIGH} K"
             raise ValueError(msg)
+
+        logger.info("Constraints: %s", pprint.pformat(constraints))
 
         all_pressures: bool = all(
             [constraint.field == "pressure" for constraint in constraints]
@@ -1050,16 +1059,21 @@ class InteriorAtmosphereSystem:
             for constraint in kwargs["constraints"]
             if constraint.field == "mass"
         ]
+        for constraint in mass_constraints:
+            logger.info("Adding constraint from mass balance: %s", constraint.species)
+
         initial_log10_pressures: np.ndarray = np.zeros_like(
             self.molecules, dtype="float64"
         )
-        sol, _, _, mesg = fsolve(
+        sol, infodict, _, mesg = fsolve(
             self.objective_func,
             initial_log10_pressures,
             args=(coeff_matrix, rhs, mass_constraints),
             full_output=True,
         )
         logger.info(mesg)
+        logger.info("Number of function calls = %d", infodict["nfev"])
+        logger.info("Final objective function evaluation = %s", infodict["fvec"])  # type: ignore
 
         return sol
 
@@ -1080,15 +1094,16 @@ class InteriorAtmosphereSystem:
 
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
-        for index, constraint in enumerate(mass_constraints):
-            for molecule in self.molecules:
-                residual_mass[index] += molecule.mass(
-                    partial_pressure_bar=self.pressures[index],
+        for constraint_index, constraint in enumerate(mass_constraints):
+            for molecule_index, molecule in enumerate(self.molecules):
+                residual_mass[constraint_index] += molecule.mass(
+                    partial_pressure_bar=self.pressures[molecule_index],
                     atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
                     element=constraint.species,
                 )
-            residual_mass[index] -= constraint.value
-            residual_mass[index] /= constraint.value
+            residual_mass[constraint_index] -= constraint.value
+            # Normalise by target mass to compute a relative residual.
+            residual_mass[constraint_index] /= constraint.value
         logger.debug("residual_mass = %s", residual_mass)
 
         # Combined residual.

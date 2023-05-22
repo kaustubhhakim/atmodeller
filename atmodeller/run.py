@@ -12,8 +12,12 @@ from typing import Any
 import numpy as np
 
 from atmodeller import OCEAN_MOLES
-from atmodeller.core import (Constraint, InteriorAtmosphereSystem,
-                             InteriorAtmosphereSystemOld, Molecule)
+from atmodeller.core import (
+    Constraint,
+    InteriorAtmosphereSystem,
+    InteriorAtmosphereSystemOld,
+    Molecule,
+)
 from atmodeller.reaction import MolarMasses
 from atmodeller.solubility import BasaltDixonCO2, NoSolubility, PeridotiteH2O
 
@@ -99,26 +103,26 @@ def main():
             molecules=molecules_new
         )
         # Test using only pressure constraints.
-        constraints: list[Constraint] = [
-            Constraint(species="CO2", value=9.449818, field="pressure"),
-            Constraint(species="H2O", value=0.378342, field="pressure"),
-        ]
-        system.solve(
-            constraints, temperature=2000, fo2_constraint=True, use_fsolve=True
-        )
+        # constraints: list[Constraint] = [
+        #     Constraint(species="CO2", value=9.449818, field="pressure"),
+        #     Constraint(species="H2O", value=0.378342, field="pressure"),
+        # ]
+        # system.solve(
+        #     constraints, temperature=2000, fo2_constraint=True, use_fsolve=True
+        # )
         # print(f"{system.pressures = }")
 
         # Test using pressure and mass constraints.
-        # molar_masses: MolarMasses = MolarMasses()
-        # n_ocean_moles: float = 1
-        # ch_ratio: float = 1
-        # h_kg: float = n_ocean_moles * OCEAN_MOLES * molar_masses.H2
-        # c_kg: float = ch_ratio * h_kg
-        # constraints: list[Constraint] = [
-        #     Constraint(species="H", value=h_kg, field="mass"),
-        #     Constraint(species="C", value=c_kg, field="mass"),
-        # ]
-        # system.solve(constraints, temperature=2000, fo2_constraint=True)
+        molar_masses: MolarMasses = MolarMasses()
+        n_ocean_moles: float = 1
+        ch_ratio: float = 1
+        h_kg: float = n_ocean_moles * OCEAN_MOLES * molar_masses.H2
+        c_kg: float = ch_ratio * h_kg
+        constraints: list[Constraint] = [
+            Constraint(species="H", value=h_kg, field="mass"),
+            Constraint(species="C", value=c_kg, field="mass"),
+        ]
+        system.solve(constraints, temperature=2000, fo2_constraint=True)
 
         # CO = system.molecules[4]
         # print(CO.name)

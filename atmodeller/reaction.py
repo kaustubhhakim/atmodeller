@@ -234,7 +234,7 @@ class MolarMasses:
 
     def __post_init__(self):
         # Define molecules here.
-        self.CH4: float = self.C + self.H * 4
+        self.CH4: float = self.C + 4 * self.H
         self.CO: float = self.C + self.O
         self.CO2: float = self.C + 2 * self.O
         self.H2: float = self.H * 2
