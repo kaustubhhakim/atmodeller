@@ -371,9 +371,11 @@ def _mass_decorator(func) -> Callable:
     """A decorator to return the mass of either the molecule or one of its elements."""
 
     @wraps(func)
-    def mass_wrapper(self: "Molecule", element: Optional[str] = None, **kwargs)->float:
+    def mass_wrapper(
+        self: "Molecule", element: Optional[str] = None, **kwargs
+    ) -> float:
         """Wrapper for mass.
-        
+
         Args:
             element: Returns the mass of this element. Defaults to None to return the molecule
                 mass.
@@ -828,12 +830,15 @@ class ReactionNetwork:
         nrows: int = number_pressure_constraints + self.number_reactions
 
         if nrows == self.number_molecules:
-            logger.info(
-                "The necessary number of constraints will be applied to solve the system"
-            )
+            msg: str = "The necessary number of constraints will be applied to "
+            msg += "the reaction network to solve the system"
+            logger.info(msg)
         else:
             num: int = self.number_molecules - nrows
-            logger.info("%d more constraint(s) are necessary to solve the system", num)
+            # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
+            msg = "%d additional (not pressure) constraint(s) are necessary " % num
+            msg += "to solve the system"
+            logger.info(msg)
 
         # Build coefficient matrix and RHS vector.
         coeff: np.ndarray = np.zeros((nrows, self.number_molecules))
@@ -867,15 +872,7 @@ class ReactionNetwork:
 
         return coeff, rhs
 
-    def solve(
-        self,
-        *,
-        constraints: list[Constraint],
-        temperature: float,
-        oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
-        fo2_shift: float = 0,
-        fo2_constraint: bool = False,
-    ) -> dict[str, float]:
+    def solve(self, **kwargs) -> np.ndarray:
         """Solves the reaction network to determine the partial pressures of all species.
 
         Applies the law of mass action.
@@ -889,45 +886,23 @@ class ReactionNetwork:
         the formation reactions are expressed in terms of log10 as well as the oxygen fugacity.
 
         Args:
-            constraints: Constraints for the system of equations.
-            temperature: Temperature.
-            oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
-                only used if `fo2_constraint` is True.
-            fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if
-                `fo2_constraint` is True.
-            fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
+            **kwargs: Keyword arguments to pass through.
 
         Returns:
-            A dictionary of all the molecules and their partial pressures.
+            The log10 of the pressures.
         """
         logger.info("Solving the reaction network")
 
-        coeff_matrix, rhs = self.get_coefficient_matrix_and_rhs(
-            constraints=constraints,
-            temperature=temperature,
-            oxygen_fugacity=oxygen_fugacity,
-            fo2_shift=fo2_shift,
-            fo2_constraint=fo2_constraint,
-        )
+        coeff_matrix, rhs = self.get_coefficient_matrix_and_rhs(**kwargs)
 
         if len(rhs) != self.number_molecules:
             num: int = self.number_molecules - len(rhs)
             raise ValueError(f"Missing {num} constraint(s) to solve the system")
 
-        solution: np.ndarray = linalg.solve(coeff_matrix, rhs)
-        logger.debug("Solution = \n%s", solution)
-        pressures: np.ndarray = 10.0**solution
+        log10_pressures: np.ndarray = linalg.solve(coeff_matrix, rhs)
+        logger.info("The solution converged.")  # For similarity with fsolve.
 
-        output: dict[str, float] = {
-            molecule: pressure
-            for (molecule, pressure) in zip(self.molecule_names, pressures)
-        }
-
-        logger.info("Solution is:")
-        for species, pressure in output.items():
-            logger.info("%s pressure (bar) = %f", species, pressure)
-
-        return output
+        return log10_pressures
 
 
 @dataclass(kw_only=True)
@@ -937,14 +912,14 @@ class InteriorAtmosphereSystem:
     molecules: list[Molecule]
     planet: PlanetProperties = field(default_factory=PlanetProperties)
     molecule_names: list[str] = field(init=False)
-    _pressures: np.ndarray = field(init=False)  # Align with order in self.molecules.
+    _log10_pressures: np.ndarray = field(init=False)  # Aligned with self.molecules.
     _reaction_network: ReactionNetwork = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating a new interior-atmosphere system")
         self.molecules.sort(key=self.molecule_sorter)
         self.molecule_names: list[str] = [molecule.name for molecule in self.molecules]
-        self._pressures = np.zeros(len(self.molecules))
+        self._log10_pressures = np.zeros_like(self.molecules, dtype="float64")
         self._reaction_network = ReactionNetwork(molecules=self.molecules)
 
     def molecule_sorter(self, molecule: Molecule) -> tuple[int, str]:
@@ -960,7 +935,21 @@ class InteriorAtmosphereSystem:
     @property
     def pressures(self) -> np.ndarray:
         """Pressures."""
-        return self._pressures
+        return 10**self.log10_pressures
+
+    @property
+    def log10_pressures(self) -> np.ndarray:
+        """Log10 pressures."""
+        return self._log10_pressures
+
+    @property
+    def pressures_dict(self) -> dict[str, float]:
+        """Pressures in a dictionary."""
+        output: dict[str, float] = {
+            molecule: pressure
+            for (molecule, pressure) in zip(self.molecule_names, self.pressures)
+        }
+        return output
 
     @property
     def atmospheric_total_pressure(self) -> float:
@@ -985,23 +974,24 @@ class InteriorAtmosphereSystem:
         oxygen_fugacity: _OxygenFugacity = IronWustiteBufferOneill(),
         fo2_shift: float = 0,
         fo2_constraint: bool = False,
-    ):
-        """Solves the system.
+        use_fsolve: Optional[bool] = None,
+    ) -> None:
+        """Solves the system with provided constraints.
 
         Depending on the user-input, this can operate with only pressure constraints, only
         mass constraints, or a combination of both.
 
         Args:
             constraints: Constraints for the system of equations.
-            temperature: float,
+            Temperature: temperature,
             oxygen_fugacity: Oxygen fugacity model. Defaults to IronWustiteBufferOneill. This is
                 only used if `fo2_constraint` is True.
             fo2_shift: log10 fo2 shift from the buffer. Defaults to 0. This is only used if
                 `fo2_constraint` is True.
             fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
-
-        Returns:
-            A dictionary of all the molecules and their partial pressures.
+            fsolve: Use fsolve to solve the system of equations. Defaults to None, which means to
+                auto select depending if the system is linear or not (which depends on the applied
+                constraints).
         """
 
         if (temperature <= TEMPERATURE_JANAF_LOW) or (
@@ -1011,13 +1001,31 @@ class InteriorAtmosphereSystem:
             msg += f"{TEMPERATURE_JANAF_HIGH} K"
             raise ValueError(msg)
 
-        # If pressure constraints only
-        if all([constraint.field == "pressure" for constraint in constraints]):
-            # Can just solve a (linear) reaction network.
+        all_pressures: bool = all(
+            [constraint.field == "pressure" for constraint in constraints]
+        )
+
+        if all_pressures and not use_fsolve:
             logger.info(
-                "Pressure constraints only so attempting to solve a linear reaction network."
+                "Pressure constraints only so attempting to solve a linear reaction network"
             )
-            self._reaction_network.solve(
+            self._log10_pressures = self._reaction_network.solve(
+                constraints=constraints,
+                temperature=temperature,
+                oxygen_fugacity=oxygen_fugacity,
+                fo2_shift=fo2_shift,
+                fo2_constraint=fo2_constraint,
+            )
+        else:
+            if all_pressures and use_fsolve:
+                msg = "Pressure constraints only and solving with fsolve"
+            else:
+                msg: str = (
+                    "Mixed pressure and mass constraints so attempting to solve a "
+                )
+                msg += "non-linear system of equations"
+            logger.info(msg)
+            self._log10_pressures = self.solve_fsolve(
                 constraints=constraints,
                 temperature=temperature,
                 oxygen_fugacity=oxygen_fugacity,
@@ -1025,7 +1033,66 @@ class InteriorAtmosphereSystem:
                 fo2_constraint=fo2_constraint,
             )
 
-        else:
-            # TODO: if mass constraints, solve non-linear problem with fO2 as the final additional
-            # constraint.
-            print("Need to solve non-linear system.")
+        logger.info(pprint.pformat(self.pressures_dict))
+
+    def solve_fsolve(self, **kwargs) -> np.ndarray:
+        """Solves the non-linear system of equations.
+
+        Args:
+            **kwargs: Keyword argument. See `self.solve`.
+        """
+        coeff_matrix, rhs = self._reaction_network.get_coefficient_matrix_and_rhs(
+            **kwargs
+        )
+
+        mass_constraints: list[Constraint] = [
+            constraint
+            for constraint in kwargs["constraints"]
+            if constraint.field == "mass"
+        ]
+        initial_log10_pressures: np.ndarray = np.zeros_like(
+            self.molecules, dtype="float64"
+        )
+        sol, _, _, mesg = fsolve(
+            self.objective_func,
+            initial_log10_pressures,
+            args=(coeff_matrix, rhs, mass_constraints),
+            full_output=True,
+        )
+        logger.info(mesg)
+
+        return sol
+
+    def objective_func(
+        self,
+        log10_pressures: np.ndarray,
+        coeff_matrix: np.ndarray,
+        rhs: np.ndarray,
+        mass_constraints: list[Constraint],
+    ) -> np.ndarray:
+        """Objective function for the non-linear system."""
+
+        self._log10_pressures = log10_pressures
+
+        # Compute residual for the reaction network.
+        residual_reaction: np.ndarray = coeff_matrix.dot(self.log10_pressures) - rhs
+        logger.debug("residual_reaction = %s", residual_reaction)
+
+        # Compute residual for the mass balance.
+        residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
+        for index, constraint in enumerate(mass_constraints):
+            for molecule in self.molecules:
+                residual_mass[index] += molecule.mass(
+                    partial_pressure_bar=self.pressures[index],
+                    atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
+                    element=constraint.species,
+                )
+            residual_mass[index] -= constraint.value
+            residual_mass[index] /= constraint.value
+        logger.debug("residual_mass = %s", residual_mass)
+
+        # Combined residual.
+        residual: np.ndarray = np.concatenate((residual_reaction, residual_mass))
+        logger.debug("residual = %s", residual)
+
+        return residual

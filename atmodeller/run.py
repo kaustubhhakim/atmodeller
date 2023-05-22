@@ -11,8 +11,10 @@ from typing import Any
 
 import numpy as np
 
+from atmodeller import OCEAN_MOLES
 from atmodeller.core import (Constraint, InteriorAtmosphereSystem,
                              InteriorAtmosphereSystemOld, Molecule)
+from atmodeller.reaction import MolarMasses
 from atmodeller.solubility import BasaltDixonCO2, NoSolubility, PeridotiteH2O
 
 logger: logging.Logger = logging.getLogger("atmodeller")
@@ -101,21 +103,36 @@ def main():
             Constraint(species="CO2", value=9.449818, field="pressure"),
             Constraint(species="H2O", value=0.378342, field="pressure"),
         ]
-        system.solve(constraints, temperature=2000, fo2_constraint=True)
+        system.solve(
+            constraints, temperature=2000, fo2_constraint=True, use_fsolve=True
+        )
+        # print(f"{system.pressures = }")
 
-        CO = system.molecules[4]
-        print(CO.name)
+        # Test using pressure and mass constraints.
+        # molar_masses: MolarMasses = MolarMasses()
+        # n_ocean_moles: float = 1
+        # ch_ratio: float = 1
+        # h_kg: float = n_ocean_moles * OCEAN_MOLES * molar_masses.H2
+        # c_kg: float = ch_ratio * h_kg
+        # constraints: list[Constraint] = [
+        #     Constraint(species="H", value=h_kg, field="mass"),
+        #     Constraint(species="C", value=c_kg, field="mass"),
+        # ]
+        # system.solve(constraints, temperature=2000, fo2_constraint=True)
+
+        # CO = system.molecules[4]
+        # print(CO.name)
         # CO.mass_in_atmosphere()
-        a = CO.mass_in_atmosphere(
-            partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
-        )  # , element="O"
+        # a = CO.mass_in_atmosphere(
+        #    partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
+        # )  # , element="O"
         # )
-        b = CO.mass(
-            partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
-        )  # , element="O"
+        # b = CO.mass(
+        #    partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
+        # )  # , element="O"
         #     )
-        print(a)
-        print(b)
+        # print(a)
+        # print(b)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)
