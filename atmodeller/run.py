@@ -66,7 +66,7 @@ def main():
         help="Nitrogen abundance in ppmw",
         action="store",
         type=float,
-        default=2.8,  # 2.8 is the mantle value of N in ppmw
+        default=0,  # 2.8,  # 2.8 is the mantle value of N in ppmw
     )
     parser.add_argument(
         "-r",
@@ -89,6 +89,9 @@ def main():
         single_solve(kwargs, interior_atmos_system)
 
     if args.test:
+        # For testing old.
+        out = single_solve(kwargs, interior_atmos_system)
+
         logger.info("Running test to solve the system with applied constraints")
 
         molecules_new: list[Molecule] = [
@@ -96,7 +99,7 @@ def main():
             Molecule("H2", NoSolubility(), 0),
             Molecule("CO", NoSolubility(), 0),
             Molecule("CO2", BasaltDixonCO2(), 0),
-            Molecule("CH4", NoSolubility(), 0),
+            # Molecule("CH4", NoSolubility(), 0),
             Molecule("O2", NoSolubility(), 0),
         ]
         system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -114,29 +117,25 @@ def main():
 
         # Test using pressure and mass constraints.
         molar_masses: MolarMasses = MolarMasses()
-        n_ocean_moles: float = 1
-        ch_ratio: float = 1
+        n_ocean_moles: float = kwargs["n_ocean_moles"]
+        ch_ratio: float = kwargs["ch_ratio"]
         h_kg: float = n_ocean_moles * OCEAN_MOLES * molar_masses.H2
         c_kg: float = ch_ratio * h_kg
+        fo2_shift = kwargs["fo2_shift"]
         constraints: list[Constraint] = [
             Constraint(species="H", value=h_kg, field="mass"),
             Constraint(species="C", value=c_kg, field="mass"),
         ]
-        system.solve(constraints, temperature=2000, fo2_constraint=True)
-
-        # CO = system.molecules[4]
-        # print(CO.name)
-        # CO.mass_in_atmosphere()
-        # a = CO.mass_in_atmosphere(
-        #    partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
-        # )  # , element="O"
-        # )
-        # b = CO.mass(
-        #    partial_pressure_bar=1, atmosphere_mean_molar_mass=1e-3
-        # )  # , element="O"
-        #     )
-        # print(a)
-        # print(b)
+        system.solve(
+            constraints, temperature=2000, fo2_constraint=True, fo2_shift=fo2_shift
+        )
+        for molecule in system.molecule_names:
+            if molecule in out:
+                delta = out[molecule] - system.pressures_dict[molecule]
+                delta /= system.pressures_dict[molecule]
+                print(delta)
+                if delta > 1.0e-3:
+                    raise ValueError("Answers do not agree")
 
     end: float = time.time()
     runtime: float = round(end - start, 1)

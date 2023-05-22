@@ -10,26 +10,16 @@ import numpy as np
 from scipy import linalg
 from scipy.optimize import fsolve
 
-from atmodeller.reaction import (
-    FormationEquilibriumConstants,
-    IronWustiteBufferOneill,
-    IvtanthermoCH4,
-    JanafC,
-    JanafH,
-    MolarMasses,
-    _OxygenFugacity,
-)
-from atmodeller.solubility import BasaltDixonCO2, LibourelN2, PeridotiteH2O, Solubility
+from atmodeller.reaction import (FormationEquilibriumConstants,
+                                 IronWustiteBufferOneill, IvtanthermoCH4,
+                                 JanafC, JanafH, MolarMasses, _OxygenFugacity)
+from atmodeller.solubility import (BasaltDixonCO2, LibourelN2, PeridotiteH2O,
+                                   Solubility)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-from atmodeller import (
-    GAS_CONSTANT,
-    GRAVITATIONAL_CONSTANT,
-    OCEAN_MOLES,
-    TEMPERATURE_JANAF_HIGH,
-    TEMPERATURE_JANAF_LOW,
-)
+from atmodeller import (GAS_CONSTANT, GRAVITATIONAL_CONSTANT, OCEAN_MOLES,
+                        TEMPERATURE_JANAF_HIGH, TEMPERATURE_JANAF_LOW)
 
 
 @dataclass(kw_only=True)
@@ -382,7 +372,7 @@ def _mass_decorator(func) -> Callable:
     def mass_wrapper(
         self: "Molecule", element: Optional[str] = None, **kwargs
     ) -> float:
-        """Wrapper for mass.
+        """Wrapper to return the mass of either the molecule or one of its elements.
 
         Args:
             element: Returns the mass of this element. Defaults to None to return the molecule
@@ -1062,16 +1052,37 @@ class InteriorAtmosphereSystem:
         for constraint in mass_constraints:
             logger.info("Adding constraint from mass balance: %s", constraint.species)
 
-        initial_log10_pressures: np.ndarray = np.zeros_like(
+        initial_log10_pressures: np.ndarray = np.ones_like(
             self.molecules, dtype="float64"
         )
-        sol, infodict, _, mesg = fsolve(
-            self.objective_func,
-            initial_log10_pressures,
-            args=(coeff_matrix, rhs, mass_constraints),
-            full_output=True,
-        )
-        logger.info(mesg)
+        logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
+        ier: int = 0
+        # Count the number of attempts to solve the system by randomising the initial condition.
+        ic_count: int = 1
+        ic_count_max: int = 10
+        while ier != 1 and ic_count <= ic_count_max:
+            sol, infodict, ier, mesg = fsolve(
+                self.objective_func,
+                initial_log10_pressures,
+                args=(coeff_matrix, rhs, mass_constraints),
+                full_output=True,
+            )
+            logger.info(mesg)
+            if ier != 1:
+                logger.info(
+                    "Retrying with a new randomised initial condition (attempt %d)",
+                    ic_count,
+                )
+                initial_log10_pressures *= np.random.random_sample()
+                logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
+                ic_count += 1
+
+        if ic_count == ic_count_max:
+            logger.error(
+                "Maximum number of randomised initial conditions has been exceeded"
+            )
+            raise RuntimeError("Solution cannot be found")
+
         logger.info("Number of function calls = %d", infodict["nfev"])
         logger.info("Final objective function evaluation = %s", infodict["fvec"])  # type: ignore
 
@@ -1084,8 +1095,17 @@ class InteriorAtmosphereSystem:
         rhs: np.ndarray,
         mass_constraints: list[Constraint],
     ) -> np.ndarray:
-        """Objective function for the non-linear system."""
+        """Objective function for the non-linear system.
 
+        Args:
+            log10_pressures: Log10 of the pressures of each molecule.
+            coeff_matrix: The coefficient matrix from the reaction network.
+            rhs: The RHS from the reaction network.
+            mass_constraints: Mass constraints to apply.
+
+        Returns:
+            The solution, which is the log10 of the pressures for each molecule.
+        """
         self._log10_pressures = log10_pressures
 
         # Compute residual for the reaction network.
