@@ -9,7 +9,7 @@ import numpy as np
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class _OxygenFugacity(ABC):
+class OxygenFugacity(ABC):
     """Oxygen fugacity base class."""
 
     @abstractmethod
@@ -37,7 +37,7 @@ class _OxygenFugacity(ABC):
         return self._buffer(temperature=temperature) + fo2_shift
 
 
-class IronWustiteBufferOneill(_OxygenFugacity):
+class IronWustiteBufferOneill(OxygenFugacity):
     """Iron-wustite buffer from O'Neill and Eggins (2002). See Table 6.
 
     https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
@@ -57,7 +57,7 @@ class IronWustiteBufferOneill(_OxygenFugacity):
         return buffer
 
 
-class IronWustiteBufferFischer(_OxygenFugacity):
+class IronWustiteBufferFischer(OxygenFugacity):
     """Iron-wustite buffer from Fischer et al. (2011).
 
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
@@ -124,6 +124,7 @@ class FormationEquilibriumConstants:
     O2: tuple[float, float] = (0, 0)
     # TODO: Commented out by Laura so check values.
     # NH3: tuple[float, float] = (-45.9, 192.77)
+
 
 class Solubility(ABC):
     """Solubility base class."""

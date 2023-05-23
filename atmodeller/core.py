@@ -11,21 +11,29 @@ from numpy.linalg import LinAlgError
 from scipy import linalg
 from scipy.optimize import fsolve
 
-from atmodeller import (GAS_CONSTANT, GRAVITATIONAL_CONSTANT,
-                        TEMPERATURE_JANAF_HIGH, TEMPERATURE_JANAF_LOW)
-from atmodeller.thermodynamics import (FormationEquilibriumConstants,
-                                       IronWustiteBufferOneill, MolarMasses,
-                                       NoSolubility, Solubility,
-                                       _OxygenFugacity)
+from atmodeller import (
+    GAS_CONSTANT,
+    GRAVITATIONAL_CONSTANT,
+    TEMPERATURE_JANAF_HIGH,
+    TEMPERATURE_JANAF_LOW,
+)
+from atmodeller.thermodynamics import (
+    FormationEquilibriumConstants,
+    IronWustiteBufferOneill,
+    MolarMasses,
+    NoSolubility,
+    OxygenFugacity,
+    Solubility,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class PlanetProperties:
+class Planet:
     """The properties of a planet.
 
-    Default values are for a reduced (Iron-Wustite buffer) and fully molten Earth.
+    Default values are for a reduced (at the Iron-Wustite buffer) and fully molten Earth.
 
     Args:
         mantle_mass: Mass of the planetary mantle. Defaults to Earth.
@@ -34,7 +42,7 @@ class PlanetProperties:
             Earth.
         surface_radius: Radius of the planetary surface. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
-        oxygen_fugacity: Oxygen fugacity model for the mantle. Defaults to
+        fo2_model: Oxygen fugacity model for the mantle. Defaults to
             IronWustiteBufferOneill,
         fo2_shift: log10 shift of the oxygen fugacity relative to the prescribed model.
 
@@ -55,7 +63,7 @@ class PlanetProperties:
     core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
     surface_radius: float = 6371000.0  # m, Earth's radius
     surface_temperature: float = 2000.0  # K
-    fo2_model: _OxygenFugacity = field(default_factory=IronWustiteBufferOneill)
+    fo2_model: OxygenFugacity = field(default_factory=IronWustiteBufferOneill)
     fo2_shift: float = 0
     planet_mass: float = field(init=False)
     surface_gravity: float = field(init=False)
@@ -192,7 +200,7 @@ class Molecule:
     def mass_in_atmosphere(
         self,
         *,
-        planet: PlanetProperties,
+        planet: Planet,
         partial_pressure_bar: float,
         atmosphere_mean_molar_mass: float,
         element: Optional[str] = None,
@@ -220,7 +228,7 @@ class Molecule:
     def mass_in_melt(
         self,
         *,
-        planet: PlanetProperties,
+        planet: Planet,
         partial_pressure_bar: float,
         element: Optional[str] = None,
     ) -> float:
@@ -248,7 +256,7 @@ class Molecule:
     def mass_in_solid(
         self,
         *,
-        planet: PlanetProperties,
+        planet: Planet,
         partial_pressure_bar: float,
         element: Optional[str] = None,
     ) -> float:
@@ -276,7 +284,7 @@ class Molecule:
     def mass(
         self,
         *,
-        planet: PlanetProperties,
+        planet: Planet,
         partial_pressure_bar: float,
         atmosphere_mean_molar_mass: float,
         element: Optional[str] = None,
@@ -525,7 +533,7 @@ class ReactionNetwork:
         self,
         *,
         constraints: list[SystemConstraint],
-        planet: PlanetProperties,
+        planet: Planet,
         fo2_constraint: bool = False,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Builds the coefficient matrix and the right hand side (RHS) vector.
@@ -648,7 +656,7 @@ class InteriorAtmosphereSystem:
     """An interior-atmosphere system."""
 
     molecules: list[Molecule]
-    planet: PlanetProperties = field(default_factory=PlanetProperties)
+    planet: Planet = field(default_factory=Planet)
     molecule_names: list[str] = field(init=False)
     number_molecules: int = field(init=False)
     _log10_pressures: np.ndarray = field(init=False)  # Aligned with self.molecules.
