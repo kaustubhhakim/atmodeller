@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -68,152 +68,6 @@ class IronWustiteBufferFischer(_OxygenFugacity):
         buffer: float = 6.94059 - 28.1808 * 1e3 / temperature
         return buffer
 
-
-# TODO: Once the chemical network approach has been tested and verified, the approach below will
-# have been superseded.
-@dataclass
-class _Reaction:
-    """A gas phase reaction.
-
-    Args:
-        temperature_factor: Factor to multiply 1/temperature for the equilibrium constant.
-        constant: Constant factor to add for the equilibrium constant.
-        fo2_stoichiometry: The stoichiometry of oxygen in the reaction.
-        oxygen_fugacity: The oxygen fugacity model to use for the reaction.
-    """
-
-    temperature_factor: float
-    constant: float
-    fo2_stoichiometry: float
-    oxygen_fugacity: _OxygenFugacity = field(default_factory=IronWustiteBufferOneill)
-
-    def equilibrium_constant_log10(self, *, temperature: float) -> float:
-        """Log10 of the equilibrium constant.
-
-        Args:
-            temperature: Temperature.
-
-        Returns:
-            Log10 of the equilibrium constant of the reaction.
-        """
-        return self.temperature_factor / temperature + self.constant
-
-    def equilibrium_constant(self, *, temperature: float) -> float:
-        """Equilibrium constant.
-
-        Args:
-            temperature: Temperature.
-
-        Returns:
-            The equilibrium constant of the reaction.
-        """
-        return 10 ** self.equilibrium_constant_log10(temperature=temperature)
-
-    def modified_equilibrium_constant_log10(
-        self, *, temperature: float, fo2_shift: float
-    ) -> float:
-        """Log10 of the 'modified' equilibrium constant, which includes oxygen fugacity.
-
-        Args:
-            temperature: Temperature.
-            fo2_shift: log10 shift relative to the buffer.
-
-        Returns:
-            Log10 of the 'modified' equilibrium constant.
-        """
-        return self.equilibrium_constant_log10(
-            temperature=temperature
-        ) - self.fo2_stoichiometry * self.oxygen_fugacity(
-            temperature=temperature, fo2_shift=fo2_shift
-        )
-
-    def modified_equilibrium_constant(
-        self, *, temperature: float, fo2_shift: float
-    ) -> float:
-        """The 'modified' equilibrium constant, which includes oxygen fugacity.
-
-        Args:
-            temperature: Temperature.
-            fo2_shift: log10 shift relative to the buffer.
-
-        Returns:
-            The 'modified' equilibrium constant.
-        """
-        return 10.0 ** self.modified_equilibrium_constant_log10(
-            temperature=temperature, fo2_shift=fo2_shift
-        )
-
-
-@dataclass
-class JanafC(_Reaction):
-    """CO2 = CO + 0.5 fo2.
-
-    JANAF log10Keq, 1500 < T < 3000. Fit by P. Sossi.
-    """
-
-    temperature_factor: float = -14467.511400133637
-    constant: float = 4.348135473316284
-    fo2_stoichiometry: float = 0.5
-
-
-@dataclass
-class JanafH(_Reaction):
-    """H2O = H2 + 0.5 fo2.
-
-    JANAF log10Keq, 1500 < T < 3000. Fit by P. Sossi.
-    """
-
-    temperature_factor: float = -13152.477779978302
-    constant: float = 3.038586383273608
-    fo2_stoichiometry: float = 0.5
-
-
-@dataclass
-class IvtanthermoC(_Reaction):
-    """CO2 = CO + 0.5 fo2.
-
-    IVANTHERMO log10Keq, 298.15 < T < 2000. Fit by Schaefer and Fegley (2017).
-
-    https://ui.adsabs.harvard.edu/abs/2017ApJ...843..120S/abstract
-    """
-
-    temperature_factor: float = -14787
-    constant: float = 4.5472
-    fo2_stoichiometry: float = 0.5
-
-
-@dataclass
-class IvtanthermoCH4(_Reaction):
-    """CO2 + 2H2 = CH4 + fo2.
-
-    IVANTHERMO log10Keq, 298.15 < T < 2000. Fit by Schaefer and Fegley (2017).
-
-    https://ui.adsabs.harvard.edu/abs/2017ApJ...843..120S/abstract
-    """
-
-    temperature_factor: float = -16276
-    constant: float = -5.4738
-    fo2_stoichiometry: float = 1
-
-
-@dataclass
-class IvtanthermoH(_Reaction):
-    """H2O = H2 + 0.5 fo2.
-
-    IVANTHERMO log10Keq, 298.15 < T < 2000. Fit by Schaefer and Fegley (2017).
-
-    https://ui.adsabs.harvard.edu/abs/2017ApJ...843..120S/abstract
-    """
-
-    temperature_factor: float = -12794
-    constant: float = 2.7768
-    fo2_stoichiometry: float = 0.5
-
-
-# TODO: Once the chemical network approach has been tested and verified, the approach above will
-# have been superseded.
-
-
 @dataclass
 class MolarMasses:
     """Molar masses of atoms and molecules in kg/mol.
@@ -250,7 +104,7 @@ class FormationEquilibriumConstants:
     """Formation equilibrium constants.
 
     These parameters result from a linear fit in temperature space to the log Kf column in the
-    JANAF data tables for a given molecule. See the jupyter notebook in 'janaf'.
+    JANAF data tables for a given molecule. See the jupyter notebook in 'janaf/'.
 
     log10(Kf) = a + b/T
 

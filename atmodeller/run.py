@@ -12,12 +12,8 @@ from typing import Any
 import numpy as np
 
 from atmodeller import OCEAN_MOLES
-from atmodeller.core import (
-    Constraint,
-    InteriorAtmosphereSystem,
-    InteriorAtmosphereSystemOld,
-    Molecule,
-)
+from atmodeller.core import (InteriorAtmosphereSystem, Molecule,
+                             SystemConstraint)
 from atmodeller.reaction import MolarMasses
 from atmodeller.solubility import BasaltDixonCO2, NoSolubility, PeridotiteH2O
 
@@ -144,7 +140,7 @@ def main():
 
 
 def single_solve(
-    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystemOld
+    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystem
 ) -> dict[str, float]:
     """Solve an atmosphere-interior system.
 
@@ -159,6 +155,11 @@ def single_solve(
     ch_ratio: float = kwargs["ch_ratio"]
     fo2_shift: float = kwargs["fo2_shift"]
     nitrogen_ppmw: float = kwargs["nitrogen"]
+
+
+
+
+
     output: dict[str, float] = interior_atmos_system.solve(
         n_ocean_moles=n_ocean_moles,
         ch_ratio=ch_ratio,
@@ -171,7 +172,7 @@ def single_solve(
 
 
 def monte_carlo_simulation(
-    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystemOld
+    kwargs: dict[str, Any], interior_atmos_system: InteriorAtmosphereSystem
 ):
     """Monte Carlo simulation to produce realisations of atmospheric conditions.
 

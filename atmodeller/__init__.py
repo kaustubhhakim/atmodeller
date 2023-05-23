@@ -89,3 +89,7 @@ GAS_CONSTANT: float = 8.31446261815324  # J/K/mol
 # Temperature range used to fit the JANAF data.
 TEMPERATURE_JANAF_HIGH = 3000  # K
 TEMPERATURE_JANAF_LOW = 1500  # K
+
+from atmodeller.core import InteriorAtmosphereSystem  # type: ignore
+from atmodeller.core import Molecule, SystemConstraint
+from atmodeller.reaction import MolarMasses
