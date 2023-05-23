@@ -92,4 +92,4 @@ TEMPERATURE_JANAF_LOW = 1500  # K
 
 from atmodeller.core import InteriorAtmosphereSystem  # type: ignore
 from atmodeller.core import Molecule, SystemConstraint
-from atmodeller.reaction import MolarMasses
+from atmodeller.thermodynamics import MolarMasses
