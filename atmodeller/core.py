@@ -141,7 +141,7 @@ class Molecule:
     molar_mass: float = field(init=False)
 
     def __post_init__(self):
-        logger.info("Creating a new molecule: %s", self.name)
+        logger.info("Creating a molecule: %s", self.name)
         masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
         self.element_masses = {
