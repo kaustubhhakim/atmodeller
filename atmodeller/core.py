@@ -11,20 +11,12 @@ from numpy.linalg import LinAlgError
 from scipy import linalg
 from scipy.optimize import fsolve
 
-from atmodeller import (
-    GAS_CONSTANT,
-    GRAVITATIONAL_CONSTANT,
-    TEMPERATURE_JANAF_HIGH,
-    TEMPERATURE_JANAF_LOW,
-)
-from atmodeller.thermodynamics import (
-    FormationEquilibriumConstants,
-    IronWustiteBufferOneill,
-    MolarMasses,
-    NoSolubility,
-    OxygenFugacity,
-    Solubility,
-)
+from atmodeller import (GAS_CONSTANT, GRAVITATIONAL_CONSTANT,
+                        TEMPERATURE_JANAF_HIGH, TEMPERATURE_JANAF_LOW)
+from atmodeller.thermodynamics import (FormationEquilibriumConstants,
+                                       IronWustiteBufferOneill, MolarMasses,
+                                       NoSolubility, OxygenFugacity,
+                                       Solubility)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -724,7 +716,7 @@ class InteriorAtmosphereSystem:
         *,
         fo2_constraint: bool = False,
         use_fsolve: Optional[bool] = None,
-    ) -> None:
+    ) -> dict[str, float]:
         """Solves the system to determine the partial pressures with provided constraints.
 
         Depending on the user-input, this can operate with only pressure constraints, only
@@ -736,6 +728,9 @@ class InteriorAtmosphereSystem:
             use_fsolve: Use fsolve to solve the system of equations. Defaults to None, which means
                 to auto select depending if the system is linear or not (which depends on the
                 applied constraints).
+
+        Returns:
+            The pressures in bar.
         """
         # The formation energy data is only fit between a certain temperature range.
         if (self.planet.surface_temperature <= TEMPERATURE_JANAF_LOW) or (
@@ -781,6 +776,8 @@ class InteriorAtmosphereSystem:
             )
 
         logger.info(pprint.pformat(self.pressures_dict))
+
+        return self.pressures_dict
 
     def _solve_fsolve(self, **kwargs) -> np.ndarray:
         """Solves the non-linear system of equations.
