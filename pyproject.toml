@@ -6,7 +6,7 @@ authors = ["Dan J Bower <djbower@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9, <3.12"
+python = "^3.10, <3.12"
 scipy = "^1.10.1"
 numpy = "^1.24.3"
 pandas = "^2.0.1"
