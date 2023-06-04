@@ -13,8 +13,14 @@ handler: logging.Handler = logging.StreamHandler()
 handler.setLevel(logging.DEBUG)
 
 # Create a formatter for the log messages.
-fmt: str = "[%(asctime)s - %(name)-20s - %(lineno)03d - %(levelname)-9s - %(funcName)s()] %(message)s"
-formatter: logging.Formatter = logging.Formatter(fmt, datefmt = "%Y-%m-%d %H:%M:%S")
+# Simple formatter.
+fmt: str = "%(asctime)s - %(name)-20s - %(levelname)-9s - %(message)s"
+datefmt: str = "%H:%M:%S"
+
+# Complex formatter.
+# fmt: str = "[%(asctime)s - %(name)-20s - %(lineno)03d - %(levelname)-9s - %(funcName)s()] %(message)s"
+# datefmt: str = "Y-%m-%d %H:%M:%S"
+formatter: logging.Formatter = logging.Formatter(fmt, datefmt=datefmt)
 handler.setFormatter(formatter)
 
 # Add the handler to the logger.
