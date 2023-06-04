@@ -27,10 +27,10 @@ If you prefer, I can send you a package tarball that you can install using the t
 	atmodeller.__file__
 	```
 This will report the location of the *atmodeller* package on your system, from which you can determine the path to *atmodeller/docs*. This directory contains the Jupyter notebook tutorials, which you can copy to a different location if you wish.
-5. With the *docs* location known, you can now access the Jupyter notebook tutorials. Exit the Python command line first, and then in the terminal type:
+6. With the *docs* location known, you can now access the Jupyter notebook tutorials. Exit the Python command line first, and then in the terminal type:
 
 	```
 	jupyter notebook docs/1_basics.ipynb
 	```
 where the path name is updated according to where *docs* is on your system and the notebook you want to open.
-6. In the Jupyter notebook window you may have to *trust* the notebook for all features to work.
+7. In the Jupyter notebook window you may have to *trust* the notebook for all features to work.
