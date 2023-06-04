@@ -648,7 +648,22 @@ class ReactionNetwork:
 
 @dataclass(kw_only=True)
 class InteriorAtmosphereSystem:
-    """An interior-atmosphere system."""
+    """An interior-atmosphere system.
+    
+    Args:
+        molecules: A list of molecules.
+
+    Attributes:
+        molecules: A list of molecules.
+        planet: A planet. Defaults to a molten Earth.
+        molecule_names: A list of the molecule names.
+        number_molecules: The number of molecules.
+        pressures: The molecule pressures (bar).
+        log10_pressures: Log10 of the molecule pressures.
+        atmospheric_total_pressure: Total atmospheric pressure.
+        atmospheric_mean_molar_mass: Mean molar mass of the atmosphere.
+        pressures_dict: The pressures of the molecules (bar) in a dictionary.
+    """
 
     molecules: list[Molecule]
     planet: Planet = field(default_factory=Planet)
@@ -819,7 +834,7 @@ class InteriorAtmosphereSystem:
 
         while ier != 1 and ic_count <= ic_count_max:
             sol, infodict, ier, mesg = fsolve(
-                self.objective_func,
+                self._objective_func,
                 initial_log10_pressures,
                 args=(design_matrix, rhs, mass_constraints),
                 full_output=True,
@@ -846,7 +861,7 @@ class InteriorAtmosphereSystem:
 
         return sol
 
-    def objective_func(
+    def _objective_func(
         self,
         log10_pressures: np.ndarray,
         design_matrix: np.ndarray,
