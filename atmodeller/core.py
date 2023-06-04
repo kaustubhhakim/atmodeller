@@ -319,6 +319,9 @@ class SystemConstraint:
             element for a mass constraint.
         value: Imposed value in kg for masses and bar for pressures.
         field: Either 'pressure' or 'mass'.
+
+    Attributes:
+        See Args.
     """
 
     species: str

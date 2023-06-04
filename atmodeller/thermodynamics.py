@@ -73,6 +73,8 @@ class IronWustiteBufferFischer(OxygenFugacity):
 class MolarMasses:
     """Molar masses of atoms and molecules in kg/mol.
 
+    Note some AI-generated and should be checked for correctness.
+
     There is a library that could do this, but it would add a dependency and there is always a
     risk it wouldn't be supported in the future:
 
@@ -81,14 +83,65 @@ class MolarMasses:
 
     # Define atoms here.
     # pylint: disable=invalid-name
-    C: float = 12.0107e-3
     H: float = 1.0079e-3
+    He: float = 4.0026e-3
+    Li: float = 6.941e-3
+    Be: float = 9.0122e-3
+    B: float = 10.81e-3
+    C: float = 12.0107e-3
     N: float = 14.0067e-3
     O: float = 15.9994e-3
+    F: float = 18.9984e-3
+    Ne: float = 20.1797e-3
+    Na: float = 22.9897e-3
+    Mg: float = 24.305e-3
+    Al: float = 26.9815e-3
+    Si: float = 28.0855e-3
+    P: float = 30.9738e-3
     S: float = 32.065e-3
+    Cl: float = 35.453e-3
+    K: float = 39.0983e-3
+    Ar: float = 39.948e-3
+    Ca: float = 40.078e-3
+    Sc: float = 44.9559e-3
+    Ti: float = 47.867e-3
+    V: float = 50.9415e-3
+    Cr: float = 51.9961e-3
+    Mn: float = 54.938e-3
+    Fe: float = 55.845e-3
+    Ni: float = 58.6934e-3
+    Co: float = 58.9332e-3
+    Cu: float = 63.546e-3
+    Zn: float = 65.38e-3
+    Ga: float = 69.723e-3
+    Ge: float = 72.63e-3
+    As: float = 74.9216e-3
+    Se: float = 78.96e-3
+    Br: float = 79.904e-3
+    Kr: float = 83.798e-3
+    Rb: float = 85.4678e-3
+    Sr: float = 87.62e-3
+    Y: float = 88.9059e-3
+    Zr: float = 91.224e-3
+    Nb: float = 92.9064e-3
+    Mo: float = 95.94e-3
+    Tc: float = 98.0e-3
+    Ru: float = 101.07e-3
+    Rh: float = 102.9055e-3
+    Pd: float = 106.42e-3
+    Ag: float = 107.8682e-3
+    Cd: float = 112.411e-3
+    In: float = 114.818e-3
+    Sn: float = 118.71e-3
+    Sb: float = 121.76e-3
+    I: float = 126.9045e-3
+    Te: float = 127.6e-3
+    Xe: float = 131.293e-3
 
     def __post_init__(self):
-        # Define molecules here.
+        # Define molecules here. Of course, for a given molecule name this could be automatically
+        # determined using basic string operations, thereby avoiding this requirement to manually
+        # compute the masses of molecules.
         self.CH4: float = self.C + 4 * self.H
         self.CO: float = self.C + self.O
         self.CO2: float = self.C + 2 * self.O
@@ -98,6 +151,44 @@ class MolarMasses:
         self.NH3: float = self.N + 3 * self.H
         self.O2: float = self.O * 2
         self.SO2: float = self.S + 2 * self.O
+        self.F2: float = self.F * 2
+        self.NaCl: float = self.Na + self.Cl
+        self.CaCO3: float = self.Ca + self.C + 3 * self.O
+        self.KBr: float = self.K + self.Br
+        self.MgO: float = self.Mg + self.O
+        self.PCl5: float = self.P + 5 * self.Cl
+        self.SiO2: float = self.Si + 2 * self.O
+        self.SF6: float = self.S + 6 * self.F
+        self.Al2O3: float = 2 * self.Al + 3 * self.O
+        self.COCl2: float = self.C + self.O + 2 * self.Cl
+        self.HF: float = self.H + self.F
+        self.HBr: float = self.H + self.Br
+        self.SiF4: float = self.Si + 4 * self.F
+        self.NaHCO3: float = self.Na + self.H + self.C + 3 * self.O
+        self.MgCl2: float = self.Mg + 2 * self.Cl
+        self.P2O5: float = 2 * self.P + 5 * self.O
+        self.SO3: float = self.S + 3 * self.O
+        self.SO4: float = self.S + 4 * self.O
+        self.Na2CO3: float = 2 * self.Na + self.C + 3 * self.O
+        self.K2SO4: float = 2 * self.K + self.S + 4 * self.O
+        self.H2SO4: float = self.H * 2 + self.S + 4 * self.O
+        self.KOH: float = self.K + self.O + self.H
+        self.NaOH: float = self.Na + self.O + self.H
+        self.CaO: float = self.Ca + self.O
+        self.P4O10: float = 4 * self.P + 10 * self.O
+        self.SiO: float = self.Si + self.O
+        self.P4S3: float = 4 * self.P + 3 * self.S
+        self.SiS2: float = self.Si + 2 * self.S
+        self.Sb2S3: float = 2 * self.Sb + 3 * self.S
+        self.As2S3: float = 2 * self.As + 3 * self.S
+        self.SnO2: float = self.Sn + 2 * self.O
+        self.Sb2O3: float = 2 * self.Sb + 3 * self.O
+        self.As2O5: float = 2 * self.As + 5 * self.O
+        self.SnCl4: float = self.Sn + 4 * self.Cl
+        self.SbCl3: float = self.Sb + 3 * self.Cl
+        self.I2: float = self.I * 2
+        self.TeO2: float = self.Te + 2 * self.O
+        self.XeF4: float = self.Xe + 4 * self.F
 
 
 @dataclass(frozen=True)
