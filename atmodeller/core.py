@@ -524,14 +524,14 @@ class ReactionNetwork:
         )
         return equilibrium_constant
 
-    def get_coefficient_matrix_and_rhs(
+    def get_design_matrix_and_rhs(
         self,
         *,
         constraints: list[SystemConstraint],
         planet: Planet,
         fo2_constraint: bool = False,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Builds the coefficient matrix and the right hand side (RHS) vector.
+        """Builds the design matrix and the right hand side (RHS) vector.
 
         Args:
             constraints: Constraints for the system of equations.
@@ -573,7 +573,7 @@ class ReactionNetwork:
             msg += "to solve the system"
             logger.info(msg)
 
-        # Build coefficient matrix and RHS vector.
+        # Build design matrix and RHS vector.
         coeff: np.ndarray = np.zeros((nrows, self.number_molecules))
         rhs: np.ndarray = np.zeros(nrows)
 
@@ -600,7 +600,7 @@ class ReactionNetwork:
             coeff[row_index, molecule_index] = 1
             rhs[row_index] = np.log10(constraint.value)
 
-        logger.debug("Coefficient matrix = \n%s", coeff)
+        logger.debug("Design matrix = \n%s", coeff)
         logger.debug("RHS vector = \n%s", rhs)
 
         return coeff, rhs
@@ -628,14 +628,14 @@ class ReactionNetwork:
         """
         logger.info("Solving the reaction network")
 
-        coeff_matrix, rhs = self.get_coefficient_matrix_and_rhs(**kwargs)
+        design_matrix, rhs = self.get_design_matrix_and_rhs(**kwargs)
 
         if len(rhs) != self.number_molecules:
             num: int = self.number_molecules - len(rhs)
             raise ValueError(f"Missing {num} constraint(s) to solve the system")
 
         try:
-            log10_pressures: np.ndarray = linalg.solve(coeff_matrix, rhs)
+            log10_pressures: np.ndarray = linalg.solve(design_matrix, rhs)
         except LinAlgError as exc:
             msg: str = "There is not a single solution to the equation set because you did not "
             msg += "specify a sufficient range of constraints"
@@ -788,7 +788,7 @@ class InteriorAtmosphereSystem:
         Args:
             **kwargs: Keyword argument. See `self.solve`.
         """
-        coeff_matrix, rhs = self._reaction_network.get_coefficient_matrix_and_rhs(
+        design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(
             **kwargs
         )
 
@@ -821,7 +821,7 @@ class InteriorAtmosphereSystem:
             sol, infodict, ier, mesg = fsolve(
                 self.objective_func,
                 initial_log10_pressures,
-                args=(coeff_matrix, rhs, mass_constraints),
+                args=(design_matrix, rhs, mass_constraints),
                 full_output=True,
             )
             logger.info(mesg)
@@ -849,7 +849,7 @@ class InteriorAtmosphereSystem:
     def objective_func(
         self,
         log10_pressures: np.ndarray,
-        coeff_matrix: np.ndarray,
+        design_matrix: np.ndarray,
         rhs: np.ndarray,
         mass_constraints: list[SystemConstraint],
     ) -> np.ndarray:
@@ -857,7 +857,7 @@ class InteriorAtmosphereSystem:
 
         Args:
             log10_pressures: Log10 of the pressures of each molecule.
-            coeff_matrix: The coefficient matrix from the reaction network.
+            design_matrix: The design matrix from the reaction network.
             rhs: The RHS from the reaction network.
             mass_constraints: Mass constraints to apply.
 
@@ -867,7 +867,7 @@ class InteriorAtmosphereSystem:
         self._log10_pressures = log10_pressures
 
         # Compute residual for the reaction network.
-        residual_reaction: np.ndarray = coeff_matrix.dot(self.log10_pressures) - rhs
+        residual_reaction: np.ndarray = design_matrix.dot(self.log10_pressures) - rhs
         logger.debug("residual_reaction = %s", residual_reaction)
 
         # Compute residual for the mass balance.
