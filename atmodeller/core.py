@@ -11,12 +11,20 @@ from numpy.linalg import LinAlgError
 from scipy import linalg
 from scipy.optimize import fsolve
 
-from atmodeller import (GAS_CONSTANT, GRAVITATIONAL_CONSTANT,
-                        TEMPERATURE_JANAF_HIGH, TEMPERATURE_JANAF_LOW)
-from atmodeller.thermodynamics import (FormationEquilibriumConstants,
-                                       IronWustiteBufferOneill, MolarMasses,
-                                       NoSolubility, OxygenFugacity,
-                                       Solubility)
+from atmodeller import (
+    GAS_CONSTANT,
+    GRAVITATIONAL_CONSTANT,
+    TEMPERATURE_JANAF_HIGH,
+    TEMPERATURE_JANAF_LOW,
+)
+from atmodeller.thermodynamics import (
+    FormationEquilibriumConstants,
+    IronWustiteBufferOneill,
+    MolarMasses,
+    NoSolubility,
+    OxygenFugacity,
+    Solubility,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 

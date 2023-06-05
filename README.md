@@ -36,3 +36,11 @@ This will report the location of the *atmodeller* package on your system, from w
 where the path name is updated according to where *docs* is on your system and the notebook you want to open.
 
 7. In the Jupyter notebook window you may have to *trust* the notebook for all features to work.
+
+## Tests
+
+You can confirm that all tests pass by running `pytest` in the root directory.
+
+## Development
+
+You are encouraged to fork this repository or create your own branch to add new features. You will need to issue a pull request to be able to merge your code into main. Follow the [Google Python style guide](https://google.github.io/styleguide/pyguide.html) and familiarise yourself with [SOLID principles](https://realpython.com/solid-principles-python/).
