@@ -139,56 +139,10 @@ class MolarMasses:
     Xe: float = 131.293e-3
 
     def __post_init__(self):
-        # Define molecules here. Of course, for a given molecule name this could be automatically
-        # determined using basic string operations, thereby avoiding this requirement to manually
-        # compute the masses of molecules.
-        self.CH4: float = self.C + 4 * self.H
-        self.CO: float = self.C + self.O
-        self.CO2: float = self.C + 2 * self.O
-        self.H2: float = self.H * 2
-        self.H2O: float = self.H * 2 + self.O
-        self.N2: float = self.N * 2
-        self.NH3: float = self.N + 3 * self.H
-        self.O2: float = self.O * 2
-        self.SO2: float = self.S + 2 * self.O
-        self.F2: float = self.F * 2
-        self.NaCl: float = self.Na + self.Cl
-        self.CaCO3: float = self.Ca + self.C + 3 * self.O
-        self.KBr: float = self.K + self.Br
-        self.MgO: float = self.Mg + self.O
-        self.PCl5: float = self.P + 5 * self.Cl
-        self.SiO2: float = self.Si + 2 * self.O
-        self.SF6: float = self.S + 6 * self.F
-        self.Al2O3: float = 2 * self.Al + 3 * self.O
-        self.COCl2: float = self.C + self.O + 2 * self.Cl
-        self.HF: float = self.H + self.F
-        self.HBr: float = self.H + self.Br
-        self.SiF4: float = self.Si + 4 * self.F
-        self.NaHCO3: float = self.Na + self.H + self.C + 3 * self.O
-        self.MgCl2: float = self.Mg + 2 * self.Cl
-        self.P2O5: float = 2 * self.P + 5 * self.O
-        self.SO3: float = self.S + 3 * self.O
-        self.SO4: float = self.S + 4 * self.O
-        self.Na2CO3: float = 2 * self.Na + self.C + 3 * self.O
-        self.K2SO4: float = 2 * self.K + self.S + 4 * self.O
-        self.H2SO4: float = self.H * 2 + self.S + 4 * self.O
-        self.KOH: float = self.K + self.O + self.H
-        self.NaOH: float = self.Na + self.O + self.H
-        self.CaO: float = self.Ca + self.O
-        self.P4O10: float = 4 * self.P + 10 * self.O
-        self.SiO: float = self.Si + self.O
-        self.P4S3: float = 4 * self.P + 3 * self.S
-        self.SiS2: float = self.Si + 2 * self.S
-        self.Sb2S3: float = 2 * self.Sb + 3 * self.S
-        self.As2S3: float = 2 * self.As + 3 * self.S
-        self.SnO2: float = self.Sn + 2 * self.O
-        self.Sb2O3: float = 2 * self.Sb + 3 * self.O
-        self.As2O5: float = 2 * self.As + 5 * self.O
-        self.SnCl4: float = self.Sn + 4 * self.Cl
-        self.SbCl3: float = self.Sb + 3 * self.Cl
-        self.I2: float = self.I * 2
-        self.TeO2: float = self.Te + 2 * self.O
-        self.XeF4: float = self.Xe + 4 * self.F
+        # This is for convenience, since the number of moles in Earth's ocean are given in terms of
+        # H2. In which case, the mass of H2 is useful to have direct access to in order to compute
+        # the mass of H in an Earth ocean.
+        self.H2: float = 2 * self.H
 
 
 @dataclass(frozen=True)

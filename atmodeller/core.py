@@ -147,7 +147,7 @@ class Molecule:
         self.element_masses = {
             key: value * getattr(masses, key) for key, value in self.elements.items()
         }
-        self.molar_mass = getattr(masses, self.name)
+        self.molar_mass = sum(self.element_masses.values())
         formation_constants: FormationEquilibriumConstants = (
             FormationEquilibriumConstants()
         )
