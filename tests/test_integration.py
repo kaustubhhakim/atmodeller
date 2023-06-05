@@ -337,6 +337,57 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
 
 # endregion
 
+# region methane
+
+
+def test_hydrogen_and_carbon_species_with_methane() -> None:
+    """Tests H2-H2O and CO-CO2 and N."""
+
+    molecules: list[Molecule] = [
+        Molecule(name="H2O", solubility=PeridotiteH2O()),
+        Molecule(name="H2", solubility=NoSolubility()),
+        Molecule(name="O2", solubility=NoSolubility()),
+        Molecule(name="CO", solubility=NoSolubility()),
+        Molecule(name="CO2", solubility=BasaltDixonCO2()),
+        Molecule(name="CH4", solubility=NoSolubility()),
+    ]
+
+    oceans: float = 1
+    ch_ratio: float = 1
+    planet: Planet = Planet()
+    planet.surface_temperature = 1500
+    molar_masses: MolarMasses = MolarMasses()
+    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    c_kg: float = ch_ratio * h_kg
+
+    constraints: list[SystemConstraint] = [
+        SystemConstraint(species="H", value=h_kg, field="mass"),
+        SystemConstraint(species="C", value=c_kg, field="mass"),
+    ]
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, planet=planet
+    )
+
+    target_pressures: np.ndarray = np.array(
+        [
+            [
+                5.35073728e01,
+                3.54994250e-01,
+                3.94851706e-12,
+                2.10691640e01,
+                3.78783261e-01,
+                2.56651708e-05,
+            ]
+        ]
+    )
+    system.solve(constraints, fo2_constraint=True)
+    assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
+
+
+# endregion
+
+
 # region nitrogen
 
 
