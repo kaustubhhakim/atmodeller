@@ -649,7 +649,7 @@ class ReactionNetwork:
 @dataclass(kw_only=True)
 class InteriorAtmosphereSystem:
     """An interior-atmosphere system.
-    
+
     Args:
         molecules: A list of molecules.
 
@@ -751,12 +751,10 @@ class InteriorAtmosphereSystem:
             The pressures in bar.
         """
         # The formation energy data is only fit between a certain temperature range.
-        if (self.planet.surface_temperature <= TEMPERATURE_JANAF_LOW) or (
-            self.planet.surface_temperature >= TEMPERATURE_JANAF_HIGH
+        if (self.planet.surface_temperature < TEMPERATURE_JANAF_LOW) or (
+            self.planet.surface_temperature > TEMPERATURE_JANAF_HIGH
         ):
-            msg: str = (
-                "Surface temperature must be in the range {TEMPERATURE_JANAF_LOW} K to "
-            )
+            msg: str = f"Surface temperature must be in the range {TEMPERATURE_JANAF_LOW} K to "
             msg += f"{TEMPERATURE_JANAF_HIGH} K"
             raise ValueError(msg)
 
@@ -803,9 +801,7 @@ class InteriorAtmosphereSystem:
         Args:
             **kwargs: Keyword argument. See `self.solve`.
         """
-        design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(
-            **kwargs
-        )
+        design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(**kwargs)
 
         mass_constraints: list[SystemConstraint] = [
             constraint
