@@ -7,10 +7,14 @@ import logging
 import time
 
 from atmodeller import OCEAN_MOLES, logger
-from atmodeller.core import (InteriorAtmosphereSystem, Molecule, Planet,
-                             SystemConstraint)
-from atmodeller.thermodynamics import (BasaltDixonCO2, LibourelN2, MolarMasses,
-                                       NoSolubility, PeridotiteH2O)
+from atmodeller.core import InteriorAtmosphereSystem, Molecule, Planet, SystemConstraint
+from atmodeller.thermodynamics import (
+    BasaltDixonCO2,
+    LibourelN2,
+    MolarMasses,
+    NoSolubility,
+    PeridotiteH2O,
+)
 
 
 def main():

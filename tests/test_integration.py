@@ -8,10 +8,21 @@ code.
 
 import numpy as np
 
-from atmodeller import (OCEAN_MOLES, InteriorAtmosphereSystem, MolarMasses,
-                        Molecule, Planet, SystemConstraint, __version__)
-from atmodeller.thermodynamics import (BasaltDixonCO2, LibourelN2,
-                                       NoSolubility, PeridotiteH2O)
+from atmodeller import (
+    OCEAN_MOLES,
+    InteriorAtmosphereSystem,
+    MolarMasses,
+    Molecule,
+    Planet,
+    SystemConstraint,
+    __version__,
+)
+from atmodeller.thermodynamics import (
+    BasaltDixonCO2,
+    LibourelN2,
+    NoSolubility,
+    PeridotiteH2O,
+)
 
 # Tolerances to compare the test results with predefined 'correct' output.
 rtol: float = 1.0e-5
