@@ -46,22 +46,22 @@ If you prefer, I can send you a package tarball that you can install using the t
     ```
     conda create --name atmodeller --python=3.10
     ```
-1. Activate the environment:
+2. Activate the environment:
 
     ```
     conda activate atmodeller
     ```
-1. Install the *atmodeller* package into the conda environment, where the filename will be something like *atmodeller-0.1.0.tar.gz*:
+3. Install the *atmodeller* package into the conda environment, where the filename will be something like *atmodeller-0.1.0.tar.gz*:
 
     ```
     pip install atmodeller-0.1.0.tar.gz
     ````
-1. To locate the example Jupyter notebooks, enter python:
+4. To locate the example Jupyter notebooks, enter python:
 
     ```
     python
     ````
-1. Once in python type: 
+5. Once in python type: 
 
     ```
     import atmodeller
@@ -69,14 +69,14 @@ If you prefer, I can send you a package tarball that you can install using the t
     ```
 This will report the location of the *atmodeller* package on your system, from which you can determine the path to *atmodeller/docs*. This directory contains the Jupyter notebook tutorials, which you can copy to a different location if you wish.
 
-1. With the *docs* location known, you can now access the Jupyter notebook tutorials. Exit the Python command line first, and then in the terminal type:
+6. With the *docs* location known, you can now access the Jupyter notebook tutorials. Exit the Python command line first, and then in the terminal type:
 
     ```
     jupyter notebook docs/1_basics.ipynb
     ```
 where the path name is updated according to where *docs* is on your system and the notebook you want to open.
 
-1. In the Jupyter notebook window you may have to *trust* the notebook for all features to work.
+7. In the Jupyter notebook window you may have to *trust* the notebook for all features to work.
 
 ## Tests
 
