@@ -30,9 +30,7 @@ logger.info("%s version %s", __name__, __version__)
 
 # Module constants.
 GRAVITATIONAL_CONSTANT: float = 6.6743e-11  # SI units.
-OCEAN_MOLES: float = (
-    7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
-)
+OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
 GAS_CONSTANT: float = 8.31446261815324  # J/K/mol.
 
 # Temperature range used to fit the JANAF data.

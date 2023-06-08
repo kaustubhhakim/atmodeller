@@ -47,11 +47,7 @@ class IronWustiteBufferOneill(OxygenFugacity):
         """See base class."""
         buffer: float = (
             2
-            * (
-                -244118
-                + 115.559 * temperature
-                - 8.474 * temperature * np.log(temperature)
-            )
+            * (-244118 + 115.559 * temperature - 8.474 * temperature * np.log(temperature))
             / (np.log(10) * 8.31441 * temperature)
         )
         return buffer
@@ -240,9 +236,7 @@ class BasaltDixonCO2(Solubility):
     """Dixon et al. (1995)."""
 
     def _solubility(self, pressure: float, temperature: float) -> float:
-        ppmw: float = (
-            (3.8e-7) * pressure * np.exp(-23 * (pressure - 1) / (83.15 * temperature))
-        )
+        ppmw: float = (3.8e-7) * pressure * np.exp(-23 * (pressure - 1) / (83.15 * temperature))
         ppmw = 1.0e4 * (4400 * ppmw) / (36.6 - 44 * ppmw)
         return ppmw
 

@@ -25,9 +25,7 @@ def main():
     logger.info("Started")
     start: float = time.time()
 
-    parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="Atmosphere modeller"
-    )
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(description="Atmosphere modeller")
     parser.add_argument(
         "-f",
         "--fo2_shift",
@@ -88,9 +86,7 @@ def main():
         n_kg: float = args.nitrogen * 1.0e-6 * planet.mantle_mass
         constraints.append(SystemConstraint(species="N", value=n_kg, field="mass"))
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
     system.solve(constraints, fo2_constraint=True)
     logger.info(system.pressures_dict)
 

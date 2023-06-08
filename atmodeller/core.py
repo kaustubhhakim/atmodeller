@@ -71,9 +71,7 @@ class Planet:
     def __post_init__(self):
         logger.info("Creating a new planet")
         self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
-        self.surface_gravity = (
-            GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
-        )
+        self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
         logger.info("Mantle mass (kg) = %s", self.mantle_mass)
         logger.info("Mantle melt fraction = %s", self.mantle_melt_fraction)
         logger.info("Core mass fraction = %s", self.core_mass_fraction)
@@ -81,9 +79,7 @@ class Planet:
         logger.info("Planetary mass (kg) = %s", self.planet_mass)
         logger.info("Surface temperature (K) = %f", self.surface_temperature)
         logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
-        logger.info(
-            "Oxygen fugacity model (mantle) = %s", self.fo2_model.__class__.__name__
-        )
+        logger.info("Oxygen fugacity model (mantle) = %s", self.fo2_model.__class__.__name__)
         logger.info("Oxygen fugacity log10 shift = %f", self.fo2_shift)
 
 
@@ -91,9 +87,7 @@ def _mass_decorator(func) -> Callable:
     """A decorator to return the mass of either the molecule or one of its elements."""
 
     @wraps(func)
-    def mass_wrapper(
-        self: "Molecule", element: Optional[str] = None, **kwargs
-    ) -> float:
+    def mass_wrapper(self: "Molecule", element: Optional[str] = None, **kwargs) -> float:
         """Wrapper to return the mass of either the molecule or one of its elements.
 
         Args:
@@ -148,9 +142,7 @@ class Molecule:
             key: value * getattr(masses, key) for key, value in self.elements.items()
         }
         self.molar_mass = sum(self.element_masses.values())
-        formation_constants: FormationEquilibriumConstants = (
-            FormationEquilibriumConstants()
-        )
+        formation_constants: FormationEquilibriumConstants = FormationEquilibriumConstants()
         self.formation_constants = getattr(formation_constants, self.name)
 
     def _count_elements(self) -> dict[str, int]:
@@ -167,9 +159,7 @@ class Molecule:
             if char.isupper():
                 if current_element != "":
                     count = int(current_count) if current_count else 1
-                    element_count[current_element] = (
-                        element_count.get(current_element, 0) + count
-                    )
+                    element_count[current_element] = element_count.get(current_element, 0) + count
                     current_count = ""
                 current_element = char
             elif char.islower():
@@ -179,9 +169,7 @@ class Molecule:
 
         if current_element != "":
             count: int = int(current_count) if current_count else 1
-            element_count[current_element] = (
-                element_count.get(current_element, 0) + count
-            )
+            element_count[current_element] = element_count.get(current_element, 0) + count
 
         return element_count
 
@@ -245,9 +233,7 @@ class Molecule:
         """
         del element
         prefactor: float = 1e-6 * planet.mantle_mass * planet.mantle_melt_fraction
-        ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar, planet.surface_temperature
-        )
+        ppmw_in_melt: float = self.solubility(partial_pressure_bar, planet.surface_temperature)
         mass: float = prefactor * ppmw_in_melt
 
         return mass
@@ -273,9 +259,7 @@ class Molecule:
         """
         del element
         prefactor: float = 1e-6 * planet.mantle_mass * (1 - planet.mantle_melt_fraction)
-        ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar, planet.surface_temperature
-        )
+        ppmw_in_melt: float = self.solubility(partial_pressure_bar, planet.surface_temperature)
         ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
         mass: float = prefactor * ppmw_in_solid
 
@@ -426,9 +410,7 @@ class ReactionNetwork:
             for j in range(i + 1, self.number_molecules):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug(
-            "augmented_matrix after forward elimination = \n%s", augmented_matrix
-        )
+        logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
         # Backward substitution.
         for i in range(self.number_elements - 1, -1, -1):
@@ -439,14 +421,10 @@ class ReactionNetwork:
                 if augmented_matrix[j, i] != 0:
                     ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
                     augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug(
-            "augmented_matrix after backward substitution = \n%s", augmented_matrix
-        )
+        logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
         reduced_matrix1: np.ndarray = augmented_matrix[:, : matrix1.shape[1]]
-        reaction_matrix: np.ndarray = augmented_matrix[
-            self.number_elements :, matrix1.shape[1] :
-        ]
+        reaction_matrix: np.ndarray = augmented_matrix[self.number_elements :, matrix1.shape[1] :]
         logger.debug("reduced_matrix1 = \n%s", reduced_matrix1)
         logger.debug("reaction_matrix = \n%s", reaction_matrix)
 
@@ -524,11 +502,8 @@ class ReactionNetwork:
         Returns:
             The equilibrium constant of the reaction.
         """
-        equilibrium_constant: float = (
-            10
-            ** self.get_reaction_log10_equilibrium_constant(
-                reaction_index=reaction_index, temperature=temperature
-            )
+        equilibrium_constant: float = 10 ** self.get_reaction_log10_equilibrium_constant(
+            reaction_index=reaction_index, temperature=temperature
         )
         return equilibrium_constant
 
@@ -602,9 +577,7 @@ class ReactionNetwork:
         for index, constraint in enumerate(pressure_constraints):
             row_index: int = self.number_reactions + index
             molecule_index: int = self.molecule_names.index(constraint.species)
-            logger.info(
-                "Row %02d: Setting %s partial pressure", row_index, constraint.species
-            )
+            logger.info("Row %02d: Setting %s partial pressure", row_index, constraint.species)
             coeff[row_index, molecule_index] = 1
             rhs[row_index] = np.log10(constraint.value)
 
@@ -716,8 +689,7 @@ class InteriorAtmosphereSystem:
     def pressures_dict(self) -> dict[str, float]:
         """Pressures in a dictionary."""
         output: dict[str, float] = {
-            molecule: pressure
-            for (molecule, pressure) in zip(self.molecule_names, self.pressures)
+            molecule: pressure for (molecule, pressure) in zip(self.molecule_names, self.pressures)
         }
         return output
 
@@ -771,9 +743,7 @@ class InteriorAtmosphereSystem:
         # TODO: If constraints give zero pressure or zero mass, then remove the molecules or report
         # an error.
 
-        all_pressures: bool = all(
-            [constraint.field == "pressure" for constraint in constraints]
-        )
+        all_pressures: bool = all([constraint.field == "pressure" for constraint in constraints])
 
         if all_pressures and not use_fsolve:
             logger.info(
@@ -788,9 +758,7 @@ class InteriorAtmosphereSystem:
             if all_pressures and use_fsolve:
                 msg = "Pressure constraints only and solving with fsolve"
             else:
-                msg: str = (
-                    "Mixed pressure and mass constraints so attempting to solve a "
-                )
+                msg: str = "Mixed pressure and mass constraints so attempting to solve a "
                 msg += "non-linear system of equations"
             logger.info(msg)
             self._log10_pressures = self._solve_fsolve(
@@ -812,9 +780,7 @@ class InteriorAtmosphereSystem:
         design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(**kwargs)
 
         mass_constraints: list[SystemConstraint] = [
-            constraint
-            for constraint in kwargs["constraints"]
-            if constraint.field == "mass"
+            constraint for constraint in kwargs["constraints"] if constraint.field == "mass"
         ]
 
         if len(rhs) + len(mass_constraints) != self.number_molecules:
@@ -824,9 +790,7 @@ class InteriorAtmosphereSystem:
         for constraint in mass_constraints:
             logger.info("Adding constraint from mass balance: %s", constraint.species)
 
-        initial_log10_pressures: np.ndarray = np.ones_like(
-            self.molecules, dtype="float64"
-        )
+        initial_log10_pressures: np.ndarray = np.ones_like(self.molecules, dtype="float64")
         logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
         ier: int = 0
         # Count the number of attempts to solve the system by randomising the initial condition.
@@ -855,9 +819,7 @@ class InteriorAtmosphereSystem:
                 ic_count += 1
 
         if ic_count == ic_count_max:
-            logger.error(
-                "Maximum number of randomised initial conditions has been exceeded"
-            )
+            logger.error("Maximum number of randomised initial conditions has been exceeded")
             raise RuntimeError("Solution cannot be found (ic_count == ic_count_max)")
 
         logger.info("Number of function calls = %d", infodict["nfev"])
