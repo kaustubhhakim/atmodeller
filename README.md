@@ -22,12 +22,11 @@ The instructions below follow <https://denisrosset.github.io/2022-planets/> for 
 1. Install [Poetry](https://python-poetry.org)
 1. Clone this repository (*atmodeller*) to a local directory
 1. In VSCode, go to *File* and *Open Folder...* and select the *atmodeller* directory
-1. We want to set up a virtual Python environment in the root directory of *atmodeller*. An advantage of using a virtual environment is that it remains completely isolated from any other Python environments on your system (e.g. Conda or otherwise). You must have a Python interpreter available to build the virtual environment according to the dependency in `pyproject.toml`, which could be a native version on your machine or a version from a Conda environment that is currently active. You only need a Python binary so it is not required to install any packages. You can create a virtual environment by using the terminal in VSCode:
+1. We want to set up a virtual Python environment in the root directory of *atmodeller*. An advantage of using a virtual environment is that it remains completely isolated from any other Python environments on your system (e.g. Conda or otherwise). You must have a Python interpreter available to build the virtual environment according to the dependency in `pyproject.toml`, which could be a native version on your machine or a version from a Conda environment that is currently active. You only need a Python binary so it is not required to install any packages. You can create a virtual environment by using the terminal in VSCode, where you may need to update `python` to reflect the location of the Python binary file. This will create a local Python environment in the `.venv` directory:
 	
     ```
     python -m venv .venv
     ```
- where you may need to update `python` to reflect the location of the Python binary file. This will create a local Python environment in the `.venv` directory.
 1. Open a new terminal window in VSCode and VSCode should recognise that you have a virtual environment in .venv, and load this environment automatically. You should see `(.venv)` as the prefix in the terminal prompt.
 1. Install the project using poetry to install all the required Python package dependencies:
 
