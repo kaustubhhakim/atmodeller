@@ -27,7 +27,7 @@ The instructions below follow <https://denisrosset.github.io/2022-planets/> for 
     ```
     python -m venv .venv
     ```
-where you may need to update `python` to reflect the location of the Python binary file. This will create a local Python environment in the `.venv` directory.
+ where you may need to update `python` to reflect the location of the Python binary file. This will create a local Python environment in the `.venv` directory.
 1. Open a new terminal window in VSCode and VSCode should recognise that you have a virtual environment in .venv, and load this environment automatically. You should see `(.venv)` as the prefix in the terminal prompt.
 1. Install the project using poetry to install all the required Python package dependencies:
 
