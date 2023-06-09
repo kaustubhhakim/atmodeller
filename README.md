@@ -44,7 +44,7 @@ If you prefer, I can send you a package tarball that you can install using the t
 1. If you have conda installed you can create a new environment *atmodeller*. You can choose any version of python equal to or greater than 3.10:
 	
     ```
-    conda create --name atmodeller --python=3.10
+    conda create --name atmodeller python=3.10
     ```
 2. Activate the environment:
 
