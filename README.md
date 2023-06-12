@@ -9,7 +9,7 @@ You are encouraged to fork this repository or create your own branch to add new 
 
 ### Development
 
-The instructions below follow <https://denisrosset.github.io/2022-planets/> for using VSCode and Poetry on a Mac. Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *atmodeller* as a community.
+The instructions below follow <https://denisrosset.github.io/2022-planets/> for using VSCode and Poetry on a Mac. Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *atmodeller* as a community. If you are a Windows or Linux user (or use a different IDE such as Spyder), please send me your installation instructions so I can update this README.
 
 1. Install [VSCode](https://code.visualstudio.com)
 1. In VSCode you are recommended to install the following extensions:
