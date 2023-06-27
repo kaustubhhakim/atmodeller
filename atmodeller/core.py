@@ -8,8 +8,8 @@ from typing import Callable, Optional
 
 import numpy as np
 from numpy.linalg import LinAlgError
-from scipy import linalg
-from scipy.optimize import fsolve
+from scipy import linalg  # type: ignore
+from scipy.optimize import fsolve  # type: ignore
 
 from atmodeller import (
     GAS_CONSTANT,
