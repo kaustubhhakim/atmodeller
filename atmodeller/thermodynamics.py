@@ -148,7 +148,9 @@ class GibbsConstants:
     These parameters result from a linear fit in temperature space to the delta-f G column in the
     JANAF data tables for a given molecule. See the jupyter notebook in 'docs/'.
 
-    G = aT + b, where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation)
+    G = aT + b
+
+    where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation).
 
     In the future we could use the Shomate equation to calculate the equilibrium of the gas phase
     reactions.
