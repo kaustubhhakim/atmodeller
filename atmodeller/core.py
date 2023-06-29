@@ -18,7 +18,7 @@ from atmodeller import (
     TEMPERATURE_JANAF_LOW,
 )
 from atmodeller.thermodynamics import (
-    FormationEquilibriumConstants,
+    GibbsConstants,
     IronWustiteBufferOneill,
     MolarMasses,
     NoSolubility,
@@ -142,7 +142,7 @@ class Molecule:
             key: value * getattr(masses, key) for key, value in self.elements.items()
         }
         self.molar_mass = sum(self.element_masses.values())
-        formation_constants: FormationEquilibriumConstants = FormationEquilibriumConstants()
+        formation_constants: GibbsConstants = GibbsConstants()
         self.formation_constants = getattr(formation_constants, self.name)
 
     def _count_elements(self) -> dict[str, int]:
@@ -170,11 +170,11 @@ class Molecule:
         if current_element != "":
             count: int = int(current_count) if current_count else 1
             element_count[current_element] = element_count.get(current_element, 0) + count
-
+        print('Element count:', element_count)
         return element_count
 
-    def get_formation_equilibrium_constant(self, *, temperature: float) -> float:
-        """Gets the formation equilibrium constant (log Kf) in the JANAF tables.
+    def get_Gibbs_constant(self, *, temperature: float) -> float:
+        """Gets the standard Gibbs free energy of formation (Gf) from our fit to JANAF datatables.
 
         Args:
             temperature: Temperature.
@@ -182,8 +182,8 @@ class Molecule:
         Returns:
             The formation equilibrium constant at the specified temperature.
         """
-        return self.formation_constants[0] + self.formation_constants[1] / temperature
-
+        return (self.formation_constants[0]*temperature) + self.formation_constants[1] 
+    
     @_mass_decorator
     def mass_in_atmosphere(
         self,
@@ -359,7 +359,7 @@ class ReactionNetwork:
         for molecule in self.molecules:
             elements.extend(list(molecule.elements.keys()))
         elements_unique: list[str] = list(set(elements))
-
+        print(elements_unique)
         return elements_unique, len(elements_unique)
 
     def find_matrix(self) -> np.ndarray:
@@ -405,10 +405,10 @@ class ReactionNetwork:
                 # Swap rows to get a non-zero pivot element.
                 nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
                 augmented_matrix[[i, nonzero_row]] = augmented_matrix[[nonzero_row, i]]
-
             # Perform row operations to eliminate values below the pivot.
             for j in range(i + 1, self.number_molecules):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
+                logger.debug("ratio = \n%s", ratio)
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
         logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
@@ -455,7 +455,10 @@ class ReactionNetwork:
     def get_reaction_log10_equilibrium_constant(
         self, *, reaction_index: int, temperature: float
     ) -> float:
-        """Gets the log10 of the reaction equilibrium constant.
+        """Gets the log10 of the reaction equilibrium constant. 
+        From the Gibbs free energy, we can calculate logKf:
+        logKf = - G/(ln(10)*R*T) 
+        *Note: R needs to be in kJ/mol for units consistency with G and logKf
 
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
@@ -468,32 +471,32 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             equilibrium_constant += self.reaction_matrix[
                 reaction_index, molecule_index
-            ] * molecule.get_formation_equilibrium_constant(temperature=temperature)
+            ] * -molecule.get_Gibbs_constant(temperature=temperature)/(np.log(10)*(GAS_CONSTANT/1000.0)*temperature)
         return equilibrium_constant
 
     def get_reaction_gibbs_energy_of_formation(
         self, *, reaction_index: int, temperature: float
     ) -> float:
-        """Gets the Gibb's free energy of formation for a reaction.
-
+        """Gets the Gibb's free energy of formation for a reaction from our linear fit to the JANAF tables.
+    
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
             temperature: Temperature.
-
+    
         Returns:
             The Gibb's free energy of the reaction.
         """
-        gibbs: float = -self.get_reaction_log10_equilibrium_constant(
-            reaction_index=reaction_index, temperature=temperature
-        )
-        gibbs *= np.log(10) * GAS_CONSTANT * temperature
-
-        return gibbs
+        gibbs_energy: float = 0
+        for molecule_index, molecule in enumerate(self.molecules):
+            gibbs_energy += self.reaction_matrix[
+                reaction_index, molecule_index
+            ] * molecule.get_Gibbs_constant(temperature=temperature)
+        return gibbs_energy
 
     def get_reaction_equilibrium_constant(
         self, *, reaction_index: int, temperature: float
     ) -> float:
-        """Gets the equilibrium constant of a reaction.
+        """Gets the equilibrium constant of a reaction Kf
 
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
