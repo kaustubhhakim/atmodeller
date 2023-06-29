@@ -142,13 +142,13 @@ class MolarMasses:
 
 
 @dataclass(frozen=True)
-class FormationEquilibriumConstants:
-    """Formation equilibrium constants.
+class GibbsConstants:
+    """Standard Gibbs free energy of formation fitting constants.
 
-    These parameters result from a linear fit in temperature space to the log Kf column in the
-    JANAF data tables for a given molecule. See the jupyter notebook in 'janaf/'.
+    These parameters result from a linear fit in temperature space to the delta-f G column in the
+    JANAF data tables for a given molecule. See the jupyter notebook in 'docs/'.
 
-    log10(Kf) = a + b/T
+    G = aT + b, where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation)
 
     In the future we could use the Shomate equation to calculate the equilibrium of the gas phase
     reactions.
@@ -156,15 +156,23 @@ class FormationEquilibriumConstants:
 
     # Want to use molecule names therefore pylint: disable=invalid-name
     C: tuple[float, float] = (0, 0)
-    CH4: tuple[float, float] = (-5.830066176470588, 4829.067647058815)
-    CO: tuple[float, float] = (4.319860294117643, 6286.120588235306)
-    CO2: tuple[float, float] = (-0.028289705882357442, 20753.870588235302)
+    CH4: tuple[float, float] = (0.11162272058823527, -92.46793382352928)
+    CO: tuple[float, float] = (-0.08269582352941174, -120.3571470588237)
+    CO2: tuple[float, float] = (0.0005482647058825124, -397.33434558823564)
     H2: tuple[float, float] = (0, 0)
-    H2O: tuple[float, float] = (-3.0385132352941198, 13152.698529411768)
+    H2O: tuple[float, float] = (0.05817258823529415, -251.80119852941178)
     N2: tuple[float, float] = (0, 0)
+    NH3: tuple[float, float] = (0.11667370588235293, -54.026338235293984)
     O2: tuple[float, float] = (0, 0)
-    # TODO: Commented out by Laura so check values.
-    # NH3: tuple[float, float] = (-45.9, 192.77)
+    SO: tuple[float, float] = (-0.004834249999999983, -59.61862500000004)
+    SO2: tuple[float, float] = (0.0725481764705883, -361.0377720588236)
+    S2: tuple[float, float] = (0, 0)
+    H2S: tuple[float, float] = (0.04955845588235296, -90.57971323529412)
+    S: tuple[float, float] = (-0.06120597058823535, 217.87218382352947)
+    Cl: tuple[float, float] = (-0.06116926470588236, 127.34372058823527)
+    Cl2: tuple[float, float] = (0, 0)
+    F: tuple[float, float] = (-0.06466483823529413, 84.63857352941173)
+    F2: tuple[float, float] = (0, 0)
 
 
 class Solubility(ABC):
