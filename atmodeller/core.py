@@ -170,7 +170,7 @@ class Molecule:
         if current_element != "":
             count: int = int(current_count) if current_count else 1
             element_count[current_element] = element_count.get(current_element, 0) + count
-        print('Element count:', element_count)
+        logger.debug("element count = \n%s", element_count)
         return element_count
 
     def get_Gibbs_constant(self, *, temperature: float) -> float:
@@ -359,7 +359,7 @@ class ReactionNetwork:
         for molecule in self.molecules:
             elements.extend(list(molecule.elements.keys()))
         elements_unique: list[str] = list(set(elements))
-        print(elements_unique)
+        logger.debug("number of unique elements = \n%s", elements_unique)
         return elements_unique, len(elements_unique)
 
     def find_matrix(self) -> np.ndarray:
@@ -467,11 +467,12 @@ class ReactionNetwork:
         Returns:
             log10 of the reaction equilibrium constant.
         """
+        J_to_kJ = 0.001
         equilibrium_constant: float = 0
         for molecule_index, molecule in enumerate(self.molecules):
             equilibrium_constant += self.reaction_matrix[
                 reaction_index, molecule_index
-            ] * -molecule.get_Gibbs_constant(temperature=temperature)/(np.log(10)*(GAS_CONSTANT/1000.0)*temperature)
+            ] * -molecule.get_Gibbs_constant(temperature=temperature)/(np.log(10)*(GAS_CONSTANT*J_to_kJ)*temperature)
         return equilibrium_constant
 
     def get_reaction_gibbs_energy_of_formation(
