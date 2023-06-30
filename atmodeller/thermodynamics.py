@@ -173,9 +173,10 @@ class GibbsConstants:
     S: tuple[float, float] = (-0.06120597058823535, 217.87218382352947)
     Cl: tuple[float, float] = (-0.06116926470588236, 127.34372058823527)
     Cl2: tuple[float, float] = (0, 0)
+    HCl: tuple[float, float] = (-0.005433338235294086, -95.73480147058832)
     F: tuple[float, float] = (-0.06466483823529413, 84.63857352941173)
     F2: tuple[float, float] = (0, 0)
-
+    HF: tuple[float, float] = (-0.0015432205882352377, -277.91656617647067)
 
 class Solubility(ABC):
     """Solubility base class."""
