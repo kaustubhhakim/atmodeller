@@ -10,7 +10,7 @@ from atmodeller import OCEAN_MOLES, logger
 from atmodeller.core import InteriorAtmosphereSystem, Molecule, Planet, SystemConstraint
 from atmodeller.thermodynamics import (
     BasaltDixonCO2,
-    LibourelN2,
+    BasaltLibourelN2,
     MolarMasses,
     NoSolubility,
     PeridotiteH2O,
@@ -82,7 +82,7 @@ def main():
 
     # Include nitrogen if desired.
     if args.nitrogen != 0:
-        molecules.append(Molecule(name="N2", solubility=LibourelN2()))
+        molecules.append(Molecule(name="N2", solubility=BasaltLibourelN2()))
         n_kg: float = args.nitrogen * 1.0e-6 * planet.mantle_mass
         constraints.append(SystemConstraint(species="N", value=n_kg, field="mass"))
 
