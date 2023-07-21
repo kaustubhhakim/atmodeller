@@ -4,7 +4,7 @@ import logging
 import pprint
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import numpy as np
 from numpy.linalg import LinAlgError
@@ -24,7 +24,7 @@ from atmodeller.thermodynamics import (
     NoSolubility,
     OxygenFugacity,
     Solubility,
-    master_container
+    composition_solubilities,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class Planet:
         fo2_model: Oxygen fugacity model for the mantle. Defaults to
             IronWustiteBufferOneill,
         fo2_shift: log10 shift of the oxygen fugacity relative to the prescribed model.
-        composition: melt composition of the planet. Default is Basalt
+        melt_composition: Melt composition of the planet. Default is None.
 
     Attributes:
         mantle_mass: Mass of the planetary mantle.
@@ -56,7 +56,7 @@ class Planet:
         surface_temperature: Temperature of the planetary surface.
         fo2_model: Oxygen fugacity model for the mantle.
         fo2_shift: log10 shift of the oxygen fugacity relative to `oxygen_fugacity`.
-        composition: melt composition of the planet. Default is Basalt 
+        melt_composition: Melt composition of the planet. Default is None.
         planet_mass: Mass of the planet.
         surface_gravity: Gravitational acceleration at the planetary surface.
     """
@@ -68,16 +68,14 @@ class Planet:
     surface_temperature: float = 2000.0  # K
     fo2_model: OxygenFugacity = field(default_factory=IronWustiteBufferOneill)
     fo2_shift: float = 0
-    composition: str = 'Basalt' #TODO: Eventually we want to format this so that it accepts no composition and then uses NoSolubility, allowing the user to then assign solubility laws explicity for each molecule 
+    melt_composition: Union[str, None] = None
     planet_mass: float = field(init=False)
     surface_gravity: float = field(init=False)
-    master_container: dict[str, Solubility] = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating a new planet")
         self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
         self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
-        self.master_container = master_container[self.composition.casefold()]
         logger.info("Mantle mass (kg) = %s", self.mantle_mass)
         logger.info("Mantle melt fraction = %s", self.mantle_melt_fraction)
         logger.info("Core mass fraction = %s", self.core_mass_fraction)
@@ -87,7 +85,7 @@ class Planet:
         logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
         logger.info("Oxygen fugacity model (mantle) = %s", self.fo2_model.__class__.__name__)
         logger.info("Oxygen fugacity log10 shift = %f", self.fo2_shift)
-        logger.info("Melt Composition = %s", self.composition)
+        logger.info("Melt Composition = %s", self.melt_composition)
 
 
 def _mass_decorator(func) -> Callable:
@@ -240,7 +238,11 @@ class Molecule:
         """
         del element
         prefactor: float = 1e-6 * planet.mantle_mass * planet.mantle_melt_fraction
-        ppmw_in_melt: float = self.solubility(partial_pressure_bar, planet.surface_temperature, planet.fo2_model(temperature=planet.surface_temperature, fo2_shift=planet.fo2_shift))
+        ppmw_in_melt: float = self.solubility(
+            partial_pressure_bar,
+            planet.surface_temperature,
+            planet.fo2_model(temperature=planet.surface_temperature, fo2_shift=planet.fo2_shift),
+        )
         mass: float = prefactor * ppmw_in_melt
 
         return mass
@@ -266,7 +268,11 @@ class Molecule:
         """
         del element
         prefactor: float = 1e-6 * planet.mantle_mass * (1 - planet.mantle_melt_fraction)
-        ppmw_in_melt: float = self.solubility(partial_pressure_bar, planet.surface_temperature, planet.fo2_model(temperature=planet.surface_temperature, fo2_shift=planet.fo2_shift))
+        ppmw_in_melt: float = self.solubility(
+            partial_pressure_bar,
+            planet.surface_temperature,
+            planet.fo2_model(temperature=planet.surface_temperature, fo2_shift=planet.fo2_shift),
+        )
         ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
         mass: float = prefactor * ppmw_in_solid
 
@@ -673,17 +679,38 @@ class InteriorAtmosphereSystem:
         self.number_molecules: int = len(self.molecules)
         self.molecule_names: list[str] = [molecule.name for molecule in self.molecules]
         logger.info("Molecules = %s", self.molecule_names)
-        self._solubility_check()
+        self._conform_solubilities_to_composition()
         self._log10_pressures = np.zeros_like(self.molecules, dtype="float64")
         self._reaction_network = ReactionNetwork(molecules=self.molecules)
-    
-    def _solubility_check(self)->None:
-        #loop over species that exist in molecule_names to see if a solubility law exists
-        for molecule in self.molecules:
-            if molecule.name in self.planet.master_container:
-                molecule.solubility = self.planet.master_container[molecule.name]
-                logger.info("Found Solubility for \n%s", molecule.name)
-                logger.info("Solubility Law is \n%s", molecule.solubility)
+
+    def _conform_solubilities_to_composition(self) -> None:
+        """Ensure that the solubilities of the species are consistent with the melt composition."""
+        if self.planet.melt_composition is not None:
+            msg: str = (
+                # pylint: disable=consider-using-f-string
+                "Setting solubilities to be consistent with the melt composition (%s)"
+                % self.planet.melt_composition
+            )
+            logger.info(msg)
+            try:
+                solubilities: dict[str, Solubility] = composition_solubilities[
+                    self.planet.melt_composition.casefold()
+                ]
+            except KeyError:
+                logger.error("Cannot find solubilities for %s", self.planet.melt_composition)
+                raise
+
+            for molecule in self.molecules:
+                try:
+                    molecule.solubility = solubilities[molecule.name]
+                    logger.info(
+                        "Found Solubility for %s: %s",
+                        molecule.name,
+                        molecule.solubility.__class__.__name__,
+                    )
+                except KeyError:
+                    logger.info("No solubility for %s", molecule.name)
+                    molecule.solubility = NoSolubility()
 
     def _molecule_sorter(self, molecule: Molecule) -> tuple[int, str]:
         """Sorter for the molecules.
@@ -878,6 +905,9 @@ class InteriorAtmosphereSystem:
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
         for constraint_index, constraint in enumerate(mass_constraints):
             for molecule_index, molecule in enumerate(self.molecules):
+                # TODO: Dan: need to pass in fO2 (and maybe other pressures like fH2) for some of
+                # the solubility laws.  Maybe pass in the dictionary of pressures (fugacities) and
+                # let the solubility law pick out what it needs.
                 residual_mass[constraint_index] += molecule.mass(
                     planet=self.planet,
                     partial_pressure_bar=self.pressures[molecule_index],

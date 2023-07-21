@@ -6,10 +6,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
-#For unit conversion commonly used in Solubility class:
-bar_to_GPa: float = 0.0001 #bar/GPa 
-molefrac_to_ppm: float = 1e6 #ppm/molefrac 
-wtperc_to_ppm : float = 1e4 #weight percent (wt. %) to ppm
+# For unit conversions.
+bar_to_GPa: float = 0.0001  # bar/GPa
+molefrac_to_ppm: float = 1e6  # ppm/molefrac
+wtperc_to_ppm: float = 1e4  # weight percent (wt. %) to ppm
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -183,6 +183,7 @@ class GibbsConstants:
     F2: tuple[float, float] = (0, 0)
     HF: tuple[float, float] = (-0.0015432205882352377, -277.91656617647067)
 
+
 class Solubility(ABC):
     """Solubility base class."""
 
@@ -192,7 +193,7 @@ class Solubility(ABC):
 
     @abstractmethod
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
-        #Note: fo2 is in log10fo2
+        # Note: fo2 is in log10fo2.
         raise NotImplementedError
 
     def __call__(self, pressure: float, temperature: float, fo2: float, *args) -> float:
@@ -203,10 +204,8 @@ class Solubility(ABC):
 class NoSolubility(Solubility):
     """No solubility."""
 
-    def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
-        del pressure
-        del temperature
-        del fo2
+    def _solubility(self, *args) -> float:
+        del args
         return 0.0
 
 
@@ -266,100 +265,164 @@ class BasaltDixonCO2(Solubility):
 
 
 class BasaltLibourelN2(Solubility):
-    """Libourel et al. (2003), basalt (tholeiitic) magmas"""
-    #Eq. 23, includes dependence on pressure and fO2:
-    def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
-        del temperature 
-        ppmw: float = (0.0611*pressure)+(((10**fo2)**-0.75)*5.97e-10*(pressure**0.5)) 
-        return ppmw
-    #Eq. 19 for relatively oxidizing conditions (air to IW), only has pressure dependence 
-    #def _solubility(self, pressure: float, temperature: float) -> float:
-    #    del temperature
-    #    ppmw: float = self.power_law(pressure, 0.0611, 1.0)
-    #    return ppmw
+    """Libourel et al. (2003), basalt (tholeiitic) magmas."""
 
-class BasaltH2(Solubility):
-    """Hirschmann et al. 2012 for Basalt"""
+    # Eq. 23, includes dependence on pressure and fO2:
+    # def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
+    #     del temperature
+    #     ppmw: float = (0.0611 * pressure) + (((10**fo2) ** -0.75) * 5.97e-10 * (pressure**0.5))
+    #     return ppmw
+
+    # TODO: Dan reinstated the law with fO2 as a temporary measure until we integrate fO2 into the
+    # workflow.
+    # Eq. 19 for relatively oxidizing conditions (air to IW), only has pressure dependence
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
-        """Power law fit to Figure 5, basalt Pure H2 curve"""
         del temperature
         del fo2
-        pressure_GPa: float = pressure*bar_to_GPa
-        #Fitting coefficients, determined in solubility_fits.ipynb
-        ppm: float = self.power_law(pressure, 6479.75, 1.20) 
+        ppmw: float = self.power_law(pressure, 0.0611, 1.0)
+        return ppmw
+
+
+class BasaltH2(Solubility):
+    """Hirschmann et al. 2012 for Basalt."""
+
+    def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
+        """Power law fit to Figure 5, basalt Pure H2 curve."""
+        del temperature
+        del fo2
+        # TODO: Maggie to check, variable is not currently used.
+        pressure_gpa: float = pressure * bar_to_GPa  # pylint: disable=unused-variable
+        # Fitting coefficients, determined in solubility_fits.ipynb
+        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
+        ppm: float = self.power_law(pressure, 6479.75, 1.20)
         return ppm
 
     def _solubility_v2(self, pressure: float, temperature: float, fo2: float) -> float:
-        """Taking fit from Fig. 4 for Basalt (with fH2(P) fitted from Tables 1 and 2)"""
+        """Taking fit from Fig. 4 for Basalt (with fH2(P) fitted from Tables 1 and 2)."""
         del temperature
         del fo2
-        pressure_GPa: float = pressure*bar_to_GPa
-        fH2 = self.power_law(pressure_GPa, 7458.81, 2.01) #bars; power-law fit 
-        molefrac: float = np.exp(-11.403-(0.76*pressure_GPa))*fH2
-        ppm: float = molefrac* molefrac_to_ppm #CHECK, is there an extra step to make this ppmw?
+        pressure_gpa: float = pressure * bar_to_GPa
+        fh2 = self.power_law(pressure_gpa, 7458.81, 2.01)  # bars; power-law fit
+        molefrac: float = np.exp(-11.403 - (0.76 * pressure_gpa)) * fh2
+        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
+        ppm: float = molefrac * molefrac_to_ppm  # CHECK, is there an extra step to make this ppmw?
         return ppm
 
 
 class AndesiteH2(Solubility):
-    """Hirschmann et al. 2012, Using the fit from Fig. 4 for Andesite (with fH2(P) fitted from Tables 1 and 2)"""
-    def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
-        del temperature 
-        del fo2
-        pressure_GPa: float = pressure*bar_to_GPa
-        fH2 = self.power_law(pressure_GPa, 7856.31, 2.17) #bars; power-law fit 
-        molefrac: float = np.exp(-10.591-(0.81*pressure_GPa))*fH2
-        ppm: float = molefrac* molefrac_to_ppm #CHECK, is there an extra step to make this ppmw?
-        return ppm
-    
-class PeridotiteH2(Solubility):
-    """Hirschmann et al. 2012 for Peridotite: Fitting power law to Figure 5, Peridotite Pure H2 curve"""
+    """Hirschmann et al. 2012.
+
+    Using the fit from Fig. 4 for Andesite (with fH2(P) fitted from Tables 1 and 2).
+    """
+
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
         del temperature
         del fo2
-        pressure_GPa: float = pressure*bar_to_GPa
+        pressure_gpa: float = pressure * bar_to_GPa
+        fh2 = self.power_law(pressure_gpa, 7856.31, 2.17)  # bars; power-law fit
+        molefrac: float = np.exp(-10.591 - (0.81 * pressure_gpa)) * fh2
+        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
+        ppm: float = molefrac * molefrac_to_ppm  # CHECK, is there an extra step to make this ppmw?
+        return ppm
+
+
+class PeridotiteH2(Solubility):
+    """Hirschmann et al. 2012 for Peridotite.
+
+    Fitting power law to Figure 5, Peridotite Pure H2 curve.
+    """
+
+    def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
+        del temperature
+        del fo2
+        # TODO: Maggie to check, variable is not currently used.
+        pressure_gpa: float = pressure * bar_to_GPa  # pylint: disable=unused-variable
+        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
         ppm: float = self.power_law(pressure, 1722.31, 1.03)
         return ppm
-    
+
+
 class ObsidianH2(Solubility):
-    """Gaillard et al. 2003, valid for pressures from 0.02-70 bar; power law fit to Table 4 data"""
+    """Gaillard et al. 2003.
+
+    Valid for pressures from 0.02-70 bar; power law fit to Table 4 data.
+    """
+
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
         del temperature
         del fo2
-        ppmw: float = self.power_law(pressure, 0.163, 1.252) 
-        return ppmw 
-    
+        ppmw: float = self.power_law(pressure, 0.163, 1.252)
+        return ppmw
+
+
 class AndesiteSO2(Solubility):
-    """Boulliung & Wood 2022, Fitting S (ppm) vs. Temperature"""
+    """Boulliung & Wood 2022.
+
+    Fitting S (ppm) vs. Temperature.
+    """
+
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
         del pressure
         del fo2
-        a, b = [-0.29028571428571454, 528.3908571428574] #from Table 3, least squares linear fit
-        ppm: float = (a*temperature) + b
+        # from Table 3, least squares linear fit.
+        temperature_factor, constant = [-0.29028571428571454, 528.3908571428574]
+        ppm: float = (temperature_factor * temperature) + constant
         return ppm
-    
+
+
 class BasaltSO2(Solubility):
-    """Boulliung & Wood 2022, Fitting S (ppm) vs. Temperature"""
+    """Boulliung & Wood 2022.
+
+    Fitting S (ppm) vs. Temperature.
+    """
+
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
         del pressure
         del fo2
-        ppm = 0.25 * np.exp(1.2249*(-1.1 - 5.5976 - (24505/temperature) + (0.8099*np.log10(temperature)))) #Fit from Figure 3, using FMQ(temperature) from O'Neill 1987a
+        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
+        ppm: float = 0.25 * np.exp(
+            1.2249 * (-1.1 - 5.5976 - (24505 / temperature) + (0.8099 * np.log10(temperature)))
+        )  # Fit from Figure 3, using FMQ(temperature) from O'Neill 1987a
         return ppm
-    
+
+
 class MercuryMagmaS(Solubility):
-    """Namur et al. 2016, S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like magmas; Check, I think this would mainly apply to H2S but maybe also S2 and S"""
+    """Namur et al. 2016.
+
+    S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like magmas.
+    """
+
+    # TODO: Maggie to check, I think this would mainly apply to H2S but maybe also S2 and S.
+
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
-        a, b, c, d  = [7.25, -2.54e4, 0.04, -0.551] #coefficients from eq. 10 of Namur+2016
-        wt_perc = np.exp(a + (b/temperature)+ ((c*pressure)/temperature) + (d*fo2))
-        ppmw = wt_perc * wtperc_to_ppm 
-        return ppmw 
-   
-basalt_container: dict = {'H2O':BasaltDixonH2O(), 'CO2':BasaltDixonCO2(), 'H2': BasaltH2(), 'N2': BasaltLibourelN2(), 'SO2': BasaltSO2()}
-andesite_container: dict = {'H2':AndesiteH2(), 'SO2':AndesiteSO2()}
-peridotite_container: dict = {'H2O':PeridotiteH2O(), 'H2':PeridotiteH2()}
-anorthdiop_containter: dict = {'H2O': AnorthiteDiopsideH2O()}
-reducedmagma_container: dict = {'H2S': MercuryMagmaS()}
-
-master_container: dict = {'basalt':basalt_container, 'andesite':andesite_container, 'peridotite':peridotite_container, 'anorthiteDiopsideEuctectic': anorthdiop_containter, 'reducedmagma': reducedmagma_container}
+        # pylint: disable=invalid-name
+        a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # coefficients from eq. 10 of Namur+2016
+        wt_perc: float = np.exp(a + (b / temperature) + ((c * pressure) / temperature) + (d * fo2))
+        ppmw: float = wt_perc * wtperc_to_ppm
+        return ppmw
 
 
+# Dictionaries of self-consistent solubility laws for a given composition.
+andesite_solubilities: dict[str, Solubility] = {"H2": AndesiteH2(), "SO2": AndesiteSO2()}
+anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
+basalt_solubilities: dict[str, Solubility] = {
+    "H2O": BasaltDixonH2O(),
+    "CO2": BasaltDixonCO2(),
+    "H2": BasaltH2(),
+    "N2": BasaltLibourelN2(),
+    "SO2": BasaltSO2(),
+}
+peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O(), "H2": PeridotiteH2()}
+reducedmagma_solubilities: dict[str, Solubility] = {"H2S": MercuryMagmaS()}
 
+# Dictionary of all the composition solubilities. Lowercase key name by convention. All of the
+# dictionaries with self-consistent solubility laws for a given composition (above) should be
+# included in this dictionary.
+# TODO: Dan, auto-assemble this dictionary rather than required the user to add?
+composition_solubilities: dict[str, dict[str, Solubility]] = {
+    "basalt": basalt_solubilities,
+    "andesite": andesite_solubilities,
+    "peridotite": peridotite_solubilities,
+    "anorthiteDiopsideEuctectic": anorthdiop_solubilities,
+    "reducedmagma": reducedmagma_solubilities,
+}

@@ -19,7 +19,7 @@ from atmodeller import (
 )
 from atmodeller.thermodynamics import (
     BasaltDixonCO2,
-    LibourelN2,
+    BasaltLibourelN2,
     NoSolubility,
     PeridotiteH2O,
 )
@@ -398,7 +398,7 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
         Molecule(name="O2", solubility=NoSolubility()),
         Molecule(name="CO", solubility=NoSolubility()),
         Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="N2", solubility=LibourelN2()),
+        Molecule(name="N2", solubility=BasaltLibourelN2()),
     ]
 
     oceans: float = 1
