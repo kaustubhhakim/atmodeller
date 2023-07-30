@@ -8,8 +8,8 @@ from typing import Callable, Optional, Union
 
 import numpy as np
 from numpy.linalg import LinAlgError
-from scipy import linalg  # type: ignore
-from scipy.optimize import fsolve  # type: ignore
+from scipy import linalg
+from scipy.optimize import fsolve
 
 from atmodeller import (
     GAS_CONSTANT,
@@ -18,7 +18,7 @@ from atmodeller import (
     TEMPERATURE_JANAF_LOW,
 )
 from atmodeller.thermodynamics import (
-    GibbsConstants,
+    GibbsFreeEnergyOfFormation,
     IronWustiteBufferOneill,
     MolarMasses,
     NoSolubility,
@@ -56,7 +56,7 @@ class Planet:
         surface_temperature: Temperature of the planetary surface.
         fo2_model: Oxygen fugacity model for the mantle.
         fo2_shift: log10 shift of the oxygen fugacity relative to `oxygen_fugacity`.
-        melt_composition: Melt composition of the planet. Default is None.
+        melt_composition: Melt composition of the planet.
         planet_mass: Mass of the planet.
         surface_gravity: Gravitational acceleration at the planetary surface.
     """
@@ -127,7 +127,6 @@ class Molecule:
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
         elements: The elements and their (stoichiometric) counts in the molecule.
         element_masses: The elements and their total masses in the molecule.
-        formation_constants: The constants for computing the formation equilibrium constant.
         molar_mass: Molar mass of the molecule.
     """
 
@@ -136,7 +135,6 @@ class Molecule:
     solid_melt_distribution_coefficient: float = 0
     elements: dict[str, int] = field(init=False)
     element_masses: dict[str, float] = field(init=False)
-    formation_constants: tuple[float, float] = field(init=False)
     molar_mass: float = field(init=False)
 
     def __post_init__(self):
@@ -147,14 +145,12 @@ class Molecule:
             key: value * getattr(masses, key) for key, value in self.elements.items()
         }
         self.molar_mass = sum(self.element_masses.values())
-        formation_constants: GibbsConstants = GibbsConstants()
-        self.formation_constants = getattr(formation_constants, self.name)
 
     def _count_elements(self) -> dict[str, int]:
         """Counts the number of atoms.
 
         Returns:
-            A dictionary of the elements and their (stoichiometric) counts.
+            A dictionary of the elements and their stoichiometric counts.
         """
         element_count: dict[str, int] = {}
         current_element: str = ""
@@ -177,17 +173,6 @@ class Molecule:
             element_count[current_element] = element_count.get(current_element, 0) + count
         logger.debug("element count = \n%s", element_count)
         return element_count
-
-    def get_gibbs_constant(self, *, temperature: float) -> float:
-        """Gets the standard Gibbs free energy of formation (Gf) from our fit to JANAF datatables.
-
-        Args:
-            temperature: Temperature.
-
-        Returns:
-            The formation equilibrium constant at the specified temperature.
-        """
-        return (self.formation_constants[0] * temperature) + self.formation_constants[1]
 
     @_mass_decorator
     def mass_in_atmosphere(
@@ -485,7 +470,7 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             equilibrium_constant += (
                 self.reaction_matrix[reaction_index, molecule_index]
-                * -molecule.get_gibbs_constant(temperature=temperature)
+                * -GibbsFreeEnergyOfFormation().get(molecule.name, temperature=temperature)
                 / (np.log(10) * (GAS_CONSTANT * j_to_kj) * temperature)
             )
         return equilibrium_constant
@@ -507,7 +492,7 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             gibbs_energy += self.reaction_matrix[
                 reaction_index, molecule_index
-            ] * molecule.get_gibbs_constant(temperature=temperature)
+            ] * GibbsFreeEnergyOfFormation().get(molecule.name, temperature=temperature)
         return gibbs_energy
 
     def get_reaction_equilibrium_constant(

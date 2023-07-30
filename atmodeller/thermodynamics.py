@@ -147,7 +147,7 @@ class MolarMasses:
 
 
 @dataclass(frozen=True)
-class GibbsConstants:
+class GibbsFreeEnergyOfFormation:
     """Standard Gibbs free energy of formation fitting constants.
 
     These parameters result from a linear fit in temperature space to the delta-f G column in the
@@ -182,6 +182,24 @@ class GibbsConstants:
     F: tuple[float, float] = (-0.06466483823529413, 84.63857352941173)
     F2: tuple[float, float] = (0, 0)
     HF: tuple[float, float] = (-0.0015432205882352377, -277.91656617647067)
+
+    def get(self, molecule: str, *, temperature: float) -> float:
+        """Gets the standard Gibbs free energy of formation (Gf).
+
+        Args:
+            molecule: Molecule.
+            temperature: Temperature.
+
+        Returns:
+            The formation equilibrium constant for the molecule at the specified temperature.
+        """
+        try:
+            formation_constants: tuple[float, float] = getattr(self, molecule)
+        except AttributeError:
+            logger.error("Thermodynamic data not available for %s", molecule)
+            raise
+
+        return formation_constants[0] * temperature + formation_constants[1]
 
 
 class Solubility(ABC):
