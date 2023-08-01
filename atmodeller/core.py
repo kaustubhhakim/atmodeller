@@ -23,6 +23,7 @@ from atmodeller.thermodynamics import (
     NoSolubility,
     OxygenFugacity,
     Solubility,
+    StandardGibbsFreeEnergyOfFormationHolland,
     StandardGibbsFreeEnergyOfFormationLinear,
     composition_solubilities,
 )

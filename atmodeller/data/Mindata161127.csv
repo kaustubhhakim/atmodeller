@@ -1,3 +1,5 @@
+# Data from Holland and Powell (1998), https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1525-1314.1998.00140.x
+# But digital data obtained from Xiang and Connolly (2021), https://onlinelibrary.wiley.com/doi/full/10.1111/jmg.12626
 name of phase component,,DfG,Hf,sd(Hf),S,V,a,b,c,d,e,f,g,a0,K,Tc,Smax,Vmax,v1,v2,k0,k0',v1,v2,v3,v4,d0,d1,d2,d3,d4,d5,d6,Tmin,Tmax,dv,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,Index,?End-member ,DfG,DfH,,
 akermanite,ak,-3669802,-3866360,1060,212.5,9.254,385.4,0.003209,-247500,-2889.9,,,,0.0000508,1420000,0,0,0,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1,akermanite ,-3668890,-3866200,0,-160
 almandine,alm,-4939678,-5263520,1320,340,11.511,677.3,0,-3772700,-5044,,,,0.0000403,1690000,0,0,0,,,,,,,,,,,,,,,,,,,,,,,,,,,,,2,almandine ,-4939800,-5263650,0,130

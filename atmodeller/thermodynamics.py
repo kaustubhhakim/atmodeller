@@ -173,7 +173,6 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
 
     def _read_thermodynamic_data(self) -> pd.DataFrame:
         data_path: Path = DATA / Path("gibbs_linear.csv")  # type: ignore
-        logger.debug(data_path)
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         data.set_index("species", inplace=True)
         return data
@@ -192,13 +191,84 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
             The standard Gibbs free energy of formation.
         """
         try:
-            logger.debug(tuple(self.data.loc[molecule].tolist()))
             formation_constants: tuple[float, float] = tuple(self.data.loc[molecule].tolist())
         except KeyError:
             logger.error("Thermodynamic data not available for %s", molecule)
             raise
 
-        return formation_constants[0] * temperature + formation_constants[1]
+        gibbs: float = formation_constants[0] * temperature + formation_constants[1]
+        logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
+
+        return gibbs
+
+
+class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormation):
+    """Standard Gibbs free energy of formation from Holland and Powell (1998).
+
+    See the comments in the data file that is parsed by __init__
+    """
+
+    def _read_thermodynamic_data(self) -> pd.DataFrame:
+        data_path: Path = DATA / Path("Mindata161127.csv")  # type: ignore
+        data: pd.DataFrame = pd.read_csv(data_path, comment="#")
+        data["name of phase component"] = data["name of phase component"].str.strip()
+        data.rename(columns={"Unnamed: 1": "Abbreviation"}, inplace=True)
+        data.set_index("name of phase component", inplace=True)
+        data = data.loc[:, :"Vmax"]
+        return data
+
+    def get(self, molecule: str, *, temperature: float) -> float:
+        """Gets the standard Gibbs free energy of formation.
+
+        Args:
+            molecule: Molecule.
+            temperature: Temperature.
+
+        Returns:
+            The standard Gibbs free energy of formation.
+        """
+        try:
+            data: pd.Series = self.data.loc[molecule]
+        except KeyError:
+            logger.error("Thermodynamic data not available for %s", molecule)
+            raise
+
+        temp_ref: float = 298  # K
+
+        # FIXME: DJB to check units in comparison to the linear JANAF fit. These Gibbs energies
+        # are different to those returned by the linear fit.
+
+        H = data.get("Hf")  # J
+        S = data.get("S")  # J/K
+        # V = data.get("V")  # J/bar
+        a = data.get("a")  # J/K           coeff for calc heat capacity
+        b = data.get("b")  # J/K^2         coeff for calc heat capacity
+        c = data.get("c")  # J K           coeff for calc heat capacity
+        d = data.get("d")  # J K^(-1/2)    coeff for calc heat capacity
+
+        # alpha0 = data.get("a0")  # K^(-1), thermal expansivity
+
+        integral_VP: float = 0.0
+
+        integral_H: float = (
+            H
+            + a * (temperature - temp_ref)
+            + b / 2 * (temperature**2 - temp_ref**2)
+            - c * (1 / temperature - 1 / temp_ref)
+            + 2 * d * (temperature**0.5 - temp_ref**0.5)
+        )
+        integral_S: float = (
+            S
+            + a * np.log(temperature / temp_ref)
+            + b * (temperature - temp_ref)
+            - c / 2 * (1 / temperature**2 - 1 / temp_ref**2)
+            - 2 * d * (1 / temperature**0.5 - 1 / temp_ref**0.5)
+        )
+
+        gibbs: float = integral_H - temperature * integral_S + integral_VP
+        logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
+
+        return gibbs
 
 
 class Solubility(ABC):
