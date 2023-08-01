@@ -18,12 +18,12 @@ from atmodeller import (
     TEMPERATURE_JANAF_LOW,
 )
 from atmodeller.thermodynamics import (
-    GibbsFreeEnergyOfFormation,
     IronWustiteBufferOneill,
     MolarMasses,
     NoSolubility,
     OxygenFugacity,
     Solubility,
+    StandardGibbsFreeEnergyOfFormationLinear,
     composition_solubilities,
 )
 
@@ -470,7 +470,9 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             equilibrium_constant += (
                 self.reaction_matrix[reaction_index, molecule_index]
-                * -GibbsFreeEnergyOfFormation().get(molecule.name, temperature=temperature)
+                * -StandardGibbsFreeEnergyOfFormationLinear().get(
+                    molecule.name, temperature=temperature
+                )
                 / (np.log(10) * (GAS_CONSTANT * j_to_kj) * temperature)
             )
         return equilibrium_constant
@@ -478,8 +480,7 @@ class ReactionNetwork:
     def get_reaction_gibbs_energy_of_formation(
         self, *, reaction_index: int, temperature: float
     ) -> float:
-        """Gets the Gibb's free energy of formation for a reaction from our linear fit to the JANAF
-        tables.
+        """Gets the Gibb's free energy of formation for a reaction.
 
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
@@ -492,7 +493,9 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             gibbs_energy += self.reaction_matrix[
                 reaction_index, molecule_index
-            ] * GibbsFreeEnergyOfFormation().get(molecule.name, temperature=temperature)
+            ] * StandardGibbsFreeEnergyOfFormationLinear().get(
+                molecule.name, temperature=temperature
+            )
         return gibbs_energy
 
     def get_reaction_equilibrium_constant(

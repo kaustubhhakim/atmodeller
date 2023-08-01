@@ -2,6 +2,7 @@
 
 __version__: str = "0.1.0"
 
+import importlib.resources
 import logging
 
 # Create the package logger.
@@ -37,6 +38,8 @@ GAS_CONSTANT: float = 8.31446261815324  # J/K/mol.
 # Temperature range used to fit the JANAF data.
 TEMPERATURE_JANAF_HIGH: float = 3000  # K
 TEMPERATURE_JANAF_LOW: float = 1500  # K
+
+DATA = importlib.resources.files("atmodeller.data")
 
 # pylint: disable=wrong-import-position
 from atmodeller.core import InteriorAtmosphereSystem  # type: ignore

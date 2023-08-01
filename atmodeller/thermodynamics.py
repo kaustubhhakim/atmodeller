@@ -3,8 +3,12 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
+import pandas as pd
+
+from atmodeller import DATA
 
 # For unit conversions.
 bar_to_GPa: float = 0.0001  # bar/GPa
@@ -146,56 +150,51 @@ class MolarMasses:
         self.H2: float = 2 * self.H
 
 
-@dataclass(frozen=True)
-class GibbsFreeEnergyOfFormation:
-    """Standard Gibbs free energy of formation fitting constants.
+class StandardGibbsFreeEnergyOfFormation(ABC):
+    """Standard Gibbs free energy of formation base class."""
 
-    These parameters result from a linear fit in temperature space to the delta-f G column in the
-    JANAF data tables for a given molecule. See the jupyter notebook in 'docs/'.
+    def __init__(self):
+        self.data: pd.DataFrame = self._read_thermodynamic_data()
 
-    G = aT + b
+    @abstractmethod
+    def _read_thermodynamic_data(self) -> pd.DataFrame:
+        """Reads and returns the thermodynamic data."""
 
-    where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation).
+    @abstractmethod
+    def get(self, molecule: str, *, temperature: float) -> float:
+        """Returns the standard Gibbs free energy of formation."""
 
-    In the future we could use the Shomate equation to calculate the equilibrium of the gas phase
-    reactions.
+
+class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormation):
+    """Standard Gibbs free energy of formation from a linear fit of JANAF data wrt. temperature.
+
+    See the comments in the data file that is parsed by __init__
     """
 
-    # Want to use molecule names therefore pylint: disable=invalid-name
-    C: tuple[float, float] = (0, 0)
-    CH4: tuple[float, float] = (0.11162272058823527, -92.46793382352928)
-    CO: tuple[float, float] = (-0.08269582352941174, -120.3571470588237)
-    CO2: tuple[float, float] = (0.0005482647058825124, -397.33434558823564)
-    H2: tuple[float, float] = (0, 0)
-    H2O: tuple[float, float] = (0.05817258823529415, -251.80119852941178)
-    N2: tuple[float, float] = (0, 0)
-    NH3: tuple[float, float] = (0.11667370588235293, -54.026338235293984)
-    O2: tuple[float, float] = (0, 0)
-    SO: tuple[float, float] = (-0.004834249999999983, -59.61862500000004)
-    SO2: tuple[float, float] = (0.0725481764705883, -361.0377720588236)
-    S2: tuple[float, float] = (0, 0)
-    H2S: tuple[float, float] = (0.04955845588235296, -90.57971323529412)
-    S: tuple[float, float] = (-0.06120597058823535, 217.87218382352947)
-    Cl: tuple[float, float] = (-0.06116926470588236, 127.34372058823527)
-    Cl2: tuple[float, float] = (0, 0)
-    HCl: tuple[float, float] = (-0.005433338235294086, -95.73480147058832)
-    F: tuple[float, float] = (-0.06466483823529413, 84.63857352941173)
-    F2: tuple[float, float] = (0, 0)
-    HF: tuple[float, float] = (-0.0015432205882352377, -277.91656617647067)
+    def _read_thermodynamic_data(self) -> pd.DataFrame:
+        data_path: Path = DATA / Path("gibbs_linear.csv")  # type: ignore
+        logger.debug(data_path)
+        data: pd.DataFrame = pd.read_csv(data_path, comment="#")
+        data.set_index("species", inplace=True)
+        return data
 
     def get(self, molecule: str, *, temperature: float) -> float:
-        """Gets the standard Gibbs free energy of formation (Gf).
+        """Gets the standard Gibbs free energy of formation.
+
+        G = aT + b
+        where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation).
 
         Args:
             molecule: Molecule.
             temperature: Temperature.
 
         Returns:
-            The formation equilibrium constant for the molecule at the specified temperature.
+            The standard Gibbs free energy of formation.
         """
         try:
-            formation_constants: tuple[float, float] = getattr(self, molecule)
-        except AttributeError:
+            logger.debug(tuple(self.data.loc[molecule].tolist()))
+            formation_constants: tuple[float, float] = tuple(self.data.loc[molecule].tolist())
+        except KeyError:
             logger.error("Thermodynamic data not available for %s", molecule)
             raise
 
