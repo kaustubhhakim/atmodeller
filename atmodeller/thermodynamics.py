@@ -162,7 +162,7 @@ class StandardGibbsFreeEnergyOfFormation(ABC):
 
     @abstractmethod
     def get(self, molecule: str, *, temperature: float) -> float:
-        """Returns the standard Gibbs free energy of formation."""
+        """Returns the standard Gibbs free energy of formation in units of J/mol"""
 
 
 class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormation):
@@ -178,7 +178,7 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
         return data
 
     def get(self, molecule: str, *, temperature: float) -> float:
-        """Gets the standard Gibbs free energy of formation.
+        """Gets the standard Gibbs free energy of formation in J/mol.
 
         G = aT + b
         where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation).
@@ -197,6 +197,7 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
             raise
 
         gibbs: float = formation_constants[0] * temperature + formation_constants[1]
+        gibbs *= 1000  # To convert from kJ to J.
         logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
 
         return gibbs
@@ -218,7 +219,7 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
         return data
 
     def get(self, molecule: str, *, temperature: float) -> float:
-        """Gets the standard Gibbs free energy of formation.
+        """Gets the standard Gibbs free energy of formation in J/mol
 
         Args:
             molecule: Molecule.
@@ -235,18 +236,12 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
 
         temp_ref: float = 298  # K
 
-        # FIXME: DJB to check units in comparison to the linear JANAF fit. These Gibbs energies
-        # are different to those returned by the linear fit.
-
         H = data.get("Hf")  # J
         S = data.get("S")  # J/K
-        # V = data.get("V")  # J/bar
-        a = data.get("a")  # J/K           coeff for calc heat capacity
-        b = data.get("b")  # J/K^2         coeff for calc heat capacity
-        c = data.get("c")  # J K           coeff for calc heat capacity
-        d = data.get("d")  # J K^(-1/2)    coeff for calc heat capacity
-
-        # alpha0 = data.get("a0")  # K^(-1), thermal expansivity
+        a = data.get("a")  # J/K           Coeff for calc heat capacity.
+        b = data.get("b")  # J/K^2         Coeff for calc heat capacity.
+        c = data.get("c")  # J K           Coeff for calc heat capacity.
+        d = data.get("d")  # J K^(-1/2)    Coeff for calc heat capacity.
 
         integral_VP: float = 0.0
 
@@ -265,7 +260,7 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
             - 2 * d * (1 / temperature**0.5 - 1 / temp_ref**0.5)
         )
 
-        gibbs: float = integral_H - temperature * integral_S + integral_VP
+        gibbs: float = integral_H - temperature * integral_S
         logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
 
         return gibbs

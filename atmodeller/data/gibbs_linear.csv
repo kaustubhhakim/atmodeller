@@ -3,6 +3,7 @@
 # JANAF data tables for a given molecule.
 # G = aT + b
 # where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation).
+# G has units of kJ/mol.
 species,a,b
 C,0,0
 CH4,0.11162272058823527,-92.46793382352928

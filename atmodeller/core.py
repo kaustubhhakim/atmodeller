@@ -455,9 +455,9 @@ class ReactionNetwork:
         self, *, reaction_index: int, temperature: float
     ) -> float:
         """Gets the log10 of the reaction equilibrium constant.
-        From the Gibbs free energy, we can calculate logKf:
+
+        From the Gibbs free energy, we can calculate logKf as:
         logKf = - G/(ln(10)*R*T)
-        *Note: R needs to be in kJ/mol for units consistency with G and logKf
 
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
@@ -466,7 +466,6 @@ class ReactionNetwork:
         Returns:
             log10 of the reaction equilibrium constant.
         """
-        j_to_kj: float = 0.001
         equilibrium_constant: float = 0
         for molecule_index, molecule in enumerate(self.molecules):
             equilibrium_constant += (
@@ -474,7 +473,7 @@ class ReactionNetwork:
                 * -StandardGibbsFreeEnergyOfFormationLinear().get(
                     molecule.name, temperature=temperature
                 )
-                / (np.log(10) * (GAS_CONSTANT * j_to_kj) * temperature)
+                / (np.log(10) * GAS_CONSTANT * temperature)
             )
         return equilibrium_constant
 
