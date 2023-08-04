@@ -18,7 +18,7 @@ from atmodeller.thermodynamics import (
     NoSolubility,
     OxygenFugacity,
     Solubility,
-    StandardGibbsFreeEnergyOfFormationHolland,
+    StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationLinear,
     composition_solubilities,
 )
@@ -315,14 +315,17 @@ class SystemConstraint:
     field: str
 
 
+@dataclass(kw_only=True)
 class ReactionNetwork:
     """Determines the necessary (often formation) reactions to solve a chemical network.
 
     Args:
         molecules: A list of molecules.
+        gibbs_data: Standard Gibbs free energy of formation.
 
     Attributes:
         molecules: A list of molecules.
+        gibbs_data: Standard Gibbs free energy of formation.
         molecule_names: The names of the molecules.
         number_molecules: The number of molecules.
         elements: The elements in the molecule and their counts.
@@ -332,11 +335,13 @@ class ReactionNetwork:
         reaction_matrix: The reaction stoichiometry matrix.
     """
 
-    def __init__(self, molecules: list[Molecule]):
-        self.molecules: list[Molecule] = molecules
+    molecules: list[Molecule]
+    gibbs_data: StandardGibbsFreeEnergyOfFormation
+
+    def __post_init__(self):
         self.molecule_names: list[str] = [molecule.name for molecule in self.molecules]
         logger.info("Molecules = %s", self.molecule_names)
-        self.number_molecules: int = len(molecules)
+        self.number_molecules: int = len(self.molecules)
         self.elements, self.number_elements = self.find_elements()
         self.number_reactions: int = self.number_molecules - self.number_elements
         self.molecule_matrix: np.ndarray = self.find_matrix()
@@ -465,9 +470,7 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             equilibrium_constant += (
                 self.reaction_matrix[reaction_index, molecule_index]
-                * -StandardGibbsFreeEnergyOfFormationLinear().get(
-                    molecule.name, temperature=temperature
-                )
+                * -self.gibbs_data.get(molecule.name, temperature=temperature)
                 / (np.log(10) * GAS_CONSTANT * temperature)
             )
         return equilibrium_constant
@@ -488,9 +491,7 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             gibbs_energy += self.reaction_matrix[
                 reaction_index, molecule_index
-            ] * StandardGibbsFreeEnergyOfFormationLinear().get(
-                molecule.name, temperature=temperature
-            )
+            ] * self.gibbs_data.get(molecule.name, temperature=temperature)
         return gibbs_energy
 
     def get_reaction_equilibrium_constant(
@@ -636,9 +637,11 @@ class InteriorAtmosphereSystem:
 
     Args:
         molecules: A list of molecules.
+        gibbs_data: Standard Gibbs free energy of formation.
 
     Attributes:
         molecules: A list of molecules.
+        gibbs_data: Standard Gibbs free energy of formation.  Defaults to a linear fit to JANAF.
         planet: A planet. Defaults to a molten Earth.
         molecule_names: A list of the molecule names.
         number_molecules: The number of molecules.
@@ -650,6 +653,9 @@ class InteriorAtmosphereSystem:
     """
 
     molecules: list[Molecule]
+    gibbs_data: StandardGibbsFreeEnergyOfFormation = field(
+        default_factory=StandardGibbsFreeEnergyOfFormationLinear
+    )
     planet: Planet = field(default_factory=Planet)
     molecule_names: list[str] = field(init=False)
     number_molecules: int = field(init=False)
@@ -664,7 +670,9 @@ class InteriorAtmosphereSystem:
         logger.info("Molecules = %s", self.molecule_names)
         self._conform_solubilities_to_composition()
         self._log10_pressures = np.zeros_like(self.molecules, dtype="float64")
-        self._reaction_network = ReactionNetwork(molecules=self.molecules)
+        self._reaction_network = ReactionNetwork(
+            molecules=self.molecules, gibbs_data=self.gibbs_data
+        )
 
     def _conform_solubilities_to_composition(self) -> None:
         """Ensure that the solubilities of the species are consistent with the melt composition."""

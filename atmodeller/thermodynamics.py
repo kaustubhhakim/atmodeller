@@ -179,6 +179,7 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
         data_path: Path = DATA_ROOT_PATH / Path("gibbs_linear.csv")  # type: ignore
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         data.set_index("species", inplace=True)
+        data = data.astype(float)
         return data
 
     def get(self, molecule: str, *, temperature: float) -> float:
@@ -223,8 +224,10 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         data["name of phase component"] = data["name of phase component"].str.strip()
         data.rename(columns={"Unnamed: 1": "Abbreviation"}, inplace=True)
+        data.drop(columns="Abbreviation", inplace=True)
         data.set_index("name of phase component", inplace=True)
         data = data.loc[:, :"Vmax"]
+        data = data.astype(float)
         return data
 
     def get(self, molecule: str, *, temperature: float) -> float:
@@ -254,17 +257,17 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
 
         integral_H: float = (
             H
-            + a * (temperature - temp_ref)
-            + b / 2 * (temperature**2 - temp_ref**2)
-            - c * (1 / temperature - 1 / temp_ref)
-            + 2 * d * (temperature**0.5 - temp_ref**0.5)
+            + a * (temperature - temp_ref)  # type: ignore a is a float.
+            + b / 2 * (temperature**2 - temp_ref**2)  # type: ignore b is a float.
+            - c * (1 / temperature - 1 / temp_ref)  # type: ignore c is a float.
+            + 2 * d * (temperature**0.5 - temp_ref**0.5)  # type: ignore d is a float.
         )
         integral_S: float = (
             S
-            + a * np.log(temperature / temp_ref)
-            + b * (temperature - temp_ref)
-            - c / 2 * (1 / temperature**2 - 1 / temp_ref**2)
-            - 2 * d * (1 / temperature**0.5 - 1 / temp_ref**0.5)
+            + a * np.log(temperature / temp_ref)  # type: ignore a is a float.
+            + b * (temperature - temp_ref)  # type: ignore b is a float.
+            - c / 2 * (1 / temperature**2 - 1 / temp_ref**2)  # type: ignore c is a float.
+            - 2 * d * (1 / temperature**0.5 - 1 / temp_ref**0.5)  # type: ignore d is a float.
         )
 
         gibbs: float = integral_H - temperature * integral_S
