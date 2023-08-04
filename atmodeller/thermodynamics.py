@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from atmodeller import DATA
+from atmodeller import DATA_ROOT_PATH
 
 # For unit conversions.
 bar_to_GPa: float = 0.0001  # bar/GPa
@@ -171,8 +171,12 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
     See the comments in the data file that is parsed by __init__
     """
 
+    # Temperature range used to fit the JANAF data.
+    TEMPERATURE_HIGH: float = 3000  # K
+    TEMPERATURE_LOW: float = 1500  # K
+
     def _read_thermodynamic_data(self) -> pd.DataFrame:
-        data_path: Path = DATA / Path("gibbs_linear.csv")  # type: ignore
+        data_path: Path = DATA_ROOT_PATH / Path("gibbs_linear.csv")  # type: ignore
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         data.set_index("species", inplace=True)
         return data
@@ -196,6 +200,11 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
             logger.error("Thermodynamic data not available for %s", molecule)
             raise
 
+        if (temperature < self.TEMPERATURE_LOW) or (temperature > self.TEMPERATURE_HIGH):
+            msg: str = f"Temperature must be in the range {self.TEMPERATURE_LOW} K to "
+            msg += f"{self.TEMPERATURE_HIGH} K"
+            raise ValueError(msg)
+
         gibbs: float = formation_constants[0] * temperature + formation_constants[1]
         gibbs *= 1000  # To convert from kJ to J.
         logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
@@ -210,7 +219,7 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
     """
 
     def _read_thermodynamic_data(self) -> pd.DataFrame:
-        data_path: Path = DATA / Path("Mindata161127.csv")  # type: ignore
+        data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         data["name of phase component"] = data["name of phase component"].str.strip()
         data.rename(columns={"Unnamed: 1": "Abbreviation"}, inplace=True)
@@ -242,8 +251,6 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
         b = data.get("b")  # J/K^2         Coeff for calc heat capacity.
         c = data.get("c")  # J K           Coeff for calc heat capacity.
         d = data.get("d")  # J K^(-1/2)    Coeff for calc heat capacity.
-
-        integral_VP: float = 0.0
 
         integral_H: float = (
             H

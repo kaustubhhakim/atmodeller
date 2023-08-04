@@ -11,12 +11,7 @@ from numpy.linalg import LinAlgError
 from scipy import linalg
 from scipy.optimize import fsolve
 
-from atmodeller import (
-    GAS_CONSTANT,
-    GRAVITATIONAL_CONSTANT,
-    TEMPERATURE_JANAF_HIGH,
-    TEMPERATURE_JANAF_LOW,
-)
+from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.thermodynamics import (
     IronWustiteBufferOneill,
     MolarMasses,
@@ -768,13 +763,6 @@ class InteriorAtmosphereSystem:
         Returns:
             The pressures in bar.
         """
-        # The formation energy data is only fit between a certain temperature range.
-        if (self.planet.surface_temperature < TEMPERATURE_JANAF_LOW) or (
-            self.planet.surface_temperature > TEMPERATURE_JANAF_HIGH
-        ):
-            msg: str = f"Surface temperature must be in the range {TEMPERATURE_JANAF_LOW} K to "
-            msg += f"{TEMPERATURE_JANAF_HIGH} K"
-            raise ValueError(msg)
 
         logger.info("Constraints: %s", pprint.pformat(constraints))
 

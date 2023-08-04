@@ -35,11 +35,7 @@ GRAVITATIONAL_CONSTANT: float = 6.6743e-11  # SI units.
 OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
 GAS_CONSTANT: float = 8.31446261815324  # J/K/mol.
 
-# Temperature range used to fit the JANAF data.
-TEMPERATURE_JANAF_HIGH: float = 3000  # K
-TEMPERATURE_JANAF_LOW: float = 1500  # K
-
-DATA = importlib.resources.files("atmodeller.data")
+DATA_ROOT_PATH = importlib.resources.files("atmodeller.data")
 
 # pylint: disable=wrong-import-position
 from atmodeller.core import InteriorAtmosphereSystem  # type: ignore
