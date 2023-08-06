@@ -22,11 +22,17 @@ from atmodeller.thermodynamics import (
     BasaltLibourelN2,
     NoSolubility,
     PeridotiteH2O,
+    StandardGibbsFreeEnergyOfFormation,
+    StandardGibbsFreeEnergyOfFormationLinear,
 )
 
 # Tolerances to compare the test results with predefined 'correct' output.
 rtol: float = 1.0e-5
 atol: float = 1.0e-8
+
+standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormation = (
+    StandardGibbsFreeEnergyOfFormationLinear()
+)
 
 
 def test_version():
@@ -55,7 +61,9 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
         SystemConstraint(species="H", value=h_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     planet.fo2_shift = 0
     target_pressures: np.ndarray = np.array(
@@ -83,7 +91,9 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
         SystemConstraint(species="H", value=h_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     planet.fo2_shift = 2
     target_pressures: np.ndarray = np.array(
@@ -111,7 +121,9 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
         SystemConstraint(species="H", value=h_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     planet.fo2_shift = -2
     target_pressures: np.ndarray = np.array(
@@ -144,7 +156,9 @@ def test_hydrogen_species_five_oceans() -> None:
         SystemConstraint(species="H", value=h_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     planet.fo2_shift = 0
     target_pressures: np.ndarray = np.array(
@@ -173,7 +187,9 @@ def test_hydrogen_species_ten_oceans() -> None:
         SystemConstraint(species="H", value=h_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     planet.fo2_shift = 0
     target_pressures: np.ndarray = np.array(
@@ -206,7 +222,9 @@ def test_hydrogen_species_temperature() -> None:
         SystemConstraint(species="H", value=h_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     planet.surface_temperature = 1500.0  # K
     target_pressures: np.ndarray = np.array(
@@ -244,7 +262,9 @@ def test_hydrogen_and_carbon_species() -> None:
         SystemConstraint(species="C", value=c_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     target_pressures: np.ndarray = np.array(
         [
@@ -282,7 +302,9 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
         SystemConstraint(species="C", value=c_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     target_pressures: np.ndarray = np.array(
         [
@@ -320,7 +342,9 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
         SystemConstraint(species="C", value=c_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     target_pressures: np.ndarray = np.array(
         [
@@ -365,7 +389,9 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
         SystemConstraint(species="C", value=c_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
 
     target_pressures: np.ndarray = np.array(
         [
@@ -416,7 +442,9 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
         SystemConstraint(species="N", value=n_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Order of target pressures: CO, H2, N2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
@@ -459,7 +487,9 @@ def test_hydrogen_and_carbon_species_with_NH3() -> None:
         SystemConstraint(species="N", value=n_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Order of target pressures: CO, H2, O2, CO2, H2O, NH3
     target_pressures: np.ndarray = np.array(
         [
@@ -508,7 +538,9 @@ def test_hydrogen_and_carbon_species_with_SO2() -> None:
         SystemConstraint(species="S", value=s_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Here the order of target pressures is: S, CO, H2, O2, CO2, H2O, SO2
     target_pressures: np.ndarray = np.array(
         [
@@ -553,7 +585,9 @@ def test_hydrogen_and_carbon_species_with_H2S() -> None:
         SystemConstraint(species="S", value=s_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Here the order of target pressures is: S, CO, H2, O2, CO2, H2O, H2S
     target_pressures: np.ndarray = np.array(
         [
@@ -598,7 +632,9 @@ def test_hydrogen_and_carbon_species_with_SO_H2S() -> None:
         SystemConstraint(species="S", value=s_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Here the order of target pressures is: CO, H2, O2, SO, CO2, H2O, H2S
     target_pressures: np.ndarray = np.array(
         [
@@ -648,7 +684,9 @@ def test_hydrogen_and_carbon_species_with_HCl() -> None:
         SystemConstraint(species="Cl", value=cl_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Here the order of target pressures is: Cl, CO, H2, HCl, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
@@ -693,7 +731,9 @@ def test_hydrogen_and_carbon_species_with_Cl2() -> None:
         SystemConstraint(species="Cl", value=cl_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Here the order of target pressures is: Cl, CO, Cl2, H2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
@@ -743,7 +783,9 @@ def test_hydrogen_and_carbon_species_with_HF() -> None:
         SystemConstraint(species="F", value=f_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Here the order of target pressures is: F, CO, H2, HF, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
@@ -788,7 +830,9 @@ def test_hydrogen_and_carbon_species_with_F2() -> None:
         SystemConstraint(species="F", value=f_kg, field="mass"),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
     # Here the order of target pressures is: F, CO, F2, H2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [

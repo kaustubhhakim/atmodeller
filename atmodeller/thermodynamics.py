@@ -87,7 +87,6 @@ class MolarMasses:
     """
 
     # Define atoms here.
-    # pylint: disable=invalid-name
     H: float = 1.0079e-3
     He: float = 4.0026e-3
     Li: float = 6.941e-3
@@ -487,7 +486,6 @@ class MercuryMagmaS(Solubility):
     # TODO: Maggie to check, I think this would mainly apply to H2S but maybe also S2 and S.
 
     def _solubility(self, pressure: float, temperature: float, fo2: float) -> float:
-        # pylint: disable=invalid-name
         a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # coefficients from eq. 10 of Namur+2016
         wt_perc: float = np.exp(a + (b / temperature) + ((c * pressure) / temperature) + (d * fo2))
         ppmw: float = wt_perc * wtperc_to_ppm
