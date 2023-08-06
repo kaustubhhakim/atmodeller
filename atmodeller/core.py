@@ -205,6 +205,7 @@ class Molecule:
         planet: Planet,
         partial_pressure_bar: float,
         element: Optional[str] = None,
+        pressures_dict: dict[str, float],
     ) -> float:
         """Mass in the molten interior.
 
@@ -213,6 +214,7 @@ class Molecule:
             partial_pressure_bar: Partial pressure in bar.
             element: Returns the mass for an element. Defaults to None to return the molecule mass.
                This argument is used by the @_mass_decorator.
+            pressure_dict: Dictionary of all the species and their partial pressures.
 
         Returns:
             Mass of the molecule (element=None) or element (element=element) in the melt.
@@ -222,7 +224,7 @@ class Molecule:
         ppmw_in_melt: float = self.solubility(
             partial_pressure_bar,
             planet.surface_temperature,
-            planet.fo2_model(temperature=planet.surface_temperature, fo2_shift=planet.fo2_shift),
+            **pressures_dict,
         )
         mass: float = prefactor * ppmw_in_melt
 
@@ -235,6 +237,7 @@ class Molecule:
         planet: Planet,
         partial_pressure_bar: float,
         element: Optional[str] = None,
+        pressures_dict: dict[str, float],
     ) -> float:
         """Mass in the solid interior.
 
@@ -243,6 +246,7 @@ class Molecule:
             partial_pressure_bar: Partial pressure in bar.
             element: Returns the mass for an element. Defaults to None to return the molecule mass.
                This argument is used by the @_mass_decorator.
+            pressure_dict: Dictionary of all the species and their partial pressures.
 
         Returns:
             Mass of the molecule (element=None) or element (element=element) in the solid.
@@ -250,9 +254,7 @@ class Molecule:
         del element
         prefactor: float = 1e-6 * planet.mantle_mass * (1 - planet.mantle_melt_fraction)
         ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar,
-            planet.surface_temperature,
-            planet.fo2_model(temperature=planet.surface_temperature, fo2_shift=planet.fo2_shift),
+            partial_pressure_bar, planet.surface_temperature, **pressures_dict
         )
         ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
         mass: float = prefactor * ppmw_in_solid
@@ -266,6 +268,7 @@ class Molecule:
         partial_pressure_bar: float,
         atmosphere_mean_molar_mass: float,
         element: Optional[str] = None,
+        pressures_dict: dict[str, float],
     ) -> float:
         """Total mass.
 
@@ -275,6 +278,7 @@ class Molecule:
             atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
             element: Returns the mass for an element. Defaults to None to return the molecule mass.
                This argument is used by the @_mass_decorator.
+            pressure_dict: Dictionary of all the species and their partial pressures.
 
         Returns:
             Total mass of the molecule (element=None) or element (element=element).
@@ -286,10 +290,16 @@ class Molecule:
             element=element,
         )
         mass_in_melt: float = self.mass_in_melt(
-            planet=planet, partial_pressure_bar=partial_pressure_bar, element=element
+            planet=planet,
+            partial_pressure_bar=partial_pressure_bar,
+            element=element,
+            pressures_dict=pressures_dict,
         )
         mass_in_solid: float = self.mass_in_solid(
-            planet=planet, partial_pressure_bar=partial_pressure_bar, element=element
+            planet=planet,
+            partial_pressure_bar=partial_pressure_bar,
+            element=element,
+            pressures_dict=pressures_dict,
         )
         total_mass: float = mass_in_atmosphere + mass_in_melt + mass_in_solid
 
@@ -637,11 +647,11 @@ class InteriorAtmosphereSystem:
 
     Args:
         molecules: A list of molecules.
-        gibbs_data: Standard Gibbs free energy of formation.
+        gibbs_data: Standard Gibbs free energy of formation. Defaults to a linear fit to JANAF.
 
     Attributes:
         molecules: A list of molecules.
-        gibbs_data: Standard Gibbs free energy of formation.  Defaults to a linear fit to JANAF.
+        gibbs_data: Standard Gibbs free energy of formation. Defaults to a linear fit to JANAF.
         planet: A planet. Defaults to a molten Earth.
         molecule_names: A list of the molecule names.
         number_molecules: The number of molecules.
@@ -708,7 +718,7 @@ class InteriorAtmosphereSystem:
 
         Sorts first by molecule complexity and second by molecule name.
 
-        Arg:
+        Args:
             molecule: Molecule.
 
         Returns:
@@ -897,6 +907,7 @@ class InteriorAtmosphereSystem:
                     partial_pressure_bar=self.pressures[molecule_index],
                     atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
                     element=constraint.species,
+                    pressures_dict=self.pressures_dict,
                 )
             residual_mass[constraint_index] -= constraint.value
             # Normalise by target mass to compute a relative residual.

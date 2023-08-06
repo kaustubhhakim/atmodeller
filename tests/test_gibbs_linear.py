@@ -448,12 +448,12 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     # Order of target pressures: CO, H2, N2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
-            62.189238254089844,
-            0.5547751075029279,
-            2.2915167502949956,
-            3.9099946023954954e-08,
-            9.449832682894986,
-            0.37834172952485223,
+            6.21892511e01,
+            5.54775108e-01,
+            2.29125124e00,
+            3.90999460e-08,
+            9.44983463e00,
+            3.78341730e-01,
         ]
     )
     system.solve(constraints, fo2_constraint=True)

@@ -415,11 +415,11 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     # Order of target pressures: CO, H2, N2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
-            6.23306591e01,
+            6.23306717e01,
             5.57429769e-01,
-            2.28854419e00,
+            2.28827919e00,
             3.90999460e-08,
-            9.25837558e00,
+            9.25837745e00,
             3.78334976e-01,
         ]
     )
