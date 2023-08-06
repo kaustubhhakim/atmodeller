@@ -432,7 +432,6 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
-# pylint: disable=invalid-name
 def test_hydrogen_and_carbon_species_with_NH3() -> None:
     """Tests H2-H2O and CO-CO2 and NH3."""
 

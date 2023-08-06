@@ -78,7 +78,6 @@ class MolarMasses:
     """
 
     # Define atoms here.
-    # pylint: disable=invalid-name
     H: float = 1.0079e-3
     He: float = 4.0026e-3
     Li: float = 6.941e-3
@@ -154,7 +153,6 @@ class FormationEquilibriumConstants:
     reactions.
     """
 
-    # Want to use molecule names therefore pylint: disable=invalid-name
     C: tuple[float, float] = (0, 0)
     CH4: tuple[float, float] = (-5.830066176470588, 4829.067647058815)
     CO: tuple[float, float] = (4.319860294117643, 6286.120588235306)
