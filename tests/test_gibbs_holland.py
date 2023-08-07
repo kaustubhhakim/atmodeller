@@ -10,7 +10,9 @@ import numpy as np
 
 from atmodeller import (
     OCEAN_MOLES,
+    BufferedFugacityConstraint,
     InteriorAtmosphereSystem,
+    MassConstraint,
     MolarMasses,
     Molecule,
     Planet,
@@ -57,16 +59,16 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    planet.fo2_shift = 0
     target_pressures: np.ndarray = np.array([5.72483121e-01, 3.91041669e-08, 3.88572857e-01])
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -85,16 +87,16 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        BufferedFugacityConstraint(log10_shift=2),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    planet.fo2_shift = 2
     target_pressures: np.ndarray = np.array([5.79128485e-02, 3.91041669e-06, 3.93083398e-01])
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -113,16 +115,16 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        BufferedFugacityConstraint(log10_shift=-2),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    planet.fo2_shift = -2
     target_pressures: np.ndarray = np.array([4.60871136e00, 3.91041669e-10, 3.12816234e-01])
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -146,16 +148,16 @@ def test_hydrogen_species_five_oceans() -> None:
     h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    planet.fo2_shift = 0
     target_pressures: np.ndarray = np.array([1.35033397e01, 3.91041669e-08, 9.16539041e00])
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
 
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -175,16 +177,16 @@ def test_hydrogen_species_ten_oceans() -> None:
     h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    planet.fo2_shift = 0
     target_pressures: np.ndarray = np.array([5.05449808e01, 3.91041669e-08, 3.43074003e01])
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -208,7 +210,8 @@ def test_hydrogen_species_temperature() -> None:
     h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -217,7 +220,7 @@ def test_hydrogen_species_temperature() -> None:
 
     planet.surface_temperature = 1500.0  # K
     target_pressures: np.ndarray = np.array([3.74207325e-01, 3.94917324e-12, 3.90596029e-01])
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -245,8 +248,9 @@ def test_hydrogen_and_carbon_species() -> None:
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
-        SystemConstraint(species="C", value=c_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        MassConstraint(species="C", value=c_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -256,7 +260,7 @@ def test_hydrogen_and_carbon_species() -> None:
     target_pressures: np.ndarray = np.array(
         [6.24207531e01, 5.78786802e-01, 3.91041669e-08, 9.27225826e00, 3.92851480e-01]
     )
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -279,8 +283,9 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
-        SystemConstraint(species="C", value=c_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        MassConstraint(species="C", value=c_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -290,7 +295,7 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     target_pressures: np.ndarray = np.array(
         [3.14496733e02, 5.78806369e-01, 3.91041669e-08, 4.67167534e01, 3.92864761e-01]
     )
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -313,8 +318,9 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
-        SystemConstraint(species="C", value=c_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        MassConstraint(species="C", value=c_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -324,7 +330,7 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     target_pressures: np.ndarray = np.array(
         [6.29708610e02, 5.78808803e-01, 3.91041669e-08, 9.35397375e01, 3.92866413e-01]
     )
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -354,8 +360,9 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
-        SystemConstraint(species="C", value=c_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        MassConstraint(species="C", value=c_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -372,7 +379,7 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
             3.04645336e-05,
         ]
     )
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -404,9 +411,10 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     n_kg: float = nitrogen_ppmw * 1.0e-6 * planet.mantle_mass
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
-        SystemConstraint(species="C", value=c_kg, field="mass"),
-        SystemConstraint(species="N", value=n_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        MassConstraint(species="C", value=c_kg),
+        MassConstraint(species="N", value=n_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -423,7 +431,7 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
             3.92848296e-01,
         ]
     )
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -449,9 +457,10 @@ def test_hydrogen_and_carbon_species_with_NH3() -> None:
     n_kg: float = nitrogen_ppmw * 1.0e-6 * planet.mantle_mass
 
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
-        SystemConstraint(species="C", value=c_kg, field="mass"),
-        SystemConstraint(species="N", value=n_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        MassConstraint(species="C", value=c_kg),
+        MassConstraint(species="N", value=n_kg),
+        BufferedFugacityConstraint(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -468,7 +477,7 @@ def test_hydrogen_and_carbon_species_with_NH3() -> None:
             4.69662215e00,
         ]
     )
-    system.solve(constraints, fo2_constraint=True)
+    system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 

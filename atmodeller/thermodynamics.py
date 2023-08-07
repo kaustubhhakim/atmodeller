@@ -43,7 +43,7 @@ class BufferedFugacity(ABC):
 
 
 class IronWustiteBufferOneill(BufferedFugacity):
-    """Iron-wustite buffer from O'Neill and Eggins (2002). See Table 6.
+    """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002). See Table 6.
 
     https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
     """
@@ -59,7 +59,7 @@ class IronWustiteBufferOneill(BufferedFugacity):
 
 
 class IronWustiteBufferFischer(BufferedFugacity):
-    """Iron-wustite buffer from Fischer et al. (2011). See Table S2 in supplementary materials.
+    """Iron-wustite buffer (fO2) from Fischer et al. (2011). See Table S2 in supplementary materials.
 
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
     """

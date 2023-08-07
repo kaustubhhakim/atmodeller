@@ -7,7 +7,14 @@ import logging
 import time
 
 from atmodeller import OCEAN_MOLES, logger
-from atmodeller.core import InteriorAtmosphereSystem, Molecule, Planet, SystemConstraint
+from atmodeller.core import (
+    BufferedFugacityConstraint,
+    InteriorAtmosphereSystem,
+    MassConstraint,
+    Molecule,
+    Planet,
+    SystemConstraint,
+)
 from atmodeller.thermodynamics import (
     BasaltDixonCO2,
     BasaltLibourelN2,
@@ -74,21 +81,21 @@ def main():
     molar_masses: MolarMasses = MolarMasses()
     h_kg: float = args.oceans * OCEAN_MOLES * molar_masses.H2
     c_kg: float = args.ch_ratio * h_kg
-    planet.fo2_shift = args.fo2_shift
     constraints: list[SystemConstraint] = [
-        SystemConstraint(species="H", value=h_kg, field="mass"),
-        SystemConstraint(species="C", value=c_kg, field="mass"),
+        MassConstraint(species="H", value=h_kg),
+        MassConstraint(species="C", value=c_kg),
+        BufferedFugacityConstraint(log10_shift=args.fO2_shift),
     ]
 
     # Include nitrogen if desired.
     if args.nitrogen != 0:
         molecules.append(Molecule(name="N2", solubility=BasaltLibourelN2()))
         n_kg: float = args.nitrogen * 1.0e-6 * planet.mantle_mass
-        constraints.append(SystemConstraint(species="N", value=n_kg, field="mass"))
+        constraints.append(MassConstraint(species="N", value=n_kg))
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
-    system.solve(constraints, fo2_constraint=True)
-    logger.info(system.pressures_dict)
+    system.solve(constraints)
+    logger.info(system.fugacities_dict)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)

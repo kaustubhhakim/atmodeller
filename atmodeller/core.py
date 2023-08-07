@@ -4,7 +4,7 @@ import logging
 import pprint
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Protocol, Union
 
 import numpy as np
 from numpy.linalg import LinAlgError
@@ -39,9 +39,6 @@ class Planet:
             Earth.
         surface_radius: Radius of the planetary surface. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
-        fo2_model: Oxygen fugacity model for the mantle. Defaults to
-            IronWustiteBufferOneill,
-        fo2_shift: log10 shift of the oxygen fugacity relative to the prescribed model.
         melt_composition: Melt composition of the planet. Default is None.
 
     Attributes:
@@ -50,8 +47,6 @@ class Planet:
         core_mass_fraction: Mass fraction of the core relative to the planetary mass.
         surface_radius: Radius of the planetary surface.
         surface_temperature: Temperature of the planetary surface.
-        fo2_model: Oxygen fugacity model for the mantle.
-        fo2_shift: log10 shift of the oxygen fugacity relative to `oxygen_fugacity`.
         melt_composition: Melt composition of the planet.
         planet_mass: Mass of the planet.
         surface_gravity: Gravitational acceleration at the planetary surface.
@@ -62,8 +57,6 @@ class Planet:
     core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
     surface_radius: float = 6371000.0  # m, Earth's radius
     surface_temperature: float = 2000.0  # K
-    fo2_model: BufferedFugacity = field(default_factory=IronWustiteBufferOneill)
-    fo2_shift: float = 0
     melt_composition: Union[str, None] = None
     planet_mass: float = field(init=False)
     surface_gravity: float = field(init=False)
@@ -79,8 +72,6 @@ class Planet:
         logger.info("Planetary mass (kg) = %s", self.planet_mass)
         logger.info("Surface temperature (K) = %f", self.surface_temperature)
         logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
-        logger.info("Oxygen fugacity model (mantle) = %s", self.fo2_model.__class__.__name__)
-        logger.info("Oxygen fugacity log10 shift = %f", self.fo2_shift)
         logger.info("Melt Composition = %s", self.melt_composition)
 
 
@@ -205,7 +196,7 @@ class Molecule:
         planet: Planet,
         partial_pressure_bar: float,
         element: Optional[str] = None,
-        pressures_dict: dict[str, float],
+        fugacities_dict: dict[str, float],
     ) -> float:
         """Mass in the molten interior.
 
@@ -224,7 +215,7 @@ class Molecule:
         ppmw_in_melt: float = self.solubility(
             partial_pressure_bar,
             planet.surface_temperature,
-            pressures_dict,
+            fugacities_dict,
         )
         mass: float = prefactor * ppmw_in_melt
 
@@ -237,7 +228,7 @@ class Molecule:
         planet: Planet,
         partial_pressure_bar: float,
         element: Optional[str] = None,
-        pressures_dict: dict[str, float],
+        fugacities_dict: dict[str, float],
     ) -> float:
         """Mass in the solid interior.
 
@@ -254,7 +245,7 @@ class Molecule:
         del element
         prefactor: float = 1e-6 * planet.mantle_mass * (1 - planet.mantle_melt_fraction)
         ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar, planet.surface_temperature, pressures_dict
+            partial_pressure_bar, planet.surface_temperature, fugacities_dict
         )
         ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
         mass: float = prefactor * ppmw_in_solid
@@ -268,7 +259,7 @@ class Molecule:
         partial_pressure_bar: float,
         atmosphere_mean_molar_mass: float,
         element: Optional[str] = None,
-        pressures_dict: dict[str, float],
+        fugacities_dict: dict[str, float],
     ) -> float:
         """Total mass.
 
@@ -293,28 +284,43 @@ class Molecule:
             planet=planet,
             partial_pressure_bar=partial_pressure_bar,
             element=element,
-            pressures_dict=pressures_dict,
+            fugacities_dict=fugacities_dict,
         )
         mass_in_solid: float = self.mass_in_solid(
             planet=planet,
             partial_pressure_bar=partial_pressure_bar,
             element=element,
-            pressures_dict=pressures_dict,
+            fugacities_dict=fugacities_dict,
         )
         total_mass: float = mass_in_atmosphere + mass_in_melt + mass_in_solid
 
         return total_mass
 
 
+class SystemConstraint(Protocol):
+    """A constraint to apply to an interior-atmosphere system."""
+
+    @property
+    def field(self) -> str:
+        ...
+
+    @property
+    def species(self) -> str:
+        ...
+
+    def get_value(self, **kwargs) -> float:
+        ...
+
+
 @dataclass(kw_only=True)
-class SystemConstraint:
-    """A constraint to apply to an interior-atmosphere system.
+class _ValueConstraint:
+    """A value constraint to apply to an interior-atmosphere system.
 
     Args:
         species: The species to constrain. Usually a molecule for a pressure constraint or an
             element for a mass constraint.
         value: Imposed value in kg for masses and bar for pressures.
-        field: Either 'pressure' or 'mass'.
+        field: Either 'fugacity' or 'mass'.
 
     Attributes:
         See Args.
@@ -323,6 +329,43 @@ class SystemConstraint:
     species: str
     value: float
     field: str
+
+    def get_value(self, **kwargs) -> float:
+        del kwargs
+        return self.value
+
+
+@dataclass(kw_only=True)
+class FugacityConstraint(_ValueConstraint):
+    field: str = "fugacity"
+
+
+@dataclass(kw_only=True)
+class MassConstraint(_ValueConstraint):
+    field: str = "mass"
+
+
+@dataclass(kw_only=True)
+class BufferedFugacityConstraint:
+    """A buffered fugacity constraint to apply to an interior-atmosphere system.
+
+    Args:
+        species: The species (molecule) that is buffered by `buffer`. Defaults to 'O2'.
+        fugacity: A BufferedFugacity. Defaults to IronWustiteBufferOneill
+        log10_shift: Log10 shift relative to the buffer.
+
+    Attributes:
+        See Args.
+    """
+
+    species: str = "O2"
+    fugacity: BufferedFugacity = field(default_factory=IronWustiteBufferOneill)
+    log10_shift: float = 0
+    field: str = field(default="fugacity", init=False)
+
+    def get_value(self, *, temperature: float, **kwargs) -> float:
+        del kwargs
+        return 10 ** self.fugacity(temperature=temperature, fugacity_log10_shift=self.log10_shift)
 
 
 @dataclass(kw_only=True)
@@ -526,35 +569,19 @@ class ReactionNetwork:
         *,
         constraints: list[SystemConstraint],
         planet: Planet,
-        fo2_constraint: bool = False,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Builds the design matrix and the right hand side (RHS) vector.
 
         Args:
             constraints: Constraints for the system of equations.
             planet: Planet properties.
-            fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
 
         Returns:
             A dictionary of all the molecules and their partial pressures.
         """
         pressure_constraints: list[SystemConstraint] = [
-            constraint for constraint in constraints if constraint.field == "pressure"
+            constraint for constraint in constraints if constraint.field == "fugacity"
         ]
-
-        if fo2_constraint:
-            logger.info(
-                "Adding fO2 as an additional constraint using %s with fO2_shift = %0.2f",
-                planet.fo2_model.__class__.__name__,
-                planet.fo2_shift,
-            )
-            fo2: float = 10 ** planet.fo2_model(
-                temperature=planet.surface_temperature, fugacity_log10_shift=planet.fo2_shift
-            )
-            constraint: SystemConstraint = SystemConstraint(
-                species="O2", value=fo2, field="pressure"
-            )
-            pressure_constraints.append(constraint)
 
         number_pressure_constraints: int = len(pressure_constraints)
         nrows: int = number_pressure_constraints + self.number_reactions
@@ -593,7 +620,7 @@ class ReactionNetwork:
             molecule_index: int = self.molecule_names.index(constraint.species)
             logger.info("Row %02d: Setting %s partial pressure", row_index, constraint.species)
             coeff[row_index, molecule_index] = 1
-            rhs[row_index] = np.log10(constraint.value)
+            rhs[row_index] = np.log10(constraint.get_value(temperature=planet.surface_temperature))
 
         logger.debug("Design matrix = \n%s", coeff)
         logger.debug("RHS vector = \n%s", rhs)
@@ -659,7 +686,7 @@ class InteriorAtmosphereSystem:
         log10_pressures: Log10 of the molecule pressures.
         atmospheric_total_pressure: Total atmospheric pressure.
         atmospheric_mean_molar_mass: Mean molar mass of the atmosphere.
-        pressures_dict: The pressures of the molecules (bar) in a dictionary.
+        fugacities_dict: The pressures of the molecules (bar) in a dictionary.
     """
 
     molecules: list[Molecule]
@@ -737,8 +764,8 @@ class InteriorAtmosphereSystem:
         return self._log10_pressures
 
     @property
-    def pressures_dict(self) -> dict[str, float]:
-        """Pressures in a dictionary."""
+    def fugacities_dict(self) -> dict[str, float]:
+        """Fugacities of all species in a dictionary."""
         output: dict[str, float] = {
             molecule: pressure for (molecule, pressure) in zip(self.molecule_names, self.pressures)
         }
@@ -763,7 +790,6 @@ class InteriorAtmosphereSystem:
         self,
         constraints: list[SystemConstraint],
         *,
-        fo2_constraint: bool = False,
         use_fsolve: Optional[bool] = None,
     ) -> dict[str, float]:
         """Solves the system to determine the partial pressures with provided constraints.
@@ -773,7 +799,6 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations.
-            fo2_constraint: Include fo2 as a pressure constraint. Defaults to False.
             use_fsolve: Use fsolve to solve the system of equations. Defaults to None, which means
                 to auto select depending if the system is linear or not (which depends on the
                 applied constraints).
@@ -796,7 +821,6 @@ class InteriorAtmosphereSystem:
             self._log10_pressures = self._reaction_network.solve(
                 constraints=constraints,
                 planet=self.planet,
-                fo2_constraint=fo2_constraint,
             )
         else:
             if all_pressures and use_fsolve:
@@ -808,12 +832,11 @@ class InteriorAtmosphereSystem:
             self._log10_pressures = self._solve_fsolve(
                 constraints=constraints,
                 planet=self.planet,
-                fo2_constraint=fo2_constraint,
             )
 
-        logger.info(pprint.pformat(self.pressures_dict))
+        logger.info(pprint.pformat(self.fugacities_dict))
 
-        return self.pressures_dict
+        return self.fugacities_dict
 
     def _solve_fsolve(self, **kwargs) -> np.ndarray:
         """Solves the non-linear system of equations.
@@ -899,19 +922,17 @@ class InteriorAtmosphereSystem:
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
         for constraint_index, constraint in enumerate(mass_constraints):
             for molecule_index, molecule in enumerate(self.molecules):
-                # TODO: Dan: need to pass in fO2 (and maybe other pressures like fH2) for some of
-                # the solubility laws.  Maybe pass in the dictionary of pressures (fugacities) and
-                # let the solubility law pick out what it needs.
                 residual_mass[constraint_index] += molecule.mass(
                     planet=self.planet,
                     partial_pressure_bar=self.pressures[molecule_index],
                     atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
                     element=constraint.species,
-                    pressures_dict=self.pressures_dict,
+                    fugacities_dict=self.fugacities_dict,
                 )
-            residual_mass[constraint_index] -= constraint.value
+            # Mass values are constant so no need to pass any arguments to get_value().
+            residual_mass[constraint_index] -= constraint.get_value()
             # Normalise by target mass to compute a relative residual.
-            residual_mass[constraint_index] /= constraint.value
+            residual_mass[constraint_index] /= constraint.get_value()
         logger.debug("residual_mass = %s", residual_mass)
 
         # Combined residual.
