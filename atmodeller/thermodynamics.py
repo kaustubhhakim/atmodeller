@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from atmodeller import DATA_ROOT_PATH
+from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT
 
 # For unit conversions.
 bar_to_GPa: float = 0.0001  # bar/GPa
@@ -57,7 +57,7 @@ class IronWustiteBufferOneill(OxygenFugacity):
         buffer: float = (
             2
             * (-244118 + 115.559 * temperature - 8.474 * temperature * np.log(temperature))
-            / (np.log(10) * 8.31441 * temperature)
+            / (np.log(10) * GAS_CONSTANT * temperature)
         )
         return buffer
 
