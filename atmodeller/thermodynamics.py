@@ -329,8 +329,8 @@ class PeridotiteH2O(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        return self.power_law(pressure, 534, 0.5)
         del fugacities_dict
+        return self.power_law(fugacity, 524, 0.5)
 
 
 class BasaltDixonH2O(Solubility):

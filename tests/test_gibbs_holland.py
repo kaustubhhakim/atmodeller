@@ -65,7 +65,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     )
 
     planet.fo2_shift = 0
-    target_pressures: np.ndarray = np.array([5.51553404e-01, 3.91041669e-08, 3.74366814e-01])
+    target_pressures: np.ndarray = np.array([5.72483121e-01, 3.91041669e-08, 3.88572857e-01])
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -93,7 +93,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     )
 
     planet.fo2_shift = 2
-    target_pressures: np.ndarray = np.array([5.57720222e-02, 3.91041669e-06, 3.78552541e-01])
+    target_pressures: np.ndarray = np.array([5.79128485e-02, 3.91041669e-06, 3.93083398e-01])
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -121,7 +121,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     )
 
     planet.fo2_shift = -2
-    target_pressures: np.ndarray = np.array([4.47053919e00, 3.91041669e-10, 3.03437800e-01])
+    target_pressures: np.ndarray = np.array([4.60871136e00, 3.91041669e-10, 3.12816234e-01])
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -154,7 +154,7 @@ def test_hydrogen_species_five_oceans() -> None:
     )
 
     planet.fo2_shift = 0
-    target_pressures: np.ndarray = np.array([1.30360539e01, 3.91041669e-08, 8.84822023e00])
+    target_pressures: np.ndarray = np.array([1.35033397e01, 3.91041669e-08, 9.16539041e00])
     system.solve(constraints, fo2_constraint=True)
 
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -183,7 +183,7 @@ def test_hydrogen_species_ten_oceans() -> None:
     )
 
     planet.fo2_shift = 0
-    target_pressures: np.ndarray = np.array([4.88994995e01, 3.91041669e-08, 3.31905301e01])
+    target_pressures: np.ndarray = np.array([5.05449808e01, 3.91041669e-08, 3.43074003e01])
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -216,7 +216,7 @@ def test_hydrogen_species_temperature() -> None:
     )
 
     planet.surface_temperature = 1500.0  # K
-    target_pressures: np.ndarray = np.array([3.60458283e-01, 3.94917324e-12, 3.76244838e-01])
+    target_pressures: np.ndarray = np.array([3.74207325e-01, 3.94917324e-12, 3.90596029e-01])
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -254,7 +254,7 @@ def test_hydrogen_and_carbon_species() -> None:
     )
 
     target_pressures: np.ndarray = np.array(
-        [6.24423187e01, 5.57404144e-01, 3.91041669e-08, 9.27546172e00, 3.78338003e-01]
+        [6.24207531e01, 5.78786802e-01, 3.91041669e-08, 9.27225826e00, 3.92851480e-01]
     )
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -288,7 +288,7 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     )
 
     target_pressures: np.ndarray = np.array(
-        [3.14518438e02, 5.57421618e-01, 3.91041669e-08, 4.67199776e01, 3.78349864e-01]
+        [3.14496733e02, 5.78806369e-01, 3.91041669e-08, 4.67167534e01, 3.92864761e-01]
     )
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -322,7 +322,7 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     )
 
     target_pressures: np.ndarray = np.array(
-        [6.29730340e02, 5.57423793e-01, 3.91041669e-08, 9.35429654e01, 3.78351340e-01]
+        [6.29708610e02, 5.78808803e-01, 3.91041669e-08, 9.35397375e01, 3.92866413e-01]
     )
     system.solve(constraints, fo2_constraint=True)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -364,12 +364,12 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
 
     target_pressures: np.ndarray = np.array(
         [
-            5.32094850e01,
-            3.62880656e-01,
+            5.31966144e01,
+            3.76818044e-01,
             3.94917324e-12,
-            2.14307378e01,
-            3.78773301e-01,
-            2.82594594e-05,
+            2.14255540e01,
+            3.93321088e-01,
+            3.04645336e-05,
         ]
     )
     system.solve(constraints, fo2_constraint=True)
@@ -415,12 +415,12 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     # Order of target pressures: CO, H2, N2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
-            6.23303573e01,
-            5.57399768e-01,
-            2.28828685e00,
+            6.23094711e01,
+            5.78782110e-01,
+            2.28753489e00,
             3.91041669e-08,
-            9.25883047e00,
-            3.78335033e-01,
+            9.25572793e00,
+            3.92848296e-01,
         ]
     )
     system.solve(constraints, fo2_constraint=True)
@@ -460,12 +460,12 @@ def test_hydrogen_and_carbon_species_with_NH3() -> None:
     # Order of target pressures: CO, H2, O2, CO2, H2O, NH3
     target_pressures: np.ndarray = np.array(
         [
-            6.08310308e01,
-            5.39234629e-01,
+            6.08116915e01,
+            5.59919395e-01,
             3.91041669e-08,
-            9.03611379e00,
-            3.66005447e-01,
-            4.69816278e00,
+            9.03324105e00,
+            3.80045230e-01,
+            4.69662215e00,
         ]
     )
     system.solve(constraints, fo2_constraint=True)
