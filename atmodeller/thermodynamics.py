@@ -279,17 +279,21 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
 class Solubility(ABC):
     """Solubility base class."""
 
-    def power_law(self, pressure: float, constant: float, exponent: float) -> float:
-        """Power law. Pressure in bar and returns ppmw."""
-        return constant * pressure**exponent
+    def power_law(self, fugacity: float, constant: float, exponent: float) -> float:
+        """Power law. Fugacity in bar and returns ppmw."""
+        return constant * fugacity**exponent
 
     @abstractmethod
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         raise NotImplementedError
 
-    def __call__(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def __call__(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         """Dissolved volatile concentration in ppmw in the melt."""
-        return self._solubility(pressure, temperature, **pressures_dict)
+        return self._solubility(fugacity, temperature, fugacities_dict)
 
 
 class NoSolubility(Solubility):
@@ -302,56 +306,77 @@ class NoSolubility(Solubility):
 
 
 class AnorthiteDiopsideH2O(Solubility):
-    """Newcombe et al. (2017)."""
+    """Newcombe et al. (2017).
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        del pressures_dict
-        return self.power_law(pressure, 727, 0.5)
+        del fugacities_dict
+        return self.power_law(fugacity, 727, 0.5)
 
 
 class PeridotiteH2O(Solubility):
-    """Sossi et al. (2022)."""
+    """Sossi et al. (2023).
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        del pressures_dict
         return self.power_law(pressure, 534, 0.5)
+        del fugacities_dict
 
 
 class BasaltDixonH2O(Solubility):
     """Dixon et al. (1995) refit by Paolo Sossi."""
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        del pressures_dict
-        return self.power_law(pressure, 965, 0.5)
+        del fugacities_dict
+        return self.power_law(fugacity, 965, 0.5)
 
 
 class BasaltWilsonH2O(Solubility):
     """Hamilton (1964) and Wilson and Head (1981)."""
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        del pressures_dict
-        return self.power_law(pressure, 215, 0.7)
+        del fugacities_dict
+        return self.power_law(fugacity, 215, 0.7)
 
 
 class LunarGlassH2O(Solubility):
-    """Newcombe et al. (2017)."""
+    """Newcombe et al. (2017).
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        del pressures_dict
-        return self.power_law(pressure, 683, 0.5)
+        del fugacities_dict
+        return self.power_law(fugacity, 683, 0.5)
 
 
 class BasaltDixonCO2(Solubility):
     """Dixon et al. (1995)."""
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
-        del pressures_dict
-        ppmw: float = (3.8e-7) * pressure * np.exp(-23 * (pressure - 1) / (83.15 * temperature))
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del fugacities_dict
+        ppmw: float = (3.8e-7) * fugacity * np.exp(-23 * (fugacity - 1) / (83.15 * temperature))
         ppmw = 1.0e4 * (4400 * ppmw) / (36.6 - 44 * ppmw)
         return ppmw
 
@@ -362,38 +387,42 @@ class BasaltLibourelN2(Solubility):
     Eq. 23, includes dependence on pressure and fO2.
     """
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        ppmw: float = self.power_law(pressure, 0.0611, 1.0)
+        ppmw: float = self.power_law(fugacity, 0.0611, 1.0)
         # TODO: Could add fO2 lower and upper bounds.
-        if "O2" in pressures_dict:
+        if "O2" in fugacities_dict:
             # TODO: Confirm fO2 and not log10fO2 or lnfO2?
-            constant: float = (pressures_dict["O2"] ** -0.75) * 5.97e-10
-            ppmw += self.power_law(pressure, constant, 0.5)
+            constant: float = (fugacities_dict["O2"] ** -0.75) * 5.97e-10
+            ppmw += self.power_law(fugacity, constant, 0.5)
         return ppmw
 
 
 class BasaltH2(Solubility):
     """Hirschmann et al. 2012 for Basalt."""
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         """Power law fit to Figure 5, basalt Pure H2 curve."""
         del temperature
-        del pressures_dict
+        del fugacities_dict
         # TODO: Maggie to check, variable is not currently used.
-        pressure_gpa: float = pressure * bar_to_GPa  # pylint: disable=unused-variable
+        pressure_gpa: float = fugacity * bar_to_GPa  # pylint: disable=unused-variable
         # Fitting coefficients, determined in solubility_fits.ipynb
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        ppm: float = self.power_law(pressure, 6479.75, 1.20)
+        ppm: float = self.power_law(fugacity, 6479.75, 1.20)
         return ppm
 
     def _solubility_v2(
-        self, pressure: float, temperature: float, **pressures_dict: float
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Taking fit from Fig. 4 for Basalt (with fH2(P) fitted from Tables 1 and 2)."""
         del temperature
-        del pressures_dict
-        pressure_gpa: float = pressure * bar_to_GPa
+        del fugacities_dict
+        pressure_gpa: float = fugacity * bar_to_GPa
         fh2 = self.power_law(pressure_gpa, 7458.81, 2.01)  # bars; power-law fit
         molefrac: float = np.exp(-11.403 - (0.76 * pressure_gpa)) * fh2
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
@@ -407,10 +436,10 @@ class AndesiteH2(Solubility):
     Using the fit from Fig. 4 for Andesite (with fH2(P) fitted from Tables 1 and 2).
     """
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(self, fugacity: float, temperature: float, fugacities_dict: float) -> float:
         del temperature
-        del pressures_dict
-        pressure_gpa: float = pressure * bar_to_GPa
+        del fugacities_dict
+        pressure_gpa: float = fugacity * bar_to_GPa
         fh2 = self.power_law(pressure_gpa, 7856.31, 2.17)  # bars; power-law fit
         molefrac: float = np.exp(-10.591 - (0.81 * pressure_gpa)) * fh2
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
@@ -424,13 +453,15 @@ class PeridotiteH2(Solubility):
     Fitting power law to Figure 5, Peridotite Pure H2 curve.
     """
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        del pressures_dict
+        del fugacities_dict
         # TODO: Maggie to check, variable is not currently used.
-        pressure_gpa: float = pressure * bar_to_GPa  # pylint: disable=unused-variable
+        pressure_gpa: float = fugacity * bar_to_GPa  # pylint: disable=unused-variable
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        ppm: float = self.power_law(pressure, 1722.31, 1.03)
+        ppm: float = self.power_law(fugacity, 1722.31, 1.03)
         return ppm
 
 
@@ -440,10 +471,12 @@ class ObsidianH2(Solubility):
     Valid for pressures from 0.02-70 bar; power law fit to Table 4 data.
     """
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         del temperature
-        del pressures_dict
-        ppmw: float = self.power_law(pressure, 0.163, 1.252)
+        del fugacities_dict
+        ppmw: float = self.power_law(fugacity, 0.163, 1.252)
         return ppmw
 
 
@@ -453,11 +486,14 @@ class AndesiteSO2(Solubility):
     Fitting S (ppm) vs. Temperature.
     """
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
-        del pressure
-        del pressures_dict
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del fugacity
+        del fugacities_dict
         # from Table 3, least squares linear fit.
-        temperature_factor, constant = [-0.29028571428571454, 528.3908571428574]
+        temperature_factor, constant = (-0.29028571428571454, 528.3908571428574)
+        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
         ppm: float = (temperature_factor * temperature) + constant
         return ppm
 
@@ -468,9 +504,11 @@ class BasaltSO2(Solubility):
     Fitting S (ppm) vs. Temperature.
     """
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
-        del pressure
-        del pressures_dict
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del fugacity
+        del fugacities_dict
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
         ppm: float = 0.25 * np.exp(
             1.2249 * (-1.1 - 5.5976 - (24505 / temperature) + (0.8099 * np.log10(temperature)))
@@ -486,11 +524,14 @@ class MercuryMagmaS(Solubility):
 
     # TODO: Maggie to check, I think this would mainly apply to H2S but maybe also S2 and S.
 
-    def _solubility(self, pressure: float, temperature: float, **pressures_dict: float) -> float:
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
         a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # Coeffs from eq. 10 (Namur et al., 2016).
         # TODO: Confirm fO2 and not log10fO2 or lnfO2?
+        # FIXME: How to deal if fO2 not available?  Drop last term?
         wt_perc: float = np.exp(
-            a + (b / temperature) + ((c * pressure) / temperature) + (d * pressures_dict["O2"])
+            a + (b / temperature) + ((c * fugacity) / temperature) + (d * fugacities_dict["O2"])
         )
         ppmw: float = wt_perc * wtperc_to_ppm
         return ppmw

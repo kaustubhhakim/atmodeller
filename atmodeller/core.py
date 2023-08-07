@@ -224,7 +224,7 @@ class Molecule:
         ppmw_in_melt: float = self.solubility(
             partial_pressure_bar,
             planet.surface_temperature,
-            **pressures_dict,
+            pressures_dict,
         )
         mass: float = prefactor * ppmw_in_melt
 
@@ -254,7 +254,7 @@ class Molecule:
         del element
         prefactor: float = 1e-6 * planet.mantle_mass * (1 - planet.mantle_melt_fraction)
         ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar, planet.surface_temperature, **pressures_dict
+            partial_pressure_bar, planet.surface_temperature, pressures_dict
         )
         ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
         mass: float = prefactor * ppmw_in_solid
