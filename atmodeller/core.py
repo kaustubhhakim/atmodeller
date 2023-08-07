@@ -13,10 +13,10 @@ from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.thermodynamics import (
+    BufferedFugacity,
     IronWustiteBufferOneill,
     MolarMasses,
     NoSolubility,
-    OxygenFugacity,
     Solubility,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationLinear,
@@ -62,7 +62,7 @@ class Planet:
     core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
     surface_radius: float = 6371000.0  # m, Earth's radius
     surface_temperature: float = 2000.0  # K
-    fo2_model: OxygenFugacity = field(default_factory=IronWustiteBufferOneill)
+    fo2_model: BufferedFugacity = field(default_factory=IronWustiteBufferOneill)
     fo2_shift: float = 0
     melt_composition: Union[str, None] = None
     planet_mass: float = field(init=False)
@@ -549,7 +549,7 @@ class ReactionNetwork:
                 planet.fo2_shift,
             )
             fo2: float = 10 ** planet.fo2_model(
-                temperature=planet.surface_temperature, fo2_shift=planet.fo2_shift
+                temperature=planet.surface_temperature, fugacity_log10_shift=planet.fo2_shift
             )
             constraint: SystemConstraint = SystemConstraint(
                 species="O2", value=fo2, field="pressure"

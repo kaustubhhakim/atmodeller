@@ -1,4 +1,4 @@
-"""Oxygen fugacity buffers, gas phase reactions, and solubility laws."""
+"""Fugacity buffers, gas phase reactions, and solubility laws."""
 
 import logging
 from abc import ABC, abstractmethod
@@ -18,59 +18,60 @@ wtperc_to_ppm: float = 1e4  # weight percent (wt. %) to ppm
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class OxygenFugacity(ABC):
-    """Oxygen fugacity base class."""
+class BufferedFugacity(ABC):
+    """Buffered fugacity base class."""
 
     @abstractmethod
-    def _buffer(self, *, temperature: float) -> float:
-        """Log10(fo2) of the buffer in terms of temperature.
+    def _fugacity(self, *, temperature: float) -> float:
+        """Log10(fugacity) of the buffer in terms of temperature.
 
         Args:
             temperature: Temperature.
 
         Returns:
-            Log10 of the oxygen fugacity.
+            Log10 of the fugacity.
         """
         raise NotImplementedError
 
-    def __call__(self, *, temperature: float, fo2_shift: float = 0) -> float:
-        """log10(fo2) plus an optional shift.
+    def __call__(self, *, temperature: float, fugacity_log10_shift: float = 0) -> float:
+        """log10(fugacity) plus an optional shift.
 
         Args:
             temperature: Temperature.
-            fo2_shift: Log10 shift.
+            fugacity_log10_shift: Log10 shift.
 
         Returns:
-            Log10 of the oxygen fugacity including a shift.
+            Log10 of the fugacity including a shift.
         """
-        return self._buffer(temperature=temperature) + fo2_shift
+        return self._fugacity(temperature=temperature) + fugacity_log10_shift
 
 
-class IronWustiteBufferOneill(OxygenFugacity):
+class IronWustiteBufferOneill(BufferedFugacity):
     """Iron-wustite buffer from O'Neill and Eggins (2002). See Table 6.
 
     https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
     """
 
-    def _buffer(self, *, temperature: float) -> float:
+    def _fugacity(self, *, temperature: float) -> float:
         """See base class."""
-        buffer: float = (
+        fugacity: float = (
             2
             * (-244118 + 115.559 * temperature - 8.474 * temperature * np.log(temperature))
             / (np.log(10) * GAS_CONSTANT * temperature)
         )
-        return buffer
+        return fugacity
 
 
-class IronWustiteBufferFischer(OxygenFugacity):
-    """Iron-wustite buffer from Fischer et al. (2011).
+class IronWustiteBufferFischer(BufferedFugacity):
+    """Iron-wustite buffer from Fischer et al. (2011). See Table S2 in supplementary materials.
 
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
     """
 
-    def _buffer(self, *, temperature: float) -> float:
+    def _fugacity(self, *, temperature: float) -> float:
         """See base class."""
-        buffer: float = 6.94059 - 28.1808 * 1e3 / temperature
+        # Collapsed polynomial since it is evaluated at P=0 GPa (i.e. no pressure dependence).
+        buffer: float = 6.44059 - 28.1808 * 1e3 / temperature
         return buffer
 
 
