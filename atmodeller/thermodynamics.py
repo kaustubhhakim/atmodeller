@@ -9,11 +9,7 @@ import numpy as np
 import pandas as pd
 
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT
-
-# For unit conversions.
-bar_to_GPa: float = 0.0001  # bar/GPa
-molefrac_to_ppm: float = 1e6  # ppm/molefrac
-wtperc_to_ppm: float = 1e4  # weight percent (wt. %) to ppm
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -410,7 +406,9 @@ class BasaltH2(Solubility):
         del temperature
         del fugacities_dict
         # TODO: Maggie to check, variable is not currently used.
-        pressure_gpa: float = fugacity * bar_to_GPa  # pylint: disable=unused-variable
+        pressure_gpa: float = UnitConversion.bar_to_GPa(
+            fugacity
+        )  # pylint: disable=unused-variable
         # Fitting coefficients, determined in solubility_fits.ipynb
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
         ppm: float = self.power_law(fugacity, 6479.75, 1.20)
@@ -422,11 +420,13 @@ class BasaltH2(Solubility):
         """Taking fit from Fig. 4 for Basalt (with fH2(P) fitted from Tables 1 and 2)."""
         del temperature
         del fugacities_dict
-        pressure_gpa: float = fugacity * bar_to_GPa
+        pressure_gpa: float = UnitConversion.bar_to_GPa(fugacity)
         fh2 = self.power_law(pressure_gpa, 7458.81, 2.01)  # bars; power-law fit
         molefrac: float = np.exp(-11.403 - (0.76 * pressure_gpa)) * fh2
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        ppm: float = molefrac * molefrac_to_ppm  # CHECK, is there an extra step to make this ppmw?
+        ppm: float = UnitConversion.mole_fraction_to_ppm(
+            molefrac
+        )  # CHECK, is there an extra step to make this ppmw?
         return ppm
 
 
@@ -439,11 +439,13 @@ class AndesiteH2(Solubility):
     def _solubility(self, fugacity: float, temperature: float, fugacities_dict: float) -> float:
         del temperature
         del fugacities_dict
-        pressure_gpa: float = fugacity * bar_to_GPa
+        pressure_gpa: float = UnitConversion.bar_to_GPa(fugacity)
         fh2 = self.power_law(pressure_gpa, 7856.31, 2.17)  # bars; power-law fit
         molefrac: float = np.exp(-10.591 - (0.81 * pressure_gpa)) * fh2
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        ppm: float = molefrac * molefrac_to_ppm  # CHECK, is there an extra step to make this ppmw?
+        ppm: float = UnitConversion.mole_fraction_to_ppm(
+            molefrac
+        )  # CHECK, is there an extra step to make this ppmw?
         return ppm
 
 
@@ -459,7 +461,9 @@ class PeridotiteH2(Solubility):
         del temperature
         del fugacities_dict
         # TODO: Maggie to check, variable is not currently used.
-        pressure_gpa: float = fugacity * bar_to_GPa  # pylint: disable=unused-variable
+        pressure_gpa: float = UnitConversion.bar_to_GPa(
+            fugacity
+        )  # pylint: disable=unused-variable
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
         ppm: float = self.power_law(fugacity, 1722.31, 1.03)
         return ppm
@@ -533,7 +537,7 @@ class MercuryMagmaS(Solubility):
         wt_perc: float = np.exp(
             a + (b / temperature) + ((c * fugacity) / temperature) + (d * fugacities_dict["O2"])
         )
-        ppmw: float = wt_perc * wtperc_to_ppm
+        ppmw: float = UnitConversion.weight_precent_to_ppmw(wt_perc)
         return ppmw
 
 
