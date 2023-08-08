@@ -305,7 +305,15 @@ class Solubility(ABC):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Dissolved volatile concentration in ppmw in the melt."""
-        return self._solubility(fugacity, temperature, fugacities_dict)
+        solubility: float = self._solubility(fugacity, temperature, fugacities_dict)
+        logger.debug(
+            "%s, f = %f, T = %f, ppmw = %f",
+            self.__class__.__name__,
+            fugacity,
+            temperature,
+            solubility,
+        )
+        return solubility
 
 
 class NoSolubility(Solubility):

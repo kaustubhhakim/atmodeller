@@ -205,7 +205,7 @@ class Molecule:
             partial_pressure_bar: Partial pressure in bar.
             element: Returns the mass for an element. Defaults to None to return the molecule mass.
                This argument is used by the @_mass_decorator.
-            pressure_dict: Dictionary of all the species and their partial pressures.
+            fugacities_dict: Dictionary of all the species and their partial pressures.
 
         Returns:
             Mass of the molecule (element=None) or element (element=element) in the melt.
@@ -237,7 +237,7 @@ class Molecule:
             partial_pressure_bar: Partial pressure in bar.
             element: Returns the mass for an element. Defaults to None to return the molecule mass.
                This argument is used by the @_mass_decorator.
-            pressure_dict: Dictionary of all the species and their partial pressures.
+            fugacities_dict: Dictionary of all the species and their partial pressures.
 
         Returns:
             Mass of the molecule (element=None) or element (element=element) in the solid.
@@ -269,7 +269,7 @@ class Molecule:
             atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
             element: Returns the mass for an element. Defaults to None to return the molecule mass.
                This argument is used by the @_mass_decorator.
-            pressure_dict: Dictionary of all the species and their partial pressures.
+            fugacities_dict: Dictionary of all the species and their partial pressures.
 
         Returns:
             Total mass of the molecule (element=None) or element (element=element).
