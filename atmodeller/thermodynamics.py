@@ -42,6 +42,22 @@ class BufferedFugacity(ABC):
         return self._fugacity(temperature=temperature) + fugacity_log10_shift
 
 
+class IronWustiteBufferHirschmann(BufferedFugacity):
+    """Iron-wustite buffer (fO2) from O'Neill and Pownceby (1993) and Hirschmann et al. (2008)."""
+
+    def _fugacity(self, *, temperature: float) -> float:
+        """See base class."""
+        # TODO: Assuming one bar (total?) pressure
+        total_pressure: float = 1  # bar
+        fugacity: float = (
+            -28776.8 / temperature
+            + 14.057
+            + 0.055 * (total_pressure - 1) / temperature
+            - 0.8853 * np.log(temperature)
+        )
+        return fugacity
+
+
 class IronWustiteBufferOneill(BufferedFugacity):
     """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002). See Table 6.
 
