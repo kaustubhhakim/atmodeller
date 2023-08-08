@@ -363,6 +363,7 @@ class BufferedFugacityConstraint:
     log10_shift: float = 0
     field: str = field(default="fugacity", init=False)
 
+    # TODO: Pass in all fugacities to enable total fugacity to be determined?
     def get_value(self, *, temperature: float, **kwargs) -> float:
         del kwargs
         return 10 ** self.fugacity(temperature=temperature, fugacity_log10_shift=self.log10_shift)
@@ -593,7 +594,7 @@ class ReactionNetwork:
         else:
             num: int = self.number_molecules - nrows
             # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
-            msg = "%d additional (not pressure) constraint(s) are necessary " % num
+            msg = "%d additional (not fugacity) constraint(s) are necessary " % num
             msg += "to solve the system"
             logger.info(msg)
 
