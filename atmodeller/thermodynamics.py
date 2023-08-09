@@ -2,16 +2,285 @@
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import wraps
 from pathlib import Path
+from typing import Callable, Optional, Union
 
 import numpy as np
 import pandas as pd
+from thermochem import janaf
 
-from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT
-from atmodeller.utilities import UnitConversion
+from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GRAVITATIONAL_CONSTANT
+from atmodeller.utilities import MolarMasses, UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass(kw_only=True)
+class Planet:
+    """The properties of a planet.
+
+    Default values are for a reduced (at the Iron-Wustite buffer) and fully molten Earth.
+
+    Args:
+        mantle_mass: Mass of the planetary mantle. Defaults to Earth.
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
+            Earth.
+        surface_radius: Radius of the planetary surface. Defaults to Earth.
+        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
+        melt_composition: Melt composition of the planet. Default is None.
+
+    Attributes:
+        mantle_mass: Mass of the planetary mantle.
+        mantle_melt_fraction: mass fraction of the mantle that is molten.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass.
+        surface_radius: Radius of the planetary surface.
+        surface_temperature: Temperature of the planetary surface.
+        melt_composition: Melt composition of the planet.
+        planet_mass: Mass of the planet.
+        surface_gravity: Gravitational acceleration at the planetary surface.
+        surface_area: Surface area of the planetary surface.
+    """
+
+    mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
+    mantle_melt_fraction: float = 1.0  # Completely molten
+    core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
+    surface_radius: float = 6371000.0  # m, Earth's radius
+    surface_temperature: float = 2000.0  # K
+    melt_composition: Union[str, None] = None
+    planet_mass: float = field(init=False)
+    surface_gravity: float = field(init=False)
+
+    def __post_init__(self):
+        logger.info("Creating a new planet")
+        self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
+        self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
+        logger.info("Mantle mass (kg) = %f", self.mantle_mass)
+        logger.info("Mantle melt fraction = %f", self.mantle_melt_fraction)
+        logger.info("Core mass fraction = %f", self.core_mass_fraction)
+        logger.info("Planetary radius (m) = %f", self.surface_radius)
+        logger.info("Planetary mass (kg) = %f", self.planet_mass)
+        logger.info("Surface temperature (K) = %f", self.surface_temperature)
+        logger.info("Surface gravity (m/s^2) = %f", self.surface_gravity)
+        logger.info("Melt Composition = %s", self.melt_composition)
+
+    @property
+    def surface_area(self):
+        """Surface area of the planet."""
+        return 4.0 * np.pi * self.surface_radius**2
+
+
+def _mass_decorator(func) -> Callable:
+    """A decorator to return the mass of either the molecule or one of its elements."""
+
+    @wraps(func)
+    def mass_wrapper(self: "Molecule", element: Optional[str] = None, **kwargs) -> float:
+        """Wrapper to return the mass of either the molecule or one of its elements.
+
+        Args:
+            element: Returns the mass of this element. Defaults to None to return the molecule
+                mass.
+            **kwargs: Catches keyword arguments to forward to func.
+
+        Returns:
+            Mass of either the molecule or element.
+        """
+        mass: float = func(self, **kwargs)
+        if element is not None:
+            mass *= self.element_masses.get(element, 0) / self.molar_mass
+
+        return mass
+
+    return mass_wrapper
+
+
+class Solubility(ABC):
+    """Solubility base class."""
+
+    def power_law(self, fugacity: float, constant: float, exponent: float) -> float:
+        """Power law. Fugacity in bar and returns ppmw."""
+        return constant * fugacity**exponent
+
+    @abstractmethod
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        raise NotImplementedError
+
+    def __call__(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """Dissolved volatile concentration in ppmw in the melt."""
+        solubility: float = self._solubility(fugacity, temperature, fugacities_dict)
+        logger.debug(
+            "%s, f = %f, T = %f, ppmw = %f",
+            self.__class__.__name__,
+            fugacity,
+            temperature,
+            solubility,
+        )
+        return solubility
+
+
+class NoSolubility(Solubility):
+    """No solubility."""
+
+    def _solubility(self, *args, **kwargs) -> float:
+        del args
+        del kwargs
+        return 0.0
+
+
+@dataclass(kw_only=True, frozen=True)
+class MoleculeOutput:
+    """Output for a molecule."""
+
+    mass_in_atmosphere: float  # kg
+    mass_in_solid: float  # kg
+    mass_in_melt: float  # kg
+    ppmw_in_solid: float  # ppm by weight
+    ppmw_in_melt: float  # ppm by weight
+    pressure_in_atmosphere: float  # bar
+
+    @property
+    def mass_in_total(self):
+        """Total mass in all reservoirs in kg."""
+        return self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
+
+
+@dataclass(kw_only=True)
+class Molecule:
+    """A molecule and its properties.
+
+    Args:
+        name: Chemical formula of the molecule.
+        solubility: Solubility model. Defaults to no solubility.
+        solid_melt_distribution_coefficient: Distribution coefficient. Defaults to 0.
+
+    Attributes:
+        name: Chemical formula of the molecule.
+        solubility: Solubility model.
+        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
+        elements: The elements and their (stoichiometric) counts in the molecule.
+        element_masses: The elements and their total masses in the molecule.
+        molar_mass: Molar mass of the molecule.
+        output: To store calculated values for output.
+    """
+
+    name: str
+    solubility: Solubility = field(default_factory=NoSolubility)
+    solid_melt_distribution_coefficient: float = 0
+    elements: dict[str, int] = field(init=False)
+    element_masses: dict[str, float] = field(init=False)
+    molar_mass: float = field(init=False)
+    output: MoleculeOutput | None = field(init=False, default=None)
+
+    def __post_init__(self):
+        logger.info("Creating a molecule: %s", self.name)
+        masses: MolarMasses = MolarMasses()
+        self.elements = self._count_elements()
+        self.element_masses = {
+            key: value * getattr(masses, key) for key, value in self.elements.items()
+        }
+        self.molar_mass = sum(self.element_masses.values())
+
+    @property
+    def is_diatomic(self) -> bool:
+        """Is the molecule diatomic.
+
+        Useful for obtaining the appropriate JANAF data for the Gibbs free energy.
+        """
+        if len(self.elements) == 1 and list(self.elements.values())[0] == 2:
+            return True
+        else:
+            return False
+
+    def _count_elements(self) -> dict[str, int]:
+        """Counts the number of atoms.
+
+        Returns:
+            A dictionary of the elements and their stoichiometric counts.
+        """
+        element_count: dict[str, int] = {}
+        current_element: str = ""
+        current_count: str = ""
+
+        for char in self.name:
+            if char.isupper():
+                if current_element != "":
+                    count = int(current_count) if current_count else 1
+                    element_count[current_element] = element_count.get(current_element, 0) + count
+                    current_count = ""
+                current_element = char
+            elif char.islower():
+                current_element += char
+            elif char.isdigit():
+                current_count += char
+
+        if current_element != "":
+            count: int = int(current_count) if current_count else 1
+            element_count[current_element] = element_count.get(current_element, 0) + count
+        logger.debug("element count = \n%s", element_count)
+        return element_count
+
+    @_mass_decorator
+    def mass(
+        self,
+        *,
+        planet: Planet,
+        partial_pressure_bar: float,
+        atmosphere_mean_molar_mass: float,
+        fugacities_dict: dict[str, float],
+        element: Optional[str] = None,
+    ) -> float:
+        """Total mass.
+
+        Args:
+            planet: Planet properties.
+            partial_pressure_bar: Partial pressure in bar.
+            atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
+            fugacities_dict: Dictionary of all the species and their partial pressures.
+            element: Returns the mass for an element. Defaults to None to return the molecule mass.
+               This argument is used by the @_mass_decorator.
+
+        Returns:
+            Total mass of the molecule (element=None) or element (element=element).
+        """
+
+        del element
+
+        # Atmosphere.
+        mass_in_atmosphere: float = (
+            UnitConversion.bar_to_Pa(partial_pressure_bar) / planet.surface_gravity
+        )
+        mass_in_atmosphere *= planet.surface_area * self.molar_mass / atmosphere_mean_molar_mass
+
+        # Melt.
+        prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
+        ppmw_in_melt: float = self.solubility(
+            partial_pressure_bar,
+            planet.surface_temperature,
+            fugacities_dict,
+        )
+        mass_in_melt = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
+
+        # Solid.
+        prefactor: float = planet.mantle_mass * (1 - planet.mantle_melt_fraction)
+        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
+        mass_in_solid = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+
+        self.output = MoleculeOutput(
+            mass_in_atmosphere=mass_in_atmosphere,
+            mass_in_solid=mass_in_solid,
+            mass_in_melt=mass_in_melt,
+            ppmw_in_solid=ppmw_in_solid,
+            ppmw_in_melt=ppmw_in_melt,
+            pressure_in_atmosphere=partial_pressure_bar,
+        )
+
+        return self.output.mass_in_total
 
 
 class BufferedFugacity(ABC):
@@ -87,81 +356,6 @@ class IronWustiteBufferFischer(BufferedFugacity):
         return buffer
 
 
-@dataclass
-class MolarMasses:
-    """Molar masses of atoms and molecules in kg/mol.
-
-    Note some AI-generated and should be checked for correctness.
-
-    There is a library that could do this, but it would add a dependency and there is always a
-    risk it wouldn't be supported in the future:
-
-    https://pypi.org/project/molmass/
-    """
-
-    # Define atoms here.
-    H: float = 1.0079e-3
-    He: float = 4.0026e-3
-    Li: float = 6.941e-3
-    Be: float = 9.0122e-3
-    B: float = 10.81e-3
-    C: float = 12.0107e-3
-    N: float = 14.0067e-3
-    O: float = 15.9994e-3
-    F: float = 18.9984e-3
-    Ne: float = 20.1797e-3
-    Na: float = 22.9897e-3
-    Mg: float = 24.305e-3
-    Al: float = 26.9815e-3
-    Si: float = 28.0855e-3
-    P: float = 30.9738e-3
-    S: float = 32.065e-3
-    Cl: float = 35.453e-3
-    K: float = 39.0983e-3
-    Ar: float = 39.948e-3
-    Ca: float = 40.078e-3
-    Sc: float = 44.9559e-3
-    Ti: float = 47.867e-3
-    V: float = 50.9415e-3
-    Cr: float = 51.9961e-3
-    Mn: float = 54.938e-3
-    Fe: float = 55.845e-3
-    Ni: float = 58.6934e-3
-    Co: float = 58.9332e-3
-    Cu: float = 63.546e-3
-    Zn: float = 65.38e-3
-    Ga: float = 69.723e-3
-    Ge: float = 72.63e-3
-    As: float = 74.9216e-3
-    Se: float = 78.96e-3
-    Br: float = 79.904e-3
-    Kr: float = 83.798e-3
-    Rb: float = 85.4678e-3
-    Sr: float = 87.62e-3
-    Y: float = 88.9059e-3
-    Zr: float = 91.224e-3
-    Nb: float = 92.9064e-3
-    Mo: float = 95.94e-3
-    Tc: float = 98.0e-3
-    Ru: float = 101.07e-3
-    Rh: float = 102.9055e-3
-    Pd: float = 106.42e-3
-    Ag: float = 107.8682e-3
-    Cd: float = 112.411e-3
-    In: float = 114.818e-3
-    Sn: float = 118.71e-3
-    Sb: float = 121.76e-3
-    I: float = 126.9045e-3
-    Te: float = 127.6e-3
-    Xe: float = 131.293e-3
-
-    def __post_init__(self):
-        # This is for convenience, since the number of moles in Earth's ocean are given in terms of
-        # H2. In which case, the mass of H2 is useful to have direct access to in order to compute
-        # the mass of H in an Earth ocean.
-        self.H2: float = 2 * self.H
-
-
 class StandardGibbsFreeEnergyOfFormation(ABC):
     """Standard Gibbs free energy of formation base class."""
 
@@ -173,7 +367,7 @@ class StandardGibbsFreeEnergyOfFormation(ABC):
         """Reads and returns the thermodynamic data."""
 
     @abstractmethod
-    def get(self, molecule: str, *, temperature: float) -> float:
+    def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol"""
 
 
@@ -194,7 +388,7 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
         data = data.astype(float)
         return data
 
-    def get(self, molecule: str, *, temperature: float) -> float:
+    def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Gets the standard Gibbs free energy of formation in J/mol.
 
         G = aT + b
@@ -208,7 +402,7 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
             The standard Gibbs free energy of formation.
         """
         try:
-            formation_constants: tuple[float, float] = tuple(self.data.loc[molecule].tolist())
+            formation_constants: tuple[float, float] = tuple(self.data.loc[molecule.name].tolist())
         except KeyError:
             logger.error("Thermodynamic data not available for %s", molecule)
             raise
@@ -220,6 +414,37 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
 
         gibbs: float = formation_constants[0] * temperature + formation_constants[1]
         gibbs *= 1000  # To convert from kJ to J.
+        logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
+
+        return gibbs
+
+
+class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation):
+    """Standard Gibbs free energy of formation from the JANAF tables."""
+
+    def _read_thermodynamic_data(self) -> pd.DataFrame:
+        """Data is downloaded when required."""
+        ...
+
+    def get(self, molecule: Molecule, *, temperature: float) -> float:
+        """Gets the standard Gibbs free energy of formation in J/mol.
+
+        In the JANAF tables, we have generally chosen the ideal diatomic gas for the reference
+        state of permanent gases such as O2, N2, Cl2 etc. (quoting from the JANAF documentation).
+
+        Returns:
+            The standard Gibbs free energy of formation.
+        """
+
+        db = janaf.Janafdb()
+        if molecule.is_diatomic:
+            phase = db.getphasedata(formula=molecule.name, phase="ref")
+        else:
+            phase = db.getphasedata(formula=molecule.name, phase="g")
+
+        logger.debug("Phase = %s", phase)
+        gibbs: float = phase.DeltaG(temperature)
+
         logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
 
         return gibbs
@@ -242,7 +467,7 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
         data = data.astype(float)
         return data
 
-    def get(self, molecule: str, *, temperature: float) -> float:
+    def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Gets the standard Gibbs free energy of formation in J/mol
 
         Args:
@@ -253,9 +478,9 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
             The standard Gibbs free energy of formation.
         """
         try:
-            data: pd.Series = self.data.loc[molecule]
+            data: pd.Series = self.data.loc[molecule.name]
         except KeyError:
-            logger.error("Thermodynamic data not available for %s", molecule)
+            logger.error("Thermodynamic data not available for %s", molecule.name)
             raise
 
         temp_ref: float = 298  # K
@@ -283,46 +508,11 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
         )
 
         gibbs: float = integral_H - temperature * integral_S
-        logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
+        logger.debug(
+            "Molecule = %s, standard Gibbs energy of formation = %f", molecule.name, gibbs
+        )
 
         return gibbs
-
-
-class Solubility(ABC):
-    """Solubility base class."""
-
-    def power_law(self, fugacity: float, constant: float, exponent: float) -> float:
-        """Power law. Fugacity in bar and returns ppmw."""
-        return constant * fugacity**exponent
-
-    @abstractmethod
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        raise NotImplementedError
-
-    def __call__(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Dissolved volatile concentration in ppmw in the melt."""
-        solubility: float = self._solubility(fugacity, temperature, fugacities_dict)
-        logger.debug(
-            "%s, f = %f, T = %f, ppmw = %f",
-            self.__class__.__name__,
-            fugacity,
-            temperature,
-            solubility,
-        )
-        return solubility
-
-
-class NoSolubility(Solubility):
-    """No solubility."""
-
-    def _solubility(self, *args, **kwargs) -> float:
-        del args
-        del kwargs
-        return 0.0
 
 
 class AnorthiteDiopsideH2O(Solubility):

@@ -43,8 +43,6 @@ from atmodeller.core import (
     FugacityConstraint,
     InteriorAtmosphereSystem,
     MassConstraint,
-    Molecule,
-    Planet,
     SystemConstraint,
 )
-from atmodeller.thermodynamics import MolarMasses
+from atmodeller.thermodynamics import Molecule, Planet

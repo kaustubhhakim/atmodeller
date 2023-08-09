@@ -13,7 +13,6 @@ from atmodeller import (
     BufferedFugacityConstraint,
     InteriorAtmosphereSystem,
     MassConstraint,
-    MolarMasses,
     Molecule,
     Planet,
     SystemConstraint,
@@ -27,6 +26,7 @@ from atmodeller.thermodynamics import (
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationHolland,
 )
+from atmodeller.utilities import MolarMasses
 
 # Tolerances to compare the test results with predefined 'correct' output.
 rtol: float = 1.0e-5

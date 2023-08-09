@@ -18,10 +18,10 @@ from atmodeller.core import (
 from atmodeller.thermodynamics import (
     BasaltDixonCO2,
     BasaltLibourelN2,
-    MolarMasses,
     NoSolubility,
     PeridotiteH2O,
 )
+from atmodeller.utilities import MolarMasses
 
 
 def main():
