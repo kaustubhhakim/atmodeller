@@ -67,13 +67,13 @@ class Planet:
         logger.info("Creating a new planet")
         self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
         self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
-        logger.info("Mantle mass (kg) = %s", self.mantle_mass)
-        logger.info("Mantle melt fraction = %s", self.mantle_melt_fraction)
-        logger.info("Core mass fraction = %s", self.core_mass_fraction)
-        logger.info("Planetary radius (m) = %s", self.surface_radius)
-        logger.info("Planetary mass (kg) = %s", self.planet_mass)
+        logger.info("Mantle mass (kg) = %f", self.mantle_mass)
+        logger.info("Mantle melt fraction = %f", self.mantle_melt_fraction)
+        logger.info("Core mass fraction = %f", self.core_mass_fraction)
+        logger.info("Planetary radius (m) = %f", self.surface_radius)
+        logger.info("Planetary mass (kg) = %f", self.planet_mass)
         logger.info("Surface temperature (K) = %f", self.surface_temperature)
-        logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
+        logger.info("Surface gravity (m/s^2) = %f", self.surface_gravity)
         logger.info("Melt Composition = %s", self.melt_composition)
 
     @property
