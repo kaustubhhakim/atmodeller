@@ -364,53 +364,6 @@ class StandardGibbsFreeEnergyOfFormation(Protocol):
         ...
 
 
-class StandardGibbsFreeEnergyOfFormationLinear:
-    """Standard Gibbs free energy of formation from a linear fit of JANAF data wrt. temperature.
-
-    See the comments in the data file that is parsed by __init__
-    """
-
-    # Temperature range used to fit the JANAF data.
-    TEMPERATURE_HIGH: float = 3000  # K
-    TEMPERATURE_LOW: float = 1500  # K
-
-    def __init__(self):
-        data_path: Path = DATA_ROOT_PATH / Path("gibbs_linear.csv")  # type: ignore
-        data: pd.DataFrame = pd.read_csv(data_path, comment="#")
-        data.set_index("species", inplace=True)
-        self.data = data.astype(float)
-
-    def get(self, molecule: Molecule, *, temperature: float) -> float:
-        """Gets the standard Gibbs free energy of formation in J/mol.
-
-        G = aT + b
-        where a = -S (standard entropy of formation) and b = H (standard enthalpy of formation).
-
-        Args:
-            molecule: Molecule.
-            temperature: Temperature.
-
-        Returns:
-            The standard Gibbs free energy of formation.
-        """
-        try:
-            formation_constants: tuple[float, float] = tuple(self.data.loc[molecule.name].tolist())
-        except KeyError:
-            logger.error("Thermodynamic data not available for %s", molecule)
-            raise
-
-        if (temperature < self.TEMPERATURE_LOW) or (temperature > self.TEMPERATURE_HIGH):
-            msg: str = f"Temperature must be in the range {self.TEMPERATURE_LOW} K to "
-            msg += f"{self.TEMPERATURE_HIGH} K"
-            raise ValueError(msg)
-
-        gibbs: float = formation_constants[0] * temperature + formation_constants[1]
-        gibbs *= 1000  # To convert from kJ to J.
-        logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
-
-        return gibbs
-
-
 class StandardGibbsFreeEnergyOfFormationJANAF:
     """Standard Gibbs free energy of formation from the JANAF tables."""
 

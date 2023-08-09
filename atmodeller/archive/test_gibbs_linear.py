@@ -1,3 +1,5 @@
+# type: ignore
+
 """Integration tests.
 
 Tests to ensure that 'correct' values are returned for certain interior-atmosphere systems. 
