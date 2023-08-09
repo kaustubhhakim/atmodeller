@@ -19,7 +19,7 @@ from atmodeller.thermodynamics import (
     Planet,
     Solubility,
     StandardGibbsFreeEnergyOfFormation,
-    StandardGibbsFreeEnergyOfFormationLinear,
+    StandardGibbsFreeEnergyOfFormationJANAF,
     composition_solubilities,
 )
 
@@ -421,7 +421,7 @@ class InteriorAtmosphereSystem:
 
     molecules: list[Molecule]
     gibbs_data: StandardGibbsFreeEnergyOfFormation = field(
-        default_factory=StandardGibbsFreeEnergyOfFormationLinear
+        default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
     planet: Planet = field(default_factory=Planet)
     molecule_names: list[str] = field(init=False)
