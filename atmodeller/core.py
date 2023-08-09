@@ -22,6 +22,7 @@ from atmodeller.thermodynamics import (
     StandardGibbsFreeEnergyOfFormationLinear,
     composition_solubilities,
 )
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class Planet:
         melt_composition: Melt composition of the planet.
         planet_mass: Mass of the planet.
         surface_gravity: Gravitational acceleration at the planetary surface.
+        surface_area: Surface area of the planetary surface.
     """
 
     mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
@@ -73,6 +75,11 @@ class Planet:
         logger.info("Surface temperature (K) = %f", self.surface_temperature)
         logger.info("Surface gravity (m/s^2) = %s", self.surface_gravity)
         logger.info("Melt Composition = %s", self.melt_composition)
+
+    @property
+    def surface_area(self):
+        """Surface area of the planet."""
+        return 4.0 * np.pi * self.surface_radius**2
 
 
 def _mass_decorator(func) -> Callable:
@@ -99,6 +106,23 @@ def _mass_decorator(func) -> Callable:
     return mass_wrapper
 
 
+@dataclass(kw_only=True, frozen=True)
+class MoleculeOutput:
+    """Output for a molecule."""
+
+    mass_in_atmosphere: float  # kg
+    mass_in_solid: float  # kg
+    mass_in_melt: float  # kg
+    ppmw_in_solid: float  # ppm by weight
+    ppmw_in_melt: float  # ppm by weight
+    pressure_in_atmosphere: float  # bar
+
+    @property
+    def mass_in_total(self):
+        """Total mass in all reservoirs in kg."""
+        return self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
+
+
 @dataclass(kw_only=True)
 class Molecule:
     """A molecule and its properties.
@@ -115,6 +139,7 @@ class Molecule:
         elements: The elements and their (stoichiometric) counts in the molecule.
         element_masses: The elements and their total masses in the molecule.
         molar_mass: Molar mass of the molecule.
+        output: To store calculated values for output.
     """
 
     name: str
@@ -123,6 +148,7 @@ class Molecule:
     elements: dict[str, int] = field(init=False)
     element_masses: dict[str, float] = field(init=False)
     molar_mass: float = field(init=False)
+    output: MoleculeOutput | None = field(init=False, default=None)
 
     def __post_init__(self):
         logger.info("Creating a molecule: %s", self.name)
@@ -162,104 +188,14 @@ class Molecule:
         return element_count
 
     @_mass_decorator
-    def mass_in_atmosphere(
-        self,
-        *,
-        planet: Planet,
-        partial_pressure_bar: float,
-        atmosphere_mean_molar_mass: float,
-        element: Optional[str] = None,
-    ) -> float:
-        """Mass in the atmosphere.
-
-        Args:
-            planet: Planet properties.
-            partial_pressure_bar: Partial pressure in bar.
-            atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
-            element: Returns the mass for an element. Defaults to None to return the molecule mass.
-               This argument is used by the @_mass_decorator.
-
-        Returns:
-            Mass of the molecule (element=None) or element (element=element) in the atmosphere.
-        """
-        del element
-        mass: float = partial_pressure_bar * 1e5 / planet.surface_gravity
-        mass *= 4.0 * np.pi * planet.surface_radius**2
-        mass *= self.molar_mass / atmosphere_mean_molar_mass
-
-        return mass
-
-    @_mass_decorator
-    def mass_in_melt(
-        self,
-        *,
-        planet: Planet,
-        partial_pressure_bar: float,
-        element: Optional[str] = None,
-        fugacities_dict: dict[str, float],
-    ) -> float:
-        """Mass in the molten interior.
-
-        Args:
-            planet: Planet properties.
-            partial_pressure_bar: Partial pressure in bar.
-            element: Returns the mass for an element. Defaults to None to return the molecule mass.
-               This argument is used by the @_mass_decorator.
-            fugacities_dict: Dictionary of all the species and their partial pressures.
-
-        Returns:
-            Mass of the molecule (element=None) or element (element=element) in the melt.
-        """
-        del element
-        prefactor: float = 1e-6 * planet.mantle_mass * planet.mantle_melt_fraction
-        ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar,
-            planet.surface_temperature,
-            fugacities_dict,
-        )
-        mass: float = prefactor * ppmw_in_melt
-
-        return mass
-
-    @_mass_decorator
-    def mass_in_solid(
-        self,
-        *,
-        planet: Planet,
-        partial_pressure_bar: float,
-        element: Optional[str] = None,
-        fugacities_dict: dict[str, float],
-    ) -> float:
-        """Mass in the solid interior.
-
-        Args:
-            planet: Planet properties.
-            partial_pressure_bar: Partial pressure in bar.
-            element: Returns the mass for an element. Defaults to None to return the molecule mass.
-               This argument is used by the @_mass_decorator.
-            fugacities_dict: Dictionary of all the species and their partial pressures.
-
-        Returns:
-            Mass of the molecule (element=None) or element (element=element) in the solid.
-        """
-        del element
-        prefactor: float = 1e-6 * planet.mantle_mass * (1 - planet.mantle_melt_fraction)
-        ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar, planet.surface_temperature, fugacities_dict
-        )
-        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
-        mass: float = prefactor * ppmw_in_solid
-
-        return mass
-
     def mass(
         self,
         *,
         planet: Planet,
         partial_pressure_bar: float,
         atmosphere_mean_molar_mass: float,
-        element: Optional[str] = None,
         fugacities_dict: dict[str, float],
+        element: Optional[str] = None,
     ) -> float:
         """Total mass.
 
@@ -267,34 +203,46 @@ class Molecule:
             planet: Planet properties.
             partial_pressure_bar: Partial pressure in bar.
             atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
+            fugacities_dict: Dictionary of all the species and their partial pressures.
             element: Returns the mass for an element. Defaults to None to return the molecule mass.
                This argument is used by the @_mass_decorator.
-            fugacities_dict: Dictionary of all the species and their partial pressures.
 
         Returns:
             Total mass of the molecule (element=None) or element (element=element).
         """
-        mass_in_atmosphere: float = self.mass_in_atmosphere(
-            planet=planet,
-            partial_pressure_bar=partial_pressure_bar,
-            atmosphere_mean_molar_mass=atmosphere_mean_molar_mass,
-            element=element,
-        )
-        mass_in_melt: float = self.mass_in_melt(
-            planet=planet,
-            partial_pressure_bar=partial_pressure_bar,
-            element=element,
-            fugacities_dict=fugacities_dict,
-        )
-        mass_in_solid: float = self.mass_in_solid(
-            planet=planet,
-            partial_pressure_bar=partial_pressure_bar,
-            element=element,
-            fugacities_dict=fugacities_dict,
-        )
-        total_mass: float = mass_in_atmosphere + mass_in_melt + mass_in_solid
 
-        return total_mass
+        del element
+
+        # Atmosphere.
+        mass_in_atmosphere: float = (
+            UnitConversion.bar_to_Pa(partial_pressure_bar) / planet.surface_gravity
+        )
+        mass_in_atmosphere *= planet.surface_area * self.molar_mass / atmosphere_mean_molar_mass
+
+        # Melt.
+        prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
+        ppmw_in_melt: float = self.solubility(
+            partial_pressure_bar,
+            planet.surface_temperature,
+            fugacities_dict,
+        )
+        mass_in_melt = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
+
+        # Solid.
+        prefactor: float = planet.mantle_mass * (1 - planet.mantle_melt_fraction)
+        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
+        mass_in_solid = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+
+        self.output = MoleculeOutput(
+            mass_in_atmosphere=mass_in_atmosphere,
+            mass_in_solid=mass_in_solid,
+            mass_in_melt=mass_in_melt,
+            ppmw_in_solid=ppmw_in_solid,
+            ppmw_in_melt=ppmw_in_melt,
+            pressure_in_atmosphere=partial_pressure_bar,
+        )
+
+        return self.output.mass_in_total
 
 
 class SystemConstraint(Protocol):

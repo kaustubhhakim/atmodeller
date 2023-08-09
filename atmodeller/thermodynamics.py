@@ -448,7 +448,7 @@ class BasaltH2(Solubility):
         fh2 = self.power_law(pressure_gpa, 7458.81, 2.01)  # bars; power-law fit
         molefrac: float = np.exp(-11.403 - (0.76 * pressure_gpa)) * fh2
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        ppm: float = UnitConversion.mole_fraction_to_ppm(
+        ppm: float = UnitConversion.fraction_to_ppm(
             molefrac
         )  # CHECK, is there an extra step to make this ppmw?
         return ppm
@@ -467,7 +467,7 @@ class AndesiteH2(Solubility):
         fh2 = self.power_law(pressure_gpa, 7856.31, 2.17)  # bars; power-law fit
         molefrac: float = np.exp(-10.591 - (0.81 * pressure_gpa)) * fh2
         # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        ppm: float = UnitConversion.mole_fraction_to_ppm(
+        ppm: float = UnitConversion.fraction_to_ppm(
             molefrac
         )  # CHECK, is there an extra step to make this ppmw?
         return ppm
