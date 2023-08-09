@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
@@ -190,7 +190,7 @@ class Molecule:
     def is_diatomic(self) -> bool:
         """Is the molecule diatomic.
 
-        Useful for obtaining the appropriate JANAF data for the Gibbs free energy.
+        Useful for obtaining the appropriate JANAF data for the Gibbs free energy of formation.
         """
         if len(self.elements) == 1 and list(self.elements.values())[0] == 2:
             return True
@@ -356,22 +356,15 @@ class IronWustiteBufferFischer(BufferedFugacity):
         return buffer
 
 
-class StandardGibbsFreeEnergyOfFormation(ABC):
-    """Standard Gibbs free energy of formation base class."""
+class StandardGibbsFreeEnergyOfFormation(Protocol):
+    """Standard Gibbs free energy of formation."""
 
-    def __init__(self):
-        self.data: pd.DataFrame = self._read_thermodynamic_data()
-
-    @abstractmethod
-    def _read_thermodynamic_data(self) -> pd.DataFrame:
-        """Reads and returns the thermodynamic data."""
-
-    @abstractmethod
     def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol"""
+        ...
 
 
-class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormation):
+class StandardGibbsFreeEnergyOfFormationLinear:
     """Standard Gibbs free energy of formation from a linear fit of JANAF data wrt. temperature.
 
     See the comments in the data file that is parsed by __init__
@@ -381,12 +374,11 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
     TEMPERATURE_HIGH: float = 3000  # K
     TEMPERATURE_LOW: float = 1500  # K
 
-    def _read_thermodynamic_data(self) -> pd.DataFrame:
+    def __init__(self):
         data_path: Path = DATA_ROOT_PATH / Path("gibbs_linear.csv")  # type: ignore
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         data.set_index("species", inplace=True)
-        data = data.astype(float)
-        return data
+        self.data = data.astype(float)
 
     def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Gets the standard Gibbs free energy of formation in J/mol.
@@ -419,12 +411,8 @@ class StandardGibbsFreeEnergyOfFormationLinear(StandardGibbsFreeEnergyOfFormatio
         return gibbs
 
 
-class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation):
+class StandardGibbsFreeEnergyOfFormationJANAF:
     """Standard Gibbs free energy of formation from the JANAF tables."""
-
-    def _read_thermodynamic_data(self) -> pd.DataFrame:
-        """Data is downloaded when required."""
-        ...
 
     def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Gets the standard Gibbs free energy of formation in J/mol.
@@ -450,13 +438,13 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
         return gibbs
 
 
-class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormation):
+class StandardGibbsFreeEnergyOfFormationHolland:
     """Standard Gibbs free energy of formation from Holland and Powell (1998).
 
     See the comments in the data file that is parsed by __init__
     """
 
-    def _read_thermodynamic_data(self) -> pd.DataFrame:
+    def __init__(self):
         data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         data["name of phase component"] = data["name of phase component"].str.strip()
@@ -465,7 +453,7 @@ class StandardGibbsFreeEnergyOfFormationHolland(StandardGibbsFreeEnergyOfFormati
         data.set_index("name of phase component", inplace=True)
         data = data.loc[:, :"Vmax"]
         data = data.astype(float)
-        return data
+        self.data = data
 
     def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Gets the standard Gibbs free energy of formation in J/mol
