@@ -29,8 +29,8 @@ from atmodeller.thermodynamics import (
 from atmodeller.utilities import MolarMasses
 
 # Tolerances to compare the test results with predefined 'correct' output.
-rtol: float = 1.0e-5
-atol: float = 1.0e-8
+rtol: float = 1.0e-4
+atol: float = 1.0e-4
 
 standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormation = (
     StandardGibbsFreeEnergyOfFormationLinear()

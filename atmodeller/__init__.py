@@ -5,6 +5,8 @@ __version__: str = "0.1.0"
 import importlib.resources
 import logging
 
+from thermochem import codata
+
 # Create the package logger.
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -31,9 +33,9 @@ logger.addHandler(handler)
 logger.info("%s version %s", __name__, __version__)
 
 # Module constants.
-GRAVITATIONAL_CONSTANT: float = 6.6743e-11  # SI units.
+GAS_CONSTANT: float = codata.value("molar gas constant")  # J/K/mol.
+GRAVITATIONAL_CONSTANT: float = codata.value("Newtonian constant of gravitation")  # m^3/kg/s^2.
 OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
-GAS_CONSTANT: float = 8.31446261815324  # J/K/mol.
 
 DATA_ROOT_PATH = importlib.resources.files("atmodeller.data")
 
