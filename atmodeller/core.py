@@ -516,6 +516,17 @@ class InteriorAtmosphereSystem:
 
         return mu_atmosphere
 
+    @property
+    def output(self) -> dict:
+        """Convenient output for analysis."""
+        output_dict: dict = {}
+        output_dict["total_pressure_in_atmosphere"] = self.atmospheric_total_pressure
+        output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
+        for molecule in self.molecules:
+            output_dict[molecule.name] = molecule.output
+        # TODO: Dan to add elemental outputs as well.
+        return output_dict
+
     def solve(
         self,
         constraints: list[SystemConstraint],
@@ -562,6 +573,16 @@ class InteriorAtmosphereSystem:
             self._log10_pressures = self._solve_fsolve(
                 constraints=constraints,
                 planet=self.planet,
+            )
+
+        # Recompute quantities that depend on the solution, since molecule.mass is not called for
+        # the linear reaction network.
+        for molecule_index, molecule in enumerate(self.molecules):
+            molecule.mass(
+                planet=self.planet,
+                partial_pressure_bar=self.pressures[molecule_index],
+                atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
+                fugacities_dict=self.fugacities_dict,
             )
 
         logger.info(pprint.pformat(self.fugacities_dict))

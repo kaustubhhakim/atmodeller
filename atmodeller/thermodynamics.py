@@ -109,9 +109,9 @@ class NoSolubility(Solubility):
         return 0.0
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class MoleculeOutput:
-    """Output for a molecule."""
+    """Output for a solution."""
 
     mass_in_atmosphere: float  # kg
     mass_in_solid: float  # kg
@@ -119,11 +119,11 @@ class MoleculeOutput:
     ppmw_in_solid: float  # ppm by weight
     ppmw_in_melt: float  # ppm by weight
     pressure_in_atmosphere: float  # bar
+    volume_mixing_ratio: float
+    mass_in_total: float = field(init=False)
 
-    @property
-    def mass_in_total(self):
-        """Total mass in all reservoirs in kg."""
-        return self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
+    def __post_init__(self):
+        self.mass_in_total = self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
 
 
 def _mass_decorator(func) -> Callable:
@@ -175,7 +175,6 @@ class Molecule:
     elements: dict[str, int] = field(init=False)
     element_masses: dict[str, float] = field(init=False)
     molar_mass: float = field(init=False)
-    output: MoleculeOutput | None = field(init=False, default=None)
 
     def __post_init__(self):
         logger.info("Creating a molecule: %s", self.name)
@@ -256,6 +255,7 @@ class Molecule:
             UnitConversion.bar_to_Pa(partial_pressure_bar) / planet.surface_gravity
         )
         mass_in_atmosphere *= planet.surface_area * self.molar_mass / atmosphere_mean_molar_mass
+        volume_mixing_ratio = partial_pressure_bar / sum(fugacities_dict.values())
 
         # Melt.
         prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
@@ -278,6 +278,7 @@ class Molecule:
             ppmw_in_solid=ppmw_in_solid,
             ppmw_in_melt=ppmw_in_melt,
             pressure_in_atmosphere=partial_pressure_bar,
+            volume_mixing_ratio=volume_mixing_ratio,
         )
 
         return self.output.mass_in_total
