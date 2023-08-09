@@ -72,30 +72,6 @@ class Planet:
         return 4.0 * np.pi * self.surface_radius**2
 
 
-def _mass_decorator(func) -> Callable:
-    """A decorator to return the mass of either the molecule or one of its elements."""
-
-    @wraps(func)
-    def mass_wrapper(self: "Molecule", element: Optional[str] = None, **kwargs) -> float:
-        """Wrapper to return the mass of either the molecule or one of its elements.
-
-        Args:
-            element: Returns the mass of this element. Defaults to None to return the molecule
-                mass.
-            **kwargs: Catches keyword arguments to forward to func.
-
-        Returns:
-            Mass of either the molecule or element.
-        """
-        mass: float = func(self, **kwargs)
-        if element is not None:
-            mass *= self.element_masses.get(element, 0) / self.molar_mass
-
-        return mass
-
-    return mass_wrapper
-
-
 class Solubility(ABC):
     """Solubility base class."""
 
@@ -148,6 +124,30 @@ class MoleculeOutput:
     def mass_in_total(self):
         """Total mass in all reservoirs in kg."""
         return self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
+
+
+def _mass_decorator(func) -> Callable:
+    """A decorator to return the mass of either the molecule or one of its elements."""
+
+    @wraps(func)
+    def mass_wrapper(self: "Molecule", element: Optional[str] = None, **kwargs) -> float:
+        """Wrapper to return the mass of either the molecule or one of its elements.
+
+        Args:
+            element: Returns the mass of this element. Defaults to None to return the molecule
+                mass.
+            **kwargs: Catches keyword arguments to forward to func.
+
+        Returns:
+            Mass of either the molecule or element.
+        """
+        mass: float = func(self, **kwargs)
+        if element is not None:
+            mass *= self.element_masses.get(element, 0) / self.molar_mass
+
+        return mass
+
+    return mass_wrapper
 
 
 @dataclass(kw_only=True)
