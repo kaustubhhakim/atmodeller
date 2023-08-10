@@ -562,10 +562,8 @@ class BasaltH2(Solubility):
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        """Power law fit to Figure 5, basalt Pure H2 curve."""
         del temperature
         del fugacities_dict
-        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
         ppmw: float = self.power_law(fugacity, 53.65376426, 0.38365457)
         return ppmw
 
@@ -580,9 +578,7 @@ class AndesiteH2(Solubility):
     def _solubility(self, fugacity: float, temperature: float, fugacities_dict: float) -> float:
         del temperature
         del fugacities_dict
-        
-        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        ppmw: float = self.power_law(pressure, 34.43369241, 0.49459427)  
+        ppmw: float = self.power_law(fugacity, 34.43369241, 0.49459427)  
         return ppmw
 
 
