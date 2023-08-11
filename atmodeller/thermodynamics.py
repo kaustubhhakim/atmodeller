@@ -317,7 +317,7 @@ class IronWustiteBufferHirschmann(BufferedFugacity):
 
     def _fugacity(self, *, temperature: float) -> float:
         """See base class."""
-        # TODO: Assuming one bar (total?) pressure
+        # total_pressure is set to 1 bar.
         total_pressure: float = 1  # bar
         fugacity: float = (
             -28776.8 / temperature

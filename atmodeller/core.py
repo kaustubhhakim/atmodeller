@@ -13,7 +13,7 @@ from scipy.optimize import fsolve
 from atmodeller import GAS_CONSTANT
 from atmodeller.thermodynamics import (
     BufferedFugacity,
-    IronWustiteBufferOneill,
+    IronWustiteBufferHirschmann,
     Molecule,
     NoSolubility,
     Planet,
@@ -80,7 +80,7 @@ class BufferedFugacityConstraint:
 
     Args:
         species: The species (molecule) that is buffered by `buffer`. Defaults to 'O2'.
-        fugacity: A BufferedFugacity. Defaults to IronWustiteBufferOneill
+        fugacity: A BufferedFugacity. Defaults to IronWustiteBufferHirschmann
         log10_shift: Log10 shift relative to the buffer.
 
     Attributes:
@@ -88,11 +88,10 @@ class BufferedFugacityConstraint:
     """
 
     species: str = "O2"
-    fugacity: BufferedFugacity = field(default_factory=IronWustiteBufferOneill)
+    fugacity: BufferedFugacity = field(default_factory=IronWustiteBufferHirschmann)
     log10_shift: float = 0
     field: str = field(default="fugacity", init=False)
 
-    # TODO: Pass in all fugacities to enable total fugacity to be determined?
     def get_value(self, *, temperature: float, **kwargs) -> float:
         del kwargs
         return 10 ** self.fugacity(temperature=temperature, fugacity_log10_shift=self.log10_shift)
