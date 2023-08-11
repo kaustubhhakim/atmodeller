@@ -14,8 +14,6 @@ from thermochem import janaf
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.utilities import MolarMasses, UnitConversion
 
-wtperc_to_ppm: float = 1e4  # weight percent (wt. %) to ppm
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -381,7 +379,9 @@ class StandardGibbsFreeEnergyOfFormationJANAF:
         """
 
         db = janaf.Janafdb()
-        if molecule.is_diatomic:
+        if molecule.name=='S2': #Maggie added because S2 (ref) doesn't exist in JANAF
+            phase = db.getphasedata(formula=molecule.name, phase='g')
+        elif molecule.is_diatomic:
             phase = db.getphasedata(formula=molecule.name, phase="ref")
         else:
             phase = db.getphasedata(formula=molecule.name, phase="g")
@@ -548,7 +548,6 @@ class BasaltLibourelN2(Solubility):
         ppmw: float = self.power_law(fugacity, 0.0611, 1.0)
         # TODO: Could add fO2 lower and upper bounds.
         if "O2" in fugacities_dict:
-            # TODO: Confirm fO2 and not log10fO2 or lnfO2?
             constant: float = (fugacities_dict["O2"] ** -0.75) * 5.97e-10
             ppmw += self.power_law(fugacity, constant, 0.5)
         return ppmw
@@ -564,7 +563,8 @@ class BasaltH2(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
-        ppmw: float = self.power_law(fugacity, 53.65376426, 0.38365457)
+        #ppmw: float = self.power_law(fugacity, 53.65376426, 0.38365457)
+        ppmw: float = 10**(1.04827856*np.log10(np.sqrt(fugacity)) + 1.10083602)
         return ppmw
 
 
@@ -578,7 +578,8 @@ class AndesiteH2(Solubility):
     def _solubility(self, fugacity: float, temperature: float, fugacities_dict: float) -> float:
         del temperature
         del fugacities_dict
-        ppmw: float = self.power_law(fugacity, 34.43369241, 0.49459427)  
+        #ppmw: float = self.power_law(fugacity, 34.43369241, 0.49459427)  
+        ppmw: float = 10**(1.20257736*np.log10(np.sqrt(fugacity)) + 1.01058631)
         return ppmw
 
 
@@ -597,59 +598,90 @@ class SilicicMeltsH2(Solubility):
         return ppmw
 
 
-class AndesiteS2_Sulfate(Solubility):
+class AndesiteS_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+ 
 
     Using expression in the abstract and the corrected expression for sulfate capacity in corrigendum
     Composition for Andesite from Table 1
-    Note: pressure here is really fS2
-    Fitting S (ppm) vs. Temperature.
-
+    Note: fugacity is fS2
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        
-        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        logCs: float = -12.948+(32851.2/temperature)
-        logS_wtp = logCs + (0.5*np.log10(fugacity)) + (1.5*fugacities_dict["O2"])
-        ppmw = (10**(logS_wtp))*wtperc_to_ppm
+        logCs: float = -12.948+(31984.243/temperature)
+        logS_wtp = logCs + (0.5*np.log10(fugacity)) + (1.5*np.log10(fugacities_dict["O2"]))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
         return ppmw
 
 
-class BasaltS2_Sulfate(Solubility):
+class TBasaltS_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+ 
 
     Using expression in the abstract and the corrected expression for sulfate capacity in corrigendum
-    Composition for T-Basalt from Table 1
-    Note: pressure here is really fS2
+    Composition for Trachy-Basalt from Table 1
+    Note: fugacity is fS2
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        logCs: float = -12.948+(33458.7/temperature)
-        logS_wtp = logCs + (0.5*np.log10(fugacity)) + (1.5*fugacities_dict["O2"])
-        ppmw = (10**(logS_wtp))*wtperc_to_ppm
+        logCs: float = -12.948+(32446.366/temperature)
+        logS_wtp = logCs + (0.5*np.log10(fugacity)) + (1.5*np.log10(fugacities_dict["O2"]))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        return ppmw
+    
+class BasaltS_Sulfate(Solubility):
+    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+ 
+
+    Using expression in the abstract and the corrected expression for sulfate capacity in corrigendum
+    Composition for NIB (natural Icelandic basalt) from Table 1
+    Note: fugacity is fS2
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        logCs: float = -12.948+(31532.862/temperature)
+        logS_wtp = logCs + (0.5*np.log10(fugacity)) + (1.5*np.log10(fugacities_dict["O2"]))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
         return ppmw
 
+class TBasaltS_Sulfide(Solubility):
+    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
+    
+    Using expression in abstract for S wt% and the expression for sulfide capacity
+    Composition for Trachy-basalt from Table 1
+    Note: fugacity is fS2
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        logCs: float = 0.225-(7842.5/temperature)
+        logS_wtp = logCs - (0.5*(np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        return ppmw
+    
 class BasaltS_Sulfide(Solubility):
     """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
     
     Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for T-basalt from Table 1
-    Note: pressure here is really fS2
+    Composition for NIB (natural Icelandic basalt) from Table 1
+    Note: fugacity is fS2
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
-        logCs: float = 0.225-(7842.5/temperature)
-        logS_wtp = logCs - (0.5*(fugacities_dict["O2"] - np.log10(fugacity)))
-        ppmw = (10**(logS_wtp))*wtperc_to_ppm
+        logCs: float = 0.225-(7817.134/temperature)
+        logS_wtp = logCs - (0.5*(np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
         return ppmw
     
 class AndesiteS_Sulfide(Solubility):
@@ -657,16 +689,16 @@ class AndesiteS_Sulfide(Solubility):
     
     Using expression in abstract for S wt% and the expression for sulfide capacity
     Composition for Andesite from Table 1
-    Note: pressure here is really fS2
+    Note: fugacity is fS2
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        # TODO: Maggie to check, ppm or ppmw? Probably use ppmw to be explicit if by weight.
         logCs: float = 0.225-(8876.5/temperature)
-        logS_wtp = logCs - (0.5*(fugacities_dict["O2"] - np.log10(fugacity)))
-        ppmw = (10**(logS_wtp))*wtperc_to_ppm
+        logS_wtp = logCs - (0.5*(np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -676,30 +708,29 @@ class MercuryMagmaS(Solubility):
     S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like magmas.
     """
 
-    # TODO: Maggie to check, I think this would mainly apply to H2S but maybe also S2 and S.
-
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # Coeffs from eq. 10 (Namur et al., 2016).
-        # TODO: Confirm fO2 and not log10fO2 or lnfO2?
         # FIXME: How to deal if fO2 not available?  Drop last term?
         wt_perc: float = np.exp(
-            a + (b / temperature) + ((c * fugacity) / temperature) + (d * fugacities_dict["O2"])
+            a + (b / temperature) + ((c * fugacity) / temperature) + (d * np.log10(fugacities_dict["O2"]))
         )
         ppmw: float = UnitConversion.weight_precent_to_ppmw(wt_perc)
         return ppmw
 
 
 # Dictionaries of self-consistent solubility laws for a given composition.
-andesite_solubilities: dict[str, Solubility] = {"H2": AndesiteH2(), "SO2": AndesiteS2_Sulfate()}
+andesite_solubilities: dict[str, Solubility] = {"H2": AndesiteH2(), "O2S": AndesiteS_Sulfate() and AndesiteS_Sulfide(), "OS": AndesiteS_Sulfate() and AndesiteS_Sulfide(), "S2": AndesiteS_Sulfate() and AndesiteS_Sulfide()}
 anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
 basalt_solubilities: dict[str, Solubility] = {
     "H2O": BasaltDixonH2O(),
     "CO2": BasaltDixonCO2(),
     "H2": BasaltH2(),
     "N2": BasaltLibourelN2(),
-    "SO2": BasaltS2_Sulfate(),
+    "O2S": BasaltS_Sulfate() and BasaltS_Sulfide(),
+    "OS": BasaltS_Sulfate() and BasaltS_Sulfide(),
+    "S2": BasaltS_Sulfate() and BasaltS_Sulfide()
 }
 peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O()}
 reducedmagma_solubilities: dict[str, Solubility] = {"H2S": MercuryMagmaS()}
