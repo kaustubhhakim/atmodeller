@@ -392,17 +392,22 @@ class StandardGibbsFreeEnergyOfFormationJANAF:
         """
 
         db = janaf.Janafdb()
-        if molecule.name == "S2":  # Maggie added because S2 (ref) doesn't exist in JANAF
-            phase = db.getphasedata(formula=molecule.name, phase="g")
-        elif molecule.is_diatomic:
-            phase = db.getphasedata(formula=molecule.name, phase="ref")
+
+        if molecule.is_diatomic:
+            try:
+                phase = db.getphasedata(formula=molecule.name, phase="ref")
+            except ValueError:
+                # For example, S2 (ref) does not exist in JANAF.
+                phase = db.getphasedata(formula=molecule.name, phase="g")
         else:
             phase = db.getphasedata(formula=molecule.name, phase="g")
 
         logger.debug("Phase = %s", phase)
         gibbs: float = phase.DeltaG(temperature)
 
-        logger.debug("Molecule = %s, standard Gibbs energy of formation = %f", molecule, gibbs)
+        logger.debug(
+            "Molecule = %s, standard Gibbs energy of formation = %f", molecule.name, gibbs
+        )
 
         return gibbs
 
