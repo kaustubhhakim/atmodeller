@@ -492,7 +492,7 @@ class AndesiteS_Sulfate(Solubility):
         logCs: float = -12.948 + (31984.243 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -510,7 +510,7 @@ class AndesiteS_Sulfide(Solubility):
         logCs: float = 0.225 - (8876.5 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -604,7 +604,7 @@ class BasaltS_Sulfate(Solubility):
         logCs: float = -12.948 + (31532.862 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -622,7 +622,7 @@ class BasaltS_Sulfide(Solubility):
         logCs: float = 0.225 - (7817.134 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -651,7 +651,7 @@ class TBasaltS_Sulfate(Solubility):
         logCs: float = -12.948 + (32446.366 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -669,7 +669,7 @@ class TBasaltS_Sulfide(Solubility):
         logCs: float = 0.225 - (7842.5 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_precent_to_ppmw(S_wtp)
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -707,7 +707,7 @@ class MercuryMagmaS(Solubility):
             + ((c * fugacity) / temperature)
             + (d * np.log10(fugacities_dict["O2"]))
         )
-        ppmw: float = UnitConversion.weight_precent_to_ppmw(wt_perc)
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(wt_perc)
         return ppmw
 
 

@@ -30,7 +30,7 @@ class UnitConversion:
         return 1 / cls.fraction_to_ppm(value_ppm)
 
     @classmethod
-    def weight_precent_to_ppmw(cls, value_weight_percent: float = 1) -> float:
+    def weight_percent_to_ppmw(cls, value_weight_percent: float = 1) -> float:
         """Weight percent to parts-per-million by weight"""
         return value_weight_percent * 1.0e4
 
