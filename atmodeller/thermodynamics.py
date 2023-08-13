@@ -83,12 +83,25 @@ class Solubility(ABC):
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
+        """Dissolved volatile concentration in ppmw in the melt.
+
+        Args:
+            fugacity: Fugacity of the species.
+            temperature: Temperature.
+            fugacities_dict: Fugacities of all other species in the system.
+
+        Returns:
+            ppmw of the species in the melt.
+        """
         raise NotImplementedError
 
     def __call__(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        """Dissolved volatile concentration in ppmw in the melt."""
+        """Dissolved volatile concentration in ppmw in the melt.
+
+        See self._solubility.
+        """
         solubility: float = self._solubility(fugacity, temperature, fugacities_dict)
         logger.debug(
             "%s, f = %f, T = %f, ppmw = %f",
@@ -473,6 +486,7 @@ class AndesiteH2(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
+        # TODO: Maggie to add comment what the next line is (or remove if no longer required).
         # ppmw: float = self.power_law(fugacity, 34.43369241, 0.49459427)
         ppmw: float = 10 ** (1.20257736 * np.log10(np.sqrt(fugacity)) + 1.01058631)
         return ppmw
@@ -483,13 +497,12 @@ class AndesiteS_Sulfate(Solubility):
 
     Using expression in the abstract and the corrected expression for sulfate capacity in
     corrigendum. Composition for Andesite from Table 1.
-
-    Note: fugacity is fS2.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
+        """Fugacity is fS2."""
         logCs: float = -12.948 + (31984.243 / temperature)
         logS_wtp: float = (
             logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
@@ -504,13 +517,12 @@ class AndesiteS_Sulfide(Solubility):
 
     Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
     for Andesite from Table 1.
-
-    Note: fugacity is fS2.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
+        """fugacity is fS2."""
         logCs: float = 0.225 - (8876.5 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
@@ -585,6 +597,7 @@ class BasaltH2(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
+        # TODO: Maggie to add comment what the next line is (or remove if no longer required).
         # ppmw: float = self.power_law(fugacity, 53.65376426, 0.38365457)
         ppmw: float = 10 ** (1.04827856 * np.log10(np.sqrt(fugacity)) + 1.10083602)
         return ppmw
@@ -613,13 +626,12 @@ class BasaltS_Sulfate(Solubility):
 
     Using expression in the abstract and the corrected expression for sulfate capacity in
     corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
-
-    Note: fugacity is fS2.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
+        """Fugacity is fS2."""
         logCs: float = -12.948 + (31532.862 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
@@ -632,13 +644,12 @@ class BasaltS_Sulfide(Solubility):
 
     Using expression in abstract for S wt% and the expression for sulfide capacity
     Composition for NIB (natural Icelandic basalt) from Table 1.
-
-    Note: fugacity is fS2.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
+        """Fugacity is fS2."""
         logCs: float = 0.225 - (7817.134 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp = 10**logS_wtp
@@ -675,13 +686,12 @@ class TBasaltS_Sulfate(Solubility):
 
     Using expression in the abstract and the corrected expression for sulfate capacity in
     corrigendum. Composition for Trachy-Basalt from Table 1.
-
-    Note: fugacity is fS2.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
+        """Fugacity is fS2."""
         logCs: float = -12.948 + (32446.366 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
@@ -693,13 +703,13 @@ class TBasaltS_Sulfide(Solubility):
     """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
 
     Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for Trachy-basalt from Table 1
-    Note: fugacity is fS2
+    Composition for Trachy-basalt from Table 1.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
+        """Fugacity is fS2."""
         logCs: float = 0.225 - (7842.5 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp = 10**logS_wtp
@@ -748,6 +758,7 @@ class MercuryMagmaS(Solubility):
 class PeridotiteH2O(Solubility):
     """Sossi et al. (2023).
 
+    Power law parameters are in the abstract:
     https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
     """
 
