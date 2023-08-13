@@ -481,37 +481,54 @@ class AndesiteH2(Solubility):
 class AndesiteS_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
-    Using expression in the abstract and the corrected expression for sulfate capacity in corrigendum
-    Composition for Andesite from Table 1
-    Note: fugacity is fS2
+    Using expression in the abstract and the corrected expression for sulfate capacity in
+    corrigendum. Composition for Andesite from Table 1.
+
+    Note: fugacity is fS2.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         logCs: float = -12.948 + (31984.243 / temperature)
-        logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        logS_wtp: float = (
+            logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        )
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
 class AndesiteS_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
+    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
 
-    Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for Andesite from Table 1
-    Note: fugacity is fS2
+    Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
+    for Andesite from Table 1.
+
+    Note: fugacity is fS2.
     """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         logCs: float = 0.225 - (8876.5 / temperature)
-        logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
+
+
+class AndesiteS(Solubility):
+    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+
+    def __init__(self):
+        self.sulfide_solubility: Solubility = AndesiteS_Sulfide()
+        self.sulfate_solubility: Solubility = AndesiteS_Sulfate()
+
+    def _solubility(self, *args, **kwargs) -> float:
+        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
+        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+        return solubility
 
 
 # endregion
@@ -560,7 +577,8 @@ class BasaltDixonH2O(Solubility):
 class BasaltH2(Solubility):
     """Hirschmann et al. 2012 for Basalt.
 
-    Fit to fH2 vs. H2 concentration from Table 2"""
+    Fit to fH2 vs. H2 concentration from Table 2.
+    """
 
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
@@ -593,9 +611,10 @@ class BasaltLibourelN2(Solubility):
 class BasaltS_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
-    Using expression in the abstract and the corrected expression for sulfate capacity in corrigendum
-    Composition for NIB (natural Icelandic basalt) from Table 1
-    Note: fugacity is fS2
+    Using expression in the abstract and the corrected expression for sulfate capacity in
+    corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
+
+    Note: fugacity is fS2.
     """
 
     def _solubility(
@@ -612,8 +631,9 @@ class BasaltS_Sulfide(Solubility):
     """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
 
     Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for NIB (natural Icelandic basalt) from Table 1
-    Note: fugacity is fS2
+    Composition for NIB (natural Icelandic basalt) from Table 1.
+
+    Note: fugacity is fS2.
     """
 
     def _solubility(
@@ -624,6 +644,19 @@ class BasaltS_Sulfide(Solubility):
         S_wtp = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
+
+
+class BasaltS(Solubility):
+    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+
+    def __init__(self):
+        self.sulfide_solubility: Solubility = BasaltS_Sulfide()
+        self.sulfate_solubility: Solubility = BasaltS_Sulfate()
+
+    def _solubility(self, *args, **kwargs) -> float:
+        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
+        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+        return solubility
 
 
 class BasaltWilsonH2O(Solubility):
@@ -640,9 +673,10 @@ class BasaltWilsonH2O(Solubility):
 class TBasaltS_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
-    Using expression in the abstract and the corrected expression for sulfate capacity in corrigendum
-    Composition for Trachy-Basalt from Table 1
-    Note: fugacity is fS2
+    Using expression in the abstract and the corrected expression for sulfate capacity in
+    corrigendum. Composition for Trachy-Basalt from Table 1.
+
+    Note: fugacity is fS2.
     """
 
     def _solubility(
@@ -743,9 +777,9 @@ class SilicicMeltsH2(Solubility):
 # Dictionaries of self-consistent solubility laws for a given composition.
 andesite_solubilities: dict[str, Solubility] = {
     "H2": AndesiteH2(),
-    "O2S": AndesiteS_Sulfate() and AndesiteS_Sulfide(),
-    "OS": AndesiteS_Sulfate() and AndesiteS_Sulfide(),
-    "S2": AndesiteS_Sulfate() and AndesiteS_Sulfide(),
+    "O2S": AndesiteS(),
+    "OS": AndesiteS(),
+    "S2": AndesiteS(),
 }
 anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
 basalt_solubilities: dict[str, Solubility] = {
@@ -753,9 +787,9 @@ basalt_solubilities: dict[str, Solubility] = {
     "CO2": BasaltDixonCO2(),
     "H2": BasaltH2(),
     "N2": BasaltLibourelN2(),
-    "O2S": BasaltS_Sulfate() and BasaltS_Sulfide(),
-    "OS": BasaltS_Sulfate() and BasaltS_Sulfide(),
-    "S2": BasaltS_Sulfate() and BasaltS_Sulfide(),
+    "O2S": BasaltS(),
+    "OS": BasaltS(),
+    "S2": BasaltS(),
 }
 peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O()}
 reducedmagma_solubilities: dict[str, Solubility] = {"H2S": MercuryMagmaS()}
