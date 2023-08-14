@@ -381,6 +381,9 @@ class StandardGibbsFreeEnergyOfFormation(Protocol):
 class StandardGibbsFreeEnergyOfFormationJANAF:
     """Standard Gibbs free energy of formation from the JANAF tables."""
 
+    ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
+    STANDARD_STATE_PRESSURE: float = 1  # bar
+
     def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Gets the standard Gibbs free energy of formation in J/mol.
 
