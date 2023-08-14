@@ -374,7 +374,7 @@ class StandardGibbsFreeEnergyOfFormation(Protocol):
     """Standard Gibbs free energy of formation."""
 
     # TODO: The Gibbs free energy of formation is determined at the prescribed temperature and
-    # standard state pressure: dG0 = dH0 - TdS0.
+    # standard state pressure: dG0 = dH0 - TdS0.  Pressure integral is not included.
 
     def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol"""
