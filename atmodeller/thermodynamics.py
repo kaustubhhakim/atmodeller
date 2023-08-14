@@ -373,6 +373,9 @@ class IronWustiteBufferFischer(BufferedFugacity):
 class StandardGibbsFreeEnergyOfFormation(Protocol):
     """Standard Gibbs free energy of formation."""
 
+    # TODO: The Gibbs free energy of formation is determined at the prescribed temperature and
+    # standard state pressure: dG0 = dH0 - TdS0.
+
     def get(self, molecule: Molecule, *, temperature: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol"""
         ...
@@ -421,6 +424,8 @@ class StandardGibbsFreeEnergyOfFormationHolland:
     See the comments in the data file that is parsed by __init__
     """
 
+    ENTHALPY_REFERENCE_TEMPERATURE: float = 298  # K # TODO: Or 298.15?
+
     def __init__(self):
         data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
         data: pd.DataFrame = pd.read_csv(data_path, comment="#")
@@ -448,8 +453,6 @@ class StandardGibbsFreeEnergyOfFormationHolland:
             logger.error("Thermodynamic data not available for %s", molecule.name)
             raise
 
-        temp_ref: float = 298  # K
-
         H = data.get("Hf")  # J
         S = data.get("S")  # J/K
         a = data.get("a")  # J/K           Coeff for calc heat capacity.
@@ -459,17 +462,17 @@ class StandardGibbsFreeEnergyOfFormationHolland:
 
         integral_H: float = (
             H
-            + a * (temperature - temp_ref)  # type: ignore a is a float.
-            + b / 2 * (temperature**2 - temp_ref**2)  # type: ignore b is a float.
-            - c * (1 / temperature - 1 / temp_ref)  # type: ignore c is a float.
-            + 2 * d * (temperature**0.5 - temp_ref**0.5)  # type: ignore d is a float.
+            + a * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore a is a float.
+            + b / 2 * (temperature**2 - self.ENTHALPY_REFERENCE_TEMPERATURE**2)  # type: ignore b is a float.
+            - c * (1 / temperature - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore c is a float.
+            + 2 * d * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)  # type: ignore d is a float.
         )
         integral_S: float = (
             S
-            + a * np.log(temperature / temp_ref)  # type: ignore a is a float.
-            + b * (temperature - temp_ref)  # type: ignore b is a float.
-            - c / 2 * (1 / temperature**2 - 1 / temp_ref**2)  # type: ignore c is a float.
-            - 2 * d * (1 / temperature**0.5 - 1 / temp_ref**0.5)  # type: ignore d is a float.
+            + a * np.log(temperature / self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore a is a float.
+            + b * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore b is a float.
+            - c / 2 * (1 / temperature**2 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**2)  # type: ignore c is a float.
+            - 2 * d * (1 / temperature**0.5 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)  # type: ignore d is a float.
         )
 
         gibbs: float = integral_H - temperature * integral_S
