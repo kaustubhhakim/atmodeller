@@ -424,7 +424,7 @@ class StandardGibbsFreeEnergyOfFormationHolland:
     See the comments in the data file that is parsed by __init__
     """
 
-    ENTHALPY_REFERENCE_TEMPERATURE: float = 298  # K # TODO: Or 298.15?
+    ENTHALPY_REFERENCE_TEMPERATURE: float = 298  # K
 
     def __init__(self):
         data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
