@@ -15,18 +15,8 @@ thermochem = "^0.8.2"
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.3.0"
-isort = "^5.12.0"
-pylint = "^2.17.3"
 pytest = "^7.3.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.black]
-line-length = 99 # override black's default line-length
-
-[tool.isort]
-# make it compatible with black
-profile = "black"

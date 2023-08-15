@@ -3,17 +3,23 @@
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.typeCheckingMode": "basic",
     "editor.formatOnSave": true,
-    "python.formatting.provider": "black",
     "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
             "source.organizeImports": true
         }
     },
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": true,
-    "python.linting.lintOnSave": true,
+    "isort.args": [
+        "--profile",
+        "black"
+    ],
     "editor.rulers": [
         99
+    ],
+    "black-formatter.args": [
+        "--line-length",
+        "99"
     ],
     "python.testing.pytestArgs": [
         "tests"
