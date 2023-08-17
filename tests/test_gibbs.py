@@ -42,9 +42,10 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
-    # region oxygen fugacity
+# region oxygen fugacity
 
+
+def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
     molecules: list[Molecule] = [

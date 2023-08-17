@@ -196,10 +196,15 @@ class Molecule:
         masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
         self.hill_formula = self._get_hill_formula()
-        self.element_masses = {
-            key: value * getattr(masses, key) for key, value in self.elements.items()
-        }
-        self.molar_mass = sum(self.element_masses.values())
+        # Below breaks for condensed phases.
+        try:
+            self.element_masses = {
+                key: value * getattr(masses, key) for key, value in self.elements.items()
+            }
+            self.molar_mass = sum(self.element_masses.values())
+        except AttributeError:
+            self.element_masses = {}
+            self.molar_mass = 0
 
     @property
     def is_diatomic(self) -> bool:
@@ -427,15 +432,13 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
         """Returns a string identifying the source of the data."""
         ...
 
-    def get(
-        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
-    ) -> float:
+    def get(self, molecule: Molecule, *, temperature: float, pressure: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol.
 
         Args:
             molecule: A Molecule.
             temperature: Temperature.
-            pressure: Total pressure, which is relevant for condensed phases.
+            pressure: Pressure (total) is relevant for condensed phases, but not for ideal gases.
 
         Returns:
             The standard Gibbs free energy of formation (J/mol).
@@ -453,9 +456,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
     ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    def get(
-        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
-    ) -> float:
+    def get(self, molecule: Molecule, *, temperature: float, pressure: float) -> float:
         """See base class.
 
         In the JANAF tables, we have generally chosen the ideal diatomic gas for the reference
@@ -581,7 +582,11 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
             # Volume at T.
             # TODO: Why the exponential?  Seems different to the paper (check with Meng).
             V_T = V * np.exp(
-                alpha0 * (T - 298) - 2 * 10.0 * alpha0 * (T**0.5 - 298**0.5)  # type: ignore
+                alpha0 * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore
+                - 2
+                * 10.0
+                * alpha0  # type: ignore
+                * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
             )
             dKdp: float = 4.0  # dimensionless, derivative of bulk modulus w.r.t. pressure
             # Derivative of bulk modulus w.r.t. temperature, from Holland and Powell (1998).
@@ -618,9 +623,7 @@ class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProto
     def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol):
         self.datasets.append(dataset)
 
-    def get(
-        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
-    ) -> float:
+    def get(self, molecule: Molecule, *, temperature: float, pressure: float) -> float:
         for dataset in self.datasets:
             try:
                 gibbs: float = dataset.get(molecule, temperature=temperature, pressure=pressure)

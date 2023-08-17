@@ -234,7 +234,7 @@ class ReactionNetwork:
         return reactions
 
     def get_reaction_log10_equilibrium_constant(
-        self, *, reaction_index: int, temperature: float
+        self, *, reaction_index: int, temperature: float, pressure: float
     ) -> float:
         """Gets the log10 of the reaction equilibrium constant.
 
@@ -244,27 +244,27 @@ class ReactionNetwork:
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
             temperature: Temperature.
+            pressure: Pressure.
 
         Returns:
             log10 of the reaction equilibrium constant.
         """
-        equilibrium_constant: float = 0
-        for molecule_index, molecule in enumerate(self.molecules):
-            equilibrium_constant += (
-                self.reaction_matrix[reaction_index, molecule_index]
-                * -self.gibbs_data.get(molecule, temperature=temperature)
-                / (np.log(10) * GAS_CONSTANT * temperature)
-            )
+        gibbs_energy: float = self.get_reaction_gibbs_energy_of_formation(
+            reaction_index=reaction_index, temperature=temperature, pressure=pressure
+        )
+        equilibrium_constant: float = -gibbs_energy / (np.log(10) * GAS_CONSTANT * temperature)
+
         return equilibrium_constant
 
     def get_reaction_gibbs_energy_of_formation(
-        self, *, reaction_index: int, temperature: float
+        self, *, reaction_index: int, temperature: float, pressure: float
     ) -> float:
         """Gets the Gibb's free energy of formation for a reaction.
 
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
             temperature: Temperature.
+            pressure: Pressure.
 
         Returns:
             The Gibb's free energy of the reaction.
@@ -273,23 +273,24 @@ class ReactionNetwork:
         for molecule_index, molecule in enumerate(self.molecules):
             gibbs_energy += self.reaction_matrix[
                 reaction_index, molecule_index
-            ] * self.gibbs_data.get(molecule, temperature=temperature)
+            ] * self.gibbs_data.get(molecule, temperature=temperature, pressure=pressure)
         return gibbs_energy
 
     def get_reaction_equilibrium_constant(
-        self, *, reaction_index: int, temperature: float
+        self, *, reaction_index: int, temperature: float, pressure: float
     ) -> float:
         """Gets the equilibrium constant of a reaction Kf
 
         Args:
             reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
             temperature: Temperature.
+            pressure: Pressure.
 
         Returns:
             The equilibrium constant of the reaction.
         """
         equilibrium_constant: float = 10 ** self.get_reaction_log10_equilibrium_constant(
-            reaction_index=reaction_index, temperature=temperature
+            reaction_index=reaction_index, temperature=temperature, pressure=pressure
         )
         return equilibrium_constant
 
@@ -298,16 +299,24 @@ class ReactionNetwork:
         *,
         constraints: list[SystemConstraint],
         planet: Planet,
+        fugacities_dict: dict[str, float],
     ) -> tuple[np.ndarray, np.ndarray]:
         """Builds the design matrix and the right hand side (RHS) vector.
 
         Args:
             constraints: Constraints for the system of equations.
             planet: Planet properties.
+            fugacities_dict: The pressures of the molecules (bar) in a dictionary.
 
         Returns:
             A dictionary of all the molecules and their partial pressures.
         """
+
+        # TODO: Formally fugacities_dict should actually be the partial pressure dict.  In which
+        # case fugacities for the equivalent partial pressures should be computed here.
+
+        pressure: float = sum(fugacities_dict.values())
+
         pressure_constraints: list[SystemConstraint] = [
             constraint for constraint in constraints if constraint.field == "fugacity"
         ]
@@ -341,7 +350,9 @@ class ReactionNetwork:
             )
             # Gibb's reaction is log10 of the equilibrium constant.
             rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
-                reaction_index=reaction_index, temperature=planet.surface_temperature
+                reaction_index=reaction_index,
+                temperature=planet.surface_temperature,
+                pressure=pressure,
             )
 
         for index, constraint in enumerate(pressure_constraints):
@@ -569,10 +580,7 @@ class InteriorAtmosphereSystem:
                 msg: str = "Mixed pressure and mass constraints so attempting to solve a "
                 msg += "non-linear system of equations"
             logger.info(msg)
-            self._log10_pressures = self._solve_fsolve(
-                constraints=constraints,
-                planet=self.planet,
-            )
+            self._log10_pressures = self._solve_fsolve(constraints=constraints)
 
         # Recompute quantities that depend on the solution, since molecule.mass is not called for
         # the linear reaction network.
@@ -588,24 +596,23 @@ class InteriorAtmosphereSystem:
 
         return self.fugacities_dict
 
-    def _solve_fsolve(self, **kwargs) -> np.ndarray:
+    def _solve_fsolve(self, constraints: list[SystemConstraint]) -> np.ndarray:
         """Solves the non-linear system of equations.
 
         Args:
-            **kwargs: Keyword argument. See `self.solve`.
+            constraints: Constraints for the system of equations.
         """
-        design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(**kwargs)
 
-        mass_constraints: list[SystemConstraint] = [
-            constraint for constraint in kwargs["constraints"] if constraint.field == "mass"
-        ]
-
-        if len(rhs) + len(mass_constraints) != self.number_molecules:
-            num: int = self.number_molecules - (len(rhs) + len(mass_constraints))
-            raise ValueError(f"Missing {num} constraint(s) to solve the system")
-
-        for constraint in mass_constraints:
-            logger.info("Adding constraint from mass balance: %s", constraint.species)
+        # TODO: Now moved into iteration. To eventually remove.
+        # design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(**kwargs)
+        # mass_constraints: list[SystemConstraint] = [
+        #    constraint for constraint in kwargs["constraints"] if constraint.field == "mass"
+        # ]
+        # if len(rhs) + len(mass_constraints) != self.number_molecules:
+        #    num: int = self.number_molecules - (len(rhs) + len(mass_constraints))
+        #    raise ValueError(f"Missing {num} constraint(s) to solve the system")
+        # for constraint in mass_constraints:
+        #    logger.info("Adding constraint from mass balance: %s", constraint.species)
 
         initial_log10_pressures: np.ndarray = np.ones_like(self.molecules, dtype="float64")
         logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
@@ -621,7 +628,7 @@ class InteriorAtmosphereSystem:
             sol, infodict, ier, mesg = fsolve(
                 self._objective_func,
                 initial_log10_pressures,
-                args=(design_matrix, rhs, mass_constraints),
+                args=(constraints),
                 full_output=True,
             )
             logger.info(mesg)
@@ -647,26 +654,30 @@ class InteriorAtmosphereSystem:
     def _objective_func(
         self,
         log10_pressures: np.ndarray,
-        design_matrix: np.ndarray,
-        rhs: np.ndarray,
-        mass_constraints: list[SystemConstraint],
+        constraints: list[SystemConstraint],
     ) -> np.ndarray:
         """Objective function for the non-linear system.
 
         Args:
             log10_pressures: Log10 of the pressures of each molecule.
-            design_matrix: The design matrix from the reaction network.
-            rhs: The RHS from the reaction network.
-            mass_constraints: Mass constraints to apply.
+            constraints: Constraints for the system of equations.
 
         Returns:
             The solution, which is the log10 of the pressures for each molecule.
         """
         self._log10_pressures = log10_pressures
 
+        design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(
+            constraints=constraints, planet=self.planet, fugacities_dict=self.fugacities_dict
+        )
+
         # Compute residual for the reaction network.
         residual_reaction: np.ndarray = design_matrix.dot(self.log10_pressures) - rhs
         logger.debug("residual_reaction = %s", residual_reaction)
+
+        mass_constraints: list[SystemConstraint] = [
+            constraint for constraint in constraints if constraint.field == "mass"
+        ]
 
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
