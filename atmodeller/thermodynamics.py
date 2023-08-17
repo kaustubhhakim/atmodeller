@@ -177,6 +177,7 @@ class Molecule:
         solubility: Solubility model.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
         elements: The elements and their (stoichiometric) counts in the molecule.
+        hill_formula: The Hill formula of the molecule.
         element_masses: The elements and their total masses in the molecule.
         molar_mass: Molar mass of the molecule.
         output: To store calculated values for output.
@@ -186,6 +187,7 @@ class Molecule:
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     elements: dict[str, int] = field(init=False)
+    hill_formula: str = field(init=False)
     element_masses: dict[str, float] = field(init=False)
     molar_mass: float = field(init=False)
 
@@ -193,6 +195,7 @@ class Molecule:
         logger.info("Creating a molecule: %s", self.name)
         masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
+        self.hill_formula = self._get_hill_formula()
         self.element_masses = {
             key: value * getattr(masses, key) for key, value in self.elements.items()
         }
@@ -215,7 +218,7 @@ class Molecule:
         Returns:
             A dictionary of the elements and their stoichiometric counts.
         """
-        element_count: dict[str, int] = {}
+        elements: dict[str, int] = {}
         current_element: str = ""
         current_count: str = ""
 
@@ -223,7 +226,7 @@ class Molecule:
             if char.isupper():
                 if current_element != "":
                     count = int(current_count) if current_count else 1
-                    element_count[current_element] = element_count.get(current_element, 0) + count
+                    elements[current_element] = elements.get(current_element, 0) + count
                     current_count = ""
                 current_element = char
             elif char.islower():
@@ -233,9 +236,33 @@ class Molecule:
 
         if current_element != "":
             count: int = int(current_count) if current_count else 1
-            element_count[current_element] = element_count.get(current_element, 0) + count
-        logger.debug("element count = \n%s", element_count)
-        return element_count
+            elements[current_element] = elements.get(current_element, 0) + count
+        logger.debug("element count = \n%s", elements)
+        return elements
+
+    def _get_hill_formula(self) -> str:
+        """Get the Hill empirical formula for this molecule.
+
+        JANAF uses the Hill empirical formula to index its data tables.
+
+        Returns:
+            The Hill empirical formula.
+        """
+        if "C" in self.elements:
+            ordered_elements = ["C"]
+            if "H" in self.elements:
+                ordered_elements.append("H")
+            ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
+        else:
+            ordered_elements = sorted(self.elements.keys())
+
+        formula_string: str = "".join(
+            [
+                element + (str(self.elements[element]) if self.elements[element] > 1 else "")
+                for element in ordered_elements
+            ]
+        )
+        return formula_string
 
     @_mass_decorator
     def mass(
