@@ -146,7 +146,7 @@ def _mass_decorator(func) -> Callable:
     """A decorator to return the mass of either the molecule or one of its elements."""
 
     @wraps(func)
-    def mass_wrapper(self: "Molecule", element: Optional[str] = None, **kwargs) -> float:
+    def mass_wrapper(self: "GasPhase", element: Optional[str] = None, **kwargs) -> float:
         """Wrapper to return the mass of either the molecule or one of its elements.
 
         Args:
@@ -166,23 +166,27 @@ def _mass_decorator(func) -> Callable:
     return mass_wrapper
 
 
-class Phase(Protocol):
+@dataclass(kw_only=True)
+class PhaseProtocol(Protocol):
     """A thermodynamic phase."""
 
-    @property
-    def phase(self) -> str:
-        ...
+    name: str
+    phase: str
 
 
 @dataclass(kw_only=True)
-class Solid(Phase):
+class SolidPhase(PhaseProtocol):
     """A solid phase."""
 
-    phase: str = "solid"
+    name: str
+    phase: str = field(init=False, default="solid")
+
+    def __post_init__(self):
+        logger.info("Creating a solid phase: %s", self.name)
 
 
 @dataclass(kw_only=True)
-class Gas(Phase):
+class GasPhase(PhaseProtocol):
     """A gas phase and its properties.
 
     Args:
@@ -215,15 +219,10 @@ class Gas(Phase):
         masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
         self.hill_formula = self._get_hill_formula()
-        # Below breaks for condensed phases.
-        try:
-            self.element_masses = {
-                key: value * getattr(masses, key) for key, value in self.elements.items()
-            }
-            self.molar_mass = sum(self.element_masses.values())
-        except AttributeError:
-            self.element_masses = {}
-            self.molar_mass = 0
+        self.element_masses = {
+            key: value * getattr(masses, key) for key, value in self.elements.items()
+        }
+        self.molar_mass = sum(self.element_masses.values())
 
     @property
     def is_diatomic(self) -> bool:
@@ -288,175 +287,8 @@ class Gas(Phase):
                 for element in ordered_elements
             ]
         )
-        return formula_string
+        logger.debug("JANAF formula string = %s", formula_string)
 
-    @_mass_decorator
-    def mass(
-        self,
-        *,
-        planet: Planet,
-        partial_pressure_bar: float,
-        atmosphere_mean_molar_mass: float,
-        fugacities_dict: dict[str, float],
-        element: Optional[str] = None,
-    ) -> float:
-        """Total mass.
-
-        Args:
-            planet: Planet properties.
-            partial_pressure_bar: Partial pressure in bar.
-            atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
-            fugacities_dict: Dictionary of all the species and their partial pressures.
-            element: Returns the mass for an element. Defaults to None to return the molecule mass.
-               This argument is used by the @_mass_decorator.
-
-        Returns:
-            Total mass of the molecule (element=None) or element (element=element).
-        """
-
-        del element
-
-        # Atmosphere.
-        mass_in_atmosphere: float = (
-            UnitConversion.bar_to_Pa(partial_pressure_bar) / planet.surface_gravity
-        )
-        mass_in_atmosphere *= planet.surface_area * self.molar_mass / atmosphere_mean_molar_mass
-        volume_mixing_ratio = partial_pressure_bar / sum(fugacities_dict.values())
-
-        # Melt.
-        prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
-        ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar,
-            planet.surface_temperature,
-            fugacities_dict,
-        )
-        mass_in_melt = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
-
-        # Solid.
-        prefactor: float = planet.mantle_mass * (1 - planet.mantle_melt_fraction)
-        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
-        mass_in_solid = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
-
-        self.output = MoleculeOutput(
-            mass_in_atmosphere=mass_in_atmosphere,
-            mass_in_solid=mass_in_solid,
-            mass_in_melt=mass_in_melt,
-            ppmw_in_solid=ppmw_in_solid,
-            ppmw_in_melt=ppmw_in_melt,
-            pressure_in_atmosphere=partial_pressure_bar,
-            volume_mixing_ratio=volume_mixing_ratio,
-        )
-
-        return self.output.mass_in_total
-
-
-@dataclass(kw_only=True)
-class Molecule:
-    """A molecule and its properties.
-
-    Args:
-        name: Chemical formula of the molecule.
-        solubility: Solubility model. Defaults to no solubility.
-        solid_melt_distribution_coefficient: Distribution coefficient. Defaults to 0.
-
-    Attributes:
-        name: Chemical formula of the molecule.
-        solubility: Solubility model.
-        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
-        elements: The elements and their (stoichiometric) counts in the molecule.
-        hill_formula: The Hill formula of the molecule.
-        element_masses: The elements and their total masses in the molecule.
-        molar_mass: Molar mass of the molecule.
-        output: To store calculated values for output.
-    """
-
-    name: str
-    solubility: Solubility = field(default_factory=NoSolubility)
-    solid_melt_distribution_coefficient: float = 0
-    elements: dict[str, int] = field(init=False)
-    hill_formula: str = field(init=False)
-    element_masses: dict[str, float] = field(init=False)
-    molar_mass: float = field(init=False)
-
-    def __post_init__(self):
-        logger.info("Creating a molecule: %s", self.name)
-        masses: MolarMasses = MolarMasses()
-        self.elements = self._count_elements()
-        self.hill_formula = self._get_hill_formula()
-        # Below breaks for condensed phases.
-        try:
-            self.element_masses = {
-                key: value * getattr(masses, key) for key, value in self.elements.items()
-            }
-            self.molar_mass = sum(self.element_masses.values())
-        except AttributeError:
-            self.element_masses = {}
-            self.molar_mass = 0
-
-    @property
-    def is_diatomic(self) -> bool:
-        """Is the molecule diatomic.
-
-        Useful for obtaining the appropriate JANAF data for the Gibbs free energy of formation.
-        """
-        if len(self.elements) == 1 and list(self.elements.values())[0] == 2:
-            return True
-        else:
-            return False
-
-    def _count_elements(self) -> dict[str, int]:
-        """Counts the number of atoms.
-
-        Returns:
-            A dictionary of the elements and their stoichiometric counts.
-        """
-        elements: dict[str, int] = {}
-        current_element: str = ""
-        current_count: str = ""
-
-        for char in self.name:
-            if char.isupper():
-                if current_element != "":
-                    count = int(current_count) if current_count else 1
-                    elements[current_element] = elements.get(current_element, 0) + count
-                    current_count = ""
-                current_element = char
-            elif char.islower():
-                current_element += char
-            elif char.isdigit():
-                current_count += char
-
-        if current_element != "":
-            count: int = int(current_count) if current_count else 1
-            elements[current_element] = elements.get(current_element, 0) + count
-        logger.debug("element count = \n%s", elements)
-        return elements
-
-    def _get_hill_formula(self) -> str:
-        """Get the Hill empirical formula for this molecule.
-
-        JANAF uses the Hill empirical formula to index its data tables.
-
-        Returns:
-            The Hill empirical formula.
-        """
-        if "C" in self.elements:
-            ordered_elements = ["C"]
-        else:
-            ordered_elements = []
-
-        if "H" in self.elements:
-            ordered_elements.append("H")
-
-        ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
-
-        formula_string: str = "".join(
-            [
-                element + (str(self.elements[element]) if self.elements[element] > 1 else "")
-                for element in ordered_elements
-            ]
-        )
-        logger.debug("Janaf formula string= %s", formula_string)
         return formula_string
 
     @_mass_decorator
@@ -628,7 +460,7 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
         """Returns a string identifying the source of the data."""
         ...
 
-    def get(self, molecule: Molecule, *, temperature: float, pressure: float) -> float:
+    def get(self, molecule: PhaseProtocol, *, temperature: float, pressure: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol.
 
         Args:
@@ -652,7 +484,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
     ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    def get(self, molecule: Molecule, *, temperature: float, pressure: float) -> float:
+    def get(self, molecule: PhaseProtocol, *, temperature: float, pressure: float) -> float:
         """See base class.
 
         In the JANAF tables, we have generally chosen the ideal diatomic gas for the reference
@@ -727,7 +559,7 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
         self.data = data
 
     def get(
-        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
+        self, molecule: PhaseProtocol, *, temperature: float, pressure: Union[float, None] = None
     ) -> float:
         """See base class."""
         try:
@@ -819,7 +651,7 @@ class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProto
     def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol):
         self.datasets.append(dataset)
 
-    def get(self, molecule: Molecule, *, temperature: float, pressure: float) -> float:
+    def get(self, molecule: PhaseProtocol, *, temperature: float, pressure: float) -> float:
         for dataset in self.datasets:
             try:
                 gibbs: float = dataset.get(molecule, temperature=temperature, pressure=pressure)

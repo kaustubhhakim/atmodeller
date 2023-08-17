@@ -47,5 +47,5 @@ from atmodeller.core import (
     MassConstraint,
     SystemConstraint,
 )
-from atmodeller.thermodynamics import Molecule, Planet
+from atmodeller.thermodynamics import GasPhase, Planet, SolidPhase
 from atmodeller.utilities import MolarMasses

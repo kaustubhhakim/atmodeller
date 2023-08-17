@@ -13,10 +13,12 @@ from scipy.optimize import fsolve
 from atmodeller import GAS_CONSTANT
 from atmodeller.thermodynamics import (
     BufferedFugacity,
+    GasPhase,
     IronWustiteBufferHirschmann,
-    Molecule,
     NoSolubility,
+    PhaseProtocol,
     Planet,
+    SolidPhase,
     Solubility,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
@@ -117,7 +119,7 @@ class ReactionNetwork:
         reaction_matrix: The reaction stoichiometry matrix.
     """
 
-    molecules: list[Molecule]
+    molecules: list[PhaseProtocol]
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
@@ -429,7 +431,7 @@ class InteriorAtmosphereSystem:
         fugacities_dict: The pressures of the molecules (bar) in a dictionary.
     """
 
-    molecules: list[Molecule]
+    molecules: list[PhaseProtocol]
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol = field(
         default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
@@ -480,7 +482,7 @@ class InteriorAtmosphereSystem:
                     logger.info("No solubility for %s", molecule.name)
                     molecule.solubility = NoSolubility()
 
-    def _molecule_sorter(self, molecule: Molecule) -> tuple[int, str]:
+    def _molecule_sorter(self, molecule: PhaseProtocol) -> tuple[int, str]:
         """Sorter for the molecules.
 
         Sorts first by molecule complexity and second by molecule name.
