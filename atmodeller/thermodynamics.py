@@ -427,12 +427,15 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
         """Returns a string identifying the source of the data."""
         ...
 
-    def get(self, molecule: Molecule, *, temperature: float) -> float:
+    def get(
+        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
+    ) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol.
 
         Args:
             molecule: A Molecule.
             temperature: Temperature.
+            pressure: Total pressure, which is relevant for condensed phases.
 
         Returns:
             The standard Gibbs free energy of formation (J/mol).
@@ -450,12 +453,16 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
     ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    def get(self, molecule: Molecule, *, temperature: float) -> float:
+    def get(
+        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
+    ) -> float:
         """See base class.
 
         In the JANAF tables, we have generally chosen the ideal diatomic gas for the reference
         state of permanent gases such as O2, N2, Cl2 etc. (quoting from the JANAF documentation).
         """
+
+        del pressure
 
         db = janaf.Janafdb()
 
@@ -503,7 +510,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
 class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
     StandardGibbsFreeEnergyOfFormationProtocol
 ):
-    """Standard Gibbs free energy of formation from Holland and Powell (1991).
+    """Standard Gibbs free energy of formation from Holland and Powell (1998).
 
     See the comments in the data file that is parsed by __init__
     """
@@ -522,7 +529,9 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
         data = data.astype(float)
         self.data = data
 
-    def get(self, molecule: Molecule, *, temperature: float) -> float:
+    def get(
+        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
+    ) -> float:
         """See base class."""
         try:
             data: pd.Series = self.data.loc[molecule.name]
@@ -537,10 +546,13 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
 
         H = data.get("Hf")  # J
         S = data.get("S")  # J/K
+        V = data.get("V")  # J/bar
         a = data.get("a")  # J/K           Coeff for calc heat capacity.
         b = data.get("b")  # J/K^2         Coeff for calc heat capacity.
         c = data.get("c")  # J K           Coeff for calc heat capacity.
         d = data.get("d")  # J K^(-1/2)    Coeff for calc heat capacity.
+        alpha0 = data.get("a0")  # K^(-1), thermal expansivity
+        K = data.get("K")  # bar, bulk modulus
 
         integral_H: float = (
             H
@@ -562,6 +574,31 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
             "Molecule = %s, standard Gibbs energy of formation = %f", molecule.name, gibbs
         )
 
+        # TODO: Is there a better way to determine if the phase is condensed or not?
+        if V:
+            logger.info("Condensed phase so including volume-pressure integral")
+            assert pressure is not None
+            # Volume at T.
+            # TODO: Why the exponential?  Seems different to the paper (check with Meng).
+            V_T = V * np.exp(
+                alpha0 * (T - 298) - 2 * 10.0 * alpha0 * (T**0.5 - 298**0.5)  # type: ignore
+            )
+            dKdp: float = 4.0  # dimensionless, derivative of bulk modulus w.r.t. pressure
+            # Derivative of bulk modulus w.r.t. temperature, from Holland and Powell (1998).
+            dKdt: float = -K * 1.5e-4  # type: ignore
+            K_T: float = K + dKdt * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore
+            integral_VP: float = (
+                V_T
+                * K_T
+                / (dKdp - 1)
+                * ((1 + dKdp * (pressure - 1.0) / K_T) ** (1.0 - 1.0 / dKdp) - 1)
+            )  # J, use P-1.0 instead of P
+        else:
+            logger.info("Ideal gas")
+            integral_VP = 0
+
+        gibbs += integral_VP
+
         return gibbs
 
 
@@ -571,6 +608,7 @@ class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProto
 
     name: str = "Combined"
     datasets: list[StandardGibbsFreeEnergyOfFormationProtocol] = field(default_factory=list)
+    STANDARD_STATE_PRESSURE: float = field(init=False, default=1)  # bar
 
     def __post_init__(self):
         if not self.datasets:
@@ -580,10 +618,12 @@ class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProto
     def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol):
         self.datasets.append(dataset)
 
-    def get(self, molecule: Molecule, *, temperature: float) -> float:
+    def get(
+        self, molecule: Molecule, *, temperature: float, pressure: Union[float, None] = None
+    ) -> float:
         for dataset in self.datasets:
             try:
-                gibbs: float = dataset.get(molecule, temperature=temperature)
+                gibbs: float = dataset.get(molecule, temperature=temperature, pressure=pressure)
                 return gibbs
             except KeyError:
                 continue
