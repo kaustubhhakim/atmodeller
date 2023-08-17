@@ -129,6 +129,9 @@ class MoleculeOutput:
     mass_in_atmosphere: float  # kg
     mass_in_solid: float  # kg
     mass_in_melt: float  # kg
+    moles_in_atmosphere: float
+    moles_in_melt: float
+    moles_in_solid: float
     ppmw_in_solid: float  # ppm by weight
     ppmw_in_melt: float  # ppm by weight
     pressure_in_atmosphere: float  # bar
@@ -269,6 +272,7 @@ class Molecule:
                 for element in ordered_elements
             ]
         )
+        logger.debug("Janaf formula string= %s", formula_string)
         return formula_string
 
     @_mass_decorator
@@ -304,6 +308,8 @@ class Molecule:
         mass_in_atmosphere *= planet.surface_area * self.molar_mass / atmosphere_mean_molar_mass
         volume_mixing_ratio = partial_pressure_bar / sum(fugacities_dict.values())
 
+        moles_in_atmosphere: float = mass_in_atmosphere / self.molar_mass
+
         # Melt.
         prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
         ppmw_in_melt: float = self.solubility(
@@ -313,15 +319,21 @@ class Molecule:
         )
         mass_in_melt = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
 
+        moles_in_melt: float = mass_in_melt / self.molar_mass
+
         # Solid.
         prefactor: float = planet.mantle_mass * (1 - planet.mantle_melt_fraction)
         ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
         mass_in_solid = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+        moles_in_solid: float = mass_in_solid / self.molar_mass
 
         self.output = MoleculeOutput(
             mass_in_atmosphere=mass_in_atmosphere,
             mass_in_solid=mass_in_solid,
             mass_in_melt=mass_in_melt,
+            moles_in_atmosphere=moles_in_atmosphere,
+            moles_in_melt=moles_in_melt,
+            moles_in_solid=moles_in_solid,
             ppmw_in_solid=ppmw_in_solid,
             ppmw_in_melt=ppmw_in_melt,
             pressure_in_atmosphere=partial_pressure_bar,
