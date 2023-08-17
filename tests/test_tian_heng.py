@@ -44,7 +44,7 @@ def test_graphite() -> None:
         GasPhase(name="CO2", solubility=NoSolubility()),
         GasPhase(name="CH4", solubility=NoSolubility()),
         GasPhase(name="O2", solubility=NoSolubility()),
-        SolidPhase(name="graphite"),
+        SolidPhase(name="C", data_name="graphite"),
     ]
 
     planet: Planet = Planet()
@@ -55,13 +55,16 @@ def test_graphite() -> None:
         molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
+    # This is comparable to the constraints imposed by Meng, i.e. an activity of C, an fO2, and a
+    # single pressure (for Meng it's the total, but for us we just impose one and solve for the
+    # others).
     constraints: list[SystemConstraint] = [
         # Note the buffer excludes pressure-dependence
         BufferedFugacityConstraint(fugacity=IronWustiteBufferBallhaus()),
-        FugacityConstraint(species="graphite", value=1),  # Activity
+        FugacityConstraint(species="C", value=1),  # Activity
         # Below are set based on the result of Tian and Heng (2023), and then we compare the
         # output of the other quantities.
-        FugacityConstraint(species="CO2", value=0.06173121847447019),
+        # FugacityConstraint(species="CO2", value=0.06173121847447019),
         FugacityConstraint(species="H2", value=44.49334998176607),
     ]
 

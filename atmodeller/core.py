@@ -587,12 +587,16 @@ class InteriorAtmosphereSystem:
         # Recompute quantities that depend on the solution, since molecule.mass is not called for
         # the linear reaction network.
         for molecule_index, molecule in enumerate(self.molecules):
-            molecule.mass(
-                planet=self.planet,
-                partial_pressure_bar=self.pressures[molecule_index],
-                atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
-                fugacities_dict=self.fugacities_dict,
-            )
+            try:
+                molecule.mass(
+                    planet=self.planet,
+                    partial_pressure_bar=self.pressures[molecule_index],
+                    atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
+                    fugacities_dict=self.fugacities_dict,
+                )
+            # TODO: Cleanup since this breaks for the solid phase
+            except AttributeError:
+                continue
 
         logger.info(pprint.pformat(self.fugacities_dict))
 
