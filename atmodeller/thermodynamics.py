@@ -250,11 +250,13 @@ class Molecule:
         """
         if "C" in self.elements:
             ordered_elements = ["C"]
-            if "H" in self.elements:
-                ordered_elements.append("H")
-            ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
         else:
-            ordered_elements = sorted(self.elements.keys())
+            ordered_elements = []
+
+        if "H" in self.elements:
+            ordered_elements.append("H")
+
+        ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
 
         formula_string: str = "".join(
             [
@@ -448,12 +450,12 @@ class StandardGibbsFreeEnergyOfFormationJANAF:
 
         if molecule.is_diatomic:
             try:
-                phase = db.getphasedata(formula=molecule.name, phase="ref")
+                phase = db.getphasedata(formula=molecule.hill_formula, phase="ref")
             except ValueError:
                 # For example, S2 (ref) does not exist in JANAF.
-                phase = db.getphasedata(formula=molecule.name, phase="g")
+                phase = db.getphasedata(formula=molecule.hill_formula, phase="g")
         else:
-            phase = db.getphasedata(formula=molecule.name, phase="g")
+            phase = db.getphasedata(formula=molecule.hill_formula, phase="g")
 
         logger.debug("Phase = %s", phase)
         gibbs: float = phase.DeltaG(temperature)
