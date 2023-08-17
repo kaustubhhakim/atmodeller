@@ -419,44 +419,77 @@ class IronWustiteBufferFischer(BufferedFugacity):
         return buffer
 
 
-class StandardGibbsFreeEnergyOfFormation(Protocol):
-    """Standard Gibbs free energy of formation."""
+class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
+    """Standard Gibbs free energy of formation protocol."""
 
-    # TODO: The Gibbs free energy of formation is determined at the prescribed temperature and
-    # standard state pressure: dG0 = dH0 - TdS0.  Pressure integral is not included.
+    @property
+    def name(self) -> str:
+        """Returns a string identifying the source of the data."""
+        ...
 
     def get(self, molecule: Molecule, *, temperature: float) -> float:
-        """Returns the standard Gibbs free energy of formation in units of J/mol"""
+        """Returns the standard Gibbs free energy of formation in units of J/mol.
+
+        Args:
+            molecule: A Molecule.
+            temperature: Temperature.
+
+        Returns:
+            The standard Gibbs free energy of formation (J/mol).
+
+        Raises:
+            KeyError: Thermodynamic data is not available for the molecule.
+        """
         ...
 
 
-class StandardGibbsFreeEnergyOfFormationJANAF:
+class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormationProtocol):
     """Standard Gibbs free energy of formation from the JANAF tables."""
 
+    name: str = "JANAF"
     ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     STANDARD_STATE_PRESSURE: float = 1  # bar
 
     def get(self, molecule: Molecule, *, temperature: float) -> float:
-        """Gets the standard Gibbs free energy of formation in J/mol.
+        """See base class.
 
         In the JANAF tables, we have generally chosen the ideal diatomic gas for the reference
         state of permanent gases such as O2, N2, Cl2 etc. (quoting from the JANAF documentation).
-
-        Returns:
-            The standard Gibbs free energy of formation.
         """
 
         db = janaf.Janafdb()
 
-        if molecule.is_diatomic:
+        def get_phase_data(phase):
             try:
-                phase = db.getphasedata(formula=molecule.hill_formula, phase="ref")
+                phase_data = db.getphasedata(formula=molecule.hill_formula, phase=phase)
             except ValueError:
-                # For example, S2 (ref) does not exist in JANAF.
-                phase = db.getphasedata(formula=molecule.hill_formula, phase="g")
-        else:
-            phase = db.getphasedata(formula=molecule.hill_formula, phase="g")
+                return None
+            return phase_data
 
+        if molecule.is_diatomic:
+            phase_data_ref = get_phase_data("ref")
+            phase_data_g = get_phase_data("g")
+            if phase_data_ref is None and phase_data_g is None:
+                msg = "Thermodynamic data for %s (%s) is not available in %s" % (
+                    molecule.name,
+                    molecule.hill_formula,
+                    self.name,
+                )
+                logger.warning(msg)
+                raise KeyError(msg)
+            phase = phase_data_ref or phase_data_g
+        else:
+            phase = get_phase_data("g")
+            if phase is None:
+                msg = "Thermodynamic data for %s (%s) is not available in %s" % (
+                    molecule.name,
+                    molecule.hill_formula,
+                    self.name,
+                )
+                logger.warning(msg)
+                raise KeyError(msg)
+
+        assert phase is not None
         logger.debug("Phase = %s", phase)
         gibbs: float = phase.DeltaG(temperature)
 
@@ -467,12 +500,15 @@ class StandardGibbsFreeEnergyOfFormationJANAF:
         return gibbs
 
 
-class StandardGibbsFreeEnergyOfFormationHolland:
-    """Standard Gibbs free energy of formation from Holland and Powell (1998).
+class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
+    StandardGibbsFreeEnergyOfFormationProtocol
+):
+    """Standard Gibbs free energy of formation from Holland and Powell (1991).
 
     See the comments in the data file that is parsed by __init__
     """
 
+    name: str = "Holland and Powell"
     ENTHALPY_REFERENCE_TEMPERATURE: float = 298  # K
 
     def __init__(self):
@@ -487,20 +523,17 @@ class StandardGibbsFreeEnergyOfFormationHolland:
         self.data = data
 
     def get(self, molecule: Molecule, *, temperature: float) -> float:
-        """Gets the standard Gibbs free energy of formation in J/mol
-
-        Args:
-            molecule: Molecule.
-            temperature: Temperature.
-
-        Returns:
-            The standard Gibbs free energy of formation.
-        """
+        """See base class."""
         try:
             data: pd.Series = self.data.loc[molecule.name]
-        except KeyError:
-            logger.error("Thermodynamic data not available for %s", molecule.name)
-            raise
+        except KeyError as exc:
+            msg: str = "Thermodynamic data for %s (%s) is not available in %s" % (
+                molecule.name,
+                molecule.hill_formula,
+                self.name,
+            )
+            logger.error(msg)
+            raise KeyError from exc
 
         H = data.get("Hf")  # J
         S = data.get("S")  # J/K
@@ -530,6 +563,37 @@ class StandardGibbsFreeEnergyOfFormationHolland:
         )
 
         return gibbs
+
+
+@dataclass
+class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProtocol):
+    """Combined thermodynamic data that uses multiple datasets."""
+
+    name: str = "Combined"
+    datasets: list[StandardGibbsFreeEnergyOfFormationProtocol] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.datasets:
+            self.add_dataset(StandardGibbsFreeEnergyOfFormationHollandAndPowell())
+            self.add_dataset(StandardGibbsFreeEnergyOfFormationJANAF())
+
+    def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol):
+        self.datasets.append(dataset)
+
+    def get(self, molecule: Molecule, *, temperature: float) -> float:
+        for dataset in self.datasets:
+            try:
+                gibbs: float = dataset.get(molecule, temperature=temperature)
+                return gibbs
+            except KeyError:
+                continue
+
+        msg: str = "Thermodynamic data for %s (%s) is not available in any dataset" % (
+            molecule.name,
+            molecule.hill_formula,
+        )
+        logger.error(msg)
+        raise KeyError(msg)
 
 
 # region Andesite solubility

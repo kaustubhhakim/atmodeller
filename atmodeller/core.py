@@ -18,8 +18,8 @@ from atmodeller.thermodynamics import (
     NoSolubility,
     Planet,
     Solubility,
-    StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationJANAF,
+    StandardGibbsFreeEnergyOfFormationProtocol,
     composition_solubilities,
 )
 
@@ -118,7 +118,7 @@ class ReactionNetwork:
     """
 
     molecules: list[Molecule]
-    gibbs_data: StandardGibbsFreeEnergyOfFormation
+    gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
         self.molecule_names: list[str] = [molecule.name for molecule in self.molecules]
@@ -419,7 +419,7 @@ class InteriorAtmosphereSystem:
     """
 
     molecules: list[Molecule]
-    gibbs_data: StandardGibbsFreeEnergyOfFormation = field(
+    gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol = field(
         default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
     planet: Planet = field(default_factory=Planet)

@@ -23,8 +23,8 @@ from atmodeller.thermodynamics import (
     BasaltLibourelN2,
     NoSolubility,
     PeridotiteH2O,
-    StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationJANAF,
+    StandardGibbsFreeEnergyOfFormationProtocol,
 )
 from atmodeller.utilities import MolarMasses
 
@@ -32,7 +32,7 @@ from atmodeller.utilities import MolarMasses
 rtol: float = 1.0e-4
 atol: float = 1.0e-4
 
-standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormation = (
+standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
     StandardGibbsFreeEnergyOfFormationJANAF()
 )
 
