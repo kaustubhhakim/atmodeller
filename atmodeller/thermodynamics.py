@@ -200,6 +200,7 @@ class ChemicalComponent(ABC):
             self.common_name,
             self.chemical_formula,
         )
+        # TODO: Choose a library with all the molar masses?
         masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
         self.hill_formula = self._hill_formula()

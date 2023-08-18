@@ -886,6 +886,21 @@ files = [
 ]
 
 [[package]]
+name = "molmass"
+version = "2023.4.10"
+description = "Molecular mass calculations"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "molmass-2023.4.10-py3-none-any.whl", hash = "sha256:90b5a57e62f9ddb4dba070e85f3778ac8e6e45473d9ec8df6e3e887e01c9f4fc"},
+    {file = "molmass-2023.4.10.tar.gz", hash = "sha256:f885a4d6446eab3319fb6afe1772a988d541f2d4c1bac8399086f30cba93147e"},
+]
+
+[package.extras]
+all = ["Flask", "pandas"]
+gui = ["wxPython (>=4.0)"]
+
+[[package]]
 name = "nbclassic"
 version = "1.0.0"
 description = "Jupyter Notebook as a Jupyter Server extension."
@@ -2011,4 +2026,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10, <3.12"
-content-hash = "9d816f4f36c14340ae5f3c4b0a532d13486d1909d0223b80ebbd330d5b013bac"
+content-hash = "754e2379d0892a41c0c78217e780d8f89e4a5f33bc025dac6e9236efa1066d07"
