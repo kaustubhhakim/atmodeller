@@ -11,12 +11,12 @@ from atmodeller.core import (
     SystemConstraint,
 )
 from atmodeller.thermodynamics import (
-    GasPhase,
+    ChemicalComponent,
+    GasSpecies,
     IronWustiteBufferBallhaus,
     NoSolubility,
-    Phase,
     Planet,
-    SolidPhase,
+    SolidSpecies,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
@@ -37,14 +37,14 @@ def test_version():
 def test_graphite() -> None:
     """Tests including graphite."""
 
-    molecules: list[Phase] = [
-        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
-        GasPhase(chemical_formula="H2O", solubility=NoSolubility()),
-        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
-        GasPhase(chemical_formula="CO2", solubility=NoSolubility()),
-        GasPhase(chemical_formula="CH4", solubility=NoSolubility()),
-        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
-        SolidPhase(chemical_formula="C", common_name="graphite"),
+    molecules: list[ChemicalComponent] = [
+        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="CO2", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        SolidSpecies(chemical_formula="C", common_name="graphite"),
     ]
 
     planet: Planet = Planet()

@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Optional, Protocol, Union
+from typing import Callable, ClassVar, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
@@ -88,7 +88,7 @@ class Solubility(ABC):
         Args:
             fugacity: Fugacity of the species.
             temperature: Temperature.
-            fugacities_dict: Fugacities of all other species in the system.
+            fugacities_dict: Fugacities of all species in the system.
 
         Returns:
             ppmw of the species in the melt.
@@ -123,8 +123,8 @@ class NoSolubility(Solubility):
 
 
 @dataclass(kw_only=True)
-class MoleculeOutput:
-    """Output for a solution."""
+class GasSpeciesOutput:
+    """Output for a gas species."""
 
     mass_in_atmosphere: float  # kg
     mass_in_solid: float  # kg
@@ -146,7 +146,7 @@ def _mass_decorator(func) -> Callable:
     """A decorator to return the mass of either the molecule or one of its elements."""
 
     @wraps(func)
-    def mass_wrapper(self: "GasPhase", element: Optional[str] = None, **kwargs) -> float:
+    def mass_wrapper(self: "GasSpecies", element: Optional[str] = None, **kwargs) -> float:
         """Wrapper to return the mass of either the molecule or one of its elements.
 
         Args:
@@ -167,8 +167,8 @@ def _mass_decorator(func) -> Callable:
 
 
 @dataclass(kw_only=True)
-class Phase(ABC):
-    """A thermodynamic phase and its properties.
+class ChemicalComponent(ABC):
+    """A chemical component and its properties.
 
     Args:
         chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
@@ -189,6 +189,7 @@ class Phase(ABC):
     element_masses: dict[str, float] = field(init=False)
     hill_formula: str = field(init=False)
     molar_mass: float = field(init=False)
+    # TODO: common for activity or fugacity?
     # TODO: Add a common activity?  Which would be an activity model for a solid and a fugacity
     # (single gas) model for a gas?  Both accepting arguments of T, P (total)?
 
@@ -201,7 +202,7 @@ class Phase(ABC):
         )
         masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
-        self.hill_formula = self._get_hill_formula()
+        self.hill_formula = self._hill_formula()
         self.element_masses = {
             key: value * getattr(masses, key) for key, value in self.elements.items()
         }
@@ -212,7 +213,7 @@ class Phase(ABC):
     def phase(self) -> str:
         ...
 
-    def _get_hill_formula(self) -> str:
+    def _hill_formula(self) -> str:
         """Get the Hill empirical formula.
 
         JANAF uses the Hill empirical formula to index its data tables.
@@ -236,7 +237,7 @@ class Phase(ABC):
                 for element in ordered_elements
             ]
         )
-        logger.debug("JANAF formula string = %s", formula_string)
+        logger.debug("Hill formula string (required for JANAF) = %s", formula_string)
 
         return formula_string
 
@@ -270,18 +271,23 @@ class Phase(ABC):
 
 
 @dataclass(kw_only=True)
-class SolidPhase(Phase):
-    """A solid phase and its properties."""
+class SolidSpecies(ChemicalComponent):
+    """A solid species."""
 
-    phase: str = field(init=False, default="solid")  # By definition.
+    @property
+    def phase(self) -> str:
+        return "solid"
+
+    # TODO: Option to specify an activity function.  Where activity is actually mole fraction*gamma
+    # where gamma is activity coefficient.
 
     # TODO: Automatically flag a constraint for unity activity when solving the system?
     # or some message to the logger?
 
 
 @dataclass(kw_only=True)
-class GasPhase(Phase):
-    """A gas phase and its properties.
+class GasSpecies(ChemicalComponent):
+    """A gas species.
 
     Args:
         chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
@@ -295,22 +301,29 @@ class GasPhase(Phase):
         element_masses: The elements and their total masses.
         hill_formula: The Hill formula.
         molar_mass: Molar mass.
+        solubility: Solubility model.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
         output: To store calculated values for output.
     """
 
+    common_name: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
-    phase: str = field(init=False, default="gas")  # By definition.
-    common_name: str = field(init=False)
+
+    # TODO: specify fugacity coefficient model (P, T)
+    # then need to multiply this by the partial pressure to get the fugacity for this species.
 
     def __post_init__(self):
         self.common_name = self.chemical_formula
         super().__post_init__()
 
     @property
+    def phase(self) -> str:
+        return "gas"
+
+    @property
     def is_diatomic(self) -> bool:
-        """Is the molecule diatomic.
+        """Returns if the molecule is diatomic (True) or not (False).
 
         Useful for obtaining the appropriate JANAF data for the Gibbs free energy of formation.
         """
@@ -371,7 +384,7 @@ class GasPhase(Phase):
         mass_in_solid = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
         moles_in_solid: float = mass_in_solid / self.molar_mass
 
-        self.output = MoleculeOutput(
+        self.output = GasSpeciesOutput(
             mass_in_atmosphere=mass_in_atmosphere,
             mass_in_solid=mass_in_solid,
             mass_in_melt=mass_in_melt,
@@ -407,16 +420,19 @@ class BufferedFugacity(ABC):
 
         Args:
             temperature: Temperature.
-            fugacity_log10_shift: Log10 shift.
+            fugacity_log10_shift: Log10 shift. Defaults to 0.
 
         Returns:
-            Log10 of the fugacity including a shift.
+            Log10 of the fugacity including the shift.
         """
         return self._fugacity(temperature=temperature) + fugacity_log10_shift
 
 
 class IronWustiteBufferHirschmann(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from O'Neill and Pownceby (1993) and Hirschmann et al. (2008)."""
+    """Iron-wustite buffer (fO2) from O'Neill and Pownceby (1993) and Hirschmann et al. (2008).
+
+    https://ui.adsabs.harvard.edu/abs/1993CoMP..114..296O/abstract
+    """
 
     def _fugacity(self, *, temperature: float) -> float:
         """See base class."""
@@ -468,7 +484,8 @@ class IronWustiteBufferBallhaus(BufferedFugacity):
 
 
 class IronWustiteBufferFischer(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from Fischer et al. (2011). See Table S2 in supplementary materials.
+    """Iron-wustite buffer (fO2) from Fischer et al. (2011). See Table S2 in supplementary
+    materials.
 
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
     """
@@ -483,16 +500,28 @@ class IronWustiteBufferFischer(BufferedFugacity):
 class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
     """Standard Gibbs free energy of formation protocol."""
 
-    @property
-    def name(self) -> str:
-        """Returns a string identifying the source of the data."""
-        ...
+    _DATA_SOURCE: str
+    _ENTHALPY_REFERENCE_TEMPERATURE: float  # K
+    _STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    def get(self, molecule: Phase, *, temperature: float, pressure: float) -> float:
+    @property
+    def DATA_SOURCE(self) -> str:
+        """Returns a string identifying the source of the data."""
+        return self._DATA_SOURCE
+
+    @property
+    def ENTHALPY_REFERENCE_TEMPERATURE(self) -> float:
+        return self._ENTHALPY_REFERENCE_TEMPERATURE
+
+    @property
+    def STANDARD_STATE_PRESSURE(self) -> float:
+        return self._STANDARD_STATE_PRESSURE
+
+    def get(self, species: ChemicalComponent, *, temperature: float, pressure: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol.
 
         Args:
-            molecule: A Molecule.
+            species: A species.
             temperature: Temperature.
             pressure: Pressure (total) is relevant for condensed phases, but not for ideal gases.
 
@@ -500,7 +529,7 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
             The standard Gibbs free energy of formation (J/mol).
 
         Raises:
-            KeyError: Thermodynamic data is not available for the molecule.
+            KeyError: Thermodynamic data is not available for the species.
         """
         ...
 
@@ -508,11 +537,11 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
 class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormationProtocol):
     """Standard Gibbs free energy of formation from the JANAF tables."""
 
-    name: str = "JANAF"
-    ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
-    STANDARD_STATE_PRESSURE: float = 1  # bar
+    _DATA_SOURCE: str = "JANAF"
+    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
+    _STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    def get(self, molecule: Phase, *, temperature: float, pressure: float) -> float:
+    def get(self, species: ChemicalComponent, *, temperature: float, pressure: float) -> float:
         """See base class.
 
         In the JANAF tables, we have generally chosen the ideal diatomic gas for the reference
@@ -525,20 +554,20 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
 
         def get_phase_data(phase):
             try:
-                phase_data = db.getphasedata(formula=molecule.hill_formula, phase=phase)
+                phase_data = db.getphasedata(formula=species.hill_formula, phase=phase)
             except ValueError:
                 return None
             return phase_data
 
-        if molecule.phase == "gas":
-            if molecule.is_diatomic:
+        if species.phase == "gas":
+            if species.is_diatomic:
                 phase_data_ref = get_phase_data("ref")
                 phase_data_g = get_phase_data("g")
                 if phase_data_ref is None and phase_data_g is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
-                        molecule.common_name,
-                        molecule.hill_formula,
-                        self.name,
+                        species.common_name,
+                        species.hill_formula,
+                        self.DATA_SOURCE,
                     )
                     logger.warning(msg)
                     raise KeyError(msg)
@@ -547,21 +576,21 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
                 phase = get_phase_data("g")
                 if phase is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
-                        molecule.common_name,
-                        molecule.hill_formula,
-                        self.name,
+                        species.common_name,
+                        species.hill_formula,
+                        self.DATA_SOURCE,
                     )
                     logger.warning(msg)
                     raise KeyError(msg)
-        else:  # if molecule.phase == "solid":
+        else:  # if species.phase == "solid":
             phase = get_phase_data("ref")
 
         assert phase is not None
-        logger.debug("Phase = %s", phase)
+        logger.debug("ChemicalComponent = %s", phase)
         gibbs: float = phase.DeltaG(temperature)
 
         logger.debug(
-            "Molecule = %s, standard Gibbs energy of formation = %f", molecule.common_name, gibbs
+            "Species = %s, standard Gibbs energy of formation = %f", species.common_name, gibbs
         )
 
         return gibbs
@@ -575,8 +604,9 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
     See the comments in the data file that is parsed by __init__
     """
 
-    name: str = "Holland and Powell"
-    ENTHALPY_REFERENCE_TEMPERATURE: float = 298  # K
+    _DATA_SOURCE: str = "Holland and Powell"
+    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298  # K
+    _STANDARD_STATE_PRESSURE: float = 1  # bar
 
     def __init__(self):
         data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
@@ -590,16 +620,20 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
         self.data = data
 
     def get(
-        self, molecule: Phase, *, temperature: float, pressure: Union[float, None] = None
+        self,
+        species: ChemicalComponent,
+        *,
+        temperature: float,
+        pressure: Union[float, None] = None,
     ) -> float:
         """See base class."""
         try:
-            data: pd.Series = self.data.loc[molecule.common_name]
+            data: pd.Series = self.data.loc[species.common_name]
         except KeyError as exc:
             msg: str = "Thermodynamic data for %s (%s) is not available in %s" % (
-                molecule.common_name,
-                molecule.hill_formula,
-                self.name,
+                species.common_name,
+                species.hill_formula,
+                self.DATA_SOURCE,
             )
             logger.error(msg)
             raise KeyError from exc
@@ -631,12 +665,12 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
 
         gibbs: float = integral_H - temperature * integral_S
         logger.debug(
-            "Phase = %s, standard Gibbs energy of formation = %f", molecule.common_name, gibbs
+            "Species = %s, standard Gibbs energy of formation = %f", species.common_name, gibbs
         )
 
         # TODO: Is there a better way to determine if the phase is condensed or not?
         if V:
-            logger.info("Condensed phase so including volume-pressure integral")
+            logger.info("Condensed species so including volume-pressure integral")
             assert pressure is not None
             # Volume at T.
             # TODO: Why the exponential?  Seems different to the paper (check with Meng).
@@ -661,38 +695,51 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
             logger.info("Ideal gas")
             integral_VP = 0
 
+        # TODO: maybe test magnitude of integral_VP to still allow linear solve.
         gibbs += integral_VP
 
         return gibbs
 
 
-@dataclass
 class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProtocol):
-    """Combined thermodynamic data that uses multiple datasets."""
+    """Combined thermodynamic data that uses multiple datasets.
 
-    name: str = "Combined"
-    datasets: list[StandardGibbsFreeEnergyOfFormationProtocol] = field(default_factory=list)
-    STANDARD_STATE_PRESSURE: float = field(init=False, default=1)  # bar
+    Args:
+        datasets: A list of thermodynamic data to use.
+    """
 
-    def __post_init__(self):
-        if not self.datasets:
+    _DATA_SOURCE: str = "Combined"
+    _STANDARD_STATE_PRESSURE: float = 1  # bar
+    # TODO: Check: Taking JANAF temperature.  Same for Holland and Powell (1998)?
+    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
+
+    def __init__(
+        self, datasets: Union[list[StandardGibbsFreeEnergyOfFormationProtocol], None] = None
+    ):
+        if datasets is None:
+            self.datasets: list[StandardGibbsFreeEnergyOfFormationProtocol] = []
             self.add_dataset(StandardGibbsFreeEnergyOfFormationHollandAndPowell())
             self.add_dataset(StandardGibbsFreeEnergyOfFormationJANAF())
+        else:
+            self.datasets = datasets
 
-    def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol):
+    def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol) -> None:
+        if len(self.datasets) >= 1:
+            logger.warning("Combining different thermodynamic data may result in consistencies")
+        logger.info("Adding thermodynamic data: %s", dataset.DATA_SOURCE)
         self.datasets.append(dataset)
 
-    def get(self, molecule: Phase, *, temperature: float, pressure: float) -> float:
+    def get(self, species: ChemicalComponent, *, temperature: float, pressure: float) -> float:
         for dataset in self.datasets:
             try:
-                gibbs: float = dataset.get(molecule, temperature=temperature, pressure=pressure)
+                gibbs: float = dataset.get(species, temperature=temperature, pressure=pressure)
                 return gibbs
             except KeyError:
                 continue
 
         msg: str = "Thermodynamic data for %s (%s) is not available in any dataset" % (
-            molecule.common_name,
-            molecule.hill_formula,
+            species.common_name,
+            species.hill_formula,
         )
         logger.error(msg)
         raise KeyError(msg)

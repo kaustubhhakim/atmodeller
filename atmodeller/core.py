@@ -13,9 +13,9 @@ from scipy.optimize import fsolve
 from atmodeller import GAS_CONSTANT
 from atmodeller.thermodynamics import (
     BufferedFugacity,
+    ChemicalComponent,
     IronWustiteBufferHirschmann,
     NoSolubility,
-    Phase,
     Planet,
     Solubility,
     StandardGibbsFreeEnergyOfFormationJANAF,
@@ -117,7 +117,7 @@ class ReactionNetwork:
         reaction_matrix: The reaction stoichiometry matrix.
     """
 
-    molecules: list[Phase]
+    molecules: list[ChemicalComponent]
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
@@ -429,7 +429,7 @@ class InteriorAtmosphereSystem:
         fugacities_dict: The pressures of the molecules (bar) in a dictionary.
     """
 
-    molecules: list[Phase]
+    molecules: list[ChemicalComponent]
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol = field(
         default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
@@ -480,7 +480,7 @@ class InteriorAtmosphereSystem:
                     logger.info("No solubility for %s", molecule.chemical_formula)
                     molecule.solubility = NoSolubility()
 
-    def _molecule_sorter(self, molecule: Phase) -> tuple[int, str]:
+    def _molecule_sorter(self, molecule: ChemicalComponent) -> tuple[int, str]:
         """Sorter for the molecules.
 
         Sorts first by molecule complexity and second by molecule name.
@@ -533,7 +533,7 @@ class InteriorAtmosphereSystem:
         output_dict["total_pressure_in_atmosphere"] = self.atmospheric_total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
         for molecule in self.molecules:
-            output_dict[molecule.chemical_name] = molecule.output
+            output_dict[molecule.chemical_formula] = molecule.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
 

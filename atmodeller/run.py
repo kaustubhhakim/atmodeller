@@ -17,10 +17,10 @@ from atmodeller.core import (
 from atmodeller.thermodynamics import (
     BasaltDixonCO2,
     BasaltLibourelN2,
-    GasPhase,
+    ChemicalComponent,
+    GasSpecies,
     NoSolubility,
     PeridotiteH2O,
-    Phase,
 )
 from atmodeller.utilities import MolarMasses
 
@@ -69,13 +69,13 @@ def main():
 
     args = parser.parse_args()
 
-    molecules: list[Phase] = [
-        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
-        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
-        GasPhase(chemical_formula="CO2", solubility=BasaltDixonCO2()),
-        GasPhase(chemical_formula="CH4", solubility=NoSolubility()),
-        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
+    molecules: list[ChemicalComponent] = [
+        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
+        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     planet: Planet = Planet()
@@ -90,7 +90,7 @@ def main():
 
     # Include nitrogen if desired.
     if args.nitrogen != 0:
-        molecules.append(GasPhase(chemical_formula="N2", solubility=BasaltLibourelN2()))
+        molecules.append(GasSpecies(chemical_formula="N2", solubility=BasaltLibourelN2()))
         n_kg: float = args.nitrogen * 1.0e-6 * planet.mantle_mass
         constraints.append(MassConstraint(species="N", value=n_kg))
 
