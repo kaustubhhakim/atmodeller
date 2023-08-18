@@ -51,9 +51,9 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -79,9 +79,9 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     """Tests H2-H2O at the IW buffer+2."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -107,9 +107,9 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -140,9 +140,9 @@ def test_hydrogen_species_five_oceans() -> None:
     """Tests H2-H2O for five H oceans."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 5
@@ -169,9 +169,9 @@ def test_hydrogen_species_ten_oceans() -> None:
     """Tests H2-H2O for ten H oceans."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 10
@@ -202,9 +202,9 @@ def test_hydrogen_species_temperature() -> None:
     """Tests H2-H2O at a different temperature."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -236,11 +236,11 @@ def test_hydrogen_and_carbon_species() -> None:
     """Tests H2-H2O and CO-CO2."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
     ]
 
     oceans: float = 1
@@ -271,11 +271,11 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     """Tests H2-H2O and CO-CO2 for C/H=5."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
     ]
 
     oceans: float = 1
@@ -306,11 +306,11 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     """Tests H2-H2O and CO-CO2 for C/H=10."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
     ]
 
     oceans: float = 1
@@ -346,12 +346,12 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
     """Tests H2-H2O and CO-CO2 and N."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="CH4", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="CH4", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -396,12 +396,12 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     """Tests H2-H2O and CO-CO2 and N."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="N2", solubility=BasaltLibourelN2()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="N2", solubility=BasaltLibourelN2()),
     ]
 
     oceans: float = 1
@@ -442,12 +442,12 @@ def test_hydrogen_and_carbon_species_with_NH3() -> None:
     """Tests H2-H2O and CO-CO2 and NH3."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="NH3", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="NH3", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -493,13 +493,13 @@ def test_hydrogen_and_carbon_species_with_SO2() -> None:
     """Tests H2-H2O and CO-CO2 and S-SO2."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="S", solubility=NoSolubility()),
-        Molecule(name="SO2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="S", solubility=NoSolubility()),
+        Molecule(chemical_formula="SO2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -541,13 +541,13 @@ def test_hydrogen_and_carbon_species_with_H2S() -> None:
     """Tests H2-H2O and CO-CO2 and S-H2S."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="S", solubility=NoSolubility()),
-        Molecule(name="H2S", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="S", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2S", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -589,13 +589,13 @@ def test_hydrogen_and_carbon_species_with_SO_H2S() -> None:
     """Tests H2-H2O and CO-CO2 and SO-H2S."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="SO", solubility=NoSolubility()),
-        Molecule(name="H2S", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="SO", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2S", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -642,13 +642,13 @@ def test_hydrogen_and_carbon_species_with_HCl() -> None:
     """Tests H2-H2O and CO-CO2 and HCl-Cl."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="Cl", solubility=NoSolubility()),
-        Molecule(name="HCl", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="Cl", solubility=NoSolubility()),
+        Molecule(chemical_formula="HCl", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -690,13 +690,13 @@ def test_hydrogen_and_carbon_species_with_Cl2() -> None:
     """Tests H2-H2O and CO-CO2 and Cl-Cl2."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="Cl", solubility=NoSolubility()),
-        Molecule(name="Cl2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="Cl", solubility=NoSolubility()),
+        Molecule(chemical_formula="Cl2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -743,13 +743,13 @@ def test_hydrogen_and_carbon_species_with_HF() -> None:
     """Tests H2-H2O and CO-CO2 and HF-F."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="F", solubility=NoSolubility()),
-        Molecule(name="HF", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="F", solubility=NoSolubility()),
+        Molecule(chemical_formula="HF", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -791,13 +791,13 @@ def test_hydrogen_and_carbon_species_with_F2() -> None:
     """Tests H2-H2O and CO-CO2 and F2-F."""
 
     molecules: list[Molecule] = [
-        Molecule(name="H2O", solubility=PeridotiteH2O()),
-        Molecule(name="H2", solubility=NoSolubility()),
-        Molecule(name="O2", solubility=NoSolubility()),
-        Molecule(name="CO", solubility=NoSolubility()),
-        Molecule(name="CO2", solubility=BasaltDixonCO2()),
-        Molecule(name="F", solubility=NoSolubility()),
-        Molecule(name="F2", solubility=NoSolubility()),
+        Molecule(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        Molecule(chemical_formula="H2", solubility=NoSolubility()),
+        Molecule(chemical_formula="O2", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO", solubility=NoSolubility()),
+        Molecule(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        Molecule(chemical_formula="F", solubility=NoSolubility()),
+        Molecule(chemical_formula="F2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1

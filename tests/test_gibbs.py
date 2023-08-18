@@ -23,7 +23,7 @@ from atmodeller.thermodynamics import (
     BasaltLibourelN2,
     NoSolubility,
     PeridotiteH2O,
-    PhaseProtocol,
+    Phase,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
@@ -49,10 +49,10 @@ def test_version():
 def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -77,10 +77,10 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     """Tests H2-H2O at the IW buffer+2."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -105,10 +105,10 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
 def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -138,10 +138,10 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
 def test_hydrogen_species_five_oceans() -> None:
     """Tests H2-H2O for five H oceans."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 5
@@ -167,10 +167,10 @@ def test_hydrogen_species_five_oceans() -> None:
 def test_hydrogen_species_ten_oceans() -> None:
     """Tests H2-H2O for ten H oceans."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 10
@@ -200,10 +200,10 @@ def test_hydrogen_species_ten_oceans() -> None:
 def test_hydrogen_species_temperature() -> None:
     """Tests H2-H2O at a different temperature."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -234,12 +234,12 @@ def test_hydrogen_species_temperature() -> None:
 def test_hydrogen_and_carbon_species() -> None:
     """Tests H2-H2O and CO-CO2."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
-        GasPhase(name="CO", solubility=NoSolubility()),
-        GasPhase(name="CO2", solubility=BasaltDixonCO2()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO2", solubility=BasaltDixonCO2()),
     ]
 
     oceans: float = 1
@@ -269,12 +269,12 @@ def test_hydrogen_and_carbon_species() -> None:
 def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     """Tests H2-H2O and CO-CO2 for C/H=5."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
-        GasPhase(name="CO", solubility=NoSolubility()),
-        GasPhase(name="CO2", solubility=BasaltDixonCO2()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO2", solubility=BasaltDixonCO2()),
     ]
 
     oceans: float = 1
@@ -304,12 +304,12 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
 def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     """Tests H2-H2O and CO-CO2 for C/H=10."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
-        GasPhase(name="CO", solubility=NoSolubility()),
-        GasPhase(name="CO2", solubility=BasaltDixonCO2()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO2", solubility=BasaltDixonCO2()),
     ]
 
     oceans: float = 1
@@ -344,13 +344,13 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
 def test_hydrogen_and_carbon_species_with_methane() -> None:
     """Tests H2-H2O and CO-CO2 and N."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
-        GasPhase(name="CO", solubility=NoSolubility()),
-        GasPhase(name="CO2", solubility=BasaltDixonCO2()),
-        GasPhase(name="CH4", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        GasPhase(chemical_formula="CH4", solubility=NoSolubility()),
     ]
 
     oceans: float = 1
@@ -394,13 +394,13 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
 def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     """Tests H2-H2O and CO-CO2 and N."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
-        GasPhase(name="CO", solubility=NoSolubility()),
-        GasPhase(name="CO2", solubility=BasaltDixonCO2()),
-        GasPhase(name="N2", solubility=BasaltLibourelN2()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        GasPhase(chemical_formula="N2", solubility=BasaltLibourelN2()),
     ]
 
     oceans: float = 1
@@ -440,13 +440,13 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
 def test_hydrogen_and_carbon_species_with_NH3() -> None:
     """Tests H2-H2O and CO-CO2 and NH3."""
 
-    molecules: list[PhaseProtocol] = [
-        GasPhase(name="H2O", solubility=PeridotiteH2O()),
-        GasPhase(name="H2", solubility=NoSolubility()),
-        GasPhase(name="O2", solubility=NoSolubility()),
-        GasPhase(name="CO", solubility=NoSolubility()),
-        GasPhase(name="CO2", solubility=BasaltDixonCO2()),
-        GasPhase(name="NH3", solubility=NoSolubility()),
+    molecules: list[Phase] = [
+        GasPhase(chemical_formula="H2O", solubility=PeridotiteH2O()),
+        GasPhase(chemical_formula="H2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="O2", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO", solubility=NoSolubility()),
+        GasPhase(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        GasPhase(chemical_formula="NH3", solubility=NoSolubility()),
     ]
 
     oceans: float = 1

@@ -13,12 +13,10 @@ from scipy.optimize import fsolve
 from atmodeller import GAS_CONSTANT
 from atmodeller.thermodynamics import (
     BufferedFugacity,
-    GasPhase,
     IronWustiteBufferHirschmann,
     NoSolubility,
-    PhaseProtocol,
+    Phase,
     Planet,
-    SolidPhase,
     Solubility,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
@@ -119,11 +117,11 @@ class ReactionNetwork:
         reaction_matrix: The reaction stoichiometry matrix.
     """
 
-    molecules: list[PhaseProtocol]
+    molecules: list[Phase]
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
-        self.molecule_names: list[str] = [molecule.name for molecule in self.molecules]
+        self.molecule_names: list[str] = [molecule.chemical_formula for molecule in self.molecules]
         logger.info("Molecules = %s", self.molecule_names)
         self.number_molecules: int = len(self.molecules)
         self.elements, self.number_elements = self.find_elements()
@@ -224,9 +222,9 @@ class ReactionNetwork:
                 coeff: float = self.reaction_matrix[reaction_index, molecule_index]
                 if coeff != 0:
                     if coeff < 0:
-                        reactants += f"{abs(coeff)} {molecule.name} + "
+                        reactants += f"{abs(coeff)} {molecule.chemical_formula} + "
                     else:
-                        products += f"{coeff} {molecule.name} + "
+                        products += f"{coeff} {molecule.chemical_formula} + "
 
             reactants = reactants.rstrip(" + ")  # Removes the extra + at the end.
             products = products.rstrip(" + ")  # Removes the extra + at the end.
@@ -431,7 +429,7 @@ class InteriorAtmosphereSystem:
         fugacities_dict: The pressures of the molecules (bar) in a dictionary.
     """
 
-    molecules: list[PhaseProtocol]
+    molecules: list[Phase]
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol = field(
         default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
@@ -445,7 +443,7 @@ class InteriorAtmosphereSystem:
         logger.info("Creating a new interior-atmosphere system")
         self.molecules.sort(key=self._molecule_sorter)
         self.number_molecules: int = len(self.molecules)
-        self.molecule_names: list[str] = [molecule.name for molecule in self.molecules]
+        self.molecule_names: list[str] = [molecule.chemical_formula for molecule in self.molecules]
         logger.info("Molecules = %s", self.molecule_names)
         self._conform_solubilities_to_composition()
         self._log10_pressures = np.zeros_like(self.molecules, dtype="float64")
@@ -472,17 +470,17 @@ class InteriorAtmosphereSystem:
 
             for molecule in self.molecules:
                 try:
-                    molecule.solubility = solubilities[molecule.name]
+                    molecule.solubility = solubilities[molecule.chemical_formula]
                     logger.info(
                         "Found Solubility for %s: %s",
-                        molecule.name,
+                        molecule.chemical_formula,
                         molecule.solubility.__class__.__name__,
                     )
                 except KeyError:
-                    logger.info("No solubility for %s", molecule.name)
+                    logger.info("No solubility for %s", molecule.chemical_formula)
                     molecule.solubility = NoSolubility()
 
-    def _molecule_sorter(self, molecule: PhaseProtocol) -> tuple[int, str]:
+    def _molecule_sorter(self, molecule: Phase) -> tuple[int, str]:
         """Sorter for the molecules.
 
         Sorts first by molecule complexity and second by molecule name.
@@ -493,7 +491,7 @@ class InteriorAtmosphereSystem:
         Returns:
             A tuple to sort first by number of elements and second by molecule name.
         """
-        return (sum(molecule.elements.values()), molecule.name)
+        return (sum(molecule.elements.values()), molecule.chemical_formula)
 
     @property
     def pressures(self) -> np.ndarray:
@@ -535,7 +533,7 @@ class InteriorAtmosphereSystem:
         output_dict["total_pressure_in_atmosphere"] = self.atmospheric_total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
         for molecule in self.molecules:
-            output_dict[molecule.name] = molecule.output
+            output_dict[molecule.chemical_name] = molecule.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
 

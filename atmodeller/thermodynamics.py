@@ -167,35 +167,38 @@ def _mass_decorator(func) -> Callable:
 
 
 @dataclass(kw_only=True)
-class PhaseProtocol(Protocol):
-    """A thermodynamic phase."""
+class Phase(ABC):
+    """A thermodynamic phase and its properties.
 
-    # TODO: Clean up. Data name is required because otherwise we don't know the relationship
-    # between the chemical formula (required for the reaction network) and the common name
-    # (required for the thermodynamic data).
-    name: str
-    data_name: str
-    phase: str
-    hill_formula: str
+    Args:
+        chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
+        common_name: Common name for locating Gibbs data in the thermodynamic database.
 
+    Attributes:
+        chemical_formula: Chemical formula.
+        common_name: Common name in the thermodynamic database.
+        elements: The elements and their stoichiometric counts.
+        element_masses: The elements and their total masses.
+        hill_formula: The Hill formula.
+        molar_mass: Molar mass.
+    """
 
-@dataclass(kw_only=True)
-class SolidPhase(PhaseProtocol):
-    """A solid phase."""
-
-    name: str
-    data_name: str  # TODO: Testing, name of the thermodynamic data to use.
+    chemical_formula: str
+    common_name: str
     elements: dict[str, int] = field(init=False)
-    hill_formula: str = field(init=False)
     element_masses: dict[str, float] = field(init=False)
+    hill_formula: str = field(init=False)
     molar_mass: float = field(init=False)
-    phase: str = field(init=False, default="solid")
-
-    # TODO: Automatically flag a constraint for unity activity when solving the system?
-    # or some message to the logger?
+    # TODO: Add a common activity?  Which would be an activity model for a solid and a fugacity
+    # (single gas) model for a gas?  Both accepting arguments of T, P (total)?
 
     def __post_init__(self):
-        logger.info("Creating a solid phase: %s", self.name)
+        logger.info(
+            "Creating a %s: %s (%s)",
+            self.__class__.__name__,
+            self.common_name,
+            self.chemical_formula,
+        )
         masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
         self.hill_formula = self._get_hill_formula()
@@ -204,36 +207,13 @@ class SolidPhase(PhaseProtocol):
         }
         self.molar_mass = sum(self.element_masses.values())
 
-    def _count_elements(self) -> dict[str, int]:
-        """Counts the number of atoms.
-
-        Returns:
-            A dictionary of the elements and their stoichiometric counts.
-        """
-        elements: dict[str, int] = {}
-        current_element: str = ""
-        current_count: str = ""
-
-        for char in self.name:
-            if char.isupper():
-                if current_element != "":
-                    count = int(current_count) if current_count else 1
-                    elements[current_element] = elements.get(current_element, 0) + count
-                    current_count = ""
-                current_element = char
-            elif char.islower():
-                current_element += char
-            elif char.isdigit():
-                current_count += char
-
-        if current_element != "":
-            count: int = int(current_count) if current_count else 1
-            elements[current_element] = elements.get(current_element, 0) + count
-        logger.debug("element count = \n%s", elements)
-        return elements
+    @property
+    @abstractmethod
+    def phase(self) -> str:
+        ...
 
     def _get_hill_formula(self) -> str:
-        """Get the Hill empirical formula for this molecule.
+        """Get the Hill empirical formula.
 
         JANAF uses the Hill empirical formula to index its data tables.
 
@@ -260,47 +240,73 @@ class SolidPhase(PhaseProtocol):
 
         return formula_string
 
+    def _count_elements(self) -> dict[str, int]:
+        """Counts the number of atoms.
+
+        Returns:
+            A dictionary of the elements and their stoichiometric counts.
+        """
+        elements: dict[str, int] = {}
+        current_element: str = ""
+        current_count: str = ""
+
+        for char in self.chemical_formula:
+            if char.isupper():
+                if current_element != "":
+                    count = int(current_count) if current_count else 1
+                    elements[current_element] = elements.get(current_element, 0) + count
+                    current_count = ""
+                current_element = char
+            elif char.islower():
+                current_element += char
+            elif char.isdigit():
+                current_count += char
+
+        if current_element != "":
+            count: int = int(current_count) if current_count else 1
+            elements[current_element] = elements.get(current_element, 0) + count
+        logger.debug("element count = \n%s", elements)
+        return elements
+
 
 @dataclass(kw_only=True)
-class GasPhase(PhaseProtocol):
+class SolidPhase(Phase):
+    """A solid phase and its properties."""
+
+    phase: str = field(init=False, default="solid")  # By definition.
+
+    # TODO: Automatically flag a constraint for unity activity when solving the system?
+    # or some message to the logger?
+
+
+@dataclass(kw_only=True)
+class GasPhase(Phase):
     """A gas phase and its properties.
 
     Args:
-        name: Chemical formula.
+        chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
         solubility: Solubility model. Defaults to no solubility.
         solid_melt_distribution_coefficient: Distribution coefficient. Defaults to 0.
 
     Attributes:
-        name: Chemical formula.
-        solubility: Solubility model.
-        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
-        elements: The elements and their (stoichiometric) counts.
-        hill_formula: The Hill formula.
+        chemical_formula: Chemical formula.
+        common_name: Common name in the thermodynamic database.
+        elements: The elements and their stoichiometric counts.
         element_masses: The elements and their total masses.
+        hill_formula: The Hill formula.
         molar_mass: Molar mass.
+        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
         output: To store calculated values for output.
     """
 
-    name: str
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
-    data_name: str = field(init=False)
-    elements: dict[str, int] = field(init=False)
-    hill_formula: str = field(init=False)
-    element_masses: dict[str, float] = field(init=False)
-    molar_mass: float = field(init=False)
-    phase: str = field(init=False, default="gas")
+    phase: str = field(init=False, default="gas")  # By definition.
+    common_name: str = field(init=False)
 
     def __post_init__(self):
-        logger.info("Creating a gas phase: %s", self.name)
-        masses: MolarMasses = MolarMasses()
-        self.elements = self._count_elements()
-        self.hill_formula = self._get_hill_formula()
-        self.element_masses = {
-            key: value * getattr(masses, key) for key, value in self.elements.items()
-        }
-        self.molar_mass = sum(self.element_masses.values())
-        self.data_name = self.name
+        self.common_name = self.chemical_formula
+        super().__post_init__()
 
     @property
     def is_diatomic(self) -> bool:
@@ -312,62 +318,6 @@ class GasPhase(PhaseProtocol):
             return True
         else:
             return False
-
-    def _count_elements(self) -> dict[str, int]:
-        """Counts the number of atoms.
-
-        Returns:
-            A dictionary of the elements and their stoichiometric counts.
-        """
-        elements: dict[str, int] = {}
-        current_element: str = ""
-        current_count: str = ""
-
-        for char in self.name:
-            if char.isupper():
-                if current_element != "":
-                    count = int(current_count) if current_count else 1
-                    elements[current_element] = elements.get(current_element, 0) + count
-                    current_count = ""
-                current_element = char
-            elif char.islower():
-                current_element += char
-            elif char.isdigit():
-                current_count += char
-
-        if current_element != "":
-            count: int = int(current_count) if current_count else 1
-            elements[current_element] = elements.get(current_element, 0) + count
-        logger.debug("element count = \n%s", elements)
-        return elements
-
-    def _get_hill_formula(self) -> str:
-        """Get the Hill empirical formula for this molecule.
-
-        JANAF uses the Hill empirical formula to index its data tables.
-
-        Returns:
-            The Hill empirical formula.
-        """
-        if "C" in self.elements:
-            ordered_elements = ["C"]
-        else:
-            ordered_elements = []
-
-        if "H" in self.elements:
-            ordered_elements.append("H")
-
-        ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
-
-        formula_string: str = "".join(
-            [
-                element + (str(self.elements[element]) if self.elements[element] > 1 else "")
-                for element in ordered_elements
-            ]
-        )
-        logger.debug("JANAF formula string = %s", formula_string)
-
-        return formula_string
 
     @_mass_decorator
     def mass(
@@ -538,7 +488,7 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
         """Returns a string identifying the source of the data."""
         ...
 
-    def get(self, molecule: PhaseProtocol, *, temperature: float, pressure: float) -> float:
+    def get(self, molecule: Phase, *, temperature: float, pressure: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol.
 
         Args:
@@ -562,7 +512,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
     ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    def get(self, molecule: PhaseProtocol, *, temperature: float, pressure: float) -> float:
+    def get(self, molecule: Phase, *, temperature: float, pressure: float) -> float:
         """See base class.
 
         In the JANAF tables, we have generally chosen the ideal diatomic gas for the reference
@@ -586,7 +536,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
                 phase_data_g = get_phase_data("g")
                 if phase_data_ref is None and phase_data_g is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
-                        molecule.name,
+                        molecule.common_name,
                         molecule.hill_formula,
                         self.name,
                     )
@@ -597,7 +547,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
                 phase = get_phase_data("g")
                 if phase is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
-                        molecule.name,
+                        molecule.common_name,
                         molecule.hill_formula,
                         self.name,
                     )
@@ -611,7 +561,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
         gibbs: float = phase.DeltaG(temperature)
 
         logger.debug(
-            "Molecule = %s, standard Gibbs energy of formation = %f", molecule.name, gibbs
+            "Molecule = %s, standard Gibbs energy of formation = %f", molecule.common_name, gibbs
         )
 
         return gibbs
@@ -640,14 +590,14 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
         self.data = data
 
     def get(
-        self, molecule: PhaseProtocol, *, temperature: float, pressure: Union[float, None] = None
+        self, molecule: Phase, *, temperature: float, pressure: Union[float, None] = None
     ) -> float:
         """See base class."""
         try:
-            data: pd.Series = self.data.loc[molecule.data_name]
+            data: pd.Series = self.data.loc[molecule.common_name]
         except KeyError as exc:
             msg: str = "Thermodynamic data for %s (%s) is not available in %s" % (
-                molecule.name,
+                molecule.common_name,
                 molecule.hill_formula,
                 self.name,
             )
@@ -680,7 +630,9 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
         )
 
         gibbs: float = integral_H - temperature * integral_S
-        logger.debug("Phase = %s, standard Gibbs energy of formation = %f", molecule.name, gibbs)
+        logger.debug(
+            "Phase = %s, standard Gibbs energy of formation = %f", molecule.common_name, gibbs
+        )
 
         # TODO: Is there a better way to determine if the phase is condensed or not?
         if V:
@@ -730,7 +682,7 @@ class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProto
     def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol):
         self.datasets.append(dataset)
 
-    def get(self, molecule: PhaseProtocol, *, temperature: float, pressure: float) -> float:
+    def get(self, molecule: Phase, *, temperature: float, pressure: float) -> float:
         for dataset in self.datasets:
             try:
                 gibbs: float = dataset.get(molecule, temperature=temperature, pressure=pressure)
@@ -739,7 +691,7 @@ class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProto
                 continue
 
         msg: str = "Thermodynamic data for %s (%s) is not available in any dataset" % (
-            molecule.name,
+            molecule.common_name,
             molecule.hill_formula,
         )
         logger.error(msg)
