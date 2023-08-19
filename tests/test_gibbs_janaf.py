@@ -49,7 +49,7 @@ def test_version():
 def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -66,7 +66,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array([3.82233051e-01, 8.70003606e-08, 3.90520470e-01])
@@ -77,7 +77,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     """Tests H2-H2O at the IW buffer+2."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -94,7 +94,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array([3.84857931e-02, 8.70003606e-06, 3.93202261e-01])
@@ -105,7 +105,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
 def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -122,7 +122,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array([3.33362588e00, 8.70003606e-10, 3.40590418e-01])
@@ -138,7 +138,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
 def test_hydrogen_species_five_oceans() -> None:
     """Tests H2-H2O for five H oceans."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -155,7 +155,7 @@ def test_hydrogen_species_five_oceans() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array([9.18186063e00, 8.70003606e-08, 9.38093793e00])
@@ -167,7 +167,7 @@ def test_hydrogen_species_five_oceans() -> None:
 def test_hydrogen_species_ten_oceans() -> None:
     """Tests H2-H2O for ten H oceans."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -184,7 +184,7 @@ def test_hydrogen_species_ten_oceans() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array([3.50479309e01, 8.70003606e-08, 3.58078256e01])
@@ -200,7 +200,7 @@ def test_hydrogen_species_ten_oceans() -> None:
 def test_hydrogen_species_temperature() -> None:
     """Tests H2-H2O at a different temperature."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -217,7 +217,7 @@ def test_hydrogen_species_temperature() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     planet.surface_temperature = 1500.0  # K
@@ -234,7 +234,7 @@ def test_hydrogen_species_temperature() -> None:
 def test_hydrogen_and_carbon_species() -> None:
     """Tests H2-H2O and CO-CO2."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -256,7 +256,7 @@ def test_hydrogen_and_carbon_species() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array(
@@ -269,7 +269,7 @@ def test_hydrogen_and_carbon_species() -> None:
 def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     """Tests H2-H2O and CO-CO2 for C/H=5."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -291,7 +291,7 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array(
@@ -304,7 +304,7 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
 def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     """Tests H2-H2O and CO-CO2 for C/H=10."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -326,7 +326,7 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array(
@@ -344,7 +344,7 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
 def test_hydrogen_and_carbon_species_with_methane() -> None:
     """Tests H2-H2O and CO-CO2 and N."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -368,7 +368,7 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     target_pressures: np.ndarray = np.array(
@@ -394,7 +394,7 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
 def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     """Tests H2-H2O and CO-CO2 and N."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -420,7 +420,7 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Order of target pressures: CO, H2, N2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
@@ -440,7 +440,7 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
 def test_hydrogen_and_carbon_species_with_H3N() -> None:
     """Tests H2-H2O and CO-CO2 and H3N."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -466,7 +466,7 @@ def test_hydrogen_and_carbon_species_with_H3N() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Order of target pressures: CO, H2, O2, CO2, H2O, NH3
     target_pressures: np.ndarray = np.array(
@@ -491,7 +491,7 @@ def test_hydrogen_and_carbon_species_with_H3N() -> None:
 def test_hydrogen_and_carbon_species_with_O2S() -> None:
     """Tests H2-H2O and CO-CO2 and S-SO2."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -518,7 +518,7 @@ def test_hydrogen_and_carbon_species_with_O2S() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Here the order of target pressures is: S, CO, H2, O2, CO2, H2O, SO2
     target_pressures: np.ndarray = np.array(
@@ -539,7 +539,7 @@ def test_hydrogen_and_carbon_species_with_O2S() -> None:
 def test_hydrogen_and_carbon_species_with_H2S() -> None:
     """Tests H2-H2O and CO-CO2 and S-H2S."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -566,7 +566,7 @@ def test_hydrogen_and_carbon_species_with_H2S() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Here the order of target pressures is: S, CO, H2, O2, CO2, H2O, H2S
     target_pressures: np.ndarray = np.array(
@@ -587,7 +587,7 @@ def test_hydrogen_and_carbon_species_with_H2S() -> None:
 def test_hydrogen_and_carbon_species_with_OS_H2S() -> None:
     """Tests H2-H2O and CO-CO2 and SO-H2S."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -614,7 +614,7 @@ def test_hydrogen_and_carbon_species_with_OS_H2S() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Here the order of target pressures is: CO, H2, O2, SO, CO2, H2O, H2S
     target_pressures: np.ndarray = np.array(
@@ -640,7 +640,7 @@ def test_hydrogen_and_carbon_species_with_OS_H2S() -> None:
 def test_hydrogen_and_carbon_species_with_HCl() -> None:
     """Tests H2-H2O and CO-CO2 and HCl-Cl."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -667,7 +667,7 @@ def test_hydrogen_and_carbon_species_with_HCl() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Here the order of target pressures is: Cl, CO, H2, HCl, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
@@ -688,7 +688,7 @@ def test_hydrogen_and_carbon_species_with_HCl() -> None:
 def test_hydrogen_and_carbon_species_with_Cl2() -> None:
     """Tests H2-H2O and CO-CO2 and Cl-Cl2."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -715,7 +715,7 @@ def test_hydrogen_and_carbon_species_with_Cl2() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Here the order of target pressures is: Cl, CO, Cl2, H2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
@@ -741,7 +741,7 @@ def test_hydrogen_and_carbon_species_with_Cl2() -> None:
 def test_hydrogen_and_carbon_species_with_HF() -> None:
     """Tests H2-H2O and CO-CO2 and HF-F."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -768,7 +768,7 @@ def test_hydrogen_and_carbon_species_with_HF() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Here the order of target pressures is: F, CO, H2, HF, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
@@ -789,7 +789,7 @@ def test_hydrogen_and_carbon_species_with_HF() -> None:
 def test_hydrogen_and_carbon_species_with_F2() -> None:
     """Tests H2-H2O and CO-CO2 and F2-F."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
@@ -816,7 +816,7 @@ def test_hydrogen_and_carbon_species_with_F2() -> None:
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
     # Here the order of target pressures is: F, CO, F2, H2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(

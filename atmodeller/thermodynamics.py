@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
-from typing import Callable, ClassVar, Optional, Protocol, Union
+from typing import Callable, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
@@ -129,13 +129,13 @@ class GasSpeciesOutput:
     mass_in_atmosphere: float  # kg
     mass_in_solid: float  # kg
     mass_in_melt: float  # kg
-    moles_in_atmosphere: float
-    moles_in_melt: float
-    moles_in_solid: float
+    moles_in_atmosphere: float  # moles
+    moles_in_melt: float  # moles
+    moles_in_solid: float  # moles
     ppmw_in_solid: float  # ppm by weight
     ppmw_in_melt: float  # ppm by weight
     pressure_in_atmosphere: float  # bar
-    volume_mixing_ratio: float
+    volume_mixing_ratio: float  # dimensionless
     mass_in_total: float = field(init=False)
 
     def __post_init__(self):
@@ -143,19 +143,19 @@ class GasSpeciesOutput:
 
 
 def _mass_decorator(func) -> Callable:
-    """A decorator to return the mass of either the molecule or one of its elements."""
+    """A decorator to return the mass of either the gas species or one of its elements."""
 
     @wraps(func)
     def mass_wrapper(self: "GasSpecies", element: Optional[str] = None, **kwargs) -> float:
-        """Wrapper to return the mass of either the molecule or one of its elements.
+        """Wrapper to return the mass of either the gas species or one of its elements.
 
         Args:
-            element: Returns the mass of this element. Defaults to None to return the molecule
+            element: Returns the mass of this element. Defaults to None to return the gas species
                 mass.
             **kwargs: Catches keyword arguments to forward to func.
 
         Returns:
-            Mass of either the molecule or element.
+            Mass of either the gas species or element.
         """
         mass: float = func(self, **kwargs)
         if element is not None:
@@ -324,7 +324,7 @@ class GasSpecies(ChemicalComponent):
 
     @property
     def is_diatomic(self) -> bool:
-        """Returns if the molecule is diatomic (True) or not (False).
+        """Returns if the species is diatomic (True) or not (False).
 
         Useful for obtaining the appropriate JANAF data for the Gibbs free energy of formation.
         """
@@ -350,11 +350,11 @@ class GasSpecies(ChemicalComponent):
             partial_pressure_bar: Partial pressure in bar.
             atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
             fugacities_dict: Dictionary of all the species and their partial pressures.
-            element: Returns the mass for an element. Defaults to None to return the molecule mass.
+            element: Returns the mass for an element. Defaults to None to return the species mass.
                This argument is used by the @_mass_decorator.
 
         Returns:
-            Total mass of the molecule (element=None) or element (element=element).
+            Total mass of the species (element=None) or element (element=element).
         """
 
         del element
@@ -365,7 +365,6 @@ class GasSpecies(ChemicalComponent):
         )
         mass_in_atmosphere *= planet.surface_area * self.molar_mass / atmosphere_mean_molar_mass
         volume_mixing_ratio = partial_pressure_bar / sum(fugacities_dict.values())
-
         moles_in_atmosphere: float = mass_in_atmosphere / self.molar_mass
 
         # Melt.
@@ -376,7 +375,6 @@ class GasSpecies(ChemicalComponent):
             fugacities_dict,
         )
         mass_in_melt = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
-
         moles_in_melt: float = mass_in_melt / self.molar_mass
 
         # Solid.
@@ -587,11 +585,16 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
             phase = get_phase_data("ref")
 
         assert phase is not None
-        logger.debug("ChemicalComponent = %s", phase)
+        logger.debug(
+            "Thermodynamic data for %s (%s) = %s", species.common_name, species.hill_formula, phase
+        )
         gibbs: float = phase.DeltaG(temperature)
 
         logger.debug(
-            "Species = %s, standard Gibbs energy of formation = %f", species.common_name, gibbs
+            "standard Gibbs energy of formation for %s (%s) = %f",
+            species.common_name,
+            species.hill_formula,
+            gibbs,
         )
 
         return gibbs
@@ -669,9 +672,7 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
             "Species = %s, standard Gibbs energy of formation = %f", species.common_name, gibbs
         )
 
-        # TODO: Is there a better way to determine if the phase is condensed or not?
-        if V:
-            logger.info("Condensed species so including volume-pressure integral")
+        if species.phase == "solid":
             assert pressure is not None
             # Volume at T.
             # TODO: Why the exponential?  Seems different to the paper (check with Meng).

@@ -69,7 +69,7 @@ def main():
 
     args = parser.parse_args()
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
@@ -90,11 +90,11 @@ def main():
 
     # Include nitrogen if desired.
     if args.nitrogen != 0:
-        molecules.append(GasSpecies(chemical_formula="N2", solubility=BasaltLibourelN2()))
+        species.append(GasSpecies(chemical_formula="N2", solubility=BasaltLibourelN2()))
         n_kg: float = args.nitrogen * 1.0e-6 * planet.mantle_mass
         constraints.append(MassConstraint(species="N", value=n_kg))
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(molecules=molecules, planet=planet)
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
     system.solve(constraints)
     logger.info(system.fugacities_dict)
 

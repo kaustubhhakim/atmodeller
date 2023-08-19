@@ -37,7 +37,7 @@ def test_version():
 def test_graphite() -> None:
     """Tests including graphite."""
 
-    molecules: list[ChemicalComponent] = [
+    species: list[ChemicalComponent] = [
         GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
         GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
@@ -52,7 +52,7 @@ def test_graphite() -> None:
     planet.surface_temperature = 600 + 273  # K
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        molecules=molecules, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
     # This is comparable to the constraints imposed by Meng, i.e. an activity of C, an fO2, and a
