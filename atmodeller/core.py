@@ -138,7 +138,7 @@ class ReactionNetwork:
         """
         elements: list[str] = []
         for species in self.species:
-            elements.extend(list(species.elements.keys()))
+            elements.extend(list(species.formula.composition().keys()))
         elements_unique: list[str] = list(set(elements))
         logger.debug("Number of unique elements = \n%s", elements_unique)
         return elements_unique, len(elements_unique)
@@ -156,7 +156,7 @@ class ReactionNetwork:
         for species_index, species in enumerate(self.species):
             for element_index, element in enumerate(self.elements):
                 try:
-                    count: int = species.elements[element]
+                    count: int = species.formula.composition()[element].count
                 except KeyError:
                     count = 0
                 matrix[species_index, element_index] = count
@@ -490,7 +490,7 @@ class InteriorAtmosphereSystem:
         Returns:
             A tuple to sort first by number of elements and second by species name.
         """
-        return (sum(species.elements.values()), species.chemical_formula)
+        return (species.formula.atoms, species.chemical_formula)
 
     @property
     def pressures(self) -> np.ndarray:

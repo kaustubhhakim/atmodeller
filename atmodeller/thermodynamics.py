@@ -160,7 +160,13 @@ def _mass_decorator(func) -> Callable:
         """
         mass: float = func(self, **kwargs)
         if element is not None:
-            mass *= self.element_masses.get(element, 0) / self.molar_mass
+            try:
+                mass *= (
+                    UnitConversion.g_to_kg(self.formula.composition()[element].mass)
+                    / self.molar_mass
+                )
+            except KeyError:  # Element not in formula so must be zero.
+                mass = 0
 
         return mass
 
@@ -178,19 +184,13 @@ class ChemicalComponent(ABC):
     Attributes:
         chemical_formula: Chemical formula.
         common_name: Common name in the thermodynamic database.
-        TODO: remove elements: The elements and their stoichiometric counts.
-        TODO: remove element_masses: The elements and their total masses.
         hill_formula: The Hill formula.
-        molar_mass: Molar mass.
     """
 
     chemical_formula: str
     common_name: str
     formula: Formula = field(init=False)
-    elements: dict[str, int] = field(init=False)
-    element_masses: dict[str, float] = field(init=False)
     # hill_formula: str = field(init=False)
-    # molar_mass: float = field(init=False)
     # TODO: common for activity or fugacity?
     # TODO: Add a common activity?  Which would be an activity model for a solid and a fugacity
     # (single gas) model for a gas?  Both accepting arguments of T, P (total)?
@@ -213,27 +213,22 @@ class ChemicalComponent(ABC):
         # Example output:
         # {'C': (1, 12.01074, 1.0)}
 
-        # TODO: Choose a library with all the molar masses?
-        # masses: MolarMasses = MolarMasses()
-        self.elements = self._count_elements()
         # self.hill_formula = self._hill_formula()
-        # TODO: FIXME: Clunky.
-        self.element_masses = {
-            key: self.formula.composition()[key].mass * 1.0e-3 for key in self.elements.keys()
-        }
-        # self.molar_mass = sum(self.element_masses.values())
 
     @property
     @abstractmethod
     def phase(self) -> str:
+        """Returns the phase (solid, gas, etc.)."""
         ...
 
     @property
     def molar_mass(self) -> float:
+        """Returns the molar mass."""
         return UnitConversion.g_to_kg(self.formula.mass)
 
     @property
     def hill_formula(self) -> str:
+        """Returns the Hill formula."""
         return self.formula.formula
 
     # TODO: Rename to is_homonuclear_diatomic
@@ -280,34 +275,6 @@ class ChemicalComponent(ABC):
 
     #     return formula_string
 
-    def _count_elements(self) -> dict[str, int]:
-        """Counts the number of atoms.
-
-        Returns:
-            A dictionary of the elements and their stoichiometric counts.
-        """
-        elements: dict[str, int] = {}
-        current_element: str = ""
-        current_count: str = ""
-
-        for char in self.chemical_formula:
-            if char.isupper():
-                if current_element != "":
-                    count = int(current_count) if current_count else 1
-                    elements[current_element] = elements.get(current_element, 0) + count
-                    current_count = ""
-                current_element = char
-            elif char.islower():
-                current_element += char
-            elif char.isdigit():
-                current_count += char
-
-        if current_element != "":
-            count: int = int(current_count) if current_count else 1
-            elements[current_element] = elements.get(current_element, 0) + count
-        logger.debug("element count = \n%s", elements)
-        return elements
-
 
 @dataclass(kw_only=True)
 class SolidSpecies(ChemicalComponent):
@@ -336,10 +303,6 @@ class GasSpecies(ChemicalComponent):
     Attributes:
         chemical_formula: Chemical formula.
         common_name: Common name in the thermodynamic database.
-        elements: The elements and their stoichiometric counts.
-        element_masses: The elements and their total masses.
-        hill_formula: The Hill formula.
-        molar_mass: Molar mass.
         solubility: Solubility model.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
         output: To store calculated values for output.
