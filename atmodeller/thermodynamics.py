@@ -217,9 +217,9 @@ class ChemicalComponent(ABC):
         # masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
         # self.hill_formula = self._hill_formula()
+        # TODO: FIXME: Clunky.
         self.element_masses = {
-            key: value * self.formula.composition()[key].mass
-            for key, value in self.elements.items()
+            key: self.formula.composition()[key].mass * 1.0e-3 for key in self.elements.keys()
         }
         # self.molar_mass = sum(self.element_masses.values())
 
@@ -251,6 +251,7 @@ class ChemicalComponent(ABC):
         else:
             return False
 
+    # TODO: Still need this since formula doesn't put H second as required by JANAF.
     # def _hill_formula(self) -> str:
     #     """Get the Hill empirical formula.
 
