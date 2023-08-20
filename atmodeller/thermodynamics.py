@@ -194,6 +194,9 @@ class ChemicalComponent(ABC):
     # TODO: common for activity or fugacity?
     # TODO: Add a common activity?  Which would be an activity model for a solid and a fugacity
     # (single gas) model for a gas?  Both accepting arguments of T, P (total)?
+    # TODO: select source of thermodynamic data for this species.  Do all the reading in/caching
+    # to set up the interpolation functions
+    # TODO: Option to specify if "ideal" or not to determine if a linear solve can be performed.
 
     def __post_init__(self):
         logger.info(
