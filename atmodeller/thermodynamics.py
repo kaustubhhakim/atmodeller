@@ -9,10 +9,11 @@ from typing import Callable, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
+from molmass import Formula
 from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GRAVITATIONAL_CONSTANT
-from atmodeller.utilities import MolarMasses, UnitConversion
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -177,18 +178,19 @@ class ChemicalComponent(ABC):
     Attributes:
         chemical_formula: Chemical formula.
         common_name: Common name in the thermodynamic database.
-        elements: The elements and their stoichiometric counts.
-        element_masses: The elements and their total masses.
+        TODO: remove elements: The elements and their stoichiometric counts.
+        TODO: remove element_masses: The elements and their total masses.
         hill_formula: The Hill formula.
         molar_mass: Molar mass.
     """
 
     chemical_formula: str
     common_name: str
+    formula: Formula = field(init=False)
     elements: dict[str, int] = field(init=False)
     element_masses: dict[str, float] = field(init=False)
-    hill_formula: str = field(init=False)
-    molar_mass: float = field(init=False)
+    # hill_formula: str = field(init=False)
+    # molar_mass: float = field(init=False)
     # TODO: common for activity or fugacity?
     # TODO: Add a common activity?  Which would be an activity model for a solid and a fugacity
     # (single gas) model for a gas?  Both accepting arguments of T, P (total)?
@@ -200,47 +202,82 @@ class ChemicalComponent(ABC):
             self.common_name,
             self.chemical_formula,
         )
+        self.formula = Formula(self.chemical_formula)
+        # print(self.formula.composition())
+        # try:
+        #     print(self.formula.composition()["C"])
+        # except KeyError:
+        #     pass
+        # print(list(self.formula.composition().keys()))
+        # print(list(self.formula.composition().values()))
+        # Example output:
+        # {'C': (1, 12.01074, 1.0)}
+
         # TODO: Choose a library with all the molar masses?
-        masses: MolarMasses = MolarMasses()
+        # masses: MolarMasses = MolarMasses()
         self.elements = self._count_elements()
-        self.hill_formula = self._hill_formula()
+        # self.hill_formula = self._hill_formula()
         self.element_masses = {
-            key: value * getattr(masses, key) for key, value in self.elements.items()
+            key: value * self.formula.composition()[key].mass
+            for key, value in self.elements.items()
         }
-        self.molar_mass = sum(self.element_masses.values())
+        # self.molar_mass = sum(self.element_masses.values())
 
     @property
     @abstractmethod
     def phase(self) -> str:
         ...
 
-    def _hill_formula(self) -> str:
-        """Get the Hill empirical formula.
+    @property
+    def molar_mass(self) -> float:
+        return UnitConversion.g_to_kg(self.formula.mass)
 
-        JANAF uses the Hill empirical formula to index its data tables.
+    @property
+    def hill_formula(self) -> str:
+        return self.formula.formula
 
-        Returns:
-            The Hill empirical formula.
+    # TODO: Rename to is_homonuclear_diatomic
+    @property
+    def is_diatomic(self) -> bool:
+        """Returns if the species is diatomic (True) or not (False).
+
+        Useful for obtaining the appropriate JANAF data for the Gibbs free energy of formation.
         """
-        if "C" in self.elements:
-            ordered_elements = ["C"]
+
+        composition = self.formula.composition()
+
+        if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
+            return True
         else:
-            ordered_elements = []
+            return False
 
-        if "H" in self.elements:
-            ordered_elements.append("H")
+    # def _hill_formula(self) -> str:
+    #     """Get the Hill empirical formula.
 
-        ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
+    #     JANAF uses the Hill empirical formula to index its data tables.
 
-        formula_string: str = "".join(
-            [
-                element + (str(self.elements[element]) if self.elements[element] > 1 else "")
-                for element in ordered_elements
-            ]
-        )
-        logger.debug("Hill formula string (required for JANAF) = %s", formula_string)
+    #     Returns:
+    #         The Hill empirical formula.
+    #     """
+    #     if "C" in self.elements:
+    #         ordered_elements = ["C"]
+    #     else:
+    #         ordered_elements = []
 
-        return formula_string
+    #     if "H" in self.elements:
+    #         ordered_elements.append("H")
+
+    #     ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
+
+    #     formula_string: str = "".join(
+    #         [
+    #             element + (str(self.elements[element]) if self.elements[element] > 1 else "")
+    #             for element in ordered_elements
+    #         ]
+    #     )
+    #     logger.debug("Hill formula string (required for JANAF) = %s", formula_string)
+
+    #     return formula_string
 
     def _count_elements(self) -> dict[str, int]:
         """Counts the number of atoms.
@@ -321,17 +358,6 @@ class GasSpecies(ChemicalComponent):
     @property
     def phase(self) -> str:
         return "gas"
-
-    @property
-    def is_diatomic(self) -> bool:
-        """Returns if the species is diatomic (True) or not (False).
-
-        Useful for obtaining the appropriate JANAF data for the Gibbs free energy of formation.
-        """
-        if len(self.elements) == 1 and list(self.elements.values())[0] == 2:
-            return True
-        else:
-            return False
 
     @_mass_decorator
     def mass(

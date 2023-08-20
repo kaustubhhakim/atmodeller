@@ -6,7 +6,9 @@ import argparse
 import logging
 import time
 
-from atmodeller import OCEAN_MOLES, logger
+from molmass import Formula
+
+from atmodeller import logger
 from atmodeller.core import (
     BufferedFugacityConstraint,
     InteriorAtmosphereSystem,
@@ -22,7 +24,7 @@ from atmodeller.thermodynamics import (
     NoSolubility,
     PeridotiteH2O,
 )
-from atmodeller.utilities import MolarMasses
+from atmodeller.utilities import earth_oceans_to_kg
 
 
 def main():
@@ -79,8 +81,7 @@ def main():
     ]
 
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = args.oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(args.oceans)
     c_kg: float = args.ch_ratio * h_kg
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),

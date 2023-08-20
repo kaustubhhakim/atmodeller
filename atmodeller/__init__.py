@@ -48,4 +48,3 @@ from atmodeller.core import (
     SystemConstraint,
 )
 from atmodeller.thermodynamics import GasSpecies, Planet, SolidSpecies
-from atmodeller.utilities import MolarMasses

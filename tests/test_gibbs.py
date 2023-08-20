@@ -9,7 +9,6 @@ code.
 import numpy as np
 
 from atmodeller import (
-    OCEAN_MOLES,
     BufferedFugacityConstraint,
     GasSpecies,
     InteriorAtmosphereSystem,
@@ -27,7 +26,7 @@ from atmodeller.thermodynamics import (
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
-from atmodeller.utilities import MolarMasses
+from atmodeller.utilities import earth_oceans_to_kg
 
 # Tolerances to compare the test results with predefined 'correct' output.
 rtol: float = 1.0e-4
@@ -57,8 +56,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
@@ -85,8 +83,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
@@ -113,8 +110,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
@@ -146,8 +142,7 @@ def test_hydrogen_species_five_oceans() -> None:
 
     oceans: float = 5
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
@@ -175,8 +170,7 @@ def test_hydrogen_species_ten_oceans() -> None:
 
     oceans: float = 10
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
@@ -208,8 +202,7 @@ def test_hydrogen_species_temperature() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
@@ -245,8 +238,7 @@ def test_hydrogen_and_carbon_species() -> None:
     oceans: float = 1
     ch_ratio: float = 1
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
@@ -280,8 +272,7 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     oceans: float = 1
     ch_ratio: float = 5
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
@@ -315,8 +306,7 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     oceans: float = 1
     ch_ratio: float = 10
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
@@ -357,8 +347,7 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
     ch_ratio: float = 1
     planet: Planet = Planet()
     planet.surface_temperature = 1500
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
     c_kg: float = ch_ratio * h_kg
 
     constraints: list[SystemConstraint] = [
@@ -407,8 +396,7 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     ch_ratio: float = 1
     nitrogen_ppmw: float = 2.8
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
     c_kg: float = ch_ratio * h_kg
     n_kg: float = nitrogen_ppmw * 1.0e-6 * planet.mantle_mass
 
@@ -453,8 +441,7 @@ def test_hydrogen_and_carbon_species_with_NH3() -> None:
     ch_ratio: float = 1
     nitrogen_ppmw: float = 2.8
     planet: Planet = Planet()
-    molar_masses: MolarMasses = MolarMasses()
-    h_kg: float = oceans * OCEAN_MOLES * molar_masses.H2
+    h_kg: float = earth_oceans_to_kg(oceans)
     c_kg: float = ch_ratio * h_kg
     n_kg: float = nitrogen_ppmw * 1.0e-6 * planet.mantle_mass
 
