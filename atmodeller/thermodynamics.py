@@ -41,9 +41,6 @@ class Planet:
         surface_radius: Radius of the planetary surface.
         surface_temperature: Temperature of the planetary surface.
         melt_composition: Melt composition of the planet.
-        planet_mass: Mass of the planet.
-        surface_gravity: Gravitational acceleration at the planetary surface.
-        surface_area: Surface area of the planetary surface.
     """
 
     mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
@@ -52,13 +49,9 @@ class Planet:
     surface_radius: float = 6371000.0  # m, Earth's radius
     surface_temperature: float = 2000.0  # K
     melt_composition: Union[str, None] = None
-    planet_mass: float = field(init=False)
-    surface_gravity: float = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating a new planet")
-        self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
-        self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
         logger.info("Mantle mass (kg) = %f", self.mantle_mass)
         logger.info("Mantle melt fraction = %f", self.mantle_melt_fraction)
         logger.info("Core mass fraction = %f", self.core_mass_fraction)
@@ -69,9 +62,19 @@ class Planet:
         logger.info("Melt Composition = %s", self.melt_composition)
 
     @property
+    def planet_mass(self) -> float:
+        """Mass of the planet."""
+        return self.mantle_mass / (1 - self.core_mass_fraction)
+
+    @property
     def surface_area(self):
         """Surface area of the planet."""
         return 4.0 * np.pi * self.surface_radius**2
+
+    @property
+    def surface_gravity(self) -> float:
+        """Surface gravity of the planet."""
+        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
 
 class BufferedFugacity(ABC):
