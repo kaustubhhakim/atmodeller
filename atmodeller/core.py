@@ -305,25 +305,25 @@ class ReactionNetwork:
         self,
         *,
         constraints: list[SystemConstraint],
-        planet: Planet,
-        fugacities_dict: dict[str, float],
-    ) -> tuple[np.ndarray, np.ndarray]:
+        temperature: float,
+        pressures_dict: dict[str, float],
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Builds the design matrix and the right hand side (RHS) vector.
 
         Args:
             constraints: Constraints for the system of equations.
-            planet: Planet properties.
-            fugacities_dict: The pressures of the species (bar) in a dictionary.
+            temperature: Temperature.
+            pressures_dict: The pressures of the species (bar) in a dictionary.
 
         Returns:
-            A dictionary of all the species and their partial pressures.
+            TODO.
         """
 
-        # TODO: Formally fugacities_dict should actually be the partial pressure dict.  In which
-        # case fugacities for the equivalent partial pressures should be computed here.
+        # TODO: Could probably pass into this def, since individual partial pressures are not
+        # required, just to the total pressure?
+        total_pressure: float = sum(pressures_dict.values())
 
-        pressure: float = sum(fugacities_dict.values())
-
+        # TODO: Update/change to fugacity.
         pressure_constraints: list[SystemConstraint] = [
             constraint for constraint in constraints if constraint.field == "fugacity"
         ]
@@ -358,21 +358,28 @@ class ReactionNetwork:
             # Gibb's reaction is log10 of the equilibrium constant.
             rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
                 reaction_index=reaction_index,
-                temperature=planet.surface_temperature,
-                pressure=pressure,
+                temperature=temperature,
+                pressure=total_pressure,
             )
 
         for index, constraint in enumerate(pressure_constraints):
             row_index: int = self.number_reactions + index
             species_index: int = self.species_names.index(constraint.species)
-            logger.info("Row %02d: Setting %s partial pressure", row_index, constraint.species)
+            logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
             coeff[row_index, species_index] = 1
-            rhs[row_index] = np.log10(constraint.get_value(temperature=planet.surface_temperature))
+            rhs[row_index] = np.log10(constraint.get_value(temperature=temperature))
+
+        # The "non-ideal" LHS vector.
+        non_ideal: np.ndarray = np.ones_like(self.species, dtype=np.float_)
+        for index, species in enumerate(self.species):
+            non_ideal[index] = species.ideality(temperature=temperature, pressure=total_pressure)
+        non_ideal = np.log10(non_ideal)
 
         logger.debug("Design matrix = \n%s", coeff)
+        logger.debug("Non-ideal vector = \n%s", non_ideal)
         logger.debug("RHS vector = \n%s", rhs)
 
-        return coeff, rhs
+        return coeff, rhs, non_ideal
 
     def solve(self, **kwargs) -> np.ndarray:
         """Solves the reaction network to determine the partial pressures of all species.
@@ -397,7 +404,8 @@ class ReactionNetwork:
         """
         logger.info("Solving the reaction network")
 
-        design_matrix, rhs = self.get_design_matrix_and_rhs(**kwargs)
+        # TODO: Figure out if linear solve possible based on non-ideal value?  All unity?
+        design_matrix, rhs, non_ideal = self.get_design_matrix_and_rhs(**kwargs)
 
         if len(rhs) != self.number_species:
             num: int = self.number_species - len(rhs)
@@ -413,6 +421,36 @@ class ReactionNetwork:
         logger.info("The solution converged.")  # For similarity with fsolve message.
 
         return log10_pressures
+
+    def get_residual(
+        self,
+        *,
+        log10_pressures: np.ndarray,
+        constraints: list[SystemConstraint],
+        temperature: float,
+        pressures_dict: dict[str, float],
+    ) -> np.ndarray:
+        """Returns the residual vector of the reaction network.
+
+        Args:
+            log10_pressures: Log10 pressures.
+            constraints: Constraints for the system of equations.
+            temperature: Temperature.
+            pressures_dict: The pressures of the species (bar) in a dictionary.
+
+        Returns:
+            The residual vector of the reaction network.
+        """
+
+        design_matrix, rhs, non_ideal = self.get_design_matrix_and_rhs(
+            constraints=constraints, temperature=temperature, pressures_dict=pressures_dict
+        )  # TODO: pressures_dict versus fugacities_dict.
+
+        residual_reaction: np.ndarray = (
+            design_matrix.dot(non_ideal) + design_matrix.dot(log10_pressures) - rhs
+        )
+        logger.debug("Residual_reaction = %s", residual_reaction)
+        return residual_reaction
 
     def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
         """Sorter for the species.
@@ -670,13 +708,13 @@ class InteriorAtmosphereSystem:
         """
         self._log10_pressures = log10_pressures
 
-        design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(
-            constraints=constraints, planet=self.planet, fugacities_dict=self.fugacities_dict
-        )
-
         # Compute residual for the reaction network.
-        residual_reaction: np.ndarray = design_matrix.dot(self.log10_pressures) - rhs
-        logger.debug("Residual_reaction = %s", residual_reaction)
+        residual_reaction: np.ndarray = self._reaction_network.get_residual(
+            log10_pressures=self.log10_pressures,
+            constraints=constraints,
+            temperature=self.planet.surface_temperature,
+            pressures_dict=self.fugacities_dict,
+        )
 
         mass_constraints: list[SystemConstraint] = [
             constraint for constraint in constraints if constraint.field == "mass"

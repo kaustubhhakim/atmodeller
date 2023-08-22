@@ -251,7 +251,7 @@ class Ideal(Ideality):
     def _ideality(self, *args, **kwargs) -> float:
         del args
         del kwargs
-        return 1
+        return 1.0
 
 
 @dataclass(kw_only=True)
