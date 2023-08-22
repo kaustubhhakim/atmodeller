@@ -530,7 +530,9 @@ class InteriorAtmosphereSystem:
         output_dict["total_pressure_in_atmosphere"] = self.atmospheric_total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
         for species in self.species:
-            output_dict[species.chemical_formula] = species.output
+            if species.phase == "gas":
+                assert isinstance(species, GasSpecies)
+                output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
 
@@ -582,16 +584,14 @@ class InteriorAtmosphereSystem:
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the linear reaction network.
         for species_index, species in enumerate(self._reaction_network.species):
-            try:
+            if species.phase == "gas":
+                assert isinstance(species, GasSpecies)
                 species.mass(
                     planet=self.planet,
                     partial_pressure_bar=self.pressures[species_index],
                     atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
                     fugacities_dict=self.fugacities_dict,
                 )
-            # TODO: Cleanup since this breaks for the solid phase
-            except AttributeError:
-                continue
 
         logger.info(pprint.pformat(self.fugacities_dict))
 
@@ -686,13 +686,15 @@ class InteriorAtmosphereSystem:
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
         for constraint_index, constraint in enumerate(mass_constraints):
             for species_index, species in enumerate(self._reaction_network.species):
-                residual_mass[constraint_index] += species.mass(
-                    planet=self.planet,
-                    partial_pressure_bar=self.pressures[species_index],
-                    atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
-                    element=constraint.species,
-                    fugacities_dict=self.fugacities_dict,
-                )
+                if species.phase == "gas":
+                    assert isinstance(species, GasSpecies)
+                    residual_mass[constraint_index] += species.mass(
+                        planet=self.planet,
+                        partial_pressure_bar=self.pressures[species_index],
+                        atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
+                        element=constraint.species,
+                        fugacities_dict=self.fugacities_dict,
+                    )
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_value()
             # Normalise by target mass to compute a relative residual.

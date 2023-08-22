@@ -23,7 +23,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 class Planet:
     """The properties of a planet.
 
-    Default values are for a reduced (at the Iron-Wustite buffer) and fully molten Earth.
+    Default values are for a fully molten Earth.
 
     Args:
         mantle_mass: Mass of the planetary mantle. Defaults to Earth.
