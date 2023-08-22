@@ -17,12 +17,10 @@ from atmodeller import (
     SystemConstraint,
     __version__,
 )
+from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
 from atmodeller.thermodynamics import (
-    BasaltDixonCO2,
-    BasaltLibourelN2,
     ChemicalComponent,
     NoSolubility,
-    PeridotiteH2O,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )

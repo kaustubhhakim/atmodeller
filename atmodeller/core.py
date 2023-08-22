@@ -11,6 +11,7 @@ from scipy import linalg
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT
+from atmodeller.solubilities import composition_solubilities
 from atmodeller.thermodynamics import (
     BufferedFugacity,
     ChemicalComponent,
@@ -20,7 +21,6 @@ from atmodeller.thermodynamics import (
     Solubility,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
-    composition_solubilities,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -6,8 +6,6 @@ import argparse
 import logging
 import time
 
-from molmass import Formula
-
 from atmodeller import logger
 from atmodeller.core import (
     BufferedFugacityConstraint,
@@ -16,14 +14,13 @@ from atmodeller.core import (
     Planet,
     SystemConstraint,
 )
-from atmodeller.thermodynamics import (
+from atmodeller.solubilities import (
     BasaltDixonCO2,
     BasaltLibourelN2,
-    ChemicalComponent,
-    GasSpecies,
     NoSolubility,
     PeridotiteH2O,
 )
+from atmodeller.thermodynamics import ChemicalComponent, GasSpecies
 from atmodeller.utilities import earth_oceans_to_kg
 
 
