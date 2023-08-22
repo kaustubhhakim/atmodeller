@@ -67,7 +67,7 @@ class Planet:
         return self.mantle_mass / (1 - self.core_mass_fraction)
 
     @property
-    def surface_area(self):
+    def surface_area(self) -> float:
         """Surface area of the planet."""
         return 4.0 * np.pi * self.surface_radius**2
 
@@ -224,6 +224,36 @@ def _mass_decorator(func) -> Callable:
     return mass_wrapper
 
 
+class Ideality(ABC):
+    """Ideality base class."""
+
+    @abstractmethod
+    def _ideality(self, *, temperature: float, pressure: float) -> float:
+        """Ideality.
+
+        Args:
+            temperature: Temperature.
+            pressure: Pressure.
+
+        Returns:
+            ideality.
+        """
+        raise NotImplementedError
+
+    def __call__(self, *, temperature: float, pressure: float) -> float:
+        """Ideality."""
+        return self._ideality(temperature=temperature, pressure=pressure)
+
+
+class Ideal(Ideality):
+    """Ideal solution (activity of unity) or ideal gas (fugacity coefficient of unity)."""
+
+    def _ideality(self, *args, **kwargs) -> float:
+        del args
+        del kwargs
+        return 1
+
+
 @dataclass(kw_only=True)
 class ChemicalComponent(ABC):
     """A chemical component and its properties.
@@ -241,9 +271,7 @@ class ChemicalComponent(ABC):
     chemical_formula: str
     common_name: str
     formula: Formula = field(init=False)
-    # TODO: common for activity or fugacity?
-    # TODO: Add a common activity?  Which would be an activity model for a solid and a fugacity
-    # (single gas) model for a gas?  Both accepting arguments of T, P (total)?
+    ideality: Ideality = field(default_factory=Ideal)
     # TODO: select source of thermodynamic data for this species.  Do all the reading in/caching
     # to set up the interpolation functions
     # TODO: Option to specify if "ideal" or not to determine if a linear solve can be performed.
@@ -275,7 +303,7 @@ class ChemicalComponent(ABC):
 
     @property
     def is_homonuclear_diatomic(self) -> bool:
-        """Returns if the species is homonuclear diatomic (True) or not (False)."""
+        """Returns True if the species is homonuclear diatomic or False if not."""
 
         composition = self.formula.composition()
 
@@ -320,12 +348,17 @@ class ChemicalComponent(ABC):
 class SolidSpecies(ChemicalComponent):
     """A solid species."""
 
+    # TODO: Check what this means if two solids are in equilibrium (solid solution). Presumably
+    # then the mole fractions become relevant.
+    activity: Ideality = field(init=False)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.activity = self.ideality  # Ideality relates to activity.
+
     @property
     def phase(self) -> str:
         return "solid"
-
-    # TODO: Option to specify an activity function.  Where activity is actually mole fraction*gamma
-    # where gamma is activity coefficient.
 
     # TODO: Automatically flag a constraint for unity activity when solving the system?
     # or some message to the logger?
@@ -338,6 +371,7 @@ class GasSpecies(ChemicalComponent):
     Args:
         chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
         solubility: Solubility model. Defaults to no solubility.
+        fugacity_coefficient: Fugacity coefficient model.
         solid_melt_distribution_coefficient: Distribution coefficient. Defaults to 0.
 
     Attributes:
@@ -350,14 +384,14 @@ class GasSpecies(ChemicalComponent):
 
     common_name: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
+    # species fugacity = fugacity coefficient * species partial pressure
+    fugacity_coefficient: Ideality = field(init=False)
     solid_melt_distribution_coefficient: float = 0
-
-    # TODO: specify fugacity coefficient model (P, T)
-    # then need to multiply this by the partial pressure to get the fugacity for this species.
 
     def __post_init__(self):
         self.common_name = self.chemical_formula
         super().__post_init__()
+        self.fugacity_coefficient = self.ideality  # Ideality relates to fugacity.
 
     @property
     def phase(self) -> str:
