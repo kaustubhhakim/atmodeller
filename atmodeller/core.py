@@ -3,6 +3,7 @@
 import logging
 import pprint
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Optional, Protocol
 
 import numpy as np
@@ -109,11 +110,6 @@ class ReactionNetwork:
     Attributes:
         species: A list of species.
         gibbs_data: Standard Gibbs free energy of formation.
-        species_names: The names of the speciess.
-        number_species: The number of species.
-        elements: The elements in the species and their counts.
-        number_elements: The number of (unique) elements in the species.
-        number_reactions: The number of reactions.
         species_matrix: The stoichiometry matrix of the species in terms of elements.
         reaction_matrix: The reaction stoichiometry matrix.
     """
@@ -122,27 +118,35 @@ class ReactionNetwork:
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
-        self.species_names: list[str] = [species.chemical_formula for species in self.species]
+        self.species.sort(key=self._species_sorter)
         logger.info("Species = %s", self.species_names)
-        self.number_species: int = len(self.species)
-        self.elements, self.number_elements = self.find_elements()
-        self.number_reactions: int = self.number_species - self.number_elements
         self.species_matrix: np.ndarray = self.find_matrix()
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
 
-    def find_elements(self) -> tuple[list, int]:
-        """Determines the elements that compose the species.
+    @property
+    def species_names(self) -> list[str]:
+        return [species.chemical_formula for species in self.species]
 
-        Returns:
-            A tuple: (list of elements, number of elements).
-        """
+    @property
+    def number_species(self) -> int:
+        return len(self.species)
+
+    @cached_property
+    def unique_elements(self) -> list[str]:
         elements: list[str] = []
         for species in self.species:
             elements.extend(list(species.formula.composition().keys()))
-        elements_unique: list[str] = list(set(elements))
-        logger.debug("Number of unique elements = \n%s", elements_unique)
-        return elements_unique, len(elements_unique)
+        unique_elements: list[str] = list(set(elements))
+        return unique_elements
+
+    @property
+    def number_unique_elements(self) -> int:
+        return len(self.unique_elements)
+
+    @property
+    def number_reactions(self) -> int:
+        return self.number_species - self.number_unique_elements
 
     def find_matrix(self) -> np.ndarray:
         """Creates a matrix where species (rows) are split into their element counts (columns).
@@ -153,9 +157,9 @@ class ReactionNetwork:
                  [2, 0, 1]]
             if the columns represent the elements H, C, and O, respectively.
         """
-        matrix: np.ndarray = np.zeros((self.number_species, self.number_elements))
+        matrix: np.ndarray = np.zeros((self.number_species, self.number_unique_elements))
         for species_index, species in enumerate(self.species):
-            for element_index, element in enumerate(self.elements):
+            for element_index, element in enumerate(self.unique_elements):
                 try:
                     count: int = species.formula.composition()[element].count
                 except KeyError:
@@ -181,7 +185,7 @@ class ReactionNetwork:
         logger.debug("augmented_matrix = \n%s", augmented_matrix)
 
         # Forward elimination.
-        for i in range(self.number_elements):  # Note only over the number of elements.
+        for i in range(self.number_unique_elements):  # Note only over the number of elements.
             # Check if the pivot element is zero.
             if augmented_matrix[i, i] == 0:
                 # Swap rows to get a non-zero pivot element.
@@ -195,7 +199,7 @@ class ReactionNetwork:
         logger.debug("Augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
         # Backward substitution.
-        for i in range(self.number_elements - 1, -1, -1):
+        for i in range(self.number_unique_elements - 1, -1, -1):
             # Normalize the pivot row.
             augmented_matrix[i] /= augmented_matrix[i, i]
             # Eliminate values above the pivot.
@@ -206,7 +210,9 @@ class ReactionNetwork:
         logger.debug("Augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
         reduced_matrix1: np.ndarray = augmented_matrix[:, : matrix1.shape[1]]
-        reaction_matrix: np.ndarray = augmented_matrix[self.number_elements :, matrix1.shape[1] :]
+        reaction_matrix: np.ndarray = augmented_matrix[
+            self.number_unique_elements :, matrix1.shape[1] :
+        ]
         logger.debug("Reduced_matrix1 = \n%s", reduced_matrix1)
         logger.debug("Reaction_matrix = \n%s", reaction_matrix)
 
@@ -408,6 +414,19 @@ class ReactionNetwork:
 
         return log10_pressures
 
+    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
+        """Sorter for the species.
+
+        Sorts first by species complexity and second by species name.
+
+        Args:
+            species: Species.
+
+        Returns:
+            A tuple to sort first by number of elements and second by species name.
+        """
+        return (species.formula.atoms, species.chemical_formula)
+
 
 @dataclass(kw_only=True)
 class InteriorAtmosphereSystem:
@@ -421,13 +440,6 @@ class InteriorAtmosphereSystem:
         species: A list of species.
         gibbs_data: Standard Gibbs free energy of formation. Defaults to a linear fit to JANAF.
         planet: A planet. Defaults to a molten Earth.
-        species_names: A list of the species names.
-        number_species: The number of species.
-        pressures: The species pressures (bar).
-        log10_pressures: Log10 of the species pressures.
-        atmospheric_total_pressure: Total atmospheric pressure.
-        atmospheric_mean_molar_mass: Mean molar mass of the atmosphere.
-        fugacities_dict: The pressures of the species (bar) in a dictionary. # TODO: Not for solid.
     """
 
     species: list[ChemicalComponent]
@@ -435,20 +447,15 @@ class InteriorAtmosphereSystem:
         default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
     planet: Planet = field(default_factory=Planet)
-    species_names: list[str] = field(init=False)
-    number_species: int = field(init=False)
     _log10_pressures: np.ndarray = field(init=False)  # Aligned with self.species.
     _reaction_network: ReactionNetwork = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating a new interior-atmosphere system")
-        self.species.sort(key=self._species_sorter)
-        self.number_species: int = len(self.species)
-        self.species_names: list[str] = [species.chemical_formula for species in self.species]
-        logger.info("Species = %s", self.species_names)
         self._conform_solubilities_to_composition()
         self._log10_pressures = np.zeros_like(self.species, dtype="float64")
         self._reaction_network = ReactionNetwork(species=self.species, gibbs_data=self.gibbs_data)
+        del self.species  # To prevent accessing. Use self._reaction_network instead.
 
     def _conform_solubilities_to_composition(self) -> None:
         """Ensure that the solubilities of the species are consistent with the melt composition."""
@@ -481,19 +488,6 @@ class InteriorAtmosphereSystem:
                         logger.info("No solubility law for %s", species.chemical_formula)
                         species.solubility = NoSolubility()
 
-    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
-        """Sorter for the species.
-
-        Sorts first by species complexity and second by species name.
-
-        Args:
-            species: Species.
-
-        Returns:
-            A tuple to sort first by number of elements and second by species name.
-        """
-        return (species.formula.atoms, species.chemical_formula)
-
     @property
     def pressures(self) -> np.ndarray:
         """Pressures."""
@@ -509,7 +503,8 @@ class InteriorAtmosphereSystem:
         """Fugacities of all species in a dictionary."""
         # TODO: activity for solid (or remove from output).
         output: dict[str, float] = {
-            species: pressure for (species, pressure) in zip(self.species_names, self.pressures)
+            species: pressure
+            for (species, pressure) in zip(self._reaction_network.species_names, self.pressures)
         }
         return output
 
@@ -522,7 +517,7 @@ class InteriorAtmosphereSystem:
     def atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere."""
         mu_atmosphere: float = 0
-        for index, species in enumerate(self.species):
+        for index, species in enumerate(self._reaction_network.species):
             mu_atmosphere += species.molar_mass * self.pressures[index]
         mu_atmosphere /= self.atmospheric_total_pressure
 
@@ -586,7 +581,7 @@ class InteriorAtmosphereSystem:
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the linear reaction network.
-        for species_index, species in enumerate(self.species):
+        for species_index, species in enumerate(self._reaction_network.species):
             try:
                 species.mass(
                     planet=self.planet,
@@ -620,7 +615,9 @@ class InteriorAtmosphereSystem:
         # for constraint in mass_constraints:
         #    logger.info("Adding constraint from mass balance: %s", constraint.species)
 
-        initial_log10_pressures: np.ndarray = np.ones_like(self.species, dtype="float64")
+        initial_log10_pressures: np.ndarray = np.ones_like(
+            self._reaction_network.species, dtype="float64"
+        )
         logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
         ier: int = 0
         # Count the number of attempts to solve the system by randomising the initial condition.
@@ -653,7 +650,7 @@ class InteriorAtmosphereSystem:
             raise RuntimeError("Solution cannot be found (ic_count == ic_count_max)")
 
         logger.info("Number of function calls = %d", infodict["nfev"])
-        logger.info("Final objective function evaluation = %s", infodict["fvec"])  # type: ignore
+        logger.info("Final objective function evaluation = %s", infodict["fvec"])
 
         return sol
 
@@ -688,7 +685,7 @@ class InteriorAtmosphereSystem:
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
         for constraint_index, constraint in enumerate(mass_constraints):
-            for species_index, species in enumerate(self.species):
+            for species_index, species in enumerate(self._reaction_network.species):
                 residual_mass[constraint_index] += species.mass(
                     planet=self.planet,
                     partial_pressure_bar=self.pressures[species_index],

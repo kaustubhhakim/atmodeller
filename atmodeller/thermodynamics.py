@@ -3,7 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import wraps
+from functools import cached_property, wraps
 from pathlib import Path
 from typing import Callable, Optional, Protocol, Union
 
@@ -232,13 +232,12 @@ class ChemicalComponent(ABC):
     Attributes:
         chemical_formula: Chemical formula.
         common_name: Common name in the thermodynamic database.
-        hill_formula: The Hill formula.
+        formula: Formula.
     """
 
     chemical_formula: str
     common_name: str
     formula: Formula = field(init=False)
-    # hill_formula: str = field(init=False)
     # TODO: common for activity or fugacity?
     # TODO: Add a common activity?  Which would be an activity model for a solid and a fugacity
     # (single gas) model for a gas?  Both accepting arguments of T, P (total)?
@@ -254,17 +253,6 @@ class ChemicalComponent(ABC):
             self.chemical_formula,
         )
         self.formula = Formula(self.chemical_formula)
-        # print(self.formula.composition())
-        # try:
-        #     print(self.formula.composition()["C"])
-        # except KeyError:
-        #     pass
-        # print(list(self.formula.composition().keys()))
-        # print(list(self.formula.composition().values()))
-        # Example output:
-        # {'C': (1, 12.01074, 1.0)}
-
-        # self.hill_formula = self._hill_formula()
 
     @property
     @abstractmethod
@@ -274,7 +262,7 @@ class ChemicalComponent(ABC):
 
     @property
     def molar_mass(self) -> float:
-        """Returns the molar mass."""
+        """Returns the molar mass in kg/mol."""
         return UnitConversion.g_to_kg(self.formula.mass)
 
     @property
@@ -282,13 +270,9 @@ class ChemicalComponent(ABC):
         """Returns the Hill formula."""
         return self.formula.formula
 
-    # TODO: Rename to is_homonuclear_diatomic
     @property
-    def is_diatomic(self) -> bool:
-        """Returns if the species is diatomic (True) or not (False).
-
-        Useful for obtaining the appropriate JANAF data for the Gibbs free energy of formation.
-        """
+    def is_homonuclear_diatomic(self) -> bool:
+        """Returns if the species is homonuclear diatomic (True) or not (False)."""
 
         composition = self.formula.composition()
 
@@ -297,34 +281,36 @@ class ChemicalComponent(ABC):
         else:
             return False
 
-    # TODO: Still need this since formula doesn't put H second as required by JANAF.
-    # def _hill_formula(self) -> str:
-    #     """Get the Hill empirical formula.
+    @cached_property
+    def modified_hill_formula(self) -> str:
+        """Returns the modified Hill formula.
 
-    #     JANAF uses the Hill empirical formula to index its data tables.
+        JANAF uses the modified Hill formula to index its data tables. In short, H, if present,
+        should appear after C (if C is present), otherwise it must be the first element.
+        """
+        elements: dict[str, int] = {
+            element: properties.count for element, properties in self.formula.composition().items()
+        }
 
-    #     Returns:
-    #         The Hill empirical formula.
-    #     """
-    #     if "C" in self.elements:
-    #         ordered_elements = ["C"]
-    #     else:
-    #         ordered_elements = []
+        if "C" in elements:
+            ordered_elements: list[str] = ["C"]
+        else:
+            ordered_elements = []
 
-    #     if "H" in self.elements:
-    #         ordered_elements.append("H")
+        if "H" in elements:
+            ordered_elements.append("H")
 
-    #     ordered_elements.extend(sorted(self.elements.keys() - {"C", "H"}))
+        ordered_elements.extend(sorted(elements.keys() - {"C", "H"}))
 
-    #     formula_string: str = "".join(
-    #         [
-    #             element + (str(self.elements[element]) if self.elements[element] > 1 else "")
-    #             for element in ordered_elements
-    #         ]
-    #     )
-    #     logger.debug("Hill formula string (required for JANAF) = %s", formula_string)
+        formula_string: str = "".join(
+            [
+                element + (str(elements[element]) if elements[element] > 1 else "")
+                for element in ordered_elements
+            ]
+        )
+        logger.debug("Modified Hill formula = %s", formula_string)
 
-    #     return formula_string
+        return formula_string
 
 
 @dataclass(kw_only=True)
@@ -497,19 +483,19 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
 
         def get_phase_data(phase):
             try:
-                phase_data = db.getphasedata(formula=species.hill_formula, phase=phase)
+                phase_data = db.getphasedata(formula=species.modified_hill_formula, phase=phase)
             except ValueError:
                 return None
             return phase_data
 
         if species.phase == "gas":
-            if species.is_diatomic:
+            if species.is_homonuclear_diatomic:
                 phase_data_ref = get_phase_data("ref")
                 phase_data_g = get_phase_data("g")
                 if phase_data_ref is None and phase_data_g is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
                         species.common_name,
-                        species.hill_formula,
+                        species.modified_hill_formula,
                         self.DATA_SOURCE,
                     )
                     logger.warning(msg)
@@ -520,7 +506,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
                 if phase is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
                         species.common_name,
-                        species.hill_formula,
+                        species.modified_hill_formula,
                         self.DATA_SOURCE,
                     )
                     logger.warning(msg)
@@ -530,14 +516,17 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
 
         assert phase is not None
         logger.debug(
-            "Thermodynamic data for %s (%s) = %s", species.common_name, species.hill_formula, phase
+            "Thermodynamic data for %s (%s) = %s",
+            species.common_name,
+            species.modified_hill_formula,
+            phase,
         )
         gibbs: float = phase.DeltaG(temperature)
 
         logger.debug(
             "standard Gibbs energy of formation for %s (%s) = %f",
             species.common_name,
-            species.hill_formula,
+            species.modified_hill_formula,
             gibbs,
         )
 
