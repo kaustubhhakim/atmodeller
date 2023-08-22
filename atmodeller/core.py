@@ -15,6 +15,7 @@ from atmodeller.solubilities import composition_solubilities
 from atmodeller.thermodynamics import (
     BufferedFugacity,
     ChemicalComponent,
+    GasSpecies,
     IronWustiteBufferHirschmann,
     NoSolubility,
     Planet,
@@ -466,18 +467,19 @@ class InteriorAtmosphereSystem:
                 logger.error("Cannot find solubilities for %s", self.planet.melt_composition)
                 raise
 
-            # TODO: Only conform for phase==gas
             for species in self.species:
-                try:
-                    species.solubility = solubilities[species.chemical_formula]
-                    logger.info(
-                        "Found Solubility for %s: %s",
-                        species.chemical_formula,
-                        species.solubility.__class__.__name__,
-                    )
-                except KeyError:
-                    logger.info("No solubility for %s", species.chemical_formula)
-                    species.solubility = NoSolubility()
+                if species.phase == "gas":
+                    assert isinstance(species, GasSpecies)
+                    try:
+                        species.solubility = solubilities[species.chemical_formula]
+                        logger.info(
+                            "Found Solubility law for %s: %s",
+                            species.chemical_formula,
+                            species.solubility.__class__.__name__,
+                        )
+                    except KeyError:
+                        logger.info("No solubility law for %s", species.chemical_formula)
+                        species.solubility = NoSolubility()
 
     def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
         """Sorter for the species.
