@@ -1,6 +1,6 @@
 """Reproducing the results of Tian and Heng (2023)."""
 
-# Tolerances to compare the test results with predefined 'correct' output.
+
 import numpy as np
 
 from atmodeller import __version__
@@ -21,6 +21,7 @@ from atmodeller.thermodynamics import (
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
 
+# Tolerances to compare the test results with predefined 'correct' output.
 rtol: float = 1.0e-4
 atol: float = 1.0e-4
 

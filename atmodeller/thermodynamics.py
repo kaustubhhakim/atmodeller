@@ -1,11 +1,13 @@
 """Fugacity buffers, gas phase reactions, and solubility laws."""
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
 from pathlib import Path
-from typing import Callable, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Callable, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
@@ -15,6 +17,10 @@ from thermochem import janaf
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.solubilities import NoSolubility, Solubility
 from atmodeller.utilities import UnitConversion
+
+if TYPE_CHECKING:
+    from atmodeller.core import InteriorAtmosphereSystem
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -187,31 +193,11 @@ class IronWustiteBufferFischer(BufferedFugacity):
         return buffer
 
 
-@dataclass(kw_only=True)
-class GasSpeciesOutput:
-    """Output for a gas species."""
-
-    mass_in_atmosphere: float  # kg
-    mass_in_solid: float  # kg
-    mass_in_melt: float  # kg
-    moles_in_atmosphere: float  # moles
-    moles_in_melt: float  # moles
-    moles_in_solid: float  # moles
-    ppmw_in_solid: float  # ppm by weight
-    ppmw_in_melt: float  # ppm by weight
-    pressure_in_atmosphere: float  # bar
-    volume_mixing_ratio: float  # dimensionless
-    mass_in_total: float = field(init=False)
-
-    def __post_init__(self):
-        self.mass_in_total = self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
-
-
 def _mass_decorator(func) -> Callable:
     """A decorator to return the mass of either the gas species or one of its elements."""
 
     @wraps(func)
-    def mass_wrapper(self: "GasSpecies", element: Optional[str] = None, **kwargs) -> float:
+    def mass_wrapper(self: GasSpecies, element: Optional[str] = None, **kwargs) -> float:
         """Wrapper to return the mass of either the gas species or one of its elements.
 
         Args:
@@ -378,6 +364,28 @@ class SolidSpecies(ChemicalComponent):
 
 
 @dataclass(kw_only=True)
+class GasSpeciesOutput:
+    """Output for a gas species."""
+
+    mass_in_atmosphere: float  # kg
+    mass_in_solid: float  # kg
+    mass_in_melt: float  # kg
+    moles_in_atmosphere: float  # moles
+    moles_in_melt: float  # moles
+    moles_in_solid: float  # moles
+    ppmw_in_solid: float  # ppm by weight
+    ppmw_in_melt: float  # ppm by weight
+    fugacity: float  # bar
+    fugacity_coefficient: float  # dimensionless
+    pressure_in_atmosphere: float  # bar
+    volume_mixing_ratio: float  # dimensionless
+    mass_in_total: float = field(init=False)
+
+    def __post_init__(self):
+        self.mass_in_total = self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
+
+
+@dataclass(kw_only=True)
 class GasSpecies(ChemicalComponent):
     """A gas species.
 
@@ -415,18 +423,14 @@ class GasSpecies(ChemicalComponent):
         self,
         *,
         planet: Planet,
-        partial_pressure_bar: float,
-        atmosphere_mean_molar_mass: float,
-        fugacities_dict: dict[str, float],
+        system: InteriorAtmosphereSystem,
         element: Optional[str] = None,
     ) -> float:
         """Total mass.
 
         Args:
             planet: Planet properties.
-            partial_pressure_bar: Partial pressure in bar.
-            atmosphere_mean_molar_mass: Mean molar mass of the atmosphere.
-            fugacities_dict: Dictionary of all the species and their partial pressures.
+            system: Interior atmosphere system.
             element: Returns the mass for an element. Defaults to None to return the species mass.
                This argument is used by the @_mass_decorator.
 
@@ -436,31 +440,36 @@ class GasSpecies(ChemicalComponent):
 
         del element
 
+        pressure: float = system.pressures_dict[self.chemical_formula]
+        fugacity: float = system.fugacities_dict[self.chemical_formula]
+        fugacity_coefficient: float = system.fugacity_coefficients_dict[self.chemical_formula]
+
         # Atmosphere.
-        mass_in_atmosphere: float = (
-            UnitConversion.bar_to_Pa(partial_pressure_bar) / planet.surface_gravity
+        mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
+        mass_in_atmosphere *= (
+            planet.surface_area * self.molar_mass / system.atmospheric_mean_molar_mass
         )
-        mass_in_atmosphere *= planet.surface_area * self.molar_mass / atmosphere_mean_molar_mass
-        volume_mixing_ratio = partial_pressure_bar / sum(fugacities_dict.values())
+        # TODO: Is partial pressure ratio correct or should it be a fugacity ratio?
+        volume_mixing_ratio: float = pressure / system.total_pressure
         moles_in_atmosphere: float = mass_in_atmosphere / self.molar_mass
 
         # Melt.
         prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
         ppmw_in_melt: float = self.solubility(
-            partial_pressure_bar,
+            fugacity,
             planet.surface_temperature,
-            fugacities_dict,
+            system.fugacities_dict,
         )
-        mass_in_melt = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
+        mass_in_melt: float = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
         moles_in_melt: float = mass_in_melt / self.molar_mass
 
         # Solid.
         prefactor: float = planet.mantle_mass * (1 - planet.mantle_melt_fraction)
         ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
-        mass_in_solid = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+        mass_in_solid: float = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
         moles_in_solid: float = mass_in_solid / self.molar_mass
 
-        self.output = GasSpeciesOutput(
+        self.output: GasSpeciesOutput = GasSpeciesOutput(
             mass_in_atmosphere=mass_in_atmosphere,
             mass_in_solid=mass_in_solid,
             mass_in_melt=mass_in_melt,
@@ -469,7 +478,9 @@ class GasSpecies(ChemicalComponent):
             moles_in_solid=moles_in_solid,
             ppmw_in_solid=ppmw_in_solid,
             ppmw_in_melt=ppmw_in_melt,
-            pressure_in_atmosphere=partial_pressure_bar,
+            fugacity=fugacity,
+            fugacity_coefficient=fugacity_coefficient,
+            pressure_in_atmosphere=pressure,
             volume_mixing_ratio=volume_mixing_ratio,
         )
 

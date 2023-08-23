@@ -1,10 +1,12 @@
 """Core classes and functions."""
 
+from __future__ import annotations
+
 import logging
 import pprint
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Optional, Protocol
+from typing import Protocol
 
 import numpy as np
 from numpy.linalg import LinAlgError
@@ -99,9 +101,12 @@ class BufferedFugacityConstraint:
     log10_shift: float = 0
     field: str = field(init=False, default="fugacity")
 
-    def get_value(self, *, temperature: float, **kwargs) -> float:
+    def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
         del kwargs
-        return 10 ** self.fugacity(temperature=temperature, fugacity_log10_shift=self.log10_shift)
+        value: float = 10 ** self.fugacity(
+            temperature=temperature, pressure=pressure, fugacity_log10_shift=self.log10_shift
+        )
+        return value
 
 
 @dataclass(kw_only=True)
@@ -309,24 +314,18 @@ class ReactionNetwork:
     def get_design_matrix_and_rhs(
         self,
         *,
+        system: InteriorAtmosphereSystem,
         constraints: list[SystemConstraint],
-        temperature: float,
-        pressures_dict: dict[str, float],
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Builds the design matrix and the right hand side (RHS) vector.
+        """Builds the design matrix, the LHS non-ideal vector, and the RHS vector.
 
         Args:
+            system: Interior atmosphere system.
             constraints: Constraints for the system of equations.
-            temperature: Temperature.
-            pressures_dict: The pressures of the species (bar) in a dictionary.
 
         Returns:
             TODO.
         """
-
-        # TODO: Could probably pass into this def, since individual partial pressures are not
-        # required, just to the total pressure?
-        total_pressure: float = sum(pressures_dict.values())
 
         # TODO: Update/change to fugacity.
         pressure_constraints: list[SystemConstraint] = [
@@ -363,8 +362,8 @@ class ReactionNetwork:
             # Gibb's reaction is log10 of the equilibrium constant.
             rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
                 reaction_index=reaction_index,
-                temperature=temperature,
-                pressure=total_pressure,
+                temperature=system.planet.surface_temperature,
+                pressure=system.total_pressure,
             )
 
         for index, constraint in enumerate(pressure_constraints):
@@ -372,12 +371,18 @@ class ReactionNetwork:
             species_index: int = self.species_names.index(constraint.species)
             logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
             coeff[row_index, species_index] = 1
-            rhs[row_index] = np.log10(constraint.get_value(temperature=temperature))
+            # TODO: Add total pressure for buffered fugacity when tests pass (since this will break
+            # the test data).
+            rhs[row_index] = np.log10(
+                constraint.get_value(temperature=system.planet.surface_temperature)
+            )
 
         # The "non-ideal" LHS vector.
         non_ideal: np.ndarray = np.ones_like(self.species, dtype=np.float_)
         for index, species in enumerate(self.species):
-            non_ideal[index] = species.ideality(temperature=temperature, pressure=total_pressure)
+            non_ideal[index] = system.fugacity_coefficients_dict[species.chemical_formula]
+            # TODO: below is old/previous.  To remove.
+            # species.ideality(temperature=temperature, pressure=total_pressure)
         non_ideal = np.log10(non_ideal)
 
         logger.debug("Design matrix = \n%s", coeff)
@@ -430,29 +435,25 @@ class ReactionNetwork:
     def get_residual(
         self,
         *,
-        log10_pressures: np.ndarray,
+        system: InteriorAtmosphereSystem,
         constraints: list[SystemConstraint],
-        temperature: float,
-        pressures_dict: dict[str, float],
     ) -> np.ndarray:
         """Returns the residual vector of the reaction network.
 
         Args:
-            log10_pressures: Log10 pressures.
+            system: Interior atmosphere system.
             constraints: Constraints for the system of equations.
-            temperature: Temperature.
-            pressures_dict: The pressures of the species (bar) in a dictionary.
 
         Returns:
             The residual vector of the reaction network.
         """
 
         design_matrix, rhs, non_ideal = self.get_design_matrix_and_rhs(
-            constraints=constraints, temperature=temperature, pressures_dict=pressures_dict
-        )  # TODO: pressures_dict versus fugacities_dict.
+            system=system, constraints=constraints
+        )
 
         residual_reaction: np.ndarray = (
-            design_matrix.dot(non_ideal) + design_matrix.dot(log10_pressures) - rhs
+            design_matrix.dot(non_ideal) + design_matrix.dot(system.log10_pressures) - rhs
         )
         logger.debug("Residual_reaction = %s", residual_reaction)
         return residual_reaction
@@ -517,37 +518,30 @@ class InteriorAtmosphereSystem:
         """Pressures of all species in a dictionary."""
         # TODO: Activity for solid (or remove from output).
         output: dict[str, float] = {
-            species: pressure
-            for (species, pressure) in zip(self._reaction_network.species_names, self.pressures)
+            species_name: pressure
+            for (species_name, pressure) in zip(
+                self._reaction_network.species_names, self.pressures
+            )
         }
         return output
 
     @property
-    def log10_fugacities(self) -> np.ndarray:
-        """Log10 fugacities."""
-        fugacities: list[float] = []
-        for index, species in enumerate(self.species):
-            # TODO: Will return activity for solid species and fugacities for gas species.
-            fugacity: float = species.ideality(
+    def fugacity_coefficients_dict(self) -> dict[str, float]:
+        """Fugacity coefficients."""
+        output: dict[str, float] = {
+            species_name: species.ideality(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
-            fugacity *= self.pressures[index]
-            fugacities.append(fugacity)
-        return np.log10(fugacities, dtype=np.float_)
-
-    @property
-    def fugacities(self) -> np.ndarray:
-        """Fugacities."""
-        return 10**self.log10_fugacities
+            for (species_name, species) in zip(self._reaction_network.species_names, self.species)
+        }
+        return output
 
     @property
     def fugacities_dict(self) -> dict[str, float]:
         """Fugacities of all species in a dictionary."""
-        # TODO: Activity for solid (or remove from output).
-        output: dict[str, float] = {
-            species: fugacity
-            for (species, fugacity) in zip(self._reaction_network.species_names, self.fugacities)
-        }
+        output: dict[str, float] = {}
+        for key, value in self.fugacity_coefficients_dict.items():
+            output[key] = value * self.pressures_dict[key]
         return output
 
     @property
@@ -612,69 +606,32 @@ class InteriorAtmosphereSystem:
     def solve(
         self,
         constraints: list[SystemConstraint],
-        # *,
-        # TODO: remove use_fsolve: Optional[bool] = None,
     ) -> dict[str, float]:
         """Solves the system to determine the partial pressures with provided constraints.
 
-        Depending on the user-input, this can operate with only pressure constraints, only
-        mass constraints, or a combination of both.
-
         Args:
             constraints: Constraints for the system of equations.
-            # TODO: remove use_fsolve: Use fsolve to solve the system of equations. Defaults to
-            # None, which means
-            #    to auto select depending if the system is linear or not (which depends on the
-            #    applied constraints).
 
         Returns:
             The pressures in bar.
         """
 
-        # FIXME: with (potentially) non-ideality, it's not as trivial to know a priori if the
-        # system is linear and can be solved as such.
-
-        # logger.info("Constraints: %s", pprint.pformat(constraints))
-
-        # # TODO: If constraints give zero pressure or zero mass, then remove the species or report
-        # # an error.
-
-        # all_pressures: bool = all([constraint.field == "pressure" for constraint in constraints])
-
-        # if all_pressures and not use_fsolve:
-        #     logger.info(
-        #         "Pressure constraints only so attempting to solve a linear reaction network"
-        #     )
-        #     self._log10_pressures = self._reaction_network.solve(
-        #         constraints=constraints,
-        #         planet=self.planet,
-        #     )
-        # else:
-        #     if all_pressures and use_fsolve:
-        #         msg = "Pressure constraints only and solving with fsolve"
-        #     else:
-        #         msg: str = "Mixed pressure and mass constraints so attempting to solve a "
-        #         msg += "non-linear system of equations"
-        #     logger.info(msg)
-
-        # Always non-linear solver.
+        logger.info("Constraints: %s", pprint.pformat(constraints))
         self._log10_pressures = self._solve_fsolve(constraints=constraints)
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
-        # the linear reaction network.
-        for species_index, species in enumerate(self.species):
+        # the linear reaction network. TODO: Update this comment? Still relevant?
+        for species in self.species:
             if species.phase == "gas":
                 assert isinstance(species, GasSpecies)
                 species.mass(
                     planet=self.planet,
-                    partial_pressure_bar=self.pressures[species_index],
-                    atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
-                    fugacities_dict=self.fugacities_dict,
+                    system=self,
                 )
 
-        logger.info(pprint.pformat(self.fugacities_dict))
+        logger.info(pprint.pformat(self.pressures_dict))
 
-        return self.fugacities_dict
+        return self.pressures_dict
 
     def _solve_fsolve(self, constraints: list[SystemConstraint]) -> np.ndarray:
         """Solves the non-linear system of equations.
@@ -683,18 +640,7 @@ class InteriorAtmosphereSystem:
             constraints: Constraints for the system of equations.
         """
 
-        # TODO: Now moved into iteration. To eventually remove.
-        # design_matrix, rhs = self._reaction_network.get_design_matrix_and_rhs(**kwargs)
-        # mass_constraints: list[SystemConstraint] = [
-        #    constraint for constraint in kwargs["constraints"] if constraint.field == "mass"
-        # ]
-        # if len(rhs) + len(mass_constraints) != self.number_molecules:
-        #    num: int = self.number_molecules - (len(rhs) + len(mass_constraints))
-        #    raise ValueError(f"Missing {num} constraint(s) to solve the system")
-        # for constraint in mass_constraints:
-        #    logger.info("Adding constraint from mass balance: %s", constraint.species)
-
-        initial_log10_pressures: np.ndarray = np.ones_like(self.species, dtype="float64")
+        initial_log10_pressures: np.ndarray = np.ones_like(self.species, dtype=np.float_)
         logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
         ier: int = 0
         # Count the number of attempts to solve the system by randomising the initial condition.
@@ -749,10 +695,8 @@ class InteriorAtmosphereSystem:
 
         # Compute residual for the reaction network.
         residual_reaction: np.ndarray = self._reaction_network.get_residual(
-            log10_pressures=self.log10_pressures,
+            system=self,
             constraints=constraints,
-            temperature=self.planet.surface_temperature,
-            pressures_dict=self.fugacities_dict,
         )
 
         mass_constraints: list[SystemConstraint] = [
@@ -760,17 +704,15 @@ class InteriorAtmosphereSystem:
         ]
 
         # Compute residual for the mass balance.
-        residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
+        residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype=np.float_)
         for constraint_index, constraint in enumerate(mass_constraints):
             for species_index, species in enumerate(self.species):
                 if species.phase == "gas":
                     assert isinstance(species, GasSpecies)
                     residual_mass[constraint_index] += species.mass(
                         planet=self.planet,
-                        partial_pressure_bar=self.pressures[species_index],
-                        atmosphere_mean_molar_mass=self.atmospheric_mean_molar_mass,
+                        system=self,
                         element=constraint.species,
-                        fugacities_dict=self.fugacities_dict,
                     )
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_value()

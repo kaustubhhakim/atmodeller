@@ -2,6 +2,8 @@
 
 """Driver script to provide a command line option to compute atmospheres."""
 
+from __future__ import annotations
+
 import argparse
 import logging
 import time
@@ -94,7 +96,7 @@ def main():
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
     system.solve(constraints)
-    logger.info(system.fugacities_dict)
+    logger.info(system.pressures_dict)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)

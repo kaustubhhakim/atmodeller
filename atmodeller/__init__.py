@@ -1,5 +1,7 @@
 """Package level variables and initialises the package logger."""
 
+from __future__ import annotations
+
 __version__: str = "0.1.0"
 
 import importlib.resources
