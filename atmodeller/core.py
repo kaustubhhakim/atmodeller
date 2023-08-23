@@ -84,6 +84,11 @@ class MassConstraint(_ValueConstraint):
 
 
 @dataclass(kw_only=True)
+class ActivityConstraint(_ValueConstraint):
+    field: str = field(init=False, default="activity")
+
+
+@dataclass(kw_only=True)
 class BufferedFugacityConstraint:
     """A buffered fugacity constraint to apply to an interior-atmosphere system.
 
@@ -327,13 +332,14 @@ class ReactionNetwork:
             TODO.
         """
 
-        # TODO: Update/change to fugacity.
-        pressure_constraints: list[SystemConstraint] = [
+        fugacity_constraints: list[SystemConstraint] = [
             constraint for constraint in constraints if constraint.field == "fugacity"
         ]
-
-        number_pressure_constraints: int = len(pressure_constraints)
-        nrows: int = number_pressure_constraints + self.number_reactions
+        pressure_constraints: list[SystemConstraint] = [
+            constraint for constraint in constraints if constraint.field == "pressure"
+        ]
+        number_constraints: int = len(fugacity_constraints) + len(pressure_constraints)
+        nrows: int = number_constraints + self.number_reactions
 
         if nrows == self.number_species:
             msg: str = "The necessary number of constraints will be applied to "
@@ -342,13 +348,14 @@ class ReactionNetwork:
         else:
             num: int = self.number_species - nrows
             # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
-            msg = "%d additional (not fugacity) constraint(s) are necessary " % num
+            msg = "%d additional (mass) constraint(s) are necessary " % num
             msg += "to solve the system"
             logger.info(msg)
 
-        # Build design matrix and RHS vector.
+        # Initialise.
         coeff: np.ndarray = np.zeros((nrows, self.number_species))
         rhs: np.ndarray = np.zeros(nrows)
+        non_ideal: np.ndarray = np.ones_like(self.species, dtype=np.float_)
 
         # Reactions.
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
@@ -359,14 +366,14 @@ class ReactionNetwork:
                 reaction_index,
                 self.reactions[reaction_index],
             )
-            # Gibb's reaction is log10 of the equilibrium constant.
             rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
                 reaction_index=reaction_index,
                 temperature=system.planet.surface_temperature,
                 pressure=system.total_pressure,
             )
 
-        for index, constraint in enumerate(pressure_constraints):
+        # Fugacity constraints.
+        for index, constraint in enumerate(fugacity_constraints):
             row_index: int = self.number_reactions + index
             species_index: int = self.species_names.index(constraint.species)
             logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
@@ -377,8 +384,20 @@ class ReactionNetwork:
                 )
             )
 
+        # Pressure constraints.
+        for index, constraint in enumerate(pressure_constraints):
+            row_index: int = self.number_reactions + len(fugacity_constraints) + index
+            species_index: int = self.species_names.index(constraint.species)
+            logger.info("Row %02d: Setting %s pressure", row_index, constraint.species)
+            coeff[row_index, species_index] = 1
+            rhs[row_index] = np.log10(
+                constraint.get_value(
+                    temperature=system.planet.surface_temperature, pressure=system.total_pressure
+                )
+            )
+            rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
+
         # The "non-ideal" LHS vector.
-        non_ideal: np.ndarray = np.ones_like(self.species, dtype=np.float_)
         for index, species in enumerate(self.species):
             non_ideal[index] = system.fugacity_coefficients_dict[species.chemical_formula]
         non_ideal = np.log10(non_ideal)

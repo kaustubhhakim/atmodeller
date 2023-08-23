@@ -16,6 +16,7 @@ from atmodeller import (
     Planet,
     SystemConstraint,
     __version__,
+    logger,
 )
 from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
 from atmodeller.thermodynamics import (
@@ -67,6 +68,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 
     target_pressures: np.ndarray = np.array([3.85705535e-01, 8.69991277e-08, 3.90491491e-01])
     system.solve(constraints)
+    logger.debug(system.output)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 

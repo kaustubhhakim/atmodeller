@@ -253,6 +253,22 @@ class Ideal(Ideality):
         return 1.0
 
 
+class NonIdealConstant(Ideality):
+    """A constant activity or fugacity coefficient. Useful for testing.
+
+    Args:
+        constant: A constant.
+    """
+
+    def __init__(self, constant: float):
+        self.constant: float = constant
+
+    def _ideality(self, *args, **kwargs) -> float:
+        del args
+        del kwargs
+        return self.constant
+
+
 @dataclass(kw_only=True)
 class ChemicalComponent(ABC):
     """A chemical component and its properties.
