@@ -48,10 +48,10 @@ class _ValueConstraint:
     """A value constraint to apply to an interior-atmosphere system.
 
     Args:
-        species: The species to constrain. Usually a species for a pressure constraint or an
-            element for a mass constraint.
-        value: Imposed value in kg for masses and bar for pressures.
-        field: Either 'fugacity' or 'mass'.
+        species: The species to constrain. Usually a species for a pressure or fugacity constraint
+            or an element for a mass constraint.
+        value: Imposed value in kg for masses and bar for pressures or fugacities.
+        field: Either 'pressure, 'fugacity' or 'mass'.
 
     Attributes:
         See Args.
@@ -68,12 +68,17 @@ class _ValueConstraint:
 
 @dataclass(kw_only=True)
 class FugacityConstraint(_ValueConstraint):
-    field: str = "fugacity"
+    field: str = field(init=False, default="fugacity")
+
+
+@dataclass(kw_only=True)
+class PressureConstraint(_ValueConstraint):
+    field: str = field(init=False, default="pressure")
 
 
 @dataclass(kw_only=True)
 class MassConstraint(_ValueConstraint):
-    field: str = "mass"
+    field: str = field(init=False, default="mass")
 
 
 @dataclass(kw_only=True)
@@ -83,7 +88,7 @@ class BufferedFugacityConstraint:
     Args:
         species: The species that is buffered by `buffer`. Defaults to 'O2'.
         fugacity: A BufferedFugacity. Defaults to IronWustiteBufferHirschmann
-        log10_shift: Log10 shift relative to the buffer.
+        log10_shift: Log10 shift relative to the buffer. Defaults to 0.
 
     Attributes:
         See Args.
@@ -92,7 +97,7 @@ class BufferedFugacityConstraint:
     species: str = "O2"
     fugacity: BufferedFugacity = field(default_factory=IronWustiteBufferHirschmann)
     log10_shift: float = 0
-    field: str = field(default="fugacity", init=False)
+    field: str = field(init=False, default="fugacity")
 
     def get_value(self, *, temperature: float, **kwargs) -> float:
         del kwargs
