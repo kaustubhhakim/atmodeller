@@ -477,12 +477,13 @@ class InteriorAtmosphereSystem:
 
     Args:
         species: A list of species.
-        gibbs_data: Standard Gibbs free energy of formation. Defaults to a linear fit to JANAF.
+        gibbs_data: Standard Gibbs free energy of formation. Defaults to JANAF.
+        planet: A planet. Defaults to a molten Earth.
 
     Attributes:
-        species: A list of species.
-        gibbs_data: Standard Gibbs free energy of formation. Defaults to a linear fit to JANAF.
-        planet: A planet. Defaults to a molten Earth.
+        species: A list of species, possibly reordered compared to the input arg.
+        gibbs_data: Standard Gibbs free energy of formation.
+        planet: A planet.
     """
 
     species: list[ChemicalComponent]
@@ -490,15 +491,92 @@ class InteriorAtmosphereSystem:
         default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
     planet: Planet = field(default_factory=Planet)
-    _log10_pressures: np.ndarray = field(init=False)  # Aligned with self.species.
     _reaction_network: ReactionNetwork = field(init=False)
+    _log10_pressures: np.ndarray = field(init=False)  # For the solution.
 
     def __post_init__(self):
         logger.info("Creating a new interior-atmosphere system")
         self._conform_solubilities_to_composition()
-        self._log10_pressures = np.zeros_like(self.species, dtype="float64")
         self._reaction_network = ReactionNetwork(species=self.species, gibbs_data=self.gibbs_data)
-        del self.species  # To prevent accessing. Use self._reaction_network instead.
+        self.species = self._reaction_network.species  # Note reordering by self._reaction_network.
+        # Initialise solution to zero.
+        self._log10_pressures = np.zeros_like(self.species, dtype=np.float_)
+
+    @property
+    def log10_pressures(self) -> np.ndarray:
+        """Log10 pressures."""
+        return self._log10_pressures
+
+    @property
+    def pressures(self) -> np.ndarray:
+        """Pressures."""
+        return 10**self.log10_pressures
+
+    @property
+    def pressures_dict(self) -> dict[str, float]:
+        """Pressures of all species in a dictionary."""
+        # TODO: Activity for solid (or remove from output).
+        output: dict[str, float] = {
+            species: pressure
+            for (species, pressure) in zip(self._reaction_network.species_names, self.pressures)
+        }
+        return output
+
+    @property
+    def log10_fugacities(self) -> np.ndarray:
+        """Log10 fugacities."""
+        fugacities: list[float] = []
+        for index, species in enumerate(self.species):
+            # TODO: Will return activity for solid species and fugacities for gas species.
+            fugacity: float = species.ideality(
+                temperature=self.planet.surface_temperature, pressure=self.total_pressure
+            )
+            fugacity *= self.pressures[index]
+            fugacities.append(fugacity)
+        return np.log10(fugacities, dtype=np.float_)
+
+    @property
+    def fugacities(self) -> np.ndarray:
+        """Fugacities."""
+        return 10**self.log10_fugacities
+
+    @property
+    def fugacities_dict(self) -> dict[str, float]:
+        """Fugacities of all species in a dictionary."""
+        # TODO: Activity for solid (or remove from output).
+        output: dict[str, float] = {
+            species: fugacity
+            for (species, fugacity) in zip(self._reaction_network.species_names, self.fugacities)
+        }
+        return output
+
+    @property
+    def total_pressure(self) -> float:
+        """Total pressure."""
+        return sum(self.pressures)
+
+    @property
+    def atmospheric_mean_molar_mass(self) -> float:
+        """Mean molar mass of the atmosphere."""
+        mu_atmosphere: float = 0
+        for index, species in enumerate(self.species):
+            mu_atmosphere += species.molar_mass * self.pressures[index]
+        mu_atmosphere /= self.total_pressure
+
+        return mu_atmosphere
+
+    @property
+    def output(self) -> dict:
+        """Convenient output for analysis."""
+        output_dict: dict = {}
+        output_dict["total_pressure_in_atmosphere"] = self.total_pressure
+        output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
+        for species in self.species:
+            if species.phase == "gas":
+                assert isinstance(species, GasSpecies)
+                output_dict[species.chemical_formula] = species.output
+        # TODO: Dan to add elemental outputs as well.
+        return output_dict
 
     def _conform_solubilities_to_composition(self) -> None:
         """Ensure that the solubilities of the species are consistent with the melt composition."""
@@ -531,59 +609,11 @@ class InteriorAtmosphereSystem:
                         logger.info("No solubility law for %s", species.chemical_formula)
                         species.solubility = NoSolubility()
 
-    @property
-    def pressures(self) -> np.ndarray:
-        """Pressures."""
-        return 10**self.log10_pressures
-
-    @property
-    def log10_pressures(self) -> np.ndarray:
-        """Log10 pressures."""
-        return self._log10_pressures
-
-    @property
-    def fugacities_dict(self) -> dict[str, float]:
-        """Fugacities of all species in a dictionary."""
-        # TODO: activity for solid (or remove from output).
-        output: dict[str, float] = {
-            species: pressure
-            for (species, pressure) in zip(self._reaction_network.species_names, self.pressures)
-        }
-        return output
-
-    @property
-    def atmospheric_total_pressure(self) -> float:
-        """Total atmospheric pressure."""
-        return sum(self.pressures)
-
-    @property
-    def atmospheric_mean_molar_mass(self) -> float:
-        """Mean molar mass of the atmosphere."""
-        mu_atmosphere: float = 0
-        for index, species in enumerate(self._reaction_network.species):
-            mu_atmosphere += species.molar_mass * self.pressures[index]
-        mu_atmosphere /= self.atmospheric_total_pressure
-
-        return mu_atmosphere
-
-    @property
-    def output(self) -> dict:
-        """Convenient output for analysis."""
-        output_dict: dict = {}
-        output_dict["total_pressure_in_atmosphere"] = self.atmospheric_total_pressure
-        output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self._reaction_network.species:
-            if species.phase == "gas":
-                assert isinstance(species, GasSpecies)
-                output_dict[species.chemical_formula] = species.output
-        # TODO: Dan to add elemental outputs as well.
-        return output_dict
-
     def solve(
         self,
         constraints: list[SystemConstraint],
-        *,
-        use_fsolve: Optional[bool] = None,
+        # *,
+        # TODO: remove use_fsolve: Optional[bool] = None,
     ) -> dict[str, float]:
         """Solves the system to determine the partial pressures with provided constraints.
 
@@ -592,41 +622,47 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations.
-            use_fsolve: Use fsolve to solve the system of equations. Defaults to None, which means
-                to auto select depending if the system is linear or not (which depends on the
-                applied constraints).
+            # TODO: remove use_fsolve: Use fsolve to solve the system of equations. Defaults to
+            # None, which means
+            #    to auto select depending if the system is linear or not (which depends on the
+            #    applied constraints).
 
         Returns:
             The pressures in bar.
         """
 
-        logger.info("Constraints: %s", pprint.pformat(constraints))
+        # FIXME: with (potentially) non-ideality, it's not as trivial to know a priori if the
+        # system is linear and can be solved as such.
 
-        # TODO: If constraints give zero pressure or zero mass, then remove the species or report
-        # an error.
+        # logger.info("Constraints: %s", pprint.pformat(constraints))
 
-        all_pressures: bool = all([constraint.field == "pressure" for constraint in constraints])
+        # # TODO: If constraints give zero pressure or zero mass, then remove the species or report
+        # # an error.
 
-        if all_pressures and not use_fsolve:
-            logger.info(
-                "Pressure constraints only so attempting to solve a linear reaction network"
-            )
-            self._log10_pressures = self._reaction_network.solve(
-                constraints=constraints,
-                planet=self.planet,
-            )
-        else:
-            if all_pressures and use_fsolve:
-                msg = "Pressure constraints only and solving with fsolve"
-            else:
-                msg: str = "Mixed pressure and mass constraints so attempting to solve a "
-                msg += "non-linear system of equations"
-            logger.info(msg)
-            self._log10_pressures = self._solve_fsolve(constraints=constraints)
+        # all_pressures: bool = all([constraint.field == "pressure" for constraint in constraints])
+
+        # if all_pressures and not use_fsolve:
+        #     logger.info(
+        #         "Pressure constraints only so attempting to solve a linear reaction network"
+        #     )
+        #     self._log10_pressures = self._reaction_network.solve(
+        #         constraints=constraints,
+        #         planet=self.planet,
+        #     )
+        # else:
+        #     if all_pressures and use_fsolve:
+        #         msg = "Pressure constraints only and solving with fsolve"
+        #     else:
+        #         msg: str = "Mixed pressure and mass constraints so attempting to solve a "
+        #         msg += "non-linear system of equations"
+        #     logger.info(msg)
+
+        # Always non-linear solver.
+        self._log10_pressures = self._solve_fsolve(constraints=constraints)
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the linear reaction network.
-        for species_index, species in enumerate(self._reaction_network.species):
+        for species_index, species in enumerate(self.species):
             if species.phase == "gas":
                 assert isinstance(species, GasSpecies)
                 species.mass(
@@ -658,9 +694,7 @@ class InteriorAtmosphereSystem:
         # for constraint in mass_constraints:
         #    logger.info("Adding constraint from mass balance: %s", constraint.species)
 
-        initial_log10_pressures: np.ndarray = np.ones_like(
-            self._reaction_network.species, dtype="float64"
-        )
+        initial_log10_pressures: np.ndarray = np.ones_like(self.species, dtype="float64")
         logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
         ier: int = 0
         # Count the number of attempts to solve the system by randomising the initial condition.
@@ -728,7 +762,7 @@ class InteriorAtmosphereSystem:
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype="float64")
         for constraint_index, constraint in enumerate(mass_constraints):
-            for species_index, species in enumerate(self._reaction_network.species):
+            for species_index, species in enumerate(self.species):
                 if species.phase == "gas":
                     assert isinstance(species, GasSpecies)
                     residual_mass[constraint_index] += species.mass(
