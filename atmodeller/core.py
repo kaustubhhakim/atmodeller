@@ -706,7 +706,7 @@ class InteriorAtmosphereSystem:
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype=np.float_)
         for constraint_index, constraint in enumerate(mass_constraints):
-            for species_index, species in enumerate(self.species):
+            for species in self.species:
                 if species.phase == "gas":
                     assert isinstance(species, GasSpecies)
                     residual_mass[constraint_index] += species.mass(
