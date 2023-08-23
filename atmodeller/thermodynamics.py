@@ -81,28 +81,32 @@ class BufferedFugacity(ABC):
     """Buffered fugacity base class."""
 
     @abstractmethod
-    def _fugacity(self, *, temperature: float) -> float:
+    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
         """Log10(fugacity) of the buffer in terms of temperature.
 
         Args:
-            temperature: Temperature.
+            temperature: Temperature (K).
+            pressure: Pressure (bar). Defaults to 1.
 
         Returns:
             Log10 of the fugacity.
         """
         raise NotImplementedError
 
-    def __call__(self, *, temperature: float, fugacity_log10_shift: float = 0) -> float:
+    def __call__(
+        self, *, temperature: float, pressure: float = 1, fugacity_log10_shift: float = 0
+    ) -> float:
         """log10(fugacity) plus an optional shift.
 
         Args:
-            temperature: Temperature.
+            temperature: Temperature (K).
+            pressure: Pressure (bar). Defaults to 1.
             fugacity_log10_shift: Log10 shift. Defaults to 0.
 
         Returns:
             Log10 of the fugacity including the shift.
         """
-        return self._fugacity(temperature=temperature) + fugacity_log10_shift
+        return self._fugacity(temperature=temperature, pressure=pressure) + fugacity_log10_shift
 
 
 class IronWustiteBufferHirschmann(BufferedFugacity):
@@ -111,27 +115,28 @@ class IronWustiteBufferHirschmann(BufferedFugacity):
     https://ui.adsabs.harvard.edu/abs/1993CoMP..114..296O/abstract
     """
 
-    def _fugacity(self, *, temperature: float) -> float:
+    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
-        # total_pressure is set to 1 bar.
-        total_pressure: float = 1  # bar
         fugacity: float = (
             -28776.8 / temperature
             + 14.057
-            + 0.055 * (total_pressure - 1) / temperature
+            + 0.055 * (pressure - 1) / temperature
             - 0.8853 * np.log(temperature)
         )
         return fugacity
 
 
 class IronWustiteBufferOneill(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002). See Table 6.
+    """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002).
+
+    Gibbs energy of reaction is at 1 bar. See Table 6.
 
     https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
     """
 
-    def _fugacity(self, *, temperature: float) -> float:
+    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
+        del pressure
         fugacity: float = (
             2
             * (-244118 + 115.559 * temperature - 8.474 * temperature * np.log(temperature))
@@ -146,31 +151,39 @@ class IronWustiteBufferBallhaus(BufferedFugacity):
     https://ui.adsabs.harvard.edu/abs/1991CoMP..107...27B/abstract
     """
 
-    def _fugacity(self, *, temperature: float) -> float:
+    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
-        # total_pressure is set to 1 bar.
-        total_pressure: float = 1  # bar
         fugacity: float = (
             14.07
             - 28784 / temperature
             - 2.04 * np.log10(temperature)
-            + 0.053 * total_pressure / temperature
-            + 3e-6 * total_pressure
+            + 0.053 * pressure / temperature
+            + 3e-6 * pressure
         )
         return fugacity
 
 
 class IronWustiteBufferFischer(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from Fischer et al. (2011). See Table S2 in supplementary
-    materials.
+    """Iron-wustite buffer (fO2) from Fischer et al. (2011).
+
+    See Table S2 in supplementary materials.
 
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
     """
 
-    def _fugacity(self, *, temperature: float) -> float:
+    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
-        # Collapsed polynomial since it is evaluated at P=0 GPa (i.e. no pressure dependence).
-        buffer: float = 6.44059 - 28.1808 * 1e3 / temperature
+        pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
+        a_P: float = 6.44059 + 0.00463099 * pressure_GPa
+        b_P: float = (
+            -28.1808
+            + 0.556272 * pressure_GPa
+            - 0.00143757 * pressure_GPa**2
+            + 4.0256e-6 * pressure_GPa**3
+            - 5.4861e-9 * pressure_GPa**4  # Note typo in Table S2. Must be pressure**4.
+        )
+        b_P *= 1000 / temperature
+        buffer: float = a_P + b_P
         return buffer
 
 

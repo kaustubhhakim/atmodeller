@@ -567,7 +567,7 @@ class InteriorAtmosphereSystem:
         output_dict: dict = {}
         output_dict["total_pressure_in_atmosphere"] = self.atmospheric_total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self.species:
+        for species in self._reaction_network.species:
             if species.phase == "gas":
                 assert isinstance(species, GasSpecies)
                 output_dict[species.chemical_formula] = species.output
