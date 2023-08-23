@@ -27,8 +27,8 @@ from atmodeller.thermodynamics import (
 from atmodeller.utilities import earth_oceans_to_kg
 
 # Tolerances to compare the test results with predefined 'correct' output.
-rtol: float = 1.0e-4
-atol: float = 1.0e-4
+rtol: float = 1.0e-8
+atol: float = 1.0e-8
 
 standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
     StandardGibbsFreeEnergyOfFormation()
@@ -65,7 +65,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
         species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    target_pressures: np.ndarray = np.array([3.85702557e-01, 8.70003606e-08, 3.90487657e-01])
+    target_pressures: np.ndarray = np.array([3.85705535e-01, 8.69991277e-08, 3.90491491e-01])
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -92,7 +92,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
         species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    target_pressures: np.ndarray = np.array([3.88381805e-02, 8.70003606e-06, 3.93200143e-01])
+    target_pressures: np.ndarray = np.array([3.88388984e-02, 8.69972318e-06, 3.93203953e-01])
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -119,7 +119,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
         species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    target_pressures: np.ndarray = np.array([3.35889712e00, 8.70003606e-10, 3.40056823e-01])
+    target_pressures: np.ndarray = np.array([3.35867961e00, 8.70152291e-10, 3.40066982e-01])
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -151,7 +151,7 @@ def test_hydrogen_species_five_oceans() -> None:
         species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    target_pressures: np.ndarray = np.array([9.26231505e00, 8.70003606e-08, 9.37722509e00])
+    target_pressures: np.ndarray = np.array([9.25738492e00, 8.70975650e-08, 9.37755422e00])
     system.solve(constraints)
 
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -179,7 +179,7 @@ def test_hydrogen_species_ten_oceans() -> None:
         species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    target_pressures: np.ndarray = np.array([3.53429002e01, 8.70003606e-08, 3.57813709e01])
+    target_pressures: np.ndarray = np.array([3.52710459e01, 8.73871716e-08, 3.57882477e01])
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -212,7 +212,7 @@ def test_hydrogen_species_temperature() -> None:
     )
 
     planet.surface_temperature = 1500.0  # K
-    target_pressures: np.ndarray = np.array([4.69139374e-01, 2.50076371e-12, 3.89667518e-01])
+    target_pressures: np.ndarray = np.array([4.69139863e-01, 2.50073390e-12, 3.89671393e-01])
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -250,7 +250,7 @@ def test_hydrogen_and_carbon_species() -> None:
     )
 
     target_pressures: np.ndarray = np.array(
-        [5.96318132e01, 3.88413014e-01, 8.70003606e-08, 1.32123568e01, 3.93231740e-01]
+        [5.96157589e01, 3.87522780e-01, 8.74014299e-08, 1.32393097e01, 3.93237350e-01]
     )
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -284,7 +284,7 @@ def test_hydrogen_and_carbon_species_five_ch_ratio() -> None:
     )
 
     target_pressures: np.ndarray = np.array(
-        [2.99899277e02, 3.88420662e-01, 8.70003606e-08, 6.64473548e01, 3.93239483e-01]
+        [2.99414663e02, 3.83950883e-01, 8.90419112e-08, 6.71143359e01, 3.93252201e-01]
     )
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -318,7 +318,7 @@ def test_hydrogen_and_carbon_species_ten_ch_ratio() -> None:
     )
 
     target_pressures: np.ndarray = np.array(
-        [6.00455365e02, 3.88421615e-01, 8.70003606e-08, 1.33040236e02, 3.93240448e-01]
+        [5.98473386e02, 3.79516928e-01, 9.11391785e-08, 1.35719545e02, 3.93261980e-01]
     )
     system.solve(constraints)
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
@@ -360,12 +360,12 @@ def test_hydrogen_and_carbon_species_with_methane() -> None:
 
     target_pressures: np.ndarray = np.array(
         [
-            5.59125286e01,
-            4.73307007e-01,
-            2.50076371e-12,
-            1.79198533e01,
-            3.93129157e-01,
-            6.34850467e-05,
+            5.58811958e01,
+            4.71837579e-01,
+            2.51637543e-12,
+            1.79658754e01,
+            3.93135889e-01,
+            6.28583933e-05,
         ]
     )
     system.solve(constraints)
@@ -411,12 +411,12 @@ def test_hydrogen_and_carbon_species_with_nitrogen() -> None:
     # Order of target pressures: CO, H2, N2, O2, CO2, H2O
     target_pressures: np.ndarray = np.array(
         [
-            5.94765770e01,
-            3.88409369e-01,
-            2.35121401e00,
-            8.70003606e-08,
-            1.31779618e01,
-            3.93228050e-01,
+            5.94596836e01,
+            3.87492671e-01,
+            2.35167247e00,
+            8.74133949e-08,
+            1.32055527e01,
+            3.93233711e-01,
         ]
     )
     system.solve(constraints)
@@ -456,12 +456,12 @@ def test_hydrogen_and_carbon_species_with_NH3() -> None:
     # Order of target pressures: CO, H2, O2, CO2, H2O, NH3
     target_pressures: np.ndarray = np.array(
         [
-            5.80300880e01,
-            3.75753229e-01,
-            8.70003606e-08,
-            1.28574696e01,
-            3.80414895e-01,
-            4.83105585e00,
+            5.80133890e01,
+            3.74858271e-01,
+            8.74172015e-08,
+            1.28846220e01,
+            3.80420404e-01,
+            4.83204103e00,
         ]
     )
     system.solve(constraints)

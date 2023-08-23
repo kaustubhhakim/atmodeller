@@ -228,7 +228,7 @@ class ReactionNetwork:
 
         return reaction_matrix
 
-    @property
+    @cached_property
     def reactions(self) -> dict[int, str]:
         """The reactions as a dictionary."""
         reactions: dict[int, str] = {}
@@ -371,18 +371,16 @@ class ReactionNetwork:
             species_index: int = self.species_names.index(constraint.species)
             logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
             coeff[row_index, species_index] = 1
-            # TODO: Add total pressure for buffered fugacity when tests pass (since this will break
-            # the test data).
             rhs[row_index] = np.log10(
-                constraint.get_value(temperature=system.planet.surface_temperature)
+                constraint.get_value(
+                    temperature=system.planet.surface_temperature, pressure=system.total_pressure
+                )
             )
 
         # The "non-ideal" LHS vector.
         non_ideal: np.ndarray = np.ones_like(self.species, dtype=np.float_)
         for index, species in enumerate(self.species):
             non_ideal[index] = system.fugacity_coefficients_dict[species.chemical_formula]
-            # TODO: below is old/previous.  To remove.
-            # species.ideality(temperature=temperature, pressure=total_pressure)
         non_ideal = np.log10(non_ideal)
 
         logger.debug("Design matrix = \n%s", coeff)
@@ -527,7 +525,7 @@ class InteriorAtmosphereSystem:
 
     @property
     def fugacity_coefficients_dict(self) -> dict[str, float]:
-        """Fugacity coefficients."""
+        """Fugacity coefficients in a dictionary."""
         output: dict[str, float] = {
             species_name: species.ideality(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure

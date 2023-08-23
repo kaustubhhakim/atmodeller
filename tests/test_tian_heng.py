@@ -22,8 +22,8 @@ from atmodeller.thermodynamics import (
 )
 
 # Tolerances to compare the test results with predefined 'correct' output.
-rtol: float = 1.0e-4
-atol: float = 1.0e-4
+rtol: float = 1.0e-8
+atol: float = 1.0e-8
 
 standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
     StandardGibbsFreeEnergyOfFormation()
@@ -71,13 +71,13 @@ def test_graphite() -> None:
 
     target_pressures: np.ndarray = np.array(
         [
-            1,
-            0.07592516605503474,
-            44.493349981766066,
-            1.2561211766550179e-25,
-            0.0617312184744702,
-            13.575444015493717,
-            941.7935496182116,
+            1.00000000e00,
+            8.17264668e-02,
+            4.44933500e01,
+            1.45485056e-25,
+            7.15136913e-02,
+            1.46103606e01,
+            9.41946227e02,
         ]
     )
     system.solve(constraints)

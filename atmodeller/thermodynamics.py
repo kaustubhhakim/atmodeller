@@ -449,7 +449,6 @@ class GasSpecies(ChemicalComponent):
         mass_in_atmosphere *= (
             planet.surface_area * self.molar_mass / system.atmospheric_mean_molar_mass
         )
-        # TODO: Is partial pressure ratio correct or should it be a fugacity ratio?
         volume_mixing_ratio: float = pressure / system.total_pressure
         moles_in_atmosphere: float = mass_in_atmosphere / self.molar_mass
 
