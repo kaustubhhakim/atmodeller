@@ -662,7 +662,7 @@ class InteriorAtmosphereSystem:
                     ic_count,
                 )
                 # Increase or decrease the magnitude of all pressures.
-                initial_log10_pressures *= np.random.random_sample()
+                initial_log10_pressures *= 2 * np.random.random_sample()
                 logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
                 ic_count += 1
 
