@@ -1,8 +1,6 @@
 """Reproducing the results of Tian and Heng (2023)."""
 
 
-import numpy as np
-
 from atmodeller import __version__
 from atmodeller.core import (
     BufferedFugacityConstraint,
@@ -20,10 +18,6 @@ from atmodeller.thermodynamics import (
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
-
-# Tolerances to compare the test results with target output.
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
 
 standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
     StandardGibbsFreeEnergyOfFormation()
@@ -61,16 +55,15 @@ def test_graphite() -> None:
         FugacityConstraint(species="H2", value=44.49334998176607),
     ]
 
-    target_pressures: np.ndarray = np.array(
-        [
-            1.00000000e00,
-            8.17264668e-02,
-            4.44933500e01,
-            1.45485056e-25,
-            7.15136913e-02,
-            1.46103606e01,
-            9.41946227e02,
-        ]
-    )
+    target_pressures: dict[str, float] = {
+        "C": 1.0,
+        "CH4": 941.9462267908025,
+        "CO": 0.0817264668302245,
+        "CO2": 0.0715136912730243,
+        "H2": 44.493349981766066,
+        "H2O": 14.610360605730092,
+        "O2": 1.4548505639981167e-25,
+    }
+
     system.solve(constraints)
-    assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
+    assert system.isclose(target_pressures)

@@ -136,7 +136,10 @@ class ReactionNetwork:
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
-        self.species.sort(key=self._species_sorter)
+        # TODO: Unsure whether to reorder since it is more intuitive for the output to mirror the
+        # order of the input.
+        # self.species.sort(key=self._species_sorter)
+        logger.info("Creating a new reaction network")
         logger.info("Species = %s", self.species_names)
         self.species_matrix: np.ndarray = self.find_matrix()
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
@@ -459,7 +462,6 @@ class ReactionNetwork:
         """
         logger.info("Solving the reaction network")
 
-        # TODO: Figure out if linear solve possible based on non-ideal value?  All unity?
         design_matrix, rhs, non_ideal = self.get_design_matrix_and_rhs(**kwargs)
 
         if len(rhs) != self.number_species:
@@ -562,12 +564,10 @@ class InteriorAtmosphereSystem:
     def pressures_dict(self) -> dict[str, float]:
         """Pressures of all species in a dictionary."""
         # TODO: Activity for solid (or remove from output).
-        output: dict[str, float] = {
-            species_name: pressure
-            for (species_name, pressure) in zip(
-                self._reaction_network.species_names, self.pressures
-            )
-        }
+        output: dict[str, float] = {}
+        for species_name, pressure in zip(self._reaction_network.species_names, self.pressures):
+            output[species_name] = pressure
+
         return output
 
     @property
@@ -616,6 +616,23 @@ class InteriorAtmosphereSystem:
                 output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
+
+    def isclose(
+        self, target_dict: dict[str, float], rtol: float = 1.0e-5, atol: float = 1.0e-8
+    ) -> np.bool_:
+        """Determines if the solution pressures are close to target values within a tolerance."""
+
+        if len(self.pressures_dict) != len(target_dict):
+            return np.bool_(False)
+
+        target_pressures: np.ndarray = np.array(
+            [target_dict[species.formula.formula] for species in self.species]
+        )
+        isclose: np.bool_ = np.isclose(
+            target_pressures, self.pressures, rtol=rtol, atol=atol
+        ).all()
+
+        return isclose
 
     def _conform_solubilities_to_composition(self) -> None:
         """Ensure that the solubilities of the species are consistent with the melt composition."""

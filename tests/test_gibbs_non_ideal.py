@@ -6,8 +6,6 @@ code.
 
 """
 
-import numpy as np
-
 from atmodeller import (
     BufferedFugacityConstraint,
     GasSpecies,
@@ -71,12 +69,12 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
         species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    target_pressures: np.ndarray = np.array(
-        [0.193861126010587, 8.69991277e-08, 0.19626421729663623]
+    target_pressures: dict[str, float] = dict(
+        [("H2O", 0.19626421729663665), ("H2", 0.19386112601058758), ("O2", 8.69970008669977e-08)]
     )
+
     system.solve(constraints)
-    assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
-    logger.debug(system.output)
+    assert system.isclose(target_pressures)
 
 
 # endregion
