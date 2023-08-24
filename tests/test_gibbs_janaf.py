@@ -662,7 +662,20 @@ def test_hydrogen_and_carbon_species_with_HCl() -> None:
             3.93222473e-01,
         ]
     )
-    system.solve(constraints)
+
+    initial_pressures: np.ndarray = np.array(
+        [
+            1e-05,
+            1e01,
+            1e-01,
+            1e-02,
+            1e-08,
+            1e01,
+            1e-01,
+        ]
+    )
+
+    system.solve(constraints, initial_log10_pressures=np.log10(initial_pressures))
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 

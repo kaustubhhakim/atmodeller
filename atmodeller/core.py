@@ -6,7 +6,7 @@ import logging
 import pprint
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Protocol
+from typing import Protocol, Union
 
 import numpy as np
 from numpy.linalg import LinAlgError
@@ -651,18 +651,23 @@ class InteriorAtmosphereSystem:
     def solve(
         self,
         constraints: list[SystemConstraint],
+        *,
+        initial_log10_pressures: Union[np.ndarray, None] = None,
     ) -> dict[str, float]:
         """Solves the system to determine the partial pressures with provided constraints.
 
         Args:
             constraints: Constraints for the system of equations.
+            initial_log10_pressures: Initial guess for the log10 pressures. Defaults to None.
 
         Returns:
             The pressures in bar.
         """
 
         logger.info("Constraints: %s", pprint.pformat(constraints))
-        self._log10_pressures = self._solve_fsolve(constraints=constraints)
+        self._log10_pressures = self._solve_fsolve(
+            constraints=constraints, initial_log10_pressures=initial_log10_pressures
+        )
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the linear reaction network. TODO: Update this comment? Still relevant?
@@ -678,14 +683,20 @@ class InteriorAtmosphereSystem:
 
         return self.pressures_dict
 
-    def _solve_fsolve(self, constraints: list[SystemConstraint]) -> np.ndarray:
+    def _solve_fsolve(
+        self,
+        *,
+        constraints: list[SystemConstraint],
+        initial_log10_pressures: Union[np.ndarray, None],
+    ) -> np.ndarray:
         """Solves the non-linear system of equations.
 
         Args:
             constraints: Constraints for the system of equations.
         """
 
-        initial_log10_pressures: np.ndarray = np.ones_like(self.species, dtype=np.float_)
+        if initial_log10_pressures is None:
+            initial_log10_pressures = np.ones_like(self.species, dtype=np.float_)
         logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
         ier: int = 0
         # Count the number of attempts to solve the system by randomising the initial condition.
