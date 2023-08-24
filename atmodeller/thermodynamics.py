@@ -315,25 +315,27 @@ class Ideal(NonIdealConstant):
 
 @dataclass(kw_only=True)
 class ChemicalComponent(ABC):
-    """A chemical component and its properties.
+    """Abstract base class representing a chemical component and its properties.
 
     Args:
-        chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
+        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
         common_name: Common name for locating Gibbs data in the thermodynamic database.
+        ideality: Ideality object for thermodynamic calculations. See subclasses for specific use.
+            Defaults to Ideal.
 
     Attributes:
         chemical_formula: Chemical formula.
         common_name: Common name in the thermodynamic database.
-        formula: Formula.
+        formula: Formula object derived from the chemical formula.
+        ideality: Ideality object for thermodynamic calculations. See subclasses for specific use.
     """
 
     chemical_formula: str
     common_name: str
-    formula: Formula = field(init=False)
     ideality: Ideality = field(default_factory=Ideal)
+    formula: Formula = field(init=False)
     # TODO: select source of thermodynamic data for this species.  Do all the reading in/caching
     # to set up the interpolation functions
-    # TODO: Option to specify if "ideal" or not to determine if a linear solve can be performed.
 
     def __post_init__(self):
         logger.info(
@@ -347,22 +349,22 @@ class ChemicalComponent(ABC):
     @property
     @abstractmethod
     def phase(self) -> str:
-        """Returns the phase (solid, gas, etc.)."""
+        """Phase (solid, gas, etc.)."""
         ...
 
     @property
     def molar_mass(self) -> float:
-        """Returns the molar mass in kg/mol."""
+        """Molar mass in kg/mol."""
         return UnitConversion.g_to_kg(self.formula.mass)
 
     @property
     def hill_formula(self) -> str:
-        """Returns the Hill formula."""
+        """Hill formula."""
         return self.formula.formula
 
     @property
     def is_homonuclear_diatomic(self) -> bool:
-        """Returns True if the species is homonuclear diatomic or False if not."""
+        """True if the species is homonuclear diatomic otherwise False."""
 
         composition = self.formula.composition()
 
@@ -373,7 +375,7 @@ class ChemicalComponent(ABC):
 
     @cached_property
     def modified_hill_formula(self) -> str:
-        """Returns the modified Hill formula.
+        """Modified Hill formula.
 
         JANAF uses the modified Hill formula to index its data tables. In short, H, if present,
         should appear after C (if C is present), otherwise it must be the first element.
@@ -405,22 +407,33 @@ class ChemicalComponent(ABC):
 
 @dataclass(kw_only=True)
 class SolidSpecies(ChemicalComponent):
-    """A solid species."""
+    """A solid species.
 
-    # TODO: Check what this means if two solids are in equilibrium (solid solution). Presumably
-    # then the mole fractions become relevant.
-    activity: Ideality = field(init=False)
+    For a solid species, 'self.ideality' refers to its activity, where the activity is equal to the
+    activity coefficient multiplied by the species' volume mixing ratio.
 
-    def __post_init__(self):
-        super().__post_init__()
-        self.activity = self.ideality  # Ideality relates to activity.
+    Args:
+        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
+        common_name: Common name for locating Gibbs data in the thermodynamic database.
+        ideality: Ideality object representing activity for thermodynamic calculations. Defaults to
+            Ideal.
+
+    Attributes:
+        chemical_formula: Chemical formula.
+        common_name: Common name in the thermodynamic database.
+        formula: Formula object derived from the chemical formula.
+        ideality: Ideality object representing activity for thermodynamic calculations.
+    """
+
+    @property
+    def activity(self) -> Ideality:
+        """Activity."""
+        return self.ideality
 
     @property
     def phase(self) -> str:
+        """See base class."""
         return "solid"
-
-    # TODO: Automatically flag a constraint for unity activity when solving the system?
-    # or some message to the logger?
 
 
 @dataclass(kw_only=True)
@@ -449,15 +462,23 @@ class GasSpeciesOutput:
 class GasSpecies(ChemicalComponent):
     """A gas species.
 
+    For a gas species, 'self.ideality' refers to its fugacity coefficient, where the fugacity is
+    equal to the fugacity coefficient multiplied by the species' partial pressure.
+
     Args:
         chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
         solubility: Solubility model. Defaults to no solubility.
-        fugacity_coefficient: Fugacity coefficient model.
-        solid_melt_distribution_coefficient: Distribution coefficient. Defaults to 0.
+        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
+            Defaults to 0.
+        ideality: Ideality object representing the fugacity coefficient for thermodynamic
+            calculations. Defaults to Ideal (i.e., unity).
 
     Attributes:
         chemical_formula: Chemical formula.
         common_name: Common name in the thermodynamic database.
+        formula: Formula object derived from the chemical formula.
+        ideality: Ideality object representing the fugacity coefficient for thermodynamic
+            calculations.
         solubility: Solubility model.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
         output: To store calculated values for output.
@@ -465,17 +486,20 @@ class GasSpecies(ChemicalComponent):
 
     common_name: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
-    # species fugacity = fugacity coefficient * species partial pressure
-    fugacity_coefficient: Ideality = field(init=False)
     solid_melt_distribution_coefficient: float = 0
 
     def __post_init__(self):
         self.common_name = self.chemical_formula
         super().__post_init__()
-        self.fugacity_coefficient = self.ideality  # Ideality relates to fugacity.
+
+    @property
+    def fugacity_coefficient(self) -> Ideality:
+        """Fugacity coefficient."""
+        return self.ideality
 
     @property
     def phase(self) -> str:
+        """See base class."""
         return "gas"
 
     @_mass_decorator
@@ -486,7 +510,7 @@ class GasSpecies(ChemicalComponent):
         system: InteriorAtmosphereSystem,
         element: Optional[str] = None,
     ) -> float:
-        """Total mass.
+        """Calculates the total mass of the species or element.
 
         Args:
             planet: Planet properties.
@@ -555,15 +579,17 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
 
     @property
     def DATA_SOURCE(self) -> str:
-        """Returns a string identifying the source of the data."""
+        """Identifies the source of the data."""
         return self._DATA_SOURCE
 
     @property
     def ENTHALPY_REFERENCE_TEMPERATURE(self) -> float:
+        """Enthalpy reference temperature."""
         return self._ENTHALPY_REFERENCE_TEMPERATURE
 
     @property
     def STANDARD_STATE_PRESSURE(self) -> float:
+        """Standard state pressure."""
         return self._STANDARD_STATE_PRESSURE
 
     def get(self, species: ChemicalComponent, *, temperature: float, pressure: float) -> float:
@@ -757,7 +783,7 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
 
 
 class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProtocol):
-    """Combined thermodynamic data that uses multiple datasets.
+    """Combines thermodynamic data that uses multiple datasets.
 
     Args:
         datasets: A list of thermodynamic data to use.
@@ -779,12 +805,18 @@ class StandardGibbsFreeEnergyOfFormation(StandardGibbsFreeEnergyOfFormationProto
             self.datasets = datasets
 
     def add_dataset(self, dataset: StandardGibbsFreeEnergyOfFormationProtocol) -> None:
+        """Adds a thermodynamic dataset.
+
+        Args:
+            dataset: A thermodynamic dataset.
+        """
         if len(self.datasets) >= 1:
             logger.warning("Combining different thermodynamic data may result in consistencies")
         logger.info("Adding thermodynamic data: %s", dataset.DATA_SOURCE)
         self.datasets.append(dataset)
 
     def get(self, species: ChemicalComponent, *, temperature: float, pressure: float) -> float:
+        """See base class."""
         for dataset in self.datasets:
             try:
                 gibbs: float = dataset.get(species, temperature=temperature, pressure=pressure)
