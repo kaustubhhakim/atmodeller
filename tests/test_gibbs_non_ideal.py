@@ -28,7 +28,7 @@ from atmodeller.thermodynamics import (
 )
 from atmodeller.utilities import earth_oceans_to_kg
 
-# Tolerances to compare the test results with predefined 'correct' output.
+# Tolerances to compare the test results with target output.
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
 

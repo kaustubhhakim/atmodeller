@@ -21,7 +21,7 @@ from atmodeller.thermodynamics import (
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
 
-# Tolerances to compare the test results with predefined 'correct' output.
+# Tolerances to compare the test results with target output.
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
 
@@ -45,27 +45,19 @@ def test_graphite() -> None:
         GasSpecies(chemical_formula="CO2", solubility=NoSolubility()),
         GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
         GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-        SolidSpecies(chemical_formula="C", common_name="graphite"),
+        SolidSpecies(chemical_formula="C", common_name="graphite"),  # Ideal activity by default.
     ]
 
     planet: Planet = Planet()
-    # Typical temperature considered.
     planet.surface_temperature = 600 + 273  # K
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
     )
 
-    # This is comparable to the constraints imposed by Meng, i.e. an activity of C, an fO2, and a
-    # single pressure (for Meng it's the total, but for us we just impose one and solve for the
-    # others).
+    # This is comparable to the constraints imposed by Meng.
     constraints: list[SystemConstraint] = [
-        # Note the buffer excludes pressure-dependence
         BufferedFugacityConstraint(fugacity=IronWustiteBufferBallhaus()),
-        FugacityConstraint(species="C", value=1),  # Activity
-        # Below are set based on the result of Tian and Heng (2023), and then we compare the
-        # output of the other quantities.
-        # FugacityConstraint(species="CO2", value=0.06173121847447019),
         FugacityConstraint(species="H2", value=44.49334998176607),
     ]
 
@@ -81,5 +73,4 @@ def test_graphite() -> None:
         ]
     )
     system.solve(constraints)
-
     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()

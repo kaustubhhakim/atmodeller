@@ -22,6 +22,7 @@ from atmodeller.thermodynamics import (
     IronWustiteBufferHirschmann,
     NoSolubility,
     Planet,
+    SolidSpecies,
     Solubility,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
@@ -93,12 +94,14 @@ class BufferedFugacityConstraint:
     """A buffered fugacity constraint to apply to an interior-atmosphere system.
 
     Args:
-        species: The species that is buffered by `buffer`. Defaults to 'O2'.
+        species: The species that is buffered by 'buffer'. Defaults to 'O2'.
         fugacity: A BufferedFugacity. Defaults to IronWustiteBufferHirschmann
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
 
     Attributes:
-        See Args.
+        species: The species that is buffered by 'buffer'.
+        fugacity: A BufferedFugacity.
+        log10_shift: Log10 shift relative to the buffer.
     """
 
     species: str = "O2"
@@ -332,13 +335,18 @@ class ReactionNetwork:
             TODO.
         """
 
+        solid_species: list[SolidSpecies] = [
+            species for species in self.species if isinstance(species, SolidSpecies)
+        ]
         fugacity_constraints: list[SystemConstraint] = [
             constraint for constraint in constraints if constraint.field == "fugacity"
         ]
         pressure_constraints: list[SystemConstraint] = [
             constraint for constraint in constraints if constraint.field == "pressure"
         ]
-        number_constraints: int = len(fugacity_constraints) + len(pressure_constraints)
+        number_constraints: int = (
+            len(solid_species) + len(fugacity_constraints) + len(pressure_constraints)
+        )
         nrows: int = number_constraints + self.number_reactions
 
         if nrows == self.number_species:
@@ -372,9 +380,22 @@ class ReactionNetwork:
                 pressure=system.total_pressure,
             )
 
+        # Solid activities.
+        for index, species in enumerate(solid_species):
+            species_name: str = species.formula.formula
+            row_index: int = self.number_reactions + index
+            species_index: int = self.species_names.index(species_name)
+            logger.info("Row %02d: Setting %s activity", row_index, species_name)
+            coeff[row_index, species_index] = 1
+            rhs[row_index] = np.log10(
+                species.activity(
+                    temperature=system.planet.surface_temperature, pressure=system.total_pressure
+                )
+            )
+
         # Fugacity constraints.
         for index, constraint in enumerate(fugacity_constraints):
-            row_index: int = self.number_reactions + index
+            row_index: int = self.number_reactions + len(solid_species) + index
             species_index: int = self.species_names.index(constraint.species)
             logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
             coeff[row_index, species_index] = 1
@@ -386,7 +407,9 @@ class ReactionNetwork:
 
         # Pressure constraints.
         for index, constraint in enumerate(pressure_constraints):
-            row_index: int = self.number_reactions + len(fugacity_constraints) + index
+            row_index: int = (
+                self.number_reactions + len(solid_species) + len(fugacity_constraints) + index
+            )
             species_index: int = self.species_names.index(constraint.species)
             logger.info("Row %02d: Setting %s pressure", row_index, constraint.species)
             coeff[row_index, species_index] = 1
@@ -399,7 +422,12 @@ class ReactionNetwork:
 
         # The "non-ideal" LHS vector.
         for index, species in enumerate(self.species):
-            non_ideal[index] = system.fugacity_coefficients_dict[species.chemical_formula]
+            # FIXME: Not for solid phases. Must be zero.
+            if species.phase == "solid":
+                value: float = 1
+            else:
+                value: float = system.fugacity_coefficients_dict[species.chemical_formula]
+            non_ideal[index] = value
         non_ideal = np.log10(non_ideal)
 
         logger.debug("Design matrix = \n%s", coeff)
