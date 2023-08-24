@@ -109,7 +109,7 @@ class BufferedFugacityConstraint:
     def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
         del kwargs
         value: float = 10 ** self.fugacity(
-            temperature=temperature, pressure=pressure, fugacity_log10_shift=self.log10_shift
+            temperature=temperature, pressure=pressure, log10_shift=self.log10_shift
         )
         return value
 

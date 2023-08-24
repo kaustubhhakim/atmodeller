@@ -1,4 +1,4 @@
-"""Fugacity buffers, gas phase reactions, and solubility laws."""
+"""Thermodynamic classes, including fugacity buffers and Gibbs energies."""
 
 from __future__ import annotations
 
@@ -69,30 +69,38 @@ class Planet:
 
     @property
     def planet_mass(self) -> float:
-        """Mass of the planet."""
+        """Mass of the planet in SI units."""
         return self.mantle_mass / (1 - self.core_mass_fraction)
 
     @property
     def surface_area(self) -> float:
-        """Surface area of the planet."""
+        """Surface area of the planet in SI units."""
         return 4.0 * np.pi * self.surface_radius**2
 
     @property
     def surface_gravity(self) -> float:
-        """Surface gravity of the planet."""
+        """Surface gravity of the planet in SI units."""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
 
 class BufferedFugacity(ABC):
-    """Buffered fugacity base class."""
+    """Abstract base class for calculating buffered fugacity based on temperature and pressure.
+
+    This class defines a method to calculate the log10(fugacity) of a buffer substance in terms of
+    temperature. Subclasses must implement the '_fugacity' method to provide the specific
+    calculation.
+
+    Attributes:
+        None
+    """
 
     @abstractmethod
     def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """Log10(fugacity) of the buffer in terms of temperature.
+        """Calculates the log10(fugacity) of the buffer in terms of temperature.
 
         Args:
-            temperature: Temperature (K).
-            pressure: Pressure (bar). Defaults to 1.
+            temperature: Temperature in Kelvin.
+            pressure: Pressure in bar. Defaults to 1 bar.
 
         Returns:
             Log10 of the fugacity.
@@ -100,19 +108,19 @@ class BufferedFugacity(ABC):
         raise NotImplementedError
 
     def __call__(
-        self, *, temperature: float, pressure: float = 1, fugacity_log10_shift: float = 0
+        self, *, temperature: float, pressure: float = 1, log10_shift: float = 0
     ) -> float:
-        """log10(fugacity) plus an optional shift.
+        """Calculates the log10(fugacity) of the buffer plus an optional shift.
 
         Args:
-            temperature: Temperature (K).
-            pressure: Pressure (bar). Defaults to 1.
-            fugacity_log10_shift: Log10 shift. Defaults to 0.
+            temperature: Temperature in Kelvin.
+            pressure: Pressure in bar. Defaults to 1 bar.
+            log10_shift: Log10 shift. Defaults to 0.
 
         Returns:
             Log10 of the fugacity including the shift.
         """
-        return self._fugacity(temperature=temperature, pressure=pressure) + fugacity_log10_shift
+        return self._fugacity(temperature=temperature, pressure=pressure) + log10_shift
 
 
 class IronWustiteBufferHirschmann(BufferedFugacity):
@@ -136,7 +144,6 @@ class IronWustiteBufferOneill(BufferedFugacity):
     """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002).
 
     Gibbs energy of reaction is at 1 bar. See Table 6.
-
     https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
     """
 
@@ -173,7 +180,6 @@ class IronWustiteBufferFischer(BufferedFugacity):
     """Iron-wustite buffer (fO2) from Fischer et al. (2011).
 
     See Table S2 in supplementary materials.
-
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
     """
 
@@ -201,8 +207,7 @@ def _mass_decorator(func) -> Callable:
         """Wrapper to return the mass of either the gas species or one of its elements.
 
         Args:
-            element: Returns the mass of this element. Defaults to None to return the gas species
-                mass.
+            element: Returns the mass of this element. Defaults to None to return the species mass.
             **kwargs: Catches keyword arguments to forward to func.
 
         Returns:
@@ -224,49 +229,88 @@ def _mass_decorator(func) -> Callable:
 
 
 class Ideality(ABC):
-    """Ideality base class."""
+    """Abstract base class for calculating ideality based on temperature and pressure.
+
+    Ideality can refer to either ideal gas behaviour or an ideal solution.
+
+    This class defines a method to calculate ideality based on temperature and pressure.
+    Subclasses must implement the '_ideality' method to provide the specific calculation.
+
+    Attributes:
+        None
+    """
 
     @abstractmethod
     def _ideality(self, *, temperature: float, pressure: float) -> float:
-        """Ideality.
+        """Calculates the ideality of a substance.
 
         Args:
-            temperature: Temperature.
-            pressure: Pressure.
+            temperature: Temperature in Kelvin.
+            pressure: Pressure in bar.
 
         Returns:
-            ideality.
+            The calculated ideality value.
         """
         raise NotImplementedError
 
     def __call__(self, *, temperature: float, pressure: float) -> float:
-        """Ideality."""
+        """Calculates the ideality of a substance at a given temperature and pressure.
+
+        Args:
+            temperature: Temperature in Kelvin.
+            pressure: Pressure in bar.
+
+        Returns:
+            The calculated ideality value.
+        """
         return self._ideality(temperature=temperature, pressure=pressure)
 
 
-class Ideal(Ideality):
-    """Ideal solution (activity of unity) or ideal gas (fugacity coefficient of unity)."""
-
-    def _ideality(self, *args, **kwargs) -> float:
-        del args
-        del kwargs
-        return 1.0
-
-
 class NonIdealConstant(Ideality):
-    """A constant activity or fugacity coefficient. Useful for testing.
+    """A non-ideal constant activity or fugacity coefficient.
+
+    Useful for testing or representing non-ideal behavior.
+
+    This class provides the _ideality method that returns a constant value, allowing you to
+    simulate non-ideal behavior with a specific coefficient.
 
     Args:
-        constant: A constant.
+        constant: The constant activity or fugacity coefficient.
+
+    Attributes:
+        constant: The constant activity or fugacity coefficient.
     """
 
     def __init__(self, constant: float):
         self.constant: float = constant
 
     def _ideality(self, *args, **kwargs) -> float:
+        """Calculates the ideality value for a constant activity or fugacity coefficient.
+
+        Args:
+            *args: Positional arguments (not used).
+            **kwargs: Keyword arguments (not used).
+
+        Returns:
+            The constant activity or fugacity coefficient.
+        """
         del args
         del kwargs
         return self.constant
+
+
+class Ideal(NonIdealConstant):
+    """An ideal solution or an ideal gas.
+
+    An ideal solution with an activity coefficient of unity or an ideal gas with a fugacity
+    coefficient of unity.
+
+    This class provides the _ideality method that returns a value of 1.0, indicating that the
+    solution or gas is ideal with no deviations from ideality.
+    """
+
+    def __init__(self, constant: float = 1.0):
+        super().__init__(constant)
 
 
 @dataclass(kw_only=True)
