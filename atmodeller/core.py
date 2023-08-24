@@ -136,22 +136,34 @@ class ReactionNetwork:
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
-        # TODO: Unsure whether to reorder since it is more intuitive for the output to mirror the
-        # order of the input.
+        # Avoid reordering since it is more intuitive for the order of the output to mirror the
+        # input.
         # self.species.sort(key=self._species_sorter)
-        logger.info("Creating a new reaction network")
+        logger.info("Creating a reaction network")
         logger.info("Species = %s", self.species_names)
         self.species_matrix: np.ndarray = self.find_matrix()
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
 
-    @property
+    @cached_property
     def species_names(self) -> list[str]:
         return [species.chemical_formula for species in self.species]
 
-    @property
+    @cached_property
+    def number_reactions(self) -> int:
+        return self.number_species - self.number_unique_elements
+
+    @cached_property
     def number_species(self) -> int:
         return len(self.species)
+
+    @cached_property
+    def number_unique_elements(self) -> int:
+        return len(self.unique_elements)
+
+    @cached_property
+    def species_indices(self) -> dict[str, int]:
+        return {name: idx for idx, name in enumerate(self.species_names)}
 
     @cached_property
     def unique_elements(self) -> list[str]:
@@ -160,14 +172,6 @@ class ReactionNetwork:
             elements.extend(list(species.formula.composition().keys()))
         unique_elements: list[str] = list(set(elements))
         return unique_elements
-
-    @property
-    def number_unique_elements(self) -> int:
-        return len(self.unique_elements)
-
-    @property
-    def number_reactions(self) -> int:
-        return self.number_species - self.number_unique_elements
 
     def find_matrix(self) -> np.ndarray:
         """Creates a matrix where species (rows) are split into their element counts (columns).
@@ -322,20 +326,77 @@ class ReactionNetwork:
         )
         return equilibrium_constant
 
-    def get_design_matrix_and_rhs(
+    def get_coefficient_matrix(self, *, constraints: list[SystemConstraint]) -> np.ndarray:
+        """Builds the coefficient matrix.
+
+        Args:
+            constraints: Constraints for the system of equations.
+
+        Returns:
+            The coefficient matrix with the stoichiometry and constraints.
+        """
+
+        solid_species = []
+        for species in self.species:
+            if isinstance(species, SolidSpecies):
+                solid_species.append(species)
+
+        fp_constraints = []
+        for constraint in constraints:
+            if constraint.field == "fugacity" or constraint.field == "pressure":
+                fp_constraints.append(constraint)
+
+        nrows: int = len(solid_species) + len(fp_constraints) + self.number_reactions
+
+        if nrows == self.number_species:
+            msg: str = "The necessary number of constraints will be applied to "
+            msg += "the reaction network to solve the system"
+            logger.info(msg)
+        else:
+            num: int = self.number_species - nrows
+            # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
+            msg = "%d additional (mass) constraint(s) are necessary " % num
+            msg += "to solve the system"
+            logger.info(msg)
+
+        coeff: np.ndarray = np.zeros((nrows, self.number_species))
+        coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
+
+        species_indices = {name: idx for idx, name in enumerate(self.species_names)}
+
+        # Solid activities.
+        for index, species in enumerate(solid_species):
+            species_name: str = species.formula.formula
+            row_index: int = self.number_reactions + index
+            species_index = species_indices[species_name]
+            logger.info("Row %02d: Setting %s activity", row_index, species_name)
+            coeff[row_index, species_index] = 1
+
+        # Fugacity and pressure constraints.
+        for index, constraint in enumerate(fp_constraints):
+            row_index: int = self.number_reactions + len(solid_species) + index
+            species_index = species_indices[constraint.species]
+            logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.field)
+            coeff[row_index, species_index] = 1
+
+        logger.debug("Coefficient matrix = \n%s", coeff)
+
+        return coeff
+
+    def get_lhs_and_rhs_vectors(
         self,
         *,
         system: InteriorAtmosphereSystem,
         constraints: list[SystemConstraint],
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Builds the design matrix, the LHS non-ideal vector, and the RHS vector.
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Builds the LHS non-ideal vector and the RHS vector.
 
         Args:
             system: Interior atmosphere system.
             constraints: Constraints for the system of equations.
 
         Returns:
-            TODO.
+            The log10(fugacity coefficient) vector and the right-hand side vector.
         """
 
         solid_species: list[SolidSpecies] = [
@@ -363,13 +424,10 @@ class ReactionNetwork:
             msg += "to solve the system"
             logger.info(msg)
 
-        # Initialise.
-        coeff: np.ndarray = np.zeros((nrows, self.number_species))
         rhs: np.ndarray = np.zeros(nrows)
         non_ideal: np.ndarray = np.ones_like(self.species, dtype=np.float_)
 
         # Reactions.
-        coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
         for reaction_index in range(self.number_reactions):
             logger.info(
                 "Row %02d: Reaction %d: %s",
@@ -387,9 +445,7 @@ class ReactionNetwork:
         for index, species in enumerate(solid_species):
             species_name: str = species.formula.formula
             row_index: int = self.number_reactions + index
-            species_index: int = self.species_names.index(species_name)
             logger.info("Row %02d: Setting %s activity", row_index, species_name)
-            coeff[row_index, species_index] = 1
             rhs[row_index] = np.log10(
                 species.activity(
                     temperature=system.planet.surface_temperature, pressure=system.total_pressure
@@ -399,9 +455,7 @@ class ReactionNetwork:
         # Fugacity constraints.
         for index, constraint in enumerate(fugacity_constraints):
             row_index: int = self.number_reactions + len(solid_species) + index
-            species_index: int = self.species_names.index(constraint.species)
             logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
-            coeff[row_index, species_index] = 1
             rhs[row_index] = np.log10(
                 constraint.get_value(
                     temperature=system.planet.surface_temperature, pressure=system.total_pressure
@@ -413,9 +467,7 @@ class ReactionNetwork:
             row_index: int = (
                 self.number_reactions + len(solid_species) + len(fugacity_constraints) + index
             )
-            species_index: int = self.species_names.index(constraint.species)
             logger.info("Row %02d: Setting %s pressure", row_index, constraint.species)
-            coeff[row_index, species_index] = 1
             rhs[row_index] = np.log10(
                 constraint.get_value(
                     temperature=system.planet.surface_temperature, pressure=system.total_pressure
@@ -433,74 +485,35 @@ class ReactionNetwork:
             non_ideal[index] = value
         non_ideal = np.log10(non_ideal)
 
-        logger.debug("Design matrix = \n%s", coeff)
         logger.debug("Non-ideal vector = \n%s", non_ideal)
         logger.debug("RHS vector = \n%s", rhs)
 
-        return coeff, rhs, non_ideal
-
-    def solve(self, **kwargs) -> np.ndarray:
-        """Solves the reaction network to determine the partial pressures of all species.
-
-        Applies the law of mass action.
-
-        We solve for the log10 of the partial pressures of each species. Operating in log10 space
-        has two advantages: 1) The dynamic range of the partial pressures is reduced, for example
-        fO2 is typically very small compared to other pressures in the system, and 2) In log10
-        space the reaction network can be expressed as a linear system which can be solved
-        directly.
-
-        One could of course use a different log space (e.g., natural log), but log10 is chosen
-        because the formation reactions are expressed in terms of log10 as well as the oxygen
-        fugacity.
-
-        Args:
-            **kwargs: Keyword arguments to pass through.
-
-        Returns:
-            The log10 of the pressures.
-        """
-        logger.info("Solving the reaction network")
-
-        design_matrix, rhs, non_ideal = self.get_design_matrix_and_rhs(**kwargs)
-
-        if len(rhs) != self.number_species:
-            num: int = self.number_species - len(rhs)
-            raise ValueError(f"Missing {num} constraint(s) to solve the system")
-
-        try:
-            log10_pressures: np.ndarray = linalg.solve(design_matrix, rhs)
-        except LinAlgError as exc:
-            msg: str = "There is not a single solution to the equation set because you did not "
-            msg += "specify a sufficient range of constraints"
-            raise RuntimeError(msg) from exc
-
-        logger.info("The solution converged.")  # For similarity with fsolve message.
-
-        return log10_pressures
+        return rhs, non_ideal
 
     def get_residual(
         self,
         *,
         system: InteriorAtmosphereSystem,
         constraints: list[SystemConstraint],
+        coefficient_matrix: np.ndarray,
     ) -> np.ndarray:
         """Returns the residual vector of the reaction network.
 
         Args:
             system: Interior atmosphere system.
             constraints: Constraints for the system of equations.
+            coefficient_matrix: Coefficient matrix.
 
         Returns:
             The residual vector of the reaction network.
         """
 
-        design_matrix, rhs, non_ideal = self.get_design_matrix_and_rhs(
-            system=system, constraints=constraints
-        )
+        rhs, non_ideal = self.get_lhs_and_rhs_vectors(system=system, constraints=constraints)
 
         residual_reaction: np.ndarray = (
-            design_matrix.dot(non_ideal) + design_matrix.dot(system.log10_pressures) - rhs
+            coefficient_matrix.dot(non_ideal)
+            + coefficient_matrix.dot(system.log10_pressures)
+            - rhs
         )
         logger.debug("Residual_reaction = %s", residual_reaction)
         return residual_reaction
@@ -543,7 +556,7 @@ class InteriorAtmosphereSystem:
     _log10_pressures: np.ndarray = field(init=False)  # For the solution.
 
     def __post_init__(self):
-        logger.info("Creating a new interior-atmosphere system")
+        logger.info("Creating an interior-atmosphere system")
         self._conform_solubilities_to_composition()
         self._reaction_network = ReactionNetwork(species=self.species, gibbs_data=self.gibbs_data)
         self.species = self._reaction_network.species  # Note reordering by self._reaction_network.
@@ -710,6 +723,7 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations.
+            initial_log10_pressures: Initial guess for the log10 pressures.
         """
 
         if initial_log10_pressures is None:
@@ -723,11 +737,15 @@ class InteriorAtmosphereSystem:
         sol: np.ndarray = np.zeros_like(initial_log10_pressures)
         infodict: dict = {}
 
+        coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
+            constraints=constraints
+        )
+
         while ier != 1 and ic_count <= ic_count_max:
             sol, infodict, ier, mesg = fsolve(
                 self._objective_func,
                 initial_log10_pressures,
-                args=(constraints),
+                args=(constraints, coefficient_matrix),
                 full_output=True,
             )
             logger.info(mesg)
@@ -754,12 +772,14 @@ class InteriorAtmosphereSystem:
         self,
         log10_pressures: np.ndarray,
         constraints: list[SystemConstraint],
+        coefficient_matrix: np.ndarray,
     ) -> np.ndarray:
         """Objective function for the non-linear system.
 
         Args:
             log10_pressures: Log10 of the pressures of each species.
             constraints: Constraints for the system of equations.
+            coefficient_matrix: Coefficient matrix.
 
         Returns:
             The solution, which is the log10 of the pressures for each species.
@@ -768,8 +788,7 @@ class InteriorAtmosphereSystem:
 
         # Compute residual for the reaction network.
         residual_reaction: np.ndarray = self._reaction_network.get_residual(
-            system=self,
-            constraints=constraints,
+            system=self, constraints=constraints, coefficient_matrix=coefficient_matrix
         )
 
         mass_constraints: list[SystemConstraint] = [

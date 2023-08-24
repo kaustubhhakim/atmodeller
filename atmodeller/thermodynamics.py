@@ -776,7 +776,6 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
             logger.info("Ideal gas")
             integral_VP = 0
 
-        # TODO: maybe test magnitude of integral_VP to still allow linear solve.
         gibbs += integral_VP
 
         return gibbs
