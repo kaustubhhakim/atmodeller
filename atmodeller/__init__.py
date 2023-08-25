@@ -9,31 +9,6 @@ import logging
 
 from scipy import constants
 
-# Create the package logger.
-logger: logging.Logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# Create a handler for the logger.
-handler: logging.Handler = logging.StreamHandler()
-handler.setLevel(logging.DEBUG)
-
-# Create a formatter for the log messages.
-# Simple formatter.
-fmt: str = "%(asctime)s - %(name)-30s - %(levelname)-9s - %(message)s"
-datefmt: str = "%H:%M:%S"
-
-# Complex formatter.
-# fmt: str = "[%(asctime)s - %(name)-20s - %(lineno)03d - %(levelname)-9s -
-# %(funcName)s()] %(message)s"
-# datefmt: str = "Y-%m-%d %H:%M:%S"
-formatter: logging.Formatter = logging.Formatter(fmt, datefmt=datefmt)
-handler.setFormatter(formatter)
-
-# Add the handler to the logger.
-logger.addHandler(handler)
-
-logger.info("%s version %s", __name__, __version__)
-
 # Module constants.
 GAS_CONSTANT: float = constants.gas_constant  # J/K/mol.
 GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant  # m^3/kg/s^2.
@@ -41,12 +16,23 @@ OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-
 
 DATA_ROOT_PATH = importlib.resources.files("atmodeller.data")
 
-# pylint: disable=wrong-import-position
-from atmodeller.core import (
-    BufferedFugacityConstraint,
-    FugacityConstraint,
-    InteriorAtmosphereSystem,
-    MassConstraint,
-    SystemConstraint,
-)
-from atmodeller.thermodynamics import GasSpecies, Planet, SolidSpecies
+# Create the package logger.
+logger: logging.Logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+
+def debug_logger() -> None:
+    """Setup the logging for debugging."""
+    logger: logging.Logger = logging.getLogger(__name__)
+    logger.handlers = []
+    handler: logging.Handler = logging.StreamHandler()
+    logger.setLevel(logging.DEBUG)
+    # Complex formatter.
+    # fmt: str = "[%(asctime)s - %(name)-20s - %(lineno)03d - %(levelname)-9s -
+    # %(funcName)s()] %(message)s"
+    # datefmt: str = "Y-%m-%d %H:%M:%S"
+    fmt: str = "%(asctime)s - %(name)-30s - %(levelname)-9s - %(message)s"
+    datefmt: str = "%H:%M:%S"
+    formatter: logging.Formatter = logging.Formatter(fmt, datefmt=datefmt)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)

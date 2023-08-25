@@ -1,19 +1,18 @@
 """Reproducing the results of Tian and Heng (2023)."""
 
 
-from atmodeller import __version__
-from atmodeller.core import (
+from atmodeller import __version__, debug_logger
+from atmodeller.constraints import (
     BufferedFugacityConstraint,
     FugacityConstraint,
-    InteriorAtmosphereSystem,
+    IronWustiteBufferBallhaus,
     SystemConstraint,
 )
+from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.thermodynamics import (
     ChemicalComponent,
     GasSpecies,
-    IronWustiteBufferBallhaus,
     NoSolubility,
-    Planet,
     SolidSpecies,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
@@ -22,6 +21,8 @@ from atmodeller.thermodynamics import (
 standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
     StandardGibbsFreeEnergyOfFormation()
 )
+
+debug_logger()
 
 
 def test_version():

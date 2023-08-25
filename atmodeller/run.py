@@ -9,13 +9,12 @@ import logging
 import time
 
 from atmodeller import logger
-from atmodeller.core import (
+from atmodeller.constraints import (
     BufferedFugacityConstraint,
-    InteriorAtmosphereSystem,
     MassConstraint,
-    Planet,
     SystemConstraint,
 )
+from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import (
     BasaltDixonCO2,
     BasaltLibourelN2,

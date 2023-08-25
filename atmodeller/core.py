@@ -6,22 +6,18 @@ import logging
 import pprint
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Protocol, Union
+from typing import Union
 
 import numpy as np
-from numpy.linalg import LinAlgError
-from scipy import linalg
 from scipy.optimize import fsolve
 
-from atmodeller import GAS_CONSTANT
+from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
+from atmodeller.constraints import SystemConstraint
 from atmodeller.solubilities import composition_solubilities
 from atmodeller.thermodynamics import (
-    BufferedFugacity,
     ChemicalComponent,
     GasSpecies,
-    IronWustiteBufferHirschmann,
     NoSolubility,
-    Planet,
     SolidSpecies,
     Solubility,
     StandardGibbsFreeEnergyOfFormationJANAF,
@@ -31,95 +27,67 @@ from atmodeller.thermodynamics import (
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class SystemConstraint(Protocol):
-    """A constraint to apply to an interior-atmosphere system."""
-
-    @property
-    def field(self) -> str:
-        ...
-
-    @property
-    def species(self) -> str:
-        ...
-
-    def get_value(self, **kwargs) -> float:
-        ...
-
-
 @dataclass(kw_only=True)
-class _ValueConstraint:
-    """A value constraint to apply to an interior-atmosphere system.
+class Planet:
+    """The properties of a planet.
+
+    Default values are for a fully molten Earth.
 
     Args:
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: Imposed value in kg for masses and bar for pressures or fugacities.
-        field: Either 'pressure, 'fugacity' or 'mass'.
+        mantle_mass: Mass of the planetary mantle. Defaults to Earth.
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
+            Earth.
+        surface_radius: Radius of the planetary surface. Defaults to Earth.
+        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
+        melt_composition: Melt composition of the planet. Default is None.
 
     Attributes:
-        See Args.
+        mantle_mass: Mass of the planetary mantle.
+        mantle_melt_fraction: mass fraction of the mantle that is molten.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass.
+        surface_radius: Radius of the planetary surface.
+        surface_temperature: Temperature of the planetary surface.
+        melt_composition: Melt composition of the planet.
     """
 
-    species: str
-    value: float
-    field: str
+    mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
+    mantle_melt_fraction: float = 1.0  # Completely molten
+    core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
+    surface_radius: float = 6371000.0  # m, Earth's radius
+    surface_temperature: float = 2000.0  # K
+    melt_composition: Union[str, None] = None
 
-    def get_value(self, **kwargs) -> float:
-        del kwargs
-        return self.value
+    def __post_init__(self):
+        logger.info("Creating a new planet")
+        logger.info("Mantle mass (kg) = %f", self.mantle_mass)
+        logger.info("Mantle melt fraction = %f", self.mantle_melt_fraction)
+        logger.info("Core mass fraction = %f", self.core_mass_fraction)
+        logger.info("Planetary radius (m) = %f", self.surface_radius)
+        logger.info("Planetary mass (kg) = %f", self.planet_mass)
+        logger.info("Surface temperature (K) = %f", self.surface_temperature)
+        logger.info("Surface gravity (m/s^2) = %f", self.surface_gravity)
+        logger.info("Melt Composition = %s", self.melt_composition)
 
+    @property
+    def planet_mass(self) -> float:
+        """Mass of the planet in SI units."""
+        return self.mantle_mass / (1 - self.core_mass_fraction)
 
-@dataclass(kw_only=True)
-class FugacityConstraint(_ValueConstraint):
-    field: str = field(init=False, default="fugacity")
+    @property
+    def surface_area(self) -> float:
+        """Surface area of the planet in SI units."""
+        return 4.0 * np.pi * self.surface_radius**2
 
-
-@dataclass(kw_only=True)
-class PressureConstraint(_ValueConstraint):
-    field: str = field(init=False, default="pressure")
-
-
-@dataclass(kw_only=True)
-class MassConstraint(_ValueConstraint):
-    field: str = field(init=False, default="mass")
-
-
-@dataclass(kw_only=True)
-class ActivityConstraint(_ValueConstraint):
-    field: str = field(init=False, default="activity")
-
-
-@dataclass(kw_only=True)
-class BufferedFugacityConstraint:
-    """A buffered fugacity constraint to apply to an interior-atmosphere system.
-
-    Args:
-        species: The species that is buffered by 'buffer'. Defaults to 'O2'.
-        fugacity: A BufferedFugacity. Defaults to IronWustiteBufferHirschmann
-        log10_shift: Log10 shift relative to the buffer. Defaults to 0.
-
-    Attributes:
-        species: The species that is buffered by 'buffer'.
-        fugacity: A BufferedFugacity.
-        log10_shift: Log10 shift relative to the buffer.
-    """
-
-    species: str = "O2"
-    fugacity: BufferedFugacity = field(default_factory=IronWustiteBufferHirschmann)
-    log10_shift: float = 0
-    field: str = field(init=False, default="fugacity")
-
-    def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
-        del kwargs
-        value: float = 10 ** self.fugacity(
-            temperature=temperature, pressure=pressure, log10_shift=self.log10_shift
-        )
-        return value
+    @property
+    def surface_gravity(self) -> float:
+        """Surface gravity of the planet in SI units."""
+        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
 
 @dataclass(kw_only=True)
 class ReactionNetwork:
-    """Determines the necessary (often formation) reactions to solve a chemical network.
+    """Determines the necessary reactions to solve a chemical network.
 
     Args:
         species: A list of species.
@@ -340,11 +308,20 @@ class ReactionNetwork:
         for species in self.species:
             if isinstance(species, SolidSpecies):
                 solid_species.append(species)
+        fugacity_constraints: list[SystemConstraint] = [
+            constraint for constraint in constraints if constraint.field == "fugacity"
+        ]
+        pressure_constraints: list[SystemConstraint] = [
+            constraint for constraint in constraints if constraint.field == "pressure"
+        ]
 
-        fp_constraints = []
-        for constraint in constraints:
-            if constraint.field == "fugacity" or constraint.field == "pressure":
-                fp_constraints.append(constraint)
+        # fp_constraints = []
+        # for constraint in constraints:
+        #     if constraint.field == "fugacity" or constraint.field == "pressure":
+        #         fp_constraints.append(constraint)
+
+        # To maintain order fugacity then pressure, as for LHS and RHS vector.
+        fp_constraints: list = fugacity_constraints + pressure_constraints
 
         nrows: int = len(solid_species) + len(fp_constraints) + self.number_reactions
 
@@ -362,20 +339,18 @@ class ReactionNetwork:
         coeff: np.ndarray = np.zeros((nrows, self.number_species))
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
-        species_indices = {name: idx for idx, name in enumerate(self.species_names)}
-
         # Solid activities.
         for index, species in enumerate(solid_species):
             species_name: str = species.formula.formula
             row_index: int = self.number_reactions + index
-            species_index = species_indices[species_name]
+            species_index: int = self.species_indices[species_name]
             logger.info("Row %02d: Setting %s activity", row_index, species_name)
             coeff[row_index, species_index] = 1
 
         # Fugacity and pressure constraints.
         for index, constraint in enumerate(fp_constraints):
             row_index: int = self.number_reactions + len(solid_species) + index
-            species_index = species_indices[constraint.species]
+            species_index: int = self.species_indices[constraint.species]
             logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.field)
             coeff[row_index, species_index] = 1
 
@@ -683,7 +658,7 @@ class InteriorAtmosphereSystem:
         constraints: list[SystemConstraint],
         *,
         initial_log10_pressures: Union[np.ndarray, None] = None,
-    ) -> dict[str, float]:
+    ) -> None:
         """Solves the system to determine the partial pressures with provided constraints.
 
         Args:
@@ -710,8 +685,6 @@ class InteriorAtmosphereSystem:
                 )
 
         logger.info(pprint.pformat(self.pressures_dict))
-
-        return self.pressures_dict
 
     def _solve_fsolve(
         self,

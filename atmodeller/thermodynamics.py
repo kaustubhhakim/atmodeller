@@ -14,218 +14,15 @@ import pandas as pd
 from molmass import Formula
 from thermochem import janaf
 
-from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GRAVITATIONAL_CONSTANT
+from atmodeller import DATA_ROOT_PATH
 from atmodeller.solubilities import NoSolubility, Solubility
 from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
-    from atmodeller.core import InteriorAtmosphereSystem
+    from atmodeller.core import InteriorAtmosphereSystem, Planet
 
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass(kw_only=True)
-class Planet:
-    """The properties of a planet.
-
-    Default values are for a fully molten Earth.
-
-    Args:
-        mantle_mass: Mass of the planetary mantle. Defaults to Earth.
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
-        core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
-            Earth.
-        surface_radius: Radius of the planetary surface. Defaults to Earth.
-        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
-        melt_composition: Melt composition of the planet. Default is None.
-
-    Attributes:
-        mantle_mass: Mass of the planetary mantle.
-        mantle_melt_fraction: mass fraction of the mantle that is molten.
-        core_mass_fraction: Mass fraction of the core relative to the planetary mass.
-        surface_radius: Radius of the planetary surface.
-        surface_temperature: Temperature of the planetary surface.
-        melt_composition: Melt composition of the planet.
-    """
-
-    mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
-    mantle_melt_fraction: float = 1.0  # Completely molten
-    core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
-    surface_radius: float = 6371000.0  # m, Earth's radius
-    surface_temperature: float = 2000.0  # K
-    melt_composition: Union[str, None] = None
-
-    def __post_init__(self):
-        logger.info("Creating a new planet")
-        logger.info("Mantle mass (kg) = %f", self.mantle_mass)
-        logger.info("Mantle melt fraction = %f", self.mantle_melt_fraction)
-        logger.info("Core mass fraction = %f", self.core_mass_fraction)
-        logger.info("Planetary radius (m) = %f", self.surface_radius)
-        logger.info("Planetary mass (kg) = %f", self.planet_mass)
-        logger.info("Surface temperature (K) = %f", self.surface_temperature)
-        logger.info("Surface gravity (m/s^2) = %f", self.surface_gravity)
-        logger.info("Melt Composition = %s", self.melt_composition)
-
-    @property
-    def planet_mass(self) -> float:
-        """Mass of the planet in SI units."""
-        return self.mantle_mass / (1 - self.core_mass_fraction)
-
-    @property
-    def surface_area(self) -> float:
-        """Surface area of the planet in SI units."""
-        return 4.0 * np.pi * self.surface_radius**2
-
-    @property
-    def surface_gravity(self) -> float:
-        """Surface gravity of the planet in SI units."""
-        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
-
-
-class BufferedFugacity(ABC):
-    """Abstract base class for calculating buffered fugacity based on temperature and pressure.
-
-    This class defines a method to calculate the log10(fugacity) of a buffer substance in terms of
-    temperature. Subclasses must implement the '_fugacity' method to provide the specific
-    calculation.
-
-    Attributes:
-        None
-    """
-
-    @abstractmethod
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """Calculates the log10(fugacity) of the buffer in terms of temperature.
-
-        Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar. Defaults to 1 bar.
-
-        Returns:
-            Log10 of the fugacity.
-        """
-        raise NotImplementedError
-
-    def __call__(
-        self, *, temperature: float, pressure: float = 1, log10_shift: float = 0
-    ) -> float:
-        """Calculates the log10(fugacity) of the buffer plus an optional shift.
-
-        Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar. Defaults to 1 bar.
-            log10_shift: Log10 shift. Defaults to 0.
-
-        Returns:
-            Log10 of the fugacity including the shift.
-        """
-        return self._fugacity(temperature=temperature, pressure=pressure) + log10_shift
-
-
-class IronWustiteBufferHirschmann(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from O'Neill and Pownceby (1993) and Hirschmann et al. (2008).
-
-    https://ui.adsabs.harvard.edu/abs/1993CoMP..114..296O/abstract
-    """
-
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """See base class."""
-        fugacity: float = (
-            -28776.8 / temperature
-            + 14.057
-            + 0.055 * (pressure - 1) / temperature
-            - 0.8853 * np.log(temperature)
-        )
-        return fugacity
-
-
-class IronWustiteBufferOneill(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002).
-
-    Gibbs energy of reaction is at 1 bar. See Table 6.
-    https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
-    """
-
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """See base class."""
-        del pressure
-        fugacity: float = (
-            2
-            * (-244118 + 115.559 * temperature - 8.474 * temperature * np.log(temperature))
-            / (np.log(10) * GAS_CONSTANT * temperature)
-        )
-        return fugacity
-
-
-class IronWustiteBufferBallhaus(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from Ballhaus et al. (1991).
-
-    https://ui.adsabs.harvard.edu/abs/1991CoMP..107...27B/abstract
-    """
-
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """See base class."""
-        fugacity: float = (
-            14.07
-            - 28784 / temperature
-            - 2.04 * np.log10(temperature)
-            + 0.053 * pressure / temperature
-            + 3e-6 * pressure
-        )
-        return fugacity
-
-
-class IronWustiteBufferFischer(BufferedFugacity):
-    """Iron-wustite buffer (fO2) from Fischer et al. (2011).
-
-    See Table S2 in supplementary materials.
-    https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
-    """
-
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """See base class."""
-        pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
-        a_P: float = 6.44059 + 0.00463099 * pressure_GPa
-        b_P: float = (
-            -28.1808
-            + 0.556272 * pressure_GPa
-            - 0.00143757 * pressure_GPa**2
-            + 4.0256e-6 * pressure_GPa**3
-            - 5.4861e-9 * pressure_GPa**4  # Note typo in Table S2. Must be pressure**4.
-        )
-        b_P *= 1000 / temperature
-        buffer: float = a_P + b_P
-        return buffer
-
-
-def _mass_decorator(func) -> Callable:
-    """A decorator to return the mass of either the gas species or one of its elements."""
-
-    @wraps(func)
-    def mass_wrapper(self: GasSpecies, element: Optional[str] = None, **kwargs) -> float:
-        """Wrapper to return the mass of either the gas species or one of its elements.
-
-        Args:
-            element: Returns the mass of this element. Defaults to None to return the species mass.
-            **kwargs: Catches keyword arguments to forward to func.
-
-        Returns:
-            Mass of either the gas species or element.
-        """
-        mass: float = func(self, **kwargs)
-        if element is not None:
-            try:
-                mass *= (
-                    UnitConversion.g_to_kg(self.formula.composition()[element].mass)
-                    / self.molar_mass
-                )
-            except KeyError:  # Element not in formula so must be zero.
-                mass = 0
-
-        return mass
-
-    return mass_wrapper
 
 
 class Ideality(ABC):
@@ -456,6 +253,35 @@ class GasSpeciesOutput:
 
     def __post_init__(self):
         self.mass_in_total = self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
+
+
+def _mass_decorator(func) -> Callable:
+    """A decorator to return the mass of either the gas species or one of its elements."""
+
+    @wraps(func)
+    def mass_wrapper(self: GasSpecies, element: Optional[str] = None, **kwargs) -> float:
+        """Wrapper to return the mass of either the gas species or one of its elements.
+
+        Args:
+            element: Returns the mass of this element. Defaults to None to return the species mass.
+            **kwargs: Catches keyword arguments to forward to func.
+
+        Returns:
+            Mass of either the gas species or element.
+        """
+        mass: float = func(self, **kwargs)
+        if element is not None:
+            try:
+                mass *= (
+                    UnitConversion.g_to_kg(self.formula.composition()[element].mass)
+                    / self.molar_mass
+                )
+            except KeyError:  # Element not in formula so mass is zero.
+                mass = 0
+
+        return mass
+
+    return mass_wrapper
 
 
 @dataclass(kw_only=True)

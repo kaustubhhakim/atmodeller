@@ -7,18 +7,17 @@ of the values for the JANAF thermodynamic data alone.
 
 """
 
-from atmodeller import (
+from atmodeller import __version__
+from atmodeller.constraints import (
     BufferedFugacityConstraint,
-    GasSpecies,
-    InteriorAtmosphereSystem,
     MassConstraint,
-    Planet,
     SystemConstraint,
-    __version__,
 )
+from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.thermodynamics import (
     ChemicalComponent,
+    GasSpecies,
     NoSolubility,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationJANAF,
