@@ -119,6 +119,19 @@ class MassConstraint(ValueConstraint):
 
 
 class SystemConstraints(UserList):
+    """Collection of constraints for an interior-atmosphere system.
+
+    A collection of constraints that can be applied to an interior-atmosphere system. It provides
+    methods to filter constraints based on their types, such as fugacity, mass conservation,
+    pressure, and reaction network constraints.
+
+    Args:
+        initlist: Initial list of constraints. Defaults to None.
+
+    Attributes:
+        data: List of constraints contained in the system.
+    """
+
     def __init__(self, initlist=None):
         self.data: list[SystemConstraint]
         super().__init__(initlist)
