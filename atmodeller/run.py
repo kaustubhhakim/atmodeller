@@ -13,6 +13,7 @@ from atmodeller.constraints import (
     BufferedFugacityConstraint,
     MassConstraint,
     SystemConstraint,
+    SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import (
@@ -94,7 +95,8 @@ def main():
         constraints.append(MassConstraint(species="N", value=n_kg))
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-    system.solve(constraints)
+    system_constraints: SystemConstraints = SystemConstraints(constraints)
+    system.solve(system_constraints)
     logger.info(system.pressures_dict)
 
     end: float = time.time()

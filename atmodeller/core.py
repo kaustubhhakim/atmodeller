@@ -11,7 +11,7 @@ import numpy as np
 from scipy.optimize import fsolve
 
 from atmodeller import GRAVITATIONAL_CONSTANT
-from atmodeller.constraints import SystemConstraint
+from atmodeller.constraints import SystemConstraint, SystemConstraints
 from atmodeller.reaction_network import ReactionNetwork
 from atmodeller.solubilities import NoSolubility, composition_solubilities
 from atmodeller.thermodynamics import (
@@ -233,7 +233,7 @@ class InteriorAtmosphereSystem:
 
     def solve(
         self,
-        constraints: list[SystemConstraint],
+        constraints: SystemConstraints,
         *,
         initial_log10_pressures: Union[np.ndarray, None] = None,
     ) -> None:
@@ -267,7 +267,7 @@ class InteriorAtmosphereSystem:
     def _solve_fsolve(
         self,
         *,
-        constraints: list[SystemConstraint],
+        constraints: SystemConstraints,
         initial_log10_pressures: Union[np.ndarray, None],
     ) -> np.ndarray:
         """Solves the non-linear system of equations.
@@ -322,7 +322,7 @@ class InteriorAtmosphereSystem:
     def _objective_func(
         self,
         log10_pressures: np.ndarray,
-        constraints: list[SystemConstraint],
+        constraints: SystemConstraints,
         coefficient_matrix: np.ndarray,
     ) -> np.ndarray:
         """Objective function for the non-linear system.
@@ -342,13 +342,9 @@ class InteriorAtmosphereSystem:
             system=self, constraints=constraints, coefficient_matrix=coefficient_matrix
         )
 
-        mass_constraints: list[SystemConstraint] = [
-            constraint for constraint in constraints if constraint.field == "mass"
-        ]
-
         # Compute residual for the mass balance.
-        residual_mass: np.ndarray = np.zeros_like(mass_constraints, dtype=np.float_)
-        for constraint_index, constraint in enumerate(mass_constraints):
+        residual_mass: np.ndarray = np.zeros_like(constraints.mass_constraints, dtype=np.float_)
+        for constraint_index, constraint in enumerate(constraints.mass_constraints):
             for species in self.species:
                 if species.phase == "gas":
                     assert isinstance(species, GasSpecies)

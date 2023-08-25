@@ -11,11 +11,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
+from atmodeller.constraints import PressureConstraint
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from atmodeller.constraints import SystemConstraint
+    from atmodeller.constraints import SystemConstraint, SystemConstraints
     from atmodeller.core import InteriorAtmosphereSystem
     from atmodeller.thermodynamics import (
         ChemicalComponent,
@@ -232,7 +233,7 @@ class ReactionNetwork:
         )
         return equilibrium_constant
 
-    def get_coefficient_matrix(self, *, constraints: list[SystemConstraint]) -> np.ndarray:
+    def get_coefficient_matrix(self, *, constraints: SystemConstraints) -> np.ndarray:
         """Builds the coefficient matrix.
 
         Args:
@@ -246,22 +247,12 @@ class ReactionNetwork:
         for species in self.species:
             if species.phase == "solid":
                 solid_species.append(species)
-        fugacity_constraints: list[SystemConstraint] = [
-            constraint for constraint in constraints if constraint.field == "fugacity"
-        ]
-        pressure_constraints: list[SystemConstraint] = [
-            constraint for constraint in constraints if constraint.field == "pressure"
-        ]
 
-        # fp_constraints = []
-        # for constraint in constraints:
-        #     if constraint.field == "fugacity" or constraint.field == "pressure":
-        #         fp_constraints.append(constraint)
-
-        # To maintain order fugacity then pressure, as for LHS and RHS vector.
-        fp_constraints: list = fugacity_constraints + pressure_constraints
-
-        nrows: int = len(solid_species) + len(fp_constraints) + self.number_reactions
+        nrows: int = (
+            len(solid_species)
+            + constraints.number_reaction_network_constraints
+            + self.number_reactions
+        )
 
         if nrows == self.number_species:
             msg: str = "The necessary number of constraints will be applied to "
@@ -282,16 +273,17 @@ class ReactionNetwork:
             species_name: str = species.formula.formula
             row_index: int = self.number_reactions + index
             species_index: int = self.species_indices[species_name]
-            logger.info("Row %02d: Setting %s activity", row_index, species_name)
+            logger.info("Row %02d: Setting %s coefficient", row_index, species_name)
             coeff[row_index, species_index] = 1
 
         # Fugacity and pressure constraints.
-        for index, constraint in enumerate(fp_constraints):
+        for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + len(solid_species) + index
             species_index: int = self.species_indices[constraint.species]
-            logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.field)
+            logger.info("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
+        logger.debug("Species = %s", self.species_names)
         logger.debug("Coefficient matrix = \n%s", coeff)
 
         return coeff
@@ -300,7 +292,7 @@ class ReactionNetwork:
         self,
         *,
         system: InteriorAtmosphereSystem,
-        constraints: list[SystemConstraint],
+        constraints: SystemConstraints,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Builds the LHS non-ideal vector and the RHS vector.
 
@@ -313,16 +305,11 @@ class ReactionNetwork:
         """
 
         solid_species: list = [species for species in self.species if species.phase == "solid"]
-        fugacity_constraints: list[SystemConstraint] = [
-            constraint for constraint in constraints if constraint.field == "fugacity"
-        ]
-        pressure_constraints: list[SystemConstraint] = [
-            constraint for constraint in constraints if constraint.field == "pressure"
-        ]
-        number_constraints: int = (
-            len(solid_species) + len(fugacity_constraints) + len(pressure_constraints)
+        nrows: int = (
+            len(solid_species)
+            + constraints.number_reaction_network_constraints
+            + self.number_reactions
         )
-        nrows: int = number_constraints + self.number_reactions
 
         if nrows == self.number_species:
             msg: str = "The necessary number of constraints will be applied to "
@@ -335,8 +322,8 @@ class ReactionNetwork:
             msg += "to solve the system"
             logger.info(msg)
 
-        rhs: np.ndarray = np.zeros(nrows)
-        non_ideal: np.ndarray = np.ones_like(self.species, dtype=np.float_)
+        rhs: np.ndarray = np.zeros(nrows, dtype=float)
+        non_ideal: np.ndarray = np.ones_like(self.species, dtype=float)
 
         # Reactions.
         for reaction_index in range(self.number_reactions):
@@ -364,7 +351,7 @@ class ReactionNetwork:
             )
 
         # Fugacity constraints.
-        for index, constraint in enumerate(fugacity_constraints):
+        for index, constraint in enumerate(constraints.fugacity_constraints):
             row_index: int = self.number_reactions + len(solid_species) + index
             logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
             rhs[row_index] = np.log10(
@@ -374,9 +361,12 @@ class ReactionNetwork:
             )
 
         # Pressure constraints.
-        for index, constraint in enumerate(pressure_constraints):
+        for index, constraint in enumerate(constraints.pressure_constraints):
             row_index: int = (
-                self.number_reactions + len(solid_species) + len(fugacity_constraints) + index
+                self.number_reactions
+                + len(solid_species)
+                + len(constraints.fugacity_constraints)
+                + index
             )
             logger.info("Row %02d: Setting %s pressure", row_index, constraint.species)
             rhs[row_index] = np.log10(
@@ -405,7 +395,7 @@ class ReactionNetwork:
         self,
         *,
         system: InteriorAtmosphereSystem,
-        constraints: list[SystemConstraint],
+        constraints: SystemConstraints,
         coefficient_matrix: np.ndarray,
     ) -> np.ndarray:
         """Returns the residual vector of the reaction network.

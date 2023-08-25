@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections import UserList
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Protocol, Type, TypeVar
 
 import numpy as np
 
@@ -16,11 +17,18 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class SystemConstraint(Protocol):
-    """A constraint to apply to an interior-atmosphere system."""
+    """A value constraint to apply to an interior-atmosphere system.
 
-    @property
-    def field(self) -> str:
-        ...
+    Args:
+        species: The species to constrain. Usually a species for a pressure or fugacity constraint
+            or an element for a mass constraint.
+        value: Imposed value in kg for masses and bar for pressures or fugacities.
+
+    Attributes:
+        species: The species to constrain. Usually a species for a pressure or fugacity constraint
+            or an element for a mass constraint.
+        value: Imposed value in kg for masses and bar for pressures or fugacities.
+    """
 
     @property
     def species(self) -> str:
@@ -30,23 +38,46 @@ class SystemConstraint(Protocol):
         ...
 
 
+T = TypeVar("T", bound=SystemConstraint)
+
+
+class SystemConstraints(UserList):
+    def __init__(self, initlist=None):
+        self.data: list[SystemConstraint]
+        super().__init__(initlist)
+
+    def _filter_by_type(self, class_type: Type[T]) -> list[T]:
+        return [constraint for constraint in self if isinstance(constraint, class_type)]
+
+    @property
+    def fugacity_constraints(self) -> list[FugacityConstraint]:
+        """Constraints for fugacity."""
+        return self._filter_by_type(FugacityConstraint)
+
+    @property
+    def mass_constraints(self) -> list[MassConstraint]:
+        """Constraints for mass conservation."""
+        return self._filter_by_type(MassConstraint)
+
+    @property
+    def pressure_constraints(self) -> list[PressureConstraint]:
+        """Constraints for pressure."""
+        return self._filter_by_type(PressureConstraint)
+
+    @property
+    def reaction_network_constraints(self) -> list[ReactionNetworkConstraint]:
+        """Constraints for the reaction network."""
+        return self._filter_by_type(ReactionNetworkConstraint)
+
+    @property
+    def number_reaction_network_constraints(self) -> int:
+        return len(self.reaction_network_constraints)
+
+
 @dataclass(kw_only=True)
-class _ValueConstraint:
-    """A value constraint to apply to an interior-atmosphere system.
-
-    Args:
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: Imposed value in kg for masses and bar for pressures or fugacities.
-        field: Either 'pressure, 'fugacity' or 'mass'.
-
-    Attributes:
-        See Args.
-    """
-
+class ValueConstraint:
     species: str
     value: float
-    field: str
 
     def get_value(self, **kwargs) -> float:
         del kwargs
@@ -54,24 +85,23 @@ class _ValueConstraint:
 
 
 @dataclass(kw_only=True)
-class FugacityConstraint(_ValueConstraint):
-    field: str = field(init=False, default="fugacity")
+class ReactionNetworkConstraint(ValueConstraint):
+    """A value constraint applied to a reaction network."""
 
 
 @dataclass(kw_only=True)
-class PressureConstraint(_ValueConstraint):
-    field: str = field(init=False, default="pressure")
+class FugacityConstraint(ReactionNetworkConstraint):
+    """TODO."""
 
 
 @dataclass(kw_only=True)
-class MassConstraint(_ValueConstraint):
-    field: str = field(init=False, default="mass")
+class PressureConstraint(ReactionNetworkConstraint):
+    """TODO."""
 
 
-# TODO: remove.
-# @dataclass(kw_only=True)
-# class ActivityConstraint(_ValueConstraint):
-#    field: str = field(init=False, default="activity")
+@dataclass(kw_only=True)
+class MassConstraint(ValueConstraint):
+    """TODO."""
 
 
 class BufferedFugacity(ABC):
@@ -191,7 +221,7 @@ class IronWustiteBufferFischer(BufferedFugacity):
 
 
 @dataclass(kw_only=True)
-class BufferedFugacityConstraint:
+class BufferedFugacityConstraint(FugacityConstraint):
     """A buffered fugacity constraint to apply to an interior-atmosphere system.
 
     Args:
@@ -206,13 +236,12 @@ class BufferedFugacityConstraint:
     """
 
     species: str = "O2"
-    fugacity: BufferedFugacity = field(default_factory=IronWustiteBufferHirschmann)
+    value: BufferedFugacity = field(default_factory=IronWustiteBufferHirschmann)
     log10_shift: float = 0
-    field: str = field(init=False, default="fugacity")
 
     def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
         del kwargs
-        value: float = 10 ** self.fugacity(
+        value: float = 10 ** self.value(
             temperature=temperature, pressure=pressure, log10_shift=self.log10_shift
         )
         return value

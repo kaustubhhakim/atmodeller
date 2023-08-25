@@ -11,6 +11,7 @@ from atmodeller.constraints import (
     BufferedFugacityConstraint,
     MassConstraint,
     SystemConstraint,
+    SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
@@ -71,7 +72,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
         [("H2O", 0.19626421729663665), ("H2", 0.19386112601058758), ("O2", 8.69970008669977e-08)]
     )
 
-    system.solve(constraints)
+    system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures)
 
 
@@ -100,7 +101,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     )
 
 #     target_pressures: np.ndarray = np.array([3.88388984e-02, 8.69972318e-06, 3.93203953e-01])
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -127,7 +128,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     )
 
 #     target_pressures: np.ndarray = np.array([3.35867961e00, 8.70152291e-10, 3.40066982e-01])
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -159,7 +160,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     )
 
 #     target_pressures: np.ndarray = np.array([9.25738492e00, 8.70975650e-08, 9.37755422e00])
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
@@ -187,7 +188,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     )
 
 #     target_pressures: np.ndarray = np.array([3.52710459e01, 8.73871716e-08, 3.57882477e01])
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -220,7 +221,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 
 #     planet.surface_temperature = 1500.0  # K
 #     target_pressures: np.ndarray = np.array([4.69139863e-01, 2.50073390e-12, 3.89671393e-01])
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -259,7 +260,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     target_pressures: np.ndarray = np.array(
 #         [5.96157589e01, 3.87522780e-01, 8.74014299e-08, 1.32393097e01, 3.93237350e-01]
 #     )
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -293,7 +294,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     target_pressures: np.ndarray = np.array(
 #         [2.99414663e02, 3.83950883e-01, 8.90419112e-08, 6.71143359e01, 3.93252201e-01]
 #     )
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -327,7 +328,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     target_pressures: np.ndarray = np.array(
 #         [5.98473386e02, 3.79516928e-01, 9.11391785e-08, 1.35719545e02, 3.93261980e-01]
 #     )
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -375,7 +376,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #             6.28583933e-05,
 #         ]
 #     )
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -426,7 +427,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #             3.93233711e-01,
 #         ]
 #     )
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
@@ -471,7 +472,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #             4.83204103e00,
 #         ]
 #     )
-#     system.solve(constraints)
+#     system.solve(SystemConstraints(constraints))
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 

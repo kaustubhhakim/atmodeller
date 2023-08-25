@@ -12,6 +12,7 @@ from atmodeller.constraints import (
     BufferedFugacityConstraint,
     MassConstraint,
     SystemConstraint,
+    SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
@@ -75,7 +76,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
         "O2": 8.699912766341827e-08,
     }
 
-    system.solve(constraints)
+    system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -107,7 +108,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
         "O2": 8.699723182761213e-06,
     }
 
-    system.solve(constraints)
+    system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -139,7 +140,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
         "O2": 8.7015229126454e-10,
     }
 
-    system.solve(constraints)
+    system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -176,7 +177,7 @@ def test_hydrogen_species_five_oceans() -> None:
         "O2": 8.709756497114863e-08,
     }
 
-    system.solve(constraints)
+    system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -215,7 +216,7 @@ def test_hydrogen_species_temperature() -> None:
         "O2": 2.5007338977221298e-12,
     }
 
-    system.solve(constraints)
+    system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -259,7 +260,7 @@ def test_hydrogen_and_carbon_species() -> None:
         "O2": 8.740142990935366e-08,
     }
 
-    system.solve(constraints)
+    system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 

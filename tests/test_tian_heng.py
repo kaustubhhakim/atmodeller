@@ -7,6 +7,7 @@ from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferBallhaus,
     SystemConstraint,
+    SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.thermodynamics import (
@@ -51,10 +52,12 @@ def test_graphite() -> None:
     )
 
     # This is comparable to the constraints imposed by Meng.
-    constraints: list[SystemConstraint] = [
-        BufferedFugacityConstraint(fugacity=IronWustiteBufferBallhaus()),
+    constraints: list = [
+        BufferedFugacityConstraint(value=IronWustiteBufferBallhaus()),
         FugacityConstraint(species="H2", value=44.49334998176607),
     ]
+
+    system_constraints: SystemConstraints = SystemConstraints(constraints)
 
     target_pressures: dict[str, float] = {
         "C": 1.0,
@@ -66,5 +69,5 @@ def test_graphite() -> None:
         "O2": 1.4548505639981167e-25,
     }
 
-    system.solve(constraints)
+    system.solve(system_constraints)
     assert system.isclose(target_pressures)
