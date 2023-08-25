@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from atmodeller.reaction_network import ReactionNetwork
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
