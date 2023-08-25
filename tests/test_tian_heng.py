@@ -6,14 +6,13 @@ from atmodeller.constraints import (
     BufferedFugacityConstraint,
     FugacityConstraint,
     IronWustiteBufferBallhaus,
-    SystemConstraint,
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
+from atmodeller.interfaces import NoSolubility
 from atmodeller.thermodynamics import (
     ChemicalComponent,
     GasSpecies,
-    NoSolubility,
     SolidSpecies,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,

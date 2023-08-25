@@ -14,11 +14,11 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
+from atmodeller.interfaces import NonIdealConstant
 from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
 from atmodeller.thermodynamics import (
     ChemicalComponent,
     GasSpecies,
-    NonIdealConstant,
     NoSolubility,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,

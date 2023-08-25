@@ -11,17 +11,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.constraints import PressureConstraint
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from atmodeller.constraints import SystemConstraint, SystemConstraints
+    from atmodeller.constraints import SystemConstraints
     from atmodeller.core import InteriorAtmosphereSystem
-    from atmodeller.thermodynamics import (
-        ChemicalComponent,
-        StandardGibbsFreeEnergyOfFormationProtocol,
-    )
+    from atmodeller.interfaces import ChemicalComponent
+    from atmodeller.thermodynamics import StandardGibbsFreeEnergyOfFormationProtocol
 
 
 @dataclass(kw_only=True)

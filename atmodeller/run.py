@@ -16,13 +16,9 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
-from atmodeller.solubilities import (
-    BasaltDixonCO2,
-    BasaltLibourelN2,
-    NoSolubility,
-    PeridotiteH2O,
-)
-from atmodeller.thermodynamics import ChemicalComponent, GasSpecies
+from atmodeller.interfaces import ChemicalComponent, NoSolubility
+from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
+from atmodeller.thermodynamics import GasSpecies
 from atmodeller.utilities import earth_oceans_to_kg
 
 

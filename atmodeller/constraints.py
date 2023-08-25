@@ -3,42 +3,50 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
 from collections import UserList
 from dataclasses import dataclass, field
-from typing import Protocol, Type, TypeVar
+from typing import Type, TypeVar
 
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
+from atmodeller.interfaces import BufferedFugacity, SystemConstraint
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class SystemConstraint(Protocol):
-    """A value constraint to apply to an interior-atmosphere system.
+T = TypeVar("T", bound=SystemConstraint)
 
-    Args:
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: Imposed value in kg for masses and bar for pressures or fugacities.
 
-    Attributes:
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: Imposed value in kg for masses and bar for pressures or fugacities.
-    """
-
-    @property
-    def species(self) -> str:
-        ...
+@dataclass(kw_only=True)
+class ValueConstraint:
+    species: str
+    value: float
 
     def get_value(self, **kwargs) -> float:
-        ...
+        del kwargs
+        return self.value
 
 
-T = TypeVar("T", bound=SystemConstraint)
+@dataclass(kw_only=True)
+class ReactionNetworkConstraint(ValueConstraint):
+    """A value constraint applied to a reaction network."""
+
+
+@dataclass(kw_only=True)
+class FugacityConstraint(ReactionNetworkConstraint):
+    """TODO."""
+
+
+@dataclass(kw_only=True)
+class PressureConstraint(ReactionNetworkConstraint):
+    """TODO."""
+
+
+@dataclass(kw_only=True)
+class MassConstraint(ValueConstraint):
+    """TODO."""
 
 
 class SystemConstraints(UserList):
@@ -72,76 +80,6 @@ class SystemConstraints(UserList):
     @property
     def number_reaction_network_constraints(self) -> int:
         return len(self.reaction_network_constraints)
-
-
-@dataclass(kw_only=True)
-class ValueConstraint:
-    species: str
-    value: float
-
-    def get_value(self, **kwargs) -> float:
-        del kwargs
-        return self.value
-
-
-@dataclass(kw_only=True)
-class ReactionNetworkConstraint(ValueConstraint):
-    """A value constraint applied to a reaction network."""
-
-
-@dataclass(kw_only=True)
-class FugacityConstraint(ReactionNetworkConstraint):
-    """TODO."""
-
-
-@dataclass(kw_only=True)
-class PressureConstraint(ReactionNetworkConstraint):
-    """TODO."""
-
-
-@dataclass(kw_only=True)
-class MassConstraint(ValueConstraint):
-    """TODO."""
-
-
-class BufferedFugacity(ABC):
-    """Abstract base class for calculating buffered fugacity based on temperature and pressure.
-
-    This class defines a method to calculate the log10(fugacity) of a buffer substance in terms of
-    temperature. Subclasses must implement the '_fugacity' method to provide the specific
-    calculation.
-
-    Attributes:
-        None
-    """
-
-    @abstractmethod
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """Calculates the log10(fugacity) of the buffer in terms of temperature.
-
-        Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar. Defaults to 1 bar.
-
-        Returns:
-            Log10 of the fugacity.
-        """
-        raise NotImplementedError
-
-    def __call__(
-        self, *, temperature: float, pressure: float = 1, log10_shift: float = 0
-    ) -> float:
-        """Calculates the log10(fugacity) of the buffer plus an optional shift.
-
-        Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar. Defaults to 1 bar.
-            log10_shift: Log10 shift. Defaults to 0.
-
-        Returns:
-            Log10 of the fugacity including the shift.
-        """
-        return self._fugacity(temperature=temperature, pressure=pressure) + log10_shift
 
 
 class IronWustiteBufferHirschmann(BufferedFugacity):

@@ -3,64 +3,15 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
 
 import numpy as np
 
+from atmodeller.interfaces import Solubility
 from atmodeller.reaction_network import ReactionNetwork
+from atmodeller.thermodynamics import GasSpecies
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-class Solubility(ABC):
-    """Solubility base class."""
-
-    def power_law(self, fugacity: float, constant: float, exponent: float) -> float:
-        """Power law. Fugacity in bar and returns ppmw."""
-        return constant * fugacity**exponent
-
-    @abstractmethod
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Dissolved volatile concentration in ppmw in the melt.
-
-        Args:
-            fugacity: Fugacity of the species.
-            temperature: Temperature.
-            fugacities_dict: Fugacities of all species in the system.
-
-        Returns:
-            ppmw of the species in the melt.
-        """
-        raise NotImplementedError
-
-    def __call__(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Dissolved volatile concentration in ppmw in the melt.
-
-        See self._solubility.
-        """
-        solubility: float = self._solubility(fugacity, temperature, fugacities_dict)
-        logger.debug(
-            "%s, f = %f, T = %f, ppmw = %f",
-            self.__class__.__name__,
-            fugacity,
-            temperature,
-            solubility,
-        )
-        return solubility
-
-
-class NoSolubility(Solubility):
-    """No solubility."""
-
-    def _solubility(self, *args, **kwargs) -> float:
-        del args
-        del kwargs
-        return 0.0
 
 
 # region Andesite solubility

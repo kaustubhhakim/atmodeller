@@ -11,18 +11,18 @@ import numpy as np
 from scipy.optimize import fsolve
 
 from atmodeller import GRAVITATIONAL_CONSTANT
-from atmodeller.constraints import SystemConstraint, SystemConstraints
+from atmodeller.constraints import SystemConstraints
+from atmodeller.interfaces import NoSolubility
 from atmodeller.reaction_network import ReactionNetwork
-from atmodeller.solubilities import NoSolubility, composition_solubilities
+from atmodeller.solubilities import composition_solubilities
 from atmodeller.thermodynamics import (
-    ChemicalComponent,
     GasSpecies,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
 
 if TYPE_CHECKING:
-    from atmodeller.solubilities import Solubility
+    from atmodeller.interfaces import ChemicalComponent, Solubility
 
 logger: logging.Logger = logging.getLogger(__name__)
 
