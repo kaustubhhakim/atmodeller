@@ -26,12 +26,9 @@ import numpy as np
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.interfaces import BufferedFugacity, SystemConstraint
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import UnitConversion, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-T = TypeVar("T", bound=SystemConstraint)
 
 
 @dataclass(kw_only=True)
@@ -136,36 +133,25 @@ class SystemConstraints(UserList):
         self.data: list[SystemConstraint]
         super().__init__(initlist)
 
-    def _filter_by_type(self, class_type: Type[T]) -> list[T]:
-        """Filter constraints by the given type.
-
-        Args:
-            class_type: Class type to filter.
-
-        Returns:
-            The constraints of the given type.
-        """
-        return [constraint for constraint in self if isinstance(constraint, class_type)]
-
     @property
     def fugacity_constraints(self) -> list[FugacityConstraint]:
         """Constraints related to fugacity."""
-        return self._filter_by_type(FugacityConstraint)
+        return filter_by_type(self.data, FugacityConstraint)
 
     @property
     def mass_constraints(self) -> list[MassConstraint]:
         """Constraints related to mass conservation."""
-        return self._filter_by_type(MassConstraint)
+        return filter_by_type(self.data, MassConstraint)
 
     @property
     def pressure_constraints(self) -> list[PressureConstraint]:
         """Constraints related to pressure."""
-        return self._filter_by_type(PressureConstraint)
+        return filter_by_type(self.data, PressureConstraint)
 
     @property
     def reaction_network_constraints(self) -> list[ReactionNetworkConstraint]:
         """Constraints related to the reaction network."""
-        return self._filter_by_type(ReactionNetworkConstraint)
+        return filter_by_type(self.data, ReactionNetworkConstraint)
 
     @property
     def number_reaction_network_constraints(self) -> int:

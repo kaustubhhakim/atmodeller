@@ -24,9 +24,9 @@ from atmodeller.constraints import (
 from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.interfaces import NoSolubility
 from atmodeller.thermodynamics import (
-    ChemicalComponent,
     GasSpecies,
     SolidSpecies,
+    Species,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
@@ -46,15 +46,19 @@ def test_version():
 def test_graphite() -> None:
     """Tests including graphite."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-        SolidSpecies(chemical_formula="C", common_name="graphite"),  # Ideal activity by default.
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+            SolidSpecies(
+                chemical_formula="C", common_name="graphite"
+            ),  # Ideal activity by default.
+        ]
+    )
 
     planet: Planet = Planet()
     planet.surface_temperature = 600 + 273  # K

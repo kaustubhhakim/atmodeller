@@ -30,8 +30,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
     from atmodeller.core import InteriorAtmosphereSystem
-    from atmodeller.interfaces import ChemicalComponent
-    from atmodeller.thermodynamics import StandardGibbsFreeEnergyOfFormationProtocol
+    from atmodeller.thermodynamics import (
+        Species,
+        StandardGibbsFreeEnergyOfFormationProtocol,
+    )
 
 
 @dataclass(kw_only=True)
@@ -49,38 +51,23 @@ class ReactionNetwork:
         reaction_matrix: The reaction stoichiometry matrix.
     """
 
-    species: list[ChemicalComponent]
+    species: Species
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
-        # Avoid reordering since it is more intuitive for the order of the output to mirror the
-        # input.
-        # self.species.sort(key=self._species_sorter)
         logger.info("Creating a reaction network")
-        logger.info("Species = %s", self.species_names)
+        logger.info("Species = %s", self.species.chemical_formulas)
         self.species_matrix: np.ndarray = self.find_matrix()
         self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
 
     @cached_property
-    def species_names(self) -> list[str]:
-        return [species.chemical_formula for species in self.species]
-
-    @cached_property
     def number_reactions(self) -> int:
-        return self.number_species - self.number_unique_elements
-
-    @cached_property
-    def number_species(self) -> int:
-        return len(self.species)
+        return self.species.number - self.number_unique_elements
 
     @cached_property
     def number_unique_elements(self) -> int:
         return len(self.unique_elements)
-
-    @cached_property
-    def species_indices(self) -> dict[str, int]:
-        return {name: idx for idx, name in enumerate(self.species_names)}
 
     @cached_property
     def unique_elements(self) -> list[str]:
@@ -99,7 +86,7 @@ class ReactionNetwork:
                  [2, 0, 1]]
             if the columns represent the elements H, C, and O, respectively.
         """
-        matrix: np.ndarray = np.zeros((self.number_species, self.number_unique_elements))
+        matrix: np.ndarray = np.zeros((self.species.number, self.number_unique_elements))
         for species_index, species in enumerate(self.species):
             for element_index, element in enumerate(self.unique_elements):
                 try:
@@ -122,7 +109,7 @@ class ReactionNetwork:
             A matrix of the reaction stoichiometry.
         """
         matrix1: np.ndarray = self.species_matrix
-        matrix2: np.ndarray = np.eye(self.number_species)
+        matrix2: np.ndarray = np.eye(self.species.number)
         augmented_matrix: np.ndarray = np.hstack((matrix1, matrix2))
         logger.debug("augmented_matrix = \n%s", augmented_matrix)
 
@@ -134,7 +121,7 @@ class ReactionNetwork:
                 nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
                 augmented_matrix[[i, nonzero_row]] = augmented_matrix[[nonzero_row, i]]
             # Perform row operations to eliminate values below the pivot.
-            for j in range(i + 1, self.number_species):
+            for j in range(i + 1, self.species.number):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
                 logger.debug("Ratio = \n%s", ratio)
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
@@ -253,47 +240,42 @@ class ReactionNetwork:
             The coefficient matrix with the stoichiometry and constraints.
         """
 
-        solid_species = []  # TODO: typing.
-        for species in self.species:
-            if species.phase == "solid":
-                solid_species.append(species)
-
         nrows: int = (
-            len(solid_species)
+            len(self.species.solid)
             + constraints.number_reaction_network_constraints
             + self.number_reactions
         )
 
-        if nrows == self.number_species:
+        if nrows == self.species.number:
             msg: str = "The necessary number of constraints will be applied to "
             msg += "the reaction network to solve the system"
             logger.info(msg)
         else:
-            num: int = self.number_species - nrows
+            num: int = self.species.number - nrows
             # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
             msg = "%d additional (mass) constraint(s) are necessary " % num
             msg += "to solve the system"
             logger.info(msg)
 
-        coeff: np.ndarray = np.zeros((nrows, self.number_species))
+        coeff: np.ndarray = np.zeros((nrows, self.species.number))
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
         # Solid activities.
-        for index, species in enumerate(solid_species):
+        for index, species in enumerate(self.species.solid):
             species_name: str = species.formula.formula
             row_index: int = self.number_reactions + index
-            species_index: int = self.species_indices[species_name]
+            species_index: int = self.species.indices[species_name]
             logger.info("Row %02d: Setting %s coefficient", row_index, species_name)
             coeff[row_index, species_index] = 1
 
         # Fugacity and pressure constraints.
         for index, constraint in enumerate(constraints.reaction_network_constraints):
-            row_index: int = self.number_reactions + len(solid_species) + index
-            species_index: int = self.species_indices[constraint.species]
+            row_index: int = self.number_reactions + len(self.species.solid) + index
+            species_index: int = self.species.indices[constraint.species]
             logger.info("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
-        logger.debug("Species = %s", self.species_names)
+        logger.debug("Species = %s", self.species.chemical_formulas)
         logger.debug("Coefficient matrix = \n%s", coeff)
 
         return coeff
@@ -314,25 +296,25 @@ class ReactionNetwork:
             The log10(fugacity coefficient) vector and the right-hand side vector.
         """
 
-        solid_species: list = [species for species in self.species if species.phase == "solid"]
         nrows: int = (
-            len(solid_species)
+            len(self.species.solid)
             + constraints.number_reaction_network_constraints
             + self.number_reactions
         )
 
-        if nrows == self.number_species:
+        if nrows == self.species.number:
             msg: str = "The necessary number of constraints will be applied to "
             msg += "the reaction network to solve the system"
             logger.info(msg)
         else:
-            num: int = self.number_species - nrows
+            num: int = self.species.number - nrows
             # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
             msg = "%d additional (mass) constraint(s) are necessary " % num
             msg += "to solve the system"
             logger.info(msg)
 
         rhs: np.ndarray = np.zeros(nrows, dtype=float)
+        # Initialise to ideal behaviour.
         non_ideal: np.ndarray = np.ones_like(self.species, dtype=float)
 
         # Reactions.
@@ -350,7 +332,7 @@ class ReactionNetwork:
             )
 
         # Solid activities.
-        for index, species in enumerate(solid_species):
+        for index, species in enumerate(self.species.solid):
             species_name: str = species.formula.formula
             row_index: int = self.number_reactions + index
             logger.info("Row %02d: Setting %s activity", row_index, species_name)
@@ -362,7 +344,7 @@ class ReactionNetwork:
 
         # Fugacity constraints.
         for index, constraint in enumerate(constraints.fugacity_constraints):
-            row_index: int = self.number_reactions + len(solid_species) + index
+            row_index: int = self.number_reactions + len(self.species.solid) + index
             logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
             rhs[row_index] = np.log10(
                 constraint.get_value(
@@ -374,7 +356,7 @@ class ReactionNetwork:
         for index, constraint in enumerate(constraints.pressure_constraints):
             row_index: int = (
                 self.number_reactions
-                + len(solid_species)
+                + len(self.species.solid)
                 + len(constraints.fugacity_constraints)
                 + index
             )
@@ -386,14 +368,9 @@ class ReactionNetwork:
             )
             rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
 
-        # The "non-ideal" LHS vector.
-        for index, species in enumerate(self.species):
-            # FIXME: Not for solid phases. Must be zero.
-            if species.phase == "solid":
-                value: float = 1
-            else:
-                value: float = system.fugacity_coefficients_dict[species.chemical_formula]
-            non_ideal[index] = value
+        for solid in self.species.solid:
+            value: float = system.fugacity_coefficients_dict[solid.chemical_formula]
+            non_ideal[self.species.indices[solid.chemical_formula]] = value
         non_ideal = np.log10(non_ideal)
 
         logger.debug("Non-ideal vector = \n%s", non_ideal)
@@ -428,16 +405,3 @@ class ReactionNetwork:
         )
         logger.debug("Residual_reaction = %s", residual_reaction)
         return residual_reaction
-
-    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
-        """Sorter for the species.
-
-        Sorts first by species complexity and second by species name.
-
-        Args:
-            species: Species.
-
-        Returns:
-            A tuple to sort first by number of elements and second by species name.
-        """
-        return (species.formula.atoms, species.chemical_formula)

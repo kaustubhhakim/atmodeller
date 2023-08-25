@@ -5,6 +5,17 @@ Tests to ensure that sensible pressures are calculated for certain interior-atmo
 The target pressures are determined for the combined thermodynamic data, but they are within 1%
 of the values for the JANAF thermodynamic data alone.
 
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
 """
 
 from atmodeller import __version__
@@ -17,9 +28,9 @@ from atmodeller.constraints import (
 from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.thermodynamics import (
-    ChemicalComponent,
     GasSpecies,
     NoSolubility,
+    Species,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
@@ -51,11 +62,13 @@ def test_version():
 def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -83,11 +96,13 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     """Tests H2-H2O at the IW buffer+2."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -115,11 +130,13 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
 def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -152,11 +169,13 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
 def test_hydrogen_species_five_oceans() -> None:
     """Tests H2-H2O for five H oceans."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 5
     planet: Planet = Planet()
@@ -189,11 +208,13 @@ def test_hydrogen_species_five_oceans() -> None:
 def test_hydrogen_species_temperature() -> None:
     """Tests H2-H2O at a different temperature."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -228,13 +249,15 @@ def test_hydrogen_species_temperature() -> None:
 def test_hydrogen_and_carbon_species() -> None:
     """Tests H2-H2O and CO-CO2."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        ]
+    )
 
     oceans: float = 1
     ch_ratio: float = 1

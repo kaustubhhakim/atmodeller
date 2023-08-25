@@ -29,9 +29,9 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
-from atmodeller.interfaces import ChemicalComponent, NoSolubility
+from atmodeller.interfaces import NoSolubility
 from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
-from atmodeller.thermodynamics import GasSpecies
+from atmodeller.thermodynamics import GasSpecies, Species
 from atmodeller.utilities import earth_oceans_to_kg
 
 
@@ -79,14 +79,16 @@ def main():
 
     args = parser.parse_args()
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
-        GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+            GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(args.oceans)

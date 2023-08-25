@@ -4,9 +4,20 @@ Tests to ensure that 'correct' values are returned for certain interior-atmosphe
 These are quite rudimentary tests, but at least confirm that nothing fundamental is broken with the
 code.
 
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
 """
 
-from atmodeller import __version__, logger
+from atmodeller import __version__
 from atmodeller.constraints import (
     BufferedFugacityConstraint,
     MassConstraint,
@@ -15,11 +26,11 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet
 from atmodeller.interfaces import NonIdealConstant
-from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
+from atmodeller.solubilities import PeridotiteH2O
 from atmodeller.thermodynamics import (
-    ChemicalComponent,
     GasSpecies,
     NoSolubility,
+    Species,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
@@ -45,15 +56,19 @@ def test_version():
 def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(
-            chemical_formula="H2O",
-            solubility=PeridotiteH2O(),
-            ideality=NonIdealConstant(2),
-        ),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility(), ideality=NonIdealConstant(2)),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(
+                chemical_formula="H2O",
+                solubility=PeridotiteH2O(),
+                ideality=NonIdealConstant(2),
+            ),
+            GasSpecies(
+                chemical_formula="H2", solubility=NoSolubility(), ideality=NonIdealConstant(2)
+            ),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()

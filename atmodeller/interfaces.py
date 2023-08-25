@@ -187,12 +187,6 @@ class ChemicalComponent(ABC):
         self.formula = Formula(self.chemical_formula)
 
     @property
-    @abstractmethod
-    def phase(self) -> str:
-        """Phase (solid, gas, etc.)."""
-        ...
-
-    @property
     def molar_mass(self) -> float:
         """Molar mass in kg/mol."""
         return UnitConversion.g_to_kg(self.formula.mass)

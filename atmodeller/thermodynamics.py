@@ -16,6 +16,7 @@ License:
 from __future__ import annotations
 
 import logging
+from collections import UserList
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
@@ -32,7 +33,7 @@ from atmodeller.interfaces import (
     Solubility,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import UnitConversion, filter_by_type
 
 if TYPE_CHECKING:
     from atmodeller.core import InteriorAtmosphereSystem, Planet
@@ -66,11 +67,6 @@ class SolidSpecies(ChemicalComponent):
     def activity(self) -> Ideality:
         """Activity."""
         return self.ideality
-
-    @property
-    def phase(self) -> str:
-        """See base class."""
-        return "solid"
 
 
 @dataclass(kw_only=True)
@@ -163,11 +159,6 @@ class GasSpecies(ChemicalComponent):
         """Fugacity coefficient."""
         return self.ideality
 
-    @property
-    def phase(self) -> str:
-        """See base class."""
-        return "gas"
-
     @_mass_decorator
     def mass(
         self,
@@ -236,6 +227,65 @@ class GasSpecies(ChemicalComponent):
         return self.output.mass_in_total
 
 
+class Species(UserList):
+    """Collections of species for an interior-atmosphere system.
+
+    A collection of species. It provides methods to filter species based on their phases (solid,
+    gas).
+
+    Args:
+        initlist: Initial list of species. Defaults to None
+
+    Attributes:
+        data: List of species contained in the system.
+    """
+
+    def __init__(self, initlist=None):
+        self.data: list[ChemicalComponent]
+        super().__init__(initlist)
+
+    @property
+    def gas(self) -> list[GasSpecies]:
+        """Gas species."""
+        return filter_by_type(self, GasSpecies)
+
+    @property
+    def solid(self) -> list[SolidSpecies]:
+        """Solid species."""
+        return filter_by_type(self, SolidSpecies)
+
+    @property
+    def indices(self) -> dict[str, int]:
+        """Indices of the species."""
+        return {
+            chemical_formula: index
+            for index, chemical_formula in enumerate(self.chemical_formulas)
+        }
+
+    @property
+    def chemical_formulas(self) -> list[str]:
+        """Chemical formulas of the species."""
+        return [species.chemical_formula for species in self.data]
+
+    @property
+    def number(self) -> int:
+        """Number of species."""
+        return len(self)
+
+    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
+        """Sorter for the species.
+
+        Sorts first by species complexity and second by species name.
+
+        Args:
+            species: Species.
+
+        Returns:
+            A tuple to sort first by number of elements and second by species name.
+        """
+        return (species.formula.atoms, species.chemical_formula)
+
+
 class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormationProtocol):
     """Standard Gibbs free energy of formation from the JANAF tables."""
 
@@ -261,7 +311,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
                 return None
             return phase_data
 
-        if species.phase == "gas":
+        if isinstance(species, GasSpecies):
             if species.is_homonuclear_diatomic:
                 phase_data_ref = get_phase_data("ref")
                 phase_data_g = get_phase_data("g")
@@ -284,7 +334,7 @@ class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormation
                     )
                     logger.warning(msg)
                     raise KeyError(msg)
-        else:  # if species.phase == "solid":
+        else:
             phase = get_phase_data("ref")
 
         assert phase is not None
@@ -378,7 +428,7 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
             "Species = %s, standard Gibbs energy of formation = %f", species.common_name, gibbs
         )
 
-        if species.phase == "solid":
+        if isinstance(species, SolidSpecies):
             assert pressure is not None
             # Volume at T.
             # TODO: Why the exponential?  Seems different to the paper (check with Meng).

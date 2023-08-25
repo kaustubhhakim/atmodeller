@@ -16,12 +16,29 @@ License:
 from __future__ import annotations
 
 import logging
+from collections import abc
+from typing import Type, TypeVar
 
 from molmass import Formula
 
 from atmodeller import OCEAN_MOLES
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> list[T]:
+    """Filter entries by the given class type.
+
+    Args:
+        some_collection: A collection (e.g. a list) to filter.
+        class_type: Class type to filter.
+
+    Returns:
+        The entries of the given type.
+    """
+    return [entry for entry in some_collection if isinstance(entry, class_type)]
 
 
 class UnitConversion:

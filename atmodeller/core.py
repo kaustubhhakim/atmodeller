@@ -1,4 +1,4 @@
-"""Core classes and functions.
+"""Core classes and functions for modeling interior-atmosphere systems.
 
 License:
     This program is free software: you can redistribute it and/or modify it under the terms of the 
@@ -29,13 +29,13 @@ from atmodeller.interfaces import NoSolubility
 from atmodeller.reaction_network import ReactionNetwork
 from atmodeller.solubilities import composition_solubilities
 from atmodeller.thermodynamics import (
-    GasSpecies,
+    Species,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
 
 if TYPE_CHECKING:
-    from atmodeller.interfaces import ChemicalComponent, Solubility
+    from atmodeller.interfaces import Solubility
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -44,7 +44,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 class Planet:
     """The properties of a planet.
 
-    Default values are for a fully molten Earth.
+    Defines the properties of a planet that are relevant for interior modeling. It provides default
+    values suitable for modelling a fully molten Earth-like planet.
 
     Args:
         mantle_mass: Mass of the planetary mantle. Defaults to Earth.
@@ -113,7 +114,7 @@ class InteriorAtmosphereSystem:
         planet: A planet.
     """
 
-    species: list[ChemicalComponent]
+    species: Species
     gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol = field(
         default_factory=StandardGibbsFreeEnergyOfFormationJANAF
     )
@@ -125,7 +126,7 @@ class InteriorAtmosphereSystem:
         logger.info("Creating an interior-atmosphere system")
         self._conform_solubilities_to_composition()
         self._reaction_network = ReactionNetwork(species=self.species, gibbs_data=self.gibbs_data)
-        self.species = self._reaction_network.species  # Note reordering by self._reaction_network.
+        self.species = self._reaction_network.species
         # Initialise solution to zero.
         self._log10_pressures = np.zeros_like(self.species, dtype=np.float_)
 
@@ -144,7 +145,7 @@ class InteriorAtmosphereSystem:
         """Pressures of all species in a dictionary."""
         # TODO: Activity for solid (or remove from output).
         output: dict[str, float] = {}
-        for species_name, pressure in zip(self._reaction_network.species_names, self.pressures):
+        for species_name, pressure in zip(self.species.chemical_formulas, self.pressures):
             output[species_name] = pressure
 
         return output
@@ -156,7 +157,7 @@ class InteriorAtmosphereSystem:
             species_name: species.ideality(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
-            for (species_name, species) in zip(self._reaction_network.species_names, self.species)
+            for (species_name, species) in zip(self.species.chemical_formulas, self.species)
         }
         return output
 
@@ -189,10 +190,8 @@ class InteriorAtmosphereSystem:
         output_dict: dict = {}
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self.species:
-            if species.phase == "gas":
-                assert isinstance(species, GasSpecies)
-                output_dict[species.chemical_formula] = species.output
+        for species in self.species.gas:
+            output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
 
@@ -230,19 +229,17 @@ class InteriorAtmosphereSystem:
                 logger.error("Cannot find solubilities for %s", self.planet.melt_composition)
                 raise
 
-            for species in self.species:
-                if species.phase == "gas":
-                    assert isinstance(species, GasSpecies)
-                    try:
-                        species.solubility = solubilities[species.chemical_formula]
-                        logger.info(
-                            "Found Solubility law for %s: %s",
-                            species.chemical_formula,
-                            species.solubility.__class__.__name__,
-                        )
-                    except KeyError:
-                        logger.info("No solubility law for %s", species.chemical_formula)
-                        species.solubility = NoSolubility()
+            for species in self.species.gas:
+                try:
+                    species.solubility = solubilities[species.chemical_formula]
+                    logger.info(
+                        "Found solubility law for %s: %s",
+                        species.chemical_formula,
+                        species.solubility.__class__.__name__,
+                    )
+                except KeyError:
+                    logger.info("No solubility law for %s", species.chemical_formula)
+                    species.solubility = NoSolubility()
 
     def solve(
         self,
@@ -266,14 +263,12 @@ class InteriorAtmosphereSystem:
         )
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
-        # the linear reaction network. TODO: Update this comment? Still relevant?
-        for species in self.species:
-            if species.phase == "gas":
-                assert isinstance(species, GasSpecies)
-                species.mass(
-                    planet=self.planet,
-                    system=self,
-                )
+        # the reaction network.
+        for species in self.species.gas:
+            species.mass(
+                planet=self.planet,
+                system=self,
+            )
 
         logger.info(pprint.pformat(self.pressures_dict))
 
@@ -358,14 +353,12 @@ class InteriorAtmosphereSystem:
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros_like(constraints.mass_constraints, dtype=np.float_)
         for constraint_index, constraint in enumerate(constraints.mass_constraints):
-            for species in self.species:
-                if species.phase == "gas":
-                    assert isinstance(species, GasSpecies)
-                    residual_mass[constraint_index] += species.mass(
-                        planet=self.planet,
-                        system=self,
-                        element=constraint.species,
-                    )
+            for species in self.species.gas:
+                residual_mass[constraint_index] += species.mass(
+                    planet=self.planet,
+                    system=self,
+                    element=constraint.species,
+                )
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_value()
             # Normalise by target mass to compute a relative residual.
