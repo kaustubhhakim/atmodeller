@@ -1,4 +1,19 @@
-"""Constraints for the system of equations."""
+"""Constraints for the system of equations.
+
+This module defines constraints that can be applied to an interior-atmosphere system.
+
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
+"""
 
 from __future__ import annotations
 
@@ -21,32 +36,86 @@ T = TypeVar("T", bound=SystemConstraint)
 
 @dataclass(kw_only=True)
 class ValueConstraint:
+    """A value constraint to apply to the system.
+
+    A constraint that associates a specific value with a species in the system. It is used to
+    enforce a particular value for a certain property, such as pressure or fugacity.
+
+    Args:
+        species: The species for which the constraint applies.
+        value: The imposed value associated with the species.
+
+    Attributes:
+        species: The species for which the constraint applies.
+        value: The imposed value associated with the species.
+    """
+
     species: str
     value: float
 
     def get_value(self, **kwargs) -> float:
+        """Retrieve the imposed value associated with the species.
+
+        Args:
+            **kwargs: Additional keyword arguments (ignored).
+
+        Returns:
+            The imposed value associated with the species.
+        """
         del kwargs
         return self.value
 
 
 @dataclass(kw_only=True)
 class ReactionNetworkConstraint(ValueConstraint):
-    """A value constraint applied to a reaction network."""
+    """A value constraint applied to a reaction network.
+
+    A constraint that applies specifically to a reaction network within the system. It extends the
+    functionality of the ValueConstraint by targeting constraints related to reaction networks.
+
+    Attributes:
+        species: The species for which the constraint applies.
+        value: The imposed value associated with the species.
+    """
 
 
 @dataclass(kw_only=True)
 class FugacityConstraint(ReactionNetworkConstraint):
-    """TODO."""
+    """A constraint for fugacity.
+
+    A constraint that enforces a specific fugacity value for a species within the context of a
+    reaction network. It is a specialized form of ReactionNetworkConstraint.
+
+    Attributes:
+        species: The species for which the fugacity constraint applies.
+        value: The imposed fugacity value associated with the species.
+    """
 
 
 @dataclass(kw_only=True)
 class PressureConstraint(ReactionNetworkConstraint):
-    """TODO."""
+    """A constraint for pressure.
+
+    A constraint that enforces a specific pressure value within the context of a reaction network.
+    It is a specialized form of ReactionNetworkConstraint.
+
+    Attributes:
+        species: The species for which the pressure constraint applies.
+        value: The imposed pressure value associated with the species.
+    """
 
 
 @dataclass(kw_only=True)
 class MassConstraint(ValueConstraint):
-    """TODO."""
+    """A constraint for mass conservation.
+
+    A constraint that enforces a specific mass value for a species as a part of mass conservation.
+    It is a specialized form of ValueConstraint.
+
+    Attributes:
+        species: The species for which the mass conservation constraint applies.
+        value: The imposed mass value associated with the species.
+    """
 
 
 class SystemConstraints(UserList):
@@ -55,30 +124,39 @@ class SystemConstraints(UserList):
         super().__init__(initlist)
 
     def _filter_by_type(self, class_type: Type[T]) -> list[T]:
+        """Filter constraints by the given type.
+
+        Args:
+            class_type: Class type to filter.
+
+        Returns:
+            The constraints of the given type.
+        """
         return [constraint for constraint in self if isinstance(constraint, class_type)]
 
     @property
     def fugacity_constraints(self) -> list[FugacityConstraint]:
-        """Constraints for fugacity."""
+        """Constraints related to fugacity."""
         return self._filter_by_type(FugacityConstraint)
 
     @property
     def mass_constraints(self) -> list[MassConstraint]:
-        """Constraints for mass conservation."""
+        """Constraints related to mass conservation."""
         return self._filter_by_type(MassConstraint)
 
     @property
     def pressure_constraints(self) -> list[PressureConstraint]:
-        """Constraints for pressure."""
+        """Constraints related to pressure."""
         return self._filter_by_type(PressureConstraint)
 
     @property
     def reaction_network_constraints(self) -> list[ReactionNetworkConstraint]:
-        """Constraints for the reaction network."""
+        """Constraints related to the reaction network."""
         return self._filter_by_type(ReactionNetworkConstraint)
 
     @property
     def number_reaction_network_constraints(self) -> int:
+        """Number of constraints related to the reaction network."""
         return len(self.reaction_network_constraints)
 
 
@@ -162,15 +240,20 @@ class IronWustiteBufferFischer(BufferedFugacity):
 class BufferedFugacityConstraint(FugacityConstraint):
     """A buffered fugacity constraint to apply to an interior-atmosphere system.
 
+    A constraint that applies a buffered fugacity requirement to a species within an
+    interior-atmosphere system. The buffered fugacity is controlled by a BufferedFugacity model,
+    with an optional log10 shift applied.
+
     Args:
-        species: The species that is buffered by 'buffer'. Defaults to 'O2'.
-        fugacity: A BufferedFugacity. Defaults to IronWustiteBufferHirschmann
+        species: The species for which the buffered fugacity constraint applies. Defaults to 'O2'.
+        fugacity: A BufferedFugacity model representing the buffer. Defaults to
+            IronWustiteBufferHirschmann.
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
 
     Attributes:
-        species: The species that is buffered by 'buffer'.
-        fugacity: A BufferedFugacity.
-        log10_shift: Log10 shift relative to the buffer.
+        species: The species that is buffered by the given buffer.
+        fugacity: The BufferedFugacity model that defines the buffer.
+        log10_shift: The log10 shift applied to the buffered fugacity.
     """
 
     species: str = "O2"
@@ -178,6 +261,16 @@ class BufferedFugacityConstraint(FugacityConstraint):
     log10_shift: float = 0
 
     def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
+        """Calculate the buffered fugacity value based on the provided temperature and pressure.
+
+        Args:
+            temperature: The temperature at which to calculate the fugacity.
+            pressure: The pressure at which to calculate the fugacity. Defaults to 1.
+            **kwargs: Additional keyword arguments (ignored).
+
+        Returns:
+            The calculated buffered fugacity value.
+        """
         del kwargs
         value: float = 10 ** self.value(
             temperature=temperature, pressure=pressure, log10_shift=self.log10_shift
