@@ -15,11 +15,12 @@ from molmass import Formula
 from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH
-from atmodeller.solubilities import NoSolubility, Solubility
+from atmodeller.solubilities import NoSolubility
 from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
     from atmodeller.core import InteriorAtmosphereSystem, Planet
+    from atmodeller.solubilities import Solubility
 
 
 logger: logging.Logger = logging.getLogger(__name__)

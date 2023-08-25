@@ -6,23 +6,24 @@ import logging
 import pprint
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraint
-from atmodeller.solubilities import composition_solubilities
+from atmodeller.solubilities import NoSolubility, composition_solubilities
 from atmodeller.thermodynamics import (
     ChemicalComponent,
     GasSpecies,
-    NoSolubility,
     SolidSpecies,
-    Solubility,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
+
+if TYPE_CHECKING:
+    from atmodeller.solubilities import Solubility
 
 logger: logging.Logger = logging.getLogger(__name__)
 
