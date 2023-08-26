@@ -16,7 +16,6 @@ License:
 from __future__ import annotations
 
 import logging
-from collections import UserList
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
@@ -33,7 +32,7 @@ from atmodeller.interfaces import (
     Solubility,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
-from atmodeller.utilities import UnitConversion, filter_by_type
+from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
     from atmodeller.core import InteriorAtmosphereSystem, Planet
@@ -225,65 +224,6 @@ class GasSpecies(ChemicalComponent):
         )
 
         return self.output.mass_in_total
-
-
-class Species(UserList):
-    """Collections of species for an interior-atmosphere system.
-
-    A collection of species. It provides methods to filter species based on their phases (solid,
-    gas).
-
-    Args:
-        initlist: Initial list of species. Defaults to None
-
-    Attributes:
-        data: List of species contained in the system.
-    """
-
-    def __init__(self, initlist=None):
-        self.data: list[ChemicalComponent]
-        super().__init__(initlist)
-
-    @property
-    def gas(self) -> list[GasSpecies]:
-        """Gas species."""
-        return filter_by_type(self, GasSpecies)
-
-    @property
-    def solid(self) -> list[SolidSpecies]:
-        """Solid species."""
-        return filter_by_type(self, SolidSpecies)
-
-    @property
-    def indices(self) -> dict[str, int]:
-        """Indices of the species."""
-        return {
-            chemical_formula: index
-            for index, chemical_formula in enumerate(self.chemical_formulas)
-        }
-
-    @property
-    def chemical_formulas(self) -> list[str]:
-        """Chemical formulas of the species."""
-        return [species.chemical_formula for species in self.data]
-
-    @property
-    def number(self) -> int:
-        """Number of species."""
-        return len(self)
-
-    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
-        """Sorter for the species.
-
-        Sorts first by species complexity and second by species name.
-
-        Args:
-            species: Species.
-
-        Returns:
-            A tuple to sort first by number of elements and second by species name.
-        """
-        return (species.formula.atoms, species.chemical_formula)
 
 
 class StandardGibbsFreeEnergyOfFormationJANAF(StandardGibbsFreeEnergyOfFormationProtocol):

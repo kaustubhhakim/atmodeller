@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import pprint
+from collections import UserList
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Union
 
@@ -25,19 +26,114 @@ from scipy.optimize import fsolve
 
 from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.interfaces import NoSolubility
+from atmodeller.interfaces import ChemicalComponent, NoSolubility
 from atmodeller.reaction_network import ReactionNetwork
 from atmodeller.solubilities import composition_solubilities
 from atmodeller.thermodynamics import (
-    Species,
+    GasSpecies,
+    SolidSpecies,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
+from atmodeller.utilities import filter_by_type
 
 if TYPE_CHECKING:
+    from atmodeller.core import Planet
     from atmodeller.interfaces import Solubility
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+class Species(UserList):
+    """Collections of species for an interior-atmosphere system.
+
+    A collection of species. It provides methods to filter species based on their phases (solid,
+    gas).
+
+    Args:
+        initlist: Initial list of species. Defaults to None
+
+    Attributes:
+        data: List of species contained in the system.
+    """
+
+    def __init__(self, initlist=None):
+        self.data: list[ChemicalComponent]
+        super().__init__(initlist)
+
+    @property
+    def gas(self) -> list[GasSpecies]:
+        """Gas species."""
+        return filter_by_type(self, GasSpecies)
+
+    @property
+    def solid(self) -> list[SolidSpecies]:
+        """Solid species."""
+        return filter_by_type(self, SolidSpecies)
+
+    @property
+    def indices(self) -> dict[str, int]:
+        """Indices of the species."""
+        return {
+            chemical_formula: index
+            for index, chemical_formula in enumerate(self.chemical_formulas)
+        }
+
+    @property
+    def chemical_formulas(self) -> list[str]:
+        """Chemical formulas of the species."""
+        return [species.chemical_formula for species in self.data]
+
+    @property
+    def number(self) -> int:
+        """Number of species."""
+        return len(self)
+
+    def conform_solubilities_to_planet_composition(self, planet: Planet) -> None:
+        """Ensure that the solubilities of the species are consistent with the planet composition.
+
+        Args:
+            planet: A planet.
+        """
+        if planet.melt_composition is not None:
+            msg: str = (
+                # pylint: disable=consider-using-f-string
+                "Setting solubilities to be consistent with the melt composition (%s)"
+                % planet.melt_composition
+            )
+            logger.info(msg)
+            try:
+                solubilities: dict[str, Solubility] = composition_solubilities[
+                    planet.melt_composition.casefold()
+                ]
+            except KeyError:
+                logger.error("Cannot find solubilities for %s", planet.melt_composition)
+                raise
+
+            for species in self.gas:
+                try:
+                    species.solubility = solubilities[species.chemical_formula]
+                    logger.info(
+                        "Found solubility law for %s: %s",
+                        species.chemical_formula,
+                        species.solubility.__class__.__name__,
+                    )
+                except KeyError:
+                    logger.info("No solubility law for %s", species.chemical_formula)
+                    species.solubility = NoSolubility()
+
+    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
+        """Sorter for the species.
+
+        Sorts first by species complexity and second by species name.
+
+        Args:
+            species: Species.
+
+        Returns:
+            A tuple to sort first by number of elements and second by species name.
+        """
+        return (species.formula.atoms, species.chemical_formula)
 
 
 @dataclass(kw_only=True)
@@ -120,20 +216,19 @@ class InteriorAtmosphereSystem:
     )
     planet: Planet = field(default_factory=Planet)
     _reaction_network: ReactionNetwork = field(init=False)
-    _log10_pressures: np.ndarray = field(init=False)  # For the solution.
+    _solution: np.ndarray = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
-        self._conform_solubilities_to_composition()
+        self.species.conform_solubilities_to_planet_composition(self.planet)
         self._reaction_network = ReactionNetwork(species=self.species, gibbs_data=self.gibbs_data)
-        self.species = self._reaction_network.species
         # Initialise solution to zero.
-        self._log10_pressures = np.zeros_like(self.species, dtype=np.float_)
+        self._solution = np.zeros_like(self.species, dtype=np.float_)
 
     @property
     def log10_pressures(self) -> np.ndarray:
         """Log10 pressures."""
-        return self._log10_pressures
+        return self._solution
 
     @property
     def pressures(self) -> np.ndarray:
@@ -212,35 +307,6 @@ class InteriorAtmosphereSystem:
 
         return isclose
 
-    def _conform_solubilities_to_composition(self) -> None:
-        """Ensure that the solubilities of the species are consistent with the melt composition."""
-        if self.planet.melt_composition is not None:
-            msg: str = (
-                # pylint: disable=consider-using-f-string
-                "Setting solubilities to be consistent with the melt composition (%s)"
-                % self.planet.melt_composition
-            )
-            logger.info(msg)
-            try:
-                solubilities: dict[str, Solubility] = composition_solubilities[
-                    self.planet.melt_composition.casefold()
-                ]
-            except KeyError:
-                logger.error("Cannot find solubilities for %s", self.planet.melt_composition)
-                raise
-
-            for species in self.species.gas:
-                try:
-                    species.solubility = solubilities[species.chemical_formula]
-                    logger.info(
-                        "Found solubility law for %s: %s",
-                        species.chemical_formula,
-                        species.solubility.__class__.__name__,
-                    )
-                except KeyError:
-                    logger.info("No solubility law for %s", species.chemical_formula)
-                    species.solubility = NoSolubility()
-
     def solve(
         self,
         constraints: SystemConstraints,
@@ -258,7 +324,7 @@ class InteriorAtmosphereSystem:
         """
 
         logger.info("Constraints: %s", pprint.pformat(constraints))
-        self._log10_pressures = self._solve_fsolve(
+        self._solution = self._solve_fsolve(
             constraints=constraints, initial_log10_pressures=initial_log10_pressures
         )
 
@@ -343,7 +409,7 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the pressures for each species.
         """
-        self._log10_pressures = log10_pressures
+        self._solution = log10_pressures
 
         # Compute residual for the reaction network.
         residual_reaction: np.ndarray = self._reaction_network.get_residual(

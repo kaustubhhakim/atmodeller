@@ -21,12 +21,11 @@ from atmodeller.constraints import (
     IronWustiteBufferBallhaus,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet
+from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.interfaces import NoSolubility
 from atmodeller.thermodynamics import (
     GasSpecies,
     SolidSpecies,
-    Species,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )

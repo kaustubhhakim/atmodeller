@@ -17,20 +17,19 @@ License:
     not, see <https://www.gnu.org/licenses/>.
 """
 
-from atmodeller import __version__
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     BufferedFugacityConstraint,
     MassConstraint,
     SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet
+from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.interfaces import NonIdealConstant
 from atmodeller.solubilities import PeridotiteH2O
 from atmodeller.thermodynamics import (
     GasSpecies,
     NoSolubility,
-    Species,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationProtocol,
 )
@@ -44,6 +43,8 @@ standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProto
     StandardGibbsFreeEnergyOfFormation()
 )
 
+debug_logger()
+
 
 def test_version():
     """Test version."""
@@ -53,7 +54,7 @@ def test_version():
 # region oxygen fugacity
 
 
-def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
+def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
     species: Species = Species(
@@ -93,7 +94,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 
 # endregion
 
-# def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
+# def test_H_oxygen_fugacity_buffer_shift_positive() -> None:
 #     """Tests H2-H2O at the IW buffer+2."""
 
 #     species: list[ChemicalComponent] = [
@@ -120,7 +121,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
-# def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
+# def test_H_oxygen_fugacity_buffer_shift_negative() -> None:
 #     """Tests H2-H2O at the IW buffer-2."""
 
 #     species: list[ChemicalComponent] = [
@@ -152,7 +153,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 # # region number of oceans
 
 
-# def test_hydrogen_species_five_oceans() -> None:
+# def test_H_five_oceans() -> None:
 #     """Tests H2-H2O for five H oceans."""
 
 #     species: list[ChemicalComponent] = [
@@ -180,7 +181,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 #     assert np.isclose(target_pressures, system.pressures, rtol=rtol, atol=atol).all()
 
 
-# def test_hydrogen_species_ten_oceans() -> None:
+# def test_H_ten_oceans() -> None:
 #     """Tests H2-H2O for ten H oceans."""
 
 #     species: list[ChemicalComponent] = [
@@ -212,7 +213,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 # # region temperature
 
 
-# def test_hydrogen_species_temperature() -> None:
+# def test_H_temperature() -> None:
 #     """Tests H2-H2O at a different temperature."""
 
 #     species: list[ChemicalComponent] = [

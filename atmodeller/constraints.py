@@ -20,7 +20,6 @@ from __future__ import annotations
 import logging
 from collections import UserList
 from dataclasses import dataclass, field
-from typing import Type, TypeVar
 
 import numpy as np
 

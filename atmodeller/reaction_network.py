@@ -29,11 +29,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
-    from atmodeller.core import InteriorAtmosphereSystem
-    from atmodeller.thermodynamics import (
-        Species,
-        StandardGibbsFreeEnergyOfFormationProtocol,
-    )
+    from atmodeller.core import InteriorAtmosphereSystem, Species
+    from atmodeller.thermodynamics import StandardGibbsFreeEnergyOfFormationProtocol
 
 
 @dataclass(kw_only=True)

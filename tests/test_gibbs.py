@@ -18,19 +18,18 @@ License:
     not, see <https://www.gnu.org/licenses/>.
 """
 
-from atmodeller import __version__
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     BufferedFugacityConstraint,
     MassConstraint,
     SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet
+from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.thermodynamics import (
     GasSpecies,
     NoSolubility,
-    Species,
     StandardGibbsFreeEnergyOfFormation,
     StandardGibbsFreeEnergyOfFormationJANAF,
     StandardGibbsFreeEnergyOfFormationProtocol,
@@ -50,16 +49,15 @@ standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProto
 rtol: float = 1.0e-2
 atol: float = 1.0e-2
 
+debug_logger()
+
 
 def test_version():
     """Test version."""
     assert __version__ == "0.1.0"
 
 
-# region oxygen fugacity
-
-
-def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
+def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
     species: Species = Species(
@@ -93,7 +91,41 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
+def test_H_basalt_melt() -> None:
+    """Tests H2-H2O at the IW buffer."""
+
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
+
+    oceans: float = 1
+    planet: Planet = Planet(melt_composition="basalt")
+    h_kg: float = earth_oceans_to_kg(oceans)
+
+    constraints: list[SystemConstraint] = [
+        MassConstraint(species="H", value=h_kg),
+        BufferedFugacityConstraint(),
+    ]
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
+    )
+
+    target_pressures: dict[str, float] = {
+        "H2": 0.09310239359434942,
+        "H2O": 0.0942558803732345,
+        "O2": 8.699588388210414e-08,
+    }
+
+    system.solve(SystemConstraints(constraints))
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+
+
+def test_H_fO2_plus() -> None:
     """Tests H2-H2O at the IW buffer+2."""
 
     species: Species = Species(
@@ -127,7 +159,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
+def test_H_fO2_minus() -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
     species: Species = Species(
@@ -161,12 +193,7 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-# endregion
-
-# region number of oceans
-
-
-def test_hydrogen_species_five_oceans() -> None:
+def test_H_five_oceans() -> None:
     """Tests H2-H2O for five H oceans."""
 
     species: Species = Species(
@@ -200,12 +227,7 @@ def test_hydrogen_species_five_oceans() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-# endregion
-
-# region temperature
-
-
-def test_hydrogen_species_temperature() -> None:
+def test_H_1500K() -> None:
     """Tests H2-H2O at a different temperature."""
 
     species: Species = Species(
@@ -241,12 +263,7 @@ def test_hydrogen_species_temperature() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-# endregion
-
-# region C over H ratio
-
-
-def test_hydrogen_and_carbon_species() -> None:
+def test_H_and_C() -> None:
     """Tests H2-H2O and CO-CO2."""
 
     species: Species = Species(
@@ -285,6 +302,3 @@ def test_hydrogen_and_carbon_species() -> None:
 
     system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
-
-
-# endregion
