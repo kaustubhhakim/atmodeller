@@ -62,12 +62,12 @@ class Species(UserList):
         super().__init__(initlist)
 
     @property
-    def gas(self) -> list[GasSpecies]:
+    def gas(self) -> dict[int, GasSpecies]:
         """Gas species."""
         return filter_by_type(self, GasSpecies)
 
     @property
-    def solid(self) -> list[SolidSpecies]:
+    def solid(self) -> dict[int, SolidSpecies]:
         """Solid species."""
         return filter_by_type(self, SolidSpecies)
 
@@ -110,7 +110,7 @@ class Species(UserList):
                 logger.error("Cannot find solubilities for %s", planet.melt_composition)
                 raise
 
-            for species in self.gas:
+            for species in self.gas.values():
                 try:
                     species.solubility = solubilities[species.chemical_formula]
                     logger.info(
@@ -285,7 +285,7 @@ class InteriorAtmosphereSystem:
         output_dict: dict = {}
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self.species.gas:
+        for species in self.species.gas.values():
             output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
@@ -330,7 +330,7 @@ class InteriorAtmosphereSystem:
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the reaction network.
-        for species in self.species.gas:
+        for species in self.species.gas.values():
             species.mass(
                 planet=self.planet,
                 system=self,
@@ -417,9 +417,9 @@ class InteriorAtmosphereSystem:
         )
 
         # Compute residual for the mass balance.
-        residual_mass: np.ndarray = np.zeros_like(constraints.mass_constraints, dtype=np.float_)
-        for constraint_index, constraint in enumerate(constraints.mass_constraints):
-            for species in self.species.gas:
+        residual_mass: np.ndarray = np.zeros(len(constraints.mass_constraints), dtype=np.float_)
+        for constraint_index, constraint in enumerate(constraints.mass_constraints.values()):
+            for species in self.species.gas.values():
                 residual_mass[constraint_index] += species.mass(
                     planet=self.planet,
                     system=self,

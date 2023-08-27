@@ -133,22 +133,22 @@ class SystemConstraints(UserList):
         super().__init__(initlist)
 
     @property
-    def fugacity_constraints(self) -> list[FugacityConstraint]:
+    def fugacity_constraints(self) -> dict[int, FugacityConstraint]:
         """Constraints related to fugacity."""
         return filter_by_type(self.data, FugacityConstraint)
 
     @property
-    def mass_constraints(self) -> list[MassConstraint]:
+    def mass_constraints(self) -> dict[int, MassConstraint]:
         """Constraints related to mass conservation."""
         return filter_by_type(self.data, MassConstraint)
 
     @property
-    def pressure_constraints(self) -> list[PressureConstraint]:
+    def pressure_constraints(self) -> dict[int, PressureConstraint]:
         """Constraints related to pressure."""
         return filter_by_type(self.data, PressureConstraint)
 
     @property
-    def reaction_network_constraints(self) -> list[ReactionNetworkConstraint]:
+    def reaction_network_constraints(self) -> dict[int, ReactionNetworkConstraint]:
         """Constraints related to the reaction network."""
         return filter_by_type(self.data, ReactionNetworkConstraint)
 
