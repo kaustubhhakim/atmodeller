@@ -51,25 +51,40 @@ class Species(UserList):
     gas).
 
     Args:
-        initlist: Initial list of species. Defaults to None
+        initlist: Initial list of species. Defaults to None.
 
     Attributes:
         data: List of species contained in the system.
     """
 
-    def __init__(self, initlist=None):
-        self.data: list[ChemicalComponent]
+    def __init__(self, initlist: Union[list[ChemicalComponent], None] = None):
+        self.data: list[ChemicalComponent]  # For typing.
         super().__init__(initlist)
 
     @property
-    def gas(self) -> dict[int, GasSpecies]:
+    def number(self) -> int:
+        """Number of species."""
+        return len(self)
+
+    @property
+    def gas_species(self) -> dict[int, GasSpecies]:
         """Gas species."""
         return filter_by_type(self, GasSpecies)
 
     @property
-    def solid(self) -> dict[int, SolidSpecies]:
+    def number_gas_species(self) -> int:
+        """Number of gas species."""
+        return len(self.gas_species)
+
+    @property
+    def solid_species(self) -> dict[int, SolidSpecies]:
         """Solid species."""
         return filter_by_type(self, SolidSpecies)
+
+    @property
+    def number_solid_species(self) -> int:
+        """Number of solid species."""
+        return len(self.solid_species)
 
     @property
     def indices(self) -> dict[str, int]:
@@ -83,11 +98,6 @@ class Species(UserList):
     def chemical_formulas(self) -> list[str]:
         """Chemical formulas of the species."""
         return [species.chemical_formula for species in self.data]
-
-    @property
-    def number(self) -> int:
-        """Number of species."""
-        return len(self)
 
     def conform_solubilities_to_planet_composition(self, planet: Planet) -> None:
         """Ensure that the solubilities of the species are consistent with the planet composition.
@@ -110,7 +120,7 @@ class Species(UserList):
                 logger.error("Cannot find solubilities for %s", planet.melt_composition)
                 raise
 
-            for species in self.gas.values():
+            for species in self.gas_species.values():
                 try:
                     species.solubility = solubilities[species.chemical_formula]
                     logger.info(
@@ -240,8 +250,8 @@ class InteriorAtmosphereSystem:
         """Pressures of all species in a dictionary."""
         # TODO: Activity for solid (or remove from output).
         output: dict[str, float] = {}
-        for species_name, pressure in zip(self.species.chemical_formulas, self.pressures):
-            output[species_name] = pressure
+        for chemical_formula, pressure in zip(self.species.chemical_formulas, self.pressures):
+            output[chemical_formula] = pressure
 
         return output
 
@@ -249,10 +259,10 @@ class InteriorAtmosphereSystem:
     def fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients in a dictionary."""
         output: dict[str, float] = {
-            species_name: species.ideality(
+            species.chemical_formula: species.ideality(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
-            for (species_name, species) in zip(self.species.chemical_formulas, self.species)
+            for species in self.species.data
         }
         return output
 
@@ -285,7 +295,7 @@ class InteriorAtmosphereSystem:
         output_dict: dict = {}
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self.species.gas.values():
+        for species in self.species.gas_species.values():
             output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
@@ -330,7 +340,7 @@ class InteriorAtmosphereSystem:
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the reaction network.
-        for species in self.species.gas.values():
+        for species in self.species.gas_species.values():
             species.mass(
                 planet=self.planet,
                 system=self,
@@ -419,7 +429,7 @@ class InteriorAtmosphereSystem:
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros(len(constraints.mass_constraints), dtype=np.float_)
         for constraint_index, constraint in enumerate(constraints.mass_constraints.values()):
-            for species in self.species.gas.values():
+            for species in self.species.gas_species.values():
                 residual_mass[constraint_index] += species.mass(
                     planet=self.planet,
                     system=self,
