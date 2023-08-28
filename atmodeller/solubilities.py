@@ -8,7 +8,11 @@ import numpy as np
 
 from atmodeller.interfaces import Solubility
 from atmodeller.reaction_network import ReactionNetwork
-from atmodeller.thermodynamics import GasSpecies
+from atmodeller.thermodynamics import (
+    ChemicalComponent,
+    GasSpecies,
+    StandardGibbsFreeEnergyOfFormationJANAF,
+)
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -28,13 +32,11 @@ class AndesiteH2(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
-        # TODO: Maggie to add comment what the next line is (or remove if no longer required).
-        # ppmw: float = self.power_law(fugacity, 34.43369241, 0.49459427)
-        ppmw: float = 10 ** (1.20257736 * np.log10(np.sqrt(fugacity)) + 1.01058631)
+        ppmw: float = 10 ** (0.60128868 * np.log10(fugacity) + 1.01058631)
         return ppmw
 
 
-class AndesiteS_Sulfate(Solubility):
+class AndesiteS2_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
     Using expression in the abstract and the corrected expression for sulfate capacity in
@@ -54,7 +56,73 @@ class AndesiteS_Sulfate(Solubility):
         return ppmw
 
 
-class AndesiteS_Sulfide(Solubility):
+class AndesiteSO_Sulfate(Solubility):
+    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
+
+    Using expression in the abstract and the corrected expression for sulfate capacity in
+    corrigendum. Composition for Andesite from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+
+        logCs: float = -12.948 + (31984.243 / temperature)
+        logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class AndesiteSO2_Sulfate(Solubility):
+    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
+
+    Using expression in the abstract and the corrected expression for sulfate capacity in
+    corrigendum. Composition for Andesite from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO2"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO2:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+
+        logCs: float = -12.948 + (31984.243 / temperature)
+        logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class AndesiteS2_Sulfide(Solubility):
     """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
 
     Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
@@ -72,12 +140,104 @@ class AndesiteS_Sulfide(Solubility):
         return ppmw
 
 
-class AndesiteS(Solubility):
+class AndesiteSO_Sulfide(Solubility):
+    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
+
+    Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
+    for Andesite from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """fugacity is fS2."""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+
+        logCs: float = 0.225 - (8876.5 / temperature)
+        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class AndesiteSO2_Sulfide(Solubility):
+    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
+
+    Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
+    for Andesite from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """fugacity is fS2."""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO2"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+
+        logCs: float = 0.225 - (8876.5 / temperature)
+        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class AndesiteS2(Solubility):
     """Total S solubility accounting for both sulfide and sulfate dissolution."""
 
     def __init__(self):
-        self.sulfide_solubility: Solubility = AndesiteS_Sulfide()
-        self.sulfate_solubility: Solubility = AndesiteS_Sulfate()
+        self.sulfide_solubility: Solubility = AndesiteS2_Sulfide()
+        self.sulfate_solubility: Solubility = AndesiteS2_Sulfate()
+
+    def _solubility(self, *args, **kwargs) -> float:
+        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
+        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+        return solubility
+
+
+class AndesiteSO(Solubility):
+    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+
+    def __init__(self):
+        self.sulfide_solubility: Solubility = AndesiteSO_Sulfide()
+        self.sulfate_solubility: Solubility = AndesiteSO_Sulfate()
+
+    def _solubility(self, *args, **kwargs) -> float:
+        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
+        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+        return solubility
+
+
+class AndesiteSO2(Solubility):
+    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+
+    def __init__(self):
+        self.sulfide_solubility: Solubility = AndesiteSO2_Sulfide()
+        self.sulfate_solubility: Solubility = AndesiteSO2_Sulfate()
 
     def _solubility(self, *args, **kwargs) -> float:
         solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
@@ -139,9 +299,7 @@ class BasaltH2(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
-        # TODO: Maggie to add comment what the next line is (or remove if no longer required).
-        # ppmw: float = self.power_law(fugacity, 53.65376426, 0.38365457)
-        ppmw: float = 10 ** (1.04827856 * np.log10(np.sqrt(fugacity)) + 1.10083602)
+        ppmw: float = 10 ** (0.52413928 * np.log10(fugacity) + 1.10083602)
         return ppmw
 
 
@@ -163,7 +321,7 @@ class BasaltLibourelN2(Solubility):
         return ppmw
 
 
-class BasaltS_Sulfate(Solubility):
+class BasaltS2_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
     Using expression in the abstract and the corrected expression for sulfate capacity in
@@ -181,7 +339,71 @@ class BasaltS_Sulfate(Solubility):
         return ppmw
 
 
-class BasaltS_Sulfide(Solubility):
+class BasaltSO_Sulfate(Solubility):
+    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
+
+    Using expression in the abstract and the corrected expression for sulfate capacity in
+    corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """Fugacity is fS2."""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+        logCs: float = -12.948 + (31532.862 / temperature)
+        logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class BasaltSO2_Sulfate(Solubility):
+    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
+
+    Using expression in the abstract and the corrected expression for sulfate capacity in
+    corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """Fugacity is fS2."""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO2"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+        logCs: float = -12.948 + (31532.862 / temperature)
+        logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class BasaltS2_Sulfide(Solubility):
     """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
 
     Using expression in abstract for S wt% and the expression for sulfide capacity
@@ -199,12 +421,102 @@ class BasaltS_Sulfide(Solubility):
         return ppmw
 
 
-class BasaltS(Solubility):
+class BasaltSO_Sulfide(Solubility):
+    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
+
+    Using expression in abstract for S wt% and the expression for sulfide capacity
+    Composition for NIB (natural Icelandic basalt) from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """Fugacity is fS2."""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+        logCs: float = 0.225 - (7817.134 / temperature)
+        logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class BasaltSO2_Sulfide(Solubility):
+    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
+
+    Using expression in abstract for S wt% and the expression for sulfide capacity
+    Composition for NIB (natural Icelandic basalt) from Table 1.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        """Fugacity is fS2."""
+        species: list[ChemicalComponent] = []
+        species.append(GasSpecies(chemical_formula="SO2"))
+        species.append(GasSpecies(chemical_formula="S2"))
+        species.append(GasSpecies(chemical_formula="O2"))
+
+        network = ReactionNetwork(
+            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        )
+        print("Reaction network for SO:", network)
+        K_rxn = network.get_reaction_equilibrium_constant(
+            reaction_index=0, temperature=temperature, pressure=1
+        )
+
+        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+        logCs: float = 0.225 - (7817.134 / temperature)
+        logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
+        S_wtp = 10**logS_wtp
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        return ppmw
+
+
+class BasaltS2(Solubility):
     """Total S solubility accounting for both sulfide and sulfate dissolution."""
 
     def __init__(self):
         self.sulfide_solubility: Solubility = BasaltS_Sulfide()
         self.sulfate_solubility: Solubility = BasaltS_Sulfate()
+
+    def _solubility(self, *args, **kwargs) -> float:
+        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
+        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+        return solubility
+
+
+class BasaltSO(Solubility):
+    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+
+    def __init__(self):
+        self.sulfide_solubility: Solubility = BasaltSO_Sulfide()
+        self.sulfate_solubility: Solubility = BasaltSO_Sulfate()
+
+    def _solubility(self, *args, **kwargs) -> float:
+        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
+        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+        return solubility
+
+
+class BasaltSO2(Solubility):
+    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+
+    def __init__(self):
+        self.sulfide_solubility: Solubility = BasaltSO2_Sulfide()
+        self.sulfate_solubility: Solubility = BasaltSO2_Sulfate()
 
     def _solubility(self, *args, **kwargs) -> float:
         solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
@@ -223,7 +535,7 @@ class BasaltWilsonH2O(Solubility):
         return self.power_law(fugacity, 215, 0.7)
 
 
-class TBasaltS_Sulfate(Solubility):
+class TBasaltS2_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
     Using expression in the abstract and the corrected expression for sulfate capacity in
@@ -241,7 +553,7 @@ class TBasaltS_Sulfate(Solubility):
         return ppmw
 
 
-class TBasaltS_Sulfide(Solubility):
+class TBasaltS2_Sulfide(Solubility):
     """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
 
     Using expression in abstract for S wt% and the expression for sulfide capacity
@@ -330,9 +642,9 @@ class SilicicMeltsH2(Solubility):
 # Dictionaries of self-consistent solubility laws for a given composition.
 andesite_solubilities: dict[str, Solubility] = {
     "H2": AndesiteH2(),
-    "O2S": AndesiteS(),
-    "OS": AndesiteS(),
-    "S2": AndesiteS(),
+    "O2S": AndesiteSO2(),
+    "OS": AndesiteSO(),
+    "S2": AndesiteS2(),
 }
 anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
 basalt_solubilities: dict[str, Solubility] = {
@@ -340,9 +652,9 @@ basalt_solubilities: dict[str, Solubility] = {
     "CO2": BasaltDixonCO2(),
     "H2": BasaltH2(),
     "N2": BasaltLibourelN2(),
-    "O2S": BasaltS(),
-    "OS": BasaltS(),
-    "S2": BasaltS(),
+    "O2S": BasaltSO2(),
+    "OS": BasaltSO(),
+    "S2": BasaltS2(),
 }
 peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O()}
 reducedmagma_solubilities: dict[str, Solubility] = {"H2S": MercuryMagmaS()}
