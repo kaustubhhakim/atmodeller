@@ -238,6 +238,7 @@ class InteriorAtmosphereSystem:
     @property
     def log10_pressures(self) -> np.ndarray:
         """Log10 pressures."""
+        # TODO: Actually the activity for solids, not pressures
         return self._solution
 
     @property
@@ -258,6 +259,8 @@ class InteriorAtmosphereSystem:
     @property
     def fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients in a dictionary."""
+        # TODO: By definition the coefficients are 0 (i.e. log10(coefficient)=1) for solids.
+        # Just evaluate / make available for gas species.
         output: dict[str, float] = {
             species.chemical_formula: species.ideality.get_value(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
@@ -269,6 +272,7 @@ class InteriorAtmosphereSystem:
     @property
     def fugacities_dict(self) -> dict[str, float]:
         """Fugacities of all species in a dictionary."""
+        # TODO: for solid phases this would be zero since fugacity coefficient is zero.
         output: dict[str, float] = {}
         for key, value in self.fugacity_coefficients_dict.items():
             output[key] = value * self.pressures_dict[key]
@@ -283,6 +287,7 @@ class InteriorAtmosphereSystem:
     def atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere."""
         mu_atmosphere: float = 0
+        # TODO: safer to loop only over gas species.
         for index, species in enumerate(self.species):
             mu_atmosphere += species.molar_mass * self.pressures[index]
         mu_atmosphere /= self.total_pressure
@@ -293,11 +298,13 @@ class InteriorAtmosphereSystem:
     def output(self) -> dict:
         """Convenient output for analysis."""
         output_dict: dict = {}
+        output_dict["temperature"] = self.planet.surface_temperature
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
         for species in self.species.gas_species:
             output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
+        # TODO: Add solid activities for completeness.
         return output_dict
 
     def isclose(
@@ -355,7 +362,7 @@ class InteriorAtmosphereSystem:
             constraints: Constraints as prescribed by the user.
 
         Returns:
-            Constraints list including solid activities.
+            Constraints including solid activities.
         """
         logger.info("Assembling constraints")
         for solid in self.species.solid_species:
@@ -406,6 +413,7 @@ class InteriorAtmosphereSystem:
                     ic_count,
                 )
                 # Increase or decrease the magnitude of all pressures.
+                # TODO: Keep activities for solids at unity or compute directly.
                 initial_log10_pressures *= 2 * np.random.random_sample()
                 logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
                 ic_count += 1
