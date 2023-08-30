@@ -16,7 +16,7 @@ License:
 from __future__ import annotations
 
 import logging
-from collections import abc
+from collections import OrderedDict, abc
 from typing import Type, TypeVar
 
 from molmass import Formula
@@ -28,7 +28,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> list[T]:
+def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> dict[int, T]:
     """Filters entries by the given class type and maintains order.
 
     Args:
@@ -36,11 +36,15 @@ def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> list
         class_type: Class type to filter.
 
     Returns:
-        A list of filtered entries.
+        An OrderedDict with indices in some_collection as keys and filtered entries as values.
     """
-    filtered: list = [entry for entry in some_collection if isinstance(entry, class_type)]
 
-    return filtered
+    ordered_dict = OrderedDict()
+    for index, entry in enumerate(some_collection):
+        if isinstance(entry, class_type):
+            ordered_dict[index] = entry
+
+    return ordered_dict
 
 
 class UnitConversion:

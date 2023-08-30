@@ -323,7 +323,7 @@ class ReactionNetwork:
                 rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
 
         # FIXME: Should be unity for solids and calculated for gases.
-        for solid in self.species.solid_species:
+        for solid in self.species.solid_species.values():
             value: float = system.fugacity_coefficients_dict[solid.chemical_formula]
             non_ideal[self.species.indices[solid.chemical_formula]] = value
         non_ideal = np.log10(non_ideal)
@@ -354,9 +354,7 @@ class ReactionNetwork:
         rhs, non_ideal = self.get_lhs_and_rhs_vectors(system=system, constraints=constraints)
 
         residual_reaction: np.ndarray = (
-            coefficient_matrix.dot(non_ideal)
-            + coefficient_matrix.dot(system.log10_pressures)
-            - rhs
+            coefficient_matrix.dot(non_ideal) + coefficient_matrix.dot(system.log_solution) - rhs
         )
         logger.debug("Residual_reaction = %s", residual_reaction)
         return residual_reaction

@@ -45,12 +45,12 @@ def test_graphite() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="CO2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="H2"),
+            GasSpecies(chemical_formula="H2O"),
+            GasSpecies(chemical_formula="CO"),
+            GasSpecies(chemical_formula="CO2"),
+            GasSpecies(chemical_formula="CH4"),
+            GasSpecies(chemical_formula="O2"),
             SolidSpecies(
                 chemical_formula="C", common_name="graphite"
             ),  # Ideal activity by default.
@@ -74,13 +74,14 @@ def test_graphite() -> None:
 
     target_pressures: dict[str, float] = {
         "C": 1.0,
-        "CH4": 941.9462267908025,
-        "CO": 0.0817264668302245,
-        "CO2": 0.0715136912730243,
+        "CH4": 941.8712626308082,
+        "CO": 0.08171351242186498,
+        "CO2": 0.07149671191170186,
         "H2": 44.493349981766066,
-        "H2O": 14.610360605730092,
-        "O2": 1.4548505639981167e-25,
+        "H2O": 14.609207391097847,
+        "O2": 1.4546209065940728e-25,
     }
 
     system.solve(system_constraints)
+    system.solution_dict
     assert system.isclose(target_pressures)

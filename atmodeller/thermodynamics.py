@@ -43,6 +43,13 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
+class SolidSpeciesOutput:
+    """Output for a solid species."""
+
+    activity: float
+
+
+@dataclass(kw_only=True)
 class SolidSpecies(ChemicalComponent):
     """A solid species.
 
@@ -61,6 +68,8 @@ class SolidSpecies(ChemicalComponent):
         formula: Formula object derived from the chemical formula.
         ideality: Ideality object representing activity for thermodynamic calculations.
     """
+
+    output: SolidSpeciesOutput = field(init=False)
 
     def __post_init__(self):
         super().__post_init__()
@@ -152,6 +161,7 @@ class GasSpecies(ChemicalComponent):
     common_name: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
+    output: GasSpeciesOutput = field(init=False)
 
     def __post_init__(self):
         self.common_name = self.chemical_formula
@@ -185,7 +195,7 @@ class GasSpecies(ChemicalComponent):
 
         del element
 
-        pressure: float = system.pressures_dict[self.chemical_formula]
+        pressure: float = system.solution_dict[self.chemical_formula]
         fugacity: float = system.fugacities_dict[self.chemical_formula]
         fugacity_coefficient: float = system.fugacity_coefficients_dict[self.chemical_formula]
 
@@ -213,7 +223,7 @@ class GasSpecies(ChemicalComponent):
         mass_in_solid: float = prefactor * ppmw_in_solid * UnitConversion.ppm_to_fraction()
         moles_in_solid: float = mass_in_solid / self.molar_mass
 
-        self.output: GasSpeciesOutput = GasSpeciesOutput(
+        self.output = GasSpeciesOutput(
             mass_in_atmosphere=mass_in_atmosphere,
             mass_in_solid=mass_in_solid,
             mass_in_melt=mass_in_melt,
