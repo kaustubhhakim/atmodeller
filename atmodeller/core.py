@@ -67,7 +67,7 @@ class Species(UserList):
         return len(self)
 
     @property
-    def gas_species(self) -> dict[int, GasSpecies]:
+    def gas_species(self) -> list[GasSpecies]:
         """Gas species."""
         return filter_by_type(self, GasSpecies)
 
@@ -77,7 +77,7 @@ class Species(UserList):
         return len(self.gas_species)
 
     @property
-    def solid_species(self) -> dict[int, SolidSpecies]:
+    def solid_species(self) -> list[SolidSpecies]:
         """Solid species."""
         return filter_by_type(self, SolidSpecies)
 
@@ -120,7 +120,7 @@ class Species(UserList):
                 logger.error("Cannot find solubilities for %s", planet.melt_composition)
                 raise
 
-            for species in self.gas_species.values():
+            for species in self.gas_species:
                 try:
                     species.solubility = solubilities[species.chemical_formula]
                     logger.info(
@@ -295,7 +295,7 @@ class InteriorAtmosphereSystem:
         output_dict: dict = {}
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self.species.gas_species.values():
+        for species in self.species.gas_species:
             output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
@@ -340,7 +340,7 @@ class InteriorAtmosphereSystem:
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the reaction network.
-        for species in self.species.gas_species.values():
+        for species in self.species.gas_species:
             species.mass(
                 planet=self.planet,
                 system=self,
@@ -358,7 +358,7 @@ class InteriorAtmosphereSystem:
             Constraints list including solid activities.
         """
         logger.info("Assembling constraints")
-        for solid in self.species.solid_species.values():
+        for solid in self.species.solid_species:
             constraints.append(solid.activity)
         logger.info("Constraints: %s", pprint.pformat(constraints))
 
@@ -445,7 +445,7 @@ class InteriorAtmosphereSystem:
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros(len(constraints.mass_constraints), dtype=np.float_)
         for constraint_index, constraint in enumerate(constraints.mass_constraints):
-            for species in self.species.gas_species.values():
+            for species in self.species.gas_species:
                 residual_mass[constraint_index] += species.mass(
                     planet=self.planet,
                     system=self,

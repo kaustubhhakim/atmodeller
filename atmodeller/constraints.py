@@ -56,20 +56,20 @@ class SystemConstraints(UserList):
         super().__init__(initlist)
 
     def _filter_by_name(self, name: str) -> list[SystemConstraint]:
-        """Filters the entries by a given name.
+        """Filters the constraints by a given name.
 
         Args:
             name: The filter string (e.g., pressure, fugacity, mass).
 
         Returns:
-            A dictionary with the index of the constraint in the list and the constraint.
+            A list of filtered constraints.
         """
-        filtered_entries: list = []
+        filtered: list = []
         for entry in self.data:
             if entry.name == name:
-                filtered_entries.append(entry)
+                filtered.append(entry)
 
-        return filtered_entries
+        return filtered
 
     @property
     def activity_constraints(self) -> list[SystemConstraint]:

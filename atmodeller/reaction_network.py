@@ -323,7 +323,7 @@ class ReactionNetwork:
                 rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
 
         # FIXME: Should be unity for solids and calculated for gases.
-        for solid in self.species.solid_species.values():
+        for solid in self.species.solid_species:
             value: float = system.fugacity_coefficients_dict[solid.chemical_formula]
             non_ideal[self.species.indices[solid.chemical_formula]] = value
         non_ideal = np.log10(non_ideal)
