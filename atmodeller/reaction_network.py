@@ -332,7 +332,7 @@ class ReactionNetwork:
             row_index: int = self.number_reactions + index
             logger.info("Row %02d: Setting %s activity", row_index, species_name)
             rhs[row_index] = np.log10(
-                species.activity(
+                species.activity.get_value(
                     temperature=system.planet.surface_temperature, pressure=system.total_pressure
                 )
             )

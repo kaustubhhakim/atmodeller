@@ -18,100 +18,23 @@ License:
 from __future__ import annotations
 
 import logging
-from collections import UserList
+from collections import OrderedDict, UserList
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import BufferedFugacity, SystemConstraint
-from atmodeller.utilities import UnitConversion, filter_by_type
+from atmodeller.interfaces import ConstantSystemConstraint, SystemConstraint
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass(kw_only=True)
-class ValueConstraint:
-    """A value constraint to apply to the system.
+@dataclass(kw_only=True, frozen=True)
+class MassConstraint(ConstantSystemConstraint):
+    """A constant mass constraint."""
 
-    A constraint that associates a specific value with a species in the system. It is used to
-    enforce a particular value for a certain property, such as pressure or fugacity.
-
-    Args:
-        species: The species for which the constraint applies.
-        value: The imposed value associated with the species.
-
-    Attributes:
-        species: The species for which the constraint applies.
-        value: The imposed value associated with the species.
-    """
-
-    species: str
-    value: float
-
-    def get_value(self, **kwargs) -> float:
-        """Retrieve the imposed value associated with the species.
-
-        Args:
-            **kwargs: Additional keyword arguments (ignored).
-
-        Returns:
-            The imposed value associated with the species.
-        """
-        del kwargs
-        return self.value
-
-
-@dataclass(kw_only=True)
-class ReactionNetworkConstraint(ValueConstraint):
-    """A value constraint applied to a reaction network.
-
-    A constraint that applies specifically to a reaction network within the system. It extends the
-    functionality of the ValueConstraint by targeting constraints related to reaction networks.
-
-    Attributes:
-        species: The species for which the constraint applies.
-        value: The imposed value associated with the species.
-    """
-
-
-@dataclass(kw_only=True)
-class FugacityConstraint(ReactionNetworkConstraint):
-    """A constraint for fugacity.
-
-    A constraint that enforces a specific fugacity value for a species within the context of a
-    reaction network. It is a specialized form of ReactionNetworkConstraint.
-
-    Attributes:
-        species: The species for which the fugacity constraint applies.
-        value: The imposed fugacity value associated with the species.
-    """
-
-
-@dataclass(kw_only=True)
-class PressureConstraint(ReactionNetworkConstraint):
-    """A constraint for pressure.
-
-    A constraint that enforces a specific pressure value within the context of a reaction network.
-    It is a specialized form of ReactionNetworkConstraint.
-
-    Attributes:
-        species: The species for which the pressure constraint applies.
-        value: The imposed pressure value associated with the species.
-    """
-
-
-@dataclass(kw_only=True)
-class MassConstraint(ValueConstraint):
-    """A constraint for mass conservation.
-
-    A constraint that enforces a specific mass value for a species as a part of mass conservation.
-    It is a specialized form of ValueConstraint.
-
-    Attributes:
-        species: The species for which the mass conservation constraint applies.
-        value: The imposed mass value associated with the species.
-    """
+    name: str = field(init=False, default="mass")
 
 
 class SystemConstraints(UserList):
@@ -132,25 +55,45 @@ class SystemConstraints(UserList):
         self.data: list[SystemConstraint]
         super().__init__(initlist)
 
+    def _filter_by_name(self, name: str) -> dict[int, SystemConstraint]:
+        """Filters the entries by a given name.
+
+        Args:
+            name: The filter string (e.g., pressure, fugacity, mass).
+
+        Returns:
+            A dictionary with the index of the constraint in the list and the constraint.
+        """
+        ordered_dict: dict[int, SystemConstraint] = OrderedDict()
+
+        for index, entry in enumerate(self.data):
+            if entry.name == name:
+                ordered_dict[index] = entry
+
+        return ordered_dict
+
     @property
-    def fugacity_constraints(self) -> dict[int, FugacityConstraint]:
+    def fugacity_constraints(self) -> dict[int, SystemConstraint]:
         """Constraints related to fugacity."""
-        return filter_by_type(self.data, FugacityConstraint)
+        return self._filter_by_name("fugacity")
 
     @property
-    def mass_constraints(self) -> dict[int, MassConstraint]:
+    def mass_constraints(self) -> dict[int, SystemConstraint]:
         """Constraints related to mass conservation."""
-        return filter_by_type(self.data, MassConstraint)
+        return self._filter_by_name("mass")
 
     @property
-    def pressure_constraints(self) -> dict[int, PressureConstraint]:
+    def pressure_constraints(self) -> dict[int, SystemConstraint]:
         """Constraints related to pressure."""
-        return filter_by_type(self.data, PressureConstraint)
+        return self._filter_by_name("pressure")
 
     @property
-    def reaction_network_constraints(self) -> dict[int, ReactionNetworkConstraint]:
+    def reaction_network_constraints(self) -> dict[int, SystemConstraint]:
         """Constraints related to the reaction network."""
-        return filter_by_type(self.data, ReactionNetworkConstraint)
+        odict: dict[int, SystemConstraint] = self._filter_by_name("fugacity")
+        odict |= self._filter_by_name("pressure")
+
+        return odict
 
     @property
     def number_reaction_network_constraints(self) -> int:
@@ -158,13 +101,18 @@ class SystemConstraints(UserList):
         return len(self.reaction_network_constraints)
 
 
-class IronWustiteBufferHirschmann(BufferedFugacity):
+@dataclass(frozen=True)
+class IronWustiteBufferConstraintHirschmann(SystemConstraint):
     """Iron-wustite buffer (fO2) from O'Neill and Pownceby (1993) and Hirschmann et al. (2008).
 
     https://ui.adsabs.harvard.edu/abs/1993CoMP..114..296O/abstract
     """
 
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
+    name: str = field(init=False, default="fugacity")
+    species: str = field(init=False, default="O2")
+    log10_shift: float = 0
+
+    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
         fugacity: float = (
             -28776.8 / temperature
@@ -172,17 +120,24 @@ class IronWustiteBufferHirschmann(BufferedFugacity):
             + 0.055 * (pressure - 1) / temperature
             - 0.8853 * np.log(temperature)
         )
+        fugacity += self.log10_shift
+        fugacity = 10**fugacity
         return fugacity
 
 
-class IronWustiteBufferOneill(BufferedFugacity):
+@dataclass(frozen=True)
+class IronWustiteBufferConstraintOneill(SystemConstraint):
     """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002).
 
     Gibbs energy of reaction is at 1 bar. See Table 6.
     https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
     """
 
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
+    name: str = field(init=False, default="fugacity")
+    species: str = field(init=False, default="O2")
+    log10_shift: float = 0
+
+    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
         del pressure
         fugacity: float = (
@@ -190,16 +145,23 @@ class IronWustiteBufferOneill(BufferedFugacity):
             * (-244118 + 115.559 * temperature - 8.474 * temperature * np.log(temperature))
             / (np.log(10) * GAS_CONSTANT * temperature)
         )
+        fugacity += self.log10_shift
+        fugacity = 10**fugacity
         return fugacity
 
 
-class IronWustiteBufferBallhaus(BufferedFugacity):
+@dataclass(frozen=True)
+class IronWustiteBufferConstraintBallhaus(SystemConstraint):
     """Iron-wustite buffer (fO2) from Ballhaus et al. (1991).
 
     https://ui.adsabs.harvard.edu/abs/1991CoMP..107...27B/abstract
     """
 
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
+    name: str = field(init=False, default="fugacity")
+    species: str = field(init=False, default="O2")
+    log10_shift: float = 0
+
+    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
         fugacity: float = (
             14.07
@@ -208,17 +170,24 @@ class IronWustiteBufferBallhaus(BufferedFugacity):
             + 0.053 * pressure / temperature
             + 3e-6 * pressure
         )
+        fugacity += self.log10_shift
+        fugacity = 10**fugacity
         return fugacity
 
 
-class IronWustiteBufferFischer(BufferedFugacity):
+@dataclass(frozen=True)
+class IronWustiteBufferConstraintFischer(SystemConstraint):
     """Iron-wustite buffer (fO2) from Fischer et al. (2011).
 
     See Table S2 in supplementary materials.
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
     """
 
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
+    name: str = field(init=False, default="fugacity")
+    species: str = field(init=False, default="O2")
+    log10_shift: float = 0
+
+    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
         """See base class."""
         pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
         a_P: float = 6.44059 + 0.00463099 * pressure_GPa
@@ -230,47 +199,7 @@ class IronWustiteBufferFischer(BufferedFugacity):
             - 5.4861e-9 * pressure_GPa**4  # Note typo in Table S2. Must be pressure**4.
         )
         b_P *= 1000 / temperature
-        buffer: float = a_P + b_P
-        return buffer
-
-
-@dataclass(kw_only=True)
-class BufferedFugacityConstraint(FugacityConstraint):
-    """A buffered fugacity constraint to apply to an interior-atmosphere system.
-
-    A constraint that applies a buffered fugacity requirement to a species within an
-    interior-atmosphere system. The buffered fugacity is controlled by a BufferedFugacity model,
-    with an optional log10 shift applied.
-
-    Args:
-        species: The species for which the buffered fugacity constraint applies. Defaults to 'O2'.
-        fugacity: A BufferedFugacity model representing the buffer. Defaults to
-            IronWustiteBufferHirschmann.
-        log10_shift: Log10 shift relative to the buffer. Defaults to 0.
-
-    Attributes:
-        species: The species that is buffered by the given buffer.
-        fugacity: The BufferedFugacity model that defines the buffer.
-        log10_shift: The log10 shift applied to the buffered fugacity.
-    """
-
-    species: str = "O2"
-    value: BufferedFugacity = field(default_factory=IronWustiteBufferHirschmann)
-    log10_shift: float = 0
-
-    def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
-        """Calculate the buffered fugacity value based on the provided temperature and pressure.
-
-        Args:
-            temperature: The temperature at which to calculate the fugacity.
-            pressure: The pressure at which to calculate the fugacity. Defaults to 1.
-            **kwargs: Additional keyword arguments (ignored).
-
-        Returns:
-            The calculated buffered fugacity value.
-        """
-        del kwargs
-        value: float = 10 ** self.value(
-            temperature=temperature, pressure=pressure, log10_shift=self.log10_shift
-        )
-        return value
+        fugacity: float = a_P + b_P
+        fugacity += self.log10_shift
+        fugacity = 10**fugacity
+        return fugacity

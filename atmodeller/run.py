@@ -23,7 +23,7 @@ import time
 
 from atmodeller import logger
 from atmodeller.constraints import (
-    BufferedFugacityConstraint,
+    IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraint,
     SystemConstraints,
@@ -96,7 +96,7 @@ def main():
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
         MassConstraint(species="C", value=c_kg),
-        BufferedFugacityConstraint(log10_shift=args.fO2_shift),
+        IronWustiteBufferConstraintHirschmann(log10_shift=args.fO2_shift),
     ]
 
     # Include nitrogen if desired.

@@ -36,7 +36,7 @@ from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
     from atmodeller.core import InteriorAtmosphereSystem, Planet
-    from atmodeller.interfaces import Ideality
+    from atmodeller.interfaces import SystemConstraint
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ class SolidSpecies(ChemicalComponent):
     """
 
     @property
-    def activity(self) -> Ideality:
+    def activity(self) -> SystemConstraint:
         """Activity."""
         return self.ideality
 
@@ -154,7 +154,7 @@ class GasSpecies(ChemicalComponent):
         super().__post_init__()
 
     @property
-    def fugacity_coefficient(self) -> Ideality:
+    def fugacity_coefficient(self) -> SystemConstraint:
         """Fugacity coefficient."""
         return self.ideality
 

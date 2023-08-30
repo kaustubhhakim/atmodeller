@@ -28,129 +28,70 @@ from atmodeller.utilities import UnitConversion
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class Ideality(ABC):
-    """Abstract base class for calculating ideality based on temperature and pressure.
+class SystemConstraint(Protocol):
+    """A constraint to apply to an interior-atmosphere system."""
 
-    Ideality can refer to either ideal gas behaviour or an ideal solution.
+    @property
+    def name(self) -> str:
+        ...
 
-    This class defines a method to calculate ideality based on temperature and pressure.
-    Subclasses must implement the '_ideality' method to provide the specific calculation.
+    @property
+    def species(self) -> str:
+        ...
 
-    Attributes:
-        None
-    """
-
-    @abstractmethod
-    def _ideality(self, *, temperature: float, pressure: float) -> float:
-        """Calculates the ideality of a substance.
+    def get_value(self, *args, **kwargs) -> float:
+        """Computes the value of the constraint for given input arguments.
 
         Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar.
+            *args: Positional arguments.
+            **kwargs: Keyword arguments.
 
         Returns:
-            The calculated ideality value.
+            The evaluation of the constraint according to *args and **kwargs.
         """
-        raise NotImplementedError
-
-    def __call__(self, *, temperature: float, pressure: float) -> float:
-        """Calculates the ideality of a substance at a given temperature and pressure.
-
-        Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar.
-
-        Returns:
-            The calculated ideality value.
-        """
-        return self._ideality(temperature=temperature, pressure=pressure)
+        ...
 
 
-class NonIdealConstant(Ideality):
-    """A non-ideal constant activity or fugacity coefficient.
-
-    Useful for testing or representing non-ideal behavior.
-
-    This class provides the _ideality method that returns a constant value, allowing you to
-    simulate non-ideal behavior with a specific coefficient.
+@dataclass(kw_only=True, frozen=True)
+class ConstantSystemConstraint(ABC):
+    """A constant value constraint.
 
     Args:
-        constant: The constant activity or fugacity coefficient.
+        name: Constraint name, which must be one of: fugacity, pressure, or mass.
+        species: The species to constrain. Usually a species for a pressure or fugacity constraint
+            or an element for a mass constraint.
+        value: The constant value.
 
     Attributes:
-        constant: The constant activity or fugacity coefficient.
+        value: The constant value. Imposed value in kg for masses and bar for pressures or
+            fugacities.
     """
 
-    def __init__(self, constant: float):
-        self.constant: float = constant
+    name: str
+    species: str
+    value: float
 
-    def _ideality(self, *args, **kwargs) -> float:
-        """Calculates the ideality value for a constant activity or fugacity coefficient.
-
-        Args:
-            *args: Positional arguments (not used).
-            **kwargs: Keyword arguments (not used).
-
-        Returns:
-            The constant activity or fugacity coefficient.
-        """
+    def get_value(self, *args, **kwargs) -> float:
+        """Returns the constant value. See base class."""
         del args
         del kwargs
-        return self.constant
+        return self.value
 
 
-class Ideal(NonIdealConstant):
-    """An ideal solution or an ideal gas.
+@dataclass(kw_only=True, frozen=True)
+class IdealityConstant(ConstantSystemConstraint):
+    """A constant activity or fugacity coefficient.
 
-    An ideal solution with an activity coefficient of unity or an ideal gas with a fugacity
-    coefficient of unity.
-
-    This class provides the _ideality method that returns a value of 1.0, indicating that the
-    solution or gas is ideal with no deviations from ideality.
-    """
-
-    def __init__(self, constant: float = 1.0):
-        super().__init__(constant)
-
-
-class BufferedFugacity(ABC):
-    """Abstract base class for calculating buffered fugacity based on temperature and pressure.
-
-    This class defines a method to calculate the log10(fugacity) of a buffer substance in terms of
-    temperature. Subclasses must implement the '_fugacity' method to provide the specific
-    calculation.
+    Args:
+        value: The constant value. Defaults to 1 (i.e. for the case of ideality, 1 is ideal).
 
     Attributes:
-        None
+        value: The constant value.
     """
 
-    @abstractmethod
-    def _fugacity(self, *, temperature: float, pressure: float = 1) -> float:
-        """Calculates the log10(fugacity) of the buffer in terms of temperature.
-
-        Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar. Defaults to 1 bar.
-
-        Returns:
-            Log10 of the fugacity.
-        """
-        raise NotImplementedError
-
-    def __call__(
-        self, *, temperature: float, pressure: float = 1, log10_shift: float = 0
-    ) -> float:
-        """Calculates the log10(fugacity) of the buffer plus an optional shift.
-
-        Args:
-            temperature: Temperature in Kelvin.
-            pressure: Pressure in bar. Defaults to 1 bar.
-            log10_shift: Log10 shift. Defaults to 0.
-
-        Returns:
-            Log10 of the fugacity including the shift.
-        """
-        return self._fugacity(temperature=temperature, pressure=pressure) + log10_shift
+    name: str = "ideality"
+    species: str = field(init=False, default="")
+    value: float = 1.0
 
 
 @dataclass(kw_only=True)
@@ -172,7 +113,7 @@ class ChemicalComponent(ABC):
 
     chemical_formula: str
     common_name: str
-    ideality: Ideality = field(default_factory=Ideal)
+    ideality: SystemConstraint = field(default_factory=IdealityConstant)
     formula: Formula = field(init=False)
     # TODO: select source of thermodynamic data for this species.  Do all the reading in/caching
     # to set up the interpolation functions
@@ -239,6 +180,7 @@ class ChemicalComponent(ABC):
         return formula_string
 
 
+# TODO: Could also subclass the SystemConstraint class for solubilities.
 class Solubility(ABC):
     """Solubility base class."""
 
@@ -325,26 +267,4 @@ class StandardGibbsFreeEnergyOfFormationProtocol(Protocol):
         Raises:
             KeyError: Thermodynamic data is not available for the species.
         """
-        ...
-
-
-class SystemConstraint(Protocol):
-    """A value constraint to apply to an interior-atmosphere system.
-
-    Args:
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: Imposed value in kg for masses and bar for pressures or fugacities.
-
-    Attributes:
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: Imposed value in kg for masses and bar for pressures or fugacities.
-    """
-
-    @property
-    def species(self) -> str:
-        ...
-
-    def get_value(self, **kwargs) -> float:
         ...

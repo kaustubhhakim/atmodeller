@@ -20,12 +20,12 @@ License:
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    BufferedFugacityConstraint,
+    IronWustiteBufferConstraintHirschmann,
     MassConstraint,
-    SystemConstraint,
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
+from atmodeller.interfaces import SystemConstraint
 from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.thermodynamics import (
     GasSpecies,
@@ -74,7 +74,7 @@ def test_H_fO2() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -108,7 +108,7 @@ def test_H_basalt_melt() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -142,7 +142,7 @@ def test_H_fO2_plus() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(log10_shift=2),
+        IronWustiteBufferConstraintHirschmann(log10_shift=2),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -176,7 +176,7 @@ def test_H_fO2_minus() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(log10_shift=-2),
+        IronWustiteBufferConstraintHirschmann(log10_shift=-2),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -210,7 +210,7 @@ def test_H_five_oceans() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -244,7 +244,7 @@ def test_H_1500K() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
@@ -285,7 +285,7 @@ def test_H_and_C() -> None:
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
         MassConstraint(species="C", value=c_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(

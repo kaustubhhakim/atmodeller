@@ -259,7 +259,7 @@ class InteriorAtmosphereSystem:
     def fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients in a dictionary."""
         output: dict[str, float] = {
-            species.chemical_formula: species.ideality(
+            species.chemical_formula: species.ideality.get_value(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
             for species in self.species.data

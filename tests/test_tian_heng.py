@@ -16,13 +16,11 @@ License:
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    BufferedFugacityConstraint,
-    FugacityConstraint,
-    IronWustiteBufferBallhaus,
+    IronWustiteBufferConstraintBallhaus,
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.interfaces import NoSolubility
+from atmodeller.interfaces import ConstantSystemConstraint, NoSolubility
 from atmodeller.thermodynamics import (
     GasSpecies,
     SolidSpecies,
@@ -68,8 +66,8 @@ def test_graphite() -> None:
 
     # This is comparable to the constraints imposed by Meng.
     constraints: list = [
-        BufferedFugacityConstraint(value=IronWustiteBufferBallhaus()),
-        FugacityConstraint(species="H2", value=44.49334998176607),
+        IronWustiteBufferConstraintBallhaus(),
+        ConstantSystemConstraint(name="fugacity", species="H2", value=44.49334998176607),
     ]
 
     system_constraints: SystemConstraints = SystemConstraints(constraints)

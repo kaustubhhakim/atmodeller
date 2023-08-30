@@ -19,13 +19,12 @@ License:
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    BufferedFugacityConstraint,
-    MassConstraint,
+    IronWustiteBufferConstraintHirschmann,
     SystemConstraint,
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.interfaces import NonIdealConstant
+from atmodeller.interfaces import ConstantSystemConstraint, IdealityConstant
 from atmodeller.solubilities import PeridotiteH2O
 from atmodeller.thermodynamics import (
     GasSpecies,
@@ -62,10 +61,12 @@ def test_H_fO2() -> None:
             GasSpecies(
                 chemical_formula="H2O",
                 solubility=PeridotiteH2O(),
-                ideality=NonIdealConstant(2),
+                ideality=IdealityConstant(value=2),
             ),
             GasSpecies(
-                chemical_formula="H2", solubility=NoSolubility(), ideality=NonIdealConstant(2)
+                chemical_formula="H2",
+                solubility=NoSolubility(),
+                ideality=IdealityConstant(value=2),
             ),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
         ]
@@ -76,8 +77,8 @@ def test_H_fO2() -> None:
     h_kg: float = earth_oceans_to_kg(oceans)
 
     constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        ConstantSystemConstraint(name="mass", species="H", value=h_kg),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
