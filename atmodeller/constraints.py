@@ -30,7 +30,7 @@ from atmodeller.utilities import UnitConversion
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class MassConstraint(ConstantSystemConstraint):
     """A constant mass constraint."""
 
@@ -73,6 +73,11 @@ class SystemConstraints(UserList):
         return ordered_dict
 
     @property
+    def activity_constraints(self) -> dict[int, SystemConstraint]:
+        """Constraints related to activity."""
+        return self._filter_by_name("activity")
+
+    @property
     def fugacity_constraints(self) -> dict[int, SystemConstraint]:
         """Constraints related to fugacity."""
         return self._filter_by_name("fugacity")
@@ -90,8 +95,9 @@ class SystemConstraints(UserList):
     @property
     def reaction_network_constraints(self) -> dict[int, SystemConstraint]:
         """Constraints related to the reaction network."""
-        odict: dict[int, SystemConstraint] = self._filter_by_name("fugacity")
-        odict |= self._filter_by_name("pressure")
+        odict: dict[int, SystemConstraint] = self.fugacity_constraints
+        odict |= self.pressure_constraints
+        odict |= self.activity_constraints
 
         return odict
 

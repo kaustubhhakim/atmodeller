@@ -62,6 +62,10 @@ class SolidSpecies(ChemicalComponent):
         ideality: Ideality object representing activity for thermodynamic calculations.
     """
 
+    def __post_init__(self):
+        super().__post_init__()
+        self.ideality.name = "activity"
+
     @property
     def activity(self) -> SystemConstraint:
         """Activity."""
@@ -152,6 +156,7 @@ class GasSpecies(ChemicalComponent):
     def __post_init__(self):
         self.common_name = self.chemical_formula
         super().__post_init__()
+        self.ideality.name = "fugacity_coefficient"
 
     @property
     def fugacity_coefficient(self) -> SystemConstraint:

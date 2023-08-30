@@ -333,7 +333,7 @@ class InteriorAtmosphereSystem:
             The pressures in bar.
         """
 
-        logger.info("Constraints: %s", pprint.pformat(constraints))
+        constraints = self._assemble_constraints(constraints)
         self._solution = self._solve_fsolve(
             constraints=constraints, initial_log10_pressures=initial_log10_pressures
         )
@@ -347,6 +347,22 @@ class InteriorAtmosphereSystem:
             )
 
         logger.info(pprint.pformat(self.pressures_dict))
+
+    def _assemble_constraints(self, constraints: SystemConstraints) -> SystemConstraints:
+        """Combines the user-prescribed constraints with intrinsic constraints (solid activities).
+
+        Args:
+            constraints: Constraints as prescribed by the user.
+
+        Returns:
+            Constraints list including solid activities.
+        """
+        logger.info("Assembling constraints")
+        for solid in self.species.solid_species.values():
+            constraints.append(solid.activity)
+        logger.info("Constraints: %s", pprint.pformat(constraints))
+
+        return constraints
 
     def _solve_fsolve(
         self,

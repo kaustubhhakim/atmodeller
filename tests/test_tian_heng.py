@@ -14,7 +14,7 @@ License:
 """
 
 
-from atmodeller import __version__, debug_logger
+from atmodeller import __version__, debug_file_logger, debug_logger
 from atmodeller.constraints import (
     IronWustiteBufferConstraintBallhaus,
     SystemConstraints,

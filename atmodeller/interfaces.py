@@ -31,13 +31,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 class SystemConstraint(Protocol):
     """A constraint to apply to an interior-atmosphere system."""
 
-    @property
-    def name(self) -> str:
-        ...
-
-    @property
-    def species(self) -> str:
-        ...
+    name: str
+    species: str
 
     def get_value(self, *args, **kwargs) -> float:
         """Computes the value of the constraint for given input arguments.
@@ -52,7 +47,7 @@ class SystemConstraint(Protocol):
         ...
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class ConstantSystemConstraint(ABC):
     """A constant value constraint.
 
@@ -78,7 +73,7 @@ class ConstantSystemConstraint(ABC):
         return self.value
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class IdealityConstant(ConstantSystemConstraint):
     """A constant activity or fugacity coefficient.
 
@@ -89,7 +84,7 @@ class IdealityConstant(ConstantSystemConstraint):
         value: The constant value.
     """
 
-    name: str = "ideality"
+    name: str = field(init=False, default="")
     species: str = field(init=False, default="")
     value: float = 1.0
 
@@ -126,6 +121,7 @@ class ChemicalComponent(ABC):
             self.chemical_formula,
         )
         self.formula = Formula(self.chemical_formula)
+        self.ideality.species = self.chemical_formula
 
     @property
     def molar_mass(self) -> float:
