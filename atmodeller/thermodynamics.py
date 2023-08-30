@@ -395,7 +395,6 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
                 * ((1 + dKdp * (pressure - 1.0) / K_T) ** (1.0 - 1.0 / dKdp) - 1)
             )  # J, use P-1.0 instead of P
         else:
-            logger.info("Ideal gas")
             integral_VP = 0
 
         gibbs += integral_VP

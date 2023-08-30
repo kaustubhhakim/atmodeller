@@ -120,7 +120,6 @@ class ReactionNetwork:
             # Perform row operations to eliminate values below the pivot.
             for j in range(i + 1, self.species.number):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
-                logger.debug("Ratio = \n%s", ratio)
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
         logger.debug("Augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
@@ -237,12 +236,7 @@ class ReactionNetwork:
             The coefficient matrix with the stoichiometry and constraints.
         """
 
-        nrows: int = (
-            # self.species.number_solid_species
-            # +
-            constraints.number_reaction_network_constraints
-            + self.number_reactions
-        )
+        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
         if nrows == self.species.number:
             msg: str = "The necessary number of constraints will be applied to "
@@ -262,22 +256,8 @@ class ReactionNetwork:
             logger.info("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
             species_index: int = self.species.indices[constraint.species]
-            logger.info("Row %02d: Setting %s coefficient", row_index, constraint.species)
+            logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
-
-        # Original working below. (Note change definition of reaction_network_constraints).
-        # Solid activities.
-        # for index, (species_index, species) in enumerate(self.species.solid_species.items()):
-        #     row_index: int = self.number_reactions + index
-        #     logger.info("Row %02d: Setting %s coefficient", row_index, species.chemical_formula)
-        #     coeff[row_index, species_index] = 1
-
-        # Fugacity and pressure constraints.
-        # for index, constraint in enumerate(constraints.reaction_network_constraints.values()):
-        #     row_index: int = self.number_reactions + self.species.number_solid_species + index
-        #     species_index: int = self.species.indices[constraint.species]
-        #     logger.info("Row %02d: Setting %s coefficient", row_index, constraint.species)
-        #     coeff[row_index, species_index] = 1
 
         logger.debug("Species = %s", self.species.chemical_formulas)
         logger.debug("Coefficient matrix = \n%s", coeff)
@@ -300,11 +280,7 @@ class ReactionNetwork:
             The log10(fugacity coefficient) vector and the right-hand side vector.
         """
 
-        nrows: int = (
-            # TODO: REMOVE self.species.number_solid_species
-            +constraints.number_reaction_network_constraints
-            + self.number_reactions
-        )
+        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
         if nrows == self.species.number:
             msg: str = "The necessary number of constraints will be applied to "
@@ -335,37 +311,16 @@ class ReactionNetwork:
                 pressure=system.total_pressure,
             )
 
-        # Fugacity constraints.
-        for index, constraint in enumerate(constraints.fugacity_constraints.values()):
+        for index, constraint in enumerate(constraints.reaction_network_constraints.values()):
             row_index: int = self.number_reactions + index
-            logger.info("Row %02d: Setting %s fugacity", row_index, constraint.species)
+            logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = np.log10(
                 constraint.get_value(
                     temperature=system.planet.surface_temperature, pressure=system.total_pressure
                 )
             )
-
-        # Pressure constraints.
-        for index, constraint in enumerate(constraints.pressure_constraints.values()):
-            row_index: int = self.number_reactions + len(constraints.fugacity_constraints) + index
-            logger.info("Row %02d: Setting %s pressure", row_index, constraint.species)
-            rhs[row_index] = np.log10(
-                constraint.get_value(
-                    temperature=system.planet.surface_temperature, pressure=system.total_pressure
-                )
-            )
-            rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
-
-        # Solid activities.
-        for index, species in enumerate(self.species.solid_species.values()):
-            species_name: str = species.formula.formula
-            row_index: int = self.number_reactions + +len(constraints.fugacity_constraints) + index
-            logger.info("Row %02d: Setting %s activity", row_index, species_name)
-            rhs[row_index] = np.log10(
-                species.activity.get_value(
-                    temperature=system.planet.surface_temperature, pressure=system.total_pressure
-                )
-            )
+            if constraint.name == "pressure":
+                rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
 
         # FIXME: Should be unity for solids and calculated for gases.
         for solid in self.species.solid_species.values():
