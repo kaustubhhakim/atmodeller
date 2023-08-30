@@ -55,11 +55,13 @@ class ConstantSystemConstraint(ABC):
         name: Constraint name, which must be one of: fugacity, pressure, or mass.
         species: The species to constrain. Usually a species for a pressure or fugacity constraint
             or an element for a mass constraint.
-        value: The constant value.
-
-    Attributes:
         value: The constant value. Imposed value in kg for masses and bar for pressures or
             fugacities.
+
+    Attributes:
+        name: Constraint name.
+        species: The species to constrain.
+        value: The constant value.
     """
 
     name: str
@@ -77,10 +79,16 @@ class ConstantSystemConstraint(ABC):
 class IdealityConstant(ConstantSystemConstraint):
     """A constant activity or fugacity coefficient.
 
+    Note:
+        name and species are usually updated after instantiation to ensure they are consistent with
+        the species that instantiated this class.
+
     Args:
-        value: The constant value. Defaults to 1 (i.e. for the case of ideality, 1 is ideal).
+        value: The constant value. Defaults to 1 (i.e. ideal behaviour).
 
     Attributes:
+        name: Constraint name.
+        species: The species to constrain.
         value: The constant value.
     """
 

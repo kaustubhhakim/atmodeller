@@ -18,7 +18,7 @@ License:
 from __future__ import annotations
 
 import logging
-from collections import OrderedDict, UserList
+from collections import UserList
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -55,7 +55,7 @@ class SystemConstraints(UserList):
         self.data: list[SystemConstraint]
         super().__init__(initlist)
 
-    def _filter_by_name(self, name: str) -> dict[int, SystemConstraint]:
+    def _filter_by_name(self, name: str) -> list[SystemConstraint]:
         """Filters the entries by a given name.
 
         Args:
@@ -64,42 +64,41 @@ class SystemConstraints(UserList):
         Returns:
             A dictionary with the index of the constraint in the list and the constraint.
         """
-        ordered_dict: dict[int, SystemConstraint] = OrderedDict()
-
-        for index, entry in enumerate(self.data):
+        filtered_entries: list = []
+        for entry in self.data:
             if entry.name == name:
-                ordered_dict[index] = entry
+                filtered_entries.append(entry)
 
-        return ordered_dict
+        return filtered_entries
 
     @property
-    def activity_constraints(self) -> dict[int, SystemConstraint]:
+    def activity_constraints(self) -> list[SystemConstraint]:
         """Constraints related to activity."""
         return self._filter_by_name("activity")
 
     @property
-    def fugacity_constraints(self) -> dict[int, SystemConstraint]:
+    def fugacity_constraints(self) -> list[SystemConstraint]:
         """Constraints related to fugacity."""
         return self._filter_by_name("fugacity")
 
     @property
-    def mass_constraints(self) -> dict[int, SystemConstraint]:
+    def mass_constraints(self) -> list[SystemConstraint]:
         """Constraints related to mass conservation."""
         return self._filter_by_name("mass")
 
     @property
-    def pressure_constraints(self) -> dict[int, SystemConstraint]:
+    def pressure_constraints(self) -> list[SystemConstraint]:
         """Constraints related to pressure."""
         return self._filter_by_name("pressure")
 
     @property
-    def reaction_network_constraints(self) -> dict[int, SystemConstraint]:
+    def reaction_network_constraints(self) -> list[SystemConstraint]:
         """Constraints related to the reaction network."""
-        odict: dict[int, SystemConstraint] = self.fugacity_constraints
-        odict |= self.pressure_constraints
-        odict |= self.activity_constraints
+        filtered_entries: list[SystemConstraint] = self.fugacity_constraints
+        filtered_entries.extend(self.pressure_constraints)
+        filtered_entries.extend(self.activity_constraints)
 
-        return odict
+        return filtered_entries
 
     @property
     def number_reaction_network_constraints(self) -> int:

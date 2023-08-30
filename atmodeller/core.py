@@ -1,4 +1,4 @@
-"""Core classes and functions for modeling interior-atmosphere systems.
+"""Core classes and functions for modelling interior-atmosphere systems.
 
 License:
     This program is free software: you can redistribute it and/or modify it under the terms of the 
@@ -444,7 +444,7 @@ class InteriorAtmosphereSystem:
 
         # Compute residual for the mass balance.
         residual_mass: np.ndarray = np.zeros(len(constraints.mass_constraints), dtype=np.float_)
-        for constraint_index, constraint in enumerate(constraints.mass_constraints.values()):
+        for constraint_index, constraint in enumerate(constraints.mass_constraints):
             for species in self.species.gas_species.values():
                 residual_mass[constraint_index] += species.mass(
                     planet=self.planet,

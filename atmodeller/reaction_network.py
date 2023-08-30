@@ -252,7 +252,7 @@ class ReactionNetwork:
         coeff: np.ndarray = np.zeros((nrows, self.species.number))
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
-        for index, constraint in enumerate(constraints.reaction_network_constraints.values()):
+        for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.info("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
             species_index: int = self.species.indices[constraint.species]
@@ -311,7 +311,7 @@ class ReactionNetwork:
                 pressure=system.total_pressure,
             )
 
-        for index, constraint in enumerate(constraints.reaction_network_constraints.values()):
+        for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
             logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = np.log10(

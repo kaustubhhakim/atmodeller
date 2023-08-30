@@ -329,7 +329,7 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
         species: ChemicalComponent,
         *,
         temperature: float,
-        pressure: Union[float, None] = None,
+        pressure: float,
     ) -> float:
         """See base class."""
         try:
@@ -374,7 +374,6 @@ class StandardGibbsFreeEnergyOfFormationHollandAndPowell(
         )
 
         if isinstance(species, SolidSpecies):
-            assert pressure is not None
             # Volume at T.
             # TODO: Why the exponential?  Seems different to the paper (check with Meng).
             V_T = V * np.exp(
