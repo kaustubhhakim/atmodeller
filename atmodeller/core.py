@@ -259,21 +259,18 @@ class InteriorAtmosphereSystem:
 
     @property
     def fugacity_coefficients_dict(self) -> dict[str, float]:
-        """Fugacity coefficients in a dictionary."""
-        # TODO: By definition the coefficients are 0 (i.e. log10(coefficient)=1) for solids.
-        # Just evaluate / make available for gas species.
+        """Fugacity coefficients (relevant for gas species only) in a dictionary."""
         output: dict[str, float] = {
-            species.chemical_formula: species.ideality.get_value(
+            species.chemical_formula: species.fugacity_coefficient.get_value(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
-            for species in self.species.data
+            for species in self.species.gas_species.values()
         }
         return output
 
     @property
     def fugacities_dict(self) -> dict[str, float]:
         """Fugacities of all species in a dictionary."""
-        # TODO: for solid phases this would be zero since fugacity coefficient is zero.
         output: dict[str, float] = {}
         for key, value in self.fugacity_coefficients_dict.items():
             output[key] = value * self.solution_dict[key]
@@ -297,7 +294,7 @@ class InteriorAtmosphereSystem:
 
     @property
     def output(self) -> dict:
-        """Convenient output for analysis."""
+        """Output for analysis."""
         output_dict: dict = {}
         output_dict["temperature"] = self.planet.surface_temperature
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure

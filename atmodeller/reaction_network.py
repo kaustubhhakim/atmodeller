@@ -264,38 +264,20 @@ class ReactionNetwork:
 
         return coeff
 
-    def get_lhs_and_rhs_vectors(
-        self,
-        *,
-        system: InteriorAtmosphereSystem,
-        constraints: SystemConstraints,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Builds the LHS non-ideal vector and the RHS vector.
+    def assemble_right_hand_side_values(
+        self, *, system: InteriorAtmosphereSystem, constraints: SystemConstraints
+    ) -> np.ndarray:
+        """Assembles the right-hand side vector of values for the system of equations.
 
         Args:
             system: Interior atmosphere system.
             constraints: Constraints for the system of equations.
 
         Returns:
-            The log10(fugacity coefficient) vector and the right-hand side vector.
+            The right-hand side vector of values.
         """
-
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
-
-        if nrows == self.species.number:
-            msg: str = "The necessary number of constraints will be applied to "
-            msg += "the reaction network to solve the system"
-            logger.info(msg)
-        else:
-            num: int = self.species.number - nrows
-            # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
-            msg = "%d additional (mass) constraint(s) are necessary " % num
-            msg += "to solve the system"
-            logger.info(msg)
-
         rhs: np.ndarray = np.zeros(nrows, dtype=float)
-        # Initialise to ideal behaviour.
-        non_ideal: np.ndarray = np.ones_like(self.species, dtype=float)
 
         # Reactions.
         for reaction_index in range(self.number_reactions):
@@ -311,6 +293,7 @@ class ReactionNetwork:
                 pressure=system.total_pressure,
             )
 
+        # Constraints.
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
             logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
@@ -322,16 +305,37 @@ class ReactionNetwork:
             if constraint.name == "pressure":
                 rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
 
-        # FIXME: Should be unity for solids and calculated for gases.
-        for solid in self.species.solid_species.values():
-            value: float = system.fugacity_coefficients_dict[solid.chemical_formula]
-            non_ideal[self.species.indices[solid.chemical_formula]] = value
-        non_ideal = np.log10(non_ideal)
+        logger.debug("RHS vector = %s", rhs)
 
-        logger.debug("Non-ideal vector = \n%s", non_ideal)
-        logger.debug("RHS vector = \n%s", rhs)
+        return rhs
 
-        return rhs, non_ideal
+    def assemble_log_fugacity_coefficients(
+        self, *, system: InteriorAtmosphereSystem
+    ) -> np.ndarray:
+        """Assembles the fugacity coefficient vector on the left-hand side of the equations.
+
+        Args:
+            system: Interior atmosphere system.
+
+        Returns:
+            The log10(fugacity coefficient) vector.
+        """
+
+        # Initialise to ideal behaviour.
+        fugacity_coefficients: np.ndarray = np.ones_like(self.species, dtype=float)
+
+        # Fugacity coefficients are only relevant for gas species. The intialisation of the array
+        # above ensures that the coefficients are all zero for solid species, once the log is
+        # taken.
+        for index, gas_species in self.species.gas_species.items():
+            fugacity_coefficients[index] = gas_species.fugacity_coefficient.get_value(
+                temperature=system.planet.surface_temperature, pressure=system.total_pressure
+            )
+        log_fugacity_coefficients: np.ndarray = np.log10(fugacity_coefficients)
+
+        logger.debug("Fugacity coefficient vector = %s", log_fugacity_coefficients)
+
+        return log_fugacity_coefficients
 
     def get_residual(
         self,
@@ -351,10 +355,17 @@ class ReactionNetwork:
             The residual vector of the reaction network.
         """
 
-        rhs, non_ideal = self.get_lhs_and_rhs_vectors(system=system, constraints=constraints)
-
+        rhs: np.ndarray = self.assemble_right_hand_side_values(
+            system=system, constraints=constraints
+        )
+        log_fugacity_coefficients: np.ndarray = self.assemble_log_fugacity_coefficients(
+            system=system
+        )
         residual_reaction: np.ndarray = (
-            coefficient_matrix.dot(non_ideal) + coefficient_matrix.dot(system.log_solution) - rhs
+            coefficient_matrix.dot(log_fugacity_coefficients)
+            + coefficient_matrix.dot(system.log_solution)
+            - rhs
         )
         logger.debug("Residual_reaction = %s", residual_reaction)
+
         return residual_reaction
