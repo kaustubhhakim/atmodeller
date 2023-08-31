@@ -14,23 +14,23 @@ License:
 """
 
 
-from atmodeller import __version__, debug_file_logger, debug_logger
+from typing import Type
+
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     IronWustiteBufferConstraintBallhaus,
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.interfaces import ConstantSystemConstraint, NoSolubility
-from atmodeller.thermodynamics import (
+from atmodeller.interfaces import (
+    ConstantSystemConstraint,
     GasSpecies,
     SolidSpecies,
-    StandardGibbsFreeEnergyOfFormation,
-    StandardGibbsFreeEnergyOfFormationProtocol,
+    ThermodynamicData,
+    ThermodynamicDataBase,
 )
 
-standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
-    StandardGibbsFreeEnergyOfFormation()
-)
+thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 
 debug_logger()
 
@@ -45,14 +45,16 @@ def test_graphite() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(chemical_formula="H2"),
-            GasSpecies(chemical_formula="H2O"),
-            GasSpecies(chemical_formula="CO"),
-            GasSpecies(chemical_formula="CO2"),
-            GasSpecies(chemical_formula="CH4"),
-            GasSpecies(chemical_formula="O2"),
+            GasSpecies(chemical_formula="H2", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="H2O", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="CO", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="CO2", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="CH4", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="O2", thermodynamic_class=thermodynamic_data),
             SolidSpecies(
-                chemical_formula="C", common_name="graphite"
+                chemical_formula="C",
+                name_in_thermodynamic_data="graphite",
+                thermodynamic_class=thermodynamic_data,
             ),  # Ideal activity by default.
         ]
     )
@@ -60,9 +62,7 @@ def test_graphite() -> None:
     planet: Planet = Planet()
     planet.surface_temperature = 600 + 273  # K
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     # This is comparable to the constraints imposed by Meng.
     constraints: list = [

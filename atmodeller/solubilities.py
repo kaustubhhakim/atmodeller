@@ -19,9 +19,8 @@ import logging
 
 import numpy as np
 
-from atmodeller.interfaces import Solubility
+from atmodeller.interfaces import GasSpecies, Solubility
 from atmodeller.reaction_network import ReactionNetwork
-from atmodeller.thermodynamics import GasSpecies
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)

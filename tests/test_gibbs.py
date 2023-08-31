@@ -18,6 +18,8 @@ License:
     not, see <https://www.gnu.org/licenses/>.
 """
 
+from typing import Type
+
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     IronWustiteBufferConstraintHirschmann,
@@ -25,25 +27,23 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.interfaces import SystemConstraint
-from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
-from atmodeller.thermodynamics import (
+from atmodeller.interfaces import (
     GasSpecies,
     NoSolubility,
-    StandardGibbsFreeEnergyOfFormation,
-    StandardGibbsFreeEnergyOfFormationJANAF,
-    StandardGibbsFreeEnergyOfFormationProtocol,
+    SystemConstraint,
+    ThermodynamicData,
+    ThermodynamicDataBase,
+    ThermodynamicDataJANAF,
 )
+from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
-# Uncomment to test JANAF only.
-# standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
-#    StandardGibbsFreeEnergyOfFormationJANAF()
+# Uncomment to test JANAF only. TODO: FIXME: clean up.
+# standard_gibbs_free_energy_of_formation: ThermodynamicDataBase = (
+#    ThermodynamicDataJANAF()
 # )
 # Uncomment to test the combined dataset.
-standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
-    StandardGibbsFreeEnergyOfFormation()
-)
+standard_gibbs_free_energy_of_formation: Type[ThermodynamicDataBase] = ThermodynamicData
 
 # Both the combined data and JANAF report the same pressures to within 1%.
 rtol: float = 1.0e-2
@@ -77,9 +77,7 @@ def test_H_fO2() -> None:
         IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 0.3857055348248646,
@@ -111,9 +109,7 @@ def test_H_basalt_melt() -> None:
         IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 0.09310239359434942,
@@ -145,9 +141,7 @@ def test_H_fO2_plus() -> None:
         IronWustiteBufferConstraintHirschmann(log10_shift=2),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 0.0388388984114118,
@@ -179,9 +173,7 @@ def test_H_fO2_minus() -> None:
         IronWustiteBufferConstraintHirschmann(log10_shift=-2),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 3.3586796133087784,
@@ -213,9 +205,7 @@ def test_H_five_oceans() -> None:
         IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 9.257384917231544,
@@ -247,9 +237,7 @@ def test_H_1500K() -> None:
         IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     planet.surface_temperature = 1500.0  # K
 
@@ -288,9 +276,7 @@ def test_H_and_C() -> None:
         IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "CO": 59.615758867959656,

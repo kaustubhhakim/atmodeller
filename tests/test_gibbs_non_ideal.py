@@ -17,6 +17,8 @@ License:
     not, see <https://www.gnu.org/licenses/>.
 """
 
+from typing import Type
+
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     IronWustiteBufferConstraintHirschmann,
@@ -24,23 +26,22 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.interfaces import ConstantSystemConstraint, IdealityConstant
-from atmodeller.solubilities import PeridotiteH2O
-from atmodeller.thermodynamics import (
+from atmodeller.interfaces import (
+    ConstantSystemConstraint,
     GasSpecies,
+    IdealityConstant,
     NoSolubility,
-    StandardGibbsFreeEnergyOfFormation,
-    StandardGibbsFreeEnergyOfFormationProtocol,
+    ThermodynamicData,
+    ThermodynamicDataBase,
 )
+from atmodeller.solubilities import PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
 # Tolerances to compare the test results with target output.
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
 
-standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
-    StandardGibbsFreeEnergyOfFormation()
-)
+thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 
 debug_logger()
 
@@ -61,14 +62,20 @@ def test_H_fO2() -> None:
             GasSpecies(
                 chemical_formula="H2O",
                 solubility=PeridotiteH2O(),
+                thermodynamic_class=thermodynamic_data,
                 ideality=IdealityConstant(value=2),
             ),
             GasSpecies(
                 chemical_formula="H2",
                 solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
                 ideality=IdealityConstant(value=2),
             ),
-            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+            GasSpecies(
+                chemical_formula="O2",
+                solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
+            ),
         ]
     )
 
@@ -81,9 +88,7 @@ def test_H_fO2() -> None:
         IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = dict(
         [("H2O", 0.19626421729663665), ("H2", 0.19386112601058758), ("O2", 8.69970008669977e-08)]

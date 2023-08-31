@@ -30,7 +30,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
     from atmodeller.core import InteriorAtmosphereSystem, Species
-    from atmodeller.thermodynamics import StandardGibbsFreeEnergyOfFormationProtocol
 
 
 @dataclass(kw_only=True)
@@ -39,17 +38,14 @@ class ReactionNetwork:
 
     Args:
         species: A list of species.
-        gibbs_data: Standard Gibbs free energy of formation.
 
     Attributes:
         species: A list of species.
-        gibbs_data: Standard Gibbs free energy of formation.
         species_matrix: The stoichiometry matrix of the species in terms of elements.
         reaction_matrix: The reaction stoichiometry matrix.
     """
 
     species: Species
-    gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol
 
     def __post_init__(self):
         logger.info("Creating a reaction network")
@@ -202,10 +198,12 @@ class ReactionNetwork:
             The Gibb's free energy of the reaction.
         """
         gibbs_energy: float = 0
-        for species_index, species in enumerate(self.species):
+        for species_index, species in enumerate(self.species.data):
             gibbs_energy += self.reaction_matrix[
                 reaction_index, species_index
-            ] * self.gibbs_data.get(species, temperature=temperature, pressure=pressure)
+            ] * species.thermodynamic_data.get_formation_gibbs(
+                temperature=temperature, pressure=pressure
+            )
         return gibbs_energy
 
     def get_reaction_equilibrium_constant(

@@ -26,16 +26,17 @@ from scipy.optimize import fsolve
 
 from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.interfaces import ChemicalComponent, NoSolubility
-from atmodeller.reaction_network import ReactionNetwork
-from atmodeller.solubilities import composition_solubilities
-from atmodeller.thermodynamics import (
+from atmodeller.interfaces import (
+    ChemicalComponent,
     GasSpecies,
+    NoSolubility,
     SolidSpecies,
     SolidSpeciesOutput,
-    StandardGibbsFreeEnergyOfFormationJANAF,
-    StandardGibbsFreeEnergyOfFormationProtocol,
+    ThermodynamicDataBase,
+    ThermodynamicDataJANAF,
 )
+from atmodeller.reaction_network import ReactionNetwork
+from atmodeller.solubilities import composition_solubilities
 from atmodeller.utilities import filter_by_type
 
 if TYPE_CHECKING:
@@ -212,19 +213,14 @@ class InteriorAtmosphereSystem:
 
     Args:
         species: A list of species.
-        gibbs_data: Standard Gibbs free energy of formation. Defaults to JANAF.
         planet: A planet. Defaults to a molten Earth.
 
     Attributes:
         species: A list of species.
-        gibbs_data: Standard Gibbs free energy of formation.
         planet: A planet.
     """
 
     species: Species
-    gibbs_data: StandardGibbsFreeEnergyOfFormationProtocol = field(
-        default_factory=StandardGibbsFreeEnergyOfFormationJANAF
-    )
     planet: Planet = field(default_factory=Planet)
     _reaction_network: ReactionNetwork = field(init=False)
     # The solution is log10 of the partial pressure for gas phases and log10 of the activity for
@@ -234,7 +230,9 @@ class InteriorAtmosphereSystem:
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_planet_composition(self.planet)
-        self._reaction_network = ReactionNetwork(species=self.species, gibbs_data=self.gibbs_data)
+        self._reaction_network = ReactionNetwork(
+            species=self.species
+        )  # TODO: remove, gibbs_data=self.gibbs_data)
         # Initialise solution to zero.
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
 
@@ -294,7 +292,7 @@ class InteriorAtmosphereSystem:
 
     @property
     def output(self) -> dict:
-        """Output for analysis."""
+        """Outputs for analysis."""
         output_dict: dict = {}
         output_dict["temperature"] = self.planet.surface_temperature
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure
