@@ -107,7 +107,7 @@ def main():
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
     system_constraints: SystemConstraints = SystemConstraints(constraints)
     system.solve(system_constraints)
-    logger.info(system.pressures_dict)
+    logger.info(system.solution_dict)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)
