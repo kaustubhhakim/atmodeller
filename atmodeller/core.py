@@ -323,13 +323,13 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
-        initial_log10_pressures: Union[np.ndarray, None] = None,
+        initial_solution: Union[np.ndarray, None] = None,
     ) -> None:
         """Solves the system to determine the partial pressures with provided constraints.
 
         Args:
             constraints: Constraints for the system of equations.
-            initial_log10_pressures: Initial guess for the log10 pressures. Defaults to None.
+            initial_solution: Initial guess for the log10 pressures. Defaults to None.
 
         Returns:
             The pressures in bar.
@@ -337,7 +337,7 @@ class InteriorAtmosphereSystem:
 
         constraints = self._assemble_constraints(constraints)
         self._log_solution = self._solve_fsolve(
-            constraints=constraints, initial_log10_pressures=initial_log10_pressures
+            constraints=constraints, initial_solution=initial_solution
         )
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
@@ -372,28 +372,46 @@ class InteriorAtmosphereSystem:
 
         return constraints
 
+    def _conform_initial_solution_to_solid_activities(self, initial_solution: np.ndarray) -> None:
+        """Conforms the initial solution (estimate) to the solid activities.
+
+        Solid activities are known a priori so they can be included as solutions in the initial
+        solution estimate.
+
+        Args:
+            initial_solution: Initial estimate of the solution.
+        """
+        for index, solid in self.species.solid_species.items():
+            logger.debug("Setting %s %d", solid.chemical_formula, index)
+            initial_solution[index] = np.log10(
+                solid.activity.get_value(
+                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
+                )
+            )
+        logger.debug("Conforming initial solution to solid activities = %s", initial_solution)
+
     def _solve_fsolve(
         self,
         *,
         constraints: SystemConstraints,
-        initial_log10_pressures: Union[np.ndarray, None],
+        initial_solution: Union[np.ndarray, None],
     ) -> np.ndarray:
         """Solves the non-linear system of equations.
 
         Args:
             constraints: Constraints for the system of equations.
-            initial_log10_pressures: Initial guess for the log10 pressures.
+            initial_solution: Initial guess for the log10 pressures.
         """
 
-        if initial_log10_pressures is None:
-            initial_log10_pressures = np.ones_like(self.species, dtype=np.float_)
-        logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
+        if initial_solution is None:
+            initial_solution = np.ones_like(self.species, dtype=np.float_)
+        self._conform_initial_solution_to_solid_activities(initial_solution)
         ier: int = 0
         # Count the number of attempts to solve the system by randomising the initial condition.
         ic_count: int = 1
         # Maximum number of attempts to solve the system by randomising the initial condition.
         ic_count_max: int = 10
-        sol: np.ndarray = np.zeros_like(initial_log10_pressures)
+        sol: np.ndarray = np.zeros_like(initial_solution)
         infodict: dict = {}
 
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
@@ -403,7 +421,7 @@ class InteriorAtmosphereSystem:
         while ier != 1 and ic_count <= ic_count_max:
             sol, infodict, ier, mesg = fsolve(
                 self._objective_func,
-                initial_log10_pressures,
+                initial_solution,
                 args=(constraints, coefficient_matrix),
                 full_output=True,
             )
@@ -414,9 +432,9 @@ class InteriorAtmosphereSystem:
                     ic_count,
                 )
                 # Increase or decrease the magnitude of all pressures.
-                # TODO: Keep activities for solids at unity or compute directly.
-                initial_log10_pressures *= 2 * np.random.random_sample()
-                logger.debug("initial_log10_pressures = %s", initial_log10_pressures)
+                initial_solution *= 2 * np.random.random_sample()
+                self._conform_initial_solution_to_solid_activities(initial_solution)
+                logger.debug("initial_solution = %s", initial_solution)
                 ic_count += 1
 
         if ic_count == ic_count_max:

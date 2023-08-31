@@ -324,9 +324,9 @@ class ReactionNetwork:
         # Initialise to ideal behaviour.
         fugacity_coefficients: np.ndarray = np.ones_like(self.species, dtype=float)
 
-        # Fugacity coefficients are only relevant for gas species. The intialisation of the array
-        # above ensures that the coefficients are all zero for solid species, once the log is
-        # taken.
+        # Fugacity coefficients are only relevant for gas species. The initialisation of the array
+        # above to unity ensures that the coefficients are all zero for solid species, once the log
+        # is taken.
         for index, gas_species in self.species.gas_species.items():
             fugacity_coefficients[index] = gas_species.fugacity_coefficient.get_value(
                 temperature=system.planet.surface_temperature, pressure=system.total_pressure

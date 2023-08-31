@@ -119,7 +119,7 @@ class ChemicalComponent(ABC):
     ideality: SystemConstraint = field(default_factory=IdealityConstant)
     formula: Formula = field(init=False)
     # TODO: select source of thermodynamic data for this species.  Do all the reading in/caching
-    # to set up the interpolation functions
+    # to set up the interpolation functions.
 
     def __post_init__(self):
         logger.info(

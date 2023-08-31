@@ -90,6 +90,7 @@ def test_H_fO2() -> None:
     )
 
     system.solve(SystemConstraints(constraints))
+    print(system.output)
     assert system.isclose(target_pressures)
 
 
