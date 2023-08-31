@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, Protocol, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -382,7 +382,6 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         data = data.loc[:, :"Vmax"]
         data = data.astype(float)
 
-        # TODO: Make namedtuple for faster processing?
         try:
             return data.loc[self.species.name_in_thermodynamic_data]
         except KeyError as exc:
@@ -404,29 +403,29 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         Returns:
             The standard Gibbs free energy of formation (J/mol).
         """
-        H = self.data.get("Hf")  # J
-        S = self.data.get("S")  # J/K
-        V = self.data.get("V")  # J/bar
-        a = self.data.get("a")  # J/K           Coeff for calc heat capacity.
-        b = self.data.get("b")  # J/K^2         Coeff for calc heat capacity.
-        c = self.data.get("c")  # J K           Coeff for calc heat capacity.
-        d = self.data.get("d")  # J K^(-1/2)    Coeff for calc heat capacity.
-        alpha0 = self.data.get("a0")  # K^(-1), thermal expansivity
-        K = self.data.get("K")  # bar, bulk modulus
+        H = self.data["Hf"]  # J
+        S = self.data["S"]  # J/K
+        V = self.data["V"]  # J/bar
+        a = self.data["a"]  # J/K           Coeff for calc heat capacity.
+        b = self.data["b"]  # J/K^2         Coeff for calc heat capacity.
+        c = self.data["c"]  # J K           Coeff for calc heat capacity.
+        d = self.data["d"]  # J K^(-1/2)    Coeff for calc heat capacity.
+        alpha0 = self.data["a0"]  # K^(-1), thermal expansivity
+        K = self.data["K"]  # bar, bulk modulus
 
         integral_H: float = (
             H
-            + a * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore a is a float.
-            + b / 2 * (temperature**2 - self.ENTHALPY_REFERENCE_TEMPERATURE**2)  # type: ignore b is a float.
-            - c * (1 / temperature - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore c is a float.
-            + 2 * d * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)  # type: ignore d is a float.
+            + a * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
+            + b / 2 * (temperature**2 - self.ENTHALPY_REFERENCE_TEMPERATURE**2)
+            - c * (1 / temperature - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE)
+            + 2 * d * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
         )
         integral_S: float = (
             S
-            + a * np.log(temperature / self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore a is a float.
-            + b * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore b is a float.
-            - c / 2 * (1 / temperature**2 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**2)  # type: ignore c is a float.
-            - 2 * d * (1 / temperature**0.5 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)  # type: ignore d is a float.
+            + a * np.log(temperature / self.ENTHALPY_REFERENCE_TEMPERATURE)
+            + b * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
+            - c / 2 * (1 / temperature**2 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**2)
+            - 2 * d * (1 / temperature**0.5 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
         )
 
         gibbs: float = integral_H - temperature * integral_S
@@ -435,10 +434,10 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
             # Volume at T.
             # TODO: Why the exponential?  Seems different to the paper (check with Meng).
             V_T = V * np.exp(
-                alpha0 * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore
+                alpha0 * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
                 - 2
                 * 10.0
-                * alpha0  # type: ignore
+                * alpha0
                 * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
             )
             dKdp: float = 4.0  # dimensionless, derivative of bulk modulus w.r.t. pressure
@@ -556,6 +555,7 @@ class ChemicalComponent(ABC):
     thermodynamic_class: Type[ThermodynamicDataBase] = ThermodynamicDataJANAF
     formula: Formula = field(init=False)
     thermodynamic_data: ThermodynamicDataBase = field(init=False)
+    output: Any = field(init=False, default=None)
 
     def __post_init__(self):
         logger.info(

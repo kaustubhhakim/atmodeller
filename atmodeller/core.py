@@ -230,9 +230,7 @@ class InteriorAtmosphereSystem:
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_planet_composition(self.planet)
-        self._reaction_network = ReactionNetwork(
-            species=self.species
-        )  # TODO: remove, gibbs_data=self.gibbs_data)
+        self._reaction_network = ReactionNetwork(species=self.species)
         # Initialise solution to zero.
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
 
@@ -297,7 +295,7 @@ class InteriorAtmosphereSystem:
         output_dict["temperature"] = self.planet.surface_temperature
         output_dict["total_pressure_in_atmosphere"] = self.total_pressure
         output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self.species:
+        for species in self.species.data:
             output_dict[species.chemical_formula] = species.output
         # TODO: Dan to add elemental outputs as well.
         return output_dict
