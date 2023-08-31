@@ -105,7 +105,6 @@ class IdealityConstant(ConstantSystemConstraint):
     value: float = 1.0
 
 
-# TODO: Could also subclass the SystemConstraint class for solubilities.
 class Solubility(ABC):
     """Solubility base class."""
 
@@ -349,6 +348,9 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
 
     https://ui.adsabs.harvard.edu/abs/1998JMetG..16..309H
 
+    The book 'Equilibrium thermodynamics in petrology: an introduction' by R. Powell also has
+    a useful appendix A with equations.
+
     See the comments in the data file that is parsed by __init__
 
     Args:
@@ -361,6 +363,8 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
     _DATA_SOURCE: str = "Holland and Powell"
     _ENTHALPY_REFERENCE_TEMPERATURE: float = 298  # K
     _STANDARD_STATE_PRESSURE: float = 1  # bar
+    dKdP: float = 4.0  # Derivative of bulk modulus (K) with respect to pressure.
+    dKdT_factor: float = -1.5e-4  # Factor for computing the temperature-dependence of K.
 
     def __init__(self, species: ChemicalComponent):
         super().__init__(species)
@@ -393,6 +397,115 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
             logger.error(msg)
             raise KeyError from exc
 
+    def get_enthalpy(self, temperature: float) -> float:
+        """Calculates the enthalpy at temperature.
+
+        Args:
+            temperature: Temperature.
+
+        Returns:
+            Enthalpy at temperature.
+        """
+        H = self.data["Hf"]  # J
+        a = self.data["a"]  # J/K           Coeff for calc heat capacity.
+        b = self.data["b"]  # J/K^2         Coeff for calc heat capacity.
+        c = self.data["c"]  # J K           Coeff for calc heat capacity.
+        d = self.data["d"]  # J K^(-1/2)    Coeff for calc heat capacity.
+
+        integral_H: float = (
+            H
+            + a * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
+            + b / 2 * (temperature**2 - self.ENTHALPY_REFERENCE_TEMPERATURE**2)
+            - c * (1 / temperature - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE)
+            + 2 * d * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
+        )
+        return integral_H
+
+    def get_entropy(self, temperature: float) -> float:
+        """Calculates the entropy at temperature.
+
+        Args:
+            temperature: Temperature.
+
+        Returns:
+            Entropy at temperature.
+        """
+        S = self.data["S"]  # J/K
+        a = self.data["a"]  # J/K           Coeff for calc heat capacity.
+        b = self.data["b"]  # J/K^2         Coeff for calc heat capacity.
+        c = self.data["c"]  # J K           Coeff for calc heat capacity.
+        d = self.data["d"]  # J K^(-1/2)    Coeff for calc heat capacity.
+
+        integral_S: float = (
+            S
+            + a * np.log(temperature / self.ENTHALPY_REFERENCE_TEMPERATURE)
+            + b * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
+            - c / 2 * (1 / temperature**2 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**2)
+            - 2 * d * (1 / temperature**0.5 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
+        )
+        return integral_S
+
+    def get_volume_at_temperature(self, temperature: float) -> float:
+        """Calculates the volume at temperature.
+
+        The exponential arises from the strict derivation, but often an expansion is performed
+        where exp(x) = 1+x as in Holland and Powell (1998). Below the exp term is retained, but
+        the equation in Holland and Powell (1998) p311 is expanded.
+
+        Args:
+            temperature: Temperature.
+
+        Returns:
+            Volume at temperature.
+        """
+        V = self.data["V"]  # J/bar
+        alpha0 = self.data["a0"]  # K^(-1), thermal expansivity
+
+        volume_T: float = V * np.exp(
+            alpha0 * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
+            - 2 * 10.0 * alpha0 * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
+        )
+        return volume_T
+
+    def get_bulk_modulus_at_temperature(self, temperature: float) -> float:
+        """Calculates the bulk modulus at temperature.
+
+        Holland and Powell (1998), p312 in the text.
+
+        Args:
+            temperature: Temperature.
+
+        Returns:
+            Bulk modulus at temperature.
+        """
+        K = self.data["K"]  # bar, bulk modulus
+        bulk_modulus_T: float = K * (
+            1 + self.dKdT_factor * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
+        )
+        return bulk_modulus_T
+
+    def get_volume_pressure_integral(self, temperature: float, pressure: float) -> float:
+        """Computes the volume-pressure integral.
+
+        Holland and Powell (1998), p312.
+
+        Args:
+            temperature: Temperature.
+            pressure: Pressure.
+
+        Returns:
+            The volume-pressure integral.
+        """
+        V_T: float = self.get_volume_at_temperature(temperature)
+        K_T: float = self.get_bulk_modulus_at_temperature(temperature)
+        integral_VP: float = (
+            V_T
+            * K_T
+            / (self.dKdP - 1)
+            * ((1 + self.dKdP * (pressure - 1.0) / K_T) ** (1.0 - 1.0 / self.dKdP) - 1)
+        )  # J, use P-1.0 instead of P.
+        return integral_VP
+
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
         """Returns the standard Gibbs free energy of formation in units of J/mol.
 
@@ -403,57 +516,11 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         Returns:
             The standard Gibbs free energy of formation (J/mol).
         """
-        H = self.data["Hf"]  # J
-        S = self.data["S"]  # J/K
-        V = self.data["V"]  # J/bar
-        a = self.data["a"]  # J/K           Coeff for calc heat capacity.
-        b = self.data["b"]  # J/K^2         Coeff for calc heat capacity.
-        c = self.data["c"]  # J K           Coeff for calc heat capacity.
-        d = self.data["d"]  # J K^(-1/2)    Coeff for calc heat capacity.
-        alpha0 = self.data["a0"]  # K^(-1), thermal expansivity
-        K = self.data["K"]  # bar, bulk modulus
 
-        integral_H: float = (
-            H
-            + a * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
-            + b / 2 * (temperature**2 - self.ENTHALPY_REFERENCE_TEMPERATURE**2)
-            - c * (1 / temperature - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE)
-            + 2 * d * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
-        )
-        integral_S: float = (
-            S
-            + a * np.log(temperature / self.ENTHALPY_REFERENCE_TEMPERATURE)
-            + b * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
-            - c / 2 * (1 / temperature**2 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**2)
-            - 2 * d * (1 / temperature**0.5 - 1 / self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
-        )
-
-        gibbs: float = integral_H - temperature * integral_S
+        gibbs: float = self.get_enthalpy(temperature) - temperature * self.get_entropy(temperature)
 
         if isinstance(self.species, SolidSpecies):
-            # Volume at T.
-            # TODO: Why the exponential?  Seems different to the paper (check with Meng).
-            V_T = V * np.exp(
-                alpha0 * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
-                - 2
-                * 10.0
-                * alpha0
-                * (temperature**0.5 - self.ENTHALPY_REFERENCE_TEMPERATURE**0.5)
-            )
-            dKdp: float = 4.0  # dimensionless, derivative of bulk modulus w.r.t. pressure
-            # Derivative of bulk modulus w.r.t. temperature, from Holland and Powell (1998).
-            dKdt: float = -K * 1.5e-4  # type: ignore
-            K_T: float = K + dKdt * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)  # type: ignore
-            integral_VP: float = (
-                V_T
-                * K_T
-                / (dKdp - 1)
-                * ((1 + dKdp * (pressure - 1.0) / K_T) ** (1.0 - 1.0 / dKdp) - 1)
-            )  # J, use P-1.0 instead of P
-        else:
-            integral_VP = 0
-
-        gibbs += integral_VP
+            gibbs += self.get_volume_pressure_integral(temperature, pressure)
 
         logger.debug(
             "Species = %s, standard Gibbs energy of formation = %f",
@@ -465,17 +532,18 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
 
 
 class ThermodynamicData(ThermodynamicDataBase):
-    """Combines thermodynamic data that uses multiple datasets.
+    """Combines thermodynamic data from multiple datasets.
 
     Args:
         species: Chemical component.
-        datasets: A list of thermodynamic data to use. Defaults to Holland and Powell followed
-            by JANAF.
+        datasets: A list of thermodynamic data to use. Defaults to Holland and Powell, and JANAF.
     """
 
     _DATA_SOURCE: str = "Combined"
     _STANDARD_STATE_PRESSURE: float = 1  # bar
-    # TODO: Check: Taking JANAF temperature.  Same for Holland and Powell (1998)?
+    # We assume the JANAF reference temperature, which is close enough to the reference temperature
+    # of Holland and Powell of 298 K (which could in fact be the same, if they simply decided to
+    # drop the decimal points when reporting the reference temperature?).
     _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
 
     def __init__(
@@ -498,7 +566,7 @@ class ThermodynamicData(ThermodynamicDataBase):
             dataset: A thermodynamic dataset.
         """
         if len(self.datasets) >= 1:
-            logger.warning("Combining different thermodynamic data may result in consistencies")
+            logger.warning("Combining different thermodynamic data may result in inconsistencies")
         logger.info("Adding thermodynamic data: %s", dataset.DATA_SOURCE)
         self.datasets.append(dataset)
 
