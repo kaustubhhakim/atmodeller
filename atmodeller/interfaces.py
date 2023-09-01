@@ -800,39 +800,6 @@ class GasSpecies(ChemicalComponent):
 
         return self.output.mass_in_total
 
-    # def _conform_solubility_to_planet_composition(self, planet: Planet) -> None:
-    #     """Ensure that the solubilities of the species are consistent with the planet composition.
-
-    #     Args:
-    #         planet: A planet.
-    #     """
-    #     if planet.melt_composition is not None:
-    #         msg: str = (
-    #             # pylint: disable=consider-using-f-string
-    #             "Setting solubility to be consistent with the melt composition (%s)"
-    #             % planet.melt_composition
-    #         )
-    #         logger.info(msg)
-    #         try:
-    #             solubilities: dict[str, Solubility] = composition_solubilities[
-    #                 planet.melt_composition.casefold()
-    #             ]
-    #         except KeyError:
-    #             logger.error("Cannot find solubilities for %s", planet.melt_composition)
-    #             raise
-
-    #         for species in self.gas_species.values():
-    #             try:
-    #                 species.solubility = solubilities[species.chemical_formula]
-    #                 logger.info(
-    #                     "Found solubility law for %s: %s",
-    #                     species.chemical_formula,
-    #                     species.solubility.__class__.__name__,
-    #                 )
-    #             except KeyError:
-    #                 logger.info("No solubility law for %s", species.chemical_formula)
-    #                 species.solubility = NoSolubility()
-
 
 @dataclass(kw_only=True)
 class SolidSpeciesOutput:

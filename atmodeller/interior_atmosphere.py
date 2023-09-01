@@ -111,8 +111,7 @@ class InteriorAtmosphereSystem:
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
-        # FIXME: Creates a circular dependency.
-        # TODO: Reinstate at some point: self.species.conform_solubilities_to_planet_composition(self.planet)
+        self.species.conform_solubilities_to_planet_composition(self.planet)
         self._reaction_network = ReactionNetwork(species=self.species)
         # Initialise solution to zero.
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)

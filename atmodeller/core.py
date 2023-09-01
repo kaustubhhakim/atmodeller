@@ -17,14 +17,22 @@ from __future__ import annotations
 
 import logging
 from collections import UserList
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
-from atmodeller.interfaces import ChemicalComponent, GasSpecies, SolidSpecies
-
-# FIXME: Creates a circular dependency: from atmodeller.solubilities import composition_solubilities
+from atmodeller.interfaces import (
+    ChemicalComponent,
+    GasSpecies,
+    NoSolubility,
+    SolidSpecies,
+    Solubility,
+)
+from atmodeller.solubilities import composition_solubilities
 from atmodeller.utilities import filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from atmodeller.interior_atmosphere import Planet
 
 
 class Species(UserList):
@@ -82,39 +90,38 @@ class Species(UserList):
         """Chemical formulas of the species."""
         return [species.chemical_formula for species in self.data]
 
-    # FIXME: Creates a circular dependency.
-    # def conform_solubilities_to_planet_composition(self, planet: Planet) -> None:
-    #     """Ensure that the solubilities of the species are consistent with the planet composition.
+    def conform_solubilities_to_planet_composition(self, planet: Planet) -> None:
+        """Ensure that the solubilities of the species are consistent with the planet composition.
 
-    #     Args:
-    #         planet: A planet.
-    #     """
-    #     if planet.melt_composition is not None:
-    #         msg: str = (
-    #             # pylint: disable=consider-using-f-string
-    #             "Setting solubilities to be consistent with the melt composition (%s)"
-    #             % planet.melt_composition
-    #         )
-    #         logger.info(msg)
-    #         try:
-    #             solubilities: dict[str, Solubility] = composition_solubilities[
-    #                 planet.melt_composition.casefold()
-    #             ]
-    #         except KeyError:
-    #             logger.error("Cannot find solubilities for %s", planet.melt_composition)
-    #             raise
+        Args:
+            planet: A planet.
+        """
+        if planet.melt_composition is not None:
+            msg: str = (
+                # pylint: disable=consider-using-f-string
+                "Setting solubilities to be consistent with the melt composition (%s)"
+                % planet.melt_composition
+            )
+            logger.info(msg)
+            try:
+                solubilities: dict[str, Solubility] = composition_solubilities[
+                    planet.melt_composition.casefold()
+                ]
+            except KeyError:
+                logger.error("Cannot find solubilities for %s", planet.melt_composition)
+                raise
 
-    #         for species in self.gas_species.values():
-    #             try:
-    #                 species.solubility = solubilities[species.chemical_formula]
-    #                 logger.info(
-    #                     "Found solubility law for %s: %s",
-    #                     species.chemical_formula,
-    #                     species.solubility.__class__.__name__,
-    #                 )
-    #             except KeyError:
-    #                 logger.info("No solubility law for %s", species.chemical_formula)
-    #                 species.solubility = NoSolubility()
+            for species in self.gas_species.values():
+                try:
+                    species.solubility = solubilities[species.chemical_formula]
+                    logger.info(
+                        "Found solubility law for %s: %s",
+                        species.chemical_formula,
+                        species.solubility.__class__.__name__,
+                    )
+                except KeyError:
+                    logger.info("No solubility law for %s", species.chemical_formula)
+                    species.solubility = NoSolubility()
 
     def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
         """Sorter for the species.
