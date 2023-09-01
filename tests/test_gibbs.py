@@ -5,39 +5,52 @@ Tests to ensure that sensible pressures are calculated for certain interior-atmo
 The target pressures are determined for the combined thermodynamic data, but they are within 1%
 of the values for the JANAF thermodynamic data alone.
 
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
 """
 
-from atmodeller import __version__
+from typing import Type
+
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    BufferedFugacityConstraint,
+    IronWustiteBufferConstraintHirschmann,
     MassConstraint,
-    SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet
-from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
-from atmodeller.thermodynamics import (
-    ChemicalComponent,
+from atmodeller.core import Species
+from atmodeller.interfaces import (
     GasSpecies,
     NoSolubility,
-    StandardGibbsFreeEnergyOfFormation,
-    StandardGibbsFreeEnergyOfFormationJANAF,
-    StandardGibbsFreeEnergyOfFormationProtocol,
+    SystemConstraint,
+    ThermodynamicData,
+    ThermodynamicDataBase,
+    ThermodynamicDataJANAF,
 )
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
-# Uncomment to test JANAF only.
-# standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
-#    StandardGibbsFreeEnergyOfFormationJANAF()
+# Uncomment to test JANAF only. TODO: FIXME: clean up.
+# standard_gibbs_free_energy_of_formation: ThermodynamicDataBase = (
+#    ThermodynamicDataJANAF()
 # )
 # Uncomment to test the combined dataset.
-standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
-    StandardGibbsFreeEnergyOfFormation()
-)
+standard_gibbs_free_energy_of_formation: Type[ThermodynamicDataBase] = ThermodynamicData
 
 # Both the combined data and JANAF report the same pressures to within 1%.
 rtol: float = 1.0e-2
 atol: float = 1.0e-2
+
+debug_logger()
 
 
 def test_version():
@@ -45,17 +58,16 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-# region oxygen fugacity
-
-
-def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
+def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -63,12 +75,10 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 0.3857055348248646,
@@ -80,14 +90,48 @@ def test_hydrogen_species_oxygen_fugacity_buffer() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
+def test_H_basalt_melt() -> None:
+    """Tests H2-H2O at the IW buffer."""
+
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
+
+    oceans: float = 1
+    planet: Planet = Planet(melt_composition="basalt")
+    h_kg: float = earth_oceans_to_kg(oceans)
+
+    constraints: list[SystemConstraint] = [
+        MassConstraint(species="H", value=h_kg),
+        IronWustiteBufferConstraintHirschmann(),
+    ]
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target_pressures: dict[str, float] = {
+        "H2": 0.09310239359434942,
+        "H2O": 0.0942558803732345,
+        "O2": 8.699588388210414e-08,
+    }
+
+    system.solve(SystemConstraints(constraints))
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+
+
+def test_H_fO2_plus() -> None:
     """Tests H2-H2O at the IW buffer+2."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -95,12 +139,10 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(log10_shift=2),
+        IronWustiteBufferConstraintHirschmann(log10_shift=2),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 0.0388388984114118,
@@ -112,14 +154,16 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_positive() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
+def test_H_fO2_minus() -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -127,12 +171,10 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(log10_shift=-2),
+        IronWustiteBufferConstraintHirschmann(log10_shift=-2),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 3.3586796133087784,
@@ -144,19 +186,16 @@ def test_hydrogen_species_oxygen_fugacity_buffer_shift_negative() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-# endregion
-
-# region number of oceans
-
-
-def test_hydrogen_species_five_oceans() -> None:
+def test_H_five_oceans() -> None:
     """Tests H2-H2O for five H oceans."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 5
     planet: Planet = Planet()
@@ -164,12 +203,10 @@ def test_hydrogen_species_five_oceans() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "H2": 9.257384917231544,
@@ -181,19 +218,16 @@ def test_hydrogen_species_five_oceans() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-# endregion
-
-# region temperature
-
-
-def test_hydrogen_species_temperature() -> None:
+def test_H_1500K() -> None:
     """Tests H2-H2O at a different temperature."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -201,12 +235,10 @@ def test_hydrogen_species_temperature() -> None:
 
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     planet.surface_temperature = 1500.0  # K
 
@@ -220,21 +252,18 @@ def test_hydrogen_species_temperature() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-# endregion
-
-# region C over H ratio
-
-
-def test_hydrogen_and_carbon_species() -> None:
+def test_H_and_C() -> None:
     """Tests H2-H2O and CO-CO2."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        ]
+    )
 
     oceans: float = 1
     ch_ratio: float = 1
@@ -245,12 +274,10 @@ def test_hydrogen_and_carbon_species() -> None:
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
         MassConstraint(species="C", value=c_kg),
-        BufferedFugacityConstraint(),
+        IronWustiteBufferConstraintHirschmann(),
     ]
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
         "CO": 59.615758867959656,
@@ -262,6 +289,3 @@ def test_hydrogen_and_carbon_species() -> None:
 
     system.solve(SystemConstraints(constraints))
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
-
-
-# endregion

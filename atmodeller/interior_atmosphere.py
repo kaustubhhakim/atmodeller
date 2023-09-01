@@ -1,0 +1,370 @@
+"""Interior atmosphere system.
+
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
+"""
+
+import logging
+import pprint
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Union
+
+import numpy as np
+from scipy.optimize import fsolve
+
+from atmodeller import GRAVITATIONAL_CONSTANT
+from atmodeller.constraints import SystemConstraints
+from atmodeller.core import Species
+from atmodeller.interfaces import SolidSpeciesOutput
+from atmodeller.reaction_network import ReactionNetwork
+
+logger: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass(kw_only=True)
+class Planet:
+    """The properties of a planet.
+
+    Defines the properties of a planet that are relevant for interior modeling. It provides default
+    values suitable for modelling a fully molten Earth-like planet.
+
+    Args:
+        mantle_mass: Mass of the planetary mantle. Defaults to Earth.
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
+            Earth.
+        surface_radius: Radius of the planetary surface. Defaults to Earth.
+        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
+        melt_composition: Melt composition of the planet. Default is None.
+
+    Attributes:
+        mantle_mass: Mass of the planetary mantle.
+        mantle_melt_fraction: mass fraction of the mantle that is molten.
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass.
+        surface_radius: Radius of the planetary surface.
+        surface_temperature: Temperature of the planetary surface.
+        melt_composition: Melt composition of the planet.
+    """
+
+    mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
+    mantle_melt_fraction: float = 1.0  # Completely molten
+    core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
+    surface_radius: float = 6371000.0  # m, Earth's radius
+    surface_temperature: float = 2000.0  # K
+    melt_composition: Union[str, None] = None
+
+    def __post_init__(self):
+        logger.info("Creating a new planet")
+        logger.info("Mantle mass (kg) = %f", self.mantle_mass)
+        logger.info("Mantle melt fraction = %f", self.mantle_melt_fraction)
+        logger.info("Core mass fraction = %f", self.core_mass_fraction)
+        logger.info("Planetary radius (m) = %f", self.surface_radius)
+        logger.info("Planetary mass (kg) = %f", self.planet_mass)
+        logger.info("Surface temperature (K) = %f", self.surface_temperature)
+        logger.info("Surface gravity (m/s^2) = %f", self.surface_gravity)
+        logger.info("Melt Composition = %s", self.melt_composition)
+
+    @property
+    def planet_mass(self) -> float:
+        """Mass of the planet in SI units."""
+        return self.mantle_mass / (1 - self.core_mass_fraction)
+
+    @property
+    def surface_area(self) -> float:
+        """Surface area of the planet in SI units."""
+        return 4.0 * np.pi * self.surface_radius**2
+
+    @property
+    def surface_gravity(self) -> float:
+        """Surface gravity of the planet in SI units."""
+        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
+
+
+@dataclass(kw_only=True)
+class InteriorAtmosphereSystem:
+    """An interior-atmosphere system.
+
+    Args:
+        species: A list of species.
+        planet: A planet. Defaults to a molten Earth.
+
+    Attributes:
+        species: A list of species.
+        planet: A planet.
+    """
+
+    species: Species
+    planet: Planet = field(default_factory=Planet)
+    _reaction_network: ReactionNetwork = field(init=False)
+    # The solution is log10 of the partial pressure for gas phases and log10 of the activity for
+    # solid phases. The order aligns with the species.
+    _log_solution: np.ndarray = field(init=False)
+
+    def __post_init__(self):
+        logger.info("Creating an interior-atmosphere system")
+        # FIXME: Creates a circular dependency.
+        # TODO: Reinstate at some point: self.species.conform_solubilities_to_planet_composition(self.planet)
+        self._reaction_network = ReactionNetwork(species=self.species)
+        # Initialise solution to zero.
+        self._log_solution = np.zeros_like(self.species, dtype=np.float_)
+
+    @property
+    def log_solution(self) -> np.ndarray:
+        """Log10 partial pressure for gas phases and log10 activity for solid phases."""
+        return self._log_solution
+
+    @property
+    def solution(self) -> np.ndarray:
+        """Solution."""
+        return 10**self.log_solution
+
+    @property
+    def solution_dict(self) -> dict[str, float]:
+        """Solution for all species in a dictionary."""
+        output: dict[str, float] = {}
+        for chemical_formula, solution in zip(self.species.chemical_formulas, self.solution):
+            output[chemical_formula] = solution
+
+        return output
+
+    @property
+    def fugacity_coefficients_dict(self) -> dict[str, float]:
+        """Fugacity coefficients (relevant for gas species only) in a dictionary."""
+        output: dict[str, float] = {
+            species.chemical_formula: species.fugacity_coefficient.get_value(
+                temperature=self.planet.surface_temperature, pressure=self.total_pressure
+            )
+            for species in self.species.gas_species.values()
+        }
+        return output
+
+    @property
+    def fugacities_dict(self) -> dict[str, float]:
+        """Fugacities of all species in a dictionary."""
+        output: dict[str, float] = {}
+        for key, value in self.fugacity_coefficients_dict.items():
+            output[key] = value * self.solution_dict[key]
+        return output
+
+    @property
+    def total_pressure(self) -> float:
+        """Total pressure."""
+        indices: list[int] = list(self.species.gas_species.keys())
+        return sum(self.solution[indices])
+
+    @property
+    def atmospheric_mean_molar_mass(self) -> float:
+        """Mean molar mass of the atmosphere."""
+        mu_atmosphere: float = 0
+        for index, species in self.species.gas_species.items():
+            mu_atmosphere += species.molar_mass * self.solution[index]
+        mu_atmosphere /= self.total_pressure
+
+        return mu_atmosphere
+
+    @property
+    def output(self) -> dict:
+        """Outputs for analysis."""
+        output_dict: dict = {}
+        output_dict["temperature"] = self.planet.surface_temperature
+        output_dict["total_pressure_in_atmosphere"] = self.total_pressure
+        output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
+        for species in self.species.data:
+            output_dict[species.chemical_formula] = species.output
+        # TODO: Dan to add elemental outputs as well.
+        return output_dict
+
+    def isclose(
+        self, target_dict: dict[str, float], rtol: float = 1.0e-5, atol: float = 1.0e-8
+    ) -> np.bool_:
+        """Determines if the solution pressures are close to target values within a tolerance."""
+
+        if len(self.solution_dict) != len(target_dict):
+            return np.bool_(False)
+
+        target_pressures: np.ndarray = np.array(
+            [target_dict[species.formula.formula] for species in self.species]
+        )
+        isclose: np.bool_ = np.isclose(target_pressures, self.solution, rtol=rtol, atol=atol).all()
+
+        return isclose
+
+    def solve(
+        self,
+        constraints: SystemConstraints,
+        *,
+        initial_solution: Union[np.ndarray, None] = None,
+    ) -> None:
+        """Solves the system to determine the partial pressures with provided constraints.
+
+        Args:
+            constraints: Constraints for the system of equations.
+            initial_solution: Initial guess for the log10 pressures. Defaults to None.
+
+        Returns:
+            The pressures in bar.
+        """
+
+        constraints = self._assemble_constraints(constraints)
+        self._log_solution = self._solve_fsolve(
+            constraints=constraints, initial_solution=initial_solution
+        )
+
+        # Recompute quantities that depend on the solution, since species.mass is not called for
+        # the reaction network but this sets the solution for the gas phase.
+        for species in self.species.gas_species.values():
+            species.mass(
+                planet=self.planet,
+                system=self,
+            )
+        for species in self.species.solid_species.values():
+            species.output = SolidSpeciesOutput(
+                activity=species.activity.get_value(
+                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
+                )
+            )
+
+        logger.info(pprint.pformat(self.solution_dict))
+
+    def _assemble_constraints(self, constraints: SystemConstraints) -> SystemConstraints:
+        """Combines the user-prescribed constraints with intrinsic constraints (solid activities).
+
+        Args:
+            constraints: Constraints as prescribed by the user.
+
+        Returns:
+            Constraints including solid activities.
+        """
+        logger.info("Assembling constraints")
+        for solid in self.species.solid_species.values():
+            constraints.append(solid.activity)
+        logger.info("Constraints: %s", pprint.pformat(constraints))
+
+        return constraints
+
+    def _conform_initial_solution_to_solid_activities(self, initial_solution: np.ndarray) -> None:
+        """Conforms the initial solution (estimate) to the solid activities.
+
+        Solid activities are known a priori so they can be included as solutions in the initial
+        solution estimate.
+
+        Args:
+            initial_solution: Initial estimate of the solution.
+        """
+        for index, solid in self.species.solid_species.items():
+            logger.debug("Setting %s %d", solid.chemical_formula, index)
+            initial_solution[index] = np.log10(
+                solid.activity.get_value(
+                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
+                )
+            )
+        logger.debug("Conforming initial solution to solid activities = %s", initial_solution)
+
+    def _solve_fsolve(
+        self,
+        *,
+        constraints: SystemConstraints,
+        initial_solution: Union[np.ndarray, None],
+    ) -> np.ndarray:
+        """Solves the non-linear system of equations.
+
+        Args:
+            constraints: Constraints for the system of equations.
+            initial_solution: Initial guess for the log10 pressures.
+        """
+
+        if initial_solution is None:
+            initial_solution = np.ones_like(self.species, dtype=np.float_)
+        self._conform_initial_solution_to_solid_activities(initial_solution)
+        ier: int = 0
+        # Count the number of attempts to solve the system by randomising the initial condition.
+        ic_count: int = 1
+        # Maximum number of attempts to solve the system by randomising the initial condition.
+        ic_count_max: int = 10
+        sol: np.ndarray = np.zeros_like(initial_solution)
+        infodict: dict = {}
+
+        coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
+            constraints=constraints
+        )
+
+        while ier != 1 and ic_count <= ic_count_max:
+            sol, infodict, ier, mesg = fsolve(
+                self._objective_func,
+                initial_solution,
+                args=(constraints, coefficient_matrix),
+                full_output=True,
+            )
+            logger.info(mesg)
+            if ier != 1:
+                logger.info(
+                    "Retrying with a new randomised initial condition (attempt %d)",
+                    ic_count,
+                )
+                # Increase or decrease the magnitude of all pressures.
+                initial_solution *= 2 * np.random.random_sample()
+                self._conform_initial_solution_to_solid_activities(initial_solution)
+                logger.debug("initial_solution = %s", initial_solution)
+                ic_count += 1
+
+        if ic_count == ic_count_max:
+            logger.error("Maximum number of randomised initial conditions has been exceeded")
+            raise RuntimeError("Solution cannot be found (ic_count == ic_count_max)")
+
+        logger.info("Number of function calls = %d", infodict["nfev"])
+        logger.info("Final objective function evaluation = %s", infodict["fvec"])
+
+        return sol
+
+    def _objective_func(
+        self,
+        log10_pressures: np.ndarray,
+        constraints: SystemConstraints,
+        coefficient_matrix: np.ndarray,
+    ) -> np.ndarray:
+        """Objective function for the non-linear system.
+
+        Args:
+            log10_pressures: Log10 of the pressures of each species.
+            constraints: Constraints for the system of equations.
+            coefficient_matrix: Coefficient matrix.
+
+        Returns:
+            The solution, which is the log10 of the pressures for each species.
+        """
+        self._log_solution = log10_pressures
+
+        # Compute residual for the reaction network.
+        residual_reaction: np.ndarray = self._reaction_network.get_residual(
+            system=self, constraints=constraints, coefficient_matrix=coefficient_matrix
+        )
+
+        # Compute residual for the mass balance.
+        residual_mass: np.ndarray = np.zeros(len(constraints.mass_constraints), dtype=np.float_)
+        for constraint_index, constraint in enumerate(constraints.mass_constraints):
+            for species in self.species.gas_species.values():
+                residual_mass[constraint_index] += species.mass(
+                    planet=self.planet,
+                    system=self,
+                    element=constraint.species,
+                )
+            # Mass values are constant so no need to pass any arguments to get_value().
+            residual_mass[constraint_index] -= constraint.get_value()
+            # Normalise by target mass to compute a relative residual.
+            residual_mass[constraint_index] /= constraint.get_value()
+        logger.debug("Residual_mass = %s", residual_mass)
+
+        # Combined residual.
+        residual: np.ndarray = np.concatenate((residual_reaction, residual_mass))
+        logger.debug("Residual = %s", residual)
+
+        return residual
