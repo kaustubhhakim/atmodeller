@@ -16,17 +16,16 @@ License:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from atmodeller.constraints import (
-    FugacityConstraint,
+    ConstantSystemConstraint,
     SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem
-from atmodeller.interfaces import Solubility
+from atmodeller.core import Species
+from atmodeller.interfaces import ChemicalComponent, GasSpecies, Solubility
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.utilities import UnitConversion
 
@@ -82,16 +81,18 @@ class AndesiteSO_Sulfate(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
         interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
 
@@ -129,16 +130,18 @@ class AndesiteSO2_Sulfate(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO2"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
         interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO2", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
 
@@ -193,16 +196,18 @@ class AndesiteSO_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """fugacity is fS2."""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
         interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
 
@@ -238,16 +243,18 @@ class AndesiteSO2_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """fugacity is fS2."""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO2"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
         interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO2", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
 
@@ -422,7 +429,7 @@ class BasaltSO_Sulfate(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
@@ -431,9 +438,11 @@ class BasaltSO_Sulfate(Solubility):
             species=species
         )
 
-        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
 
@@ -473,7 +482,7 @@ class BasaltSO2_Sulfate(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO2"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
@@ -482,9 +491,11 @@ class BasaltSO2_Sulfate(Solubility):
             species=species
         )
 
-        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO2", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
 
@@ -547,7 +558,7 @@ class BasaltSO_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
@@ -556,9 +567,11 @@ class BasaltSO_Sulfide(Solubility):
             species=species
         )
 
-        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
 
@@ -597,7 +610,7 @@ class BasaltSO2_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
-        species: list[ChemicalComponent] = []
+        species: Species = Species()
         species.append(GasSpecies(chemical_formula="SO2"))
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
@@ -606,9 +619,11 @@ class BasaltSO2_Sulfide(Solubility):
             species=species
         )
 
-        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
-        O2_fugacity: SystemConstraint = FugacityConstraint(
-            species="O2", value=fugacities_dict["O2"]
+        SO2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="SO2", value=fugacity
+        )
+        O2_fugacity: SystemConstraint = ConstantSystemConstraint(
+            name="fugacity", species="O2", value=fugacities_dict["O2"]
         )
         constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
 
