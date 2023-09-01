@@ -1,14 +1,50 @@
-"""Utilities."""
+"""Utilities.
+
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
+"""
 
 from __future__ import annotations
 
 import logging
+from collections import OrderedDict, abc
+from typing import Type, TypeVar
 
 from molmass import Formula
 
 from atmodeller import OCEAN_MOLES
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> dict[int, T]:
+    """Filters entries by the given class type and maintains order.
+
+    Args:
+        some_collection: A collection (e.g. a list) to filter.
+        class_type: Class type to filter.
+
+    Returns:
+        An OrderedDict with indices in some_collection as keys and filtered entries as values.
+    """
+
+    ordered_dict = OrderedDict()
+    for index, entry in enumerate(some_collection):
+        if isinstance(entry, class_type):
+            ordered_dict[index] = entry
+
+    return ordered_dict
 
 
 class UnitConversion:

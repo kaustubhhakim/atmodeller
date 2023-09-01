@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 
-"""Driver script to provide a command line option to compute atmospheres."""
+"""Driver script to provide a command line option to compute atmospheres.
+
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
+"""
 
 from __future__ import annotations
 
@@ -10,15 +23,15 @@ import time
 
 from atmodeller import logger
 from atmodeller.constraints import (
-    BufferedFugacityConstraint,
+    IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet
-from atmodeller.interfaces import ChemicalComponent, NoSolubility
+from atmodeller.core import Species
+from atmodeller.interfaces import GasSpecies, NoSolubility
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
-from atmodeller.thermodynamics import GasSpecies
 from atmodeller.utilities import earth_oceans_to_kg
 
 
@@ -66,14 +79,16 @@ def main():
 
     args = parser.parse_args()
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
-        GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+            GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+        ]
+    )
 
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(args.oceans)
@@ -81,7 +96,7 @@ def main():
     constraints: list[SystemConstraint] = [
         MassConstraint(species="H", value=h_kg),
         MassConstraint(species="C", value=c_kg),
-        BufferedFugacityConstraint(log10_shift=args.fO2_shift),
+        IronWustiteBufferConstraintHirschmann(log10_shift=args.fO2_shift),
     ]
 
     # Include nitrogen if desired.
@@ -93,7 +108,7 @@ def main():
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
     system_constraints: SystemConstraints = SystemConstraints(constraints)
     system.solve(system_constraints)
-    logger.info(system.pressures_dict)
+    logger.info(system.solution_dict)
 
     end: float = time.time()
     runtime: float = round(end - start, 1)

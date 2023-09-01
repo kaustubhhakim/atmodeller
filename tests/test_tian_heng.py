@@ -1,26 +1,37 @@
-"""Reproducing the results of Tian and Heng (2023)."""
+"""Reproducing the results of Tian and Heng (2023).
 
+License:
+    This program is free software: you can redistribute it and/or modify it under the terms of the 
+    GNU General Public License as published by the Free Software Foundation, either version 3 of 
+    the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+    the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program. If 
+    not, see <https://www.gnu.org/licenses/>.
+"""
+
+
+from typing import Type
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    BufferedFugacityConstraint,
-    FugacityConstraint,
-    IronWustiteBufferBallhaus,
+    IronWustiteBufferConstraintBallhaus,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet
-from atmodeller.interfaces import NoSolubility
-from atmodeller.thermodynamics import (
-    ChemicalComponent,
+from atmodeller.core import Species
+from atmodeller.interfaces import (
+    ConstantSystemConstraint,
     GasSpecies,
     SolidSpecies,
-    StandardGibbsFreeEnergyOfFormation,
-    StandardGibbsFreeEnergyOfFormationProtocol,
+    ThermodynamicData,
+    ThermodynamicDataBase,
 )
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
-standard_gibbs_free_energy_of_formation: StandardGibbsFreeEnergyOfFormationProtocol = (
-    StandardGibbsFreeEnergyOfFormation()
-)
+thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 
 debug_logger()
 
@@ -33,40 +44,45 @@ def test_version():
 def test_graphite() -> None:
     """Tests including graphite."""
 
-    species: list[ChemicalComponent] = [
-        GasSpecies(chemical_formula="H2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="H2O", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CO2", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="CH4", solubility=NoSolubility()),
-        GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-        SolidSpecies(chemical_formula="C", common_name="graphite"),  # Ideal activity by default.
-    ]
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="H2O", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="CO", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="CO2", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="CH4", thermodynamic_class=thermodynamic_data),
+            GasSpecies(chemical_formula="O2", thermodynamic_class=thermodynamic_data),
+            SolidSpecies(
+                chemical_formula="C",
+                name_in_thermodynamic_data="graphite",
+                thermodynamic_class=thermodynamic_data,
+            ),  # Ideal activity by default.
+        ]
+    )
 
     planet: Planet = Planet()
     planet.surface_temperature = 600 + 273  # K
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, gibbs_data=standard_gibbs_free_energy_of_formation, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     # This is comparable to the constraints imposed by Meng.
     constraints: list = [
-        BufferedFugacityConstraint(value=IronWustiteBufferBallhaus()),
-        FugacityConstraint(species="H2", value=44.49334998176607),
+        IronWustiteBufferConstraintBallhaus(),
+        ConstantSystemConstraint(name="fugacity", species="H2", value=44.49334998176607),
     ]
 
     system_constraints: SystemConstraints = SystemConstraints(constraints)
 
     target_pressures: dict[str, float] = {
         "C": 1.0,
-        "CH4": 941.9462267908025,
-        "CO": 0.0817264668302245,
-        "CO2": 0.0715136912730243,
+        "CH4": 941.8712626308082,
+        "CO": 0.08171351242186498,
+        "CO2": 0.07149671191170186,
         "H2": 44.493349981766066,
-        "H2O": 14.610360605730092,
-        "O2": 1.4548505639981167e-25,
+        "H2O": 14.609207391097847,
+        "O2": 1.4546209065940728e-25,
     }
 
     system.solve(system_constraints)
+    system.solution_dict
     assert system.isclose(target_pressures)
