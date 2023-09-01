@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+from atmodeller.constraints import (
+    FugacityConstraint,
+    SystemConstraint,
+    SystemConstraints,
+)
+from atmodeller.core import InteriorAtmosphereSystem
 from atmodeller.interfaces import Solubility
 from atmodeller.reaction_network import ReactionNetwork
 from atmodeller.thermodynamics import (
@@ -47,7 +54,7 @@ class AndesiteS2_Sulfate(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
-        logCs: float = -12.948 + (31984.243 / temperature)
+        logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = (
             logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         )
@@ -72,17 +79,31 @@ class AndesiteSO_Sulfate(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
-        )
+        interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
 
-        logCs: float = -12.948 + (31984.243 / temperature)
+        interior_atmosphere.solve(constraints)
+
+        output = interior_atmosphere.output
+
+        fS2 = output["S2"].fugacity
+
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+
+        logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
@@ -105,17 +126,30 @@ class AndesiteSO2_Sulfate(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO2:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
-        )
+        interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
 
-        logCs: float = -12.948 + (31984.243 / temperature)
+        interior_atmosphere.solve(constraints)
+
+        output = interior_atmosphere.output
+
+        fS2 = output["S2"].fugacity
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+
+        logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
@@ -133,7 +167,7 @@ class AndesiteS2_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """fugacity is fS2."""
-        logCs: float = 0.225 - (8876.5 / temperature)
+        logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
@@ -156,17 +190,29 @@ class AndesiteSO_Sulfide(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
-        )
+        interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
 
-        logCs: float = 0.225 - (8876.5 / temperature)
+        interior_atmosphere.solve(constraints)
+
+        output = interior_atmosphere.output
+
+        fS2 = output["S2"].fugacity
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+
+        logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
@@ -189,17 +235,30 @@ class AndesiteSO2_Sulfide(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
-        )
+        interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species)
 
-        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
 
-        logCs: float = 0.225 - (8876.5 / temperature)
+        interior_atmosphere.solve(constraints)
+
+        output = interior_atmosphere.output
+
+        fS2 = output["S2"].fugacity
+
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+
+        logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
@@ -332,10 +391,15 @@ class BasaltS2_Sulfate(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
-        logCs: float = -12.948 + (31532.862 / temperature)
+        logger.debug("S2 Fugacity for S2 Sulfate Solubility Law = \n%s", fugacity)
+
+        logCs: float = -12.948 + (32333.5635 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        if ppmw >= 1000:
+            logger.debug("WARNING: S2 Sulfate Solubility is getting too high: \n%s", ppmw)
+            ppmw = 1000.0
         return ppmw
 
 
@@ -355,19 +419,38 @@ class BasaltSO_Sulfate(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
+        interior_atmosphere_SOSulfate: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+            species=species
         )
 
-        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
-        logCs: float = -12.948 + (31532.862 / temperature)
+        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
+
+        interior_atmosphere_SOSulfate.solve(constraints)
+
+        output = interior_atmosphere_SOSulfate.output
+
+        fS2 = output["S2"].fugacity
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+        logger.debug("Calculated S2 Fugacity for SO Sulfate Solubility Law = \n%s", fS2)
+
+        logCs: float = -12.948 + (32333.5635 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        if ppmw >= 1000:
+            logger.debug("WARNING: SO Sulfate Solubility is getting too high: \n%s", ppmw)
+            ppmw = 1000.0
         return ppmw
 
 
@@ -387,19 +470,39 @@ class BasaltSO2_Sulfate(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
+        interior_atmosphere_SO2Sulfate: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+            species=species
         )
 
-        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
-        logCs: float = -12.948 + (31532.862 / temperature)
+        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
+
+        interior_atmosphere_SO2Sulfate.solve(constraints)
+
+        output = interior_atmosphere_SO2Sulfate.output
+
+        fS2 = output["S2"].fugacity
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+        # logger.debug("SO2 Sulfate Reaction Network is \n%s", network.reactions)
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+        logger.debug("Calculated S2 Fugacity for SO2 Sulfate Solubility Law = \n%s", fS2)
+
+        logCs: float = -12.948 + (32333.5635 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        if ppmw >= 1000:
+            logger.debug("WARNING: SO2 Sulfate Solubility is getting too high: \n%s", ppmw)
+            ppmw = 1000.0
         return ppmw
 
 
@@ -414,10 +517,14 @@ class BasaltS2_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
-        logCs: float = 0.225 - (7817.134 / temperature)
+        logger.debug("S2 Fugacity for S2 Sulfide Solubility Law = \n%s", fugacity)
+        logCs: float = 0.225 - (8045.7465 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        if ppmw >= 1000:
+            logger.debug("WARNING: S2 Sulfide Solubility is getting too high: \n%s", ppmw)
+            ppmw = 1000.0
         return ppmw
 
 
@@ -437,19 +544,37 @@ class BasaltSO_Sulfide(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
+        interior_atmosphere_SOSulfide: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+            species=species
         )
 
-        fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
-        logCs: float = 0.225 - (7817.134 / temperature)
+        SO_fugacity: SystemConstraint = FugacityConstraint(species="SO", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO_fugacity])
+
+        interior_atmosphere_SOSulfide.solve(constraints)
+
+        output = interior_atmosphere_SOSulfide.output
+
+        fS2 = output["S2"].fugacity
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = (fugacity**2) / (K_rxn * fugacities_dict["O2"])
+        logger.debug("Calculated S2 Fugacity for SO Sulfide Solubility Law = \n%s", fS2)
+        logCs: float = 0.225 - (8045.7465 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        if ppmw >= 1000:
+            logger.debug("WARNING: SO Sulfide Solubility is getting too high: \n%s", ppmw)
+            ppmw = 1000.0
         return ppmw
 
 
@@ -469,19 +594,40 @@ class BasaltSO2_Sulfide(Solubility):
         species.append(GasSpecies(chemical_formula="S2"))
         species.append(GasSpecies(chemical_formula="O2"))
 
-        network = ReactionNetwork(
-            species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
-        )
-        print("Reaction network for SO:", network)
-        K_rxn = network.get_reaction_equilibrium_constant(
-            reaction_index=0, temperature=temperature, pressure=1
+        interior_atmosphere_SO2Sulfide: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+            species=species
         )
 
-        fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
-        logCs: float = 0.225 - (7817.134 / temperature)
+        SO2_fugacity: SystemConstraint = FugacityConstraint(species="SO2", value=fugacity)
+        O2_fugacity: SystemConstraint = FugacityConstraint(
+            species="O2", value=fugacities_dict["O2"]
+        )
+        constraints: SystemConstraints = SystemConstraints([O2_fugacity, SO2_fugacity])
+
+        interior_atmosphere_SO2Sulfide.solve(constraints)
+
+        output = interior_atmosphere_SO2Sulfide.output
+
+        fS2 = output["S2"].fugacity
+        # network = ReactionNetwork(
+        #    species=species, gibbs_data=StandardGibbsFreeEnergyOfFormationJANAF()
+        # )
+        # logger.debug("SO2 Sulfide Reaction Network is \n%s", network.reactions)
+
+        # K_rxn = network.get_reaction_equilibrium_constant(
+        #    reaction_index=0, temperature=temperature, pressure=1
+        # )
+
+        # fS2 = ((fugacity) / (K_rxn * fugacities_dict["O2"])) ** 2
+        logger.debug("Calculated S2 Fugacity for SO2 Sulfide Solubility Law = \n%s", fS2)
+
+        logCs: float = 0.225 - (8045.7465 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        if ppmw >= 1000:
+            logger.debug("WARNING: SO2 Sulfide Solubility is getting too high: \n%s", ppmw)
+            ppmw = 1000.0
         return ppmw
 
 
@@ -489,8 +635,8 @@ class BasaltS2(Solubility):
     """Total S solubility accounting for both sulfide and sulfate dissolution."""
 
     def __init__(self):
-        self.sulfide_solubility: Solubility = BasaltS_Sulfide()
-        self.sulfate_solubility: Solubility = BasaltS_Sulfate()
+        self.sulfide_solubility: Solubility = BasaltS2_Sulfide()
+        self.sulfate_solubility: Solubility = BasaltS2_Sulfate()
 
     def _solubility(self, *args, **kwargs) -> float:
         solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
