@@ -301,7 +301,7 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
             else:
                 phase = get_phase_data("g")
                 if phase is None:
-                    msg = "Thermodynamic data for %s (%s) is not available in %s" % (
+                    msg: str = "Thermodynamic data for %s (%s) is not available in %s" % (
                         self.species.name_in_thermodynamic_data,
                         self.species.modified_hill_formula,
                         self.DATA_SOURCE,

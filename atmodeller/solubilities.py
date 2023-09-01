@@ -25,7 +25,7 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import Species
-from atmodeller.interfaces import ChemicalComponent, GasSpecies, Solubility
+from atmodeller.interfaces import GasSpecies, Solubility
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.utilities import UnitConversion
 
