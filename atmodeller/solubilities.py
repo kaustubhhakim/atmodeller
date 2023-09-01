@@ -16,17 +16,16 @@ License:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from atmodeller.constraints import (
-    FugacityConstraint,
+    ConstantSystemConstraint,
     SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem
-from atmodeller.interfaces import Solubility
+from atmodeller.core import Species
+from atmodeller.interfaces import GasSpecies, Solubility
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.utilities import UnitConversion
 
@@ -84,7 +83,6 @@ class AndesiteSO_Sulfate(Solubility):
         """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
         del fugacity
         fS2 = fugacities_dict["S2"]
-
         logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp: float = 10**logS_wtp
@@ -105,7 +103,6 @@ class AndesiteSO2_Sulfate(Solubility):
         """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
         del fugacity
         fS2 = fugacities_dict["S2"]
-
         logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp: float = 10**logS_wtp
@@ -124,6 +121,8 @@ class AndesiteS2_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """fugacity is fS2."""
+        del fugacity
+        fS2 = fugacities_dict["S2"]
         logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
@@ -144,7 +143,6 @@ class AndesiteSO_Sulfide(Solubility):
         """fugacity is fS2."""
         del fugacity
         fS2 = fugacities_dict["S2"]
-
         logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp: float = 10**logS_wtp
@@ -322,9 +320,7 @@ class BasaltSO_Sulfate(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         del fugacity
-
         fS2 = fugacities_dict["S2"]
-
         logCs: float = -12.948 + (32333.5635 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
@@ -350,7 +346,6 @@ class BasaltSO2_Sulfate(Solubility):
         """Fugacity is fS2."""
         del fugacity
         fS2 = fugacities_dict["S2"]
-
         logCs: float = -12.948 + (32333.5635 / temperature)
         logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp = 10**logS_wtp
@@ -399,7 +394,6 @@ class BasaltSO_Sulfide(Solubility):
         """Fugacity is fS2."""
         del fugacity
         fS2 = fugacities_dict["S2"]
-
         logCs: float = 0.225 - (8045.7465 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp = 10**logS_wtp
@@ -425,7 +419,6 @@ class BasaltSO2_Sulfide(Solubility):
         """Fugacity is fS2."""
         del fugacity
         fS2 = fugacities_dict["S2"]
-
         logCs: float = 0.225 - (8045.7465 / temperature)
         logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp = 10**logS_wtp
