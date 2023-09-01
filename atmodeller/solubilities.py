@@ -19,14 +19,7 @@ import logging
 
 import numpy as np
 
-from atmodeller.constraints import (
-    ConstantSystemConstraint,
-    SystemConstraint,
-    SystemConstraints,
-)
-from atmodeller.core import Species
-from atmodeller.interfaces import GasSpecies, Solubility
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.interfaces import Solubility
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -121,8 +114,6 @@ class AndesiteS2_Sulfide(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """fugacity is fS2."""
-        del fugacity
-        fS2 = fugacities_dict["S2"]
         logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
