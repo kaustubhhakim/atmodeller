@@ -21,7 +21,7 @@ from atmodeller.constraints import (
     IronWustiteBufferConstraintBallhaus,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
+from atmodeller.core import Species
 from atmodeller.interfaces import (
     ConstantSystemConstraint,
     GasSpecies,
@@ -29,6 +29,7 @@ from atmodeller.interfaces import (
     ThermodynamicData,
     ThermodynamicDataBase,
 )
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 

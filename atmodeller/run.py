@@ -28,8 +28,9 @@ from atmodeller.constraints import (
     SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import InteriorAtmosphereSystem, Planet, Species
+from atmodeller.core import Species
 from atmodeller.interfaces import GasSpecies, NoSolubility
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
