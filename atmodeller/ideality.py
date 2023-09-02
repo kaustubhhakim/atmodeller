@@ -784,7 +784,7 @@ class CorkSimple:
             pressure: Pressure in kbar.
 
         Returns:
-            RTlnf in J mol^(-1).
+            RTlnf in kJ mol^(-1).
         """
 
         RTlnf: float = (
@@ -800,26 +800,26 @@ class CorkSimple:
             + 2 / 3 * self.c(temperature) * pressure * np.sqrt(pressure)
             + self.d(temperature) / 2 * pressure**2
         )
-        RTlnf *= 1e3  # Converts units to J mol^(-1).
         return RTlnf
 
-    def fugacity(self, *, temperature: float, pressure: float) -> float:
-        """Fugacity.
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Fugacity in kbar.
 
         Args:
             temperature: Temperature in Kelvin.
             pressure: Pressure in kbar.
 
         Returns:
-            fugacity in bar.
+            fugacity in kbar.
         """
-        # GAS_CONSTANT has correct units.
         fugacity: float = np.exp(
-            self.RTlnf(temperature=temperature, pressure=pressure) / (GAS_CONSTANT * temperature)
+            self.RTlnf(temperature=temperature, pressure=pressure)
+            / (GAS_CONSTANT_KJ * temperature)
         )
+        fugacity /= 1e3  # TODO: Check.
         return fugacity
 
-    def fugacity_coefficient(self, *, temperature: float, pressure: float) -> float:
+    def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
         """Fugacity coefficient.
 
         Args:
@@ -829,10 +829,7 @@ class CorkSimple:
         Returns:
             fugacity coefficient.
         """
-        # TODO: Clean up. Clunky for fugacity to require kbar yet return bar.
-        fugacity_coefficient: float = self.fugacity(temperature=temperature, pressure=pressure) / (
-            pressure * 1e3
-        )
+        fugacity_coefficient: float = self.fugacity(temperature, pressure) / (pressure)
         return fugacity_coefficient
 
     def volume(self, temperature: float, pressure: float) -> float:
@@ -921,11 +918,45 @@ class CorkCO(CorkSimple):
     Pc: float = field(init=False, default=0.0350)
 
 
+# Holland and Powell (2011) use this model for additional species below, using critical constants
+# from the following reference:
+# Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.
+# McGraw-Hill, New York.
+
+
+@dataclass(kw_only=True, frozen=True)
+class CorkS2(CorkSimple):
+    """Critical constants for S2."""
+
+    # Data not in The Properties of Gases and Liquids.  Use S instead?
+
+    Tc: float  # TODO = field(init=False, default=132.9)
+    Pc: float  # TODO = field(init=False, default=0.0350)
+
+
+@dataclass(kw_only=True, frozen=True)
+class CorkH2S(CorkSimple):
+    """Critical constants for H2S.
+
+    Appendix A.19 in The Properties of Gases and Liquids (2001), 5th edition.
+    """
+
+    Tc: float = field(init=False, default=373.4)
+    Pc: float = field(init=False, default=0.08963)
+
+
 def main():
     """For testing."""
 
-    pressure: float = 1
-    temperature: float = 500 + 273
+    # 1 bar = 10^5 Pa
+    # 1 kbar = 10^8 Pa
+    # 10 kbar = 1 GPa
+
+    # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
+    # coefficient for H2 maxes out and then decreases again.
+
+    pressure: float = 30  # 1000 * 1e-3
+    temperature: float = 1673  # 1673  # 1000 + 273
 
     # These tests are fot CO, CH4, and H2. The results agree with Meng, but I need to clarify the
     # unit conversions.
@@ -948,16 +979,25 @@ def test_simple_cork(temperature, pressure):
     cork: CorkSimple = CorkCO()
     V = cork.volume(temperature, pressure)
     RTlnf = cork.RTlnf(temperature, pressure)
+    fugacity = cork.fugacity(temperature, pressure)
+    fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("CO: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
     cork: CorkSimple = CorkCH4()
     V = cork.volume(temperature, pressure)
-    Vcm3 = cork.volume_cm3(temperature, pressure)
+    # Vcm3 = cork.volume_cm3(temperature, pressure)
     RTlnf = cork.RTlnf(temperature, pressure)
-    print("CH4: V = %f, Vcm3 = %f, RTlnf = %f" % (V, Vcm3, RTlnf))
+    fugacity = cork.fugacity(temperature, pressure)
+    fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
+    print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("CH4: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
     cork: CorkSimple = CorkH2()
     V = cork.volume(temperature, pressure)
     RTlnf = cork.RTlnf(temperature, pressure)
+    fugacity = cork.fugacity(temperature, pressure)
+    fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("H2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
     print("\n")
 
 
