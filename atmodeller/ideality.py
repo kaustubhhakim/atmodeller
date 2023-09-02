@@ -25,8 +25,11 @@ import numpy as np
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+GAS_CONSTANT_KJ: float = GAS_CONSTANT * 1e-3
 
 
 # calculate pure gas fugacity coefficient and Modified Redlich-Kwang volume
@@ -36,20 +39,23 @@ def Calc_lambda(P, T, a, b, V_init):
     pressure in this function is in kbar, temperature in K
     """
 
-    R = GAS_CONSTANT * 1e-3  # Note unit in kJ requires P in kbar
     EOS = (
         lambda V: P * V**3
-        - R * T * V**2
-        - (b * R * T + b**2 * P - a / np.sqrt(T)) * V
+        - GAS_CONSTANT_KJ * T * V**2
+        - (b * GAS_CONSTANT_KJ * T + b**2 * P - a / np.sqrt(T)) * V
         - a * b / np.sqrt(T)
     )
-    Jacob = lambda V: 3 * P * V**2 - 2 * R * T * V - (b * R * T + b**2 * P - a / np.sqrt(T))
+    Jacob = (
+        lambda V: 3 * P * V**2
+        - 2 * GAS_CONSTANT_KJ * T * V
+        - (b * GAS_CONSTANT_KJ * T + b**2 * P - a / np.sqrt(T))
+    )
     V_mrk = fsolve(EOS, V_init, fprime=Jacob, xtol=1e-6)
 
     # compressibility factor
-    Z = P * V_mrk / (R * T)
-    B = b * P / (R * T)
-    A = a / (b * R * T**1.5)
+    Z = P * V_mrk / (GAS_CONSTANT_KJ * T)
+    B = b * P / (GAS_CONSTANT_KJ * T)
+    A = a / (b * GAS_CONSTANT_KJ * T**1.5)
     lnlambda = Z - 1.0 - np.log(Z - B) - A * np.log(1.0 + B / Z)
 
     return lnlambda, V_mrk
@@ -252,11 +258,10 @@ class CorkFull(ABC):
         Returns:
             Compressibility factor (units TODO).
         """
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
         # TODO: Meng computes the compressibility factor using only the MRK volume. See line 48
         # in his outgassing-2 Jupyter notebook. And equation A.2. in HP91 seems to suggest a virial
         # contribution as the last term, so maybe it should be V MRK?
-        compressibility: float = pressure * volume / (R * temperature)
+        compressibility: float = pressure * volume / (GAS_CONSTANT_KJ * temperature)
 
         return compressibility
 
@@ -271,8 +276,7 @@ class CorkFull(ABC):
             B factor (units TODO).
         """
         del pressure
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
-        A: float = self.a(temperature) / (self.b * R * temperature**1.5)
+        A: float = self.a(temperature) / (self.b * GAS_CONSTANT_KJ * temperature**1.5)
 
         return A
 
@@ -286,8 +290,7 @@ class CorkFull(ABC):
         Returns:
             B factor (units TODO).
         """
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
-        B: float = self.b * pressure / (R * temperature)
+        B: float = self.b * pressure / (GAS_CONSTANT_KJ * temperature)
 
         return B
 
@@ -322,11 +325,10 @@ class CorkFull(ABC):
             ln(fugacity virial) (units TODO).
         """
         if pressure >= self.P0:
-            R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
             ln_fugacity: float = (2.0 / 3) * self.c(temperature) * (pressure - self.P0) ** 1.5 + (
                 1.0 / 2
             ) * self.d(temperature) * (pressure - self.P0) ** 2
-            ln_fugacity /= R * temperature
+            ln_fugacity /= GAS_CONSTANT_KJ * temperature
         else:
             ln_fugacity = 0
 
@@ -393,12 +395,11 @@ class CorkFull(ABC):
             Residual of the MRK volume.
         """
 
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
         residual: float = (
             pressure * volume**3
-            - R * temperature * volume**2
+            - GAS_CONSTANT_KJ * temperature * volume**2
             - (
-                self.b * R * temperature
+                self.b * GAS_CONSTANT_KJ * temperature
                 + self.b**2 * pressure
                 - a(temperature) / np.sqrt(temperature)
             )
@@ -423,12 +424,11 @@ class CorkFull(ABC):
             Jacobian of the MRK volume.
         """
 
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
         jacobian: float = (
             3 * pressure * volume**2
-            - 2 * R * temperature * volume
+            - 2 * GAS_CONSTANT_KJ * temperature * volume
             - (
-                self.b * R * temperature
+                self.b * GAS_CONSTANT_KJ * temperature
                 + self.b**2 * pressure
                 - a(temperature) / np.sqrt(temperature)
             )
@@ -452,8 +452,7 @@ class CorkFull(ABC):
         # (1991) cannot work. To check with Meng.
         # assert temperature >= self.Tc
 
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
-        volume_init: float = R * temperature / pressure + self.b
+        volume_init: float = GAS_CONSTANT_KJ * temperature / pressure + self.b
 
         volume_MRK: float = fsolve(
             self._objective_function_volume_MRK,
@@ -609,7 +608,6 @@ class CorkFullH2O(CorkFull):
 
         assert temperature < self.Tc
 
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
         volume_init: float = self.b / 2
 
         volume_MRK: float = fsolve(
@@ -634,8 +632,7 @@ class CorkFullH2O(CorkFull):
 
         assert temperature < self.Tc
 
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
-        volume_init: float = R * temperature / pressure + 10.0 * self.b
+        volume_init: float = GAS_CONSTANT_KJ * temperature / pressure + 10.0 * self.b
 
         volume_MRK: float = fsolve(
             self._objective_function_volume_MRK,
@@ -656,7 +653,6 @@ class CorkFullH2O(CorkFull):
         Returns:
             ln(fugacity) (units TODO).
         """
-        R: float = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
 
         if temperature >= self.Tc:
             ln_fugacity: float = super().ln_fugacity_MRK(temperature, pressure)
@@ -697,6 +693,8 @@ class CorkSimple:
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
     gases which are known to obey approximately the principle of corresponding states.
 
+    The units in Holland and Powell (1991) are K and kbar, so note unit conversions.
+
     Corresponding states parameters from Table 2 in Holland and Powell (1991).
 
     Args:
@@ -704,12 +702,20 @@ class CorkSimple:
         Pc: Critical pressure in kbar.
 
     Attributes:
-        TODO.
+        Tc: Critical temperature in Kelvin.
+        Pc: Critical pressure in kbar.
+        a0: Universal constant (Table 2, Holland and Powell, 1991).
+        a1: Universal constant (Table 2, Holland and Powell, 1991).
+        b0: Universal constant (Table 2, Holland and Powell, 1991).
+        c0: Universal constant (Table 2, Holland and Powell, 1991).
+        c1: Universal constant (Table 2, Holland and Powell, 1991).
+        d0: Universal constant (Table 2, Holland and Powell, 1991).
+        d1: Universal constant (Table 2, Holland and Powell, 1991).
     """
 
-    # FIXME: Note units.
     Tc: float  # K
     Pc: float  # kbar
+    # Universal constants from Table 2, Holland and Powell (1991).
     a0: float = field(init=False, default=5.45963e-5)
     a1: float = field(init=False, default=-8.63920e-6)
     b0: float = field(init=False, default=9.18301e-4)
@@ -719,13 +725,13 @@ class CorkSimple:
     d1: float = field(init=False, default=-8.38293e-8)
 
     def a(self, temperature: float) -> float:
-        """Equation 9, Holland and Powell (1991).
+        """Parameter a in Equation 9, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Coefficient a in kJ^2 kbar^(-1) K^(1/2) mol^(-2).
+            Parameter a in kJ^2 kbar^(-1) K^(1/2) mol^(-2).
         """
         a: float = (
             self.a0 * self.Tc ** (5.0 / 2.0) / self.Pc
@@ -735,22 +741,22 @@ class CorkSimple:
 
     @property
     def b(self) -> float:
-        """Equation 9, Holland and Powell (1991).
+        """Parameter b in Equation 9, Holland and Powell (1991).
 
         Returns:
-            Coefficient b in kJ kbar^(-1) mol^(-1).
+            Parameter b in kJ kbar^(-1) mol^(-1).
         """
         b: float = self.b0 * self.Tc / self.Pc
         return b
 
     def c(self, temperature: float) -> float:
-        """Equation 9, Holland and Powell (1991).
+        """Parameter c in Equation 9, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Coefficient c.
+            Parameter c.
         """
         c: float = (
             self.c0 * self.Tc / self.Pc ** (3.0 / 2.0)
@@ -759,42 +765,42 @@ class CorkSimple:
         return c
 
     def d(self, temperature: float) -> float:
-        """Equation 9, Holland and Powell (1991).
+        """Parameter d in Equation 9, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Coefficient d.
+            Parameter d.
         """
         d: float = self.d0 * self.Tc / self.Pc**2 + self.d1 / self.Pc**2 * temperature
         return d
 
     def RTlnf(self, temperature: float, pressure: float) -> float:
-        """Equation 8, Holland and Powell (1991).
+        """RTlnf from Equation 8, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
             pressure: Pressure in kbar.
 
         Returns:
-            RTlnf in Joules. TODO: Must be per mol?
+            RTlnf in J mol^(-1).
         """
-        R = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
+
         RTlnf: float = (
-            R * temperature * np.log(1000 * pressure)
+            GAS_CONSTANT_KJ * temperature * np.log(1000 * pressure)
             + self.b * pressure
             + self.a(temperature)
             / self.b
             / np.sqrt(temperature)
             * (
-                np.log(R * temperature + self.b * pressure)
-                - np.log(R * temperature + 2.0 * self.b * pressure)
+                np.log(GAS_CONSTANT_KJ * temperature + self.b * pressure)
+                - np.log(GAS_CONSTANT_KJ * temperature + 2.0 * self.b * pressure)
             )
             + 2 / 3 * self.c(temperature) * pressure * np.sqrt(pressure)
             + self.d(temperature) / 2 * pressure**2
         )
-        RTlnf *= 1e3  # kJ to J. Must actually be J/mol?
+        RTlnf *= 1e3  # Converts units to J mol^(-1).
         return RTlnf
 
     def fugacity(self, *, temperature: float, pressure: float) -> float:
@@ -807,6 +813,7 @@ class CorkSimple:
         Returns:
             fugacity in bar.
         """
+        # GAS_CONSTANT has correct units.
         fugacity: float = np.exp(
             self.RTlnf(temperature=temperature, pressure=pressure) / (GAS_CONSTANT * temperature)
         )
@@ -829,28 +836,45 @@ class CorkSimple:
         return fugacity_coefficient
 
     def volume(self, temperature: float, pressure: float) -> float:
-        """Equation 7a, Holland and Powell (1991).
+        """Volume. Equation 7a, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
             pressure: Pressure in kbar.
 
         Returns:
-            Volume (units TODO).
+            Volume in kJ kbar^(-1) mol^(-1).
         """
-        R = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires P in kbar.
         volume: float = (
-            R * temperature / pressure
+            GAS_CONSTANT_KJ * temperature / pressure
             + self.b
             - self.a(temperature)
-            * R
+            * GAS_CONSTANT_KJ
             * np.sqrt(temperature)
-            / (R * temperature + self.b * pressure)
-            / (R * temperature + 2.0 * self.b * pressure)
+            / (GAS_CONSTANT_KJ * temperature + self.b * pressure)
+            / (GAS_CONSTANT_KJ * temperature + 2.0 * self.b * pressure)
             + self.c(temperature) * np.sqrt(pressure)
             + self.d(temperature) * pressure
         )
         return volume
+
+    def volume_cm3(self, temperature: float, pressure: float) -> float:
+        """Volume in cm^3 mol^(-1). Equation 7a, Holland and Powell (1991).
+
+        This is useful for comparing with Figs 8a-c in Holland and Powell (1991), which shows the
+        volume-temperature plots for CO, CH4, and H2.
+
+        Args:
+            temperature: Temperature in Kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            Volume in cm^3 mol^(-1).
+        """
+        volume_kJ_per_kbar: float = self.volume(temperature, pressure)
+        volume_cm3: float = volume_kJ_per_kbar * UnitConversion.kJ_per_kbar_to_cm3()
+
+        return volume_cm3
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -900,8 +924,8 @@ class CorkCO(CorkSimple):
 def main():
     """For testing."""
 
-    pressure: float = 0.5
-    temperature: float = 1500
+    pressure: float = 1
+    temperature: float = 500 + 273
 
     # These tests are fot CO, CH4, and H2. The results agree with Meng, but I need to clarify the
     # unit conversions.
@@ -910,14 +934,13 @@ def main():
 
 def test_simple_cork(temperature, pressure):
     # Meng's functions.
-    print("Mengs functions")
+    print("\nMengs functions")
     V, RTlnf = Calc_V_f(pressure, temperature, "CO")
     print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
     V, RTlnf = Calc_V_f(pressure, temperature, "CH4")
     print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
     V, RTlnf = Calc_V_f(pressure, temperature, "H2")
     print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
-
     print("\n")
 
     # My classes.
@@ -928,12 +951,14 @@ def test_simple_cork(temperature, pressure):
     print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
     cork: CorkSimple = CorkCH4()
     V = cork.volume(temperature, pressure)
+    Vcm3 = cork.volume_cm3(temperature, pressure)
     RTlnf = cork.RTlnf(temperature, pressure)
-    print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("CH4: V = %f, Vcm3 = %f, RTlnf = %f" % (V, Vcm3, RTlnf))
     cork: CorkSimple = CorkH2()
     V = cork.volume(temperature, pressure)
     RTlnf = cork.RTlnf(temperature, pressure)
     print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("\n")
 
 
 if __name__ == "__main__":
