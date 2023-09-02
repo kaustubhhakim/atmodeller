@@ -692,7 +692,7 @@ class CorkFullH2O(CorkFull):
 
 @dataclass(kw_only=True, frozen=True)
 class CorkSimple:
-    """Simplified Cork equation from Holland and Powell (1991).
+    """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
     gases which are known to obey approximately the principle of corresponding states.
@@ -700,16 +700,16 @@ class CorkSimple:
     Corresponding states parameters from Table 2 in Holland and Powell (1991).
 
     Args:
-        Tc: TODO.
-        Pc: TODO.
+        Tc: Critical temperature in Kelvin.
+        Pc: Critical pressure in kbar.
 
     Attributes:
         TODO.
     """
 
     # FIXME: Note units.
-    Tc: float
-    Pc: float
+    Tc: float  # K
+    Pc: float  # kbar
     a0: float = field(init=False, default=5.45963e-5)
     a1: float = field(init=False, default=-8.63920e-6)
     b0: float = field(init=False, default=9.18301e-4)
@@ -725,7 +725,7 @@ class CorkSimple:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Coefficient a.
+            Coefficient a in kJ^2 kbar^(-1) K^(1/2) mol^(-2).
         """
         a: float = (
             self.a0 * self.Tc ** (5.0 / 2.0) / self.Pc
@@ -738,7 +738,7 @@ class CorkSimple:
         """Equation 9, Holland and Powell (1991).
 
         Returns:
-            Coefficient b.
+            Coefficient b in kJ kbar^(-1) mol^(-1).
         """
         b: float = self.b0 * self.Tc / self.Pc
         return b
