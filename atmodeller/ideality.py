@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """Fugacity coefficients and non-ideal effects.
 
 License:
@@ -34,7 +36,7 @@ def Calc_lambda(P, T, a, b, V_init):
     pressure in this function is in kbar, temperature in K
     """
 
-    R = 8.314472e-3  # Note unit in kJ requires P in kbar
+    R = GAS_CONSTANT * 1e-3  # Note unit in kJ requires P in kbar
     EOS = (
         lambda V: P * V**3
         - R * T * V**2
@@ -56,7 +58,7 @@ def Calc_lambda(P, T, a, b, V_init):
 # calculate pure gas fugacity using the CORK equation from HP98
 # return value is RTlnf in Joules, rather than f
 def Calc_V_f(P, T, name):
-    R = 8.314472e-3  # Note unit in kJ requires P in kbar
+    R = GAS_CONSTANT * 1e-3  # Note unit in kJ requires P in kbar
     if (name == "H2O") | (name == "CO2"):
         if name == "H2O":
             a0 = 1113.4
@@ -731,16 +733,13 @@ class CorkSimple:
         )
         return a
 
-    def b(self, temperature: float) -> float:
+    @property
+    def b(self) -> float:
         """Equation 9, Holland and Powell (1991).
-
-        Args:
-            temperature: Temperature in Kelvin.
 
         Returns:
             Coefficient b.
         """
-        del temperature
         b: float = self.b0 * self.Tc / self.Pc
         return b
 
@@ -771,7 +770,7 @@ class CorkSimple:
         d: float = self.d0 * self.Tc / self.Pc**2 + self.d1 / self.Pc**2 * temperature
         return d
 
-    def RTlnf(self, *, temperature: float, pressure: float) -> float:
+    def RTlnf(self, temperature: float, pressure: float) -> float:
         """Equation 8, Holland and Powell (1991).
 
         Args:
@@ -784,13 +783,13 @@ class CorkSimple:
         R = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires pressure in kbar.
         RTlnf: float = (
             R * temperature * np.log(1000 * pressure)
-            + self.b(temperature) * pressure
+            + self.b * pressure
             + self.a(temperature)
-            / self.b(temperature)
+            / self.b
             / np.sqrt(temperature)
             * (
-                np.log(R * temperature + self.b(temperature) * pressure)
-                - np.log(R * temperature + 2.0 * self.b(temperature) * pressure)
+                np.log(R * temperature + self.b * pressure)
+                - np.log(R * temperature + 2.0 * self.b * pressure)
             )
             + 2 / 3 * self.c(temperature) * pressure * np.sqrt(pressure)
             + self.d(temperature) / 2 * pressure**2
@@ -842,12 +841,12 @@ class CorkSimple:
         R = GAS_CONSTANT * 1.0e-3  # Note unit in kJ requires P in kbar.
         volume: float = (
             R * temperature / pressure
-            + self.b(temperature)
+            + self.b
             - self.a(temperature)
             * R
             * np.sqrt(temperature)
-            / (R * temperature + self.b(temperature) * pressure)
-            / (R * temperature + 2.0 * self.b(temperature) * pressure)
+            / (R * temperature + self.b * pressure)
+            / (R * temperature + 2.0 * self.b * pressure)
             + self.c(temperature) * np.sqrt(pressure)
             + self.d(temperature) * pressure
         )
@@ -896,3 +895,46 @@ class CorkCO(CorkSimple):
 
     Tc: float = field(init=False, default=132.9)
     Pc: float = field(init=False, default=0.0350)
+
+
+def main():
+    """For testing."""
+
+    pressure: float = 0.5
+    temperature: float = 1500
+
+    # These tests are fot CO, CH4, and H2. The results agree with Meng, but I need to clarify the
+    # unit conversions.
+    test_simple_cork(temperature, pressure)
+
+
+def test_simple_cork(temperature, pressure):
+    # Meng's functions.
+    print("Mengs functions")
+    V, RTlnf = Calc_V_f(pressure, temperature, "CO")
+    print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
+    V, RTlnf = Calc_V_f(pressure, temperature, "CH4")
+    print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
+    V, RTlnf = Calc_V_f(pressure, temperature, "H2")
+    print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
+
+    print("\n")
+
+    # My classes.
+    print("My classes")
+    cork: CorkSimple = CorkCO()
+    V = cork.volume(temperature, pressure)
+    RTlnf = cork.RTlnf(temperature, pressure)
+    print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
+    cork: CorkSimple = CorkCH4()
+    V = cork.volume(temperature, pressure)
+    RTlnf = cork.RTlnf(temperature, pressure)
+    print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
+    cork: CorkSimple = CorkH2()
+    V = cork.volume(temperature, pressure)
+    RTlnf = cork.RTlnf(temperature, pressure)
+    print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
+
+
+if __name__ == "__main__":
+    main()
