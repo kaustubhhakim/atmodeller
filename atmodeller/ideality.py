@@ -213,36 +213,36 @@ class CorkFull(ABC):
 
     @abstractmethod
     def a(self, temperature: float) -> float:
-        """Function a. Holland and Powell (1991).
+        """Parameter a in Equation 6, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Function a.
+            Parameter a in kJ^2 kbar^(-1) K^(1/2) mol^(-2).
         """
         raise NotImplementedError
 
     def c(self, temperature: float) -> float:
-        """Virial-type function c. Equation 4, Holland and Powell (1991).
+        """Virial-type parameter c in Equation 4, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Function c.
+            Parameter c.
         """
         c: float = self.c0 + self.c1 * temperature
         return c
 
     def d(self, temperature: float) -> float:
-        """Virial-type function d. Equation 4, Holland and Powell (1991).
+        """Virial-type parameter d in Equation 4, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Function d.
+            Parameter d.
         """
         d: float = self.d0 + self.d1 * temperature
         return d
@@ -555,13 +555,13 @@ class CorkFullH2O(CorkFull):
         return Psat
 
     def a_gas(self, temperature: float) -> float:
-        """Function a for gaseous H2O. Equation 6a, Holland and Powell (1991).
+        """Parameter a for gaseous H2O. Equation 6a, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Function a for gaseous H2O.
+            Parameter a for gaseous H2O.
         """
         a: float = (
             self.a0
@@ -572,13 +572,13 @@ class CorkFullH2O(CorkFull):
         return a
 
     def a(self, temperature: float) -> float:
-        """Function a for liquid and supercritical H2O. Equation 6, Holland and Powell (1991).
+        """Parameter a for liquid and supercritical H2O. Equation 6, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in Kelvin.
 
         Returns:
-            Function a for liquid and supercritical H2O.
+            Parameter a for liquid and supercritical H2O.
         """
         if temperature < self.Tc:
             a: float = (
