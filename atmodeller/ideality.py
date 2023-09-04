@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 import numpy as np
+from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT
@@ -29,7 +30,7 @@ from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-GAS_CONSTANT_KJ: float = GAS_CONSTANT * 1e-3
+GAS_CONSTANT_KJ: float = GAS_CONSTANT / kilo
 
 
 # calculate pure gas fugacity coefficient and Modified Redlich-Kwang volume
@@ -693,7 +694,7 @@ class CorkSimple:
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
     gases which are known to obey approximately the principle of corresponding states.
 
-    The units in Holland and Powell (1991) are K and kbar, so note unit conversions.
+    The units in Holland and Powell (1991) are K and kbar, so note unit conversions where relevant.
 
     Corresponding states parameters from Table 2 in Holland and Powell (1991).
 
@@ -819,7 +820,7 @@ class CorkSimple:
             self.RTlnf(temperature=temperature, pressure=pressure)
             / (GAS_CONSTANT_KJ * temperature)
         )  # bar
-        fugacity /= 1e3
+        fugacity /= kilo  # kbar
         return fugacity
 
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
@@ -958,11 +959,10 @@ def main():
     # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
     # coefficient for H2 maxes out and then decreases again.
 
-    pressure: float = 50  # 30  # 1000 * 1e-3
-    temperature: float = 2000  # 1673  # 1673  # 1000 + 273
+    pressure: float = 10
+    temperature: float = 2000
 
-    # These tests are fot CO, CH4, and H2. The results agree with Meng, but I need to clarify the
-    # unit conversions.
+    # These tests are for CO, CH4, and H2. The results agree with Meng.
     test_simple_cork(temperature, pressure)
 
 
@@ -1001,6 +1001,13 @@ def test_simple_cork(temperature, pressure):
     fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
     print("H2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+    cork: CorkSimple = CorkSimpleCO2()
+    V = cork.volume(temperature, pressure)
+    RTlnf = cork.RTlnf(temperature, pressure)
+    fugacity = cork.fugacity(temperature, pressure)
+    fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
+    print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
     print("\n")
 
 
