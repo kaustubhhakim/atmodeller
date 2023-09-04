@@ -110,9 +110,9 @@ def test_AllS_Sulfide_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO_Sulfide()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO_Sulfide()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2_Sulfide()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2_Sulfide()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2_Sulfide()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
         ]
     )
@@ -129,8 +129,8 @@ def test_AllS_Sulfide_IW() -> None:
 
     target_pressures: dict[str, float] = {
         "S2": 0.0007885473892479838,
-        "SO": 0.0013803406461261175,
-        "SO2": 0.002232789217137583,
+        "OS": 0.0013803406461261175,
+        "O2S": 0.002232789217137583,
         "O2": 1.0269753162299365e-06,
     }
 
@@ -143,9 +143,9 @@ def test_AllS_Sulfate_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO_Sulfate()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO_Sulfate()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2_Sulfate()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2_Sulfate()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2_Sulfate()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
         ]
     )
@@ -162,8 +162,8 @@ def test_AllS_Sulfate_IW() -> None:
 
     target_pressures: dict[str, float] = {
         "S2": 161.03818676537367,
-        "SO": 0.6267517706568156,
-        "SO2": 1.0186283878331845,
+        "OS": 0.6267517706568156,
+        "O2S": 1.0186283878331845,
         "O2": 1.0367582919375649e-06,
     }
 
@@ -176,9 +176,9 @@ def test_AllS_TotalSolubility_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
         ]
     )
@@ -195,8 +195,8 @@ def test_AllS_TotalSolubility_IW() -> None:
 
     target_pressures: dict[str, float] = {
         "S2": 0.0007885469624182632,
-        "SO": 0.0013803402725464258,
-        "SO2": 0.002232788612848466,
+        "OS": 0.0013803402725464258,
+        "O2S": 0.002232788612848466,
         "O2": 1.0269753162298525e-06,
     }
 
@@ -209,9 +209,9 @@ def test_AllS_TotalSolubility_IWp3() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
         ]
     )
@@ -228,8 +228,8 @@ def test_AllS_TotalSolubility_IWp3() -> None:
 
     target_pressures: dict[str, float] = {
         "S2": 0.35155185366764335,
-        "SO": 0.922957016616041,
-        "SO2": 47.27780744686448,
+        "OS": 0.922957016616041,
+        "O2S": 47.27780744686448,
         "O2": 0.0010298851822133756,
     }
 
@@ -242,9 +242,9 @@ def test_AllS_TotalSolubility_IWm3() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
         ]
     )
@@ -261,8 +261,8 @@ def test_AllS_TotalSolubility_IWm3() -> None:
 
     target_pressures: dict[str, float] = {
         "S2": 7.885746000191323e-07,
-        "SO": 1.3803642849455947e-06,
-        "SO2": 7.060819472779197e-08,
+        "OS": 1.3803642849455947e-06,
+        "O2S": 7.060819472779197e-08,
         "O2": 1.0269750528534265e-09,
     }
 
@@ -277,10 +277,10 @@ def test_CHOS_Species_IW() -> None:
         [
             GasSpecies(chemical_formula="H2O", solubility=BasaltDixonH2O()),
             GasSpecies(chemical_formula="H2", solubility=BasaltH2()),
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
             GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
         ]
@@ -304,10 +304,10 @@ def test_CHOS_Species_IW() -> None:
     target_pressures: dict[str, float] = {
         "H2O": 0.9938623599950259,
         "H2": 0.9373400578523818,
-        "SO": 0.0014029288354079062,
+        "OS": 0.0014029288354079062,
         "S2": 0.0008014376241378935,
         "O2": 1.0437988324950095e-06,
-        "SO2": 0.002287839173668045,
+        "O2S": 0.002287839173668045,
         "CO": 229.64954695306662,
         "CO2": 47.22697115570074,
     }
@@ -323,10 +323,10 @@ def test_CHOS_Species_IWp3() -> None:
         [
             GasSpecies(chemical_formula="H2O", solubility=BasaltDixonH2O()),
             GasSpecies(chemical_formula="H2", solubility=BasaltH2()),
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
             GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
         ]
@@ -350,10 +350,10 @@ def test_CHOS_Species_IWp3() -> None:
     target_pressures: dict[str, float] = {
         "H2O": 1.188967762490119,
         "H2": 0.03536836491607379,
-        "SO": 0.8721291643917857,
+        "OS": 0.8721291643917857,
         "S2": 0.30811156610889007,
         "O2": 0.0010492255755840164,
-        "SO2": 45.091708496863454,
+        "O2S": 45.091708496863454,
         "CO": 42.591742711345944,
         "CO2": 277.7000395495448,
     }
@@ -369,10 +369,10 @@ def test_CHOS_Species_IWm3() -> None:
         [
             GasSpecies(chemical_formula="H2O", solubility=BasaltDixonH2O()),
             GasSpecies(chemical_formula="H2", solubility=BasaltH2()),
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
             GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
         ]
@@ -396,10 +396,10 @@ def test_CHOS_Species_IWm3() -> None:
     target_pressures: dict[str, float] = {
         "H2O": 0.4293969992073274,
         "H2": 12.81113199992055,
-        "SO": 1.4019595661823213e-06,
+        "OS": 1.4019595661823213e-06,
         "S2": 8.009115444022984e-07,
         "O2": 1.043041704293421e-09,
-        "SO2": 7.227161703487836e-08,
+        "O2S": 7.227161703487836e-08,
         "CO": 251.48618508527014,
         "CO2": 1.6348618769791592,
     }
@@ -415,10 +415,10 @@ def test_CHONS_Species_IW() -> None:
         [
             GasSpecies(chemical_formula="H2O", solubility=BasaltDixonH2O()),
             GasSpecies(chemical_formula="H2", solubility=BasaltH2()),
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
             GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
             GasSpecies(chemical_formula="N2", solubility=BasaltLibourelN2()),
@@ -445,10 +445,10 @@ def test_CHONS_Species_IW() -> None:
     target_pressures: dict[str, float] = {
         "H2O": 0.9938672430188247,
         "H2": 0.9372856248427179,
-        "SO": 0.0014031055367537371,
+        "OS": 0.0014031055367537371,
         "S2": 0.0008015385430031337,
         "O2": 1.043930331535086e-06,
-        "SO2": 0.002288271457007958,
+        "O2S": 0.002288271457007958,
         "CO": 229.4915238784822,
         "CO2": 47.19744674053677,
         "N2": 2.3491188709942548,
@@ -465,10 +465,10 @@ def test_CHONS_Species_IW_LowerT() -> None:
         [
             GasSpecies(chemical_formula="H2O", solubility=BasaltDixonH2O()),
             GasSpecies(chemical_formula="H2", solubility=BasaltH2()),
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
             GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
             GasSpecies(chemical_formula="N2", solubility=BasaltLibourelN2()),
@@ -495,10 +495,10 @@ def test_CHONS_Species_IW_LowerT() -> None:
     target_pressures: dict[str, float] = {
         "H2O": 0.985172841599582,
         "H2": 1.0073714331735775,
-        "SO": 4.317740951918956e-05,
+        "OS": 4.317740951918956e-05,
         "S2": 7.286429137857455e-05,
         "O2": 2.7714826681743157e-09,
-        "SO2": 0.00011508895918623868,
+        "O2S": 0.00011508895918623868,
         "CO": 221.91202759714838,
         "CO2": 57.03350797424276,
         "N2": 2.385505258325644,
@@ -516,17 +516,17 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
         [
             GasSpecies(chemical_formula="H2O", solubility=BasaltDixonH2O()),
             GasSpecies(chemical_formula="H2", solubility=BasaltH2()),
-            GasSpecies(chemical_formula="SO", solubility=BasaltSO()),
+            GasSpecies(chemical_formula="OS", solubility=BasaltSO()),
             GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
             GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
-            GasSpecies(chemical_formula="SO2", solubility=BasaltSO2()),
+            GasSpecies(chemical_formula="O2S", solubility=BasaltSO2()),
             GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
             GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
             GasSpecies(chemical_formula="N2", solubility=BasaltLibourelN2()),
         ]
     )
 
-    planet: Planet = Planet(surface_temperature=1800)
+    planet: Planet = Planet(surface_temperature=2173)
     S2_fugacity: float = 5e-3
     mass_H: float = 0.00108 * planet.mantle_mass * (2 / 18)
     mass_C: float = 0.00014 * planet.mantle_mass
@@ -545,10 +545,10 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
     target_pressures: dict[str, float] = {
         "H2O": 0.9938673900926728,
         "H2": 0.9372852480841496,
-        "SO": 0.0035043975980955165,
+        "OS": 0.0035043975980955165,
         "S2": 0.004999999999999999,
         "O2": 1.043931479752966e-06,
-        "SO2": 0.005715191906613821,
+        "O2S": 0.005715191906613821,
         "CO": 229.49902517843927,
         "CO2": 47.19901542212745,
         "N2": 2.3491951391673873,
