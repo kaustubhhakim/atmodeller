@@ -295,7 +295,7 @@ class BasaltS2_Sulfate(Solubility):
             msg = "WARNING: S2 Sulfate Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
-            raise KeyError(msg)
+            # raise KeyError(msg)
         return ppmw
 
 
@@ -320,7 +320,7 @@ class BasaltSO_Sulfate(Solubility):
             msg = "WARNING: SO Sulfate Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
-            raise KeyError(msg)
+            # raise KeyError(msg)
         return ppmw
 
 
@@ -345,7 +345,7 @@ class BasaltSO2_Sulfate(Solubility):
             msg = "WARNING: SO2 Sulfate Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
-            raise KeyError(msg)
+            # raise KeyError(msg)
         return ppmw
 
 
@@ -368,7 +368,7 @@ class BasaltS2_Sulfide(Solubility):
             msg = "WARNING: S2 Sulfide Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
-            raise KeyError(msg)
+            # raise KeyError(msg)
         return ppmw
 
 
@@ -393,7 +393,7 @@ class BasaltSO_Sulfide(Solubility):
             msg = "WARNING: SO Sulfide Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
-            raise KeyError(msg)
+            # raise KeyError(msg)
         return ppmw
 
 
@@ -418,7 +418,7 @@ class BasaltSO2_Sulfide(Solubility):
             msg = "WARNING: SO2 Sulfide Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
-            raise KeyError(msg)
+            # raise KeyError(msg)
         return ppmw
 
 
