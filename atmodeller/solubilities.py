@@ -75,7 +75,7 @@ class AndesiteSO_Sulfate(Solubility):
     ) -> float:
         """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
         del fugacity
-        fS2 = fugacities_dict["S2"]
+        fS2: float = fugacities_dict["S2"]
         logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp: float = 10**logS_wtp
@@ -95,7 +95,7 @@ class AndesiteSO2_Sulfate(Solubility):
     ) -> float:
         """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
         del fugacity
-        fS2 = fugacities_dict["S2"]
+        fS2: float = fugacities_dict["S2"]
         logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
         S_wtp: float = 10**logS_wtp
@@ -133,7 +133,7 @@ class AndesiteSO_Sulfide(Solubility):
     ) -> float:
         """fugacity is fS2."""
         del fugacity
-        fS2 = fugacities_dict["S2"]
+        fS2: float = fugacities_dict["S2"]
         logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp: float = 10**logS_wtp
@@ -288,13 +288,17 @@ class BasaltS2_Sulfate(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = -12.948 + (32333.5635 / temperature)
-        logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        logS_wtp: float = (
+            logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        )
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        # TODO: To discuss.  This does influence the results of the sulphur test suite. Maybe
+        # better to instead sanity check the solubilities once a solution has been found?
         if ppmw >= 1000:
-            msg = "WARNING: S2 Sulfate Solubility is getting too high: \n%s" % (ppmw)
+            msg: str = "S2 sulfate solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
-            ppmw = 1000.0
+            ppmw = 1000.0  # Could be dangerous to assign an arbitrary cut-off.  Make a parameter?
             # raise KeyError(msg)
         return ppmw
 
@@ -361,11 +365,11 @@ class BasaltS2_Sulfide(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = 0.225 - (8045.7465 / temperature)
-        logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
-        S_wtp = 10**logS_wtp
+        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        S_wtp: float = 10**logS_wtp
         ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         if ppmw >= 1000:
-            msg = "WARNING: S2 Sulfide Solubility is getting too high: \n%s" % (ppmw)
+            msg: str = "S2 sulfide solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
             # raise KeyError(msg)
@@ -384,13 +388,13 @@ class BasaltSO_Sulfide(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         del fugacity
-        fS2 = fugacities_dict["S2"]
+        fS2: float = fugacities_dict["S2"]
         logCs: float = 0.225 - (8045.7465 / temperature)
-        logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         if ppmw >= 1000:
-            msg = "WARNING: SO Sulfide Solubility is getting too high: \n%s" % (ppmw)
+            msg: str = "SO sulfide solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
             # raise KeyError(msg)
@@ -409,13 +413,13 @@ class BasaltSO2_Sulfide(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         del fugacity
-        fS2 = fugacities_dict["S2"]
+        fS2: float = fugacities_dict["S2"]
         logCs: float = 0.225 - (8045.7465 / temperature)
-        logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
+        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         if ppmw >= 1000:
-            msg = "WARNING: SO2 Sulfide Solubility is getting too high: \n%s" % (ppmw)
+            msg: str = "SO2 sulfide solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
             ppmw = 1000.0
             # raise KeyError(msg)
@@ -484,9 +488,11 @@ class TBasaltS2_Sulfate(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = -12.948 + (32446.366 / temperature)
-        logS_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        logS_wtp: float = (
+            logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        )
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
@@ -502,9 +508,9 @@ class TBasaltS2_Sulfide(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = 0.225 - (7842.5 / temperature)
-        logS_wtp = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        S_wtp: float = 10**logS_wtp
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
 
 
