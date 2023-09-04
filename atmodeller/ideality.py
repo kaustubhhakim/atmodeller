@@ -805,6 +805,9 @@ class CorkSimple:
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Fugacity in kbar.
 
+        Note that the fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and
+        f0 is the pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
+
         Args:
             temperature: Temperature in Kelvin.
             pressure: Pressure in kbar.
@@ -815,8 +818,8 @@ class CorkSimple:
         fugacity: float = np.exp(
             self.RTlnf(temperature=temperature, pressure=pressure)
             / (GAS_CONSTANT_KJ * temperature)
-        )
-        fugacity /= 1e3  # TODO: Check.
+        )  # bar
+        fugacity /= 1e3
         return fugacity
 
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
@@ -955,8 +958,8 @@ def main():
     # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
     # coefficient for H2 maxes out and then decreases again.
 
-    pressure: float = 30  # 1000 * 1e-3
-    temperature: float = 1673  # 1673  # 1000 + 273
+    pressure: float = 50  # 30  # 1000 * 1e-3
+    temperature: float = 2000  # 1673  # 1673  # 1000 + 273
 
     # These tests are fot CO, CH4, and H2. The results agree with Meng, but I need to clarify the
     # unit conversions.
