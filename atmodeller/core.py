@@ -90,6 +90,7 @@ class Species(UserList):
         """Chemical formulas of the species."""
         return [species.chemical_formula for species in self.data]
 
+    # TODO: Conform this at the species level on GasSpecies.
     def conform_solubilities_to_planet_composition(self, planet: Planet) -> None:
         """Ensure that the solubilities of the species are consistent with the planet composition.
 
