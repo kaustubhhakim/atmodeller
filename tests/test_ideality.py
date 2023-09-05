@@ -93,13 +93,13 @@ def test_H_fO2() -> None:
                 chemical_formula="H2O",
                 solubility=PeridotiteH2O(),
                 thermodynamic_class=thermodynamic_data,
-                ideality=IdealityConstant(value=2),
+                fugacity_coefficient=IdealityConstant(value=2),
             ),
             GasSpecies(
                 chemical_formula="H2",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
-                ideality=IdealityConstant(value=2),
+                fugacity_coefficient=IdealityConstant(value=2),
             ),
             GasSpecies(
                 chemical_formula="O2",
@@ -123,6 +123,53 @@ def test_H_fO2() -> None:
     target_pressures: dict[str, float] = dict(
         [("H2O", 0.19626421729663665), ("H2", 0.19386112601058758), ("O2", 8.69970008669977e-08)]
     )
+
+    system.solve(SystemConstraints(constraints))
+    print(system.output)
+    assert system.isclose(target_pressures)
+
+
+def test_H2_with_cork() -> None:
+    """Tests H2-H2O at the IW buffer."""
+
+    species: Species = Species(
+        [
+            GasSpecies(
+                chemical_formula="H2O",
+                solubility=PeridotiteH2O(),
+                thermodynamic_class=thermodynamic_data,
+            ),
+            GasSpecies(
+                chemical_formula="H2",
+                solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
+                fugacity_coefficient=CorkH2(),
+            ),
+            GasSpecies(
+                chemical_formula="O2",
+                solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
+            ),
+        ]
+    )
+
+    # oceans: float = 1
+    planet: Planet = Planet(surface_temperature=2000)
+    # h_kg: float = earth_oceans_to_kg(oceans)
+
+    constraints: list[SystemConstraint] = [
+        # ConstantSystemConstraint(name="mass", species="H", value=h_kg),
+        ConstantSystemConstraint(name="fugacity", species="H2", value=1e3),
+        IronWustiteBufferConstraintHirschmann(),
+    ]
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target_pressures: dict[str, float] = {
+        "H2": 747.5737656770727,
+        "H2O": 1072.4328856736947,
+        "O2": 9.76211086495026e-08,
+    }
 
     system.solve(SystemConstraints(constraints))
     print(system.output)

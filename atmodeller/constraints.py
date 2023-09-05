@@ -24,8 +24,12 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import ConstantSystemConstraint, SystemConstraint
-from atmodeller.utilities import UnitConversion
+from atmodeller.interfaces import (
+    ConstantSystemConstraint,
+    SolidSpecies,
+    SystemConstraint,
+)
+from atmodeller.utilities import UnitConversion, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -43,6 +47,9 @@ class SystemConstraints(UserList):
     A collection of constraints that can be applied to an interior-atmosphere system. It provides
     methods to filter constraints based on their types, such as fugacity, mass conservation,
     pressure, and reaction network constraints.
+
+    Note that solid activity constraints are inherent to the species and are combined with these
+    user-prescribed constraints when the system is solved.
 
     Args:
         initlist: Initial list of constraints. Defaults to None.
@@ -72,11 +79,6 @@ class SystemConstraints(UserList):
         return filtered
 
     @property
-    def activity_constraints(self) -> list[SystemConstraint]:
-        """Constraints related to activity."""
-        return self._filter_by_name("activity")
-
-    @property
     def fugacity_constraints(self) -> list[SystemConstraint]:
         """Constraints related to fugacity."""
         return self._filter_by_name("fugacity")
@@ -96,7 +98,6 @@ class SystemConstraints(UserList):
         """Constraints related to the reaction network."""
         filtered_entries: list[SystemConstraint] = self.fugacity_constraints
         filtered_entries.extend(self.pressure_constraints)
-        filtered_entries.extend(self.activity_constraints)
 
         return filtered_entries
 

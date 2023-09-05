@@ -235,7 +235,11 @@ class ReactionNetwork:
             The coefficient matrix with the stoichiometry and constraints.
         """
 
-        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
+        nrows: int = (
+            constraints.number_reaction_network_constraints
+            + self.number_reactions
+            + self.species.number_solid_species
+        )
 
         if nrows == self.species.number:
             msg: str = "The necessary number of constraints will be applied to "
@@ -275,7 +279,11 @@ class ReactionNetwork:
         Returns:
             The right-hand side vector of values.
         """
-        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
+        nrows: int = (
+            constraints.number_reaction_network_constraints
+            + self.number_reactions
+            + self.species.number_solid_species
+        )
         rhs: np.ndarray = np.zeros(nrows, dtype=float)
 
         # Reactions.

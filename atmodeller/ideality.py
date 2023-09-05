@@ -26,6 +26,7 @@ from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT
+from atmodeller.interfaces import IdealityConstant, SystemConstraint
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -716,6 +717,7 @@ class CorkSimple:
 
     Tc: float  # K
     Pc: float  # kbar
+    name: str = field(init=False, default="fugacity_coefficient")
     # Universal constants from Table 2, Holland and Powell (1991).
     a0: float = field(init=False, default=5.45963e-5)
     a1: float = field(init=False, default=-8.63920e-6)
@@ -877,6 +879,24 @@ class CorkSimple:
 
         return volume_cm3
 
+    # TODO: Consolidate the relationship between this class and a SystemConstraint. Use a protocol?
+    def get_value(self, temperature: float, pressure: float, *args, **kwargs) -> float:
+        """Evaluate the fugacity cofficient at temperature and pressure.
+
+        Args:
+            temperature: Temperature in Kelvin.
+            pressure: Pressure in bar.
+
+        Returns:
+            Fugacity coefficient evaluated at temperature and pressure.
+        """
+        del args
+        del kwargs
+        pressure_kbar: float = pressure / kilo
+        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
+
+        return fugacity_coefficient
+
 
 @dataclass(kw_only=True, frozen=True)
 class CorkSimpleCO2(CorkSimple):
@@ -885,6 +905,7 @@ class CorkSimpleCO2(CorkSimple):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
+    species: str = field(init=False, default="CO2")
     Tc: float = field(init=False, default=304.2)
     Pc: float = field(init=False, default=0.0738)
 
@@ -896,6 +917,7 @@ class CorkCH4(CorkSimple):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
+    species: str = field(init=False, default="CH2")
     Tc: float = field(init=False, default=190.6)
     Pc: float = field(init=False, default=0.0460)
 
@@ -907,6 +929,7 @@ class CorkH2(CorkSimple):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
+    species: str = field(init=False, default="H2")
     Tc: float = field(init=False, default=41.2)
     Pc: float = field(init=False, default=0.0211)
 
@@ -918,6 +941,7 @@ class CorkCO(CorkSimple):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
+    species: str = field(init=False, default="CO")
     Tc: float = field(init=False, default=132.9)
     Pc: float = field(init=False, default=0.0350)
 
@@ -934,6 +958,7 @@ class CorkS2(CorkSimple):
 
     # Data not in The Properties of Gases and Liquids.  Use S instead?
 
+    species: str = field(init=False, default="S2")
     Tc: float  # TODO = field(init=False, default=132.9)
     Pc: float  # TODO = field(init=False, default=0.0350)
 
@@ -945,6 +970,7 @@ class CorkH2S(CorkSimple):
     Appendix A.19 in The Properties of Gases and Liquids (2001), 5th edition.
     """
 
+    species: str = field(init=False, default="H2S")
     Tc: float = field(init=False, default=373.4)
     Pc: float = field(init=False, default=0.08963)
 
@@ -959,7 +985,7 @@ def main():
     # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
     # coefficient for H2 maxes out and then decreases again.
 
-    pressure: float = 10
+    pressure: float = 1.8200066513507675  # 10
     temperature: float = 2000
 
     # These tests are for CO, CH4, and H2. The results agree with Meng.

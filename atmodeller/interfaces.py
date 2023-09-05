@@ -604,22 +604,18 @@ class ChemicalComponent(ABC):
     Args:
         chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        ideality: Ideality object for thermodynamic calculations. See subclasses for specific use.
-            Defaults to Ideal.
         thermodynamic_class: Class for thermodynamic data. Defaults to JANAF.
 
     Attributes:
         chemical_formula: Chemical formula.
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         formula: Formula object derived from the chemical formula.
-        ideality: Ideality object for thermodynamic calculations. See subclasses for specific use.
         thermodynamic_class: Class for thermodynamic data.
         thermodynamic_data: Instance of thermodynamic_class for this chemical component.
     """
 
     chemical_formula: str
     name_in_thermodynamic_data: str
-    ideality: SystemConstraint = field(default_factory=IdealityConstant)
     thermodynamic_class: Type[ThermodynamicDataBase] = ThermodynamicDataJANAF
     formula: Formula = field(init=False)
     thermodynamic_data: ThermodynamicDataBase = field(init=False)
@@ -633,7 +629,6 @@ class ChemicalComponent(ABC):
             self.chemical_formula,
         )
         self.formula = Formula(self.chemical_formula)
-        self.ideality.species = self.chemical_formula
         self.thermodynamic_data = self.thermodynamic_class(self)
 
     @property
@@ -693,28 +688,23 @@ class ChemicalComponent(ABC):
 class GasSpecies(ChemicalComponent):
     """A gas species.
 
-    For a gas species, 'self.ideality' refers to its fugacity coefficient, where the fugacity is
-    equal to the fugacity coefficient multiplied by the species' partial pressure.
-
     Args:
         chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
-        ideality: Ideality object representing the fugacity coefficient for thermodynamic
-            calculations. Defaults to Ideal (i.e., unity).
         thermodynamic_class: Class for thermodynamic data. Defaults to JANAF.
         solubility: Solubility model. Defaults to no solubility.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
             Defaults to 0.
+        fugacity_coefficient: Fugacity coefficient object. Defaults to ideal gas (i.e. unity).
 
     Attributes:
         chemical_formula: Chemical formula.
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         formula: Formula object derived from the chemical formula.
-        ideality: Ideality object representing the fugacity coefficient for thermodynamic
-            calculations.
         thermodynamic_class: Class for thermodynamic data.
         thermodynamic_data: Instance of thermodynamic_class for this chemical component.
         solubility: Solubility model.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
+        fugacity_coefficient: Fugacity coefficient object.
         output: Stores calculated values for output.
     """
 
@@ -722,16 +712,11 @@ class GasSpecies(ChemicalComponent):
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     output: Union[GasSpeciesOutput, None] = field(init=False, default=None)
+    fugacity_coefficient: SystemConstraint = field(default_factory=IdealityConstant)
 
     def __post_init__(self):
         self.name_in_thermodynamic_data = self.chemical_formula
         super().__post_init__()
-        self.ideality.name = "fugacity_coefficient"
-
-    @property
-    def fugacity_coefficient(self) -> SystemConstraint:
-        """Fugacity coefficient."""
-        return self.ideality
 
     @_mass_decorator
     def mass(
@@ -812,33 +797,21 @@ class SolidSpeciesOutput:
 class SolidSpecies(ChemicalComponent):
     """A solid species.
 
-    For a solid species, 'self.ideality' refers to its activity, where the activity is equal to the
-    activity coefficient multiplied by the species' volume mixing ratio.
-
     Args:
         chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         thermodynamic_class: Class for thermodynamic data. Defaults to JANAF.
-        ideality: Ideality object representing activity for thermodynamic calculations. Defaults to
-            Ideal (i.e., unity).
+        activity: Activity object. Defaults to ideal (i.e. unity).
 
     Attributes:
         chemical_formula: Chemical formula.
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         formula: Formula object derived from the chemical formula.
-        ideality: Ideality object representing activity for thermodynamic calculations.
         thermodynamic_class: Class for thermodynamic data.
         thermodynamic_data: Instance of thermodynamic_class for this chemical component.
+        activity: Activity object.
         output: Stores calculated values for output.
     """
 
     output: Union[SolidSpeciesOutput, None] = field(init=False, default=None)
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.ideality.name = "activity"
-
-    @property
-    def activity(self) -> SystemConstraint:
-        """Activity."""
-        return self.ideality
+    activity: SystemConstraint = field(default_factory=IdealityConstant)
