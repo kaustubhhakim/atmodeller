@@ -30,7 +30,6 @@ from atmodeller.core import Species
 from atmodeller.interfaces import (
     GasSpecies,
     NoSolubility,
-    SystemConstraint,
     ThermodynamicData,
     ThermodynamicDataBase,
     ThermodynamicDataJANAF,
@@ -73,10 +72,12 @@ def test_H_fO2() -> None:
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -86,7 +87,7 @@ def test_H_fO2() -> None:
         "O2": 8.699912766341827e-08,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -105,10 +106,12 @@ def test_H_basalt_melt() -> None:
     planet: Planet = Planet(melt_composition="basalt")
     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -137,10 +140,12 @@ def test_H_fO2_plus() -> None:
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        IronWustiteBufferConstraintHirschmann(log10_shift=2),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(log10_shift=2),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -169,10 +174,12 @@ def test_H_fO2_minus() -> None:
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        IronWustiteBufferConstraintHirschmann(log10_shift=-2),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(log10_shift=-2),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -201,10 +208,12 @@ def test_H_five_oceans() -> None:
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -233,10 +242,12 @@ def test_H_1500K() -> None:
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -271,11 +282,13 @@ def test_H_and_C() -> None:
     h_kg: float = earth_oceans_to_kg(oceans)
     c_kg: float = ch_ratio * h_kg
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        MassConstraint(species="C", value=c_kg),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            MassConstraint(species="C", value=c_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 

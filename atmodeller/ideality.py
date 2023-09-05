@@ -26,7 +26,6 @@ from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import IdealityConstant, SystemConstraint
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)

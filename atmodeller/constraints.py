@@ -24,19 +24,29 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import (
-    ConstantSystemConstraint,
-    SolidSpecies,
-    SystemConstraint,
-)
-from atmodeller.utilities import UnitConversion, filter_by_type
+from atmodeller.interfaces import ConstantSystemConstraint, SystemConstraint
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
+class FugacityConstraint(ConstantSystemConstraint):
+    """A constant fugacity constraint. See base class."""
+
+    name: str = field(init=False, default="fugacity")
+
+
+@dataclass(kw_only=True)
+class PressureConstraint(ConstantSystemConstraint):
+    """A constant pressure constraint. See base class."""
+
+    name: str = field(init=False, default="pressure")
+
+
+@dataclass(kw_only=True)
 class MassConstraint(ConstantSystemConstraint):
-    """A constant mass constraint."""
+    """A constant mass constraint. See base class."""
 
     name: str = field(init=False, default="mass")
 
@@ -49,7 +59,7 @@ class SystemConstraints(UserList):
     pressure, and reaction network constraints.
 
     Note that solid activity constraints are inherent to the species and are combined with these
-    user-prescribed constraints when the system is solved.
+    user-prescribed constraints when the interior-atmosphere system is solved.
 
     Args:
         initlist: Initial list of constraints. Defaults to None.

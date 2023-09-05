@@ -22,7 +22,7 @@ from typing import Type
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    ConstantSystemConstraint,
+    FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraints,
@@ -31,7 +31,6 @@ from atmodeller.core import Species
 from atmodeller.interfaces import (
     GasSpecies,
     NoSolubility,
-    SystemConstraint,
     ThermodynamicData,
     ThermodynamicDataBase,
     ThermodynamicDataJANAF,
@@ -87,10 +86,12 @@ def test_S2_SO_Sulfide_IW() -> None:
 
     planet: Planet = Planet()
     S2_fugacity: float = 1e-5
-    constraints: list[SystemConstraint] = [
-        ConstantSystemConstraint(name="fugacity", species="S2", value=S2_fugacity),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(species="S2", value=S2_fugacity),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -99,7 +100,7 @@ def test_S2_SO_Sulfide_IW() -> None:
         "OS": 6.018454943818516e-05,
         "O2": 8.699485217915599e-08,
     }
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     print("output:", system.output)
 
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
@@ -120,10 +121,12 @@ def test_AllS_Sulfide_IW() -> None:
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
     print("S mass:", mass_S)
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -153,10 +156,12 @@ def test_AllS_Sulfate_IW() -> None:
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
     print("S mass:", mass_S)
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -186,10 +191,12 @@ def test_AllS_TotalSolubility_IW() -> None:
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
     print("S mass:", mass_S)
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -219,10 +226,12 @@ def test_AllS_TotalSolubility_IWp3() -> None:
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
     print("S mass:", mass_S)
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        IronWustiteBufferConstraintHirschmann(log10_shift=3),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            IronWustiteBufferConstraintHirschmann(log10_shift=3),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -252,10 +261,12 @@ def test_AllS_TotalSolubility_IWm3() -> None:
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
     print("S mass:", mass_S)
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        IronWustiteBufferConstraintHirschmann(log10_shift=-3),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            IronWustiteBufferConstraintHirschmann(log10_shift=-3),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -292,12 +303,14 @@ def test_CHOS_Species_IW() -> None:
     mass_C: float = 0.00014 * planet.mantle_mass
     mass_S: float = 0.0002 * planet.mantle_mass
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        MassConstraint(species="H", value=mass_H),
-        MassConstraint(species="C", value=mass_C),
-        IronWustiteBufferConstraintHirschmann(log10_shift=0),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            MassConstraint(species="H", value=mass_H),
+            MassConstraint(species="C", value=mass_C),
+            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -338,12 +351,14 @@ def test_CHOS_Species_IWp3() -> None:
     mass_C: float = 0.00014 * planet.mantle_mass
     mass_S: float = 0.0002 * planet.mantle_mass
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        MassConstraint(species="H", value=mass_H),
-        MassConstraint(species="C", value=mass_C),
-        IronWustiteBufferConstraintHirschmann(log10_shift=3),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            MassConstraint(species="H", value=mass_H),
+            MassConstraint(species="C", value=mass_C),
+            IronWustiteBufferConstraintHirschmann(log10_shift=3),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -384,12 +399,14 @@ def test_CHOS_Species_IWm3() -> None:
     mass_C: float = 0.00014 * planet.mantle_mass
     mass_S: float = 0.0002 * planet.mantle_mass
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        MassConstraint(species="H", value=mass_H),
-        MassConstraint(species="C", value=mass_C),
-        IronWustiteBufferConstraintHirschmann(log10_shift=-3),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            MassConstraint(species="H", value=mass_H),
+            MassConstraint(species="C", value=mass_C),
+            IronWustiteBufferConstraintHirschmann(log10_shift=-3),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -432,13 +449,15 @@ def test_CHONS_Species_IW() -> None:
     mass_S: float = 0.0002 * planet.mantle_mass
     mass_N: float = 0.0000028 * planet.mantle_mass
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        MassConstraint(species="H", value=mass_H),
-        MassConstraint(species="C", value=mass_C),
-        MassConstraint(species="N", value=mass_N),
-        IronWustiteBufferConstraintHirschmann(log10_shift=0),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            MassConstraint(species="H", value=mass_H),
+            MassConstraint(species="C", value=mass_C),
+            MassConstraint(species="N", value=mass_N),
+            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -482,13 +501,15 @@ def test_CHONS_Species_IW_LowerT() -> None:
     mass_S: float = 0.0002 * planet.mantle_mass
     mass_N: float = 0.0000028 * planet.mantle_mass
 
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="S", value=mass_S),
-        MassConstraint(species="H", value=mass_H),
-        MassConstraint(species="C", value=mass_C),
-        MassConstraint(species="N", value=mass_N),
-        IronWustiteBufferConstraintHirschmann(log10_shift=0),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            MassConstraint(species="H", value=mass_H),
+            MassConstraint(species="C", value=mass_C),
+            MassConstraint(species="N", value=mass_N),
+            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -532,13 +553,15 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
     mass_C: float = 0.00014 * planet.mantle_mass
     mass_N: float = 0.0000028 * planet.mantle_mass
 
-    constraints: list[SystemConstraint] = [
-        ConstantSystemConstraint(name="fugacity", species="S2", value=S2_fugacity),
-        MassConstraint(species="H", value=mass_H),
-        MassConstraint(species="C", value=mass_C),
-        MassConstraint(species="N", value=mass_N),
-        IronWustiteBufferConstraintHirschmann(log10_shift=0),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(species="S2", value=S2_fugacity),
+            MassConstraint(species="H", value=mass_H),
+            MassConstraint(species="C", value=mass_C),
+            MassConstraint(species="N", value=mass_N),
+            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 

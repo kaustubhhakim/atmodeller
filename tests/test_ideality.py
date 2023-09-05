@@ -21,14 +21,14 @@ from typing import Type
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
-    SystemConstraint,
+    MassConstraint,
     SystemConstraints,
 )
 from atmodeller.core import Species
 from atmodeller.ideality import CorkCH4, CorkCO, CorkH2, CorkSimple, CorkSimpleCO2
 from atmodeller.interfaces import (
-    ConstantSystemConstraint,
     GasSpecies,
     IdealityConstant,
     NoSolubility,
@@ -113,10 +113,12 @@ def test_H_fO2() -> None:
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        ConstantSystemConstraint(name="mass", species="H", value=h_kg),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
@@ -157,11 +159,12 @@ def test_H2_with_cork() -> None:
     planet: Planet = Planet(surface_temperature=2000)
     # h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: list[SystemConstraint] = [
-        # ConstantSystemConstraint(name="mass", species="H", value=h_kg),
-        ConstantSystemConstraint(name="fugacity", species="H2", value=1e3),
-        IronWustiteBufferConstraintHirschmann(),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(species="H2", value=1e3),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 

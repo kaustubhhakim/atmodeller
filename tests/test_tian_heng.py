@@ -66,12 +66,12 @@ def test_graphite() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     # This is comparable to the constraints imposed by Meng.
-    constraints: list = [
-        IronWustiteBufferConstraintBallhaus(),
-        ConstantSystemConstraint(name="fugacity", species="H2", value=44.49334998176607),
-    ]
-
-    system_constraints: SystemConstraints = SystemConstraints(constraints)
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            IronWustiteBufferConstraintBallhaus(),
+            ConstantSystemConstraint(name="fugacity", species="H2", value=44.49334998176607),
+        ]
+    )
 
     target_pressures: dict[str, float] = {
         "C": 1.0,
@@ -83,6 +83,6 @@ def test_graphite() -> None:
         "O2": 1.4546209065940728e-25,
     }
 
-    system.solve(system_constraints)
+    system.solve(constraints)
     system.solution_dict
     assert system.isclose(target_pressures)

@@ -38,10 +38,10 @@ class ReactionNetwork:
     """Determines the necessary reactions to solve a chemical network.
 
     Args:
-        species: A list of species.
+        species: Speciess.
 
     Attributes:
-        species: A list of species.
+        species: Species.
         species_matrix: The stoichiometry matrix of the species in terms of elements.
         reaction_matrix: The reaction stoichiometry matrix.
     """
