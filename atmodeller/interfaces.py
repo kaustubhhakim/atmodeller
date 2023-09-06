@@ -52,20 +52,20 @@ class SystemConstraint(Protocol):
     name: str
     species: str
 
-    def get_value(self, *args, **kwargs) -> float:
+    def get_value(self, **kwargs) -> float:
         """Computes the value of the constraint for given input arguments.
 
         Args:
-            *args: Positional arguments.
-            **kwargs: Keyword arguments.
+
+            **kwargs: Keyword arguments only.
 
         Returns:
-            The evaluation of the constraint according to *args and **kwargs.
+            The evaluation of the constraint according to **kwargs.
         """
         ...
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class ConstantSystemConstraint(ABC):
     """A constant value constraint.
 
@@ -86,14 +86,13 @@ class ConstantSystemConstraint(ABC):
     species: str
     value: float
 
-    def get_value(self, *args, **kwargs) -> float:
+    def get_value(self, **kwargs) -> float:
         """Returns the constant value. See base class."""
-        del args
         del kwargs
         return self.value
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class IdealityConstant(ConstantSystemConstraint):
     """A constant fugacity coefficient or activity.
 

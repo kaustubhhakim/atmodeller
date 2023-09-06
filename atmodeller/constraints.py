@@ -30,21 +30,21 @@ from atmodeller.utilities import UnitConversion
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class FugacityConstraint(ConstantSystemConstraint):
     """A constant fugacity constraint. See base class."""
 
     name: str = field(init=False, default="fugacity")
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class PressureConstraint(ConstantSystemConstraint):
     """A constant pressure constraint. See base class."""
 
     name: str = field(init=False, default="pressure")
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class MassConstraint(ConstantSystemConstraint):
     """A constant mass constraint. See base class."""
 
@@ -52,7 +52,7 @@ class MassConstraint(ConstantSystemConstraint):
 
 
 class SystemConstraints(UserList):
-    """Collection of constraints for an interior-atmosphere system.
+    """A collection of constraints for an interior-atmosphere system.
 
     A collection of constraints that can be applied to an interior-atmosphere system. It provides
     methods to filter constraints based on their types, such as fugacity, mass conservation,
@@ -65,7 +65,7 @@ class SystemConstraints(UserList):
         initlist: Initial list of constraints. Defaults to None.
 
     Attributes:
-        data: List of constraints contained in the system.
+        data: A list of constraints for the interior-atmosphere system.
     """
 
     def __init__(self, initlist=None):
@@ -117,19 +117,38 @@ class SystemConstraints(UserList):
         return len(self.reaction_network_constraints)
 
 
-@dataclass(frozen=True)
-class IronWustiteBufferConstraintHirschmann(SystemConstraint):
+@dataclass(kw_only=True, frozen=True)
+class RedoxBuffer:
+    """A mineral redox buffer that constrains a fugacity as a function of temperature.
+
+    Args:
+        log10_shift: Log10 shift relative to the buffer.
+    """
+
+    log10_shift: float = 0
+    name: str = field(init=False, default="fugacity")
+
+
+@dataclass(kw_only=True, frozen=True)
+class OxygenFugacityBuffer(RedoxBuffer):
+    """A mineral redox buffer that constraints oxygen fugacity as a function of temperature."""
+
+    species: str = field(init=False, default="O2")
+
+
+@dataclass(kw_only=True, frozen=True)
+class IronWustiteBufferConstraintHirschmann(OxygenFugacityBuffer):
     """Iron-wustite buffer (fO2) from O'Neill and Pownceby (1993) and Hirschmann et al. (2008).
 
     https://ui.adsabs.harvard.edu/abs/1993CoMP..114..296O/abstract
+
+    See base class.
     """
 
-    name: str = field(init=False, default="fugacity")
-    species: str = field(init=False, default="O2")
-    log10_shift: float = 0
-
-    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
+    def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
         """See base class."""
+
+        del kwargs
         fugacity: float = (
             -28776.8 / temperature
             + 14.057
@@ -138,24 +157,25 @@ class IronWustiteBufferConstraintHirschmann(SystemConstraint):
         )
         fugacity += self.log10_shift
         fugacity = 10**fugacity
+
         return fugacity
 
 
-@dataclass(frozen=True)
-class IronWustiteBufferConstraintOneill(SystemConstraint):
+@dataclass(kw_only=True, frozen=True)
+class IronWustiteBufferConstraintOneill(OxygenFugacityBuffer):
     """Iron-wustite buffer (fO2) from O'Neill and Eggins (2002).
 
     Gibbs energy of reaction is at 1 bar. See Table 6.
     https://ui.adsabs.harvard.edu/abs/2002ChGeo.186..151O/abstract
+
+    See base class.
     """
 
-    name: str = field(init=False, default="fugacity")
-    species: str = field(init=False, default="O2")
-    log10_shift: float = 0
-
-    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
+    def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
         """See base class."""
+
         del pressure
+        del kwargs
         fugacity: float = (
             2
             * (-244118 + 115.559 * temperature - 8.474 * temperature * np.log(temperature))
@@ -163,22 +183,23 @@ class IronWustiteBufferConstraintOneill(SystemConstraint):
         )
         fugacity += self.log10_shift
         fugacity = 10**fugacity
+
         return fugacity
 
 
-@dataclass(frozen=True)
-class IronWustiteBufferConstraintBallhaus(SystemConstraint):
+@dataclass(kw_only=True, frozen=True)
+class IronWustiteBufferConstraintBallhaus(OxygenFugacityBuffer):
     """Iron-wustite buffer (fO2) from Ballhaus et al. (1991).
 
     https://ui.adsabs.harvard.edu/abs/1991CoMP..107...27B/abstract
+
+    See base class.
     """
 
-    name: str = field(init=False, default="fugacity")
-    species: str = field(init=False, default="O2")
-    log10_shift: float = 0
-
-    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
+    def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
         """See base class."""
+
+        del kwargs
         fugacity: float = (
             14.07
             - 28784 / temperature
@@ -188,23 +209,24 @@ class IronWustiteBufferConstraintBallhaus(SystemConstraint):
         )
         fugacity += self.log10_shift
         fugacity = 10**fugacity
+
         return fugacity
 
 
-@dataclass(frozen=True)
-class IronWustiteBufferConstraintFischer(SystemConstraint):
+@dataclass(kw_only=True, frozen=True)
+class IronWustiteBufferConstraintFischer(OxygenFugacityBuffer):
     """Iron-wustite buffer (fO2) from Fischer et al. (2011).
 
     See Table S2 in supplementary materials.
     https://ui.adsabs.harvard.edu/abs/2011E%26PSL.304..496F/abstract
+
+    See base class.
     """
 
-    name: str = field(init=False, default="fugacity")
-    species: str = field(init=False, default="O2")
-    log10_shift: float = 0
-
-    def get_value(self, *, temperature: float, pressure: float = 1) -> float:
+    def get_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
         """See base class."""
+
+        del kwargs
         pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
         a_P: float = 6.44059 + 0.00463099 * pressure_GPa
         b_P: float = (
