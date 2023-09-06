@@ -294,7 +294,7 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
 
         db: janaf.Janafdb = janaf.Janafdb()
 
-        def get_phase_data(phase):
+        def get_phase_data(phase) -> Union[janaf.JanafPhase, None]:
             try:
                 phase_data: janaf.JanafPhase = db.getphasedata(
                     formula=self.species.modified_hill_formula, phase=phase
@@ -305,8 +305,8 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
 
         if isinstance(self.species, GasSpecies):
             if self.species.is_homonuclear_diatomic:
-                phase_data_ref = get_phase_data("ref")
-                phase_data_g = get_phase_data("g")
+                phase_data_ref: Union[janaf.JanafPhase, None] = get_phase_data("ref")
+                phase_data_g: Union[janaf.JanafPhase, None] = get_phase_data("g")
                 if phase_data_ref is None and phase_data_g is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
                         self.species.name_in_thermodynamic_data,

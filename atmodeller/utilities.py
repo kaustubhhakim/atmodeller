@@ -20,6 +20,7 @@ from collections import OrderedDict, abc
 from typing import Type, TypeVar
 
 from molmass import Formula
+from scipy.constants import kilo, mega
 
 from atmodeller import OCEAN_MOLES
 
@@ -47,6 +48,12 @@ def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> dict
     return ordered_dict
 
 
+def earth_oceans_to_kg(number_of_earth_oceans: float = 1) -> float:
+    h_grams: float = number_of_earth_oceans * OCEAN_MOLES * Formula("H2").mass
+    h_kg: float = UnitConversion().g_to_kg(h_grams)
+    return h_kg
+
+
 class UnitConversion:
     """Unit conversions."""
 
@@ -63,12 +70,12 @@ class UnitConversion:
     @staticmethod
     def fraction_to_ppm(value_fraction: float = 1) -> float:
         """Mole or mass fraction to parts-per-million by mole or mass, respectively."""
-        return value_fraction * 1.0e6
+        return value_fraction * mega
 
     @staticmethod
     def g_to_kg(value_grams: float = 1) -> float:
         """Grams to kilograms."""
-        return value_grams * 1.0e-3
+        return value_grams / kilo
 
     @classmethod
     def ppm_to_fraction(cls, value_ppm: float = 1) -> float:
@@ -84,9 +91,3 @@ class UnitConversion:
     def weight_percent_to_ppmw(value_weight_percent: float = 1) -> float:
         """Weight percent to parts-per-million by weight"""
         return value_weight_percent * 1.0e4
-
-
-def earth_oceans_to_kg(number_of_earth_oceans: float = 1) -> float:
-    h_grams: float = number_of_earth_oceans * OCEAN_MOLES * Formula("H2").mass
-    h_kg: float = UnitConversion().g_to_kg(h_grams)
-    return h_kg
