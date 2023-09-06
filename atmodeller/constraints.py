@@ -76,7 +76,7 @@ class SystemConstraints(UserList):
         """Filters the constraints by a given name.
 
         Args:
-            name: The filter string (e.g., pressure, fugacity, mass).
+            name: The filter string (e.g., fugacity, pressure, mass).
 
         Returns:
             A list of filtered constraints.

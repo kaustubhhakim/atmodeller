@@ -29,8 +29,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
-    from atmodeller.core import Species
-    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Species
 
 
 @dataclass(kw_only=True)

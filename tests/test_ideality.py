@@ -26,7 +26,6 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.core import Species
 from atmodeller.ideality import CorkCH4, CorkCO, CorkH2, CorkSimple, CorkSimpleCO2
 from atmodeller.interfaces import (
     GasSpecies,
@@ -35,7 +34,7 @@ from atmodeller.interfaces import (
     ThermodynamicData,
     ThermodynamicDataBase,
 )
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 

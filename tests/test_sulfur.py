@@ -27,7 +27,6 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.core import Species
 from atmodeller.interfaces import (
     GasSpecies,
     NoSolubility,
@@ -35,7 +34,7 @@ from atmodeller.interfaces import (
     ThermodynamicDataBase,
     ThermodynamicDataJANAF,
 )
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import (
     BasaltDixonCO2,
     BasaltDixonH2O,
