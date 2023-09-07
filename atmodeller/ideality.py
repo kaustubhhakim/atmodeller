@@ -27,6 +27,7 @@ from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT
+from atmodeller.interfaces import GetValueConstraint
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -196,8 +197,43 @@ def Calc_V_f(P, T, name):
         return V, 1e3 * RTlnf
 
 
+class FugacityModel(GetValueConstraint, ABC):
+    def get_value(self, temperature: float, pressure: float, *args, **kwargs) -> float:
+        """Evaluate the fugacity coefficient at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in bar.
+            *args: Catches unused positional arguments.
+            **kwargs: Catches unused keyword arguments.
+
+        Returns:
+            Fugacity coefficient evaluated at temperature and pressure.
+        """
+        del args
+        del kwargs
+        pressure_kbar: float = pressure / kilo
+        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
+
+        return fugacity_coefficient
+
+    # TODO: Document that depending on the model, some of these are computed first.
+    # TODO: RT ln f term.
+    # @abstractmethod
+    def chemical_potential(self, temperature: float, pressure: float) -> float:
+        ...
+
+    @abstractmethod
+    def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
+        ...
+
+    @abstractmethod
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        ...
+
+
 @dataclass(kw_only=True, frozen=True)
-class CorkFull(ABC):
+class CorkFull(FugacityModel):
     """Full Cork equation from Holland and Powell (1991)."""
 
     a0: float
@@ -464,14 +500,14 @@ class CorkFull(ABC):
 
         volume_init: float = GAS_CONSTANT_KJ * temperature / pressure + self.b
 
-        volume_MRK: float = fsolve(
+        volume_MRK: np.ndarray = fsolve(
             self._objective_function_volume_MRK,
             volume_init,
             args=(temperature, pressure, self.a),
             fprime=self._volume_MRK_jacobian,
         )  # type: ignore
 
-        return volume_MRK
+        return volume_MRK[0]
 
     def volume_virial(self, *, temperature: float, pressure: float) -> float:
         """Virial-type volume term.
@@ -494,23 +530,6 @@ class CorkFull(ABC):
             volume_virial = 0
 
         return volume_virial
-
-    def get_value(self, temperature: float, pressure: float, *args, **kwargs) -> float:
-        """Evaluate the fugacity coefficient at temperature and pressure.
-
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in bar.
-
-        Returns:
-            Fugacity coefficient evaluated at temperature and pressure.
-        """
-        del args
-        del kwargs
-        pressure_kbar: float = pressure / kilo
-        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
-
-        return fugacity_coefficient
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -637,14 +656,14 @@ class CorkFullH2O(CorkFull):
 
         volume_init: float = self.b / 2
 
-        volume_MRK: float = fsolve(
+        volume_MRK: np.ndarray = fsolve(
             self._objective_function_volume_MRK,
             volume_init,
             args=(temperature, pressure, self.a),
             fprime=self._volume_MRK_jacobian,
         )  # type: ignore
 
-        return volume_MRK
+        return volume_MRK[0]
 
     def volume_MRK_gaseous_phase_below_Tc(self, temperature: float, pressure: float) -> float:
         """MRK volume for the gaseous phase below the critical temperature.
@@ -661,14 +680,14 @@ class CorkFullH2O(CorkFull):
 
         volume_init: float = GAS_CONSTANT_KJ * temperature / pressure + 10.0 * self.b
 
-        volume_MRK: float = fsolve(
+        volume_MRK: np.ndarray = fsolve(
             self._objective_function_volume_MRK,
             volume_init,
             args=(temperature, pressure, self.a_gas),
             fprime=self._volume_MRK_jacobian,
         )  # type: ignore
 
-        return volume_MRK
+        return volume_MRK[0]
 
     # TODO: FIXME: Needs refreshing to work for critical behaviour.
     def lnf_MRK(self, temperature: float, pressure: float) -> float:
@@ -715,7 +734,7 @@ class CorkFullH2O(CorkFull):
 
 
 @dataclass(kw_only=True, frozen=True)
-class CorkSimple:
+class CorkSimple(FugacityModel):
     """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
@@ -805,6 +824,7 @@ class CorkSimple:
         d: float = self.d0 * self.Tc / self.Pc**2 + self.d1 / self.Pc**2 * temperature
         return d
 
+    # TODO: rename to chemical potential.
     def RTlnf(self, temperature: float, pressure: float) -> float:
         """RTlnf from Equation 8, Holland and Powell (1991).
 
@@ -1010,8 +1030,8 @@ def main():
     # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
     # coefficient for H2 maxes out and then decreases again.
 
-    pressure: float = 4  # 1.8200066513507675  # 10
-    temperature: float = 2500  # 1500  # 2000
+    pressure: float = 2  # 4  # 1.8200066513507675  # 10
+    temperature: float = 2000  # 1500  # 2000
 
     # These tests are for CO, CH4, and H2. The results agree with Meng.
     # test_simple_cork(temperature, pressure)

@@ -26,7 +26,15 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.ideality import CorkCH4, CorkCO, CorkH2, CorkSimple, CorkSimpleCO2
+from atmodeller.ideality import (
+    CorkCH4,
+    CorkCO,
+    CorkFull,
+    CorkFullCO2,
+    CorkH2,
+    CorkSimple,
+    CorkSimpleCO2,
+)
 from atmodeller.interfaces import (
     GasSpecies,
     IdealityConstant,
@@ -55,7 +63,7 @@ def test_version():
 def check_simple_Cork_gas(
     gas_type: Type[CorkSimple], expected_V: float, expected_fugacity_coeff: float
 ) -> None:
-    """Checks fugacity and volume for a given gas type using CorkSimple."""
+    """Checks the volume and fugacity cofficient for a given gas type using CorkSimple."""
     temperature: float = 2000  # K
     pressure: float = 10  # kbar
     # The class constructor requires no arguments.
@@ -64,6 +72,17 @@ def check_simple_Cork_gas(
     fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
 
     assert V == expected_V
+    assert fugacity_coeff == expected_fugacity_coeff
+
+
+def check_full_Cork_gas(gas_type: Type[CorkFull], expected_fugacity_coeff: float) -> None:
+    """Checks the fugacity coefficient for a given gas type using CorkFull."""
+    temperature: float = 2000  # K
+    pressure: float = 2  # kbar
+    # The class constructor requires no arguments.
+    cork: CorkFull = gas_type()  # type: ignore
+    fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
+
     assert fugacity_coeff == expected_fugacity_coeff
 
 
@@ -81,6 +100,11 @@ def test_CorkCH4() -> None:
 
 def test_simple_CorkCO2() -> None:
     check_simple_Cork_gas(CorkSimpleCO2, 4.672048888683978, 7.1335509191383455)
+
+
+def test_full_CorkCO2() -> None:
+    """Below P0 so virial contribution excluded."""
+    check_full_Cork_gas(CorkFullCO2, 1.6063624424808558)
 
 
 def test_H_fO2() -> None:

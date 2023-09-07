@@ -36,6 +36,22 @@ if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 
+class GetValueConstraint(Protocol):
+    """A constraint to apply to an interior-atmosphere system."""
+
+    def get_value(self, **kwargs) -> float:
+        """Computes the value of the constraint for given input arguments.
+
+        Args:
+
+            **kwargs: Keyword arguments only.
+
+        Returns:
+            The evaluation of the constraint according to **kwargs.
+        """
+        ...
+
+
 class SystemConstraint(Protocol):
     """A constraint to apply to an interior-atmosphere system.
 
@@ -66,7 +82,7 @@ class SystemConstraint(Protocol):
 
 
 @dataclass(kw_only=True, frozen=True)
-class ConstantSystemConstraint(ABC):
+class ConstantSystemConstraint(SystemConstraint, ABC):
     """A constant value constraint.
 
     Args:
