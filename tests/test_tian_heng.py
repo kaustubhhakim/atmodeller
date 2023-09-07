@@ -18,11 +18,11 @@ from typing import Type
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    FugacityConstraint,
     IronWustiteBufferConstraintBallhaus,
     SystemConstraints,
 )
 from atmodeller.interfaces import (
-    ConstantSystemConstraint,
     GasSpecies,
     SolidSpecies,
     ThermodynamicData,
@@ -68,7 +68,7 @@ def test_graphite() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintBallhaus(),
-            ConstantSystemConstraint(name="fugacity", species="H2", value=44.49334998176607),
+            FugacityConstraint(species="H2", value=44.49334998176607),
         ]
     )
 

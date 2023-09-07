@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -36,70 +36,59 @@ if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 
-class GetValueConstraint(Protocol):
-    """A constraint to apply to an interior-atmosphere system."""
+class GetValueABC(ABC):
+    """An object with a get_value method."""
 
+    @abstractmethod
     def get_value(self, **kwargs) -> float:
-        """Computes the value of the constraint for given input arguments.
+        """Computes the value for given input arguments.
 
         Args:
-
             **kwargs: Keyword arguments only.
 
         Returns:
-            The evaluation of the constraint according to **kwargs.
-        """
-        ...
-
-
-class SystemConstraint(Protocol):
-    """A constraint to apply to an interior-atmosphere system.
-
-    Args:
-        name: Constraint name, which must be one of: fugacity, pressure, or mass.
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-
-    Attributes:
-        name: Constraint name.
-        species: The species to constrain.
-    """
-
-    name: str
-    species: str
-
-    def get_value(self, **kwargs) -> float:
-        """Computes the value of the constraint for given input arguments.
-
-        Args:
-
-            **kwargs: Keyword arguments only.
-
-        Returns:
-            The evaluation of the constraint according to **kwargs.
+            An evaluation based on the provided arguments.
         """
         ...
 
 
 @dataclass(kw_only=True, frozen=True)
-class ConstantSystemConstraint(SystemConstraint, ABC):
-    """A constant value constraint.
+class ConstraintABC(GetValueABC):
+    """A constraint to apply to an interior-atmosphere system.
 
     Args:
-        name: Constraint name, which must be one of: fugacity, pressure, or mass.
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: The constant value. Imposed value in kg for masses and bar for pressures or
-            fugacities.
+        name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
+            'mass'.
+        species: The species to constrain, typically representing a species for pressure or
+            fugacity constraints or an element for mass constraints.
 
     Attributes:
-        name: Constraint name.
+        name: The name of the constraint.
         species: The species to constrain.
-        value: The constant value.
     """
 
     name: str
     species: str
+
+
+@dataclass(kw_only=True, frozen=True)
+class ConstantConstraint(ConstraintABC):
+    """A constraint of a constant value.
+
+    Args:
+        name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
+            'mass'.
+        species: The species to constrain, typically representing a species for pressure or
+            fugacity constraints or an element for mass constraints.
+        value: The constant value, which is usually in kg for masses and bar for pressures or
+            fugacities.
+
+    Attributes:
+        name: The name of the constraint.
+        species: The species to constrain.
+        value: The constant value.
+    """
+
     value: float
 
     def get_value(self, **kwargs) -> float:
@@ -109,7 +98,7 @@ class ConstantSystemConstraint(SystemConstraint, ABC):
 
 
 @dataclass(kw_only=True, frozen=True)
-class IdealityConstant(ConstantSystemConstraint):
+class IdealityConstant(ConstantConstraint):
     """A constant fugacity coefficient or activity.
 
     The constructor must accept no arguments to enable it to be used as default factory when the
@@ -746,7 +735,7 @@ class GasSpecies(ChemicalComponent):
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     output: Union[GasSpeciesOutput, None] = field(init=False, default=None)
-    fugacity_coefficient: SystemConstraint = field(default_factory=IdealityConstant)
+    fugacity_coefficient: GetValueABC = field(default_factory=IdealityConstant)
 
     def __post_init__(self):
         self.name_in_thermodynamic_data = self.chemical_formula
@@ -848,4 +837,4 @@ class SolidSpecies(ChemicalComponent):
     """
 
     output: Union[SolidSpeciesOutput, None] = field(init=False, default=None)
-    activity: SystemConstraint = field(default_factory=IdealityConstant)
+    activity: ConstraintABC = field(default_factory=IdealityConstant)

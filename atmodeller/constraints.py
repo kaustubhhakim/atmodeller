@@ -24,28 +24,28 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import ConstantSystemConstraint, SystemConstraint
+from atmodeller.interfaces import ConstantConstraint, ConstraintABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True, frozen=True)
-class FugacityConstraint(ConstantSystemConstraint):
+class FugacityConstraint(ConstantConstraint):
     """A constant fugacity constraint. See base class."""
 
     name: str = field(init=False, default="fugacity")
 
 
 @dataclass(kw_only=True, frozen=True)
-class PressureConstraint(ConstantSystemConstraint):
+class PressureConstraint(ConstantConstraint):
     """A constant pressure constraint. See base class."""
 
     name: str = field(init=False, default="pressure")
 
 
 @dataclass(kw_only=True, frozen=True)
-class MassConstraint(ConstantSystemConstraint):
+class MassConstraint(ConstantConstraint):
     """A constant mass constraint. See base class."""
 
     name: str = field(init=False, default="mass")
@@ -69,10 +69,10 @@ class SystemConstraints(UserList):
     """
 
     def __init__(self, initlist=None):
-        self.data: list[SystemConstraint]
+        self.data: list[ConstraintABC]
         super().__init__(initlist)
 
-    def _filter_by_name(self, name: str) -> list[SystemConstraint]:
+    def _filter_by_name(self, name: str) -> list[ConstraintABC]:
         """Filters the constraints by a given name.
 
         Args:
@@ -89,24 +89,24 @@ class SystemConstraints(UserList):
         return filtered
 
     @property
-    def fugacity_constraints(self) -> list[SystemConstraint]:
+    def fugacity_constraints(self) -> list[ConstraintABC]:
         """Constraints related to fugacity."""
         return self._filter_by_name("fugacity")
 
     @property
-    def mass_constraints(self) -> list[SystemConstraint]:
+    def mass_constraints(self) -> list[ConstraintABC]:
         """Constraints related to mass conservation."""
         return self._filter_by_name("mass")
 
     @property
-    def pressure_constraints(self) -> list[SystemConstraint]:
+    def pressure_constraints(self) -> list[ConstraintABC]:
         """Constraints related to pressure."""
         return self._filter_by_name("pressure")
 
     @property
-    def reaction_network_constraints(self) -> list[SystemConstraint]:
+    def reaction_network_constraints(self) -> list[ConstraintABC]:
         """Constraints related to the reaction network."""
-        filtered_entries: list[SystemConstraint] = self.fugacity_constraints
+        filtered_entries: list[ConstraintABC] = self.fugacity_constraints
         filtered_entries.extend(self.pressure_constraints)
 
         return filtered_entries
@@ -118,7 +118,7 @@ class SystemConstraints(UserList):
 
 
 @dataclass(kw_only=True, frozen=True)
-class RedoxBuffer:
+class RedoxBuffer(ConstraintABC):
     """A mineral redox buffer that constrains a fugacity as a function of temperature.
 
     Args:

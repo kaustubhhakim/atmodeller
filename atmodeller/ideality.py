@@ -27,7 +27,7 @@ from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import GetValueConstraint
+from atmodeller.interfaces import GetValueABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -197,31 +197,25 @@ def Calc_V_f(P, T, name):
         return V, 1e3 * RTlnf
 
 
-class FugacityModel(GetValueConstraint, ABC):
-    def get_value(self, temperature: float, pressure: float, *args, **kwargs) -> float:
-        """Evaluate the fugacity coefficient at temperature and pressure.
+class FugacityModelABC(GetValueABC):
+    """A fugacity model that calculates a fugacity coefficient."""
+
+    def get_value(self, *, temperature: float, pressure: float, **kwargs) -> float:
+        """Evaluates the fugacity coefficient at temperature and pressure.
 
         Args:
             temperature: Temperature in kelvin.
             pressure: Pressure in bar.
-            *args: Catches unused positional arguments.
             **kwargs: Catches unused keyword arguments.
 
         Returns:
             Fugacity coefficient evaluated at temperature and pressure.
         """
-        del args
         del kwargs
         pressure_kbar: float = pressure / kilo
         fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
 
         return fugacity_coefficient
-
-    # TODO: Document that depending on the model, some of these are computed first.
-    # TODO: RT ln f term.
-    # @abstractmethod
-    def chemical_potential(self, temperature: float, pressure: float) -> float:
-        ...
 
     @abstractmethod
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
@@ -233,7 +227,7 @@ class FugacityModel(GetValueConstraint, ABC):
 
 
 @dataclass(kw_only=True, frozen=True)
-class CorkFull(FugacityModel):
+class CorkFull(FugacityModelABC):
     """Full Cork equation from Holland and Powell (1991)."""
 
     a0: float
@@ -251,6 +245,10 @@ class CorkFull(FugacityModel):
     # Powell, 1991).
     P0: float  # kbar.
     name: str = field(init=False, default="fugacity_coefficient")
+
+    # TODO: Decorator to deal with pressure units from bar to kbar for calculation?
+    # def get_value(self, *, temperature: float, pressure: float, **kwargs) -> float:
+    #    return super().get_value(temperature=temperature, pressure=pressure, **kwargs)
 
     @abstractmethod
     def a(self, temperature: float) -> float:
@@ -734,7 +732,7 @@ class CorkFullH2O(CorkFull):
 
 
 @dataclass(kw_only=True, frozen=True)
-class CorkSimple(FugacityModel):
+class CorkSimple(FugacityModelABC):
     """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
