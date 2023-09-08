@@ -386,10 +386,7 @@ class CorkFull(GetValueABC):
     Tc: float  # kelvin.
     P0: float  # kbar.
     # Constants from Table 1, Holland and Powell (1991).
-    a0: float
-    a1: float
-    a2: float
-    # a3-a9 only required for H2O so they are not included in this base class.
+    a_coefficients: tuple[float, ...]
     b: float
     a_virial: tuple[float, float]
     b_virial: tuple[float, float]
@@ -636,9 +633,7 @@ class CorkFull(GetValueABC):
 class CorkFullCO2(CorkFull):
     """Full Cork equation for CO2 from Holland and Powell (1991)."""
 
-    a0: float = field(init=False, default=741.2)
-    a1: float = field(init=False, default=-0.10891)
-    a2: float = field(init=False, default=-3.903e-4)
+    a_coefficients: tuple[float, ...] = field(init=False, default=(741.2, -0.10891, -3.903e-4))
     b: float = field(init=False, default=3.057)
     a_virial: tuple[float, float] = field(init=False, default=(1.33790e-2, -1.01740e-5))
     b_virial: tuple[float, float] = field(init=False, default=(-2.26924e-1, 7.73793e-5))
@@ -654,7 +649,11 @@ class CorkFullCO2(CorkFull):
         Returns:
             Function a.
         """
-        a: float = self.a0 + self.a1 * temperature + self.a2 * temperature**2
+        a: float = (
+            self.a_coefficients[0]
+            + self.a_coefficients[1] * temperature
+            + self.a_coefficients[2] * temperature**2
+        )
         return a
 
 
@@ -662,16 +661,21 @@ class CorkFullCO2(CorkFull):
 class CorkFullH2O(CorkFull):
     """Full Cork equation for H2O from Holland and Powell (1991)."""
 
-    a0: float = field(init=False, default=1113.4)
-    a1: float = field(init=False, default=-0.88517)
-    a2: float = field(init=False, default=4.53e-3)
-    a3: float = field(init=False, default=-1.3183e-5)
-    a4: float = field(init=False, default=-0.22291)
-    a5: float = field(init=False, default=-3.8022e-4)
-    a6: float = field(init=False, default=1.7791e-7)
-    a7: float = field(init=False, default=5.8487)
-    a8: float = field(init=False, default=-2.1370e-2)
-    a9: float = field(init=False, default=6.8133e-5)
+    a_coefficients: tuple[float, ...] = field(
+        init=False,
+        default=(
+            1113.4,
+            -0.88517,
+            4.53e-3,
+            -1.3183e-5,
+            -0.22291,
+            -3.8022e-4,
+            1.7791e-7,
+            5.8487,
+            -2.1370e-2,
+            6.8133e-5,
+        ),
+    )
     b: float = field(init=False, default=1.465)
     a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
     b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))
@@ -705,10 +709,10 @@ class CorkFullH2O(CorkFull):
             Parameter a for gaseous H2O.
         """
         a: float = (
-            self.a0
-            + self.a7 * (self.Tc - temperature)
-            + self.a8 * (self.Tc - temperature) ** 2
-            + self.a9 * (self.Tc - temperature) ** 3
+            self.a_coefficients[0]
+            + self.a_coefficients[7] * (self.Tc - temperature)
+            + self.a_coefficients[8] * (self.Tc - temperature) ** 2
+            + self.a_coefficients[9] * (self.Tc - temperature) ** 3
         )
         return a
 
@@ -723,17 +727,17 @@ class CorkFullH2O(CorkFull):
         """
         if temperature < self.Tc:
             a: float = (
-                self.a0
-                + self.a1 * (self.Tc - temperature)
-                + self.a2 * (self.Tc - temperature) ** 2
-                + self.a3 * (self.Tc - temperature) ** 3
+                self.a_coefficients[0]
+                + self.a_coefficients[1] * (self.Tc - temperature)
+                + self.a_coefficients[2] * (self.Tc - temperature) ** 2
+                + self.a_coefficients[3] * (self.Tc - temperature) ** 3
             )
         else:
             a = (
-                self.a0
-                + self.a4 * (temperature - self.Tc)
-                + self.a5 * (temperature - self.Tc) ** 2
-                + self.a6 * (temperature - self.Tc) ** 3
+                self.a_coefficients[0]
+                + self.a_coefficients[4] * (temperature - self.Tc)
+                + self.a_coefficients[5] * (temperature - self.Tc) ** 2
+                + self.a_coefficients[6] * (temperature - self.Tc) ** 3
             )
         return a
 
