@@ -19,6 +19,8 @@ License:
 
 from typing import Type
 
+from pytest import approx
+
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
@@ -71,8 +73,8 @@ def check_simple_Cork_gas(
     V: float = cork.volume(temperature, pressure)
     fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
 
-    assert V == expected_V
-    assert fugacity_coeff == expected_fugacity_coeff
+    assert V == approx(expected_V, rtol, atol)
+    assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
 
 
 def check_full_Cork_gas(gas_type: Type[CorkFull], expected_fugacity_coeff: float) -> None:

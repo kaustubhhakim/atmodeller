@@ -59,8 +59,8 @@ class ConstraintABC(GetValueABC):
     Args:
         name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
             'mass'.
-        species: The species to constrain, typically representing a species for pressure or
-            fugacity constraints or an element for mass constraints.
+        species: The species to constrain, typically representing a species for 'pressure' or
+            'fugacity' constraints or an element for 'mass' constraints.
 
     Attributes:
         name: The name of the constraint.
@@ -78,8 +78,8 @@ class ConstantConstraint(ConstraintABC):
     Args:
         name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
             'mass'.
-        species: The species to constrain, typically representing a species for pressure or
-            fugacity constraints or an element for mass constraints.
+        species: The species to constrain, typically representing a species for 'pressure' or
+            'fugacity' constraints or an element for 'mass' constraints.
         value: The constant value, which is usually in kg for masses and bar for pressures or
             fugacities.
 
@@ -101,10 +101,10 @@ class ConstantConstraint(ConstraintABC):
 class IdealityConstant(ConstantConstraint):
     """A constant fugacity coefficient or activity.
 
-    The constructor must accept no arguments to enable it to be used as default factory when the
+    The constructor must accept no arguments to enable it to be used as a default factory when the
     user does not specify a fugacity coefficient model for a gas species or an activity model for
     a solid species. Therefore, the name and species arguments are set to empty strings because
-    they are not required.
+    they are not used.
 
     Args:
         value: The constant value. Defaults to 1 (i.e. ideal behaviour).
@@ -118,8 +118,8 @@ class IdealityConstant(ConstantConstraint):
     value: float = 1.0
 
 
-class Solubility(ABC):
-    """A Solubility law for a species."""
+class Solubility(GetValueABC):
+    """A solubility law for a species."""
 
     def power_law(self, fugacity: float, constant: float, exponent: float) -> float:
         """Computes solubility from a power law.
@@ -150,8 +150,8 @@ class Solubility(ABC):
         """
         raise NotImplementedError
 
-    def __call__(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    def get_value(
+        self, *, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         """Dissolved volatile concentration in the melt in ppmw.
 
@@ -777,10 +777,10 @@ class GasSpecies(ChemicalComponent):
 
         # Melt.
         prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
-        ppmw_in_melt: float = self.solubility(
-            fugacity,
-            planet.surface_temperature,
-            system.fugacities_dict,
+        ppmw_in_melt: float = self.solubility.get_value(
+            fugacity=fugacity,
+            temperature=planet.surface_temperature,
+            fugacities_dict=system.fugacities_dict,
         )
         mass_in_melt: float = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
         moles_in_melt: float = mass_in_melt / self.molar_mass

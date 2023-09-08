@@ -18,7 +18,7 @@ License:
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -197,39 +197,202 @@ def Calc_V_f(P, T, name):
         return V, 1e3 * RTlnf
 
 
-class FugacityModelABC(GetValueABC):
-    """A fugacity model that calculates a fugacity coefficient."""
+@dataclass(kw_only=True, frozen=True)
+class VirialCompensation:
+    """A compensation term for the increasing deviation of the MRK volumes with pressure.
 
-    def get_value(self, *, temperature: float, pressure: float, **kwargs) -> float:
-        """Evaluates the fugacity coefficient at temperature and pressure.
+    General form of the equation from Holland and Powell (1998):
+
+        V_virial = a(P-P0) + b(P-P0)**0.5 + c(P-P0)**0.25
+
+    This form also works for the virial compensation term from Holland and Powell (1991), in which
+    case c=0. Pc and Tc are required for gases which are known to obey approximately the principle
+    of corresponding states.
+
+    Args:
+        a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
+            may be additionally scaled by Tc and Pc in the case of corresponding states.
+        b_coefficients: As above for the b coefficients.
+        c_coefficients: As above for the c coefficients.
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data. Units are kbar. Defaults
+            to zero for the corresponding states case.
+        Tc: Critical temperature in kelvin. Defaults to 1 (not used).
+        Pc: Critical pressure in kbar. Defaults to 1 (not used).
+
+    Attributes:
+        a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
+            may be additionally scaled by Tc and Pc in the case of corresponding states.
+        b_coefficients: As above for the b coefficients.
+        c_coefficients: As above for the c coefficients.
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data. Units are kbar.
+        Tc: Critical temperature in kelvin.
+        Pc: Critical pressure in kbar.
+    """
+
+    a_coefficients: tuple[float, float]
+    b_coefficients: tuple[float, float]
+    c_coefficients: tuple[float, float]
+    P0: float = 0  # For corresponding states this should default to zero.
+    Pc: float = 1  # Only non unity for corresponding states.
+    Tc: float = 1  # Only non unity for corresponding states.
+
+    def a(self, temperature: float) -> float:
+        """a parameter.
 
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in bar.
-            **kwargs: Catches unused keyword arguments.
 
         Returns:
-            Fugacity coefficient evaluated at temperature and pressure.
+            a parameter.
         """
-        del kwargs
-        pressure_kbar: float = pressure / kilo
-        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
+        a: float = self.a_coefficients[0] * self.Tc + self.a_coefficients[1] * temperature
+        a /= self.Pc**2
+
+        return a
+
+    def b(self, temperature: float) -> float:
+        """b parameter.
+
+        Args:
+            temperature: Temperature in kelvin.
+
+        Returns:
+            b parameter.
+        """
+        b: float = self.b_coefficients[0] * self.Tc + self.b_coefficients[1] * temperature
+        b /= self.Pc ** (3 / 2)
+
+        return b
+
+    def c(self, temperature: float) -> float:
+        """c parameter.
+
+        Args:
+            temperature: Temperature in kelvin.
+
+        Returns:
+            c parameter.
+        """
+        c: float = self.c_coefficients[0] * self.Tc + self.c_coefficients[1] * temperature
+        c /= self.Pc ** (5 / 4)
+
+        return c
+
+    def ln_fugacity_coefficient(self, temperature: float, pressure: float) -> float:
+        """Natural log of the virial contribution to the fugacity coefficient.
+
+        Equation A.2., Holland and Powell (1991).
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            ln(fugacity_coefficient).
+        """
+
+        ln_fugacity_coefficient: float = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_KJ * temperature
+        )
+
+        return ln_fugacity_coefficient
+
+    def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
+        """Fugacity coefficient of the virial contribution.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            fugacity_coefficient.
+        """
+        fugacity_coefficient: float = np.exp(self.ln_fugacity_coefficient(temperature, pressure))
 
         return fugacity_coefficient
 
-    @abstractmethod
-    def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
-        ...
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume contribution.
 
-    @abstractmethod
-    def fugacity(self, temperature: float, pressure: float) -> float:
-        ...
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            Volume term.
+        """
+        volume: float = (
+            self.a(temperature) * (pressure - self.P0)
+            + self.b(temperature) * (pressure - self.P0) ** 0.5
+            + self.c(temperature) * (pressure - self.P0) ** 0.25
+        )
+
+        return volume
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (V dP) contribution.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            Volume integral in kJ mol^(-1).
+        """
+        volume_integral: float = (
+            self.a(temperature) / 2.0 * (pressure - self.P0) ** 2
+            + 2.0 / 3.0 * self.b(temperature) * (pressure - self.P0) ** (3.0 / 2.0)
+            + 4.0 / 5.0 * self.c(temperature) * (pressure - self.P0) ** (5.0 / 4.0)
+        )
+
+        return volume_integral
+
+
+# TODO: Move comment elsewhere.
+#    In the Appendix of Holland and Powell (1991) it states that the virial component of
+#    fugacity is added to the MRK component if the pressure is above P0.
 
 
 @dataclass(kw_only=True, frozen=True)
-class CorkFull(FugacityModelABC):
-    """Full Cork equation from Holland and Powell (1991)."""
+class CorkFull(GetValueABC):
+    """A Full Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
+    The units in Holland and Powell (1991) are K and kbar, so note unit conversions where relevant.
+
+    Constants correspond to Table 1 in Holland and Powell (1991).
+
+    Args:
+        Tc: Critical temperature in kelvin.
+        p0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data. Units are kbar.
+        a0: Constant (Table 1, Holland and Powell, 1991).
+        a1: Constant (Table 1, Holland and Powell, 1991).
+        a2: Constant (Table 1, Holland and Powell, 1991).
+        b: Constant (Table 1, Holland and Powell, 1991).
+        c0: Constant (Table 1, Holland and Powell, 1991).
+        c1: Constant (Table 1, Holland and Powell, 1991).
+        d0: Constant (Table 1, Holland and Powell, 1991).
+        d1: Constant (Table 1, Holland and Powell, 1991).
+
+    Attributes:
+        Tc: Critical temperature in kelvin.
+        p0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data. Units are kbar.
+        a0: Constant (Table 1, Holland and Powell, 1991).
+        a1: Constant (Table 1, Holland and Powell, 1991).
+        a2: Constant (Table 1, Holland and Powell, 1991).
+        b: Constant (Table 1, Holland and Powell, 1991).
+        c0: Constant (Table 1, Holland and Powell, 1991).
+        c1: Constant (Table 1, Holland and Powell, 1991).
+        d0: Constant (Table 1, Holland and Powell, 1991).
+        d1: Constant (Table 1, Holland and Powell, 1991).
+    """
+
+    Tc: float  # kelvin.
+    P0: float  # kbar.
+    # Constants from Table 1, Holland and Powell (1991).
     a0: float
     a1: float
     a2: float
@@ -239,16 +402,21 @@ class CorkFull(FugacityModelABC):
     c1: float
     d0: float
     d1: float
-    Tc: float  # Critical temperature in kelvin.
-    # P0 is the pressure at which the MRK equation begins to overestimate the molar volume
-    # significantly, and may be determined from the experimental data (quoting from Holland and
-    # Powell, 1991).
-    P0: float  # kbar.
-    name: str = field(init=False, default="fugacity_coefficient")
 
-    # TODO: Decorator to deal with pressure units from bar to kbar for calculation?
-    # def get_value(self, *, temperature: float, pressure: float, **kwargs) -> float:
-    #    return super().get_value(temperature=temperature, pressure=pressure, **kwargs)
+    def get_value(self, *, temperature: float, pressure: float) -> float:
+        """Evaluates the fugacity coefficient at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in bar.
+
+        Returns:
+            Fugacity coefficient evaluated at temperature and pressure.
+        """
+        pressure_kbar: float = pressure / kilo
+        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
+
+        return fugacity_coefficient
 
     @abstractmethod
     def a(self, temperature: float) -> float:
@@ -262,29 +430,31 @@ class CorkFull(FugacityModelABC):
         """
         raise NotImplementedError
 
-    def c(self, temperature: float) -> float:
-        """Virial-type parameter c in Equation 4, Holland and Powell (1991).
+    # TODO: Moved to new class.
+    # def c(self, temperature: float) -> float:
+    #     """Virial-type parameter c in Equation 4, Holland and Powell (1991).
 
-        Args:
-            temperature: Temperature in kelvin.
+    #     Args:
+    #         temperature: Temperature in kelvin.
 
-        Returns:
-            Parameter c.
-        """
-        c: float = self.c0 + self.c1 * temperature
-        return c
+    #     Returns:
+    #         Parameter c.
+    #     """
+    #     c: float = self.c0 + self.c1 * temperature
+    #     return c
 
-    def d(self, temperature: float) -> float:
-        """Virial-type parameter d in Equation 4, Holland and Powell (1991).
+    # TODO: Moved to new class.
+    # def d(self, temperature: float) -> float:
+    #     """Virial-type parameter d in Equation 4, Holland and Powell (1991).
 
-        Args:
-            temperature: Temperature in kelvin.
+    #     Args:
+    #         temperature: Temperature in kelvin.
 
-        Returns:
-            Parameter d.
-        """
-        d: float = self.d0 + self.d1 * temperature
-        return d
+    #     Returns:
+    #         Parameter d.
+    #     """
+    #     d: float = self.d0 + self.d1 * temperature
+    #     return d
 
     @staticmethod
     def compressibility_factor(temperature: float, pressure: float, volume: float) -> float:
@@ -359,27 +529,27 @@ class CorkFull(FugacityModelABC):
 
         return ln_fugacity_coefficient
 
-    def ln_fugacity_coefficient_virial(self, temperature: float, pressure: float) -> float:
-        """Natural log of the virial contribution to the fugacity coefficient.
+    # def ln_fugacity_coefficient_virial(self, temperature: float, pressure: float) -> float:
+    #     """Natural log of the virial contribution to the fugacity coefficient.
 
-        Equation A.2., Holland and Powell (1991).
+    #     Equation A.2., Holland and Powell (1991).
 
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+    #     Args:
+    #         temperature: Temperature in kelvin.
+    #         pressure: Pressure in kbar.
 
-        Returns:
-            ln(fugacity_coefficient_virial).
-        """
-        if pressure >= self.P0:
-            ln_fugacity_coefficient: float = (2.0 / 3) * self.c(temperature) * (
-                pressure - self.P0
-            ) ** 1.5 + (1.0 / 2) * self.d(temperature) * (pressure - self.P0) ** 2
-            ln_fugacity_coefficient /= GAS_CONSTANT_KJ * temperature
-        else:
-            ln_fugacity_coefficient = 0
+    #     Returns:
+    #         ln(fugacity_coefficient_virial).
+    #     """
+    #     if pressure >= self.P0:
+    #         ln_fugacity_coefficient: float = (2.0 / 3) * self.c(temperature) * (
+    #             pressure - self.P0
+    #         ) ** 1.5 + (1.0 / 2) * self.d(temperature) * (pressure - self.P0) ** 2
+    #         ln_fugacity_coefficient /= GAS_CONSTANT_KJ * temperature
+    #     else:
+    #         ln_fugacity_coefficient = 0
 
-        return ln_fugacity_coefficient
+    #     return ln_fugacity_coefficient
 
     def ln_fugacity_coefficient(self, temperature: float, pressure: float) -> float:
         """Natural log of the fugacity coefficient including both MRK and virial contributions.
@@ -507,27 +677,28 @@ class CorkFull(FugacityModelABC):
 
         return volume_MRK[0]
 
-    def volume_virial(self, *, temperature: float, pressure: float) -> float:
-        """Virial-type volume term.
+    # TODO: Moved to new class.
+    # def volume_virial(self, *, temperature: float, pressure: float) -> float:
+    #     """Virial-type volume term.
 
-        In the Appendix of Holland and Powell (1991) it states that the virial component of volume
-        is added to the MRK component if the pressure is above P0.
+    #     In the Appendix of Holland and Powell (1991) it states that the virial component of volume
+    #     is added to the MRK component if the pressure is above P0.
 
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+    #     Args:
+    #         temperature: Temperature in kelvin.
+    #         pressure: Pressure in kbar.
 
-        Returns:
-            Virial-type volume term.
-        """
-        if pressure > self.P0:
-            volume_virial: float = self.c(temperature) * (pressure - self.P0) ** 0.5 + self.d(
-                temperature
-            ) * (pressure - self.P0)
-        else:
-            volume_virial = 0
+    #     Returns:
+    #         Virial-type volume term.
+    #     """
+    #     if pressure > self.P0:
+    #         volume_virial: float = self.c(temperature) * (pressure - self.P0) ** 0.5 + self.d(
+    #             temperature
+    #         ) * (pressure - self.P0)
+    #     else:
+    #         volume_virial = 0
 
-        return volume_virial
+    #     return volume_virial
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -731,16 +902,18 @@ class CorkFullH2O(CorkFull):
         return ln_fugacity
 
 
-@dataclass(kw_only=True, frozen=True)
-class CorkSimple(FugacityModelABC):
+@dataclass(kw_only=True)
+class CorkSimple(GetValueABC):
     """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
-    gases which are known to obey approximately the principle of corresponding states.
+    gases which are known to obey approximately the principle of corresponding states. The
+    corresponding states parameters are from Table 2 in Holland and Powell (1991). Note also in
+    this case it appears P0 is always zero, even though for the full CORK equations it determines
+    whether or not the virial contribution is added. It assumes there are no complications of
+    critical behaviour in the P-T range considered.
 
     The units in Holland and Powell (1991) are K and kbar, so note unit conversions where relevant.
-
-    Corresponding states parameters from Table 2 in Holland and Powell (1991).
 
     Args:
         Tc: Critical temperature in kelvin.
@@ -752,23 +925,46 @@ class CorkSimple(FugacityModelABC):
         a0: Universal constant (Table 2, Holland and Powell, 1991).
         a1: Universal constant (Table 2, Holland and Powell, 1991).
         b0: Universal constant (Table 2, Holland and Powell, 1991).
-        c0: Universal constant (Table 2, Holland and Powell, 1991).
-        c1: Universal constant (Table 2, Holland and Powell, 1991).
-        d0: Universal constant (Table 2, Holland and Powell, 1991).
-        d1: Universal constant (Table 2, Holland and Powell, 1991).
+        a_virial: Constants for virial contribution (d0 and d1 in Table 2).
+        b_virial: Constants for virial contribution (c0 and c1 in Table 2).
+        c_virial: Constants for vitial contribution (not used).
+        virial: Virial contribution object.
     """
 
-    Tc: float  # K
+    Tc: float  # kelvin
     Pc: float  # kbar
-    name: str = field(init=False, default="fugacity_coefficient")
     # Universal constants from Table 2, Holland and Powell (1991).
     a0: float = field(init=False, default=5.45963e-5)
     a1: float = field(init=False, default=-8.63920e-6)
     b0: float = field(init=False, default=9.18301e-4)
-    c0: float = field(init=False, default=-3.30558e-5)
-    c1: float = field(init=False, default=2.30524e-6)
-    d0: float = field(init=False, default=6.93054e-7)
-    d1: float = field(init=False, default=-8.38293e-8)
+    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-7, -8.38293e-8))
+    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-5, 2.30524e-6))
+    c_virial: tuple[float, float] = field(init=False, default=(0, 0))
+    virial: VirialCompensation = field(init=False)
+
+    def __post_init__(self):
+        self.virial = VirialCompensation(
+            a_coefficients=self.a_virial,
+            b_coefficients=self.b_virial,
+            c_coefficients=self.c_virial,
+            Pc=self.Pc,
+            Tc=self.Tc,
+        )
+
+    def get_value(self, *, temperature: float, pressure: float) -> float:
+        """Evaluates the fugacity coefficient at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in bar.
+
+        Returns:
+            Fugacity coefficient evaluated at temperature and pressure.
+        """
+        pressure_kbar: float = pressure / kilo
+        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
+
+        return fugacity_coefficient
 
     def a(self, temperature: float) -> float:
         """Parameter a in Equation 9, Holland and Powell (1991).
@@ -795,59 +991,40 @@ class CorkSimple(FugacityModelABC):
         b: float = self.b0 * self.Tc / self.Pc
         return b
 
-    def c(self, temperature: float) -> float:
-        """Parameter c in Equation 9, Holland and Powell (1991).
-
-        Args:
-            temperature: Temperature in kelvin.
-
-        Returns:
-            Parameter c.
-        """
-        c: float = (
-            self.c0 * self.Tc / self.Pc ** (3.0 / 2.0)
-            + self.c1 / self.Pc ** (3.0 / 2.0) * temperature
-        )
-        return c
-
-    def d(self, temperature: float) -> float:
-        """Parameter d in Equation 9, Holland and Powell (1991).
-
-        Args:
-            temperature: Temperature in kelvin.
-
-        Returns:
-            Parameter d.
-        """
-        d: float = self.d0 * self.Tc / self.Pc**2 + self.d1 / self.Pc**2 * temperature
-        return d
-
-    # TODO: rename to chemical potential.
-    def RTlnf(self, temperature: float, pressure: float) -> float:
-        """RTlnf from Equation 8, Holland and Powell (1991).
+    def compressibility_factor(self, temperature: float, pressure: float) -> float:
+        """Compressibility factor.
 
         Args:
             temperature: Temperature in kelvin.
             pressure: Pressure in kbar.
 
         Returns:
-            RTlnf in kJ mol^(-1).
+            Compressibility factor, which is non-dimensional.
         """
-
-        RTlnf: float = (
-            GAS_CONSTANT_KJ * temperature * np.log(1000 * pressure)
-            + self.b * pressure
-            + self.a(temperature)
-            / self.b
-            / np.sqrt(temperature)
-            * (
-                np.log(GAS_CONSTANT_KJ * temperature + self.b * pressure)
-                - np.log(GAS_CONSTANT_KJ * temperature + 2.0 * self.b * pressure)
-            )
-            + 2 / 3 * self.c(temperature) * pressure * np.sqrt(pressure)
-            + self.d(temperature) / 2 * pressure**2
+        compressibility: float = (
+            pressure * self.volume(temperature, pressure) / (GAS_CONSTANT_KJ * temperature)
         )
-        return RTlnf
+
+        return compressibility
+
+    def ln_fugacity(self, temperature: float, pressure: float) -> float:
+        """Natural log of the fugacity.
+
+        Note that the fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and
+        f0 is the pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            fugacity in kbar.
+        """
+        ln_fugacity: float = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_KJ * temperature
+        )
+
+        return ln_fugacity
 
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Fugacity in kbar.
@@ -862,11 +1039,9 @@ class CorkSimple(FugacityModelABC):
         Returns:
             fugacity in kbar.
         """
-        fugacity: float = np.exp(
-            self.RTlnf(temperature=temperature, pressure=pressure)
-            / (GAS_CONSTANT_KJ * temperature)
-        )  # bar
+        fugacity: float = np.exp(self.ln_fugacity(temperature, pressure))  # bar
         fugacity /= kilo  # kbar
+
         return fugacity
 
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
@@ -880,10 +1055,11 @@ class CorkSimple(FugacityModelABC):
             fugacity coefficient.
         """
         fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
+
         return fugacity_coefficient
 
-    def volume(self, temperature: float, pressure: float) -> float:
-        """Volume. Equation 7a, Holland and Powell (1991).
+    def volume_MRK(self, temperature: float, pressure: float) -> float:
+        """Volume from MRK contribution. Equation 7, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in kelvin.
@@ -900,9 +1076,24 @@ class CorkSimple(FugacityModelABC):
             * np.sqrt(temperature)
             / (GAS_CONSTANT_KJ * temperature + self.b * pressure)
             / (GAS_CONSTANT_KJ * temperature + 2.0 * self.b * pressure)
-            + self.c(temperature) * np.sqrt(pressure)
-            + self.d(temperature) * pressure
         )
+
+        return volume
+
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume. Equation 7a, Holland and Powell (1991).
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            Volume in kJ kbar^(-1) mol^(-1).
+        """
+        volume: float = self.volume_MRK(temperature, pressure) + self.virial.volume(
+            temperature, pressure
+        )
+
         return volume
 
     def volume_cm3(self, temperature: float, pressure: float) -> float:
@@ -923,68 +1114,87 @@ class CorkSimple(FugacityModelABC):
 
         return volume_cm3
 
-    def get_value(self, temperature: float, pressure: float, *args, **kwargs) -> float:
-        """Evaluate the fugacity coefficient at temperature and pressure.
+    def volume_integral_MRK(self, temperature: float, pressure: float) -> float:
+        """Volume integral (V dP) from MRK contribution. Equation 8, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in bar.
+            pressure: Pressure in kbar.
 
         Returns:
-            Fugacity coefficient evaluated at temperature and pressure.
+            Volume integral in kJ mol^(-1).
         """
-        del args
-        del kwargs
-        pressure_kbar: float = pressure / kilo
-        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure_kbar)
+        volume_integral: float = (
+            GAS_CONSTANT_KJ * temperature * np.log(1000 * pressure)
+            + self.b * pressure
+            + self.a(temperature)
+            / self.b
+            / np.sqrt(temperature)
+            * (
+                np.log(GAS_CONSTANT_KJ * temperature + self.b * pressure)
+                - np.log(GAS_CONSTANT_KJ * temperature + 2.0 * self.b * pressure)
+            )
+        )
 
-        return fugacity_coefficient
+        return volume_integral
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (V dP). Equation 8, Holland and Powell (1991).
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            Volume integral in kJ mol^(-1).
+        """
+        volume_integral: float = self.volume_integral_MRK(
+            temperature, pressure
+        ) + self.virial.volume_integral(temperature, pressure)
+
+        return volume_integral
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class CorkSimpleCO2(CorkSimple):
     """Critical constants for CO2.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    species: str = field(init=False, default="CO2")
     Tc: float = field(init=False, default=304.2)
     Pc: float = field(init=False, default=0.0738)
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class CorkCH4(CorkSimple):
     """Critical constants for CH4.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    species: str = field(init=False, default="CH2")
     Tc: float = field(init=False, default=190.6)
     Pc: float = field(init=False, default=0.0460)
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class CorkH2(CorkSimple):
     """Critical constants for H2.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    species: str = field(init=False, default="H2")
     Tc: float = field(init=False, default=41.2)
     Pc: float = field(init=False, default=0.0211)
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class CorkCO(CorkSimple):
     """Critical constants for CO.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    species: str = field(init=False, default="CO")
     Tc: float = field(init=False, default=132.9)
     Pc: float = field(init=False, default=0.0350)
 
@@ -995,25 +1205,23 @@ class CorkCO(CorkSimple):
 # McGraw-Hill, New York.
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class CorkS2(CorkSimple):
     """Critical constants for S2."""
 
     # Data not in The Properties of Gases and Liquids.  Use S instead?
 
-    species: str = field(init=False, default="S2")
     Tc: float  # TODO = field(init=False, default=132.9)
     Pc: float  # TODO = field(init=False, default=0.0350)
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class CorkH2S(CorkSimple):
     """Critical constants for H2S.
 
     Appendix A.19 in The Properties of Gases and Liquids (2001), 5th edition.
     """
 
-    species: str = field(init=False, default="H2S")
     Tc: float = field(init=False, default=373.4)
     Pc: float = field(init=False, default=0.08963)
 
@@ -1028,13 +1236,13 @@ def main():
     # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
     # coefficient for H2 maxes out and then decreases again.
 
-    pressure: float = 2  # 4  # 1.8200066513507675  # 10
+    pressure: float = 4  # 4  # 1.8200066513507675  # 10
     temperature: float = 2000  # 1500  # 2000
 
     # These tests are for CO, CH4, and H2. The results agree with Meng.
-    # test_simple_cork(temperature, pressure)
+    test_simple_cork(temperature, pressure)
 
-    test_full_cork(temperature, pressure)
+    # test_full_cork(temperature, pressure)
 
 
 def test_simple_cork(temperature, pressure):
@@ -1052,7 +1260,7 @@ def test_simple_cork(temperature, pressure):
     print("My classes")
     cork: CorkSimple = CorkCO()
     V = cork.volume(temperature, pressure)
-    RTlnf = cork.RTlnf(temperature, pressure)
+    RTlnf = cork.volume_integral(temperature, pressure)
     fugacity = cork.fugacity(temperature, pressure)
     fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
@@ -1060,26 +1268,26 @@ def test_simple_cork(temperature, pressure):
     cork: CorkSimple = CorkCH4()
     V = cork.volume(temperature, pressure)
     # Vcm3 = cork.volume_cm3(temperature, pressure)
-    RTlnf = cork.RTlnf(temperature, pressure)
+    RTlnf = cork.volume_integral(temperature, pressure)
     fugacity = cork.fugacity(temperature, pressure)
     fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
     print("CH4: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
     cork: CorkSimple = CorkH2()
     V = cork.volume(temperature, pressure)
-    RTlnf = cork.RTlnf(temperature, pressure)
+    RTlnf = cork.volume_integral(temperature, pressure)
     fugacity = cork.fugacity(temperature, pressure)
     fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
     print("H2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
-    cork: CorkSimple = CorkSimpleCO2()
-    V = cork.volume(temperature, pressure)
-    RTlnf = cork.RTlnf(temperature, pressure)
-    fugacity = cork.fugacity(temperature, pressure)
-    fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
-    print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
-    print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
-    print("\n")
+    # cork: CorkSimple = CorkSimpleCO2()
+    # V = cork.volume(temperature, pressure)
+    # RTlnf = cork.volume_integral(temperature, pressure)
+    # fugacity = cork.fugacity(temperature, pressure)
+    # fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
+    # print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
+    # print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+    # print("\n")
 
 
 def test_full_cork(temperature, pressure):
@@ -1110,7 +1318,7 @@ def test_full_cork(temperature, pressure):
 
     cork = CorkSimpleCO2()
     V = cork.volume(temperature, pressure)
-    RTlnf = cork.RTlnf(temperature, pressure)
+    RTlnf = cork.volume_integral(temperature, pressure)
     fugacity = cork.fugacity(temperature, pressure)
     fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     print("CO2: Simple CORK")

@@ -20,6 +20,8 @@ License:
 
 from typing import Type
 
+import numpy as np
+
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
@@ -324,7 +326,11 @@ def test_CHOS_Species_IW() -> None:
         "CO2": 47.22697115570074,
     }
 
-    system.solve(SystemConstraints(constraints))
+    # Give a reasonable initial guess
+    initial_log10: np.ndarray = np.array([0, 0, -3, -4, -6, -3, 2, 1])
+    initial_solution: np.ndarray = 10**initial_log10
+
+    system.solve(constraints, initial_solution=initial_solution)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
