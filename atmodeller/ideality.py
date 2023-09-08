@@ -26,7 +26,7 @@ import numpy as np
 from scipy.constants import kilo
 from scipy.optimize import fsolve
 
-from atmodeller import GAS_CONSTANT
+from atmodeller import GAS_CONSTANT, debug_logger
 from atmodeller.interfaces import GetValueABC
 from atmodeller.utilities import UnitConversion
 
@@ -788,6 +788,7 @@ class CorkFullH2OHollandAndPowell1991(CorkFull):
         """
 
         assert temperature < self.Tc
+        assert pressure <= self.Psat(temperature)
 
         volume_init: float = GAS_CONSTANT_KJ * temperature / pressure + 10.0 * self.b
 
@@ -801,7 +802,7 @@ class CorkFullH2OHollandAndPowell1991(CorkFull):
         return volume_MRK[0]
 
     # TODO: FIXME: Needs refreshing to work for critical behaviour.
-    def lnf_MRK(self, temperature: float, pressure: float) -> float:
+    def ln_fugacity_coefficient_MRK(self, temperature: float, pressure: float) -> float:
         """Natural log of the fugacity. Appendix A, Holland and Powell (1991).
 
         Args:
@@ -813,10 +814,15 @@ class CorkFullH2OHollandAndPowell1991(CorkFull):
         """
 
         # TODO: Check is this fugacity or fugacity coefficient?
+        # This branch seems to work for H2O (agrees with Meng).
         if temperature >= self.Tc:
+            print("Temperature >= Critical temperature")
             ln_fugacity: float = super().ln_fugacity_coefficient_MRK(temperature, pressure)
 
         elif pressure <= self.Psat(temperature):
+            # FIXME: This branch appears to be broken (does not agree with Meng) for H2O.
+            # But CO2 looks fine
+            print("pressure <= saturation pressure: %s" % self.__class__.__name__)
             A: float = self.A_factor(temperature, pressure)
             B: float = self.B_factor(temperature, pressure)
             volume: float = self.volume_MRK_gaseous_phase_below_Tc(temperature, pressure)
@@ -824,6 +830,7 @@ class CorkFullH2OHollandAndPowell1991(CorkFull):
             ln_fugacity: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
 
         else:  # pressure > self.Psat(temperature):
+            print("hitting else condition")
             # Step (1), Appendix A, Holland and Powell (1991).
             A: float = self.A_factor(temperature, pressure)
             B: float = self.B_factor(temperature, pressure)
@@ -1191,8 +1198,10 @@ def main():
     # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
     # coefficient for H2 maxes out and then decreases again.
 
-    pressure: float = 10  # 4  # 1.8200066513507675  # 10
-    temperature: float = 500  # 1500  # 2000
+    debug_logger()
+
+    pressure: float = 0.1  # 4  # 1.8200066513507675  # 10
+    temperature: float = 600  # 1500  # 2000
 
     # These tests are for CO, CH4, and H2. The results agree with Meng.
     # test_simple_cork(temperature, pressure)
@@ -1284,6 +1293,8 @@ def test_full_cork(temperature, pressure):
     fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     # print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
     print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+    Psat = cork.Psat(temperature)
+    print("H2O Psat = %f" % Psat)
 
     cork = CorkSimpleCO2()
     V = cork.volume(temperature, pressure)
