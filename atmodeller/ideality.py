@@ -630,8 +630,8 @@ class CorkFull(GetValueABC):
 
 
 @dataclass(kw_only=True)
-class CorkFullCO2(CorkFull):
-    """Full Cork equation for CO2 from Holland and Powell (1991)."""
+class CorkFullCO2HollAndPowell1991(CorkFull):
+    """Full CORK equation for CO2 from Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(init=False, default=(741.2, -0.10891, -3.903e-4))
     b: float = field(init=False, default=3.057)
@@ -658,8 +658,19 @@ class CorkFullCO2(CorkFull):
 
 
 @dataclass(kw_only=True)
-class CorkFullH2O(CorkFull):
-    """Full Cork equation for H2O from Holland and Powell (1991)."""
+class CorkFullCO2(CorkFullCO2HollAndPowell1991):
+    """Full CORK equation for CO2 from Holland and Powell (1998).
+
+    Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
+    """
+
+    a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
+    b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
+
+
+@dataclass(kw_only=True)
+class CorkFullH2OHollandAndPowell1991(CorkFull):
+    """Full CORK equation for H2O from Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -832,6 +843,18 @@ class CorkFullH2O(CorkFull):
             ln_fugacity = ln_fugacity1 - ln_fugacity2 + ln_fugacity3
 
         return ln_fugacity
+
+
+@dataclass(kw_only=True)
+class CorkFullH2O(CorkFullH2OHollandAndPowell1991):
+    """Full CORK equation for H2O from Holland and Powell (1998).
+
+    Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
+    """
+
+    a_virial: tuple[float, float] = field(init=False, default=(1.9853e-3, 0))
+    b_virial: tuple[float, float] = field(init=False, default=(-8.9090e-2, 0))
+    c_virial: tuple[float, float] = field(init=False, default=(8.0331e-2, 0))
 
 
 @dataclass(kw_only=True)
@@ -1168,8 +1191,8 @@ def main():
     # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
     # coefficient for H2 maxes out and then decreases again.
 
-    pressure: float = 4  # 4  # 1.8200066513507675  # 10
-    temperature: float = 2000  # 1500  # 2000
+    pressure: float = 10  # 4  # 1.8200066513507675  # 10
+    temperature: float = 500  # 1500  # 2000
 
     # These tests are for CO, CH4, and H2. The results agree with Meng.
     # test_simple_cork(temperature, pressure)
@@ -1232,6 +1255,12 @@ def test_full_cork(temperature, pressure):
     fugacity: float = np.exp(RTlnf / (GAS_CONSTANT * temperature))
     fugacity_coeff: float = fugacity / pressure
     print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+    V, RTlnf = Calc_V_f(pressure, temperature, "H2O")
+    print("H2O: V = %f, RTlnf = %f" % (V, RTlnf))
+    fugacity: float = np.exp(RTlnf / (GAS_CONSTANT * temperature))
+    fugacity_coeff: float = fugacity / pressure
+    print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+
     # TODO: Get CO2 working first since that is without critical behaviour.
     # V, RTlnf = Calc_V_f(pressure, temperature, "H2O")
     # print("H2O: V = %f, RTlnf = %f" % (V, RTlnf))
@@ -1247,6 +1276,14 @@ def test_full_cork(temperature, pressure):
     fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
     # print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
     print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+
+    cork = CorkFullH2O()
+    # V = cork.volume(temperature, pressure)
+    # RTlnf = cork.RTlnf(temperature, pressure)
+    fugacity = cork.fugacity(temperature, pressure)
+    fugacity_coeff = cork.fugacity_coefficient(temperature, pressure)
+    # print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
 
     cork = CorkSimpleCO2()
     V = cork.volume(temperature, pressure)
