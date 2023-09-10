@@ -34,6 +34,7 @@ from atmodeller.ideality import (
     CorkCorrespondingStates,
     CorkFull,
     CorkFullCO2,
+    CorkFullH2O,
     CorkH2,
     CorkSimpleCO2,
 )
@@ -106,9 +107,41 @@ def test_simple_CorkCO2() -> None:
     check_simple_Cork_gas(2000, 10, CorkSimpleCO2, 4.672048888683978, 7.1335509191383455)
 
 
-def test_full_CorkCO2() -> None:
+def test_CorkCO2_at_P0() -> None:
     """Below P0 so virial contribution excluded."""
     check_full_Cork_gas(2000, 2, CorkFullCO2, 1.6063624424808558)
+
+
+def test_CorkCO2_above_P0() -> None:
+    """Above P0 so virial contribution included."""
+    check_full_Cork_gas(2000, 10, CorkFullCO2, 7.556079199888717)
+
+
+def test_CorkH2O_above_Tc_below_P0() -> None:
+    """Above Tc and below P0."""
+    check_full_Cork_gas(2000, 1, CorkFullH2O, 1.048278616058322)
+
+
+def test_CorkH2O_above_Tc_above_P0() -> None:
+    """Above Tc and above P0."""
+    check_full_Cork_gas(2000, 5, CorkFullH2O, 1.3444013638026706)
+
+
+def test_CorkH2O_below_Tc_below_Psat() -> None:
+    """Below Tc and below Psat."""
+    # Psat = 0.118224 at T = 600 K.
+    check_full_Cork_gas(600, 0.1, CorkFullH2O, 0.7910907770688191)
+
+
+def test_CorkH2O_below_Tc_above_Psat() -> None:
+    """Below Tc and above Psat."""
+    # Psat = 0.118224 at T = 600 K.
+    check_full_Cork_gas(600, 1, CorkFullH2O, 0.14052644311851598)
+
+
+def test_CorkH2O_below_Tc_above_P0() -> None:
+    """Below Tc and above P0."""
+    check_full_Cork_gas(600, 10, CorkFullH2O, 0.40066985009753664)
 
 
 def test_H_fO2() -> None:
