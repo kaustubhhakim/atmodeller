@@ -31,10 +31,10 @@ from atmodeller.constraints import (
 from atmodeller.ideality import (
     CorkCH4,
     CorkCO,
+    CorkCorrespondingStates,
     CorkFull,
     CorkFullCO2,
     CorkH2,
-    CorkSimple,
     CorkSimpleCO2,
 )
 from atmodeller.interfaces import (
@@ -63,13 +63,15 @@ def test_version():
 
 
 def check_simple_Cork_gas(
-    gas_type: Type[CorkSimple], expected_V: float, expected_fugacity_coeff: float
+    temperature: float,
+    pressure: float,
+    gas_type: Type[CorkCorrespondingStates],
+    expected_V: float,
+    expected_fugacity_coeff: float,
 ) -> None:
     """Checks the volume and fugacity cofficient for a given gas type using CorkSimple."""
-    temperature: float = 2000  # K
-    pressure: float = 10  # kbar
     # The class constructor requires no arguments.
-    cork: CorkSimple = gas_type()  # type: ignore
+    cork: CorkCorrespondingStates = gas_type()  # type: ignore
     V: float = cork.volume(temperature, pressure)
     fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
 
@@ -77,36 +79,36 @@ def check_simple_Cork_gas(
     assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
 
 
-def check_full_Cork_gas(gas_type: Type[CorkFull], expected_fugacity_coeff: float) -> None:
+def check_full_Cork_gas(
+    temperature: float, pressure: float, gas_type: Type[CorkFull], expected_fugacity_coeff: float
+) -> None:
     """Checks the fugacity coefficient for a given gas type using CorkFull."""
-    temperature: float = 2000  # K
-    pressure: float = 2  # kbar
     # The class constructor requires no arguments.
     cork: CorkFull = gas_type()  # type: ignore
     fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
 
-    assert fugacity_coeff == expected_fugacity_coeff
+    assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
 
 
 def test_CorkH2() -> None:
-    check_simple_Cork_gas(CorkH2, 3.7218446244368684, 4.672042007568433)
+    check_simple_Cork_gas(2000, 10, CorkH2, 3.7218446244368684, 4.672042007568433)
 
 
 def test_CorkCO() -> None:
-    check_simple_Cork_gas(CorkCO, 4.6747168815213715, 7.698485559533069)
+    check_simple_Cork_gas(2000, 10, CorkCO, 4.6747168815213715, 7.698485559533069)
 
 
 def test_CorkCH4() -> None:
-    check_simple_Cork_gas(CorkCH4, 4.786943829010815, 8.116070626285136)
+    check_simple_Cork_gas(2000, 10, CorkCH4, 4.786943829010815, 8.116070626285136)
 
 
 def test_simple_CorkCO2() -> None:
-    check_simple_Cork_gas(CorkSimpleCO2, 4.672048888683978, 7.1335509191383455)
+    check_simple_Cork_gas(2000, 10, CorkSimpleCO2, 4.672048888683978, 7.1335509191383455)
 
 
 def test_full_CorkCO2() -> None:
     """Below P0 so virial contribution excluded."""
-    check_full_Cork_gas(CorkFullCO2, 1.6063624424808558)
+    check_full_Cork_gas(2000, 2, CorkFullCO2, 1.6063624424808558)
 
 
 def test_H_fO2() -> None:
