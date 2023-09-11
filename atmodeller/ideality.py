@@ -22,7 +22,7 @@ import numpy as np
 from scipy.constants import kilo
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.eos_interfaces import MRKExplicitABC, MRKImplicitABC
+from atmodeller.eos_interfaces import MRKABC, MRKExplicitABC, MRKImplicitABC
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -208,15 +208,15 @@ class VirialCompensation:
 
 
 @dataclass(kw_only=True)
-class MRKH2OLiquidHollandPowell1991(MRKImplicitABC):
-    """MRK a parameter for liquid H2O. Equation 6, Holland and Powell (1991)."""
+class MRKH2OLiquid(MRKImplicitABC):
+    """MRK for liquid H2O. Equation 6, Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(1113.4, -0.88517, 4.53e-3, -1.3183e-5),
     )
     b0: float = field(init=False, default=1.465)
-    Tc: float = field(init=False, default=673.0)  # FIXME: Paper says should be 695 K.
+    Tc: float = field(init=False, default=673.0)  # TODO: Paper says should be 695 K.
 
     def a(self, temperature: float) -> float:
         """MRK a parameter for liquid H2O. Equation 6, Holland and Powell (1991).
@@ -227,7 +227,6 @@ class MRKH2OLiquidHollandPowell1991(MRKImplicitABC):
         Returns:
             MRK a parameter for liquid H2O.
         """
-
         assert temperature <= self.Tc
 
         a: float = (
@@ -241,7 +240,7 @@ class MRKH2OLiquidHollandPowell1991(MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKH2OGasHollandPowell1991(MRKImplicitABC):
+class MRKH2OGas(MRKImplicitABC):
     """MRK for gaseous H2O. Equation 6a, Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(
@@ -265,7 +264,6 @@ class MRKH2OGasHollandPowell1991(MRKImplicitABC):
         Returns:
             MRK a parameter for gaseous H2O.
         """
-
         assert temperature <= self.Tc
 
         a: float = (
@@ -274,11 +272,12 @@ class MRKH2OGasHollandPowell1991(MRKImplicitABC):
             + self.a_coefficients[2] * (self.Tc - temperature) ** 2
             + self.a_coefficients[3] * (self.Tc - temperature) ** 3
         )
+
         return a
 
 
 @dataclass(kw_only=True)
-class MRKH2OFluidHollandPowell1991(MRKImplicitABC):
+class MRKH2OFluid(MRKImplicitABC):
     """MRK a parameter for supercritical H2O. Equation 6, Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(
@@ -302,7 +301,6 @@ class MRKH2OFluidHollandPowell1991(MRKImplicitABC):
         Returns:
             MRK a parameter supercritical H2O.
         """
-
         assert temperature >= self.Tc
 
         a = (
@@ -487,12 +485,12 @@ class CorkFullH2OHollandAndPowell1991(CorkFull):
 
         if temperature >= self.Tc:
             print("temperature >= critical temperature")
-            mrk: MRK = MRKH2OFluidHollandPowell1991()
+            mrk: MRKABC = MRKH2OFluid()
             volume_integral: float = mrk.volume_integral(temperature, pressure)
 
         elif pressure <= self.Psat(temperature):
             print("pressure <= saturation pressure")
-            mrk: MRK = MRKH2OGasHollandPowell1991()
+            mrk: MRKABC = MRKH2OGas()
             volume_init = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
             volume_integral: float = mrk.volume_integral(
                 temperature, pressure, volume_init=volume_init
@@ -502,17 +500,17 @@ class CorkFullH2OHollandAndPowell1991(CorkFull):
             print("temperature < critical temperature and pressure > saturation pressure")
             saturation_pressure: float = self.Psat(temperature)
             # See step (1-4) in Appendix A, Holland and Powell (1991).
-            mrk: MRK = MRKH2OGasHollandPowell1991()
+            mrk: MRKABC = MRKH2OGas()
             volume_init: float = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
             volume_integral1: float = mrk.volume_integral(
                 temperature, saturation_pressure, volume_init=volume_init
             )
-            mrk = MRKH2OLiquidHollandPowell1991()
+            mrk = MRKH2OLiquid()
             volume_init = self.b / 2
             volume_integral2 = mrk.volume_integral(
                 temperature, saturation_pressure, volume_init=volume_init
             )
-            mrk = MRKH2OLiquidHollandPowell1991()
+            mrk = MRKH2OLiquid()
             volume_init = self.GAS_CONSTANT * temperature / pressure + self.b
             volume_integral3 = mrk.volume_integral(temperature, pressure, volume_init=volume_init)
             volume_integral = volume_integral1 - volume_integral2 + volume_integral3
