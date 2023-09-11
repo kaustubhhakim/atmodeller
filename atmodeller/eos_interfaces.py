@@ -595,7 +595,7 @@ class VirialCompensation:
 
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
             Volume term.
@@ -613,7 +613,7 @@ class VirialCompensation:
 
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
             Volume integral.
@@ -628,7 +628,7 @@ class VirialCompensation:
 
 
 @dataclass(kw_only=True)
-class CorkFull(MRKImplicitABC):
+class CorkFullABC(MRKImplicitABC):
     """A Full Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Args:
@@ -691,73 +691,10 @@ class CorkFull(MRKImplicitABC):
 
         return volume
 
-    def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral including virial compensation. Equation 8, Holland and Powell (1991).
-
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
-
-        Returns:
-            Volume integral.
-        """
-        volume_integral: float = super().volume_integral(temperature, pressure)
-
-        if pressure > self.P0:
-            volume_integral += self.virial.volume_integral(temperature, pressure)
-
-        return volume_integral
-
-
-# TODO: testing multiple inheritance.
-@dataclass(kw_only=True)
-class Cork:
-    """A Full Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
-
-    Args:
-        P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly, and may be determined from experimental data. Defaults to zero.
-        a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter.
-        b0: Coefficient to compute the Redlich-Kwong constant b.
-        scaling: Scaling depending on the units of a_coefficients and b0. Defaults to kilo for
-            the Holland and Powell data since pressures are in kbar.
-        a_virial: a coefficients for the virial compensation. Defaults to zero coefficients.
-        b_virial: b coefficients for the virial compensation. Defaults to zero coefficients.
-        c_virial: c coefficients for the virial compensation. Defaults to zero coefficients.
-
-    Attributes:
-        p0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly, and may be determined from experimental data.
-        a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter.
-        b0: Coefficient to compute the Redlich-Kwong constant b.
-        scaling: Scaling depending on the units of a_coefficients and b0.
-        GAS_CONSTANT: Gas constant with the appropriate units depending on the units of
-            a_coefficients and b0.
-        a_virial: a coefficients for the virial compensation.
-        b_virial: b coefficients for the virial compensation.
-        c_virial: c coefficients for the virial compensation.
-        virial: A VirialCompensation instance.
-    """
-
-    P0: float = 0
-    a_virial: tuple[float, float] = field(init=False, default=(0, 0))
-    b_virial: tuple[float, float] = field(init=False, default=(0, 0))
-    c_virial: tuple[float, float] = field(init=False, default=(0, 0))
-    virial: VirialCompensation = field(init=False)
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.virial = VirialCompensation(
-            a_coefficients=self.a_virial,
-            b_coefficients=self.b_virial,
-            c_coefficients=self.c_virial,
-            P0=self.P0,
-        )
-
-    def volume(
+    def volume_integral(
         self, temperature: float, pressure: float, *, volume_init: float | None = None
     ) -> float:
-        """Volume including virial compensation. Equation 7a, Holland and Powell (1991).
+        """Volume integral including virial compensation. Equation 8, Holland and Powell (1991).
 
         Args:
             temperature: Temperature in kelvin.
@@ -765,26 +702,11 @@ class Cork:
             volume_init: Initial volume estimate. Defaults to None.
 
         Returns:
-            Volume including the virial compensation.
+            Volume integral including the virial compensation.
         """
-        volume: float = super().volume(temperature, pressure, volume_init=volume_init)
-
-        if pressure > self.P0:
-            volume += self.virial.volume(temperature, pressure)
-
-        return volume
-
-    def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral including virial compensation. Equation 8, Holland and Powell (1991).
-
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
-
-        Returns:
-            Volume integral.
-        """
-        volume_integral: float = super().volume_integral(temperature, pressure)
+        volume_integral: float = super().volume_integral(
+            temperature, pressure, volume_init=volume_init
+        )
 
         if pressure > self.P0:
             volume_integral += self.virial.volume_integral(temperature, pressure)

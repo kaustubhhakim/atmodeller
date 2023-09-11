@@ -32,7 +32,7 @@ from atmodeller.ideality import (
     CorkCH4,
     CorkCO,
     CorkCorrespondingStates,
-    CorkFull,
+    CorkFullABC,
     CorkFullCO2,
     CorkFullH2O,
     CorkH2,
@@ -81,7 +81,10 @@ def check_simple_Cork_gas(
 
 
 def check_full_Cork_gas(
-    temperature: float, pressure: float, gas_type: Type[CorkFull], expected_fugacity_coeff: float
+    temperature: float,
+    pressure: float,
+    gas_type: Type[CorkFullABC],
+    expected_fugacity_coeff: float,
 ) -> None:
     """Checks the fugacity coefficient for a given gas type using CorkFull."""
     # The class constructor requires no arguments.
