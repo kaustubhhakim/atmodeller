@@ -30,7 +30,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class MRK(GetValueABC):
+class MRKABC(GetValueABC):
     """A Modified Redlich Kwong (MRK) EOS.
 
     For example, Equation 3, Holland and Powell (1991):
@@ -193,7 +193,7 @@ class MRK(GetValueABC):
 
 
 @dataclass(kw_only=True)
-class MRKExplicit(MRK):
+class MRKExplicitABC(MRKABC):
     """A Modified Redlich Kwong (MRK) EOS with explicit equations for the volume and its integral.
 
     Args:
@@ -263,7 +263,7 @@ class MRKExplicit(MRK):
 
 
 @dataclass(kw_only=True)
-class MRKImplicit(MRK):
+class MRKImplicitABC(MRKABC):
     """A Modified Redlich Kwong (MRK) EOS in an implicit form.
 
     Args:

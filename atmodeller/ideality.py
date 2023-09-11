@@ -22,7 +22,7 @@ import numpy as np
 from scipy.constants import kilo
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.eos_interfaces import MRK, MRKExplicit, MRKImplicit
+from atmodeller.eos_interfaces import MRKExplicitABC, MRKImplicitABC
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -39,9 +39,14 @@ class VirialCompensation:
     case c=0. Pc and Tc are required for gases which are known to obey approximately the principle
     of corresponding states.
 
+    Although this looks similar to an EOS, it's important to remember that it only calculates an
+    additional perturbation to the volume and the volume integral of an MRK EOS, and hence it does
+    not return a meaningful volume or volume integral by itself.
+
     Args:
         a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
-            may be additionally scaled by Tc and Pc in the case of corresponding states.
+            may be additionally scaled (internally) by Tc and Pc in the case of corresponding
+            states.
         b_coefficients: As above for the b coefficients.
         c_coefficients: As above for the c coefficients.
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
@@ -54,7 +59,8 @@ class VirialCompensation:
 
     Attributes:
         a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
-            may be additionally scaled by Tc and Pc in the case of corresponding states.
+            may be additionally (internally) scaled by Tc and Pc in the case of corresponding
+            states.
         b_coefficients: As above for the b coefficients.
         c_coefficients: As above for the c coefficients.
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
@@ -82,6 +88,9 @@ class VirialCompensation:
     def a(self, temperature: float) -> float:
         """a parameter.
 
+        Note the scalings by self.Tc and self.Pc to accommodate corresponding states. For example,
+        Equation 9 in Holland and Powell (1991).
+
         Args:
             temperature: Temperature in kelvin.
 
@@ -96,6 +105,9 @@ class VirialCompensation:
     def b(self, temperature: float) -> float:
         """b parameter.
 
+        Note the scalings by self.Tc and self.Pc to accommodate corresponding states. For example,
+        Equation 9 in Holland and Powell (1991).
+
         Args:
             temperature: Temperature in kelvin.
 
@@ -109,6 +121,8 @@ class VirialCompensation:
 
     def c(self, temperature: float) -> float:
         """c parameter.
+
+        Note the scalings by self.Tc and self.Pc to accommodate corresponding states.
 
         Args:
             temperature: Temperature in kelvin.
@@ -126,14 +140,16 @@ class VirialCompensation:
 
         Equation A.2., Holland and Powell (1991).
 
+        Note that since this EOS is computing a perturbation the volume integral relates to the
+        fugacity coefficient and NOT the fugacity as would ordinarily be assumed.
+
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
-            ln(fugacity_coefficient).
+            Natural log of the fugacity coefficient.
         """
-
         ln_fugacity_coefficient: float = self.volume_integral(temperature, pressure) / (
             self.GAS_CONSTANT * temperature
         )
@@ -145,10 +161,10 @@ class VirialCompensation:
 
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
-            fugacity_coefficient.
+            Fugacity coefficient.
         """
         fugacity_coefficient: float = np.exp(self.ln_fugacity_coefficient(temperature, pressure))
 
@@ -180,7 +196,7 @@ class VirialCompensation:
             pressure: Pressure in kbar.
 
         Returns:
-            Volume integral in kJ mol^(-1).
+            Volume integral.
         """
         volume_integral: float = (
             self.a(temperature) / 2.0 * (pressure - self.P0) ** 2
@@ -192,7 +208,7 @@ class VirialCompensation:
 
 
 @dataclass(kw_only=True)
-class MRKH2OLiquidHollandPowell1991(MRKImplicit):
+class MRKH2OLiquidHollandPowell1991(MRKImplicitABC):
     """MRK a parameter for liquid H2O. Equation 6, Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(
@@ -225,7 +241,7 @@ class MRKH2OLiquidHollandPowell1991(MRKImplicit):
 
 
 @dataclass(kw_only=True)
-class MRKH2OGasHollandPowell1991(MRKImplicit):
+class MRKH2OGasHollandPowell1991(MRKImplicitABC):
     """MRK for gaseous H2O. Equation 6a, Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(
@@ -262,7 +278,7 @@ class MRKH2OGasHollandPowell1991(MRKImplicit):
 
 
 @dataclass(kw_only=True)
-class MRKH2OFluidHollandPowell1991(MRKImplicit):
+class MRKH2OFluidHollandPowell1991(MRKImplicitABC):
     """MRK a parameter for supercritical H2O. Equation 6, Holland and Powell (1991)."""
 
     a_coefficients: tuple[float, ...] = field(
@@ -300,7 +316,7 @@ class MRKH2OFluidHollandPowell1991(MRKImplicit):
 
 
 @dataclass(kw_only=True)
-class CorkFull(MRKImplicit):
+class CorkFull(MRKImplicitABC):
     """A Full Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     The units in Holland and Powell (1991) are K and kbar, so note unit conversions where relevant.
@@ -520,7 +536,7 @@ class CorkFullH2O(CorkFullH2OHollandAndPowell1991):
 
 
 @dataclass(kw_only=True)
-class CorkCorrespondingStates(MRKExplicit):
+class CorkCorrespondingStates(MRKExplicitABC):
     """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
