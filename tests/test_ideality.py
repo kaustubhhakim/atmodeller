@@ -28,7 +28,7 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.ideality import (
+from atmodeller.eos import (
     CorkCH4,
     CorkCO,
     CorkCorrespondingStates,
