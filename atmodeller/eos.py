@@ -195,7 +195,9 @@ class CorkFullH2OHollandAndPowell1991(CorkFullABC):
     See base class.
     """
 
-    a_coefficients: tuple[float, ...] = field(init=False)
+    a_coefficients: tuple[float, ...] = field(
+        init=False, default=(0,)
+    )  # TODO: Check not required.
     b0: float = field(init=False, default=1.465)
     a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
     b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))

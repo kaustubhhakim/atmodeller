@@ -26,6 +26,7 @@ from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
+    PressureConstraint,
     SystemConstraints,
 )
 from atmodeller.eos import (
@@ -42,6 +43,7 @@ from atmodeller.interfaces import (
     GasSpecies,
     IdealityConstant,
     NoSolubility,
+    SolidSpecies,
     ThermodynamicData,
     ThermodynamicDataBase,
 )
@@ -226,6 +228,80 @@ def test_H2_with_cork() -> None:
         [
             FugacityConstraint(species="H2", value=1e3),
             IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target_pressures: dict[str, float] = {
+        "H2": 747.5737656770727,
+        "H2O": 1072.4328856736947,
+        "O2": 9.76211086495026e-08,
+    }
+
+    system.solve(SystemConstraints(constraints))
+    print(system.output)
+    assert system.isclose(target_pressures)
+
+
+def test_CORK() -> None:
+    """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer."""
+    species: Species = Species(
+        [
+            GasSpecies(
+                chemical_formula="H2",
+                solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
+                fugacity_coefficient=CorkH2(),
+            ),
+            GasSpecies(
+                chemical_formula="H2O",
+                solubility=PeridotiteH2O(),
+                thermodynamic_class=thermodynamic_data,
+                fugacity_coefficient=CorkFullH2O(),
+            ),
+            GasSpecies(
+                chemical_formula="O2",
+                solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
+            ),
+            # GasSpecies(
+            #     chemical_formula="CO",
+            #     solubility=NoSolubility(),
+            #     thermodynamic_class=thermodynamic_data,
+            # ),
+            # GasSpecies(
+            #     chemical_formula="CO2",
+            #     solubility=NoSolubility(),
+            #     thermodynamic_class=thermodynamic_data,
+            # ),
+            # GasSpecies(
+            #     chemical_formula="CH4",
+            #     solubility=NoSolubility(),
+            #     thermodynamic_class=thermodynamic_data,
+            # ),
+            # SolidSpecies(
+            #     chemical_formula="C",
+            #     name_in_thermodynamic_data="graphite",
+            #     thermodynamic_class=thermodynamic_data,
+            # ),  # Ideal activity by default.
+        ]
+    )
+
+    oceans: float = 10
+    planet: Planet = Planet()
+    planet.surface_temperature = 2000  # K 600 + 273  # K
+    h_kg: float = earth_oceans_to_kg(oceans)
+    c_kg: float = h_kg
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(species="H2", value=958),
+            # PressureConstraint(species="H2", value=734),
+            IronWustiteBufferConstraintHirschmann(),
+            # FugacityConstraint(species="CO", value=1e3),
+            # MassConstraint(species="C", value=c_kg),
+            # FugacityConstraint(species="CH4", value=1e2),
         ]
     )
 
