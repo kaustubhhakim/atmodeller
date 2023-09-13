@@ -300,6 +300,7 @@ def test_CORK() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(species="H2", value=958),
+            # MassConstraint(species="H", value=h_kg),
             # PressureConstraint(species="H2", value=734),
             IronWustiteBufferConstraintHirschmann(),
             # FugacityConstraint(species="CO", value=1e3),
