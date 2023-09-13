@@ -63,6 +63,7 @@ class AndesiteS2_Sulfate(Solubility):
         return ppmw
 
 
+
 class AndesiteSO_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
@@ -174,32 +175,6 @@ class AndesiteS2(Solubility):
         return solubility
 
 
-class AndesiteSO(Solubility):
-    """Total S solubility accounting for both sulfide and sulfate dissolution."""
-
-    def __init__(self):
-        self.sulfide_solubility: Solubility = AndesiteSO_Sulfide()
-        self.sulfate_solubility: Solubility = AndesiteSO_Sulfate()
-
-    def _solubility(self, *args, **kwargs) -> float:
-        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
-        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
-        return solubility
-
-
-class AndesiteSO2(Solubility):
-    """Total S solubility accounting for both sulfide and sulfate dissolution."""
-
-    def __init__(self):
-        self.sulfide_solubility: Solubility = AndesiteSO2_Sulfide()
-        self.sulfate_solubility: Solubility = AndesiteSO2_Sulfate()
-
-    def _solubility(self, *args, **kwargs) -> float:
-        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
-        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
-        return solubility
-
-
 # endregion
 
 
@@ -288,6 +263,10 @@ class BasaltS2_Sulfate(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = -12.948 + (32333.5635 / temperature)
+        logSO4_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
+        SO4_wtp = 10**logSO4_wtp
+        S_wtp = SO4_wtp * (32.065 / 96.06)
+        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
         logS_wtp: float = (
             logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         )
@@ -295,10 +274,11 @@ class BasaltS2_Sulfate(Solubility):
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         # TODO: To discuss.  This does influence the results of the sulphur test suite. Maybe
         # better to instead sanity check the solubilities once a solution has been found?
+
         if ppmw >= 1000:
             msg: str = "S2 sulfate solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
-            ppmw = 1000.0  # Could be dangerous to assign an arbitrary cut-off.  Make a parameter?
+            # ppmw = 1000.0  # Could be dangerous to assign an arbitrary cut-off.  Make a parameter?
             # raise KeyError(msg)
         return ppmw
 
@@ -323,7 +303,7 @@ class BasaltSO_Sulfate(Solubility):
         if ppmw >= 1000:
             msg = "WARNING: SO Sulfate Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
-            ppmw = 1000.0
+            # ppmw = 1000.0
             # raise KeyError(msg)
         return ppmw
 
@@ -348,7 +328,7 @@ class BasaltSO2_Sulfate(Solubility):
         if ppmw >= 1000:
             msg = "WARNING: SO2 Sulfate Solubility is getting too high: \n%s" % (ppmw)
             logger.warning(msg)
-            ppmw = 1000.0
+            # ppmw = 1000.0
             # raise KeyError(msg)
         return ppmw
 
@@ -371,7 +351,7 @@ class BasaltS2_Sulfide(Solubility):
         if ppmw >= 1000:
             msg: str = "S2 sulfide solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
-            ppmw = 1000.0
+            # ppmw = 1000.0
             # raise KeyError(msg)
         return ppmw
 
@@ -396,7 +376,7 @@ class BasaltSO_Sulfide(Solubility):
         if ppmw >= 1000:
             msg: str = "SO sulfide solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
-            ppmw = 1000.0
+            # ppmw = 1000.0
             # raise KeyError(msg)
         return ppmw
 
@@ -421,7 +401,7 @@ class BasaltSO2_Sulfide(Solubility):
         if ppmw >= 1000:
             msg: str = "SO2 sulfide solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
-            ppmw = 1000.0
+            # ppmw = 1000.0
             # raise KeyError(msg)
         return ppmw
 
@@ -432,32 +412,6 @@ class BasaltS2(Solubility):
     def __init__(self):
         self.sulfide_solubility: Solubility = BasaltS2_Sulfide()
         self.sulfate_solubility: Solubility = BasaltS2_Sulfate()
-
-    def _solubility(self, *args, **kwargs) -> float:
-        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
-        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
-        return solubility
-
-
-class BasaltSO(Solubility):
-    """Total S solubility accounting for both sulfide and sulfate dissolution."""
-
-    def __init__(self):
-        self.sulfide_solubility: Solubility = BasaltSO_Sulfide()
-        self.sulfate_solubility: Solubility = BasaltSO_Sulfate()
-
-    def _solubility(self, *args, **kwargs) -> float:
-        solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
-        solubility += self.sulfate_solubility._solubility(*args, **kwargs)
-        return solubility
-
-
-class BasaltSO2(Solubility):
-    """Total S solubility accounting for both sulfide and sulfate dissolution."""
-
-    def __init__(self):
-        self.sulfide_solubility: Solubility = BasaltSO2_Sulfide()
-        self.sulfate_solubility: Solubility = BasaltSO2_Sulfate()
 
     def _solubility(self, *args, **kwargs) -> float:
         solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
@@ -585,18 +539,15 @@ class SilicicMeltsH2(Solubility):
 # Dictionaries of self-consistent solubility laws for a given composition.
 andesite_solubilities: dict[str, Solubility] = {
     "H2": AndesiteH2(),
-    "O2S": AndesiteSO2(),
-    "OS": AndesiteSO(),
     "S2": AndesiteS2(),
 }
+
 anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
 basalt_solubilities: dict[str, Solubility] = {
     "H2O": BasaltDixonH2O(),
     "CO2": BasaltDixonCO2(),
     "H2": BasaltH2(),
     "N2": BasaltLibourelN2(),
-    "O2S": BasaltSO2(),
-    "OS": BasaltSO(),
     "S2": BasaltS2(),
 }
 peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O()}
