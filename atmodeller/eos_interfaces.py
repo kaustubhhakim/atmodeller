@@ -39,7 +39,7 @@ class FugacityModelABC(GetValueABC):
     RTlnf = integral(VdP).
 
     Args:
-        scaling: Scaling depending on the units of pressure (iei, 1 for bar, kilo for kbar).
+        scaling: Scaling depending on the units of pressure (i.e., 1 for bar, kilo for kbar).
 
     Attributes:
         scaling: Scaling depending on the units.

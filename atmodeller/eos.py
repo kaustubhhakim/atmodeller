@@ -18,9 +18,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+import numpy as np
+from scipy.constants import kilo
+
 from atmodeller.eos_interfaces import (
     MRKABC,
     CorkFullABC,
+    FugacityModelABC,
     MRKExplicitABC,
     MRKImplicitABC,
     VirialCompensation,
@@ -473,3 +477,185 @@ class CorkH2S(CorkCorrespondingStates):
 
     Tc: float = field(init=False, default=373.4)
     Pc: float = field(init=False, default=0.08963)
+
+
+@dataclass(kw_only=True)
+class SaxenaFeiH2(FugacityModelABC):
+    """Saxena and Fei (1988) fugacity model for H2.
+
+    https://www.sciencedirect.com/science/article/abs/pii/0016703788902736
+
+    Attributes:
+        Tc: Critical temperature in kelvin.
+        Pc: Critical pressure in bar.
+        a_coefficients: a coefficients (see paper).
+        b_coefficients: a coefficients (see paper).
+        c_coefficients: a coefficients (see paper).
+        d_coefficients: a coefficients (see paper).
+        scaling: Scaling is unity for bar.
+        GAS_CONSTANT: Gas constant with the appropriate units.
+    """
+
+    Tc: float = field(init=False, default=13)  # kelvin
+    Pc: float = field(init=False, default=33.1)  # bar
+
+    a_coefficients: tuple[float, float, float, float] = field(
+        init=False, default=(1.6688, -2.0759, -9.6173, -0.1694)
+    )
+    b_coefficients: tuple[float, float, float, float] = field(
+        init=False, default=(-2.0410e-3, 7.9230e-2, 5.4295e-2, 4.0887e-4)
+    )
+    c_coefficients: tuple[float, float, float, float] = field(
+        init=False, default=(-2.1693e-7, 1.7406e-6, -2.1885e-4, 5.0897e-5)
+    )
+    d_coefficients: tuple[float, float, float, float] = field(
+        init=False, default=(-7.1635e-12, 1.6197e-10, -4.8181e-9, 0)
+    )
+
+    def _get_compressibility_coefficient(
+        self, temperature: float, coefficients: tuple[float, float, float, float]
+    ) -> float:
+        """General form of the coefficients for the compressibility calculation.
+
+        Args:
+            temperature: Temperature in kelvin.
+            coefficients: Tuple of the coefficients a, b, c, or d.
+
+        Returns
+            The relevant coefficient.
+        """
+        Tr: float = self.reduced_temperature(temperature)
+        coefficient: float = (
+            coefficients[0]
+            + coefficients[1] / Tr
+            + coefficients[2] / Tr**2
+            + coefficients[3] * np.log(Tr)
+        )
+
+        return coefficient
+
+    def a(self, temperature: float) -> float:
+        """a parameter.
+
+        Args:
+            Temperature: temperature in kelvin.
+
+        Returns:
+            a parameter.
+        """
+        return self._get_compressibility_coefficient(temperature, self.a_coefficients)
+
+    def b(self, temperature: float) -> float:
+        """b parameter.
+
+        Args:
+            Temperature: temperature in kelvin.
+
+        Returns:
+            b parameter.
+        """
+        return self._get_compressibility_coefficient(temperature, self.b_coefficients)
+
+    def c(self, temperature: float) -> float:
+        """c parameter.
+
+        Args:
+            Temperature: temperature in kelvin.
+
+        Returns:
+            c parameter.
+        """
+        return self._get_compressibility_coefficient(temperature, self.c_coefficients)
+
+    def d(self, temperature: float) -> float:
+        """d parameter.
+
+        Args:
+            Temperature: temperature in kelvin.
+
+        Returns:
+            d parameter.
+        """
+        return self._get_compressibility_coefficient(temperature, self.d_coefficients)
+
+    def compressibility_parameter(self, temperature: float, pressure: float) -> float:
+        """Compressibility parameter at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            The compressibility parameter, Z.
+        """
+
+        Pr: float = self.reduced_pressure(pressure)
+        Z: float = (
+            self.a(temperature)
+            + self.b(temperature) * Pr
+            + self.c(temperature) * Pr**2
+            + self.d(temperature) * Pr**3
+        )
+
+        return Z
+
+    def reduced_pressure(self, pressure: float) -> float:
+        """Reduced pressure.
+
+        Args:
+            pressure: Pressure in kbar.
+
+        Returns:
+            The reduced pressure, which is dimensionless.
+        """
+        return pressure / self.Pc
+
+    def reduced_temperature(self, temperature: float) -> float:
+        """Reduced temperature.
+
+        Args:
+            temperature: Temperature in kelvin.
+
+        Returns:
+            The reduced temperature, which is dimensionless.
+        """
+        return temperature / self.Tc
+
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume.
+        """
+        Z: float = self.compressibility_parameter(temperature, pressure)
+        volume: float = Z * self.GAS_CONSTANT * temperature / pressure
+
+        return volume
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (V dP).
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume integral.
+        """
+        Pr: float = self.reduced_pressure(pressure)
+        volume_integral: float = (
+            (
+                self.a(temperature) * np.log(pressure)
+                + self.b(temperature) * Pr
+                + 0.5 * self.c(temperature) * Pr**2
+                + (1 / 3) * self.d(temperature) * Pr**3
+            )
+            * self.GAS_CONSTANT
+            * temperature
+        )
+
+        return volume_integral
