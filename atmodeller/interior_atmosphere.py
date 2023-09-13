@@ -726,6 +726,28 @@ class InteriorAtmosphereSystem:
             )
         logger.debug("Conforming initial solution to solid activities = %s", initial_solution)
 
+    def _conform_initial_solution_to_constraints(
+        self, initial_solution: np.ndarray, constraints: SystemConstraints
+    ) -> None:
+        """Conforms the initial solution (estimate) to pressure and fugacity constraints.
+
+        Pressure and fugacity constraints can be imposed directly on the initial solution
+        estimate. For simplicity we impose both as pressure constraints.
+
+        Args:
+            initial_solution: Initial estimate of the solution.
+            constraints: Constraints for the system of equations.
+        """
+        for constraint in constraints.reaction_network_constraints:
+            index: int = self.species.indices[constraint.species]
+            logger.debug("Setting %s %d", constraint.species, index)
+            initial_solution[index] = np.log10(
+                constraint.get_value(
+                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
+                )
+            )
+        logger.debug("Conforming initial solution to constraints = %s", initial_solution)
+
     def _solve_fsolve(
         self,
         *,
@@ -738,10 +760,13 @@ class InteriorAtmosphereSystem:
             constraints: Constraints for the system of equations.
             initial_solution: Initial guess for the log10 pressures.
         """
-
+        # Initial guess for gas species is 1 log10 unit, i.e. 10 bar.
         if initial_solution is None:
             initial_solution = np.ones_like(self.species, dtype=np.float_)
+
         self._conform_initial_solution_to_solid_activities(initial_solution)
+        self._conform_initial_solution_to_constraints(initial_solution, constraints)
+
         ier: int = 0
         # Count the number of attempts to solve the system by randomising the initial condition.
         ic_count: int = 1
@@ -770,6 +795,7 @@ class InteriorAtmosphereSystem:
                 # Increase or decrease the magnitude of all pressures.
                 initial_solution *= 2 * np.random.random_sample()
                 self._conform_initial_solution_to_solid_activities(initial_solution)
+                self._conform_initial_solution_to_constraints(initial_solution, constraints)
                 logger.debug("initial_solution = %s", initial_solution)
                 ic_count += 1
 

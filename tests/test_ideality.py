@@ -48,7 +48,7 @@ from atmodeller.interfaces import (
     ThermodynamicDataBase,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import PeridotiteH2O
+from atmodeller.solubilities import BasaltDixonCO2, BasaltH2, BasaltSO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
 # Tolerances to compare the test results with target output.
@@ -250,7 +250,7 @@ def test_CORK() -> None:
         [
             GasSpecies(
                 chemical_formula="H2",
-                solubility=NoSolubility(),
+                solubility=BasaltH2(),
                 thermodynamic_class=thermodynamic_data,
                 fugacity_coefficient=CorkH2(),
             ),
@@ -265,21 +265,24 @@ def test_CORK() -> None:
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
             ),
-            # GasSpecies(
-            #     chemical_formula="CO",
-            #     solubility=NoSolubility(),
-            #     thermodynamic_class=thermodynamic_data,
-            # ),
-            # GasSpecies(
-            #     chemical_formula="CO2",
-            #     solubility=NoSolubility(),
-            #     thermodynamic_class=thermodynamic_data,
-            # ),
-            # GasSpecies(
-            #     chemical_formula="CH4",
-            #     solubility=NoSolubility(),
-            #     thermodynamic_class=thermodynamic_data,
-            # ),
+            GasSpecies(
+                chemical_formula="CO",
+                solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
+                fugacity_coefficient=CorkCO(),
+            ),
+            GasSpecies(
+                chemical_formula="CO2",
+                solubility=BasaltDixonCO2(),
+                thermodynamic_class=thermodynamic_data,
+                fugacity_coefficient=CorkFullCO2(),
+            ),
+            GasSpecies(
+                chemical_formula="CH4",
+                solubility=NoSolubility(),
+                thermodynamic_class=thermodynamic_data,
+                fugacity_coefficient=CorkCH4(),
+            ),
             # SolidSpecies(
             #     chemical_formula="C",
             #     name_in_thermodynamic_data="graphite",
@@ -300,7 +303,7 @@ def test_CORK() -> None:
             # PressureConstraint(species="H2", value=734),
             IronWustiteBufferConstraintHirschmann(),
             # FugacityConstraint(species="CO", value=1e3),
-            # MassConstraint(species="C", value=c_kg),
+            MassConstraint(species="C", value=c_kg),
             # FugacityConstraint(species="CH4", value=1e2),
         ]
     )
@@ -308,9 +311,12 @@ def test_CORK() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2": 747.5737656770727,
-        "H2O": 1072.4328856736947,
-        "O2": 9.76211086495026e-08,
+        "CH4": 10.362368367415021,
+        "CO": 276.0229490743045,
+        "CO2": 64.1797264653132,
+        "H2": 696.9735901947636,
+        "H2O": 933.3318808785544,
+        "O2": 9.862056623578625e-08,
     }
 
     system.solve(SystemConstraints(constraints))
