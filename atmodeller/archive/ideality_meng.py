@@ -1,25 +1,19 @@
-"""Fugacity coefficients and non-ideal effects.
+"""Functions originally written by Meng to compute pure gas fugacities from Holland and Powell.
 
-License:
-    This program is free software: you can redistribute it and/or modify it under the terms of the 
-    GNU General Public License as published by the Free Software Foundation, either version 3 of 
-    the License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
-    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
-    the GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along with this program. If 
-    not, see <https://www.gnu.org/licenses/>.
+This module can be deleted once testing is complete.
 """
-from __future__ import annotations
 
 import logging
 
 import numpy as np
+from scipy.constants import kilo
 from scipy.optimize import fsolve
 
+from atmodeller import GAS_CONSTANT, debug_logger
+
 logger: logging.Logger = logging.getLogger(__name__)
+
+GAS_CONSTANT_KJ: float = GAS_CONSTANT / kilo
 
 
 # calculate pure gas fugacity coefficient and Modified Redlich-Kwang volume
@@ -29,20 +23,23 @@ def Calc_lambda(P, T, a, b, V_init):
     pressure in this function is in kbar, temperature in K
     """
 
-    R = 8.314472e-3  # Note unit in kJ requires P in kbar
     EOS = (
         lambda V: P * V**3
-        - R * T * V**2
-        - (b * R * T + b**2 * P - a / np.sqrt(T)) * V
+        - GAS_CONSTANT_KJ * T * V**2
+        - (b * GAS_CONSTANT_KJ * T + b**2 * P - a / np.sqrt(T)) * V
         - a * b / np.sqrt(T)
     )
-    Jacob = lambda V: 3 * P * V**2 - 2 * R * T * V - (b * R * T + b**2 * P - a / np.sqrt(T))
+    Jacob = (
+        lambda V: 3 * P * V**2
+        - 2 * GAS_CONSTANT_KJ * T * V
+        - (b * GAS_CONSTANT_KJ * T + b**2 * P - a / np.sqrt(T))
+    )
     V_mrk = fsolve(EOS, V_init, fprime=Jacob, xtol=1e-6)
 
     # compressibility factor
-    Z = P * V_mrk / (R * T)
-    B = b * P / (R * T)
-    A = a / (b * R * T**1.5)
+    Z = P * V_mrk / (GAS_CONSTANT_KJ * T)
+    B = b * P / (GAS_CONSTANT_KJ * T)
+    A = a / (b * GAS_CONSTANT_KJ * T**1.5)
     lnlambda = Z - 1.0 - np.log(Z - B) - A * np.log(1.0 + B / Z)
 
     return lnlambda, V_mrk
@@ -51,7 +48,7 @@ def Calc_lambda(P, T, a, b, V_init):
 # calculate pure gas fugacity using the CORK equation from HP98
 # return value is RTlnf in Joules, rather than f
 def Calc_V_f(P, T, name):
-    R = 8.314472e-3  # Note unit in kJ requires P in kbar
+    R = GAS_CONSTANT * 1e-3  # Note unit in kJ requires P in kbar
     if (name == "H2O") | (name == "CO2"):
         if name == "H2O":
             a0 = 1113.4
@@ -99,17 +96,22 @@ def Calc_V_f(P, T, name):
         else:
             if P <= Psat:
                 V_init = R * T / P + 10.0 * b
-                lnlambda_mrk, V_mrk = Calc_lambda(P, T, a_gas, b, V_init)
+                lnlambda_mrk, V_mrk = Calc_lambda(P, T, a_gas, b, V_init)  # type: ignore
+                # print(lnlambda_mrk, V_mrk)
 
             else:
+                # print("Psat = %f" % Psat)
                 V_init = R * T / P + 10.0 * b
-                lnlambda1, V_mrk = Calc_lambda(Psat, T, a_gas, b, V_init)
+                lnlambda1, V_mrk = Calc_lambda(Psat, T, a_gas, b, V_init)  # type: ignore
+                # print(lnlambda1, V_mrk)
 
                 V_init = b / 2.0
                 lnlambda2, V_mrk = Calc_lambda(Psat, T, a, b, V_init)
+                # print(lnlambda2, V_mrk)
 
                 V_init = R * T / P + b
                 lnlambda3, V_mrk = Calc_lambda(P, T, a, b, V_init)
+                # print(lnlambda3, V_mrk)
 
                 lnlambda_mrk = lnlambda1 - lnlambda2 + lnlambda3
 
@@ -131,7 +133,7 @@ def Calc_V_f(P, T, name):
             V_vir = 0.0
 
         lnlambda = lnlambda_mrk + lnlambda_vir
-        V = V_mrk + V_vir
+        V = V_mrk + V_vir  # type: ignore
         RTlnf = R * T * lnlambda + R * T * np.log(P / 1e-3)
         RTlnf = 1e3 * RTlnf  # convert to J
 
@@ -158,10 +160,10 @@ def Calc_V_f(P, T, name):
         d0 = 6.93054e-7
         d1 = -8.38293e-8
 
-        a = a0 * Tc ** (5.0 / 2.0) / Pc + a1 * Tc ** (3.0 / 2.0) / Pc * T
-        b = b0 * Tc / Pc
-        c = c0 * Tc / Pc ** (3.0 / 2.0) + c1 / Pc ** (3.0 / 2.0) * T
-        d = d0 * Tc / Pc**2 + d1 / Pc**2 * T
+        a = a0 * Tc ** (5.0 / 2.0) / Pc + a1 * Tc ** (3.0 / 2.0) / Pc * T  # type: ignore
+        b = b0 * Tc / Pc  # type: ignore
+        c = c0 * Tc / Pc ** (3.0 / 2.0) + c1 / Pc ** (3.0 / 2.0) * T  # type: ignore
+        d = d0 * Tc / Pc**2 + d1 / Pc**2 * T  # type: ignore
 
         V = (
             R * T / P
@@ -179,3 +181,45 @@ def Calc_V_f(P, T, name):
         )
 
         return V, 1e3 * RTlnf
+
+
+def main():
+    """For testing."""
+
+    # 1 bar = 10^5 Pa
+    # 1 kbar = 10^8 Pa
+    # 10 kbar = 1 GPa
+
+    # Comparison with Kite's H2 fugacity coefficient is not great. But around >30kbar the fugacity
+    # coefficient for H2 maxes out and then decreases again.
+
+    debug_logger()
+
+    pressure: float = 0.1  # kbar
+    temperature: float = 600  # K
+
+    print("\nMengs functions\n")
+    print("temperature = %s, pressure = %s\n" % (temperature, pressure))
+    print("Corresponding states:\n")
+    V, RTlnf = Calc_V_f(pressure, temperature, "CO")
+    print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
+    V, RTlnf = Calc_V_f(pressure, temperature, "CH4")
+    print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
+    V, RTlnf = Calc_V_f(pressure, temperature, "H2")
+    print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
+    print("\n")
+    print("Full CORK:\n")
+    V, RTlnf = Calc_V_f(pressure, temperature, "CO2")
+    print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
+    fugacity: float = np.exp(RTlnf / (GAS_CONSTANT * temperature))
+    fugacity_coeff: float = fugacity / 1000 / pressure
+    print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+    V, RTlnf = Calc_V_f(pressure, temperature, "H2O")
+    print("H2O: V = %f, RTlnf = %f" % (V, RTlnf))
+    fugacity: float = np.exp(RTlnf / (GAS_CONSTANT * temperature))
+    fugacity_coeff: float = fugacity / 1000 / pressure
+    print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+
+
+if __name__ == "__main__":
+    main()

@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -36,67 +36,80 @@ if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 
-class SystemConstraint(Protocol):
-    """A constraint to apply to an interior-atmosphere system."""
+class GetValueABC(ABC):
+    """An object with a get_value method."""
 
-    name: str
-    species: str
-
-    def get_value(self, *args, **kwargs) -> float:
-        """Computes the value of the constraint for given input arguments.
+    @abstractmethod
+    def get_value(self, **kwargs) -> float:
+        """Computes the value for given input arguments.
 
         Args:
-            *args: Positional arguments.
-            **kwargs: Keyword arguments.
+            **kwargs: Keyword arguments only.
 
         Returns:
-            The evaluation of the constraint according to *args and **kwargs.
+            An evaluation based on the provided arguments.
         """
         ...
 
 
-@dataclass(kw_only=True)
-class ConstantSystemConstraint(ABC):
-    """A constant value constraint.
+@dataclass(kw_only=True, frozen=True)
+class ConstraintABC(GetValueABC):
+    """A constraint to apply to an interior-atmosphere system.
 
     Args:
-        name: Constraint name, which must be one of: fugacity, pressure, or mass.
-        species: The species to constrain. Usually a species for a pressure or fugacity constraint
-            or an element for a mass constraint.
-        value: The constant value. Imposed value in kg for masses and bar for pressures or
-            fugacities.
+        name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
+            'mass'.
+        species: The species to constrain, typically representing a species for 'pressure' or
+            'fugacity' constraints or an element for 'mass' constraints.
 
     Attributes:
-        name: Constraint name.
+        name: The name of the constraint.
         species: The species to constrain.
-        value: The constant value.
     """
 
     name: str
     species: str
+
+
+@dataclass(kw_only=True, frozen=True)
+class ConstantConstraint(ConstraintABC):
+    """A constraint of a constant value.
+
+    Args:
+        name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
+            'mass'.
+        species: The species to constrain, typically representing a species for 'pressure' or
+            'fugacity' constraints or an element for 'mass' constraints.
+        value: The constant value, which is usually in kg for masses and bar for pressures or
+            fugacities.
+
+    Attributes:
+        name: The name of the constraint.
+        species: The species to constrain.
+        value: The constant value.
+    """
+
     value: float
 
-    def get_value(self, *args, **kwargs) -> float:
+    def get_value(self, **kwargs) -> float:
         """Returns the constant value. See base class."""
-        del args
         del kwargs
         return self.value
 
 
-@dataclass(kw_only=True)
-class IdealityConstant(ConstantSystemConstraint):
-    """A constant activity or fugacity coefficient.
+@dataclass(kw_only=True, frozen=True)
+class IdealityConstant(ConstantConstraint):
+    """A constant fugacity coefficient or activity.
 
-    Note:
-        name and species are usually updated after instantiation to ensure they are consistent with
-        the species that instantiated this class.
+    The constructor must accept no arguments to enable it to be used as a default factory when the
+    user does not specify a fugacity coefficient model for a gas species or an activity model for
+    a solid species. Therefore, the name and species arguments are set to empty strings because
+    they are not used.
 
     Args:
         value: The constant value. Defaults to 1 (i.e. ideal behaviour).
 
     Attributes:
-        name: Constraint name.
-        species: The species to constrain.
         value: The constant value.
     """
 
@@ -105,33 +118,42 @@ class IdealityConstant(ConstantSystemConstraint):
     value: float = 1.0
 
 
-class Solubility(ABC):
-    """Solubility base class."""
+class Solubility(GetValueABC):
+    """A solubility law for a species."""
 
     def power_law(self, fugacity: float, constant: float, exponent: float) -> float:
-        """Power law. Fugacity in bar and returns ppmw."""
+        """Computes solubility from a power law.
+
+        Args:
+            fugacity: Fugacity of the species in bar.
+            constant: Constant for the power law.
+            exponent: Exponent for the power law.
+
+        Returns:
+            Dissolved volatile concentration in the melt in ppmw.
+        """
         return constant * fugacity**exponent
 
     @abstractmethod
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        """Dissolved volatile concentration in ppmw in the melt.
+        """Dissolved volatile concentration in the melt in ppmw.
 
         Args:
-            fugacity: Fugacity of the species.
-            temperature: Temperature.
+            fugacity: Fugacity of the species in bar.
+            temperature: Temperature in kelvin.
             fugacities_dict: Fugacities of all species in the system.
 
         Returns:
-            ppmw of the species in the melt.
+            Dissolved volatile concentration in the melt in ppmw.
         """
         raise NotImplementedError
 
-    def __call__(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    def get_value(
+        self, *, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
-        """Dissolved volatile concentration in ppmw in the melt.
+        """Dissolved volatile concentration in the melt in ppmw.
 
         See self._solubility.
         """
@@ -150,6 +172,7 @@ class NoSolubility(Solubility):
     """No solubility."""
 
     def _solubility(self, *args, **kwargs) -> float:
+        """See base class."""
         del args
         del kwargs
         return 0.0
@@ -173,24 +196,24 @@ class ThermodynamicDataBase(ABC):
 
     @property
     def ENTHALPY_REFERENCE_TEMPERATURE(self) -> float:
-        """Enthalpy reference temperature."""
+        """Enthalpy reference temperature in kelvin."""
         return self._ENTHALPY_REFERENCE_TEMPERATURE
 
     @property
     def STANDARD_STATE_PRESSURE(self) -> float:
-        """Standard state pressure."""
+        """Standard state pressure in bar."""
         return self._STANDARD_STATE_PRESSURE
 
     @abstractmethod
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-        """Returns the standard Gibbs free energy of formation in units of J/mol.
+        """Computes the standard Gibbs free energy of formation in units of J/mol.
 
         Args:
-            temperature: Temperature.
-            pressure: Pressure (total).
+            temperature: Temperature in kelvin.
+            pressure: Total pressure in bar.
 
         Returns:
-            The standard Gibbs free energy of formation (J/mol).
+            The standard Gibbs free energy of formation in J/mol.
         """
         ...
 
@@ -229,7 +252,7 @@ def _mass_decorator(func) -> Callable:
             **kwargs: Catches keyword arguments to forward to func.
 
         Returns:
-            Mass of either the gas species or element.
+            Mass of either the gas species or one of its elements.
         """
         mass: float = func(self, **kwargs)
         if element is not None:
@@ -274,11 +297,11 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
             A JanafPhase instance.
         """
 
-        db = janaf.Janafdb()
+        db: janaf.Janafdb = janaf.Janafdb()
 
-        def get_phase_data(phase):
+        def get_phase_data(phase) -> Union[janaf.JanafPhase, None]:
             try:
-                phase_data = db.getphasedata(
+                phase_data: janaf.JanafPhase = db.getphasedata(
                     formula=self.species.modified_hill_formula, phase=phase
                 )
             except ValueError:
@@ -287,8 +310,8 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
 
         if isinstance(self.species, GasSpecies):
             if self.species.is_homonuclear_diatomic:
-                phase_data_ref = get_phase_data("ref")
-                phase_data_g = get_phase_data("g")
+                phase_data_ref: Union[janaf.JanafPhase, None] = get_phase_data("ref")
+                phase_data_g: Union[janaf.JanafPhase, None] = get_phase_data("g")
                 if phase_data_ref is None and phase_data_g is None:
                     msg = "Thermodynamic data for %s (%s) is not available in %s" % (
                         self.species.name_in_thermodynamic_data,
@@ -322,14 +345,14 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
         return phase
 
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-        """Returns the standard Gibbs free energy of formation in units of J/mol.
+        """Computes the standard Gibbs free energy of formation in J/mol.
 
         Args:
-            temperature: Temperature.
-            pressure: Pressure (total).
+            temperature: Temperature in kelvin.
+            pressure: Total pressure in bar.
 
         Returns:
-            The standard Gibbs free energy of formation (J/mol).
+            The standard Gibbs free energy of formation in J/mol.
         """
         del pressure
         gibbs: float = self.data.DeltaG(temperature)
@@ -374,7 +397,7 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         """Gets the relevant phase data for the species.
 
         Returns:
-            A pandas series.
+            The phase data.
         """
 
         data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
@@ -401,10 +424,10 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         """Calculates the enthalpy at temperature.
 
         Args:
-            temperature: Temperature.
+            temperature: Temperature in kelvin.
 
         Returns:
-            Enthalpy at temperature.
+            Enthalpy in J.
         """
         H = self.data["Hf"]  # J
         a = self.data["a"]  # J/K           Coeff for calc heat capacity.
@@ -425,10 +448,10 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         """Calculates the entropy at temperature.
 
         Args:
-            temperature: Temperature.
+            temperature: Temperature in kelvin.
 
         Returns:
-            Entropy at temperature.
+            Entropy in J/K.
         """
         S = self.data["S"]  # J/K
         a = self.data["a"]  # J/K           Coeff for calc heat capacity.
@@ -453,10 +476,10 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         the equation in Holland and Powell (1998) p311 is expanded.
 
         Args:
-            temperature: Temperature.
+            temperature: Temperature in kelvin.
 
         Returns:
-            Volume at temperature.
+            Volume in J/bar.
         """
         V = self.data["V"]  # J/bar
         alpha0 = self.data["a0"]  # K^(-1), thermal expansivity
@@ -473,12 +496,12 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         Holland and Powell (1998), p312 in the text.
 
         Args:
-            temperature: Temperature.
+            temperature: Temperature in kelvin.
 
         Returns:
-            Bulk modulus at temperature.
+            Bulk modulus in bar..
         """
-        K = self.data["K"]  # bar, bulk modulus
+        K = self.data["K"]  # Bulk modulus in bar.
         bulk_modulus_T: float = K * (
             1 + self.dKdT_factor * (temperature - self.ENTHALPY_REFERENCE_TEMPERATURE)
         )
@@ -490,8 +513,8 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         Holland and Powell (1998), p312.
 
         Args:
-            temperature: Temperature.
-            pressure: Pressure.
+            temperature: Temperature in kelvin.
+            pressure: Pressure in bar.
 
         Returns:
             The volume-pressure integral.
@@ -510,11 +533,11 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
         """Returns the standard Gibbs free energy of formation in units of J/mol.
 
         Args:
-            temperature: Temperature.
-            pressure: Pressure (total).
+            temperature: Temperature in kelvin.
+            pressure: Pressure (total) in bar.
 
         Returns:
-            The standard Gibbs free energy of formation (J/mol).
+            The standard Gibbs free energy of formation in J/mol.
         """
 
         gibbs: float = self.get_enthalpy(temperature) - temperature * self.get_entropy(temperature)
@@ -571,14 +594,14 @@ class ThermodynamicData(ThermodynamicDataBase):
         self.datasets.append(dataset)
 
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-        """Returns the standard Gibbs free energy of formation in units of J/mol.
+        """The standard Gibbs free energy of formation in J/mol.
 
         Args:
-            temperature: Temperature.
-            pressure: Pressure (total).
+            temperature: Temperature in kelvin.
+            pressure: Pressure (total) in bar.
 
         Returns:
-            The standard Gibbs free energy of formation (J/mol).
+            The standard Gibbs free energy of formation in J/mol.
         """
         for dataset in self.datasets:
             try:
@@ -599,27 +622,23 @@ class ThermodynamicData(ThermodynamicDataBase):
 
 @dataclass(kw_only=True)
 class ChemicalComponent(ABC):
-    """Abstract base class representing a chemical component and its properties.
+    """A chemical component and its properties.
 
     Args:
         chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        ideality: Ideality object for thermodynamic calculations. See subclasses for specific use.
-            Defaults to Ideal.
-        thermodynamic_class: Class for thermodynamic data. Defaults to JANAF.
+        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
 
     Attributes:
         chemical_formula: Chemical formula.
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         formula: Formula object derived from the chemical formula.
-        ideality: Ideality object for thermodynamic calculations. See subclasses for specific use.
-        thermodynamic_class: Class for thermodynamic data.
+        thermodynamic_class: The class for thermodynamic data.
         thermodynamic_data: Instance of thermodynamic_class for this chemical component.
     """
 
     chemical_formula: str
     name_in_thermodynamic_data: str
-    ideality: SystemConstraint = field(default_factory=IdealityConstant)
     thermodynamic_class: Type[ThermodynamicDataBase] = ThermodynamicDataJANAF
     formula: Formula = field(init=False)
     thermodynamic_data: ThermodynamicDataBase = field(init=False)
@@ -633,7 +652,6 @@ class ChemicalComponent(ABC):
             self.chemical_formula,
         )
         self.formula = Formula(self.chemical_formula)
-        self.ideality.species = self.chemical_formula
         self.thermodynamic_data = self.thermodynamic_class(self)
 
     @property
@@ -693,28 +711,23 @@ class ChemicalComponent(ABC):
 class GasSpecies(ChemicalComponent):
     """A gas species.
 
-    For a gas species, 'self.ideality' refers to its fugacity coefficient, where the fugacity is
-    equal to the fugacity coefficient multiplied by the species' partial pressure.
-
     Args:
         chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
-        ideality: Ideality object representing the fugacity coefficient for thermodynamic
-            calculations. Defaults to Ideal (i.e., unity).
-        thermodynamic_class: Class for thermodynamic data. Defaults to JANAF.
+        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
         solubility: Solubility model. Defaults to no solubility.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
             Defaults to 0.
+        fugacity_coefficient: Fugacity coefficient object. Defaults to ideal gas (i.e. unity).
 
     Attributes:
         chemical_formula: Chemical formula.
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         formula: Formula object derived from the chemical formula.
-        ideality: Ideality object representing the fugacity coefficient for thermodynamic
-            calculations.
-        thermodynamic_class: Class for thermodynamic data.
+        thermodynamic_class: The class for thermodynamic data.
         thermodynamic_data: Instance of thermodynamic_class for this chemical component.
         solubility: Solubility model.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
+        fugacity_coefficient: Fugacity coefficient object.
         output: Stores calculated values for output.
     """
 
@@ -722,16 +735,11 @@ class GasSpecies(ChemicalComponent):
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     output: Union[GasSpeciesOutput, None] = field(init=False, default=None)
+    fugacity_coefficient: GetValueABC = field(default_factory=IdealityConstant)
 
     def __post_init__(self):
         self.name_in_thermodynamic_data = self.chemical_formula
         super().__post_init__()
-        self.ideality.name = "fugacity_coefficient"
-
-    @property
-    def fugacity_coefficient(self) -> SystemConstraint:
-        """Fugacity coefficient."""
-        return self.ideality
 
     @_mass_decorator
     def mass(
@@ -769,10 +777,10 @@ class GasSpecies(ChemicalComponent):
 
         # Melt.
         prefactor: float = planet.mantle_mass * planet.mantle_melt_fraction
-        ppmw_in_melt: float = self.solubility(
-            fugacity,
-            planet.surface_temperature,
-            system.fugacities_dict,
+        ppmw_in_melt: float = self.solubility.get_value(
+            fugacity=fugacity,
+            temperature=planet.surface_temperature,
+            fugacities_dict=system.fugacities_dict,
         )
         mass_in_melt: float = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
         moles_in_melt: float = mass_in_melt / self.molar_mass
@@ -812,33 +820,21 @@ class SolidSpeciesOutput:
 class SolidSpecies(ChemicalComponent):
     """A solid species.
 
-    For a solid species, 'self.ideality' refers to its activity, where the activity is equal to the
-    activity coefficient multiplied by the species' volume mixing ratio.
-
     Args:
         chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        thermodynamic_class: Class for thermodynamic data. Defaults to JANAF.
-        ideality: Ideality object representing activity for thermodynamic calculations. Defaults to
-            Ideal (i.e., unity).
+        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
+        activity: Activity object. Defaults to ideal (i.e. unity).
 
     Attributes:
         chemical_formula: Chemical formula.
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         formula: Formula object derived from the chemical formula.
-        ideality: Ideality object representing activity for thermodynamic calculations.
-        thermodynamic_class: Class for thermodynamic data.
+        thermodynamic_class: The class for thermodynamic data.
         thermodynamic_data: Instance of thermodynamic_class for this chemical component.
+        activity: Activity object.
         output: Stores calculated values for output.
     """
 
     output: Union[SolidSpeciesOutput, None] = field(init=False, default=None)
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.ideality.name = "activity"
-
-    @property
-    def activity(self) -> SystemConstraint:
-        """Activity."""
-        return self.ideality
+    activity: ConstraintABC = field(default_factory=IdealityConstant)

@@ -18,18 +18,17 @@ from typing import Type
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    FugacityConstraint,
     IronWustiteBufferConstraintBallhaus,
     SystemConstraints,
 )
-from atmodeller.core import Species
 from atmodeller.interfaces import (
-    ConstantSystemConstraint,
     GasSpecies,
     SolidSpecies,
     ThermodynamicData,
     ThermodynamicDataBase,
 )
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 
 thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 
@@ -66,12 +65,12 @@ def test_graphite() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     # This is comparable to the constraints imposed by Meng.
-    constraints: list = [
-        IronWustiteBufferConstraintBallhaus(),
-        ConstantSystemConstraint(name="fugacity", species="H2", value=44.49334998176607),
-    ]
-
-    system_constraints: SystemConstraints = SystemConstraints(constraints)
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            IronWustiteBufferConstraintBallhaus(),
+            FugacityConstraint(species="H2", value=44.49334998176607),
+        ]
+    )
 
     target_pressures: dict[str, float] = {
         "C": 1.0,
@@ -83,6 +82,6 @@ def test_graphite() -> None:
         "O2": 1.4546209065940728e-25,
     }
 
-    system.solve(system_constraints)
+    system.solve(constraints)
     system.solution_dict
     assert system.isclose(target_pressures)

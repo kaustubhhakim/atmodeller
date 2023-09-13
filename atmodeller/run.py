@@ -23,14 +23,13 @@ import time
 
 from atmodeller import logger
 from atmodeller.constraints import (
+    ConstraintABC,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
-    SystemConstraint,
     SystemConstraints,
 )
-from atmodeller.core import Species
 from atmodeller.interfaces import GasSpecies, NoSolubility
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltDixonCO2, BasaltLibourelN2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
@@ -93,11 +92,13 @@ def main():
     planet: Planet = Planet()
     h_kg: float = earth_oceans_to_kg(args.oceans)
     c_kg: float = args.ch_ratio * h_kg
-    constraints: list[SystemConstraint] = [
-        MassConstraint(species="H", value=h_kg),
-        MassConstraint(species="C", value=c_kg),
-        IronWustiteBufferConstraintHirschmann(log10_shift=args.fO2_shift),
-    ]
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            MassConstraint(species="C", value=c_kg),
+            IronWustiteBufferConstraintHirschmann(log10_shift=args.fO2_shift),
+        ]
+    )
 
     # Include nitrogen if desired.
     if args.nitrogen != 0:
@@ -106,8 +107,7 @@ def main():
         constraints.append(MassConstraint(species="N", value=n_kg))
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-    system_constraints: SystemConstraints = SystemConstraints(constraints)
-    system.solve(system_constraints)
+    system.solve(constraints)
     logger.info(system.solution_dict)
 
     end: float = time.time()
