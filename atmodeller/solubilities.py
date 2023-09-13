@@ -63,7 +63,6 @@ class AndesiteS2_Sulfate(Solubility):
         return ppmw
 
 
-
 class AndesiteSO_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
@@ -244,10 +243,8 @@ class BasaltLibourelN2(Solubility):
     ) -> float:
         del temperature
         ppmw: float = self.power_law(fugacity, 0.0611, 1.0)
-        # TODO: Could add fO2 lower and upper bounds.
-        if "O2" in fugacities_dict:
-            constant: float = (fugacities_dict["O2"] ** -0.75) * 5.97e-10
-            ppmw += self.power_law(fugacity, constant, 0.5)
+        constant: float = (fugacities_dict["O2"] ** -0.75) * 5.97e-10
+        ppmw += self.power_law(fugacity, constant, 0.5)
         return ppmw
 
 
@@ -495,7 +492,6 @@ class MercuryMagmaS(Solubility):
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
         a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # Coeffs from eq. 10 (Namur et al., 2016).
-        # FIXME: How to deal if fO2 not available?  Drop last term?
         wt_perc: float = np.exp(
             a
             + (b / temperature)

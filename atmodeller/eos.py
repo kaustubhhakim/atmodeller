@@ -19,7 +19,6 @@ import logging
 from dataclasses import dataclass, field
 
 import numpy as np
-from scipy.constants import kilo
 
 from atmodeller.eos_interfaces import (
     MRKABC,
