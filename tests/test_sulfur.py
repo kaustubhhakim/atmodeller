@@ -467,6 +467,8 @@ def test_CHOS_Species_IW() -> None:
         "CO2": 47.22814633265304,
     }
 
-    system.solve(SystemConstraints(constraints))
+    initial_solution: np.ndarray = np.log10([1, 1, 1e-3, 1e-3, 1e-6, 1e-3, 1e2, 1])
+
+    system.solve(constraints, initial_solution=initial_solution)
     logger.debug("This test is likely to fail.")
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
