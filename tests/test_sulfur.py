@@ -18,6 +18,7 @@ License:
     not, see <https://www.gnu.org/licenses/>.
 """
 
+import logging
 from typing import Type
 
 import numpy as np
@@ -60,7 +61,7 @@ standard_gibbs_free_energy_of_formation: Type[ThermodynamicDataBase] = Thermodyn
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
 
-debug_logger()
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def test_version():
@@ -371,4 +372,97 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+
+
+def test_COS_Species_IW() -> None:
+    """Tests Sulfur Solubility with C, O and S species at IW, 2173 K.
+    This test is currently failing"""
+
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="OS", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2S", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        ]
+    )
+
+    planet: Planet = Planet(surface_temperature=2173)
+    mass_C: float = 0.00014 * planet.mantle_mass
+    mass_S: float = 0.0002 * planet.mantle_mass
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            MassConstraint(species="C", value=mass_C),
+            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target_pressures: dict[str, float] = {
+        "OS": 0.003040722714933701,
+        "S2": 0.0037650388586196962,
+        "O2": 1.0437570555403361e-06,
+        "O2S": 0.004958587456124795,
+        "CO": 230.67647327936177,
+        "CO2": 47.437207165120746,
+    }
+
+    system.solve(SystemConstraints(constraints))
+    logger.debug("This test is likely to fail.")
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+
+
+def test_CHOS_Species_IW() -> None:
+    """Tests Sulfur Solubility with H, C, O and S species at IW-3, 2173 K.
+    This test is currently failing."""
+
+    species: Species = Species(
+        [
+            GasSpecies(chemical_formula="H2O", solubility=BasaltDixonH2O()),
+            GasSpecies(chemical_formula="H2", solubility=BasaltH2()),
+            GasSpecies(chemical_formula="OS", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="S2", solubility=BasaltS2()),
+            GasSpecies(chemical_formula="O2", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="O2S", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO", solubility=NoSolubility()),
+            GasSpecies(chemical_formula="CO2", solubility=BasaltDixonCO2()),
+        ]
+    )
+
+    planet: Planet = Planet(surface_temperature=2173)
+
+    mass_H: float = 0.00108 * planet.mantle_mass * (2 / 18)
+    mass_C: float = 0.00014 * planet.mantle_mass
+    mass_S: float = 0.0002 * planet.mantle_mass
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="S", value=mass_S),
+            MassConstraint(species="H", value=mass_H),
+            MassConstraint(species="C", value=mass_C),
+            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target_pressures: dict[str, float] = {
+        "H2O": 0.9938624694394833,
+        "H2": 0.9373397768144074,
+        "OS": 0.0030408454906003597,
+        "S2": 0.0037651891167604728,
+        "O2": 1.04379968829635e-06,
+        "O2S": 0.0049588889406645496,
+        "CO": 229.65516731392094,
+        "CO2": 47.22814633265304,
+    }
+
+    system.solve(SystemConstraints(constraints))
+    logger.debug("This test is likely to fail.")
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
