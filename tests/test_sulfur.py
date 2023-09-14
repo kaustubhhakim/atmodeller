@@ -63,6 +63,8 @@ atol: float = 1.0e-8
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+debug_logger()
+
 
 def test_version():
     """Test version."""
@@ -413,7 +415,9 @@ def test_COS_Species_IW() -> None:
         "CO2": 47.437207165120746,
     }
 
-    system.solve(SystemConstraints(constraints))
+    initial_solution: np.ndarray = np.log10([0.003, 0.003, 1e-6, 0.005, 230, 47])
+
+    system.solve(constraints, initial_solution=initial_solution)
     logger.debug("This test is likely to fail.")
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 

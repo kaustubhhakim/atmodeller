@@ -824,6 +824,7 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the pressures for each species.
         """
+        logger.debug("log10_pressures = %s", log10_pressures)
         self._log_solution = log10_pressures
 
         # Compute residual for the reaction network.
