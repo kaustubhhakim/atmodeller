@@ -63,47 +63,6 @@ class AndesiteS2_Sulfate(Solubility):
         return ppmw
 
 
-
-class AndesiteSO_Sulfate(Solubility):
-    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
-
-    Using expression in the abstract and the corrected expression for sulfate capacity in
-    corrigendum. Composition for Andesite from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
-        del fugacity
-        fS2: float = fugacities_dict["S2"]
-        logCs: float = -12.948 + (31586.2393 / temperature)
-        logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        S_wtp: float = 10**logS_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        return ppmw
-
-
-class AndesiteSO2_Sulfate(Solubility):
-    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
-
-    Using expression in the abstract and the corrected expression for sulfate capacity in
-    corrigendum. Composition for Andesite from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Fugacity is fS2. First, we need to convert the input, fSO, to fS2"""
-        del fugacity
-        fS2: float = fugacities_dict["S2"]
-        logCs: float = -12.948 + (31586.2393 / temperature)
-        logS_wtp: float = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        S_wtp: float = 10**logS_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        return ppmw
-
-
 class AndesiteS2_Sulfide(Solubility):
     """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
 
@@ -117,46 +76,6 @@ class AndesiteS2_Sulfide(Solubility):
         """fugacity is fS2."""
         logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
-        S_wtp: float = 10**logS_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        return ppmw
-
-
-class AndesiteSO_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
-
-    Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
-    for Andesite from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """fugacity is fS2."""
-        del fugacity
-        fS2: float = fugacities_dict["S2"]
-        logCs: float = 0.225 - (8921.0927 / temperature)
-        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
-        S_wtp: float = 10**logS_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        return ppmw
-
-
-class AndesiteSO2_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
-
-    Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
-    for Andesite from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """fugacity is fS2."""
-        del fugacity
-        fS2 = fugacities_dict["S2"]
-        logCs: float = 0.225 - (8921.0927 / temperature)
-        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         return ppmw
@@ -263,14 +182,11 @@ class BasaltS2_Sulfate(Solubility):
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = -12.948 + (32333.5635 / temperature)
-        logSO4_wtp = logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        SO4_wtp = 10**logSO4_wtp
-        S_wtp = SO4_wtp * (32.065 / 96.06)
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        logS_wtp: float = (
+        logSO4_wtp: float = (
             logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
         )
-        S_wtp: float = 10**logS_wtp
+        SO4_wtp: float = 10**logSO4_wtp
+        S_wtp: float = SO4_wtp * (32.065 / 96.06)
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         # TODO: To discuss.  This does influence the results of the sulphur test suite. Maybe
         # better to instead sanity check the solubilities once a solution has been found?
@@ -279,56 +195,6 @@ class BasaltS2_Sulfate(Solubility):
             msg: str = "S2 sulfate solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
             # ppmw = 1000.0  # Could be dangerous to assign an arbitrary cut-off.  Make a parameter?
-            # raise KeyError(msg)
-        return ppmw
-
-
-class BasaltSO_Sulfate(Solubility):
-    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
-
-    Using expression in the abstract and the corrected expression for sulfate capacity in
-    corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Fugacity is fS2."""
-        del fugacity
-        fS2 = fugacities_dict["S2"]
-        logCs: float = -12.948 + (32333.5635 / temperature)
-        logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        if ppmw >= 1000:
-            msg = "WARNING: SO Sulfate Solubility is getting too high: \n%s" % (ppmw)
-            logger.warning(msg)
-            # ppmw = 1000.0
-            # raise KeyError(msg)
-        return ppmw
-
-
-class BasaltSO2_Sulfate(Solubility):
-    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
-
-    Using expression in the abstract and the corrected expression for sulfate capacity in
-    corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Fugacity is fS2."""
-        del fugacity
-        fS2 = fugacities_dict["S2"]
-        logCs: float = -12.948 + (32333.5635 / temperature)
-        logS_wtp = logCs + (0.5 * np.log10(fS2)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        S_wtp = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        if ppmw >= 1000:
-            msg = "WARNING: SO2 Sulfate Solubility is getting too high: \n%s" % (ppmw)
-            logger.warning(msg)
-            # ppmw = 1000.0
             # raise KeyError(msg)
         return ppmw
 
@@ -347,59 +213,9 @@ class BasaltS2_Sulfide(Solubility):
         logCs: float = 0.225 - (8045.7465 / temperature)
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
-        ppmw = UnitConversion.weight_percent_to_ppmw(S_wtp)
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
         if ppmw >= 1000:
             msg: str = "S2 sulfide solubility is getting too high = %f ppmw" % (ppmw)
-            logger.warning(msg)
-            # ppmw = 1000.0
-            # raise KeyError(msg)
-        return ppmw
-
-
-class BasaltSO_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
-
-    Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for NIB (natural Icelandic basalt) from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Fugacity is fS2."""
-        del fugacity
-        fS2: float = fugacities_dict["S2"]
-        logCs: float = 0.225 - (8045.7465 / temperature)
-        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
-        S_wtp: float = 10**logS_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        if ppmw >= 1000:
-            msg: str = "SO sulfide solubility is getting too high = %f ppmw" % (ppmw)
-            logger.warning(msg)
-            # ppmw = 1000.0
-            # raise KeyError(msg)
-        return ppmw
-
-
-class BasaltSO2_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
-
-    Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for NIB (natural Icelandic basalt) from Table 1.
-    """
-
-    def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
-    ) -> float:
-        """Fugacity is fS2."""
-        del fugacity
-        fS2: float = fugacities_dict["S2"]
-        logCs: float = 0.225 - (8045.7465 / temperature)
-        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fS2)))
-        S_wtp = 10**logS_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        if ppmw >= 1000:
-            msg: str = "SO2 sulfide solubility is getting too high = %f ppmw" % (ppmw)
             logger.warning(msg)
             # ppmw = 1000.0
             # raise KeyError(msg)
