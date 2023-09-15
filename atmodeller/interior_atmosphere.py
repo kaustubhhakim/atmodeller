@@ -23,7 +23,7 @@ from functools import cached_property
 from typing import Union
 
 import numpy as np
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, root
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
@@ -775,36 +775,50 @@ class InteriorAtmosphereSystem:
         sol: np.ndarray = np.zeros_like(initial_solution)
         infodict: dict = {}
 
+        # Hard-coded for testing different solvers, but should either be an option for the user to
+        # change or the 'best' solver should be used.
+        ROOT: bool = True
+        FSOLVE: bool = False
+
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=constraints
         )
 
-        while ier != 1 and ic_count <= ic_count_max:
-            sol, infodict, ier, mesg = fsolve(
+        if ROOT:
+            solarray = root(
                 self._objective_func,
                 initial_solution,
                 args=(constraints, coefficient_matrix),
-                full_output=True,
             )
-            logger.info(mesg)
-            if ier != 1:
-                logger.info(
-                    "Retrying with a new randomised initial condition (attempt %d)",
-                    ic_count,
+            sol = solarray.x
+
+        if FSOLVE:
+            while ier != 1 and ic_count <= ic_count_max:
+                sol, infodict, ier, mesg = fsolve(
+                    self._objective_func,
+                    initial_solution,
+                    args=(constraints, coefficient_matrix),
+                    full_output=True,
                 )
-                # Increase or decrease the magnitude of all pressures.
-                initial_solution *= 2 * np.random.random_sample()
-                self._conform_initial_solution_to_solid_activities(initial_solution)
-                self._conform_initial_solution_to_constraints(initial_solution, constraints)
-                logger.debug("initial_solution = %s", initial_solution)
-                ic_count += 1
+                logger.info(mesg)
+                if ier != 1:
+                    logger.info(
+                        "Retrying with a new randomised initial condition (attempt %d)",
+                        ic_count,
+                    )
+                    # Increase or decrease the magnitude of all pressures.
+                    initial_solution *= 2 * np.random.random_sample()
+                    self._conform_initial_solution_to_solid_activities(initial_solution)
+                    self._conform_initial_solution_to_constraints(initial_solution, constraints)
+                    logger.debug("initial_solution = %s", initial_solution)
+                    ic_count += 1
 
-        if ic_count == ic_count_max:
-            logger.error("Maximum number of randomised initial conditions has been exceeded")
-            raise RuntimeError("Solution cannot be found (ic_count == ic_count_max)")
+            if ic_count == ic_count_max:
+                logger.error("Maximum number of randomised initial conditions has been exceeded")
+                raise RuntimeError("Solution cannot be found (ic_count == ic_count_max)")
 
-        logger.info("Number of function calls = %d", infodict["nfev"])
-        logger.info("Final objective function evaluation = %s", infodict["fvec"])
+            logger.info("Number of function calls = %d", infodict["nfev"])
+            logger.info("Final objective function evaluation = %s", infodict["fvec"])
 
         return sol
 
@@ -824,6 +838,7 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the pressures for each species.
         """
+        logger.debug("log10_pressures = %s", log10_pressures)
         self._log_solution = log10_pressures
 
         # Compute residual for the reaction network.

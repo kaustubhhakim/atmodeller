@@ -10,6 +10,7 @@ from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT, debug_logger
+from atmodeller.eos import CorkFullCO2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -41,6 +42,10 @@ def Calc_lambda(P, T, a, b, V_init):
     B = b * P / (GAS_CONSTANT_KJ * T)
     A = a / (b * GAS_CONSTANT_KJ * T**1.5)
     lnlambda = Z - 1.0 - np.log(Z - B) - A * np.log(1.0 + B / Z)
+    print("Z = %f" % Z)
+    print("A = %f" % A)
+    print("B = %f" % B)
+    print("lnlambda = %f" % lnlambda)
 
     return lnlambda, V_mrk
 
@@ -195,30 +200,39 @@ def main():
 
     debug_logger()
 
-    pressure: float = 0.1  # kbar
-    temperature: float = 600  # K
+    pressure: float = 20  # kbar
+    temperature: float = 2000  # K
 
     print("\nMengs functions\n")
     print("temperature = %s, pressure = %s\n" % (temperature, pressure))
-    print("Corresponding states:\n")
-    V, RTlnf = Calc_V_f(pressure, temperature, "CO")
-    print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
-    V, RTlnf = Calc_V_f(pressure, temperature, "CH4")
-    print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
-    V, RTlnf = Calc_V_f(pressure, temperature, "H2")
-    print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
-    print("\n")
+    # print("Corresponding states:\n")
+    # V, RTlnf = Calc_V_f(pressure, temperature, "CO")
+    # print("CO: V = %f, RTlnf = %f" % (V, RTlnf))
+    # V, RTlnf = Calc_V_f(pressure, temperature, "CH4")
+    # print("CH4: V = %f, RTlnf = %f" % (V, RTlnf))
+    # V, RTlnf = Calc_V_f(pressure, temperature, "H2")
+    # print("H2: V = %f, RTlnf = %f" % (V, RTlnf))
+    # print("\n")
     print("Full CORK:\n")
     V, RTlnf = Calc_V_f(pressure, temperature, "CO2")
     print("CO2: V = %f, RTlnf = %f" % (V, RTlnf))
     fugacity: float = np.exp(RTlnf / (GAS_CONSTANT * temperature))
     fugacity_coeff: float = fugacity / 1000 / pressure
     print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
-    V, RTlnf = Calc_V_f(pressure, temperature, "H2O")
-    print("H2O: V = %f, RTlnf = %f" % (V, RTlnf))
-    fugacity: float = np.exp(RTlnf / (GAS_CONSTANT * temperature))
-    fugacity_coeff: float = fugacity / 1000 / pressure
-    print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+    # V, RTlnf = Calc_V_f(pressure, temperature, "H2O")
+    # print("H2O: V = %f, RTlnf = %f" % (V, RTlnf))
+    # fugacity: float = np.exp(RTlnf / (GAS_CONSTANT * temperature))
+    # fugacity_coeff: float = fugacity / 1000 / pressure
+    # print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
+    # print("\n")
+    print("Dan Full CORK:\n")
+    cork = CorkFullCO2()
+    fugacity_coeff = cork.get_value(temperature=temperature, pressure=pressure * kilo)
+    fugacity = cork.fugacity(temperature=temperature, pressure=pressure)
+    volume = cork.volume(temperature=temperature, pressure=pressure)
+    volume_integral = cork.volume_integral(temperature=temperature, pressure=pressure)
+    print("CO2: V = %f, RTlnf = %f" % (volume, volume_integral))
+    print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
 
 
 if __name__ == "__main__":

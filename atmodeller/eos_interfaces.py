@@ -33,16 +33,17 @@ logger: logging.Logger = logging.getLogger(__name__)
 class FugacityModelABC(GetValueABC):
     """A fugacity model.
 
-    Importantly, this base class requires a specification for the volume and volume integral, since
-    then the fugacity and related quantities can be computed using:
+    This base class requires a specification for the volume and volume integral, since then the
+    fugacity and related quantities can be computed using the standard relation:
 
     RTlnf = integral(VdP).
 
     Args:
         scaling: Scaling depending on the units of pressure (i.e., 1 for bar, kilo for kbar).
+            Defaults to unity, meaning that the internal units of pressure are bar.
 
     Attributes:
-        scaling: Scaling depending on the units.
+        scaling: Scaling depending on the units of pressure.
         GAS_CONSTANT: Gas constant with the appropriate units.
     """
 
@@ -56,14 +57,15 @@ class FugacityModelABC(GetValueABC):
     def get_value(self, *, temperature: float, pressure: float) -> float:
         """Evaluates the fugacity coefficient at temperature and pressure.
 
-        Note that the input 'pressure' must be in bar, so it is scaled here using 'self.scaling'.
+        Note that the input 'pressure' must ALWAYS be in bar, so it is scaled here using
+        'self.scaling' since self.fugacity_coefficient requires the internal units of pressure.
 
         Args:
             temperature: Temperature in kelvin.
             pressure: Pressure in bar.
 
         Returns:
-            Fugacity coefficient evaluated at temperature and pressure.
+            Fugacity coefficient evaluated at temperature and pressure, which is dimensionaless.
         """
         pressure /= self.scaling
         fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure)
@@ -115,7 +117,7 @@ class FugacityModelABC(GetValueABC):
             pressure: Pressure.
 
         Returns:
-            fugacity coefficient.
+            fugacity coefficient, which is non-dimensional.
         """
         fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
 
@@ -163,11 +165,6 @@ class MRKABC(FugacityModelABC):
         a is the Redlich-Kwong function, which is a function of T.
         b is the Redlich-Kwong constant b.
 
-    Importantly, this base class requires a specification for the volume and volume integral, since
-    then the fugacity and related quantities can be computed using:
-
-        RTlnf = integral(VdP)
-
     Args:
         a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter.
         b0: Coefficient to compute the Redlich-Kwong constant b.
@@ -187,7 +184,7 @@ class MRKABC(FugacityModelABC):
 
     @abstractmethod
     def a(self, temperature: float) -> float:
-        """MRK a parameter.
+        """MRK a parameter computed from self.a_coefficients.
 
         Args:
             temperature: Temperature in kelvin.
@@ -200,15 +197,52 @@ class MRKABC(FugacityModelABC):
     @property
     @abstractmethod
     def b(self) -> float:
-        """MRK b parameter.
-
-        Args:
-            temperature: Temperature in kelvin.
+        """MRK b parameter, which is is independent of temperature, computed from self.b0.
 
         Returns:
             MRK b parameter.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def volume_MRK(self, temperature: float, pressure: float) -> float:
+        """MRK Volume.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume.
+        """
+        ...
+
+    def volume(self, *args, **kwargs) -> float:
+        """Volume is just the MRK volume.
+
+        *args and **kwargs are passed through.
+        """
+        return self.volume_MRK(*args, **kwargs)
+
+    @abstractmethod
+    def volume_integral_MRK(self, temperature: float, pressure: float) -> float:
+        """MRK volume integral (VdP).
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume integral.
+        """
+        ...
+
+    def volume_integral(self, *args, **kwargs) -> float:
+        """Volume integral is just the MRK volume integral.
+
+        *args and **kwargs are passed through.
+        """
+        return self.volume_integral_MRK(*args, **kwargs)
 
 
 @dataclass(kw_only=True)
@@ -225,11 +259,10 @@ class MRKExplicitABC(MRKABC):
         a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter.
         b0: Coefficient to compute the Redlich-Kwong constant b.
         scaling: Scaling depending on the units of a_coefficients and b0.
-        GAS_CONSTANT: Gas constant with the appropriate units depending on the units of
-            a_coefficients and b0.
+        GAS_CONSTANT: Gas constant with the appropriate units.
     """
 
-    def volume(self, temperature: float, pressure: float) -> float:
+    def volume_MRK(self, temperature: float, pressure: float) -> float:
         """Convenient volume-explicit equation. Equation 7, Holland and Powell (1991).
 
         Without complications of critical phenomena the MRK equation can be simplified using the
@@ -242,7 +275,7 @@ class MRKExplicitABC(MRKABC):
             pressure: Pressure.
 
         Returns:
-            volume.
+            MRK volume.
         """
         volume: float = (
             self.GAS_CONSTANT * temperature / pressure
@@ -256,7 +289,7 @@ class MRKExplicitABC(MRKABC):
 
         return volume
 
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral_MRK(self, temperature: float, pressure: float) -> float:
         """Volume-explicit integral (VdP). Equation 8, Holland and Powell (1991).
 
         Args:
@@ -267,7 +300,7 @@ class MRKExplicitABC(MRKABC):
             Volume integral.
         """
         volume_integral: float = (
-            self.GAS_CONSTANT * temperature * np.log(1000 * pressure)
+            self.GAS_CONSTANT * temperature * np.log(self.scaling * pressure)
             + self.b * pressure
             + self.a(temperature)
             / self.b
@@ -295,8 +328,7 @@ class MRKImplicitABC(MRKABC):
         a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter.
         b0: Coefficient to compute the Redlich-Kwong constant b.
         scaling: Scaling depending on the units of a_coefficients and b0.
-        GAS_CONSTANT: Gas constant with the appropriate units depending on the units of
-            a_coefficients and b0.
+        GAS_CONSTANT: Gas constant with the appropriate units.
     """
 
     @property
@@ -333,7 +365,7 @@ class MRKImplicitABC(MRKABC):
 
         return B
 
-    def compressibility_factor(
+    def compressibility_factor_MRK(
         self, temperature: float, pressure: float, *, volume_init: float | None = None
     ) -> float:
         """Compressibility factor.
@@ -348,13 +380,13 @@ class MRKImplicitABC(MRKABC):
         """
         compressibility: float = (
             pressure
-            * self.volume(temperature, pressure, volume_init=volume_init)
+            * self.volume_MRK(temperature, pressure, volume_init=volume_init)
             / (self.GAS_CONSTANT * temperature)
         )
 
         return compressibility
 
-    def volume_integral(
+    def volume_integral_MRK(
         self,
         temperature: float,
         pressure: float,
@@ -374,18 +406,22 @@ class MRKImplicitABC(MRKABC):
         Returns:
             Volume integral.
         """
-        z: float = self.compressibility_factor(temperature, pressure, volume_init=volume_init)
+        z: float = self.compressibility_factor_MRK(temperature, pressure, volume_init=volume_init)
+        # TODO: REMOVE print("Z = %f" % z)
         A: float = self.A_factor(temperature, pressure)
+        # TODO: REMOVE print("A = %f" % A)
         B: float = self.B_factor(temperature, pressure)
+        # TODO: REMOVE print("B = %f" % B)
         # Recall that the base class requires a specification of the volume_integral, but the
         # equations in Holland and Powell (1991) go via the fugacity coefficient.
         ln_fugacity_coefficient: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
         ln_fugacity: float = np.log(self.scaling * pressure) + ln_fugacity_coefficient
+        # TODO: REMOVE print(ln_fugacity_coefficient)
         volume_integral: float = self.GAS_CONSTANT * temperature * ln_fugacity
 
         return volume_integral
 
-    def volume(
+    def volume_MRK(
         self, temperature: float, pressure: float, *, volume_init: float | None = None
     ) -> float:
         """Solves the MRK equation numerically to compute the volume.
@@ -703,7 +739,7 @@ class CorkFullABC(MRKImplicitABC):
         Returns:
             Volume including the virial compensation.
         """
-        volume: float = super().volume(temperature, pressure, volume_init=volume_init)
+        volume: float = self.volume_MRK(temperature, pressure, volume_init=volume_init)
 
         if pressure > self.P0:
             volume += self.virial.volume(temperature, pressure)
@@ -723,7 +759,7 @@ class CorkFullABC(MRKImplicitABC):
         Returns:
             Volume integral including the virial compensation.
         """
-        volume_integral: float = super().volume_integral(
+        volume_integral: float = self.volume_integral_MRK(
             temperature, pressure, volume_init=volume_init
         )
 
