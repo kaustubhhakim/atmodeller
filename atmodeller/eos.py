@@ -495,8 +495,8 @@ class SaxenaFeiH2(FugacityModelABC):
         GAS_CONSTANT: Gas constant with the appropriate units.
     """
 
-    Tc: float = field(init=False, default=13)  # kelvin
-    Pc: float = field(init=False, default=33.1)  # bar
+    Tc: float = field(init=False, default=33.1)  # kelvin
+    Pc: float = field(init=False, default=13)  # bar
 
     a_coefficients: tuple[float, float, float, float] = field(
         init=False, default=(1.6688, -2.0759, -9.6173, -0.1694)
