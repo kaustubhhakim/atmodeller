@@ -384,7 +384,7 @@ class CorkCorrespondingStates(MRKExplicitABC):
         Returns:
             Volume in kJ kbar^(-1) mol^(-1).
         """
-        volume: float = super().volume(temperature, pressure) + self.virial.volume(
+        volume: float = self.volume_MRK(temperature, pressure) + self.virial.volume(
             temperature, pressure
         )
 
@@ -400,7 +400,7 @@ class CorkCorrespondingStates(MRKExplicitABC):
         Returns:
             Volume integral in kJ mol^(-1).
         """
-        volume_integral: float = super().volume_integral(
+        volume_integral: float = self.volume_integral_MRK(
             temperature, pressure
         ) + self.virial.volume_integral(temperature, pressure)
 
@@ -478,6 +478,8 @@ class CorkH2S(CorkCorrespondingStates):
     Pc: float = field(init=False, default=0.08963)
 
 
+# FIXME: This class likely has a bug. Need to compare this model against others or dig in the paper
+# to confirm unit conversions etc.
 @dataclass(kw_only=True)
 class SaxenaFeiH2(FugacityModelABC):
     """Saxena and Fei (1988) fugacity model for H2.

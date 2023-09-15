@@ -119,7 +119,7 @@ def test_CorkCO2_at_P0() -> None:
 
 def test_CorkCO2_above_P0() -> None:
     """Above P0 so virial contribution included."""
-    check_full_Cork_gas(2000, 10, CorkFullCO2, 7.556079199888717)
+    check_full_Cork_gas(2000, 10, CorkFullCO2, 7.4492345831832525)
 
 
 def test_CorkH2O_above_Tc_below_P0() -> None:

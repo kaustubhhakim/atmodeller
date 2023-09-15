@@ -407,16 +407,12 @@ class MRKImplicitABC(MRKABC):
             Volume integral.
         """
         z: float = self.compressibility_factor_MRK(temperature, pressure, volume_init=volume_init)
-        # TODO: REMOVE print("Z = %f" % z)
         A: float = self.A_factor(temperature, pressure)
-        # TODO: REMOVE print("A = %f" % A)
         B: float = self.B_factor(temperature, pressure)
-        # TODO: REMOVE print("B = %f" % B)
         # Recall that the base class requires a specification of the volume_integral, but the
-        # equations in Holland and Powell (1991) go via the fugacity coefficient.
+        # equations in Holland and Powell (1991) are in terms of the fugacity coefficient.
         ln_fugacity_coefficient: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
         ln_fugacity: float = np.log(self.scaling * pressure) + ln_fugacity_coefficient
-        # TODO: REMOVE print(ln_fugacity_coefficient)
         volume_integral: float = self.GAS_CONSTANT * temperature * ln_fugacity
 
         return volume_integral
@@ -698,7 +694,7 @@ class CorkFullABC(MRKImplicitABC):
         c_virial: c coefficients for the virial compensation. Defaults to zero coefficients.
 
     Attributes:
-        p0: Pressure at which the MRK equation begins to overestimate the molar volume
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
             significantly, and may be determined from experimental data.
         a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter.
         b0: Coefficient to compute the Redlich-Kwong constant b.
