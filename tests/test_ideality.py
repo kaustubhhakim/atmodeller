@@ -21,7 +21,7 @@ from typing import Type
 
 from pytest import approx
 
-from atmodeller import __version__, debug_logger
+from atmodeller import __version__, debug_logger, logging
 from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
@@ -56,8 +56,9 @@ rtol: float = 1.0e-8
 atol: float = 1.0e-8
 
 thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
-
 debug_logger()
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def test_version():
@@ -77,7 +78,7 @@ def check_simple_Cork_gas(
     cork: CorkCorrespondingStates = gas_type()  # type: ignore
     V: float = cork.volume(temperature, pressure)
     fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
-
+    print("Fugacity Coefficient:", fugacity_coeff)
     assert V == approx(expected_V, rtol, atol)
     assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
 
