@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.constants import kilo
-from scipy.optimize import fsolve
+from scipy.optimize import root
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.interfaces import GetValueABC
@@ -407,6 +407,19 @@ class MRKImplicitABC(MRKABC):
 
         return volume_integral
 
+    @abstractmethod
+    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
+        """Initial guess volume for the solution to ensure convergence to the correct root.
+
+        Args:
+            temperature: Temperature.
+            pressure: Pressure.
+
+        Returns:
+            Initial solution volume.
+        """
+        ...
+
     def volume_MRK(
         self, temperature: float, pressure: float, *, volume_init: float | None = None
     ) -> float:
@@ -423,17 +436,16 @@ class MRKImplicitABC(MRKABC):
             volume.
         """
         if volume_init is None:
-            # From Holland and Powell (1991), above Tc there is only one real root.
-            volume_init = self.GAS_CONSTANT * temperature / pressure + self.b
+            volume_init = self.initial_solution_volume(temperature, pressure)
 
-        volume_solution: np.ndarray = fsolve(
+        sol = root(
             self._objective_function_volume,
             volume_init,
             args=(temperature, pressure),
-            fprime=self._volume_jacobian,
-        )  # type: ignore
+            jac=self._volume_jacobian,
+        )
 
-        volume: float = volume_solution[0]
+        volume: float = sol.x[0]
 
         return volume
 
@@ -711,6 +723,25 @@ class CORKFullABC(MRKImplicitABC):
             c_coefficients=self.c_virial,
             P0=self.P0,
         )
+
+    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
+        """Initial guess volume for the solution to ensure convergence to the correct root.
+
+        This assumes the (only one) real root for temperatures above the critical temperature is
+        desired.
+
+        See appendix in Holland and Powell (1991).
+
+        Args:
+            temperature: Temperature.
+            pressure: Pressure.
+
+        Returns:
+            Initial solution volume.
+        """
+        initial_volume: float = self.GAS_CONSTANT * temperature / pressure + self.b
+
+        return initial_volume
 
     def volume(
         self, temperature: float, pressure: float, *, volume_init: float | None = None

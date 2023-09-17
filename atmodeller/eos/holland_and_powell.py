@@ -43,7 +43,6 @@ import logging
 from dataclasses import dataclass, field
 
 from atmodeller.eos.eos_interfaces import (
-    MRKABC,
     CORKFullABC,
     FugacityModelABC,
     MRKExplicitABC,
@@ -52,6 +51,13 @@ from atmodeller.eos.eos_interfaces import (
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+# For the CORK H2O model there are two different temperatures.
+# The critical temperature.
+Tc_H2O: float = 695  # K
+# This is the temperature at which a_gas = a in Holland and Powell (1991), thereby allowing the
+# critical point to be handled by a single a parameter.
+Ta_H2O: float = 673  # K
 
 
 @dataclass(kw_only=True)
@@ -66,7 +72,7 @@ class MRKH2OLiquidHP91(MRKImplicitABC):
         default=(1113.4, -0.88517, 4.53e-3, -1.3183e-5),
     )
     b0: float = field(init=False, default=1.465)
-    Tc: float = field(init=False, default=673.0)  # TODO: Check consistency with 695 K of paper.
+    Ta: float = field(init=False, default=Ta_H2O)
 
     def a(self, temperature: float) -> float:
         """MRK a parameter for liquid H2O. Equation 6, Holland and Powell (1991).
@@ -77,16 +83,33 @@ class MRKH2OLiquidHP91(MRKImplicitABC):
         Returns:
             MRK a parameter for liquid H2O.
         """
-        assert temperature <= self.Tc
+        assert temperature <= self.Ta
 
         a: float = (
             self.a_coefficients[0]
-            + self.a_coefficients[1] * (self.Tc - temperature)
-            + self.a_coefficients[2] * (self.Tc - temperature) ** 2
-            + self.a_coefficients[3] * (self.Tc - temperature) ** 3
+            + self.a_coefficients[1] * (self.Ta - temperature)
+            + self.a_coefficients[2] * (self.Ta - temperature) ** 2
+            + self.a_coefficients[3] * (self.Ta - temperature) ** 3
         )
 
         return a
+
+    def initial_solution_volume(self, *args, **kwargs) -> float:
+        """Initial guess volume for the solution to ensure convergence to the correct root.
+
+        For the liquid phase a suitably low value must be chosen. See appendix in Holland and
+        Powell (1991).
+
+        *args and **kwargs catches unused arguments.
+
+        Returns:
+            Initial solution volume.
+        """
+        del args
+        del kwargs
+        initial_volume = self.b / 2
+
+        return initial_volume
 
 
 @dataclass(kw_only=True)
@@ -106,7 +129,7 @@ class MRKH2OGasHP91(MRKImplicitABC):
         ),
     )
     b0: float = field(init=False, default=1.465)
-    Tc: float = field(init=False, default=673.0)  # TODO: Check consistency with 695 K of paper.
+    Ta: float = field(init=False, default=Ta_H2O)
 
     def a(self, temperature: float) -> float:
         """MRK a parameter for gaseous H2O. Equation 6a, Holland and Powell (1991).
@@ -117,16 +140,32 @@ class MRKH2OGasHP91(MRKImplicitABC):
         Returns:
             MRK a parameter for gaseous H2O.
         """
-        assert temperature <= self.Tc
+        assert temperature <= self.Ta
 
         a: float = (
             self.a_coefficients[0]
-            + self.a_coefficients[1] * (self.Tc - temperature)
-            + self.a_coefficients[2] * (self.Tc - temperature) ** 2
-            + self.a_coefficients[3] * (self.Tc - temperature) ** 3
+            + self.a_coefficients[1] * (self.Ta - temperature)
+            + self.a_coefficients[2] * (self.Ta - temperature) ** 2
+            + self.a_coefficients[3] * (self.Ta - temperature) ** 3
         )
 
         return a
+
+    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
+        """Initial guess volume for the solution to ensure convergence to the correct root.
+
+        See appendix in Holland and Powell (1991).
+
+        Args:
+            temperature: Temperature.
+            pressure: Pressure.
+
+        Returns:
+            Initial solution volume.
+        """
+        initial_volume: float = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
+
+        return initial_volume
 
 
 @dataclass(kw_only=True)
@@ -146,7 +185,8 @@ class MRKH2OFluidHP91(MRKImplicitABC):
         ),
     )
     b0: float = field(init=False, default=1.465)
-    Tc: float = field(init=False, default=673.0)  # TODO: Check consistency with 695 K of paper.
+    Ta: float = field(init=False, default=Ta_H2O)
+    Tc: float = field(init=False, default=Tc_H2O)
 
     def a(self, temperature: float) -> float:
         """MRK a parameter for supercritical H2O. Equation 6, Holland and Powell (1991).
@@ -157,16 +197,35 @@ class MRKH2OFluidHP91(MRKImplicitABC):
         Returns:
             MRK a parameter supercritical H2O.
         """
-        assert temperature >= self.Tc
+        assert temperature >= self.Ta
 
         a: float = (
             self.a_coefficients[0]
-            + self.a_coefficients[1] * (temperature - self.Tc)
-            + self.a_coefficients[2] * (temperature - self.Tc) ** 2
-            + self.a_coefficients[3] * (temperature - self.Tc) ** 3
+            + self.a_coefficients[1] * (temperature - self.Ta)
+            + self.a_coefficients[2] * (temperature - self.Ta) ** 2
+            + self.a_coefficients[3] * (temperature - self.Ta) ** 3
         )
 
         return a
+
+    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
+        """Initial guess volume for the solution to ensure convergence to the correct root.
+
+        See appendix in Holland and Powell (1991).
+
+        Args:
+            temperature: Temperature.
+            pressure: Pressure.
+
+        Returns:
+            Initial solution volume.
+        """
+        if temperature >= self.Tc:
+            initial_volume: float = self.GAS_CONSTANT * temperature / pressure + self.b
+        else:
+            initial_volume = self.b / 2
+
+        return initial_volume
 
 
 @dataclass(kw_only=True)
@@ -220,12 +279,16 @@ class CORKFullH2OHP91(CORKFullABC):
     See base class.
     """
 
-    a_coefficients: tuple[float, ...] = field(init=False, default=(0,))
+    a_coefficients: tuple[float, ...] = field(init=False, default=(0,))  # Not used.
     b0: float = field(init=False, default=1.465)
     a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
     b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))
-    Tc: float = field(init=False, default=673.0)  # FIXME: Paper says should be 695 K.
+    Ta: float = field(init=False, default=Ta_H2O)
+    Tc: float = field(init=False, default=Tc_H2O)
     P0: float = field(init=False, default=2.0)
+    mrk_fluid: MRKImplicitABC = field(init=False, default_factory=MRKH2OFluidHP91)
+    mrk_gas: MRKImplicitABC = field(init=False, default_factory=MRKH2OGasHP91)
+    mrk_liquid: MRKImplicitABC = field(init=False, default_factory=MRKH2OLiquidHP91)
 
     def a(self):
         """Due to critical behaviour a single a parameter cannot be determined for H2O."""
@@ -248,7 +311,40 @@ class CORKFullH2OHP91(CORKFullABC):
         )
         return Psat
 
-    # TODO: volume to override base class.
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in kbar.
+
+        Returns:
+            Volume.
+        """
+        Psat: float = self.Psat(temperature)
+
+        if temperature >= self.Tc:
+            logger.debug("temperature >= critical temperature of %f", self.Tc)
+            volume: float = self.mrk_fluid.volume(temperature, pressure)
+
+        elif temperature <= self.Ta and pressure <= Psat:
+            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
+            volume = self.mrk_gas.volume(temperature, pressure)
+
+        elif temperature < self.Tc and pressure <= Psat:
+            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
+            volume = self.mrk_fluid.volume(temperature, pressure)
+
+        else:  # temperature < self.Tc and pressure > Psat:
+            if temperature <= self.Ta:
+                volume = self.mrk_liquid.volume(temperature, pressure)
+            else:
+                volume = self.mrk_fluid.volume(temperature, pressure)
+
+        if pressure > self.P0:
+            volume += self.virial.volume(temperature, pressure)
+
+        return volume
 
     def volume_integral(self, temperature: float, pressure: float) -> float:
         """Volume integral including virial compensation. Appendix A, Holland and Powell (1991).
@@ -263,38 +359,32 @@ class CORKFullH2OHP91(CORKFullABC):
         Returns:
             volume integral.
         """
+        Psat: float = self.Psat(temperature)
 
         if temperature >= self.Tc:
-            logger.debug("temperature >= critical temperature")
-            mrk: MRKABC = MRKH2OFluidHP91()
-            volume_integral: float = mrk.volume_integral(temperature, pressure)
+            logger.debug("temperature >= critical temperature of %f", self.Tc)
+            volume_integral: float = self.mrk_fluid.volume_integral(temperature, pressure)
 
-        elif pressure <= self.Psat(temperature):
-            logger.debug("pressure <= saturation pressure")
-            mrk: MRKABC = MRKH2OGasHP91()
-            volume_init = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
-            volume_integral: float = mrk.volume_integral(
-                temperature, pressure, volume_init=volume_init
-            )
+        elif temperature <= self.Ta and pressure <= Psat:
+            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
+            volume_integral = self.mrk_gas.volume_integral(temperature, pressure)
 
-        else:  # pressure > self.Psat(temperature):
-            logger.debug("temperature < critical temperature and pressure > saturation pressure")
-            saturation_pressure: float = self.Psat(temperature)
-            # See step (1-4) in Appendix A, Holland and Powell (1991).
-            mrk: MRKABC = MRKH2OGasHP91()
-            volume_init: float = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
-            volume_integral1: float = mrk.volume_integral(
-                temperature, saturation_pressure, volume_init=volume_init
-            )
-            mrk = MRKH2OLiquidHP91()
-            volume_init = self.b / 2
-            volume_integral2 = mrk.volume_integral(
-                temperature, saturation_pressure, volume_init=volume_init
-            )
-            mrk = MRKH2OLiquidHP91()
-            volume_init = self.GAS_CONSTANT * temperature / pressure + self.b
-            volume_integral3 = mrk.volume_integral(temperature, pressure, volume_init=volume_init)
-            volume_integral = volume_integral1 - volume_integral2 + volume_integral3
+        elif temperature < self.Tc and pressure <= Psat:
+            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
+            volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
+
+        else:  # temperature < self.Tc and pressure > Psat:
+            if temperature <= self.Ta:
+                # To converge to the correct root the actual pressure must be used to compute the
+                # initial volume, not Psat.
+                volume_init: float = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
+                volume_integral = self.mrk_gas.volume_integral(
+                    temperature, Psat, volume_init=volume_init
+                )
+                volume_integral -= self.mrk_liquid.volume_integral(temperature, Psat)
+                volume_integral += self.mrk_liquid.volume_integral(temperature, pressure)
+            else:
+                volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
 
         if pressure > self.P0:
             volume_integral += self.virial.volume_integral(temperature, pressure)
