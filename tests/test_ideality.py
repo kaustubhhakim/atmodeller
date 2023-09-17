@@ -1,20 +1,10 @@
 """Integration tests.
 
+See the LICENSE file for licensing information.
+
 Tests to ensure that 'correct' values are returned for certain interior-atmosphere systems. 
 These are quite rudimentary tests, but at least confirm that nothing fundamental is broken with the
 code.
-
-License:
-    This program is free software: you can redistribute it and/or modify it under the terms of the 
-    GNU General Public License as published by the Free Software Foundation, either version 3 of 
-    the License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
-    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
-    the GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along with this program. If 
-    not, see <https://www.gnu.org/licenses/>.
 """
 
 from typing import Type
@@ -29,15 +19,17 @@ from atmodeller.constraints import (
     PressureConstraint,
     SystemConstraints,
 )
-from atmodeller.eos import (
-    CorkCH4,
-    CorkCO,
-    CorkCorrespondingStates,
-    CorkFullABC,
-    CorkFullCO2,
-    CorkFullH2O,
-    CorkH2,
-    CorkSimpleCO2,
+from atmodeller.eos.eos_interfaces import FugacityModelABC
+from atmodeller.eos.holland_and_powell import (
+    CORKCorrespondingStatesCH4HP91,
+    CORKCorrespondingStatesCOHP91,
+    CORKCorrespondingStatesH2HP91,
+    CORKCorrespondingStatesHP91,
+    CORKFullABC,
+    CORKFullCO2HP98,
+    CORKFullH2OHP98,
+    CORKSimpleCO2HP91,
+    get_holland_and_powell_fugacity_models,
 )
 from atmodeller.interfaces import (
     GasSpecies,
@@ -69,13 +61,13 @@ def test_version():
 def check_simple_Cork_gas(
     temperature: float,
     pressure: float,
-    gas_type: Type[CorkCorrespondingStates],
+    gas_type: Type[CORKCorrespondingStatesHP91],
     expected_V: float,
     expected_fugacity_coeff: float,
 ) -> None:
     """Checks the volume and fugacity cofficient for a given gas type using CorkSimple."""
     # The class constructor requires no arguments.
-    cork: CorkCorrespondingStates = gas_type()  # type: ignore
+    cork: CORKCorrespondingStatesHP91 = gas_type()  # type: ignore
     V: float = cork.volume(temperature, pressure)
     fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
     print("Fugacity Coefficient:", fugacity_coeff)
@@ -86,7 +78,7 @@ def check_simple_Cork_gas(
 def check_full_Cork_gas(
     temperature: float,
     pressure: float,
-    gas_type: Type[CorkFullABC],
+    gas_type: Type[CORKFullABC],
     expected_fugacity_coeff: float,
 ) -> None:
     """Checks the fugacity coefficient for a given gas type using CorkFull."""
@@ -98,56 +90,62 @@ def check_full_Cork_gas(
 
 
 def test_CorkH2() -> None:
-    check_simple_Cork_gas(2000, 10, CorkH2, 3.7218446244368684, 4.672042007568433)
+    check_simple_Cork_gas(
+        2000, 10, CORKCorrespondingStatesH2HP91, 3.7218446244368684, 4.672042007568433
+    )
 
 
 def test_CorkCO() -> None:
-    check_simple_Cork_gas(2000, 10, CorkCO, 4.6747168815213715, 7.698485559533069)
+    check_simple_Cork_gas(
+        2000, 10, CORKCorrespondingStatesCOHP91, 4.6747168815213715, 7.698485559533069
+    )
 
 
 def test_CorkCH4() -> None:
-    check_simple_Cork_gas(2000, 10, CorkCH4, 4.786943829010815, 8.116070626285136)
+    check_simple_Cork_gas(
+        2000, 10, CORKCorrespondingStatesCH4HP91, 4.786943829010815, 8.116070626285136
+    )
 
 
 def test_simple_CorkCO2() -> None:
-    check_simple_Cork_gas(2000, 10, CorkSimpleCO2, 4.672048888683978, 7.1335509191383455)
+    check_simple_Cork_gas(2000, 10, CORKSimpleCO2HP91, 4.672048888683978, 7.1335509191383455)
 
 
 def test_CorkCO2_at_P0() -> None:
     """Below P0 so virial contribution excluded."""
-    check_full_Cork_gas(2000, 2, CorkFullCO2, 1.6063624424808558)
+    check_full_Cork_gas(2000, 2, CORKFullCO2HP98, 1.6063624424808558)
 
 
 def test_CorkCO2_above_P0() -> None:
     """Above P0 so virial contribution included."""
-    check_full_Cork_gas(2000, 10, CorkFullCO2, 7.4492345831832525)
+    check_full_Cork_gas(2000, 10, CORKFullCO2HP98, 7.4492345831832525)
 
 
 def test_CorkH2O_above_Tc_below_P0() -> None:
     """Above Tc and below P0."""
-    check_full_Cork_gas(2000, 1, CorkFullH2O, 1.048278616058322)
+    check_full_Cork_gas(2000, 1, CORKFullH2OHP98, 1.048278616058322)
 
 
 def test_CorkH2O_above_Tc_above_P0() -> None:
     """Above Tc and above P0."""
-    check_full_Cork_gas(2000, 5, CorkFullH2O, 1.3444013638026706)
+    check_full_Cork_gas(2000, 5, CORKFullH2OHP98, 1.3444013638026706)
 
 
 def test_CorkH2O_below_Tc_below_Psat() -> None:
     """Below Tc and below Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_full_Cork_gas(600, 0.1, CorkFullH2O, 0.7910907770688191)
+    check_full_Cork_gas(600, 0.1, CORKFullH2OHP98, 0.7910907770688191)
 
 
 def test_CorkH2O_below_Tc_above_Psat() -> None:
     """Below Tc and above Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_full_Cork_gas(600, 1, CorkFullH2O, 0.14052644311851598)
+    check_full_Cork_gas(600, 1, CORKFullH2OHP98, 0.14052644311851598)
 
 
 def test_CorkH2O_below_Tc_above_P0() -> None:
     """Below Tc and above P0."""
-    check_full_Cork_gas(600, 10, CorkFullH2O, 0.40066985009753664)
+    check_full_Cork_gas(600, 10, CORKFullH2OHP98, 0.40066985009753664)
 
 
 def test_H_fO2() -> None:
@@ -211,7 +209,7 @@ def test_H2_with_cork() -> None:
                 chemical_formula="H2",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CorkH2(),
+                fugacity_coefficient=CORKCorrespondingStatesH2HP91(),
             ),
             GasSpecies(
                 chemical_formula="O2",
@@ -247,19 +245,22 @@ def test_H2_with_cork() -> None:
 
 def test_CORK() -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer."""
+
+    fugacity_models: dict[str, FugacityModelABC] = get_holland_and_powell_fugacity_models()
+
     species: Species = Species(
         [
             GasSpecies(
                 chemical_formula="H2",
                 solubility=BasaltH2(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CorkH2(),
+                fugacity_coefficient=fugacity_models["H2"],
             ),
             GasSpecies(
                 chemical_formula="H2O",
                 solubility=PeridotiteH2O(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CorkFullH2O(),
+                fugacity_coefficient=fugacity_models["H2O"],
             ),
             GasSpecies(
                 chemical_formula="O2",
@@ -270,19 +271,19 @@ def test_CORK() -> None:
                 chemical_formula="CO",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CorkCO(),
+                fugacity_coefficient=fugacity_models["CO"],
             ),
             GasSpecies(
                 chemical_formula="CO2",
                 solubility=BasaltDixonCO2(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CorkFullCO2(),
+                fugacity_coefficient=fugacity_models["CO2"],
             ),
             GasSpecies(
                 chemical_formula="CH4",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CorkCH4(),
+                fugacity_coefficient=fugacity_models["CH4"],
             ),
             # SolidSpecies(
             #     chemical_formula="C",

@@ -1,4 +1,7 @@
-"""Package level variables and initialises the package logger."""
+"""Package level variables and initialises the package logger.
+
+See the LICENSE file for licensing information.
+"""
 
 from __future__ import annotations
 

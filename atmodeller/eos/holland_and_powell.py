@@ -1,16 +1,40 @@
-"""Fugacity coefficients and non-ideal effects.
+"""Fugacity models from Holland and Powell (1991, 1998, 2011).
 
-License:
-    This program is free software: you can redistribute it and/or modify it under the terms of the 
-    GNU General Public License as published by the Free Software Foundation, either version 3 of 
-    the License, or (at your option) any later version.
+See the LICENSE file for licensing information.
 
-    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
-    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
-    the GNU General Public License for more details.
+This module contains concrete classes for the fugacity models presented in Holland and Powell 
+(1991, 1998, 2011).
 
-    You should have received a copy of the GNU General Public License along with this program. If 
-    not, see <https://www.gnu.org/licenses/>.
+Classes:
+    MRKH2OLiquidHP91: MRK for liquid H2O (only) in Holland and Powell (1991).
+    MRKH2OGasHP91: MRK for gaseous H2O (only) in Holland and Powell (1991).
+    MRKH2OFluidHP91: MRK for fluid H2O (only) in Holland and Powell (1991).
+    CORKFullCO2HP91: Full CORK for CO2 in Holland and Powell (1991).
+    CORKFullCO2HP98: Full CORK for CO2 in Holland and Powell (1998).
+    CORKSimpleCO2HP91: Simple CORK model for CO2 in Holland and Powell (1991).
+    CORKFullH2OHP91: Full CORK for H2O in Holland and Powell (1991).
+    CORKFullH2OHP98: Full CORK for H2O in Holland and Powell (1998).
+    CORKCorrespondingStatesCH4HP91: Corresponding states for CH4 in Holland and Powell (1991).
+    CORKCorrespondingStatesH2HP91: Corresponding states for H2 in Holland and Powell (1991).
+    CORKCorrespondingStatesCOHP91: Corresponding states for CO in Holland and Powell (1991).
+    CORKCorrespondingStatesS2HP11: Corresponding states for S2 in Holland and Powell (2011).
+    CORKCorrespondingStatesH2SHP11: Corresponding states for H2S in Holland and Powell (2011).
+
+Example:
+    Get the preferred fugacity models for various species from the Holland and Powell models:
+    
+    ```python
+    >>> from atmodeller.eos.holland_and_powell import get_holland_and_powell_fugacity_models
+    >>> models = get_holland_and_powell_fugacity_models()
+    >>> # list the available species
+    >>> models.keys()
+    >>> # Get the fugacity model for CO
+    >>> co_model = models['CO']
+    >>> # Determine the fugacity coefficient at 2000 K and 1000 bar
+    >>> fugacity_coefficient = co_model.get_value(temperature=2000, pressure=1000)
+    >>> print(fugacity_coefficient)
+    1.2664435476696503
+    ```
 """
 
 from __future__ import annotations
@@ -18,18 +42,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-import numpy as np
-from scipy.constants import kilo
-
-from atmodeller.eos_interfaces import (
+from atmodeller.eos.eos_interfaces import (
     MRKABC,
-    CorkFullABC,
+    CORKFullABC,
     FugacityModelABC,
     MRKExplicitABC,
     MRKImplicitABC,
-    ShiSaxenaABC,
-    ShiSaxenaHighPressure,
-    ShiSaxenaLowPressure,
     VirialCompensation,
 )
 
@@ -37,7 +55,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class MRKH2OLiquid(MRKImplicitABC):
+class MRKH2OLiquidHP91(MRKImplicitABC):
     """MRK for liquid H2O. Equation 6, Holland and Powell (1991).
 
     See base class.
@@ -72,7 +90,7 @@ class MRKH2OLiquid(MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKH2OGas(MRKImplicitABC):
+class MRKH2OGasHP91(MRKImplicitABC):
     """MRK for gaseous H2O. Equation 6a, Holland and Powell (1991).
 
     See base class.
@@ -112,7 +130,7 @@ class MRKH2OGas(MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKH2OFluid(MRKImplicitABC):
+class MRKH2OFluidHP91(MRKImplicitABC):
     """MRK a parameter for supercritical H2O. Equation 6, Holland and Powell (1991).
 
     See base class.
@@ -152,7 +170,7 @@ class MRKH2OFluid(MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class CorkFullCO2HollAndPowell1991(CorkFullABC):
+class CORKFullCO2HP91(CORKFullABC):
     """Full CORK equation for CO2 from Holland and Powell (1991).
 
     See base class.
@@ -183,7 +201,7 @@ class CorkFullCO2HollAndPowell1991(CorkFullABC):
 
 
 @dataclass(kw_only=True)
-class CorkFullCO2(CorkFullCO2HollAndPowell1991):
+class CORKFullCO2HP98(CORKFullCO2HP91):
     """Full CORK equation for CO2 from Holland and Powell (1998).
 
     Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
@@ -196,15 +214,13 @@ class CorkFullCO2(CorkFullCO2HollAndPowell1991):
 
 
 @dataclass(kw_only=True)
-class CorkFullH2OHollandAndPowell1991(CorkFullABC):
+class CORKFullH2OHP91(CORKFullABC):
     """Full CORK equation for H2O from Holland and Powell (1991).
 
     See base class.
     """
 
-    a_coefficients: tuple[float, ...] = field(
-        init=False, default=(0,)
-    )  # TODO: Check not required.
+    a_coefficients: tuple[float, ...] = field(init=False, default=(0,))
     b0: float = field(init=False, default=1.465)
     a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
     b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))
@@ -250,12 +266,12 @@ class CorkFullH2OHollandAndPowell1991(CorkFullABC):
 
         if temperature >= self.Tc:
             logger.debug("temperature >= critical temperature")
-            mrk: MRKABC = MRKH2OFluid()
+            mrk: MRKABC = MRKH2OFluidHP91()
             volume_integral: float = mrk.volume_integral(temperature, pressure)
 
         elif pressure <= self.Psat(temperature):
             logger.debug("pressure <= saturation pressure")
-            mrk: MRKABC = MRKH2OGas()
+            mrk: MRKABC = MRKH2OGasHP91()
             volume_init = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
             volume_integral: float = mrk.volume_integral(
                 temperature, pressure, volume_init=volume_init
@@ -265,17 +281,17 @@ class CorkFullH2OHollandAndPowell1991(CorkFullABC):
             logger.debug("temperature < critical temperature and pressure > saturation pressure")
             saturation_pressure: float = self.Psat(temperature)
             # See step (1-4) in Appendix A, Holland and Powell (1991).
-            mrk: MRKABC = MRKH2OGas()
+            mrk: MRKABC = MRKH2OGasHP91()
             volume_init: float = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
             volume_integral1: float = mrk.volume_integral(
                 temperature, saturation_pressure, volume_init=volume_init
             )
-            mrk = MRKH2OLiquid()
+            mrk = MRKH2OLiquidHP91()
             volume_init = self.b / 2
             volume_integral2 = mrk.volume_integral(
                 temperature, saturation_pressure, volume_init=volume_init
             )
-            mrk = MRKH2OLiquid()
+            mrk = MRKH2OLiquidHP91()
             volume_init = self.GAS_CONSTANT * temperature / pressure + self.b
             volume_integral3 = mrk.volume_integral(temperature, pressure, volume_init=volume_init)
             volume_integral = volume_integral1 - volume_integral2 + volume_integral3
@@ -287,7 +303,7 @@ class CorkFullH2OHollandAndPowell1991(CorkFullABC):
 
 
 @dataclass(kw_only=True)
-class CorkFullH2O(CorkFullH2OHollandAndPowell1991):
+class CORKFullH2OHP98(CORKFullH2OHP91):
     """Full CORK equation for H2O from Holland and Powell (1998).
 
     Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
@@ -301,7 +317,7 @@ class CorkFullH2O(CorkFullH2OHollandAndPowell1991):
 
 
 @dataclass(kw_only=True)
-class CorkCorrespondingStates(MRKExplicitABC):
+class CORKCorrespondingStatesHP91(MRKExplicitABC):
     """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
@@ -412,146 +428,93 @@ class CorkCorrespondingStates(MRKExplicitABC):
 
 
 @dataclass(kw_only=True)
-class CorkSimpleCO2(CorkCorrespondingStates):
+class CORKSimpleCO2HP91(CORKCorrespondingStatesHP91):
     """Critical constants for CO2. See base class.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=304.2)
-    Pc: float = field(init=False, default=0.0738)
+    Tc: float = field(init=False, default=304.2)  # K
+    Pc: float = field(init=False, default=0.0738)  # kbar
 
 
 @dataclass(kw_only=True)
-class CorkCH4(CorkCorrespondingStates):
+class CORKCorrespondingStatesCH4HP91(CORKCorrespondingStatesHP91):
     """Critical constants for CH4. See base class.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=190.6)
-    Pc: float = field(init=False, default=0.0460)
+    Tc: float = field(init=False, default=190.6)  # K
+    Pc: float = field(init=False, default=0.0460)  # kbar
 
 
 @dataclass(kw_only=True)
-class CorkH2(CorkCorrespondingStates):
+class CORKCorrespondingStatesH2HP91(CORKCorrespondingStatesHP91):
     """Critical constants for H2. See base class.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=41.2)
-    Pc: float = field(init=False, default=0.0211)
+    Tc: float = field(init=False, default=41.2)  # K
+    Pc: float = field(init=False, default=0.0211)  # kbar
 
 
 @dataclass(kw_only=True)
-class CorkCO(CorkCorrespondingStates):
+class CORKCorrespondingStatesCOHP91(CORKCorrespondingStatesHP91):
     """Critical constants for CO. See base class.
 
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=132.9)
-    Pc: float = field(init=False, default=0.0350)
-
-
-# Holland and Powell (2011) use this model for additional species below, using critical constants
-# from the following reference:
-# Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.
-# McGraw-Hill, New York.
+    Tc: float = field(init=False, default=132.9)  # K
+    Pc: float = field(init=False, default=0.0350)  # kbar
 
 
 @dataclass(kw_only=True)
-class CorkS2(CorkCorrespondingStates):
+class CORKCorrespondingStatesS2HP11(CORKCorrespondingStatesHP91):
     """Critical constants for S2. See base class.
 
-    Shi and Saxena, Thermodynamic modeling of the C-H-O-S fluid system, American Mineralogist,
-    Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid phases.
+    Holland and Powell (2011) state that the critical constants for S2 are taken from:
 
-    http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
+        Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.
+        McGraw-Hill, New York.
 
+    In the fifth edition of this book S2 is not given (only S is), so instead the critical
+    constants for S2 are taken from:
+
+        Shi and Saxena, Thermodynamic modeling of the C-H-O-S fluid system, American Mineralogist,
+        Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid phases.
+        http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
     """
 
-    Tc: float = field(init=False, default=208.15)
-    Pc: float = field(init=False, default=0.072954)
+    Tc: float = field(init=False, default=208.15)  # K
+    Pc: float = field(init=False, default=0.072954)  # kbar
 
 
 @dataclass(kw_only=True)
-class CorkH2S(CorkCorrespondingStates):
+class CORKCorrespondingStatesH2SHP11(CORKCorrespondingStatesHP91):
     """Critical constants for H2S. See base class.
 
-    Appendix A.19 in The Properties of Gases and Liquids (2001), 5th edition.
+    Appendix A.19 in:
+
+        Poling, Prausnitz, and O'Connell, 2001. The Properties of Gases and Liquids, 5th edition.
+        McGraw-Hill, New York. DOI: 10.1036/0070116822.
     """
 
-    Tc: float = field(init=False, default=373.4)
-    Pc: float = field(init=False, default=0.08963)
+    Tc: float = field(init=False, default=373.4)  # K
+    Pc: float = field(init=False, default=0.08963)  # kbar
 
 
-@dataclass(kw_only=True)
-class ShiSaxenaHighPressureH2(ShiSaxenaHighPressure):
-    Tc: float = field(init=False, default=33.25)
-    Pc: float = field(init=False, default=12.9696)
-    a_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1)
-    )
-    b_coefficients: tuple[float, ...] = field(
-        init=False, default=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5)
-    )
-    c_coefficients: tuple[float, ...] = field(
-        init=False, default=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10)
-    )
-    d_coefficients: tuple[float, ...] = field(
-        init=False, default=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0)
-    )
+def get_holland_and_powell_fugacity_models() -> dict[str, FugacityModelABC]:
+    """Gets a dictionary of the preferred fugacity models to use for each species."""
+    models: dict[str, FugacityModelABC] = {}
+    models["CH4"] = CORKCorrespondingStatesCH4HP91()
+    models["CO"] = CORKCorrespondingStatesCOHP91()
+    models["CO2"] = CORKFullCO2HP98()
+    models["H2"] = CORKCorrespondingStatesH2HP91()
+    models["H2O"] = CORKFullH2OHP98()
+    models["H2S"] = CORKCorrespondingStatesH2SHP11()
+    models["S2"] = CORKCorrespondingStatesS2HP11()
 
-
-@dataclass(kw_only=True)
-class ShiSaxenaLowPressureH2(ShiSaxenaLowPressure):
-    Tc: float = field(init=False, default=33.25)
-    Pc: float = field(init=False, default=12.9696)
-    a_coefficients: tuple[float, ...] = field(init=False, default=(1, 0, 0, 0, 0, 0))
-    b_coefficients: tuple[float, ...] = field(init=False, default=(0, 0.9827e-1, 0, -0.2709, 0))
-    c_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, -0.1030e-2, 0, 0.1427e-1))
-    d_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, 0, 0, 0))
-
-
-@dataclass(kw_only=True)
-class ShiSaxenaH2(FugacityModelABC):
-    low_pressure_eos: ShiSaxenaABC = field(default_factory=ShiSaxenaLowPressureH2)
-    high_pressure_eos: ShiSaxenaABC = field(default_factory=ShiSaxenaHighPressureH2)
-
-    def get_value(self, *, temperature: float, pressure: float) -> float:
-        """Evaluates the fugacity coefficient at temperature and pressure.
-
-        Note that the input 'pressure' must ALWAYS be in bar, so it is scaled here using
-        'self.scaling' since self.fugacity_coefficient requires the internal units of pressure.
-
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in bar.
-
-        Returns:
-            Fugacity coefficient evaluated at temperature and pressure, which is dimensionaless.
-        """
-        pressure /= self.scaling
-
-        if pressure >= 1e3:
-            return self.high_pressure_eos.get_value(temperature=temperature, pressure=pressure)
-        else:
-            return self.low_pressure_eos.get_value(temperature=temperature, pressure=pressure)
-
-    def volume(self, temperature: float, pressure: float) -> float:
-        if pressure / self.scaling >= 1e3:
-            return self.high_pressure_eos.volume(temperature=temperature, pressure=pressure)
-        else:
-            return self.low_pressure_eos.volume(temperature=temperature, pressure=pressure)
-
-    def volume_integral(self, temperature: float, pressure: float) -> float:
-        if pressure / self.scaling >= 1e3:
-            return self.high_pressure_eos.volume_integral(
-                temperature=temperature, pressure=pressure
-            )
-        else:
-            return self.low_pressure_eos.volume_integral(
-                temperature=temperature, pressure=pressure
-            )
+    return models

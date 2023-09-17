@@ -1,5 +1,7 @@
 """Functions originally written by Meng to compute pure gas fugacities from Holland and Powell.
 
+See the LICENSE file for licensing information.
+
 This module can be deleted once testing is complete.
 """
 
@@ -10,7 +12,7 @@ from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT, debug_logger
-from atmodeller.eos import CorkFullCO2
+from atmodeller.eos.holland_and_powell import CORKFullCO2HP98
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -226,7 +228,7 @@ def main():
     # print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
     # print("\n")
     print("Dan Full CORK:\n")
-    cork = CorkFullCO2()
+    cork = CORKFullCO2HP98()
     fugacity_coeff = cork.get_value(temperature=temperature, pressure=pressure * kilo)
     fugacity = cork.fugacity(temperature=temperature, pressure=pressure)
     volume = cork.volume(temperature=temperature, pressure=pressure)
