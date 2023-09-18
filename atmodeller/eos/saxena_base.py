@@ -1,9 +1,30 @@
+"""Base classes for the fugacity models from Saxena and Fei (1987) and Shi and Saxena (1992).
+
+See the LICENSE file for licensing information.
+"""
+from __future__ import annotations
+
+import logging
+from abc import abstractmethod
+from dataclasses import dataclass, field
+
+import numpy as np
+
+from atmodeller.eos.interfaces import FugacityModelABC
+
+logger: logging.Logger = logging.getLogger(__name__)
+
+
 @dataclass(kw_only=True)
-class ShiSaxenaABC(FugacityModelABC):
+class SaxenaABC(FugacityModelABC):
     """Shi and Saxena fugacity model.
 
-    Shi and Saxena, Thermodynamic modeling of the C-H-O-S fluid system, American Mineralogist,
-    Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid phases.
+    The model presented in Shi and Saxena (1992) is a general form that can be adapted to the
+    previous work of Saxena and Fei (1987).
+
+    Shi and Saxena (1992), Thermodynamic modeling of the C-H-O-S fluid system,
+    American Mineralogist, Volume 77, pages 1038-1049, 1992.
+    See table 2, critical data of C-H-O-S fluid phases.
 
     http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
 
@@ -14,25 +35,26 @@ class ShiSaxenaABC(FugacityModelABC):
         b_coefficients: b coefficients (see paper).
         c_coefficients: c coefficients (see paper).
         d_coefficients: d coefficients (see paper).
-        scaling: Scaling is unity for bar.
-        GAS_CONSTANT: Gas constant with the appropriate units.
+        P0: Standard state pressure. Set to 1 bar.
+        scaling: See base class.
+        GAS_CONSTANT: See base class.
     """
 
     Tc: float
     Pc: float
-    # TODO: Different P0 to P0 used in Holland and Powell
-    # Integration start for pressure.
-    P0: float = field(init=False, default=1)  # 1 bar
     a_coefficients: tuple[float, ...]
     b_coefficients: tuple[float, ...]
     c_coefficients: tuple[float, ...]
     d_coefficients: tuple[float, ...]
+    P0: float = field(init=False, default=1)  # 1 bar
 
     @abstractmethod
     def _get_compressibility_coefficient(
         self, temperature: float, coefficients: tuple[float, ...]
     ) -> float:
         """General form of the coefficients for the compressibility calculation.
+
+        Shi and Saxena (1992), Equation 1.
 
         Args:
             temperature: Temperature in kelvin.
@@ -52,7 +74,9 @@ class ShiSaxenaABC(FugacityModelABC):
         Returns:
             a parameter.
         """
-        return self._get_compressibility_coefficient(temperature, self.a_coefficients)
+        a: float = self._get_compressibility_coefficient(temperature, self.a_coefficients)
+
+        return a
 
     def b(self, temperature: float) -> float:
         """b parameter.
@@ -63,7 +87,9 @@ class ShiSaxenaABC(FugacityModelABC):
         Returns:
             b parameter.
         """
-        return self._get_compressibility_coefficient(temperature, self.b_coefficients)
+        b: float = self._get_compressibility_coefficient(temperature, self.b_coefficients)
+
+        return b
 
     def c(self, temperature: float) -> float:
         """c parameter.
@@ -74,7 +100,9 @@ class ShiSaxenaABC(FugacityModelABC):
         Returns:
             c parameter.
         """
-        return self._get_compressibility_coefficient(temperature, self.c_coefficients)
+        c: float = self._get_compressibility_coefficient(temperature, self.c_coefficients)
+
+        return c
 
     def d(self, temperature: float) -> float:
         """d parameter.
@@ -85,19 +113,22 @@ class ShiSaxenaABC(FugacityModelABC):
         Returns:
             d parameter.
         """
-        return self._get_compressibility_coefficient(temperature, self.d_coefficients)
+        d: float = self._get_compressibility_coefficient(temperature, self.d_coefficients)
+
+        return d
 
     def compressibility_parameter(self, temperature: float, pressure: float) -> float:
         """Compressibility parameter at temperature and pressure.
 
+        Shi and Saxena (1992), Equation 2.
+
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
             The compressibility parameter, Z.
         """
-
         Pr: float = self.reduced_pressure(pressure)
         Z: float = (
             self.a(temperature)
@@ -112,24 +143,28 @@ class ShiSaxenaABC(FugacityModelABC):
         """Reduced pressure.
 
         Args:
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
             The reduced pressure, which is dimensionless.
         """
-        return pressure / self.Pc
+        Pr: float = pressure / self.Pc
+
+        return Pr
 
     @property
     def reduced_pressure0(self) -> float:
-        """Reduced pressure.
+        """Reduced standard state pressure.
 
         Args:
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
-            The reduced pressure, which is dimensionless.
+            The reduced standard state pressure, which is dimensionless.
         """
-        return self.P0 / self.Pc
+        Pr0: float = self.P0 / self.Pc
+
+        return Pr0
 
     def reduced_temperature(self, temperature: float) -> float:
         """Reduced temperature.
@@ -140,10 +175,14 @@ class ShiSaxenaABC(FugacityModelABC):
         Returns:
             The reduced temperature, which is dimensionless.
         """
-        return temperature / self.Tc
+        Tr: float = temperature / self.Tc
+
+        return Tr
 
     def volume(self, temperature: float, pressure: float) -> float:
         """Volume.
+
+        Shi and Saxena (1992), Equation 1.
 
         Args:
             temperature: Temperature in kelvin.
@@ -159,6 +198,8 @@ class ShiSaxenaABC(FugacityModelABC):
 
     def volume_integral(self, temperature: float, pressure: float) -> float:
         """Volume integral (V dP).
+
+        Shi and Saxena (1992), Equation 11.
 
         Args:
             temperature: Temperature in kelvin.
@@ -184,13 +225,18 @@ class ShiSaxenaABC(FugacityModelABC):
 
 
 @dataclass(kw_only=True)
-class ShiSaxenaLowPressure(ShiSaxenaABC):
-    """Low pressure (< 1 kbar)."""
+class SaxenaLowPressure(SaxenaABC):
+    """Fugacity for low pressure (< 1 kbar).
+
+    See base class.
+    """
 
     def _get_compressibility_coefficient(
         self, temperature: float, coefficients: tuple[float, ...]
     ) -> float:
         """General form of the coefficients for the compressibility calculation.
+
+        Shi and Saxena (1992), Equation 3b.
 
         Args:
             temperature: Temperature in kelvin.
@@ -212,13 +258,18 @@ class ShiSaxenaLowPressure(ShiSaxenaABC):
 
 
 @dataclass(kw_only=True)
-class ShiSaxenaHighPressure(ShiSaxenaABC):
-    """High pressure (>=1 kbar)."""
+class SaxenaHighPressure(SaxenaABC):
+    """Fugacity for high pressure (>=1 kbar).
+
+    See base class.
+    """
 
     def _get_compressibility_coefficient(
         self, temperature: float, coefficients: tuple[float, ...]
     ) -> float:
         """General form of the coefficients for the compressibility calculation.
+
+        Shi and Saxena (1992), Equation 3a.
 
         Args:
             temperature: Temperature in kelvin.
