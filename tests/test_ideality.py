@@ -19,18 +19,19 @@ from atmodeller.constraints import (
     PressureConstraint,
     SystemConstraints,
 )
-from atmodeller.eos.eos_interfaces import FugacityModelABC
-from atmodeller.eos.holland_and_powell import (
+from atmodeller.eos.holland import (
+    CORKCO2HP98,
+    CORKH2OHP98,
+    MRKCO2HP91,
     CORKCorrespondingStatesCH4HP91,
     CORKCorrespondingStatesCOHP91,
     CORKCorrespondingStatesH2HP91,
     CORKCorrespondingStatesHP91,
     CORKFullABC,
-    CORKFullCO2HP98,
-    CORKFullH2OHP98,
     CORKSimpleCO2HP91,
     get_holland_and_powell_fugacity_models,
 )
+from atmodeller.eos.interfaces import FugacityModelABC
 from atmodeller.interfaces import (
     GasSpecies,
     IdealityConstant,
@@ -113,39 +114,49 @@ def test_simple_CorkCO2() -> None:
 
 def test_CorkCO2_at_P0() -> None:
     """Below P0 so virial contribution excluded."""
-    check_full_Cork_gas(2000, 2, CORKFullCO2HP98, 1.6063624424808558)
+    check_full_Cork_gas(2000, 2, CORKCO2HP98, 1.6063624424808558)
+
+
+def test_CorkCO2_at_P0_NEW() -> None:
+    """Below P0 so virial contribution excluded."""
+    check_full_Cork_gas(2000, 2, MRKCO2HP91, 1.6063624424808558)
 
 
 def test_CorkCO2_above_P0() -> None:
     """Above P0 so virial contribution included."""
-    check_full_Cork_gas(2000, 10, CORKFullCO2HP98, 7.4492345831832525)
+    check_full_Cork_gas(2000, 10, CORKCO2HP98, 7.4492345831832525)
+
+
+# def test_CorkCO2_above_P0_NEW() -> None:
+#     """Above P0 so virial contribution included."""
+#     check_full_Cork_gas(2000, 10, CORKFullCO2HP98NEW, 7.4492345831832525)
 
 
 def test_CorkH2O_above_Tc_below_P0() -> None:
     """Above Tc and below P0."""
-    check_full_Cork_gas(2000, 1, CORKFullH2OHP98, 1.048278616058322)
+    check_full_Cork_gas(2000, 1, CORKH2OHP98, 1.048278616058322)
 
 
 def test_CorkH2O_above_Tc_above_P0() -> None:
     """Above Tc and above P0."""
-    check_full_Cork_gas(2000, 5, CORKFullH2OHP98, 1.3444013638026706)
+    check_full_Cork_gas(2000, 5, CORKH2OHP98, 1.3444013638026706)
 
 
 def test_CorkH2O_below_Tc_below_Psat() -> None:
     """Below Tc and below Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_full_Cork_gas(600, 0.1, CORKFullH2OHP98, 0.7910907770688191)
+    check_full_Cork_gas(600, 0.1, CORKH2OHP98, 0.7910907770688191)
 
 
 def test_CorkH2O_below_Tc_above_Psat() -> None:
     """Below Tc and above Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_full_Cork_gas(600, 1, CORKFullH2OHP98, 0.14052644311851598)
+    check_full_Cork_gas(600, 1, CORKH2OHP98, 0.14052644311851598)
 
 
 def test_CorkH2O_below_Tc_above_P0() -> None:
     """Below Tc and above P0."""
-    check_full_Cork_gas(600, 10, CORKFullH2OHP98, 0.40066985009753664)
+    check_full_Cork_gas(600, 10, CORKH2OHP98, 0.40066985009753664)
 
 
 def test_H_fO2() -> None:

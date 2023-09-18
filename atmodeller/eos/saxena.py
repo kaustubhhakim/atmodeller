@@ -8,19 +8,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-import numpy as np
-from scipy.constants import kilo
-
-from atmodeller.eos.eos_interfaces import (
-    MRKABC,
-    CORKFullABC,
-    FugacityModelABC,
-    MRKExplicitABC,
-    MRKImplicitABC,
+from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.saxena_base import (
     ShiSaxenaABC,
     ShiSaxenaHighPressure,
     ShiSaxenaLowPressure,
-    VirialCompensation,
 )
 
 

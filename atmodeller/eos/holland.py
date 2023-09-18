@@ -9,11 +9,15 @@ Classes:
     MRKH2OLiquidHP91: MRK for liquid H2O (only) in Holland and Powell (1991).
     MRKH2OGasHP91: MRK for gaseous H2O (only) in Holland and Powell (1991).
     MRKH2OFluidHP91: MRK for fluid H2O (only) in Holland and Powell (1991).
-    CORKFullCO2HP91: Full CORK for CO2 in Holland and Powell (1991).
-    CORKFullCO2HP98: Full CORK for CO2 in Holland and Powell (1998).
+    MRKH2OHP91: MRK for H2O with critical behaviour in Holland and Powell (1991).
+    MRKCO2HP91: MRK for CO2 in Holland and Powell (1991).
+    CORKCO2HP91: Full CORK for CO2 in Holland and Powell (1991).
+    CORKCO2HP98: Full CORK for CO2 in Holland and Powell (1998).
     CORKSimpleCO2HP91: Simple CORK model for CO2 in Holland and Powell (1991).
-    CORKFullH2OHP91: Full CORK for H2O in Holland and Powell (1991).
-    CORKFullH2OHP98: Full CORK for H2O in Holland and Powell (1998).
+    CORKH2OHP91: Full CORK for H2O in Holland and Powell (1991).
+    CORKH2OHP98: Full CORK for H2O in Holland and Powell (1998).
+
+    # TODO: REFRESH.
     CORKCorrespondingStatesCH4HP91: Corresponding states for CH4 in Holland and Powell (1991).
     CORKCorrespondingStatesH2HP91: Corresponding states for H2 in Holland and Powell (1991).
     CORKCorrespondingStatesCOHP91: Corresponding states for CO in Holland and Powell (1991).
@@ -42,9 +46,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from atmodeller.eos.eos_interfaces import (
+from scipy.constants import kilo
+
+from atmodeller.eos.holland_base import (
     CORKFullABC,
     FugacityModelABC,
+    MRKCriticalBehaviour,
     MRKExplicitABC,
     MRKImplicitABC,
     VirialCompensation,
@@ -61,7 +68,12 @@ Ta_H2O: float = 673  # K
 
 
 @dataclass(kw_only=True)
-class MRKH2OLiquidHP91(MRKImplicitABC):
+class Unitskbar:
+    scaling: float = field(init=False, default=kilo)
+
+
+@dataclass(kw_only=True)
+class MRKH2OLiquidHP91(Unitskbar, MRKImplicitABC):
     """MRK for liquid H2O. Equation 6, Holland and Powell (1991).
 
     See base class.
@@ -113,7 +125,7 @@ class MRKH2OLiquidHP91(MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKH2OGasHP91(MRKImplicitABC):
+class MRKH2OGasHP91(Unitskbar, MRKImplicitABC):
     """MRK for gaseous H2O. Equation 6a, Holland and Powell (1991).
 
     See base class.
@@ -169,7 +181,7 @@ class MRKH2OGasHP91(MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKH2OFluidHP91(MRKImplicitABC):
+class MRKH2OFluidHP91(Unitskbar, MRKImplicitABC):
     """MRK a parameter for supercritical H2O. Equation 6, Holland and Powell (1991).
 
     See base class.
@@ -229,18 +241,14 @@ class MRKH2OFluidHP91(MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class CORKFullCO2HP91(CORKFullABC):
-    """Full CORK equation for CO2 from Holland and Powell (1991).
+class MRKCO2HP91(Unitskbar, MRKImplicitABC):
+    """MRK for CO2. Holland and Powell (1991).
 
     See base class.
     """
 
     a_coefficients: tuple[float, ...] = field(init=False, default=(741.2, -0.10891, -3.903e-4))
     b0: float = field(init=False, default=3.057)
-    a_virial: tuple[float, float] = field(init=False, default=(1.33790e-2, -1.01740e-5))
-    b_virial: tuple[float, float] = field(init=False, default=(-2.26924e-1, 7.73793e-5))
-    Tc: float = field(init=False, default=304.2)
-    P0: float = field(init=False, default=5.0)
 
     def a(self, temperature: float) -> float:
         """MRK a parameter. Holland and Powell (1991), p270.
@@ -258,41 +266,28 @@ class CORKFullCO2HP91(CORKFullABC):
         )
         return a
 
+    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
+        """Initial guess volume for the solution to ensure convergence to the correct root.
+
+        Args:
+            temperature: Temperature.
+            pressure: Pressure.
+
+        Returns:
+            Initial solution volume.
+        """
+        initial_volume: float = self.GAS_CONSTANT * temperature / pressure + self.b
+
+        return initial_volume
+
 
 @dataclass(kw_only=True)
-class CORKFullCO2HP98(CORKFullCO2HP91):
-    """Full CORK equation for CO2 from Holland and Powell (1998).
-
-    Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
-
-    See base class.
-    """
-
-    a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
-    b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
-
-
-@dataclass(kw_only=True)
-class CORKFullH2OHP91(CORKFullABC):
-    """Full CORK equation for H2O from Holland and Powell (1991).
-
-    See base class.
-    """
-
-    a_coefficients: tuple[float, ...] = field(init=False, default=(0,))  # Not used.
-    b0: float = field(init=False, default=1.465)
-    a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
-    b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))
-    Ta: float = field(init=False, default=Ta_H2O)
-    Tc: float = field(init=False, default=Tc_H2O)
-    P0: float = field(init=False, default=2.0)
+class MRKH2OHP91(Unitskbar, MRKCriticalBehaviour):
     mrk_fluid: MRKImplicitABC = field(init=False, default_factory=MRKH2OFluidHP91)
     mrk_gas: MRKImplicitABC = field(init=False, default_factory=MRKH2OGasHP91)
     mrk_liquid: MRKImplicitABC = field(init=False, default_factory=MRKH2OLiquidHP91)
-
-    def a(self):
-        """Due to critical behaviour a single a parameter cannot be determined for H2O."""
-        raise NotImplementedError()
+    Ta: float = field(init=False, default=Ta_H2O)
+    Tc: float = field(init=False, default=Tc_H2O)
 
     def Psat(self, temperature: float) -> float:
         """Saturation curve. Equation 5, Holland and Powell (1991).
@@ -311,89 +306,48 @@ class CORKFullH2OHP91(CORKFullABC):
         )
         return Psat
 
-    def volume(self, temperature: float, pressure: float) -> float:
-        """Volume.
 
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+@dataclass(kw_only=True)
+class CORKCO2HP91(Unitskbar, CORKFullABC):
+    """Full CORK equation for CO2 from Holland and Powell (1991).
 
-        Returns:
-            Volume.
-        """
-        Psat: float = self.Psat(temperature)
+    See base class.
+    """
 
-        if temperature >= self.Tc:
-            logger.debug("temperature >= critical temperature of %f", self.Tc)
-            volume: float = self.mrk_fluid.volume(temperature, pressure)
-
-        elif temperature <= self.Ta and pressure <= Psat:
-            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
-            volume = self.mrk_gas.volume(temperature, pressure)
-
-        elif temperature < self.Tc and pressure <= Psat:
-            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
-            volume = self.mrk_fluid.volume(temperature, pressure)
-
-        else:  # temperature < self.Tc and pressure > Psat:
-            if temperature <= self.Ta:
-                volume = self.mrk_liquid.volume(temperature, pressure)
-            else:
-                volume = self.mrk_fluid.volume(temperature, pressure)
-
-        if pressure > self.P0:
-            volume += self.virial.volume(temperature, pressure)
-
-        return volume
-
-    def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral including virial compensation. Appendix A, Holland and Powell (1991).
-
-        Overrides the base class because we might have to integrate across different regions of P-T
-        space depending on the input temperature and pressure.
-
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
-
-        Returns:
-            volume integral.
-        """
-        Psat: float = self.Psat(temperature)
-
-        if temperature >= self.Tc:
-            logger.debug("temperature >= critical temperature of %f", self.Tc)
-            volume_integral: float = self.mrk_fluid.volume_integral(temperature, pressure)
-
-        elif temperature <= self.Ta and pressure <= Psat:
-            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
-            volume_integral = self.mrk_gas.volume_integral(temperature, pressure)
-
-        elif temperature < self.Tc and pressure <= Psat:
-            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
-            volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
-
-        else:  # temperature < self.Tc and pressure > Psat:
-            if temperature <= self.Ta:
-                # To converge to the correct root the actual pressure must be used to compute the
-                # initial volume, not Psat.
-                volume_init: float = self.GAS_CONSTANT * temperature / pressure + 10 * self.b
-                volume_integral = self.mrk_gas.volume_integral(
-                    temperature, Psat, volume_init=volume_init
-                )
-                volume_integral -= self.mrk_liquid.volume_integral(temperature, Psat)
-                volume_integral += self.mrk_liquid.volume_integral(temperature, pressure)
-            else:
-                volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
-
-        if pressure > self.P0:
-            volume_integral += self.virial.volume_integral(temperature, pressure)
-
-        return volume_integral
+    P0: float = field(init=False, default=5.0)
+    mrk: FugacityModelABC = field(init=False, default_factory=MRKCO2HP91)
+    a_virial: tuple[float, float] = field(init=False, default=(1.33790e-2, -1.01740e-5))
+    b_virial: tuple[float, float] = field(init=False, default=(-2.26924e-1, 7.73793e-5))
 
 
 @dataclass(kw_only=True)
-class CORKFullH2OHP98(CORKFullH2OHP91):
+class CORKCO2HP98(CORKCO2HP91):
+    """Full CORK equation for CO2 from Holland and Powell (1998).
+
+    Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
+
+    See base class.
+    """
+
+    a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
+    b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
+
+
+@dataclass(kw_only=True)
+class CORKH2OHP91(Unitskbar, CORKFullABC):
+    """Full CORK equation for H2O from Holland and Powell (1991).
+
+    See base class.
+    """
+
+    P0: float = field(init=False, default=2.0)
+    mrk: FugacityModelABC = field(init=False, default_factory=MRKH2OHP91)
+    a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
+    b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))
+
+
+@dataclass(kw_only=True)
+class CORKH2OHP98(CORKH2OHP91):
     """Full CORK equation for H2O from Holland and Powell (1998).
 
     Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
@@ -601,9 +555,9 @@ def get_holland_and_powell_fugacity_models() -> dict[str, FugacityModelABC]:
     models: dict[str, FugacityModelABC] = {}
     models["CH4"] = CORKCorrespondingStatesCH4HP91()
     models["CO"] = CORKCorrespondingStatesCOHP91()
-    models["CO2"] = CORKFullCO2HP98()
+    models["CO2"] = CORKCO2HP98()
     models["H2"] = CORKCorrespondingStatesH2HP91()
-    models["H2O"] = CORKFullH2OHP98()
+    models["H2O"] = CORKH2OHP98()
     models["H2S"] = CORKCorrespondingStatesH2SHP11()
     models["S2"] = CORKCorrespondingStatesS2HP11()
 
