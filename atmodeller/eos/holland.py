@@ -3,21 +3,12 @@
 See the LICENSE file for licensing information.
 
 This module contains concrete classes for the fugacity models presented in Holland and Powell 
-(1991, 1998, 2011).
+(1991, 1998, 2011). You will usually want to use the CORK models, since these are the most
+complete. The MRK models are nevertheless useful for comparison and understanding the influence
+of the virial compensation term that is encapsulated within the CORK model.
 
-Classes:
-    MRKH2OLiquidHP91: MRK for liquid H2O (only) in Holland and Powell (1991).
-    MRKH2OGasHP91: MRK for gaseous H2O (only) in Holland and Powell (1991).
-    MRKH2OFluidHP91: MRK for fluid H2O (only) in Holland and Powell (1991).
-    MRKH2OHP91: MRK for H2O with critical behaviour in Holland and Powell (1991).
-    MRKCO2HP91: Full MRK for CO2 in Holland and Powell (1991).
-    MRKSimpleCO2HP91: Simple MRK for CO2 in Holland and Powell (1991).
-    MRKCH4HP91: MRK corresponding states for CH4 in Holland and Powell (1991).
-    MRKH2HP91: MRK corresponding states for H2 in Holland and Powell (1991).
-    MRKCOHP91: MRK corresponding states for CO in Holland and Powell (1991).
-    MRKS2HP11: MRK corresponding states for S2 in Holland and Powell (2011).
-    MRKH2SHP11: MRK corresponding states for H2S in Holland and Powell (2011).
-
+Concrete classes:
+  
     CORKCO2HP91: Full CORK for CO2 in Holland and Powell (1991).
     CORKCO2HP98: Full CORK for CO2 in Holland and Powell (1998).
     CORKSimpleCO2HP91: Simple CORK model for CO2 in Holland and Powell (1991).
@@ -28,12 +19,37 @@ Classes:
     CORKCOHP91: CORK corresponding states for CO in Holland and Powell (1991).
     CORKS2HP11: CORK corresponding states for S2 in Holland and Powell (2011).
     CORKH2SHP11: CORK corresponding states for H2S in Holland and Powell (2011).
+    MRKH2OLiquidHP91: MRK for liquid H2O (only) in Holland and Powell (1991).
+    MRKH2OGasHP91: MRK for gaseous H2O (only) in Holland and Powell (1991).
+    MRKH2OFluidHP91: MRK for fluid H2O (only) in Holland and Powell (1991).
+    MRKH2OHP91: MRK for H2O with critical behaviour in Holland and Powell (1991).
+    MRKH2OHP98: MRK for H2O with critical behaviour in Holland and Powell (1998).
+    MRKCO2HP91: Full MRK for CO2 in Holland and Powell (1991).
+    MRKCO2HP98: Full MRK for CO2 in Holland and Powell (1998).
+    MRKSimpleCO2HP91: Simple MRK for CO2 in Holland and Powell (1991).
+    MRKCH4HP91: MRK corresponding states for CH4 in Holland and Powell (1991).
+    MRKH2HP91: MRK corresponding states for H2 in Holland and Powell (1991).
+    MRKCOHP91: MRK corresponding states for CO in Holland and Powell (1991).
+    MRKS2HP11: MRK corresponding states for S2 in Holland and Powell (2011).
+    MRKH2SHP11: MRK corresponding states for H2S in Holland and Powell (2011).
 
-Example:
-    Get the preferred fugacity models for various species from the Holland and Powell models:
+Examples:
+    Get the fugacity coefficient for the H2O CORK model from Holland and Powell (1998). Note that
+    the input pressure should always be in bar:
+
+    ```python
+    >>> from atmodeller.eos.holland import CORKH2OHP98
+    >>> model = CORKH2OHP98()
+    >>> fugacity_coefficient = model.get_value(temperature=2000, pressure=1000)
+    >>> print(fugacity_coefficient)
+    1.048278616058322
+    ```
+
+    Get the preferred fugacity models for various species from the Holland and Powell models. Note
+    that the input pressure should always be in bar:
     
     ```python
-    >>> from atmodeller.eos.holland_and_powell import get_holland_and_powell_fugacity_models
+    >>> from atmodeller.eos.holland import get_holland_fugacity_models
     >>> models = get_holland_and_powell_fugacity_models()
     >>> # list the available species
     >>> models.keys()
@@ -63,19 +79,17 @@ from atmodeller.eos.holland_base import (
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-# For the CORK H2O model there are two different temperatures.
-# The critical temperature.
+# The critical temperature for the CORK H2O model.
 Tc_H2O: float = 695  # K
-# This is the temperature at which a_gas = a in Holland and Powell (1991), thereby allowing the
-# critical point to be handled by a single a parameter.
+# The temperature at which a_gas = a; hence the critical point is handled by a single a parameter.
 Ta_H2O: float = 673  # K
-# b parameter value is the same across phases.
+# b parameter value is the same across all phases (i.e. gas, fluid, liquid).
 b0_H2O: float = 1.465
 
 
 @dataclass(kw_only=True)
 class Unitskbar:
-    """Mixin to use kbar for the pressure units."""
+    """Mixin to use kbar for the pressure units, which is required for Holland and Powell data."""
 
     scaling: float = field(init=False, default=kilo)
 
@@ -291,6 +305,10 @@ class MRKCO2HP91(Unitskbar, MRKImplicitABC):
         return initial_volume
 
 
+# For completeness, the MRK model for CO2 in 1998 is the same as the 1991 paper.
+MRKCO2HP98 = MRKCO2HP91
+
+
 @dataclass(kw_only=True)
 class MRKH2OHP91(Unitskbar, MRKCriticalBehaviour):
     """MRK for H2O that spans the range across the critical behaviour.
@@ -322,6 +340,10 @@ class MRKH2OHP91(Unitskbar, MRKCriticalBehaviour):
         return Psat
 
 
+# For completeness, the MRK model for H2O in 1998 is the same as the 1991 paper.
+MRKH2OHP98 = MRKH2OHP91
+
+
 @dataclass(kw_only=True)
 class CORKCO2HP91(Unitskbar, CORKABC):
     """Full CORK equation for CO2 from Holland and Powell (1991).
@@ -336,7 +358,7 @@ class CORKCO2HP91(Unitskbar, CORKABC):
 
 
 @dataclass(kw_only=True)
-class CORKCO2HP98(CORKCO2HP91):
+class CORKCO2HP98(Unitskbar, CORKABC):
     """Full CORK equation for CO2 from Holland and Powell (1998).
 
     Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
@@ -344,6 +366,8 @@ class CORKCO2HP98(CORKCO2HP91):
     See base class.
     """
 
+    P0: float = field(init=False, default=5.0)
+    mrk: FugacityModelABC = field(init=False, default_factory=MRKCO2HP98)
     a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
     b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
 
@@ -362,7 +386,7 @@ class CORKH2OHP91(Unitskbar, CORKABC):
 
 
 @dataclass(kw_only=True)
-class CORKH2OHP98(CORKH2OHP91):
+class CORKH2OHP98(Unitskbar, CORKABC):
     """Full CORK equation for H2O from Holland and Powell (1998).
 
     Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
@@ -370,6 +394,8 @@ class CORKH2OHP98(CORKH2OHP91):
     See base class.
     """
 
+    P0: float = field(init=False, default=2.0)
+    mrk: FugacityModelABC = field(init=False, default_factory=MRKH2OHP98)
     a_virial: tuple[float, float] = field(init=False, default=(1.9853e-3, 0))
     b_virial: tuple[float, float] = field(init=False, default=(-8.9090e-2, 0))
     c_virial: tuple[float, float] = field(init=False, default=(8.0331e-2, 0))
@@ -456,6 +482,11 @@ class CORKCorrespondingStatesHP91(Unitskbar, CORKABC):
     c_virial: tuple[float, float] = field(init=False, default=(0, 0))
 
 
+# Critical parameters for CO2.
+Tc_CO2: float = 304.2
+Pc_CO2: float = 0.0738
+
+
 @dataclass(kw_only=True)
 class MRKSimpleCO2HP91(MRKCorrespondingStatesHP91):
     """MRK for CO. See base class.
@@ -463,8 +494,8 @@ class MRKSimpleCO2HP91(MRKCorrespondingStatesHP91):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=304.2)
-    Pc: float = field(init=False, default=0.0738)
+    Tc: float = field(init=False, default=Tc_CO2)
+    Pc: float = field(init=False, default=Pc_CO2)
 
 
 @dataclass(kw_only=True)
@@ -475,8 +506,13 @@ class CORKSimpleCO2HP91(CORKCorrespondingStatesHP91):
     """
 
     mrk: FugacityModelABC = field(init=False, default_factory=MRKSimpleCO2HP91)
-    Tc: float = field(init=False, default=304.2)
-    Pc: float = field(init=False, default=0.0738)
+    Tc: float = field(init=False, default=Tc_CO2)
+    Pc: float = field(init=False, default=Pc_CO2)
+
+
+# Critical parameters for CH4.
+Tc_CH4: float = 190.6
+Pc_CH4: float = 0.0460
 
 
 @dataclass(kw_only=True)
@@ -486,8 +522,8 @@ class MRKCH4HP91(MRKCorrespondingStatesHP91):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=190.6)
-    Pc: float = field(init=False, default=0.0460)
+    Tc: float = field(init=False, default=Tc_CH4)
+    Pc: float = field(init=False, default=Pc_CH4)
 
 
 @dataclass(kw_only=True)
@@ -498,8 +534,13 @@ class CORKCH4HP91(CORKCorrespondingStatesHP91):
     """
 
     mrk: FugacityModelABC = field(init=False, default_factory=MRKCH4HP91)
-    Tc: float = field(init=False, default=190.6)  # K
-    Pc: float = field(init=False, default=0.0460)
+    Tc: float = field(init=False, default=Tc_CH4)  # K
+    Pc: float = field(init=False, default=Pc_CH4)
+
+
+# Critical parameters for H2.
+Tc_H2: float = 41.2
+Pc_H2: float = 0.0211
 
 
 @dataclass(kw_only=True)
@@ -509,8 +550,8 @@ class MRKH2HP91(MRKCorrespondingStatesHP91):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=41.2)  # K
-    Pc: float = field(init=False, default=0.0211)
+    Tc: float = field(init=False, default=Tc_H2)  # K
+    Pc: float = field(init=False, default=Pc_H2)
 
 
 @dataclass(kw_only=True)
@@ -521,8 +562,13 @@ class CORKH2HP91(CORKCorrespondingStatesHP91):
     """
 
     mrk: FugacityModelABC = field(init=False, default_factory=MRKH2HP91)
-    Tc: float = field(init=False, default=41.2)
-    Pc: float = field(init=False, default=0.0211)
+    Tc: float = field(init=False, default=Tc_H2)
+    Pc: float = field(init=False, default=Pc_H2)
+
+
+# Critical parameters for CO.
+Tc_CO: float = 132.9
+Pc_CO: float = 0.0350
 
 
 @dataclass(kw_only=True)
@@ -532,8 +578,8 @@ class MRKCOHP91(MRKCorrespondingStatesHP91):
     See Table below Figure 8 in Holland and Powell (1991).
     """
 
-    Tc: float = field(init=False, default=132.9)
-    Pc: float = field(init=False, default=0.0350)
+    Tc: float = field(init=False, default=Tc_CO)
+    Pc: float = field(init=False, default=Pc_CO)
 
 
 @dataclass(kw_only=True)
@@ -544,8 +590,13 @@ class CORKCOHP91(CORKCorrespondingStatesHP91):
     """
 
     mrk: FugacityModelABC = field(init=False, default_factory=MRKCOHP91)
-    Tc: float = field(init=False, default=132.9)
-    Pc: float = field(init=False, default=0.0350)
+    Tc: float = field(init=False, default=Tc_CO)
+    Pc: float = field(init=False, default=Pc_CO)
+
+
+# Critical parameters for S2.
+Tc_S2: float = 208.15
+Pc_S2: float = 0.072954
 
 
 @dataclass(kw_only=True)
@@ -565,8 +616,8 @@ class MRKS2HP11(MRKCorrespondingStatesHP91):
         http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
     """
 
-    Tc: float = field(init=False, default=208.15)
-    Pc: float = field(init=False, default=0.072954)
+    Tc: float = field(init=False, default=Tc_S2)
+    Pc: float = field(init=False, default=Pc_S2)
 
 
 @dataclass(kw_only=True)
@@ -587,8 +638,13 @@ class CORKS2HP11(CORKCorrespondingStatesHP91):
     """
 
     mrk: FugacityModelABC = field(init=False, default_factory=MRKS2HP11)
-    Tc: float = field(init=False, default=208.15)
-    Pc: float = field(init=False, default=0.072954)
+    Tc: float = field(init=False, default=Tc_S2)
+    Pc: float = field(init=False, default=Pc_S2)
+
+
+# Critical parameters for S2.
+Tc_H2S: float = 373.4
+Pc_H2S: float = 0.08963
 
 
 @dataclass(kw_only=True)
@@ -601,8 +657,8 @@ class MRKH2SHP11(MRKCorrespondingStatesHP91):
         McGraw-Hill, New York. DOI: 10.1036/0070116822.
     """
 
-    Tc: float = field(init=False, default=373.4)
-    Pc: float = field(init=False, default=0.08963)
+    Tc: float = field(init=False, default=Tc_H2S)
+    Pc: float = field(init=False, default=Pc_H2S)
 
 
 @dataclass(kw_only=True)
@@ -616,11 +672,11 @@ class CORKH2SHP11(CORKCorrespondingStatesHP91):
     """
 
     mrk: FugacityModelABC = field(init=False, default_factory=MRKH2SHP11)
-    Tc: float = field(init=False, default=373.4)
-    Pc: float = field(init=False, default=0.08963)
+    Tc: float = field(init=False, default=Tc_H2S)
+    Pc: float = field(init=False, default=Pc_H2S)
 
 
-def get_holland_and_powell_fugacity_models() -> dict[str, FugacityModelABC]:
+def get_holland_fugacity_models() -> dict[str, FugacityModelABC]:
     """Gets a dictionary of the preferred fugacity models to use for each species.
 
     Returns:

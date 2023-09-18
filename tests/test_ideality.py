@@ -29,7 +29,7 @@ from atmodeller.eos.holland import (
     MRKCO2HP91,
     CORKCorrespondingStatesHP91,
     CORKSimpleCO2HP91,
-    get_holland_and_powell_fugacity_models,
+    get_holland_fugacity_models,
 )
 from atmodeller.eos.interfaces import FugacityModelABC
 from atmodeller.interfaces import (
@@ -111,19 +111,9 @@ def test_CorkCO2_at_P0() -> None:
     check_full_Cork_gas(2000, 2, CORKCO2HP98, 1.6063624424808558)
 
 
-def test_CorkCO2_at_P0_NEW() -> None:
-    """Below P0 so virial contribution excluded."""
-    check_full_Cork_gas(2000, 2, MRKCO2HP91, 1.6063624424808558)
-
-
 def test_CorkCO2_above_P0() -> None:
     """Above P0 so virial contribution included."""
     check_full_Cork_gas(2000, 10, CORKCO2HP98, 7.4492345831832525)
-
-
-# def test_CorkCO2_above_P0_NEW() -> None:
-#     """Above P0 so virial contribution included."""
-#     check_full_Cork_gas(2000, 10, CORKFullCO2HP98NEW, 7.4492345831832525)
 
 
 def test_CorkH2O_above_Tc_below_P0() -> None:
@@ -251,7 +241,7 @@ def test_H2_with_cork() -> None:
 def test_CORK() -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer."""
 
-    fugacity_models: dict[str, FugacityModelABC] = get_holland_and_powell_fugacity_models()
+    fugacity_models: dict[str, FugacityModelABC] = get_holland_fugacity_models()
 
     species: Species = Species(
         [
