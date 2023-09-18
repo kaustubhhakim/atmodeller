@@ -34,6 +34,31 @@ class SaxenaLowPressureH2(SaxenaLowPressure):
     d_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, 0, 0, 0))
 
 
+@dataclass(kw_only=True)
+class SaxenaHighPressureH2(SaxenaHighPressure):
+    """High pressure model for H2.
+
+    Table 1(b) >1 kbar.
+
+    See base class.
+    """
+
+    Tc: float = field(init=False, default=Tc_H2)
+    Pc: float = field(init=False, default=Pc_H2)
+    a_coefficients: tuple[float, ...] = field(
+        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1)
+    )
+    b_coefficients: tuple[float, ...] = field(
+        init=False, default=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5)
+    )
+    c_coefficients: tuple[float, ...] = field(
+        init=False, default=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10)
+    )
+    d_coefficients: tuple[float, ...] = field(
+        init=False, default=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0)
+    )
+
+
 # TODO: Dan to clean up below here.
 
 # @dataclass(kw_only=True)
