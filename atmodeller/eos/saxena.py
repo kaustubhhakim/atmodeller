@@ -46,7 +46,7 @@ class SaxenaHighPressureH2(SaxenaHighPressure):
     Tc: float = field(init=False, default=Tc_H2)
     Pc: float = field(init=False, default=Pc_H2)
     a_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1)
+        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e-4, 0, 0, -1.6936e-1)
     )
     b_coefficients: tuple[float, ...] = field(
         init=False, default=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5)
