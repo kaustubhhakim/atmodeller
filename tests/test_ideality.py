@@ -20,14 +20,14 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.eos.holland import (
+    CORKABC,
+    CORKCH4HP91,
     CORKCO2HP98,
+    CORKCOHP91,
+    CORKH2HP91,
     CORKH2OHP98,
     MRKCO2HP91,
-    CORKCorrespondingStatesCH4HP91,
-    CORKCorrespondingStatesCOHP91,
-    CORKCorrespondingStatesH2HP91,
     CORKCorrespondingStatesHP91,
-    CORKFullABC,
     CORKSimpleCO2HP91,
     get_holland_and_powell_fugacity_models,
 )
@@ -79,7 +79,7 @@ def check_simple_Cork_gas(
 def check_full_Cork_gas(
     temperature: float,
     pressure: float,
-    gas_type: Type[CORKFullABC],
+    gas_type: Type[CORKABC],
     expected_fugacity_coeff: float,
 ) -> None:
     """Checks the fugacity coefficient for a given gas type using CorkFull."""
@@ -91,21 +91,15 @@ def check_full_Cork_gas(
 
 
 def test_CorkH2() -> None:
-    check_simple_Cork_gas(
-        2000, 10, CORKCorrespondingStatesH2HP91, 3.7218446244368684, 4.672042007568433
-    )
+    check_simple_Cork_gas(2000, 10, CORKH2HP91, 3.7218446244368684, 4.672042007568433)
 
 
 def test_CorkCO() -> None:
-    check_simple_Cork_gas(
-        2000, 10, CORKCorrespondingStatesCOHP91, 4.6747168815213715, 7.698485559533069
-    )
+    check_simple_Cork_gas(2000, 10, CORKCOHP91, 4.6747168815213715, 7.698485559533069)
 
 
 def test_CorkCH4() -> None:
-    check_simple_Cork_gas(
-        2000, 10, CORKCorrespondingStatesCH4HP91, 4.786943829010815, 8.116070626285136
-    )
+    check_simple_Cork_gas(2000, 10, CORKCH4HP91, 4.786943829010815, 8.116070626285136)
 
 
 def test_simple_CorkCO2() -> None:
@@ -220,7 +214,7 @@ def test_H2_with_cork() -> None:
                 chemical_formula="H2",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CORKCorrespondingStatesH2HP91(),
+                fugacity_coefficient=CORKH2HP91(),
             ),
             GasSpecies(
                 chemical_formula="O2",

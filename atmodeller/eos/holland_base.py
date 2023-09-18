@@ -1,4 +1,4 @@
-"""Base classes for Holland and Powell (1991, 1998, 2011).
+"""Base classes for the fugacity models from Holland and Powell (1991, 1998, 2011).
 
 See the LICENSE file for licensing information.
 """
@@ -208,8 +208,8 @@ class MRKImplicitABC(MRKABC):
         z: float = self.compressibility_factor(temperature, pressure, volume_init=volume_init)
         A: float = self.A_factor(temperature, pressure)
         B: float = self.B_factor(temperature, pressure)
-        # Recall that the base class requires a specification of the volume_integral, but the
-        # equations in Holland and Powell (1991) are in terms of the fugacity coefficient.
+        # The base class requires a specification of the volume_integral, but the equations in
+        # Holland and Powell (1991) are in terms of the fugacity coefficient.
         ln_fugacity_coefficient: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
         ln_fugacity: float = np.log(self.scaling * pressure) + ln_fugacity_coefficient
         volume_integral: float = self.GAS_CONSTANT * temperature * ln_fugacity
@@ -345,7 +345,7 @@ class MRKCriticalBehaviour(FugacityModelABC):
             temperature: Temperature in kelvin.
 
         Returns:
-            Saturation curve pressure in kbar.
+            Saturation curve pressure.
         """
         ...
 
@@ -354,7 +354,7 @@ class MRKCriticalBehaviour(FugacityModelABC):
 
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            pressure: Pressure.
 
         Returns:
             Volume.
@@ -448,8 +448,8 @@ class VirialCompensation:
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
             significantly, and may be determined from experimental data. Defaults to zero, which is
             appropriate for the corresponding states case.
-        Tc: Critical temperature in kelvin. Defaults to 1, which effectively means it is unused.
-        Pc: Critical pressure. Defaults to 1, which effectively means it is unused.
+        Tc: Critical temperature in kelvin for corresponding states, otherwise set to unity.
+        Pc: Critical pressure for corresponding states, otherwise set to unity.
         scaling: Scaling depending on the units of the coefficients. Defaults to unity.
 
     Attributes:
@@ -460,8 +460,8 @@ class VirialCompensation:
         c_coefficients: As above for the c coefficients.
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
             significantly, and may be determined from experimental data.
-        Tc: Critical temperature in kelvin.
-        Pc: Critical pressure.
+        Tc: Critical temperature in kelvin for corresponding states.
+        Pc: Critical pressure for corresponding states.
         scaling: Scaling depending on the units of the coefficients.
         GAS_CONSTANT: Gas constant with the appropriate units depending on the units of the
             coefficients.
@@ -470,9 +470,9 @@ class VirialCompensation:
     a_coefficients: tuple[float, float]
     b_coefficients: tuple[float, float]
     c_coefficients: tuple[float, float]
-    P0: float = 0  # Default must be zero for corresponding states.
-    Pc: float = 1  # Defaults to 1, which effectively means unused.
-    Tc: float = 1  # Defaults to 1, which effectively means unused.
+    P0: float
+    Pc: float = 1  # Defaults to 1, which effectively means unused (i.e. not corresponding states).
+    Tc: float = 1  # Defaults to 1, which effectively means unused (i.e. not corresponding states).
     scaling: float = 1
     GAS_CONSTANT: float = field(init=False, default=GAS_CONSTANT)
 
@@ -583,7 +583,7 @@ class VirialCompensation:
         return volume
 
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (V dP) contribution.
+        """Volume integral (VdP) contribution.
 
         Args:
             temperature: Temperature in kelvin.
@@ -602,17 +602,19 @@ class VirialCompensation:
 
 
 @dataclass(kw_only=True)
-class CORKFullABC(FugacityModelABC):
+class CORKABC(FugacityModelABC):
     """A Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
 
     Args:
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly, and may be determined from experimental data. Defaults to zero.
+            significantly, and may be determined from experimental data.
         mrk: Fugacity model for computing the MRK contribution.
         a_virial: a coefficients for the virial compensation. Defaults to zero coefficients.
         b_virial: b coefficients for the virial compensation. Defaults to zero coefficients.
         c_virial: c coefficients for the virial compensation. Defaults to zero coefficients.
-        scaling: See base class.
+        Tc: Critical temperature in kelvin for corresponding states, otherwise set to unity.
+        Pc: Critical pressure for corresponding states, otherwise set to unity.
+        scaling: See base class. The scaling scales the virial compensation term.
 
     Attributes:
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
@@ -621,13 +623,17 @@ class CORKFullABC(FugacityModelABC):
         a_virial: a coefficients for the virial compensation. Defaults to zero coefficients.
         b_virial: b coefficients for the virial compensation. Defaults to zero coefficients.
         c_virial: c coefficients for the virial compensation. Defaults to zero coefficients.
+        Tc: Critical temperature in kelvin for corresponding states.
+        Pc: Critical pressure for corresponding states.
         virial: A VirialCompensation instance.
         scaling: See base class.
         GAS_CONSTANT: See base class.
     """
 
-    P0: float = 0
+    P0: float
     mrk: FugacityModelABC
+    Tc: float = 1
+    Pc: float = 1
     a_virial: tuple[float, float] = field(init=False, default=(0, 0))
     b_virial: tuple[float, float] = field(init=False, default=(0, 0))
     c_virial: tuple[float, float] = field(init=False, default=(0, 0))
@@ -640,7 +646,9 @@ class CORKFullABC(FugacityModelABC):
             b_coefficients=self.b_virial,
             c_coefficients=self.c_virial,
             P0=self.P0,
-            scaling=self.scaling,
+            Tc=self.Tc,
+            Pc=self.Pc,
+            scaling=self.scaling,  # Note that the specified scaling is used for the virial term.
         )
 
     def volume(self, temperature: float, pressure: float) -> float:

@@ -12,7 +12,7 @@ from scipy.constants import kilo
 from scipy.optimize import fsolve
 
 from atmodeller import GAS_CONSTANT, debug_logger
-from atmodeller.eos.holland_and_powell import CORKCO2HP98, CORKH2OHP98
+from atmodeller.eos.holland import CORKCO2HP98, CORKH2OHP98
 
 logger: logging.Logger = logging.getLogger(__name__)
 
