@@ -105,6 +105,7 @@ class H2LowPressureSS92(SaxenaFiveCoefficients):
     d_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, 0, 0, 0))
 
 
+# FIXME: Model is broken, perhaps some coefficients are wrong in the paper?
 @dataclass(kw_only=True)
 class H2HighPressureSS92(SaxenaEightCoefficients):
     """High pressure model for H2 from Shi and Saxena (1992).
@@ -151,6 +152,7 @@ class H2SS92(SaxenaCombined):
     upper_pressure_bounds: tuple[float, ...] = (1000,)
 
 
+# FIXME: Model is broken, perhaps some coefficients are wrong in the paper?
 @dataclass(kw_only=True)
 class H2HighPressureSF88(SaxenaEightCoefficients):
     """High pressure model for H2 from Saxena and Fei (1988).
