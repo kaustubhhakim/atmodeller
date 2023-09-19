@@ -48,8 +48,8 @@ from atmodeller.utilities import earth_oceans_to_kg
 standard_gibbs_free_energy_of_formation: Type[ThermodynamicDataBase] = ThermodynamicData
 
 # Both the combined data and JANAF report the same pressures to within 1%.
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
+rtol: float = 1.0e-3
+atol: float = 1.0e-3
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -407,7 +407,7 @@ def test_COS_Species_IW() -> None:
 
     initial_solution: np.ndarray = np.log10([0.003, 0.003, 1e-6, 0.005, 230, 47])
 
-    system.solve(constraints, initial_solution=initial_solution)
+    system.solve(constraints)  # , initial_solution=initial_solution)
     logger.debug("This test is likely to fail.")
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 

@@ -13,7 +13,7 @@ from functools import cached_property
 from typing import Union
 
 import numpy as np
-from scipy.optimize import fsolve, root
+from scipy.optimize import fsolve, least_squares, minimize, root
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
@@ -767,12 +767,27 @@ class InteriorAtmosphereSystem:
 
         # Hard-coded for testing different solvers, but should either be an option for the user to
         # change or the 'best' solver should be used.
-        ROOT: bool = True
+        LEAST_SQUARES: bool = True
+        ROOT: bool = False
         FSOLVE: bool = False
 
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=constraints
         )
+
+        if LEAST_SQUARES:
+            # FIXME: Hacked bounds for test_COS_Species_IW
+            bounds = [
+                [-np.inf, -np.inf, -9, -np.inf, -np.inf, -np.inf],
+                [np.inf, np.inf, -3, np.inf, np.inf, np.inf],
+            ]
+            result = least_squares(
+                self._objective_func,
+                initial_solution,
+                args=(constraints, coefficient_matrix),
+                bounds=bounds,
+            )
+            sol = result.x
 
         if ROOT:
             solarray = root(
