@@ -11,6 +11,9 @@ Concrete classes:
     H2SS92: Full model for H2 from Shi and Saxena (1992).
     H2HighPressureSF88: High pressure model for H2 from Saxena and Fei (1988).
     SO2SS92: Model for SO2 from Shi and Saxena (1992).
+    H2SLowPressureSS92: Low pressure model for H2S from Shi and Saxena (1992).
+    H2SHighPressureSS92: High pressure model for H2S from Shi and Saxena (1992).
+    H2SSS92: Model for H2S from Shi and Saxena (1992).
     O2SS92: Corresponding states for O2 from Shi and Saxena (1992).
     CO2SS92: Corresponding states for CO2 from Shi and Saxena (1992).
     COSS92: Corresponding states for CO from Shi and Saxena (1992).
@@ -57,8 +60,8 @@ from atmodeller.eos.interfaces import FugacityModelABC
 from atmodeller.eos.saxena_base import (
     SaxenaABC,
     SaxenaCombined,
-    SaxenaHighPressure,
-    SaxenaLowPressure,
+    SaxenaEightCoefficients,
+    SaxenaFiveCoefficients,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -86,7 +89,7 @@ table2: dict[str, critical] = {
 
 
 @dataclass(kw_only=True)
-class H2LowPressureSS92(SaxenaLowPressure):
+class H2LowPressureSS92(SaxenaFiveCoefficients):
     """Low pressure model for H2 from Shi and Saxena (1992).
 
     Table 1(b), <1000 bar.
@@ -103,7 +106,7 @@ class H2LowPressureSS92(SaxenaLowPressure):
 
 
 @dataclass(kw_only=True)
-class H2HighPressureSS92(SaxenaHighPressure):
+class H2HighPressureSS92(SaxenaEightCoefficients):
     """High pressure model for H2 from Shi and Saxena (1992).
 
     Table 1(b), >1 kbar.
@@ -149,7 +152,7 @@ class H2SS92(SaxenaCombined):
 
 
 @dataclass(kw_only=True)
-class H2HighPressureSF88(SaxenaHighPressure):
+class H2HighPressureSF88(SaxenaEightCoefficients):
     """High pressure model for H2 from Saxena and Fei (1988).
 
     Table on p1196.
@@ -174,7 +177,7 @@ class H2HighPressureSF88(SaxenaHighPressure):
 
 
 @dataclass(kw_only=True)
-class SO2SS92(SaxenaHighPressure):
+class SO2SS92(SaxenaEightCoefficients):
     """Fugacity model for SO2 from Shi and Saxena (1992).
 
     Table 1(c).
@@ -199,7 +202,80 @@ class SO2SS92(SaxenaHighPressure):
 
 
 @dataclass(kw_only=True)
-class CorrespondingStatesLowPressureSS92(SaxenaLowPressure):
+class H2SLowPressureSS92(SaxenaEightCoefficients):
+    """Fugacity model for H2S from Shi and Saxena (1992).
+
+    Table 1(d), 1-500 bar.
+
+    See base class.
+    """
+
+    Tc: float = table2["H2S"].Tc
+    Pc: float = table2["H2S"].Pc
+    a_coefficients: tuple[float, ...] = field(
+        init=False,
+        default=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
+    )
+    b_coefficients: tuple[float, ...] = field(
+        init=False,
+        default=(0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515),
+    )
+    c_coefficients: tuple[float, ...] = field(
+        init=False,
+        default=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
+    )
+    d_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, 0, 0, 0, 0, 0, 0))
+
+
+@dataclass(kw_only=True)
+class H2SHighPressureSS92(SaxenaEightCoefficients):
+    """Fugacity model for H2S from Shi and Saxena (1992).
+
+    Table 1(d), 500-10000 bar.
+
+    See base class.
+    """
+
+    Tc: float = table2["H2S"].Tc
+    Pc: float = table2["H2S"].Pc
+    a_coefficients: tuple[float, ...] = field(
+        init=False,
+        default=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
+    )
+    b_coefficients: tuple[float, ...] = field(
+        init=False,
+        default=(0.22545e-1, 0.17473e-2, 0.48253e-1, 0, -0.19890e-1, 0, 0.32794e-1, -0.10985e-1),
+    )
+    c_coefficients: tuple[float, ...] = field(
+        init=False,
+        default=(0.57375e-3, -0.20944e-5, -0.11894e-2, 0, 0.14661e-2, 0, -0.75605e-3, -0.27985e-3),
+    )
+    d_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, 0, 0, 0, 0, 0, 0))
+
+
+@dataclass(kw_only=True)
+class H2SSS92(SaxenaCombined):
+    """H2S fugacity model from Shi and Saxena (1992).
+
+    Combines the low pressure and high pressure models into a single model. See Table 1(d).
+
+    See base class.
+    """
+
+    Tc: float = field(init=False, default=table2["H2S"].Tc)
+    Pc: float = field(init=False, default=table2["H2S"].Pc)
+    classes: tuple[Type[SaxenaABC], ...] = field(
+        init=False,
+        default=(
+            H2SLowPressureSS92,
+            H2SHighPressureSS92,
+        ),
+    )
+    upper_pressure_bounds: tuple[float, ...] = (500,)
+
+
+@dataclass(kw_only=True)
+class CorrespondingStatesLowPressureSS92(SaxenaFiveCoefficients):
     """Low pressure model for corresponding fluid species from Shi and Saxena (1992).
 
     Table 1(a), <1000 bar.
@@ -214,7 +290,7 @@ class CorrespondingStatesLowPressureSS92(SaxenaLowPressure):
 
 
 @dataclass(kw_only=True)
-class CorrespondingStatesMediumPressureSS92(SaxenaHighPressure):
+class CorrespondingStatesMediumPressureSS92(SaxenaEightCoefficients):
     """Medium pressure model for corresponding fluid species from Shi and Saxena (1992).
 
     Table 1(a), 1000-5000 bar.
@@ -231,7 +307,7 @@ class CorrespondingStatesMediumPressureSS92(SaxenaHighPressure):
 
 
 @dataclass(kw_only=True)
-class CorrespondingStatesHighPressureSS92(SaxenaHighPressure):
+class CorrespondingStatesHighPressureSS92(SaxenaEightCoefficients):
     """High pressure model for corresponding fluid species from Shi and Saxena (1992).
 
     Table 1(a), >5000 bar.
@@ -336,63 +412,9 @@ def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
     models["CO2"] = CO2SS92()
     models["COS"] = COSSS92()
     models["H2"] = H2SS92()
+    models["H2S"] = H2SSS92()
     models["O2"] = O2SS92()
     models["S2"] = S2SS92()
     models["SO2"] = SO2SS92()
 
     return models
-
-
-# TODO: Dan to clean up below here.
-
-
-# @dataclass(kw_only=True)
-# class ShiSaxenaLowPressureH2(ShiSaxenaLowPressure):
-#     Tc: float = field(init=False, default=33.25)
-#     Pc: float = field(init=False, default=12.9696)
-#     a_coefficients: tuple[float, ...] = field(init=False, default=(1, 0, 0, 0, 0, 0))
-#     b_coefficients: tuple[float, ...] = field(init=False, default=(0, 0.9827e-1, 0, -0.2709, 0))
-#     c_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, -0.1030e-2, 0, 0.1427e-1))
-#     d_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, 0, 0, 0))
-
-
-# @dataclass(kw_only=True)
-# class ShiSaxenaH2(FugacityModelABC):
-#     low_pressure_eos: ShiSaxenaABC = field(default_factory=ShiSaxenaLowPressureH2)
-#     high_pressure_eos: ShiSaxenaABC = field(default_factory=ShiSaxenaHighPressureH2)
-
-#     def get_value(self, *, temperature: float, pressure: float) -> float:
-#         """Evaluates the fugacity coefficient at temperature and pressure.
-
-#         Note that the input 'pressure' must ALWAYS be in bar, so it is scaled here using
-#         'self.scaling' since self.fugacity_coefficient requires the internal units of pressure.
-
-#         Args:
-#             temperature: Temperature in kelvin.
-#             pressure: Pressure in bar.
-
-#         Returns:
-#             Fugacity coefficient evaluated at temperature and pressure, which is dimensionaless.
-#         """
-#         pressure /= self.scaling
-
-#         if pressure >= 1e3:
-#             return self.high_pressure_eos.get_value(temperature=temperature, pressure=pressure)
-#         else:
-#             return self.low_pressure_eos.get_value(temperature=temperature, pressure=pressure)
-
-#     def volume(self, temperature: float, pressure: float) -> float:
-#         if pressure / self.scaling >= 1e3:
-#             return self.high_pressure_eos.volume(temperature=temperature, pressure=pressure)
-#         else:
-#             return self.low_pressure_eos.volume(temperature=temperature, pressure=pressure)
-
-#     def volume_integral(self, temperature: float, pressure: float) -> float:
-#         if pressure / self.scaling >= 1e3:
-#             return self.high_pressure_eos.volume_integral(
-#                 temperature=temperature, pressure=pressure
-#             )
-#         else:
-#             return self.low_pressure_eos.volume_integral(
-#                 temperature=temperature, pressure=pressure
-#             )

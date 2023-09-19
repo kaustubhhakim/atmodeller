@@ -234,8 +234,8 @@ class SaxenaABC(FugacityModelABC):
 
 
 @dataclass(kw_only=True)
-class SaxenaLowPressure(SaxenaABC):
-    """Fugacity for low pressure (< 1 kbar).
+class SaxenaFiveCoefficients(SaxenaABC):
+    """Fugacity model with five coefficients.
 
     See base class.
     """
@@ -267,8 +267,8 @@ class SaxenaLowPressure(SaxenaABC):
 
 
 @dataclass(kw_only=True)
-class SaxenaHighPressure(SaxenaABC):
-    """Fugacity for high pressure (>=1 kbar).
+class SaxenaEightCoefficients(SaxenaABC):
+    """Fugacity model with eight coefficients.
 
     See base class.
     """
