@@ -8,7 +8,6 @@ complete. The MRK models are nevertheless useful for comparison and understandin
 of the virial compensation term that is encapsulated within the CORK model.
 
 Concrete classes:
-  
     CORKCO2HP91: Full CORK for CO2 in Holland and Powell (1991).
     CORKCO2HP98: Full CORK for CO2 in Holland and Powell (1998).
     CORKSimpleCO2HP91: Simple CORK model for CO2 in Holland and Powell (1991).

@@ -122,7 +122,7 @@ class FugacityModelABC(GetValueABC):
 
     @abstractmethod
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (V dP).
+        """Volume integral (VdP).
 
         Args:
             temperature: Temperature in kelvin.

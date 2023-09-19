@@ -1,4 +1,4 @@
-"""Base classes for the fugacity models from Saxena and Fei (1987) and Shi and Saxena (1992).
+"""Base classes for the fugacity models from Shi and Saxena (1992) and Saxena and Fei (1988).
 
 See the LICENSE file for licensing information.
 """
@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from typing import Type
 
 import numpy as np
 
@@ -17,24 +18,32 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True)
 class SaxenaABC(FugacityModelABC):
-    """Shi and Saxena fugacity model.
+    """Shi and Saxena (1992) fugacity model.
 
     The model presented in Shi and Saxena (1992) is a general form that can be adapted to the
-    previous work of Saxena and Fei (1987).
+    previous work of Saxena and Fei (1988).
 
-    Shi and Saxena (1992), Thermodynamic modeling of the C-H-O-S fluid system,
-    American Mineralogist, Volume 77, pages 1038-1049, 1992.
-    See table 2, critical data of C-H-O-S fluid phases.
+    Shi and Saxena (1992), Thermodynamic modeling of the C-H-O-S fluid system, American
+    Mineralogist, Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid
+    phases.
 
     http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
 
+    Args:
+        Tc: Critical temperature in kelvin.
+        Pc: Critical pressure.
+        a_coefficients: a coefficients (see paper). Defaults to empty.
+        b_coefficients: b coefficients (see paper). Defaults to empty.
+        c_coefficients: c coefficients (see paper). Defaults to empty.
+        d_coefficients: d coefficients (see paper). Defaults to empty.
+
     Attributes:
         Tc: Critical temperature in kelvin.
-        Pc: Critical pressure in bar.
-        a_coefficients: a coefficients (see paper).
-        b_coefficients: b coefficients (see paper).
-        c_coefficients: c coefficients (see paper).
-        d_coefficients: d coefficients (see paper).
+        Pc: Critical pressure.
+        a_coefficients: a coefficients.
+        b_coefficients: b coefficients.
+        c_coefficients: c coefficients.
+        d_coefficients: d coefficients.
         P0: Standard state pressure. Set to 1 bar.
         scaling: See base class.
         GAS_CONSTANT: See base class.
@@ -42,10 +51,10 @@ class SaxenaABC(FugacityModelABC):
 
     Tc: float
     Pc: float
-    a_coefficients: tuple[float, ...]
-    b_coefficients: tuple[float, ...]
-    c_coefficients: tuple[float, ...]
-    d_coefficients: tuple[float, ...]
+    a_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    b_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    c_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    d_coefficients: tuple[float, ...] = field(default_factory=tuple)
     P0: float = field(init=False, default=1)  # 1 bar
 
     @abstractmethod
@@ -69,7 +78,7 @@ class SaxenaABC(FugacityModelABC):
         """a parameter.
 
         Args:
-            Temperature: temperature in kelvin.
+            temperature: Temperature in kelvin.
 
         Returns:
             a parameter.
@@ -82,7 +91,7 @@ class SaxenaABC(FugacityModelABC):
         """b parameter.
 
         Args:
-            Temperature: temperature in kelvin.
+            temperature: Temperature in kelvin.
 
         Returns:
             b parameter.
@@ -95,7 +104,7 @@ class SaxenaABC(FugacityModelABC):
         """c parameter.
 
         Args:
-            Temperature: temperature in kelvin.
+            temperature: Temperature in kelvin.
 
         Returns:
             c parameter.
@@ -108,7 +117,7 @@ class SaxenaABC(FugacityModelABC):
         """d parameter.
 
         Args:
-            Temperature: temperature in kelvin.
+            temperature: Temperature in kelvin.
 
         Returns:
             d parameter.
@@ -162,7 +171,7 @@ class SaxenaABC(FugacityModelABC):
         Returns:
             The reduced standard state pressure, which is dimensionless.
         """
-        Pr0: float = self.P0 / self.Pc
+        Pr0: float = self.P0 / self.scaling / self.Pc
 
         return Pr0
 
@@ -197,7 +206,7 @@ class SaxenaABC(FugacityModelABC):
         return volume
 
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (V dP).
+        """Volume integral (VdP).
 
         Shi and Saxena (1992), Equation 11.
 
@@ -291,3 +300,80 @@ class SaxenaHighPressure(SaxenaABC):
         )
 
         return coefficient
+
+
+@dataclass(kw_only=True)
+class SaxenaCombined(FugacityModelABC):
+    """Combines multiple Saxena fugacity models for different pressure ranges into a single model.
+
+    Args:
+        Tc: Critical temperature in kelvin.
+        Pc: Critical pressure.
+        classes: Saxena fugacity classes with coefficients specified and ordered by increasing
+            pressure.
+        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
+
+    Attributes:
+        Tc: Critical temperature in kelvin.
+        Pc: Critical pressure.
+        classes: Saxena fugacity classes with coefficients specified and ordered by increasing
+            pressure.
+        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
+        models: Instantiated fugacity classes.
+    """
+
+    Tc: float
+    Pc: float
+    classes: tuple[Type[SaxenaABC], ...]
+    upper_pressure_bounds: tuple[float, ...]
+    models: list[FugacityModelABC] = field(init=False, default_factory=list)
+
+    def __post_init__(self):
+        super().__post_init__()
+        for fugacity_class in self.classes:
+            self.models.append(fugacity_class(Tc=self.Tc, Pc=self.Pc))
+
+    def _get_index(self, pressure: float) -> int:
+        """Gets the index of the appropriate fugacity model using the pressure.
+
+        Args:
+            pressure: Pressure.
+
+        Returns:
+            Index of the relevant fugacity model.
+        """
+        for index, pressure_high in enumerate(self.upper_pressure_bounds):
+            if pressure < pressure_high:
+                return index
+        # If the pressure is higher than all specified pressure ranges, use the last model.
+        return len(self.models) - 1
+
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume.
+        """
+        index: int = self._get_index(pressure)
+        volume: float = self.models[index].volume(temperature, pressure)
+
+        return volume
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (VdP).
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume integral.
+        """
+        index: int = self._get_index(pressure)
+        volume: float = self.models[index].volume_integral(temperature, pressure)
+
+        return volume
