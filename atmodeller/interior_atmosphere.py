@@ -13,7 +13,7 @@ from functools import cached_property
 from typing import Union
 
 import numpy as np
-from scipy.optimize import fsolve, least_squares, minimize, root
+from scipy.optimize import fsolve, least_squares, root
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
@@ -650,12 +650,16 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         *,
         initial_solution: Union[np.ndarray, None] = None,
+        factor: float = 100,
     ) -> None:
         """Solves the system to determine the partial pressures with provided constraints.
 
         Args:
             constraints: Constraints for the system of equations.
             initial_solution: Initial guess for the log10 pressures. Defaults to None.
+            factor: A parameter determining the initial step bound (factor * || diag * x||). Should
+                be in the interval (0.1, 100). Defaults to 100.
+            https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
 
         Returns:
             The pressures in bar.
@@ -663,7 +667,7 @@ class InteriorAtmosphereSystem:
 
         constraints = self._assemble_constraints(constraints)
         self._log_solution = self._solve_fsolve(
-            constraints=constraints, initial_solution=initial_solution
+            constraints=constraints, initial_solution=initial_solution, factor=factor
         )
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
@@ -743,12 +747,19 @@ class InteriorAtmosphereSystem:
         *,
         constraints: SystemConstraints,
         initial_solution: Union[np.ndarray, None],
+        factor: float,
     ) -> np.ndarray:
         """Solves the non-linear system of equations.
 
         Args:
             constraints: Constraints for the system of equations.
             initial_solution: Initial guess for the log10 pressures.
+            factor: A parameter determining the initial step bound (factor * || diag * x||). Should
+                be in the interval (0.1, 100).
+            https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
+
+        Returns:
+            The solution array.
         """
         # Initial guess for gas species is 1 log10 unit, i.e. 10 bar.
         if initial_solution is None:
@@ -766,9 +777,10 @@ class InteriorAtmosphereSystem:
         infodict: dict = {}
 
         # Hard-coded for testing different solvers, but should either be an option for the user to
-        # change or the 'best' solver should be used.
-        LEAST_SQUARES: bool = True
-        ROOT: bool = False
+        # change or the 'best' solver should be used. Dan will clean this up once testing is
+        # complete.
+        LEAST_SQUARES: bool = False
+        ROOT: bool = True
         FSOLVE: bool = False
 
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
@@ -777,15 +789,15 @@ class InteriorAtmosphereSystem:
 
         if LEAST_SQUARES:
             # FIXME: Hacked bounds for test_COS_Species_IW
-            bounds = [
-                [-np.inf, -np.inf, -9, -np.inf, -np.inf, -np.inf],
-                [np.inf, np.inf, -3, np.inf, np.inf, np.inf],
-            ]
+            # bounds = [
+            #    [-np.inf, -np.inf, -9, -np.inf, -np.inf, -np.inf],
+            #    [np.inf, np.inf, -3, np.inf, np.inf, np.inf],
+            # ]
             result = least_squares(
                 self._objective_func,
                 initial_solution,
                 args=(constraints, coefficient_matrix),
-                bounds=bounds,
+                # bounds=bounds,
             )
             sol = result.x
 
@@ -794,6 +806,7 @@ class InteriorAtmosphereSystem:
                 self._objective_func,
                 initial_solution,
                 args=(constraints, coefficient_matrix),
+                options={"factor": factor},
             )
             sol = solarray.x
 
