@@ -1,30 +1,18 @@
-"""Integration tests.
+"""Tests with sulfur.
 
 See the LICENSE file for licensing information.
 
-Tests to ensure that sensible pressures are calculated for certain interior-atmosphere systems.
-
-The target pressures are determined for the combined thermodynamic data, but they are within 1%
-of the values for the JANAF thermodynamic data alone.
+Tests using the JANAF data for simple interior-atmosphere systems that include sulfur.
 """
 
-import logging
-from typing import Type
-
-from atmodeller import __version__, debug_logger
+from atmodeller import __version__
 from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.interfaces import (
-    GasSpecies,
-    NoSolubility,
-    ThermodynamicData,
-    ThermodynamicDataBase,
-    ThermodynamicDataJANAF,
-)
+from atmodeller.interfaces import GasSpecies, NoSolubility
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import (
     BasaltDixonCO2,
@@ -34,24 +22,10 @@ from atmodeller.solubilities import (
     BasaltS2,
     BasaltS2_Sulfate,
     BasaltS2_Sulfide,
-    PeridotiteH2O,
 )
-from atmodeller.utilities import earth_oceans_to_kg
 
-# Uncomment to test JANAF only.
-# standard_gibbs_free_energy_of_formation: ThermodynamicDataBase = (
-#    ThermodynamicDataJANAF
-# )
-# Uncomment to test the combined dataset.
-standard_gibbs_free_energy_of_formation: Type[ThermodynamicDataBase] = ThermodynamicData
-
-# Both the combined data and JANAF report the same pressures to within 1%.
-rtol: float = 1.0e-3
-atol: float = 1.0e-3
-
-logger: logging.Logger = logging.getLogger(__name__)
-
-debug_logger()
+rtol: float = 1.0e-8
+atol: float = 1.0e-8
 
 
 def test_version():

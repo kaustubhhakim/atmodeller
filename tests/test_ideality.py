@@ -1,22 +1,17 @@
-"""Integration tests.
+"""Tests for the fugacity coefficients.
 
 See the LICENSE file for licensing information.
-
-Tests to ensure that 'correct' values are returned for certain interior-atmosphere systems. 
-These are quite rudimentary tests, but at least confirm that nothing fundamental is broken with the
-code.
 """
 
 from typing import Type
 
 from pytest import approx
 
-from atmodeller import __version__, debug_logger, logging
+from atmodeller import __version__
 from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
-    PressureConstraint,
     SystemConstraints,
 )
 from atmodeller.eos.holland import (
@@ -26,7 +21,6 @@ from atmodeller.eos.holland import (
     CORKCOHP91,
     CORKH2HP91,
     CORKH2OHP98,
-    MRKCO2HP91,
     CORKCorrespondingStatesHP91,
     CORKSimpleCO2HP91,
     get_holland_fugacity_models,
@@ -36,7 +30,6 @@ from atmodeller.interfaces import (
     GasSpecies,
     IdealityConstant,
     NoSolubility,
-    SolidSpecies,
     ThermodynamicData,
     ThermodynamicDataBase,
 )
@@ -49,9 +42,6 @@ rtol: float = 1.0e-8
 atol: float = 1.0e-8
 
 thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
-debug_logger()
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 def test_version():
@@ -66,7 +56,7 @@ def check_simple_Cork_gas(
     expected_V: float,
     expected_fugacity_coeff: float,
 ) -> None:
-    """Checks the volume and fugacity cofficient for a given gas type using CorkSimple."""
+    """Checks the volume and fugacity cofficient for a given gas type using simple CORK."""
     # The class constructor requires no arguments.
     cork: CORKCorrespondingStatesHP91 = gas_type()  # type: ignore
     V: float = cork.volume(temperature, pressure)
@@ -82,9 +72,9 @@ def check_full_Cork_gas(
     gas_type: Type[CORKABC],
     expected_fugacity_coeff: float,
 ) -> None:
-    """Checks the fugacity coefficient for a given gas type using CorkFull."""
+    """Checks the fugacity coefficient for a given gas type using the full CORK."""
     # The class constructor requires no arguments.
-    cork: CorkFull = gas_type()  # type: ignore
+    cork: CorkABC = gas_type()  # type: ignore
     fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
 
     assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
