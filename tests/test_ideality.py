@@ -7,7 +7,7 @@ from typing import Type
 
 from pytest import approx
 
-from atmodeller import __version__
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
@@ -40,6 +40,8 @@ rtol: float = 1.0e-8
 atol: float = 1.0e-8
 
 thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
+
+debug_logger()
 
 
 def test_version():

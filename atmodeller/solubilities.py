@@ -19,7 +19,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 # Solubility limiters.
 MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight.
 # Maximum sulfur solubility.
-SULFUR_MAXIMUM_PPMW: float = 1000
+SULFUR_MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(1)  # 1% by weight
 
 
 def limit_solubility(bound: float = MAXIMUM_PPMW) -> Callable:

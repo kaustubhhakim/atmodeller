@@ -5,7 +5,7 @@ See the LICENSE file for licensing information.
 Tests using the JANAF data for simple CHO interior-atmosphere systems.
 """
 
-from atmodeller import __version__
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
@@ -18,6 +18,8 @@ from atmodeller.utilities import earth_oceans_to_kg
 
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
+
+debug_logger()
 
 
 def test_version():

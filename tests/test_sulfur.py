@@ -5,7 +5,7 @@ See the LICENSE file for licensing information.
 Tests using the JANAF data for simple interior-atmosphere systems that include sulfur.
 """
 
-from atmodeller import __version__
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
@@ -26,6 +26,8 @@ from atmodeller.solubilities import (
 
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
+
+debug_logger()
 
 
 def test_version():
@@ -96,7 +98,7 @@ def test_AllS_Sulfide_IW() -> None:
         "O2": 1.0269757432683765e-06,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -166,7 +168,7 @@ def test_AllS_TotalSolubility_IW() -> None:
         "O2": 1.0269757432682946e-06,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -236,7 +238,7 @@ def test_AllS_TotalSolubility_IWm3() -> None:
         "O2": 1.0269750531288816e-09,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -278,7 +280,7 @@ def test_HOS_Species_IW() -> None:
         "O2S": 0.004839395737226402,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 

@@ -6,7 +6,7 @@ See the LICENSE file for licensing information.
 
 from typing import Type
 
-from atmodeller import __version__
+from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintBallhaus,
@@ -26,6 +26,8 @@ thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
+
+debug_logger()
 
 
 def test_version():
