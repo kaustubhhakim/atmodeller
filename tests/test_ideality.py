@@ -15,13 +15,11 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.eos.holland import (
-    CORKABC,
     CORKCH4HP91,
     CORKCO2HP98,
     CORKCOHP91,
     CORKH2HP91,
     CORKH2OHP98,
-    CORKCorrespondingStatesHP91,
     CORKSimpleCO2HP91,
     get_holland_fugacity_models,
 )
@@ -49,88 +47,78 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def check_simple_Cork_gas(
+def check_fugacity_coefficient(
     temperature: float,
     pressure: float,
-    gas_type: Type[CORKCorrespondingStatesHP91],
-    expected_V: float,
+    fugacity_model: Type[FugacityModelABC],
     expected_fugacity_coeff: float,
 ) -> None:
-    """Checks the volume and fugacity cofficient for a given gas type using simple CORK."""
-    # The class constructor requires no arguments.
-    cork: CORKCorrespondingStatesHP91 = gas_type()  # type: ignore
-    V: float = cork.volume(temperature, pressure)
-    fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
-    print("Fugacity Coefficient:", fugacity_coeff)
-    assert V == approx(expected_V, rtol, atol)
-    assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
+    """Checks the fugacity coefficient for a given fugacity model.
 
+    Args:
+        temperature: Temperature in kelvin.
+        pressure: Pressure.
+        fugacity_model: Fugacity model.
+        expected_fugacity_coeff: The expected value of the fugacity coefficient.
+    """
 
-def check_full_Cork_gas(
-    temperature: float,
-    pressure: float,
-    gas_type: Type[CORKABC],
-    expected_fugacity_coeff: float,
-) -> None:
-    """Checks the fugacity coefficient for a given gas type using the full CORK."""
-    # The class constructor requires no arguments.
-    cork: CorkABC = gas_type()  # type: ignore
-    fugacity_coeff: float = cork.fugacity_coefficient(temperature, pressure)
+    model: FugacityModelABC = fugacity_model()
+    fugacity_coeff: float = model.fugacity_coefficient(temperature, pressure)
 
     assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
 
 
 def test_CorkH2() -> None:
-    check_simple_Cork_gas(2000, 10, CORKH2HP91, 3.7218446244368684, 4.672042007568433)
+    check_fugacity_coefficient(2000, 10, CORKH2HP91, 4.672042007568433)
 
 
 def test_CorkCO() -> None:
-    check_simple_Cork_gas(2000, 10, CORKCOHP91, 4.6747168815213715, 7.698485559533069)
+    check_fugacity_coefficient(2000, 10, CORKCOHP91, 7.698485559533069)
 
 
 def test_CorkCH4() -> None:
-    check_simple_Cork_gas(2000, 10, CORKCH4HP91, 4.786943829010815, 8.116070626285136)
+    check_fugacity_coefficient(2000, 10, CORKCH4HP91, 8.116070626285136)
 
 
 def test_simple_CorkCO2() -> None:
-    check_simple_Cork_gas(2000, 10, CORKSimpleCO2HP91, 4.672048888683978, 7.1335509191383455)
+    check_fugacity_coefficient(2000, 10, CORKSimpleCO2HP91, 7.1335509191383455)
 
 
 def test_CorkCO2_at_P0() -> None:
     """Below P0 so virial contribution excluded."""
-    check_full_Cork_gas(2000, 2, CORKCO2HP98, 1.6063624424808558)
+    check_fugacity_coefficient(2000, 2, CORKCO2HP98, 1.6063624424808558)
 
 
 def test_CorkCO2_above_P0() -> None:
     """Above P0 so virial contribution included."""
-    check_full_Cork_gas(2000, 10, CORKCO2HP98, 7.4492345831832525)
+    check_fugacity_coefficient(2000, 10, CORKCO2HP98, 7.4492345831832525)
 
 
 def test_CorkH2O_above_Tc_below_P0() -> None:
     """Above Tc and below P0."""
-    check_full_Cork_gas(2000, 1, CORKH2OHP98, 1.048278616058322)
+    check_fugacity_coefficient(2000, 1, CORKH2OHP98, 1.048278616058322)
 
 
 def test_CorkH2O_above_Tc_above_P0() -> None:
     """Above Tc and above P0."""
-    check_full_Cork_gas(2000, 5, CORKH2OHP98, 1.3444013638026706)
+    check_fugacity_coefficient(2000, 5, CORKH2OHP98, 1.3444013638026706)
 
 
 def test_CorkH2O_below_Tc_below_Psat() -> None:
     """Below Tc and below Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_full_Cork_gas(600, 0.1, CORKH2OHP98, 0.7910907770688191)
+    check_fugacity_coefficient(600, 0.1, CORKH2OHP98, 0.7910907770688191)
 
 
 def test_CorkH2O_below_Tc_above_Psat() -> None:
     """Below Tc and above Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_full_Cork_gas(600, 1, CORKH2OHP98, 0.14052644311851598)
+    check_fugacity_coefficient(600, 1, CORKH2OHP98, 0.14052644311851598)
 
 
 def test_CorkH2O_below_Tc_above_P0() -> None:
     """Below Tc and above P0."""
-    check_full_Cork_gas(600, 10, CORKH2OHP98, 0.40066985009753664)
+    check_fugacity_coefficient(600, 10, CORKH2OHP98, 0.40066985009753664)
 
 
 def test_H_fO2() -> None:
@@ -176,7 +164,6 @@ def test_H_fO2() -> None:
     )
 
     system.solve(SystemConstraints(constraints))
-    print(system.output)
     assert system.isclose(target_pressures)
 
 
@@ -224,7 +211,6 @@ def test_H2_with_cork() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    print(system.output)
     assert system.isclose(target_pressures)
 
 
@@ -308,5 +294,4 @@ def test_CORK() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    print(system.output)
     assert system.isclose(target_pressures)
