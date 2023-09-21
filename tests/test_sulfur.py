@@ -1,17 +1,9 @@
-"""Integration tests.
+"""Tests with sulfur.
 
 See the LICENSE file for licensing information.
 
-Tests to ensure that sensible pressures are calculated for certain interior-atmosphere systems.
-
-The target pressures are determined for the combined thermodynamic data, but they are within 1%
-of the values for the JANAF thermodynamic data alone.
+Tests using the JANAF data for simple interior-atmosphere systems that include sulfur.
 """
-
-import logging
-from typing import Type
-
-import numpy as np
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
@@ -20,13 +12,7 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.interfaces import (
-    GasSpecies,
-    NoSolubility,
-    ThermodynamicData,
-    ThermodynamicDataBase,
-    ThermodynamicDataJANAF,
-)
+from atmodeller.interfaces import GasSpecies, NoSolubility
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import (
     BasaltDixonCO2,
@@ -36,22 +22,10 @@ from atmodeller.solubilities import (
     BasaltS2,
     BasaltS2_Sulfate,
     BasaltS2_Sulfide,
-    PeridotiteH2O,
 )
-from atmodeller.utilities import earth_oceans_to_kg
 
-# Uncomment to test JANAF only. TODO: FIXME: clean up.
-# standard_gibbs_free_energy_of_formation: ThermodynamicDataBase = (
-#    ThermodynamicDataJANAF()
-# )
-# Uncomment to test the combined dataset.
-standard_gibbs_free_energy_of_formation: Type[ThermodynamicDataBase] = ThermodynamicData
-
-# Both the combined data and JANAF report the same pressures to within 1%.
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 debug_logger()
 
@@ -88,9 +62,8 @@ def test_S2_SO_Sulfide_IW() -> None:
         "OS": 6.018454943818516e-05,
         "O2": 8.699485217915599e-08,
     }
-    system.solve(SystemConstraints(constraints))
-    print("output:", system.output)
 
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -108,7 +81,7 @@ def test_AllS_Sulfide_IW() -> None:
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
-    print("S mass:", mass_S)
+
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
@@ -124,7 +97,8 @@ def test_AllS_Sulfide_IW() -> None:
         "O2S": 0.004839725408460836,
         "O2": 1.0269757432683765e-06,
     }
-    system.solve(SystemConstraints(constraints))
+
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -142,7 +116,7 @@ def test_AllS_Sulfate_IW() -> None:
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 2e-4 * planet.mantle_mass
-    print("S mass:", mass_S)
+
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
@@ -159,7 +133,7 @@ def test_AllS_Sulfate_IW() -> None:
         "O2S": 1.0186830187658191,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -177,7 +151,7 @@ def test_AllS_TotalSolubility_IW() -> None:
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
-    print("S mass:", mass_S)
+
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
@@ -194,7 +168,7 @@ def test_AllS_TotalSolubility_IW() -> None:
         "O2": 1.0269757432682946e-06,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -212,7 +186,7 @@ def test_AllS_TotalSolubility_IWp3() -> None:
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
-    print("S mass:", mass_S)
+
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
@@ -229,7 +203,7 @@ def test_AllS_TotalSolubility_IWp3() -> None:
         "O2": 0.0010329892821750164,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -247,7 +221,7 @@ def test_AllS_TotalSolubility_IWm3() -> None:
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
-    print("S mass:", mass_S)
+
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
@@ -264,7 +238,7 @@ def test_AllS_TotalSolubility_IWm3() -> None:
         "O2": 1.0269750531288816e-09,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -306,12 +280,7 @@ def test_HOS_Species_IW() -> None:
         "O2S": 0.004839395737226402,
     }
 
-    # Give a reasonable initial guess
-    # initial_log10: np.ndarray = np.array([0, 0, -3, -3, -6, -3, 2, 1])
-    # initial_solution: np.ndarray = 10.0**initial_log10
-    # initial_solution: np.ndarray = np.array([1, 1, 1e-3, 1e-3, 1.04e-6, 1e-3, 1e2, 10])
-
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
@@ -368,8 +337,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
 
 
 def test_COS_Species_IW() -> None:
-    """Tests Sulfur Solubility with C, O and S species at IW, 2173 K.
-    This test is currently failing"""
+    """Tests Sulfur Solubility with C, O and S species at IW, 2173 K."""
 
     species: Species = Species(
         [
@@ -405,16 +373,13 @@ def test_COS_Species_IW() -> None:
         "CO2": 47.437207165120746,
     }
 
-    initial_solution: np.ndarray = np.log10([0.003, 0.003, 1e-6, 0.005, 230, 47])
-
-    system.solve(constraints, initial_solution=initial_solution)
-    logger.debug("This test is likely to fail.")
+    # initial_solution: np.ndarray = np.log10([0.003, 0.003, 1e-6, 0.005, 230, 47])
+    system.solve(constraints, factor=1)  # , initial_solution=initial_solution)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
 def test_CHOS_Species_IW() -> None:
-    """Tests Sulfur Solubility with H, C, O and S species at IW-3, 2173 K.
-    This test is currently failing."""
+    """Tests Sulfur Solubility with H, C, O and S species at IW-3, 2173 K."""
 
     species: Species = Species(
         [
@@ -457,8 +422,6 @@ def test_CHOS_Species_IW() -> None:
         "CO2": 47.22814633265304,
     }
 
-    initial_solution: np.ndarray = np.log10([1, 1, 1e-3, 1e-3, 1e-6, 1e-3, 1e2, 1])
-
-    system.solve(constraints, initial_solution=initial_solution)
-    logger.debug("This test is likely to fail.")
+    # initial_solution: np.ndarray = np.log10([1, 1, 1e-3, 1e-3, 1e-6, 1e-3, 1e2, 1])
+    system.solve(constraints, factor=1)  # , initial_solution=initial_solution)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
