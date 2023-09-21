@@ -20,7 +20,12 @@ from atmodeller.interfaces import (
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 
+# This data uses the Holland and Powell data of preference, but then uses JANAF if species cannot
+# be found in Holland and Powell.
 thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
+
+rtol: float = 1.0e-8
+atol: float = 1.0e-8
 
 debug_logger()
 
@@ -31,7 +36,10 @@ def test_version():
 
 
 def test_graphite() -> None:
-    """Tests including graphite."""
+    """Tests including graphite.
+
+    Note that the thermodynamic data must be assigned independently to each species.
+    """
 
     species: Species = Species(
         [
@@ -73,5 +81,4 @@ def test_graphite() -> None:
     }
 
     system.solve(constraints)
-    system.solution_dict
-    assert system.isclose(target_pressures)
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)

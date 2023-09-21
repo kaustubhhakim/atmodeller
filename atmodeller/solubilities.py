@@ -6,6 +6,8 @@ See the LICENSE file for licensing information.
 from __future__ import annotations
 
 import logging
+from functools import wraps
+from typing import Callable
 
 import numpy as np
 
@@ -13,6 +15,40 @@ from atmodeller.interfaces import Solubility
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+# Solubility limiters.
+MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight.
+# Maximum sulfur solubility.
+SULFUR_MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(1)  # 1% by weight
+
+
+def limit_solubility(bound: float = MAXIMUM_PPMW) -> Callable:
+    """A decorator to limit the solubility in ppmw.
+
+    Args:
+        bound: The maximum limit of the solubility in ppmw. Defaults to MAXIMUM_PPMW.
+
+    Returns:
+        The decorator.
+    """
+
+    def decorator(func) -> Callable:
+        @wraps(func)
+        def wrapper(self: Solubility, *args, **kwargs):
+            result: float = func(self, *args, **kwargs)
+            if result > bound:
+                msg: str = "%s solubility (%d ppmw) will be limited to %d ppmw" % (
+                    self.__class__.__name__,
+                    result,
+                    bound,
+                )
+                logger.warning(msg)
+
+            return min(result, bound)  # Limit the result to 'bound'
+
+        return wrapper
+
+    return decorator
 
 
 # region Andesite solubility
@@ -40,6 +76,7 @@ class AndesiteS2_Sulfate(Solubility):
     corrigendum. Composition for Andesite from Table 1.
     """
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
@@ -50,6 +87,7 @@ class AndesiteS2_Sulfate(Solubility):
         )
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+
         return ppmw
 
 
@@ -60,6 +98,7 @@ class AndesiteS2_Sulfide(Solubility):
     for Andesite from Table 1.
     """
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
@@ -68,6 +107,7 @@ class AndesiteS2_Sulfide(Solubility):
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+
         return ppmw
 
 
@@ -78,9 +118,11 @@ class AndesiteS2(Solubility):
         self.sulfide_solubility: Solubility = AndesiteS2_Sulfide()
         self.sulfate_solubility: Solubility = AndesiteS2_Sulfate()
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(self, *args, **kwargs) -> float:
         solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
         solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+
         return solubility
 
 
@@ -98,6 +140,7 @@ class AnorthiteDiopsideH2O(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
+
         return self.power_law(fugacity, 727, 0.5)
 
 
@@ -113,6 +156,7 @@ class BasaltDixonCO2(Solubility):
         del fugacities_dict
         ppmw: float = (3.8e-7) * fugacity * np.exp(-23 * (fugacity - 1) / (83.15 * temperature))
         ppmw = 1.0e4 * (4400 * ppmw) / (36.6 - 44 * ppmw)
+
         return ppmw
 
 
@@ -124,6 +168,7 @@ class BasaltDixonH2O(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
+
         return self.power_law(fugacity, 965, 0.5)
 
 
@@ -139,6 +184,7 @@ class BasaltH2(Solubility):
         del temperature
         del fugacities_dict
         ppmw: float = 10 ** (0.52413928 * np.log10(fugacity) + 1.10083602)
+
         return ppmw
 
 
@@ -155,6 +201,7 @@ class BasaltLibourelN2(Solubility):
         ppmw: float = self.power_law(fugacity, 0.0611, 1.0)
         constant: float = (fugacities_dict["O2"] ** -0.75) * 5.97e-10
         ppmw += self.power_law(fugacity, constant, 0.5)
+
         return ppmw
 
 
@@ -165,6 +212,7 @@ class BasaltS2_Sulfate(Solubility):
     corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
     """
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
@@ -176,14 +224,7 @@ class BasaltS2_Sulfate(Solubility):
         SO4_wtp: float = 10**logSO4_wtp
         S_wtp: float = SO4_wtp * (32.065 / 96.06)
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        # TODO: To discuss.  This does influence the results of the sulphur test suite. Maybe
-        # better to instead sanity check the solubilities once a solution has been found?
 
-        if ppmw >= 1000:
-            msg: str = "S2 sulfate solubility is getting too high = %f ppmw" % (ppmw)
-            logger.warning(msg)
-            # ppmw = 1000.0  # Could be dangerous to assign an arbitrary cut-off.  Make a parameter?
-            # raise KeyError(msg)
         return ppmw
 
 
@@ -194,6 +235,7 @@ class BasaltS2_Sulfide(Solubility):
     Composition for NIB (natural Icelandic basalt) from Table 1.
     """
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
@@ -202,11 +244,7 @@ class BasaltS2_Sulfide(Solubility):
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
-        if ppmw >= 1000:
-            msg: str = "S2 sulfide solubility is getting too high = %f ppmw" % (ppmw)
-            logger.warning(msg)
-            # ppmw = 1000.0
-            # raise KeyError(msg)
+
         return ppmw
 
 
@@ -217,9 +255,11 @@ class BasaltS2(Solubility):
         self.sulfide_solubility: Solubility = BasaltS2_Sulfide()
         self.sulfate_solubility: Solubility = BasaltS2_Sulfate()
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(self, *args, **kwargs) -> float:
         solubility: float = self.sulfide_solubility._solubility(*args, **kwargs)
         solubility += self.sulfate_solubility._solubility(*args, **kwargs)
+
         return solubility
 
 
@@ -241,6 +281,7 @@ class TBasaltS2_Sulfate(Solubility):
     corrigendum. Composition for Trachy-Basalt from Table 1.
     """
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
@@ -251,6 +292,7 @@ class TBasaltS2_Sulfate(Solubility):
         )
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+
         return ppmw
 
 
@@ -261,6 +303,7 @@ class TBasaltS2_Sulfide(Solubility):
     Composition for Trachy-basalt from Table 1.
     """
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
@@ -269,6 +312,7 @@ class TBasaltS2_Sulfide(Solubility):
         logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
+
         return ppmw
 
 
@@ -295,6 +339,7 @@ class MercuryMagmaS(Solubility):
     S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like magmas.
     """
 
+    @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
         self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
     ) -> float:
@@ -306,6 +351,7 @@ class MercuryMagmaS(Solubility):
             + (d * np.log10(fugacities_dict["O2"]))
         )
         ppmw: float = UnitConversion.weight_percent_to_ppmw(wt_perc)
+
         return ppmw
 
 
