@@ -603,6 +603,16 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
                     )
                     logger.warning(msg)
                     raise KeyError(msg)
+        elif isinstance(self.species, LiquidSpecies):
+            phase = get_phase_data("l") 
+            if phase is None:
+                msg: str = "Thermodynamic data for %s (%s) is not available in %s" % (
+                    self.species.name_in_thermodynamic_data,
+                    self.species.modified_hill_formula,
+                    self.DATA_SOURCE,
+                )
+                logger.warning(msg)
+                raise KeyError(msg)
         else:
             phase = get_phase_data("ref")
 
@@ -1112,4 +1122,34 @@ class SolidSpecies(ChemicalComponent):
     """
 
     output: Union[SolidSpeciesOutput, None] = field(init=False, default=None)
+    activity: ConstraintABC = field(default_factory=IdealityConstant)
+
+@dataclass(kw_only=True)
+class LiquidSpeciesOutput:
+    """Output for a solid species."""
+
+    activity: float
+
+
+@dataclass(kw_only=True)
+class LiquidSpecies(ChemicalComponent):
+    """A solid species.
+
+    Args:
+        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
+        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
+        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
+        activity: Activity object. Defaults to ideal (i.e. unity).
+
+    Attributes:
+        chemical_formula: Chemical formula.
+        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
+        formula: Formula object derived from the chemical formula.
+        thermodynamic_class: The class for thermodynamic data.
+        thermodynamic_data: Instance of thermodynamic_class for this chemical component.
+        activity: Activity object.
+        output: Stores calculated values for output.
+    """
+
+    output: Union[LiquidSpeciesOutput, None] = field(init=False, default=None)
     activity: ConstraintABC = field(default_factory=IdealityConstant)
