@@ -102,7 +102,7 @@ def test_H_and_Si_liquid() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(species='H2O', value=1),
-            FugacityConstraint(species='OSi', value=1),
+            FugacityConstraint(species='O2Si', value=1),
             IronWustiteBufferConstraintHirschmann(log10_shift=3),
         ]
     )
@@ -110,12 +110,12 @@ def test_H_and_Si_liquid() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        'H2': 0.03095039977652221,
+        'H2': 0.030951379695419654,
         'H2O': 1.0,
-        'H4Si': 1.9649448270713194e-14,
-        'O2': 8.700604070214889e-05,
-        'O2Si': 448322.3567819643,
-        'OSi': 1.0
+        'H4Si': 4.383438963504379e-20,
+        'O2': 8.700053157689063e-05,
+        'O2Si': 1.0,
+        'OSi': 2.2306085026027508e-06
         }
 
     system.solve(SystemConstraints(constraints))
