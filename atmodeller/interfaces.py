@@ -1126,17 +1126,17 @@ class SolidSpecies(ChemicalComponent):
 
 @dataclass(kw_only=True)
 class LiquidSpeciesOutput:
-    """Output for a solid species."""
+    """Output for a liquid species (copy of SolidSpeciesOutput)"""
 
     activity: float
 
 
 @dataclass(kw_only=True)
 class LiquidSpecies(ChemicalComponent):
-    """A solid species.
+    """A liquid species  (copy of SolidSpecies)
 
     Args:
-        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
+        chemical_formula: Chemical formula (e.g., SiO2.).
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
         activity: Activity object. Defaults to ideal (i.e. unity).
