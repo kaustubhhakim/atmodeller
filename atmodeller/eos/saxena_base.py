@@ -11,13 +11,13 @@ from typing import Type
 
 import numpy as np
 
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import FugacityModelABC, FugacityModelABC_V2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class SaxenaABC(FugacityModelABC):
+class SaxenaABC(FugacityModelABC_V2):
     """Shi and Saxena (1992) fugacity model.
 
     The model presented in Shi and Saxena (1992) is a general form that can be adapted to the
@@ -232,6 +232,30 @@ class SaxenaABC(FugacityModelABC):
 
         return volume_integral
 
+    def ln_fugacity_coefficient_fromint(self, temperature: float, pressure: float) -> float:
+        """ln(fugacity coefficient) = (1/RT) Integral of (Vcalc - Videal)dP
+
+        Using Z fit and equation for lnphi from https://en.wikipedia.org/wiki/Fugacity
+
+        Args:
+            temperature: Temperature in Kelvin
+            pressure: Pressure.
+
+        Returns:
+        ln(phi) = ln(fugacity coefficient)
+        """
+        P0: float = self.P0
+        Z: float = self.compressibility_parameter(temperature, pressure)
+        volume_calc: float = (
+            (self.GAS_CONSTANT * temperature * Z) / pressure
+        ) * 10  # Vol units: cm3/mol
+        volume_ideal: float = (
+            (self.GAS_CONSTANT * temperature) / pressure
+        ) * 10  # Vol units: cm3/mol
+        integral: float = ((volume_calc - volume_ideal) * (pressure - P0)) / 10
+        ln_phi: float = integral / (self.GAS_CONSTANT * temperature)
+        return ln_phi
+
 
 @dataclass(kw_only=True)
 class SaxenaFiveCoefficients(SaxenaABC):
@@ -303,7 +327,7 @@ class SaxenaEightCoefficients(SaxenaABC):
 
 
 @dataclass(kw_only=True)
-class SaxenaCombined(FugacityModelABC):
+class SaxenaCombined(FugacityModelABC_V2):
     """Combines multiple Saxena fugacity models for different pressure ranges into a single model.
 
     Args:
@@ -326,7 +350,7 @@ class SaxenaCombined(FugacityModelABC):
     Pc: float
     classes: tuple[Type[SaxenaABC], ...]
     upper_pressure_bounds: tuple[float, ...]
-    models: list[FugacityModelABC] = field(init=False, default_factory=list)
+    models: list[FugacityModelABC_V2] = field(init=False, default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
@@ -377,3 +401,18 @@ class SaxenaCombined(FugacityModelABC):
         volume: float = self.models[index].volume_integral(temperature, pressure)
 
         return volume
+
+    def ln_fugacity_coefficient_fromint(self, temperature: float, pressure: float) -> float:
+        """ln(fugacity coefficient)
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            ln(phi)
+        """
+        index: int = self._get_index(pressure)
+        ln_phi: float = self.models[index].ln_fugacity_coefficient_fromint(temperature, pressure)
+
+        return ln_phi

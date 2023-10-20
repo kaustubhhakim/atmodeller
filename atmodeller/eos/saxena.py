@@ -56,7 +56,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Type
 
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import FugacityModelABC, FugacityModelABC_V2
 from atmodeller.eos.saxena_base import (
     SaxenaABC,
     SaxenaCombined,
@@ -105,7 +105,6 @@ class H2LowPressureSS92(SaxenaFiveCoefficients):
     d_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, 0, 0, 0))
 
 
-# FIXME: Model is broken, perhaps some coefficients are wrong in the paper?
 @dataclass(kw_only=True)
 class H2HighPressureSS92(SaxenaEightCoefficients):
     """High pressure model for H2 from Shi and Saxena (1992).
@@ -187,7 +186,6 @@ class H2SS92(SaxenaCombined):
     upper_pressure_bounds: tuple[float, ...] = (1000,)
 
 
-# FIXME: Model is broken, perhaps some coefficients are wrong in the paper?
 @dataclass(kw_only=True)
 class H2HighPressureSF88(SaxenaEightCoefficients):
     """High pressure model for H2 from Saxena and Fei (1988).
@@ -223,13 +221,10 @@ class H2HighPressureSF88_Refit(SaxenaEightCoefficients):
 
     Tc: float = field(init=False, default=table2["H2"].Tc)
     Pc: float = field(init=False, default=table2["H2"].Pc)
-   # [ 1.00574429e+00  1.93017653e-03 -3.79261119e-01 -2.44218196e-03
-  #1.31517894e-03  7.22328436e-02  4.84354184e-02 -4.19624518e-04
-  #2.64454394e-06 -5.18445624e-05 -2.05045980e-04 -3.64843202e-07
-  #2.28281092e-11 -1.07138600e-08  3.67720812e-07]
+
     a_coefficients: tuple[float, ...] = field(
         init=False,
-        default=(1.00574429e+00, 0, 1.93017653e-03, 0, -3.79261119e-01, 0, 0, -2.44218196e-03),
+        default=(1.00574429e00, 0, 1.93017653e-03, 0, -3.79261119e-01, 0, 0, -2.44218196e-03),
     )
     b_coefficients: tuple[float, ...] = field(
         init=False,
@@ -468,13 +463,13 @@ class COSSS92(CorrespondingStates):
     Pc: float = field(init=False, default=table2["COS"].Pc)
 
 
-def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
+def get_saxena_fugacity_models() -> dict[str, FugacityModelABC_V2]:
     """Gets a dictionary of the preferred fugacity models to use for each species.
 
     Returns:
         Dictionary of preferred fugacity models for each species.
     """
-    models: dict[str, FugacityModelABC] = {}
+    models: dict[str, FugacityModelABC_V2] = {}
     models["CH4"] = CH4SS92()
     models["CO"] = COSS92()
     models["CO2"] = CO2SS92()

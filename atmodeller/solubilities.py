@@ -385,6 +385,38 @@ class SilicicMeltsH2(Solubility):
         return ppmw
 
 
+class BasaltCO(Solubility):
+    """Yoshioka et al. 2019. https://www.sciencedirect.com/science/article/pii/S0016703719303461
+
+    Valid for pressures up to 3 GPa. Using their CO expression for MORB.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del temperature
+        del fugacities_dict
+        CO_wtp: float = 10 ** (-5.20 + (0.8 * np.log(fugacity)))
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
+        return ppmw
+
+
+class RhyoliteCO(Solubility):
+    """Yoshioka et al. 2019. https://www.sciencedirect.com/science/article/pii/S0016703719303461
+
+    Valid for pressures up to 3 GPa. Using their CO expression for Rhyolite.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del temperature
+        del fugacities_dict
+        CO_wtp: float = 10 ** (-4.08 + (0.52 * np.log(fugacity)))
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
+        return ppmw
+
+
 # Dictionaries of self-consistent solubility laws for a given composition.
 andesite_solubilities: dict[str, Solubility] = {
     "H2": AndesiteH2(),
@@ -398,6 +430,10 @@ basalt_solubilities: dict[str, Solubility] = {
     "H2": BasaltH2(),
     "N2": BasaltLibourelN2(),
     "S2": BasaltS2(),
+    "CO": BasaltCO(),
+}
+rhyolite_solubilities: dict[str, Solubility] = {
+    "CO": RhyoliteCO(),
 }
 peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O()}
 reducedmagma_solubilities: dict[str, Solubility] = {"H2S": MercuryMagmaS()}
@@ -411,4 +447,5 @@ composition_solubilities: dict[str, dict[str, Solubility]] = {
     "peridotite": peridotite_solubilities,
     "anorthiteDiopsideEuctectic": anorthdiop_solubilities,
     "reducedmagma": reducedmagma_solubilities,
+    "rhyolite": rhyolite_solubilities,
 }
