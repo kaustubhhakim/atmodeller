@@ -417,6 +417,22 @@ class RhyoliteCO(Solubility):
         return ppmw
 
 
+class BasaltHe(Solubility):
+    """Jambon et al. 1986, Assuming Henry's Law
+
+    Valid for 1 bar and temperatures from 1250-1600 C.
+    """
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del temperature
+        del fugacities_dict
+        He_conc: float = 56e-5 * fugacity  # units cm3*STP/g
+        ppmw: float = (1 / He_conc) * 1e6
+        return ppmw
+
+
 # Dictionaries of self-consistent solubility laws for a given composition.
 andesite_solubilities: dict[str, Solubility] = {
     "H2": AndesiteH2(),
@@ -431,6 +447,7 @@ basalt_solubilities: dict[str, Solubility] = {
     "N2": BasaltLibourelN2(),
     "S2": BasaltS2(),
     "CO": BasaltCO(),
+    "He": BasaltHe(),
 }
 rhyolite_solubilities: dict[str, Solubility] = {
     "CO": RhyoliteCO(),
