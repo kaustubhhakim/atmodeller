@@ -428,8 +428,42 @@ class BasaltHe(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
-        He_conc: float = 56e-5 * fugacity  # units cm3*STP/g
+        He_conc: float = (
+            56e-5 * fugacity
+        )  # units cm3*STP/g, I think something is up with the units here
         ppmw: float = (1 / He_conc) * 1e6
+        return ppmw
+
+
+class BasaltCl2(Solubility):
+    """Thomas & Wood 2021, Figure 4: relation between dissolved Cl concentration and Cl fugacity.
+    Icelandic basalt
+
+    Valid at 1400 C and 1.5 GPa"""
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del temperature
+        del fugacities_dict
+        Cl_wtp: float = 78.56 * np.sqrt(fugacity)
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(Cl_wtp)
+        return ppmw
+
+
+class AnorthiteDiopsideForsteriteCl2(Solubility):
+    """Thomas & Wood 2021, Figure 4: relation between dissolved Cl concentration and Cl fugacity.
+    CMAS composition: An50Di28Fo22 (anorthite-diopside-forsterite), Fe-free low-degree mantle melt
+
+    Valid at 1400 C and 1.5 GPa"""
+
+    def _solubility(
+        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+    ) -> float:
+        del temperature
+        del fugacities_dict
+        Cl_wtp: float = 140.52 * np.sqrt(fugacity)
+        ppmw: float = UnitConversion.weight_percent_to_ppmw(Cl_wtp)
         return ppmw
 
 
@@ -448,6 +482,7 @@ basalt_solubilities: dict[str, Solubility] = {
     "S2": BasaltS2(),
     "CO": BasaltCO(),
     "He": BasaltHe(),
+    "Cl2": BasaltCl2(),
 }
 rhyolite_solubilities: dict[str, Solubility] = {
     "CO": RhyoliteCO(),
