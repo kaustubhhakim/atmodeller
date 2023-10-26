@@ -38,6 +38,22 @@ class FugacityModelABC(GetValueABC):
         """Scales the GAS_CONSTANT to ensure it has the correct units."""
         self.GAS_CONSTANT /= self.scaling
 
+    def compressibility_parameter(self, temperature: float, pressure: float) -> float:
+        """Compressibility parameter at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure
+
+        Returns:
+            The compressibility parameter, Z
+        """
+        volume: float = self.volume(temperature, pressure)
+        volume_ideal: float = self.ideal_volume(temperature, pressure)
+        Z: float = volume / volume_ideal
+
+        return Z
+
     def get_value(self, *, temperature: float, pressure: float) -> float:
         """Evaluates the fugacity coefficient at temperature and pressure.
 
@@ -106,6 +122,20 @@ class FugacityModelABC(GetValueABC):
         fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
 
         return fugacity_coefficient
+
+    def ideal_volume(self, temperature: float, pressure: float) -> float:
+        """Ideal volume
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure.
+
+        Returns:
+            ideal volume
+        """
+        volume_ideal: float = self.GAS_CONSTANT * temperature / pressure
+
+        return volume_ideal
 
     @abstractmethod
     def volume(self, temperature: float, pressure: float) -> float:
