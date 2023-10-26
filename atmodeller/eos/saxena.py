@@ -56,7 +56,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Type
 
-from atmodeller.eos.interfaces import FugacityModelABC, FugacityModelABC_V2
+from atmodeller.eos.interfaces import FugacityModelABC
 from atmodeller.eos.saxena_base import (
     SaxenaABC,
     SaxenaCombined,
@@ -463,13 +463,13 @@ class COSSS92(CorrespondingStates):
     Pc: float = field(init=False, default=table2["COS"].Pc)
 
 
-def get_saxena_fugacity_models() -> dict[str, FugacityModelABC_V2]:
+def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
     """Gets a dictionary of the preferred fugacity models to use for each species.
 
     Returns:
         Dictionary of preferred fugacity models for each species.
     """
-    models: dict[str, FugacityModelABC_V2] = {}
+    models: dict[str, FugacityModelABC] = {}
     models["CH4"] = CH4SS92()
     models["CO"] = COSS92()
     models["CO2"] = CO2SS92()
