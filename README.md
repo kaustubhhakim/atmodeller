@@ -5,13 +5,11 @@ See the Jupyter notebook tutorials in the package directory `docs/`.
 
 You are encouraged to fork this repository or create your own branch to add new features. You will need to issue a pull request to be able to merge your code into the main branch. Follow the [Google Python style guide](https://google.github.io/styleguide/pyguide.html) and familiarise yourself with [SOLID principles](https://realpython.com/solid-principles-python/).
 
-If you are a Windows or Linux user (or use a different IDE such as Spyder), please send me your installation instructions so I can update this README.
+If you are a Windows or Linux user (or use a different IDE such as Spyder), please send me your installation instructions so I can update this README. Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *atmodeller* as a community.
 
 ## Installation
 
 ### General / MacOS
-
-Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *atmodeller* as a community.
 
 1. Install [VSCode](https://code.visualstudio.com) if you don't already have it.
 1. In VSCode you are recommended to install the following extensions:
