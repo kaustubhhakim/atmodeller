@@ -9,7 +9,7 @@ If you are a Windows or Linux user (or use a different IDE such as Spyder), plea
 
 ## Installation
 
-### General / MacOS
+### General / MacOS (VSCode)
 
 1. Install [VSCode](https://code.visualstudio.com) if you don't already have it.
 1. In VSCode you are recommended to install the following extensions:
