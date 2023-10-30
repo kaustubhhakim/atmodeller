@@ -205,7 +205,7 @@ class SaxenaABC(FugacityModelABC):
             Volume.
         """
         Z: float = self.compressibility_parameter(temperature, pressure)
-        volume: float = Z * self.GAS_CONSTANT * temperature / pressure
+        volume: float = Z * self.ideal_volume(temperature, pressure)
 
         return volume
 

@@ -167,10 +167,10 @@ class MRKImplicitABC(MRKABC):
 
         return B
 
-    def compressibility_factor(
+    def compressibility_parameter(
         self, temperature: float, pressure: float, *, volume_init: float | None = None
     ) -> float:
-        """Compressibility factor.
+        """Compressibility parameter at temperature and pressure
 
         Args:
             temperature: Temperature in kelvin.
@@ -178,15 +178,13 @@ class MRKImplicitABC(MRKABC):
             volume_init: Initial volume estimate. Defaults to None.
 
         Returns:
-            Compressibility factor, which is non-dimensional.
+            The compressibility parameter, Z
         """
-        compressibility: float = (
-            pressure
-            * self.volume(temperature, pressure, volume_init=volume_init)
-            / (self.GAS_CONSTANT * temperature)
-        )
+        volume: float = self.volume(temperature, pressure, volume_init=volume_init)
+        volume_ideal: float = self.ideal_volume(temperature, pressure)
+        Z: float = volume / volume_ideal
 
-        return compressibility
+        return Z
 
     def volume_integral(
         self,
@@ -205,7 +203,7 @@ class MRKImplicitABC(MRKABC):
         Returns:
             Volume integral.
         """
-        z: float = self.compressibility_factor(temperature, pressure, volume_init=volume_init)
+        z: float = self.compressibility_parameter(temperature, pressure, volume_init=volume_init)
         A: float = self.A_factor(temperature, pressure)
         B: float = self.B_factor(temperature, pressure)
         # The base class requires a specification of the volume_integral, but the equations in

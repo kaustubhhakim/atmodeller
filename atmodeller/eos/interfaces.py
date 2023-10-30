@@ -38,16 +38,18 @@ class FugacityModelABC(GetValueABC):
         """Scales the GAS_CONSTANT to ensure it has the correct units."""
         self.GAS_CONSTANT /= self.scaling
 
-    def compressibility_parameter(self, temperature: float, pressure: float) -> float:
+    def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
         """Compressibility parameter at temperature and pressure.
 
         Args:
             temperature: Temperature in kelvin
             pressure: Pressure
+            **kwargs: Catches unused keyword arguments, but used for overrides in subclasses.
 
         Returns:
             The compressibility parameter, Z
         """
+        del kwargs
         volume: float = self.volume(temperature, pressure)
         volume_ideal: float = self.ideal_volume(temperature, pressure)
         Z: float = volume / volume_ideal
