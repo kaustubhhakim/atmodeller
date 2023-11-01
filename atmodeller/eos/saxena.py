@@ -120,38 +120,38 @@ class H2HighPressureSS92Broken(SaxenaEightCoefficients):
     )
 
 
-@dataclass(kw_only=True)
-class H2HighPressureSS92_Refit(SaxenaEightCoefficients):
-    """High pressure model for H2 from Shi and Saxena (1992), Refitted using V, P, T Data from
-    Presnall 1969 and Ross & Ree 1983, assuming same functional form as Shi & Saxena, including which
-    coefficients they put at zero
+# @dataclass(kw_only=True)
+# class H2HighPressureSS92_Refit(SaxenaEightCoefficients):
+#     """High pressure model for H2 from Shi and Saxena (1992), Refitted using V, P, T Data from
+#     Presnall 1969 and Ross & Ree 1983, assuming same functional form as Shi & Saxena, including which
+#     coefficients they put at zero
 
-    Table 1(b), >1 kbar.
+#     Table 1(b), >1 kbar.
 
-    See base class.
-    """
+#     See base class.
+#     """
 
-    Tc: float = critical_data_dictionary["H2"].Tc
-    Pc: float = critical_data_dictionary["H2"].Pc
+#     Tc: float = critical_data_dictionary["H2"].Tc
+#     Pc: float = critical_data_dictionary["H2"].Pc
 
-    a_coefficients: tuple[float, ...] = field(
-        init=False,
-        default=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
-    )
+#     a_coefficients: tuple[float, ...] = field(
+#         init=False,
+#         default=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
+#     )
 
-    b_coefficients: tuple[float, ...] = field(
-        init=False,
-        default=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
-    )
+#     b_coefficients: tuple[float, ...] = field(
+#         init=False,
+#         default=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
+#     )
 
-    c_coefficients: tuple[float, ...] = field(
-        init=False,
-        default=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
-    )
+#     c_coefficients: tuple[float, ...] = field(
+#         init=False,
+#         default=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
+#     )
 
-    d_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.28281107e-11, 0, -1.07138603e-08, 0, 3.67720815e-07, 0, 0, 0)
-    )
+#     d_coefficients: tuple[float, ...] = field(
+#         init=False, default=(2.28281107e-11, 0, -1.07138603e-08, 0, 3.67720815e-07, 0, 0, 0)
+#     )
 
 
 @dataclass(kw_only=True)
@@ -169,7 +169,7 @@ class H2SS92(CombinedReducedFugacityModel):
         init=False,
         default=(
             H2LowPressureSS92,
-            H2HighPressureSS92_Refit,
+            H2HighPressureSS92Broken,
         ),
     )
     upper_pressure_bounds: tuple[float, ...] = (1000,)
@@ -200,32 +200,32 @@ class H2HighPressureSF88(SaxenaEightCoefficients):
     )
 
 
-@dataclass(kw_only=True)
-class H2HighPressureSF88_Refit(SaxenaEightCoefficients):
-    """High pressure model for H2 from Saxena and Fei (1988), Refitted with Data from Presnall 1969 and
-    Ross and Ree 1983. Using same functional form as Saxena & Fei, including which coefficient is zero
+# @dataclass(kw_only=True)
+# class H2HighPressureSF88_Refit(SaxenaEightCoefficients):
+#     """High pressure model for H2 from Saxena and Fei (1988), Refitted with Data from Presnall 1969 and
+#     Ross and Ree 1983. Using same functional form as Saxena & Fei, including which coefficient is zero
 
-    See base class.
-    """
+#     See base class.
+#     """
 
-    Tc: float = field(init=False, default=critical_data_dictionary["H2"].Tc)
-    Pc: float = field(init=False, default=critical_data_dictionary["H2"].Pc)
+#     Tc: float = field(init=False, default=critical_data_dictionary["H2"].Tc)
+#     Pc: float = field(init=False, default=critical_data_dictionary["H2"].Pc)
 
-    a_coefficients: tuple[float, ...] = field(
-        init=False,
-        default=(1.00574429e00, 0, 1.93017653e-03, 0, -3.79261119e-01, 0, 0, -2.44218196e-03),
-    )
-    b_coefficients: tuple[float, ...] = field(
-        init=False,
-        default=(1.31517894e-03, 0, 7.22328436e-02, 0, 4.84354184e-02, 0, 0, -4.19624518e-04),
-    )
-    c_coefficients: tuple[float, ...] = field(
-        init=False,
-        default=(2.64454394e-06, 0, -5.18445624e-05, 0, -2.05045980e-04, 0, 0, -3.64843202e-07),
-    )
-    d_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.28281092e-11, 0, -1.07138600e-08, 0, 3.67720812e-07, 0, 0, 0)
-    )
+#     a_coefficients: tuple[float, ...] = field(
+#         init=False,
+#         default=(1.00574429e00, 0, 1.93017653e-03, 0, -3.79261119e-01, 0, 0, -2.44218196e-03),
+#     )
+#     b_coefficients: tuple[float, ...] = field(
+#         init=False,
+#         default=(1.31517894e-03, 0, 7.22328436e-02, 0, 4.84354184e-02, 0, 0, -4.19624518e-04),
+#     )
+#     c_coefficients: tuple[float, ...] = field(
+#         init=False,
+#         default=(2.64454394e-06, 0, -5.18445624e-05, 0, -2.05045980e-04, 0, 0, -3.64843202e-07),
+#     )
+#     d_coefficients: tuple[float, ...] = field(
+#         init=False, default=(2.28281092e-11, 0, -1.07138600e-08, 0, 3.67720812e-07, 0, 0, 0)
+#     )
 
 
 @dataclass(kw_only=True)
