@@ -23,7 +23,8 @@ from atmodeller.eos.holland import (
     CORKSimpleCO2HP91,
     get_holland_fugacity_models,
 )
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import FugacityModelABC, FugacityModelABC_V2
+from atmodeller.eos.saxena import CO2SS92, H2SS92, get_saxena_fugacity_models
 from atmodeller.interfaces import (
     GasSpecies,
     IdealityConstant,
