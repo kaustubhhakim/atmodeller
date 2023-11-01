@@ -5,11 +5,7 @@ See the LICENSE file for licensing information.
 
 from atmodeller import __version__, debug_logger
 from atmodeller.eos.interfaces import FugacityModelABC
-from atmodeller.eos.saxena import get_saxena_fugacity_models
-
-# Tolerances to compare the test results with target output.
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
+from atmodeller.eos.saxena import H2SF87, get_saxena_fugacity_models
 
 debug_logger()
 
@@ -21,9 +17,27 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
+# These tests only test the pressure regime above 5 kbar.
+
+
 def test_Ar(check_values) -> None:
     """Comparison with Table 1 in Saxena and Fei (1987)"""
     check_values.compressibility(2510, 100e3, fugacity_models["Ar"], 7.41624600755374)
+
+
+def test_CH4(check_values) -> None:
+    """Comparison with Table 1 in Saxena and Fei (1987)"""
+    check_values.compressibility(1912, 159e3, fugacity_models["CH4"], 17.77499804453072)
+
+
+def test_CO2(check_values) -> None:
+    """Comparison with Table 1 in Saxena and Fei (1987)"""
+    check_values.compressibility(1167, 184e3, fugacity_models["CO2"], 33.886349109271734)
+
+
+def test_H2_SF87(check_values) -> None:
+    """Comparison with Table 1 in Saxena and Fei (1987)"""
+    check_values.compressibility(1222, 41.66e3, H2SF87(), 4.975497264839999)
 
 
 def test_N2(check_values) -> None:
