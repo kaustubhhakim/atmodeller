@@ -20,6 +20,9 @@ Concrete classes:
     CH4SS92: Corresponding states for CH4 from Shi and Saxena (1992).
     S2SS92: Corresponding states for S2 from Shi and Saxena (1992).
     COSSS92: Correponding states for COS from Shi and Saxena (1992).
+    N2SF87: Corresponding states for N2 from Saxena and Fei (1987).
+    H2SF87: Corresponding states for H2 from Saxena and Fei (1987).
+    ArSF87: Corresponding states for Ar from Saxena and Fei (1987).
 
 Examples:
     Get the fugacity coefficient for the CO2 corresponding states model from Shi and Saxena (1992)
@@ -74,6 +77,7 @@ class critical:
     Pc: float
 
 
+# Critical temperature and pressure data for the corresponding states model.
 table2: dict[str, critical] = {
     "H2O": critical(647.25, 221.1925),
     "CO2": critical(304.15, 73.8659),
@@ -85,6 +89,8 @@ table2: dict[str, critical] = {
     "SO2": critical(430.95, 78.7295),
     "COS": critical(377.55, 65.8612),
     "H2S": critical(373.55, 90.0779),
+    "N2": critical(126.2, 33.9),  # Saxena and Fei (1987)
+    "Ar": critical(151, 48.6),  # Saxena and Fei (1987)
 }
 
 
@@ -373,27 +379,29 @@ class CorrespondingStatesMediumPressureSS92(SaxenaEightCoefficients):
 class CorrespondingStatesHighPressureSS92(SaxenaEightCoefficients):
     """High pressure model for corresponding fluid species from Shi and Saxena (1992).
 
+    The coefficients are given to higher precision in Saxena and Fei (1987) so those are used.
+
     Table 1(a), >5000 bar.
 
     See base class.
     """
 
     a_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.0614, 0, 0, 0, -2.235, 0, 0, -3.941e-1)
+        init=False, default=(2.0614, 0, 0, 0, -2.2351, 0, 0, -3.9411e-1)
     )
     b_coefficients: tuple[float, ...] = field(
-        init=False, default=(0, 0, 5.513e-2, 0, 3.934e-2, 0, 0, 0)
+        init=False, default=(0, 0, 5.5125e-2, 0, 3.9344e-2, 0, 0, 0)
     )
     c_coefficients: tuple[float, ...] = field(
-        init=False, default=(0, 0, -1.894e-6, 0, -1.109e-5, 0, -2.189e-5, 0)
+        init=False, default=(0, 0, -1.8935e-6, 0, -1.1092e-5, 0, -2.1892e-5, 0)
     )
     d_coefficients: tuple[float, ...] = field(
-        init=False, default=(0, 0, 5.053e-11, 0, 0, -6.303e-21, 0, 0)
+        init=False, default=(0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0)
     )
 
 
 @dataclass(kw_only=True)
-class CorrespondingStates(SaxenaCombined):
+class CorrespondingStatesSS92(SaxenaCombined):
     """Corresponding states for O2, CO2, CO, CH4, S2, and COS, from Shi and Saxena (1992).
 
     Table 1(a).
@@ -416,7 +424,7 @@ class CorrespondingStates(SaxenaCombined):
 
 
 @dataclass(kw_only=True)
-class O2SS92(CorrespondingStates):
+class O2SS92(CorrespondingStatesSS92):
     """Corresponding states for O2 from Shi and Saxena (1992)."""
 
     Tc: float = field(init=False, default=table2["O2"].Tc)
@@ -424,7 +432,7 @@ class O2SS92(CorrespondingStates):
 
 
 @dataclass(kw_only=True)
-class CO2SS92(CorrespondingStates):
+class CO2SS92(CorrespondingStatesSS92):
     """Corresponding states for CO2 from Shi and Saxena (1992)."""
 
     Tc: float = field(init=False, default=table2["CO2"].Tc)
@@ -432,7 +440,7 @@ class CO2SS92(CorrespondingStates):
 
 
 @dataclass(kw_only=True)
-class COSS92(CorrespondingStates):
+class COSS92(CorrespondingStatesSS92):
     """Corresponding states for CO from Shi and Saxena (1992)."""
 
     Tc: float = field(init=False, default=table2["CO"].Tc)
@@ -440,7 +448,7 @@ class COSS92(CorrespondingStates):
 
 
 @dataclass(kw_only=True)
-class CH4SS92(CorrespondingStates):
+class CH4SS92(CorrespondingStatesSS92):
     """Corresponding states for CH4 from Shi and Saxena (1992)."""
 
     Tc: float = field(init=False, default=table2["CH4"].Tc)
@@ -448,7 +456,7 @@ class CH4SS92(CorrespondingStates):
 
 
 @dataclass(kw_only=True)
-class S2SS92(CorrespondingStates):
+class S2SS92(CorrespondingStatesSS92):
     """Corresponding states for S2 from Shi and Saxena (1992)."""
 
     Tc: float = field(init=False, default=table2["S2"].Tc)
@@ -456,11 +464,47 @@ class S2SS92(CorrespondingStates):
 
 
 @dataclass(kw_only=True)
-class COSSS92(CorrespondingStates):
+class COSSS92(CorrespondingStatesSS92):
     """Corresponding states for COS from Shi and Saxena (1992)."""
 
     Tc: float = field(init=False, default=table2["COS"].Tc)
     Pc: float = field(init=False, default=table2["COS"].Pc)
+
+
+@dataclass(kw_only=True)
+class N2SF87(CorrespondingStatesSS92):
+    """Corresponding states for N2 from Saxena and Fei (1987).
+
+    This extends the model for N2 over the same pressure range, although the original model in
+    Saxena and Fei (1987) was only the high pressure fit.
+    """
+
+    Tc: float = table2["N2"].Tc
+    Pc: float = table2["N2"].Pc
+
+
+@dataclass(kw_only=True)
+class H2SF87(CorrespondingStatesSS92):
+    """Corresponding states for H2 from Saxena and Fei (1987).
+
+    This extends the model for H2 over the same pressure range, although the original model in
+    Saxena and Fei (1987) was only the high pressure fit.
+    """
+
+    Tc: float = table2["H2"].Tc
+    Pc: float = table2["H2"].Pc
+
+
+@dataclass(kw_only=True)
+class ArSF87(CorrespondingStatesSS92):
+    """Corresponding states for Ar from Saxena and Fei (1987).
+
+    This extends the model for Ar over the same pressure range, although the original model in
+    Saxena and Fei (1987) was only the high pressure fit.
+    """
+
+    Tc: float = table2["Ar"].Tc
+    Pc: float = table2["Ar"].Pc
 
 
 def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
