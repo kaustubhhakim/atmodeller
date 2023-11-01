@@ -3,11 +3,13 @@
 See the LICENSE file for licensing information.
 """
 
+import logging
+
 from atmodeller import __version__, debug_logger
 from atmodeller.eos.interfaces import FugacityModelABC
 from atmodeller.eos.saxena import H2SF87, get_saxena_fugacity_models
 
-debug_logger()
+logger: logging.Logger = debug_logger()
 
 fugacity_models: dict[str, FugacityModelABC] = get_saxena_fugacity_models()
 

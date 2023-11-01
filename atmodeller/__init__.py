@@ -41,7 +41,7 @@ def simple_formatter() -> logging.Formatter:
     return formatter
 
 
-def debug_logger() -> None:
+def debug_logger() -> logging.Logger:
     """Setup the logging for debugging: DEBUG to the console."""
     # Console logger.
     logger: logging.Logger = logging.getLogger(__name__)
@@ -52,8 +52,10 @@ def debug_logger() -> None:
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
+    return logger
 
-def debug_file_logger() -> None:
+
+def debug_file_logger() -> logging.Logger:
     """Setup the logging to a file (DEBUG) and to the console (INFO)."""
     # Console logger.
     logger: logging.Logger = logging.getLogger(__name__)
@@ -70,3 +72,5 @@ def debug_file_logger() -> None:
     file_handler.setFormatter(file_formatter)
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
+
+    return logger
