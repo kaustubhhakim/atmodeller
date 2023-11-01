@@ -164,3 +164,39 @@ class FugacityModelABC(GetValueABC):
             Volume integral.
         """
         ...
+
+
+@dataclass(frozen=True)
+class critical_data:
+    """Critical temperature and pressure of a gas species.
+
+    Args:
+        Tc: Critical temperature in kelvin
+        Pc: Critical pressure in bar
+
+    Attributes:
+        Tc: Critical temperature in kelvin
+        Pc: Critical pressure in bar
+    """
+
+    Tc: float
+    Pc: float
+
+
+# Critical temperature and pressure data for a corresponding states model, based on Table 2 in
+# Shi and Saxena (1992) with some additions. For simplicity, we just compile one set of critical
+# data, even though they vary a little between studies which could result in subtle differences.
+critical_data_dictionary: dict[str, critical_data] = {
+    "H2O": critical_data(647.25, 221.1925),
+    "CO2": critical_data(304.15, 73.8659),
+    "CH4": critical_data(191.05, 46.4069),
+    "CO": critical_data(133.15, 34.9571),
+    "O2": critical_data(154.75, 50.7638),
+    "H2": critical_data(33.25, 12.9696),
+    "S2": critical_data(208.15, 72.954),
+    "SO2": critical_data(430.95, 78.7295),
+    "COS": critical_data(377.55, 65.8612),
+    "H2S": critical_data(373.55, 90.0779),
+    "N2": critical_data(126.2, 33.9),  # Saxena and Fei (1987)
+    "Ar": critical_data(151, 48.6),  # Saxena and Fei (1987)
+}

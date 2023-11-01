@@ -239,7 +239,7 @@ class SaxenaABC(FugacityModelABC):
 
 @dataclass(kw_only=True)
 class SaxenaFiveCoefficients(SaxenaABC):
-    """Fugacity model with five coefficients.
+    """Fugacity model with five coefficients, which is generally used for low pressures.
 
     See base class.
     """
@@ -272,7 +272,7 @@ class SaxenaFiveCoefficients(SaxenaABC):
 
 @dataclass(kw_only=True)
 class SaxenaEightCoefficients(SaxenaABC):
-    """Fugacity model with eight coefficients.
+    """Fugacity model with eight coefficients, which is generally used for high pressures.
 
     See base class.
     """

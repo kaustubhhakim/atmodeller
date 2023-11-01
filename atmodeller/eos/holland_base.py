@@ -172,6 +172,9 @@ class MRKImplicitABC(MRKABC):
     ) -> float:
         """Compressibility parameter at temperature and pressure
 
+        Overrides the base class because an extra keyword argument is required to ensure the
+        correct compressibility parameter is returned.
+
         Args:
             temperature: Temperature in kelvin.
             pressure: Pressure.
