@@ -68,3 +68,44 @@ def test_H2_medium_pressure_SS92(check_values) -> None:
     expected: float = 164.388310378618
     expected = UnitConversion.cm3_to_J_per_bar(expected)
     check_values.volume(873, 500, H2LowPressureSS92(), expected)
+
+
+# def test_H2_high_pressure_SS92(check_values) -> None:
+#     """Comparison with Figure 1 in Shi and Saxena (1992)"""
+#     expected: float = 164.388310378618
+#     expected = UnitConversion.cm3_to_J_per_bar(expected)
+#     check_values.volume(1473, 4000, H2HighPressureSS92(), expected)
+
+
+# H2S
+
+
+def test_H2S_low_pressure_SS92(check_values) -> None:
+    """Comparison with Figure 3 in Shi and Saxena (1992)"""
+    expected: float = 272.7266232763035
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(673, 200, fugacity_models["H2S"], expected)
+
+
+def test_H2S_medium_pressure_SS92(check_values) -> None:
+    """Comparison with Figure 3 in Shi and Saxena (1992)"""
+    expected: float = 116.55537998390933
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(1873, 2000, fugacity_models["H2S"], expected)
+
+
+# SO2
+
+
+def test_SO2_low_pressure_SS92(check_values) -> None:
+    """Comparison with Figure 2 in Shi and Saxena (1992)"""
+    expected: float = 8308.036738813245
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(1073, 10, fugacity_models["SO2"], expected)
+
+
+def test_SO2_high_pressure_SS92(check_values) -> None:
+    """Comparison with Figure 2 in Shi and Saxena (1992)"""
+    expected: float = 70.86864302460566
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(1873, 4000, fugacity_models["SO2"], expected)

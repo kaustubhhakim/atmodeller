@@ -91,8 +91,11 @@ class H2LowPressureSS92(SaxenaFiveCoefficients):
 
 
 @dataclass(kw_only=True)
-class H2HighPressureSS92(SaxenaEightCoefficients):
+class H2HighPressureSS92Broken(SaxenaEightCoefficients):
     """High pressure model for H2 from Shi and Saxena (1992).
+
+    WARNING: The coefficients do not reproduce the model correctly according to a comparison with
+    Figure 1. The coefficients must be stated incorrectly in the paper.
 
     Table 1(b), >1 kbar.
 
@@ -103,7 +106,7 @@ class H2HighPressureSS92(SaxenaEightCoefficients):
     Pc: float = critical_data_dictionary["H2"].Pc
 
     a_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e-4, 0, 0, -1.6936e-1)
+        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1)
     )
     b_coefficients: tuple[float, ...] = field(
         init=False, default=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5)
