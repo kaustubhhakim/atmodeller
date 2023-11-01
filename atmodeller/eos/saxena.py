@@ -102,8 +102,9 @@ class H2HighPressureSS92Broken(SaxenaEightCoefficients):
     See base class.
     """
 
-    Tc: float = critical_data_dictionary["H2"].Tc
-    Pc: float = critical_data_dictionary["H2"].Pc
+    # TODO: Turns out this works if the non reduced parameters are used.
+    Tc: float = 1  # critical_data_dictionary["H2"].Tc
+    Pc: float = 1  # critical_data_dictionary["H2"].Pc
 
     a_coefficients: tuple[float, ...] = field(
         init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1)
