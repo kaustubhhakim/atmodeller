@@ -5,11 +5,11 @@ See the Jupyter notebook tutorials in the package directory `docs/`.
 
 You are encouraged to fork this repository or create your own branch to add new features. You will need to issue a pull request to be able to merge your code into the main branch. Follow the [Google Python style guide](https://google.github.io/styleguide/pyguide.html) and familiarise yourself with [SOLID principles](https://realpython.com/solid-principles-python/).
 
+If you are a Windows or Linux user (or use a different IDE such as Spyder), please send me your installation instructions so I can update this README. Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *atmodeller* as a community.
+
 ## Installation
 
-### Development
-
-Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *SPIDER* as a community. If you are a Windows or Linux user (or use a different IDE such as Spyder), please send me your installation instructions so I can update this README.
+### General / MacOS (VSCode)
 
 1. Install [VSCode](https://code.visualstudio.com) if you don't already have it.
 1. In VSCode you are recommended to install the following extensions:
@@ -39,6 +39,37 @@ Formally you don't have to use VSCode or Poetry, but using them makes it easier 
 
 To ensure that all developers are using the same settings for linting and formatting (e.g., using pylint, black, isort, as installed as extensions in step 2) there is a `settings.json` file in the `.vscode` directory. These settings will take precedence over your user settings for this project only.
 
+### Windows PowerShell installation (VSCode or PyCharm)
+
+1. Install Python if you do not already have it. Powershell will open the windows store where python versions are free for download and install by typing:
+   
+    ```
+    python
+    ```
+1. Install [Poetry](https://python-poetry.org) if you do not already have it, preferentially using [pipx](https://pypa.github.io/pipx/installation/).
+1. Clone this repository (*atmodeller*) to a local directory
+1. Create a poetry environment in your IDE of choice
+   - In VSCode, go to *File* and *Open Folder...* and select the *atmodeller* directory
+   - In PyCharm, add a new project and select the *atmodeller* directory
+1. We want to set up a virtual Python environment in the root directory of *atmodeller*. An advantage of using a virtual environment is that it remains completely isolated from any other Python environments on your system (e.g. Conda or otherwise). You must have a Python interpreter available to build the virtual environment according to the dependency in `pyproject.toml`, which could be a native version on your machine or a version from a Conda environment that is currently active. You only need a Python binary, so it is not required to install any packages. 
+2. Create a virtual environment by using the terminal (you can also use the terminal in your IDE of preference). This command will create a local Python environment in the `.venv` directory:
+    
+    ```
+    python -m venv .venv
+    ```
+3. Add virtual Python environment as interpreter in your IDE.
+   - Open a new terminal window in VSCode and VSCode should recognise that you have a virtual environment in .venv and load this environment automatically. 
+   - PyCharm should recognize the virtual environment and the poetry `pyproject.toml` file and propose the installation. If not, manually set up a _Poetry Environment_ under _Add New Interpreter > Add Local Interpreter_. Obtain the installation path of poetry in PowerShell with:
+
+      ```
+      gcm poetry
+      ```
+   You should now see `(.venv)` as the prefix in the terminal prompt.
+8. Install the project using poetry to install all the required Python package dependencies:
+
+    ```
+    poetry install
+    ```
 
 ### Tarball
 

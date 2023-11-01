@@ -2,8 +2,8 @@
 
 See the LICENSE file for licensing information.
 
-This module contains concrete classes for the fugacity models presented in Shi and Saxena (1992)
-and Saxena and Fei (1988).
+This module contains concrete classes for the fugacity models presented in Shi and Saxena (1992), 
+Saxena and Fei (1988), and Saxena and Fei (1987).
 
 Concrete classes:
     H2LowPressureSS92: Low pressure model for H2 from Shi and Saxena (1992).
@@ -20,6 +20,9 @@ Concrete classes:
     CH4SS92: Corresponding states for CH4 from Shi and Saxena (1992).
     S2SS92: Corresponding states for S2 from Shi and Saxena (1992).
     COSSS92: Correponding states for COS from Shi and Saxena (1992).
+    N2SF87: Corresponding states for N2 from Saxena and Fei (1987).
+    H2SF87: Corresponding states for H2 from Saxena and Fei (1987).
+    ArSF87: Corresponding states for Ar from Saxena and Fei (1987).
 
 Examples:
     Get the fugacity coefficient for the CO2 corresponding states model from Shi and Saxena (1992)
@@ -56,36 +59,18 @@ import logging
 from dataclasses import dataclass, field
 from typing import Type
 
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import (
+    CombinedReducedFugacityModel,
+    FugacityModelABC,
+    critical_data_dictionary,
+)
 from atmodeller.eos.saxena_base import (
     SaxenaABC,
-    SaxenaCombined,
     SaxenaEightCoefficients,
     SaxenaFiveCoefficients,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-# Shi and Saxena (1992), Table 2.
-@dataclass(frozen=True)
-class critical:
-    Tc: float
-    Pc: float
-
-
-table2: dict[str, critical] = {
-    "H2O": critical(647.25, 221.1925),
-    "CO2": critical(304.15, 73.8659),
-    "CH4": critical(191.05, 46.4069),
-    "CO": critical(133.15, 34.9571),
-    "O2": critical(154.75, 50.7638),
-    "H2": critical(33.25, 12.9696),
-    "S2": critical(208.15, 72.954),
-    "SO2": critical(430.95, 78.7295),
-    "COS": critical(377.55, 65.8612),
-    "H2S": critical(373.55, 90.0779),
-}
 
 
 @dataclass(kw_only=True)
@@ -97,8 +82,8 @@ class H2LowPressureSS92(SaxenaFiveCoefficients):
     See base class.
     """
 
-    Tc: float = table2["H2"].Tc
-    Pc: float = table2["H2"].Pc
+    Tc: float = critical_data_dictionary["H2"].Tc
+    Pc: float = critical_data_dictionary["H2"].Pc
     a_coefficients: tuple[float, ...] = field(init=False, default=(1, 0, 0, 0, 0, 0))
     b_coefficients: tuple[float, ...] = field(init=False, default=(0, 0.9827e-1, 0, -0.2709, 0))
     c_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, -0.1030e-2, 0, 0.1427e-1))
@@ -106,19 +91,22 @@ class H2LowPressureSS92(SaxenaFiveCoefficients):
 
 
 @dataclass(kw_only=True)
-class H2HighPressureSS92(SaxenaEightCoefficients):
+class H2HighPressureSS92Broken(SaxenaEightCoefficients):
     """High pressure model for H2 from Shi and Saxena (1992).
+
+    WARNING: The coefficients do not reproduce the model correctly according to a comparison with
+    Figure 1. The coefficients must be stated incorrectly in the paper.
 
     Table 1(b), >1 kbar.
 
     See base class.
     """
 
-    Tc: float = table2["H2"].Tc
-    Pc: float = table2["H2"].Pc
+    Tc: float = critical_data_dictionary["H2"].Tc
+    Pc: float = critical_data_dictionary["H2"].Pc
 
     a_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e-4, 0, 0, -1.6936e-1)
+        init=False, default=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1)
     )
     b_coefficients: tuple[float, ...] = field(
         init=False, default=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5)
@@ -142,8 +130,8 @@ class H2HighPressureSS92_Refit(SaxenaEightCoefficients):
     See base class.
     """
 
-    Tc: float = table2["H2"].Tc
-    Pc: float = table2["H2"].Pc
+    Tc: float = critical_data_dictionary["H2"].Tc
+    Pc: float = critical_data_dictionary["H2"].Pc
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -166,7 +154,7 @@ class H2HighPressureSS92_Refit(SaxenaEightCoefficients):
 
 
 @dataclass(kw_only=True)
-class H2SS92(SaxenaCombined):
+class H2SS92(CombinedReducedFugacityModel):
     """H2 fugacity model from Shi and Saxena (1992).
 
     Combines the low pressure and high pressure models into a single model. See Table 1(b).
@@ -174,8 +162,8 @@ class H2SS92(SaxenaCombined):
     See base class.
     """
 
-    Tc: float = field(init=False, default=table2["H2"].Tc)
-    Pc: float = field(init=False, default=table2["H2"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["H2"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["H2"].Pc)
     classes: tuple[Type[SaxenaABC], ...] = field(
         init=False,
         default=(
@@ -195,8 +183,8 @@ class H2HighPressureSF88(SaxenaEightCoefficients):
     See base class.
     """
 
-    Tc: float = field(init=False, default=table2["H2"].Tc)
-    Pc: float = field(init=False, default=table2["H2"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["H2"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["H2"].Pc)
     a_coefficients: tuple[float, ...] = field(
         init=False, default=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694)
     )
@@ -219,8 +207,8 @@ class H2HighPressureSF88_Refit(SaxenaEightCoefficients):
     See base class.
     """
 
-    Tc: float = field(init=False, default=table2["H2"].Tc)
-    Pc: float = field(init=False, default=table2["H2"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["H2"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["H2"].Pc)
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -248,8 +236,8 @@ class SO2SS92(SaxenaEightCoefficients):
     See base class.
     """
 
-    Tc: float = table2["SO2"].Tc
-    Pc: float = table2["SO2"].Pc
+    Tc: float = critical_data_dictionary["SO2"].Tc
+    Pc: float = critical_data_dictionary["SO2"].Pc
     a_coefficients: tuple[float, ...] = field(
         init=False, default=(0.92854, 0.43269e-1, -0.24671, 0, 0.24999, 0, -0.53182, -0.16461e-1)
     )
@@ -273,8 +261,8 @@ class H2SLowPressureSS92(SaxenaEightCoefficients):
     See base class.
     """
 
-    Tc: float = table2["H2S"].Tc
-    Pc: float = table2["H2S"].Pc
+    Tc: float = critical_data_dictionary["H2S"].Tc
+    Pc: float = critical_data_dictionary["H2S"].Pc
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
@@ -299,8 +287,8 @@ class H2SHighPressureSS92(SaxenaEightCoefficients):
     See base class.
     """
 
-    Tc: float = table2["H2S"].Tc
-    Pc: float = table2["H2S"].Pc
+    Tc: float = critical_data_dictionary["H2S"].Tc
+    Pc: float = critical_data_dictionary["H2S"].Pc
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
@@ -317,7 +305,7 @@ class H2SHighPressureSS92(SaxenaEightCoefficients):
 
 
 @dataclass(kw_only=True)
-class H2SSS92(SaxenaCombined):
+class H2SSS92(CombinedReducedFugacityModel):
     """H2S fugacity model from Shi and Saxena (1992).
 
     Combines the low pressure and high pressure models into a single model. See Table 1(d).
@@ -325,8 +313,8 @@ class H2SSS92(SaxenaCombined):
     See base class.
     """
 
-    Tc: float = field(init=False, default=table2["H2S"].Tc)
-    Pc: float = field(init=False, default=table2["H2S"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["H2S"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["H2S"].Pc)
     classes: tuple[Type[SaxenaABC], ...] = field(
         init=False,
         default=(
@@ -373,27 +361,29 @@ class CorrespondingStatesMediumPressureSS92(SaxenaEightCoefficients):
 class CorrespondingStatesHighPressureSS92(SaxenaEightCoefficients):
     """High pressure model for corresponding fluid species from Shi and Saxena (1992).
 
+    The coefficients are given to higher precision in Saxena and Fei (1987) so those are used.
+
     Table 1(a), >5000 bar.
 
     See base class.
     """
 
     a_coefficients: tuple[float, ...] = field(
-        init=False, default=(2.0614, 0, 0, 0, -2.235, 0, 0, -3.941e-1)
+        init=False, default=(2.0614, 0, 0, 0, -2.2351, 0, 0, -3.9411e-1)
     )
     b_coefficients: tuple[float, ...] = field(
-        init=False, default=(0, 0, 5.513e-2, 0, 3.934e-2, 0, 0, 0)
+        init=False, default=(0, 0, 5.5125e-2, 0, 3.9344e-2, 0, 0, 0)
     )
     c_coefficients: tuple[float, ...] = field(
-        init=False, default=(0, 0, -1.894e-6, 0, -1.109e-5, 0, -2.189e-5, 0)
+        init=False, default=(0, 0, -1.8935e-6, 0, -1.1092e-5, 0, -2.1892e-5, 0)
     )
     d_coefficients: tuple[float, ...] = field(
-        init=False, default=(0, 0, 5.053e-11, 0, 0, -6.303e-21, 0, 0)
+        init=False, default=(0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0)
     )
 
 
 @dataclass(kw_only=True)
-class CorrespondingStates(SaxenaCombined):
+class CorrespondingStatesSS92(CombinedReducedFugacityModel):
     """Corresponding states for O2, CO2, CO, CH4, S2, and COS, from Shi and Saxena (1992).
 
     Table 1(a).
@@ -416,51 +406,87 @@ class CorrespondingStates(SaxenaCombined):
 
 
 @dataclass(kw_only=True)
-class O2SS92(CorrespondingStates):
+class O2SS92(CorrespondingStatesSS92):
     """Corresponding states for O2 from Shi and Saxena (1992)."""
 
-    Tc: float = field(init=False, default=table2["O2"].Tc)
-    Pc: float = field(init=False, default=table2["O2"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["O2"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["O2"].Pc)
 
 
 @dataclass(kw_only=True)
-class CO2SS92(CorrespondingStates):
+class CO2SS92(CorrespondingStatesSS92):
     """Corresponding states for CO2 from Shi and Saxena (1992)."""
 
-    Tc: float = field(init=False, default=table2["CO2"].Tc)
-    Pc: float = field(init=False, default=table2["CO2"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["CO2"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["CO2"].Pc)
 
 
 @dataclass(kw_only=True)
-class COSS92(CorrespondingStates):
+class COSS92(CorrespondingStatesSS92):
     """Corresponding states for CO from Shi and Saxena (1992)."""
 
-    Tc: float = field(init=False, default=table2["CO"].Tc)
-    Pc: float = field(init=False, default=table2["CO"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["CO"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["CO"].Pc)
 
 
 @dataclass(kw_only=True)
-class CH4SS92(CorrespondingStates):
+class CH4SS92(CorrespondingStatesSS92):
     """Corresponding states for CH4 from Shi and Saxena (1992)."""
 
-    Tc: float = field(init=False, default=table2["CH4"].Tc)
-    Pc: float = field(init=False, default=table2["CH4"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["CH4"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["CH4"].Pc)
 
 
 @dataclass(kw_only=True)
-class S2SS92(CorrespondingStates):
+class S2SS92(CorrespondingStatesSS92):
     """Corresponding states for S2 from Shi and Saxena (1992)."""
 
-    Tc: float = field(init=False, default=table2["S2"].Tc)
-    Pc: float = field(init=False, default=table2["S2"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["S2"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["S2"].Pc)
 
 
 @dataclass(kw_only=True)
-class COSSS92(CorrespondingStates):
+class COSSS92(CorrespondingStatesSS92):
     """Corresponding states for COS from Shi and Saxena (1992)."""
 
-    Tc: float = field(init=False, default=table2["COS"].Tc)
-    Pc: float = field(init=False, default=table2["COS"].Pc)
+    Tc: float = field(init=False, default=critical_data_dictionary["COS"].Tc)
+    Pc: float = field(init=False, default=critical_data_dictionary["COS"].Pc)
+
+
+@dataclass(kw_only=True)
+class N2SF87(CorrespondingStatesSS92):
+    """Corresponding states for N2 from Saxena and Fei (1987).
+
+    This extends the model for N2 over the same pressure range, although the original model in
+    Saxena and Fei (1987) was only the high pressure fit.
+    """
+
+    Tc: float = critical_data_dictionary["N2"].Tc
+    Pc: float = critical_data_dictionary["N2"].Pc
+
+
+@dataclass(kw_only=True)
+class H2SF87(CorrespondingStatesSS92):
+    """Corresponding states for H2 from Saxena and Fei (1987).
+
+    This extends the model for H2 over the same pressure range, although the original model in
+    Saxena and Fei (1987) was only the high pressure fit.
+    """
+
+    Tc: float = critical_data_dictionary["H2"].Tc
+    Pc: float = critical_data_dictionary["H2"].Pc
+
+
+@dataclass(kw_only=True)
+class ArSF87(CorrespondingStatesSS92):
+    """Corresponding states for Ar from Saxena and Fei (1987).
+
+    This extends the model for Ar over the same pressure range, although the original model in
+    Saxena and Fei (1987) was only the high pressure fit.
+    """
+
+    Tc: float = critical_data_dictionary["Ar"].Tc
+    Pc: float = critical_data_dictionary["Ar"].Pc
 
 
 def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
@@ -470,12 +496,14 @@ def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
         Dictionary of preferred fugacity models for each species.
     """
     models: dict[str, FugacityModelABC] = {}
+    models["Ar"] = ArSF87()
     models["CH4"] = CH4SS92()
     models["CO"] = COSS92()
     models["CO2"] = CO2SS92()
     models["COS"] = COSSS92()
     models["H2"] = H2SS92()
     models["H2S"] = H2SSS92()
+    models["N2"] = N2SF87()
     models["O2"] = O2SS92()
     models["S2"] = S2SS92()
     models["SO2"] = SO2SS92()

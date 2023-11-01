@@ -5,8 +5,6 @@ See the LICENSE file for licensing information.
 
 from typing import Type
 
-from pytest import approx
-
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
@@ -50,78 +48,57 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def check_fugacity_coefficient(
-    temperature: float,
-    pressure: float,
-    fugacity_model: Type[FugacityModelABC],
-    expected_fugacity_coeff: float,
-) -> None:
-    """Checks the fugacity coefficient for a given fugacity model.
-
-    Args:
-        temperature: Temperature in kelvin.
-        pressure: Pressure.
-        fugacity_model: Fugacity model.
-        expected_fugacity_coeff: The expected value of the fugacity coefficient.
-    """
-
-    model: FugacityModelABC = fugacity_model()
-    fugacity_coeff: float = model.fugacity_coefficient(temperature, pressure)
-
-    assert fugacity_coeff == approx(expected_fugacity_coeff, rtol, atol)
+def test_CorkH2(check_values) -> None:
+    check_values.fugacity_coefficient(2000, 10, CORKH2HP91(), 4.672042007568433)
 
 
-def test_CorkH2() -> None:
-    check_fugacity_coefficient(2000, 10, CORKH2HP91, 4.672042007568433)
+def test_CorkCO(check_values) -> None:
+    check_values.fugacity_coefficient(2000, 10, CORKCOHP91(), 7.698485559533069)
 
 
-def test_CorkCO() -> None:
-    check_fugacity_coefficient(2000, 10, CORKCOHP91, 7.698485559533069)
+def test_CorkCH4(check_values) -> None:
+    check_values.fugacity_coefficient(2000, 10, CORKCH4HP91(), 8.116070626285136)
 
 
-def test_CorkCH4() -> None:
-    check_fugacity_coefficient(2000, 10, CORKCH4HP91, 8.116070626285136)
+def test_simple_CorkCO2(check_values) -> None:
+    check_values.fugacity_coefficient(2000, 10, CORKSimpleCO2HP91(), 7.1335509191383455)
 
 
-def test_simple_CorkCO2() -> None:
-    check_fugacity_coefficient(2000, 10, CORKSimpleCO2HP91, 7.1335509191383455)
-
-
-def test_CorkCO2_at_P0() -> None:
+def test_CorkCO2_at_P0(check_values) -> None:
     """Below P0 so virial contribution excluded."""
-    check_fugacity_coefficient(2000, 2, CORKCO2HP98, 1.6063624424808558)
+    check_values.fugacity_coefficient(2000, 2, CORKCO2HP98(), 1.6063624424808558)
 
 
-def test_CorkCO2_above_P0() -> None:
+def test_CorkCO2_above_P0(check_values) -> None:
     """Above P0 so virial contribution included."""
-    check_fugacity_coefficient(2000, 10, CORKCO2HP98, 7.4492345831832525)
+    check_values.fugacity_coefficient(2000, 10, CORKCO2HP98(), 7.4492345831832525)
 
 
-def test_CorkH2O_above_Tc_below_P0() -> None:
+def test_CorkH2O_above_Tc_below_P0(check_values) -> None:
     """Above Tc and below P0."""
-    check_fugacity_coefficient(2000, 1, CORKH2OHP98, 1.048278616058322)
+    check_values.fugacity_coefficient(2000, 1, CORKH2OHP98(), 1.048278616058322)
 
 
-def test_CorkH2O_above_Tc_above_P0() -> None:
+def test_CorkH2O_above_Tc_above_P0(check_values) -> None:
     """Above Tc and above P0."""
-    check_fugacity_coefficient(2000, 5, CORKH2OHP98, 1.3444013638026706)
+    check_values.fugacity_coefficient(2000, 5, CORKH2OHP98(), 1.3444013638026706)
 
 
-def test_CorkH2O_below_Tc_below_Psat() -> None:
+def test_CorkH2O_below_Tc_below_Psat(check_values) -> None:
     """Below Tc and below Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_fugacity_coefficient(600, 0.1, CORKH2OHP98, 0.7910907770688191)
+    check_values.fugacity_coefficient(600, 0.1, CORKH2OHP98(), 0.7910907770688191)
 
 
-def test_CorkH2O_below_Tc_above_Psat() -> None:
+def test_CorkH2O_below_Tc_above_Psat(check_values) -> None:
     """Below Tc and above Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_fugacity_coefficient(600, 1, CORKH2OHP98, 0.14052644311851598)
+    check_values.fugacity_coefficient(600, 1, CORKH2OHP98(), 0.14052644311851598)
 
 
-def test_CorkH2O_below_Tc_above_P0() -> None:
+def test_CorkH2O_below_Tc_above_P0(check_values) -> None:
     """Below Tc and above P0."""
-    check_fugacity_coefficient(600, 10, CORKH2OHP98, 0.40066985009753664)
+    check_values.fugacity_coefficient(600, 10, CORKH2OHP98(), 0.40066985009753664)
 
 
 def test_H_fO2() -> None:
