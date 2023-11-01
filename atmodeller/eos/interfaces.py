@@ -5,6 +5,7 @@ See the LICENSE file for licensing information.
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from typing import Type
 
 import numpy as np
 
@@ -29,14 +30,17 @@ class FugacityModelABC(GetValueABC):
     Attributes:
         scaling: Scaling depending on the units of pressure.
         GAS_CONSTANT: Gas constant with the appropriate units.
+        standard_state_pressure: Standard state pressure with the appropriate units. Set to 1 bar.
     """
 
     scaling: float = 1
     GAS_CONSTANT: float = field(init=False, default=GAS_CONSTANT)
+    standard_state_pressure: float = field(init=False, default=1)  # 1 bar
 
     def __post_init__(self):
-        """Scales the GAS_CONSTANT to ensure it has the correct units."""
+        """Scales pressure quantities to ensure they use the internal pressure units."""
         self.GAS_CONSTANT /= self.scaling
+        self.standard_state_pressure /= self.scaling
 
     def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
         """Compressibility parameter at temperature and pressure.
@@ -164,6 +168,152 @@ class FugacityModelABC(GetValueABC):
             Volume integral.
         """
         ...
+
+
+@dataclass(kw_only=True)
+class ReducedFugacityModelABC(FugacityModelABC):
+    """A fugacity model that is formulated in terms of reduced temperature and pressure.
+
+    See base class.
+
+    Args:
+        Tc: Critical temperature in kelvin
+        Pc: Critical pressure
+        scaling: Scaling depending on the units of the coefficients that are used in this model.
+            For pressure in bar this is unity and for pressure in kbar this is kilo. Defaults to
+            unity.
+
+    Attributes:
+        Tc: Critical temperature in kelvin
+        Pc: Critical pressure
+        scaling: Scaling depending on the units of pressure
+        GAS_CONSTANT: Gas constant with the appropriate units
+        standard_state_pressure: Standard state pressure with the appropriate units. Set to 1 bar.
+    """
+
+    Tc: float
+    Pc: float
+
+    def reduced_pressure(self, pressure: float) -> float:
+        """Reduced pressure.
+
+        Args:
+            pressure: Pressure.
+
+        Returns:
+            The reduced pressure, which is dimensionless.
+        """
+        Pr: float = pressure / self.Pc
+
+        return Pr
+
+    def reduced_temperature(self, temperature: float) -> float:
+        """Reduced temperature.
+
+        Args:
+            temperature: Temperature in kelvin.
+
+        Returns:
+            The reduced temperature, which is dimensionless.
+        """
+        Tr: float = temperature / self.Tc
+
+        return Tr
+
+    @property
+    def reduced_standard_state_pressure(self) -> float:
+        """Reduced standard state pressure.
+
+        Args:
+            pressure: Pressure.
+
+        Returns:
+            The reduced standard state pressure, which is dimensionless.
+        """
+        Pr0: float = self.standard_state_pressure / self.Pc
+
+        return Pr0
+
+
+@dataclass(kw_only=True)
+class CombinedReducedFugacityModel(ReducedFugacityModelABC):
+    """Combines multiple fugacity models for different pressure ranges into a single model.
+
+    Args:
+        Tc: Critical temperature in kelvin.
+        Pc: Critical pressure.
+        classes: Reduced fugacity classes with coefficients specified and ordered by increasing
+            pressure.
+        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
+        scaling: Scaling depending on the units of the coefficients that are used in this model.
+            For pressure in bar this is unity and for pressure in kbar this is kilo. Defaults to
+            unity.
+
+    Attributes:
+        Tc: Critical temperature in kelvin.
+        Pc: Critical pressure.
+        classes: Reduced fugacity classes with coefficients specified and ordered by increasing
+            pressure.
+        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
+        models: Instantiated fugacity classes.
+        scaling: Scaling depending on the units of pressure
+        GAS_CONSTANT: Gas constant with the appropriate units
+        standard_state_pressure: Standard state pressure with the appropriate units. Set to 1 bar.
+    """
+
+    classes: tuple[Type[ReducedFugacityModelABC], ...]
+    upper_pressure_bounds: tuple[float, ...]
+    models: list[FugacityModelABC] = field(init=False, default_factory=list)
+
+    def __post_init__(self):
+        super().__post_init__()
+        for fugacity_class in self.classes:
+            self.models.append(fugacity_class(Tc=self.Tc, Pc=self.Pc))
+
+    def _get_index(self, pressure: float) -> int:
+        """Gets the index of the appropriate fugacity model using the pressure.
+
+        Args:
+            pressure: Pressure.
+
+        Returns:
+            Index of the relevant fugacity model.
+        """
+        for index, pressure_high in enumerate(self.upper_pressure_bounds):
+            if pressure < pressure_high:
+                return index
+        # If the pressure is higher than all specified pressure ranges, use the last model.
+        return len(self.models) - 1
+
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume.
+        """
+        index: int = self._get_index(pressure)
+        volume: float = self.models[index].volume(temperature, pressure)
+
+        return volume
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (VdP).
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure.
+
+        Returns:
+            Volume integral.
+        """
+        index: int = self._get_index(pressure)
+        volume: float = self.models[index].volume_integral(temperature, pressure)
+
+        return volume
 
 
 @dataclass(frozen=True)

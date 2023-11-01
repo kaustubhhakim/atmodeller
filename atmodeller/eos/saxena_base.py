@@ -11,13 +11,13 @@ from typing import Type
 
 import numpy as np
 
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import ReducedFugacityModelABC
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class SaxenaABC(FugacityModelABC):
+class SaxenaABC(ReducedFugacityModelABC):
     """Shi and Saxena (1992) fugacity model.
 
     The model presented in Shi and Saxena (1992) is a general form that can be adapted to the
@@ -44,18 +44,15 @@ class SaxenaABC(FugacityModelABC):
         b_coefficients: b coefficients.
         c_coefficients: c coefficients.
         d_coefficients: d coefficients.
-        P0: Standard state pressure. Set to 1 bar.
         scaling: See base class.
         GAS_CONSTANT: See base class.
+        standard_state_pressure: Standard state pressure. Set to 1 bar.
     """
 
-    Tc: float
-    Pc: float
     a_coefficients: tuple[float, ...] = field(default_factory=tuple)
     b_coefficients: tuple[float, ...] = field(default_factory=tuple)
     c_coefficients: tuple[float, ...] = field(default_factory=tuple)
     d_coefficients: tuple[float, ...] = field(default_factory=tuple)
-    P0: float = field(init=False, default=1)  # 1 bar
 
     @abstractmethod
     def _get_compressibility_coefficient(
@@ -152,46 +149,6 @@ class SaxenaABC(FugacityModelABC):
 
         return Z
 
-    def reduced_pressure(self, pressure: float) -> float:
-        """Reduced pressure.
-
-        Args:
-            pressure: Pressure.
-
-        Returns:
-            The reduced pressure, which is dimensionless.
-        """
-        Pr: float = pressure / self.Pc
-
-        return Pr
-
-    @property
-    def reduced_pressure0(self) -> float:
-        """Reduced standard state pressure.
-
-        Args:
-            pressure: Pressure.
-
-        Returns:
-            The reduced standard state pressure, which is dimensionless.
-        """
-        Pr0: float = self.P0 / self.scaling / self.Pc
-
-        return Pr0
-
-    def reduced_temperature(self, temperature: float) -> float:
-        """Reduced temperature.
-
-        Args:
-            temperature: Temperature in kelvin.
-
-        Returns:
-            The reduced temperature, which is dimensionless.
-        """
-        Tr: float = temperature / self.Tc
-
-        return Tr
-
     def volume(self, temperature: float, pressure: float) -> float:
         """Volume.
 
@@ -222,7 +179,7 @@ class SaxenaABC(FugacityModelABC):
             Volume integral.
         """
         Pr: float = self.reduced_pressure(pressure)
-        P0r: float = self.reduced_pressure0
+        P0r: float = self.reduced_standard_state_pressure
         volume_integral: float = (
             (
                 self.a(temperature) * np.log(Pr / P0r)
@@ -304,80 +261,3 @@ class SaxenaEightCoefficients(SaxenaABC):
         )
 
         return coefficient
-
-
-@dataclass(kw_only=True)
-class SaxenaCombined(FugacityModelABC):
-    """Combines multiple Saxena fugacity models for different pressure ranges into a single model.
-
-    Args:
-        Tc: Critical temperature in kelvin.
-        Pc: Critical pressure.
-        classes: Saxena fugacity classes with coefficients specified and ordered by increasing
-            pressure.
-        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
-
-    Attributes:
-        Tc: Critical temperature in kelvin.
-        Pc: Critical pressure.
-        classes: Saxena fugacity classes with coefficients specified and ordered by increasing
-            pressure.
-        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
-        models: Instantiated fugacity classes.
-    """
-
-    Tc: float
-    Pc: float
-    classes: tuple[Type[SaxenaABC], ...]
-    upper_pressure_bounds: tuple[float, ...]
-    models: list[FugacityModelABC] = field(init=False, default_factory=list)
-
-    def __post_init__(self):
-        super().__post_init__()
-        for fugacity_class in self.classes:
-            self.models.append(fugacity_class(Tc=self.Tc, Pc=self.Pc))
-
-    def _get_index(self, pressure: float) -> int:
-        """Gets the index of the appropriate fugacity model using the pressure.
-
-        Args:
-            pressure: Pressure.
-
-        Returns:
-            Index of the relevant fugacity model.
-        """
-        for index, pressure_high in enumerate(self.upper_pressure_bounds):
-            if pressure < pressure_high:
-                return index
-        # If the pressure is higher than all specified pressure ranges, use the last model.
-        return len(self.models) - 1
-
-    def volume(self, temperature: float, pressure: float) -> float:
-        """Volume.
-
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
-
-        Returns:
-            Volume.
-        """
-        index: int = self._get_index(pressure)
-        volume: float = self.models[index].volume(temperature, pressure)
-
-        return volume
-
-    def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP).
-
-        Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
-
-        Returns:
-            Volume integral.
-        """
-        index: int = self._get_index(pressure)
-        volume: float = self.models[index].volume_integral(temperature, pressure)
-
-        return volume

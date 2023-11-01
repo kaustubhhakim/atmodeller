@@ -59,10 +59,13 @@ import logging
 from dataclasses import dataclass, field
 from typing import Type
 
-from atmodeller.eos.interfaces import FugacityModelABC, critical_data_dictionary
+from atmodeller.eos.interfaces import (
+    CombinedReducedFugacityModel,
+    FugacityModelABC,
+    critical_data_dictionary,
+)
 from atmodeller.eos.saxena_base import (
     SaxenaABC,
-    SaxenaCombined,
     SaxenaEightCoefficients,
     SaxenaFiveCoefficients,
 )
@@ -148,7 +151,7 @@ class H2HighPressureSS92_Refit(SaxenaEightCoefficients):
 
 
 @dataclass(kw_only=True)
-class H2SS92(SaxenaCombined):
+class H2SS92(CombinedReducedFugacityModel):
     """H2 fugacity model from Shi and Saxena (1992).
 
     Combines the low pressure and high pressure models into a single model. See Table 1(b).
@@ -299,7 +302,7 @@ class H2SHighPressureSS92(SaxenaEightCoefficients):
 
 
 @dataclass(kw_only=True)
-class H2SSS92(SaxenaCombined):
+class H2SSS92(CombinedReducedFugacityModel):
     """H2S fugacity model from Shi and Saxena (1992).
 
     Combines the low pressure and high pressure models into a single model. See Table 1(d).
@@ -377,7 +380,7 @@ class CorrespondingStatesHighPressureSS92(SaxenaEightCoefficients):
 
 
 @dataclass(kw_only=True)
-class CorrespondingStatesSS92(SaxenaCombined):
+class CorrespondingStatesSS92(CombinedReducedFugacityModel):
     """Corresponding states for O2, CO2, CO, CH4, S2, and COS, from Shi and Saxena (1992).
 
     Table 1(a).
@@ -490,12 +493,14 @@ def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
         Dictionary of preferred fugacity models for each species.
     """
     models: dict[str, FugacityModelABC] = {}
+    models["Ar"] = ArSF87()
     models["CH4"] = CH4SS92()
     models["CO"] = COSS92()
     models["CO2"] = CO2SS92()
     models["COS"] = COSSS92()
     models["H2"] = H2SS92()
     models["H2S"] = H2SSS92()
+    models["N2"] = N2SF87()
     models["O2"] = O2SS92()
     models["S2"] = S2SS92()
     models["SO2"] = SO2SS92()
