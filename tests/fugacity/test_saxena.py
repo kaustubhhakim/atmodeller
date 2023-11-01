@@ -7,7 +7,8 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.eos.interfaces import FugacityModelABC
-from atmodeller.eos.saxena import H2SF87, get_saxena_fugacity_models
+from atmodeller.eos.saxena import H2SF87, H2LowPressureSS92, get_saxena_fugacity_models
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = debug_logger()
 
@@ -50,3 +51,20 @@ def test_N2(check_values) -> None:
 def test_O2(check_values) -> None:
     """Comparison with Table 1 in Saxena and Fei (1987)"""
     check_values.compressibility(1823, 133e3, fugacity_models["O2"], 12.409268281002012)
+
+
+# H2 model
+
+
+def test_H2_low_pressure_SS92(check_values) -> None:
+    """Comparison with Figure 1 in Shi and Saxena (1992)"""
+    expected: float = 7279.356114821697
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(873, 10, H2LowPressureSS92(), expected)
+
+
+def test_H2_medium_pressure_SS92(check_values) -> None:
+    """Comparison with Figure 1 in Shi and Saxena (1992)"""
+    expected: float = 164.388310378618
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(873, 500, H2LowPressureSS92(), expected)

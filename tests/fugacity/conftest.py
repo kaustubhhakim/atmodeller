@@ -50,6 +50,26 @@ class CheckValues:
 
         assert fugacity_coeff == approx(expected, rtol, atol)
 
+    @staticmethod
+    def volume(
+        temperature: float,
+        pressure: float,
+        fugacity_model: FugacityModelABC,
+        expected: float,
+    ) -> None:
+        """Checks the volume.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure
+            fugacity_model: Fugacity model
+            expected: The expected value
+        """
+
+        volume: float = fugacity_model.volume(temperature, pressure)
+
+        assert volume == approx(expected, rtol, atol)
+
 
 @pytest.fixture(scope="module")
 def check_values():

@@ -70,12 +70,17 @@ class UnitConversion:
     @classmethod
     def ppm_to_fraction(cls, value_ppm: float = 1) -> float:
         """Parts-per-million by mole or mass to mole or mass fraction, respectively."""
-        return 1 / cls.fraction_to_ppm(value_ppm)
+        return value_ppm / cls.fraction_to_ppm()
 
-    @staticmethod
-    def kJ_per_kbar_to_cm3(kJ_per_kbar: float = 1) -> float:
-        """kJ/kbar (or J/bar) to cm^3."""
-        return kJ_per_kbar * 10
+    @classmethod
+    def J_per_bar_to_cm3(cls, J_per_bar: float = 1) -> float:
+        """J/bar (or kJ/kbar) to cm^3."""
+        return J_per_bar * 10
+
+    @classmethod
+    def cm3_to_J_per_bar(cls, cm_cubed: float = 1) -> float:
+        """cm^3 to J/bar"""
+        return cm_cubed / cls.J_per_bar_to_cm3()
 
     @staticmethod
     def weight_percent_to_ppmw(value_weight_percent: float = 1) -> float:
