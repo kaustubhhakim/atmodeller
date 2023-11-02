@@ -164,8 +164,8 @@ class H2SS92(CombinedReducedFugacityModel):
     See base class.
     """
 
-    Tc: float = field(init=False, default=critical_data_dictionary["H2"].Tc)
-    Pc: float = field(init=False, default=critical_data_dictionary["H2"].Pc)
+    Tc: float = 1  # field(init=False, default=critical_data_dictionary["H2"].Tc)
+    Pc: float = 1  # field(init=False, default=critical_data_dictionary["H2"].Pc)
     classes: tuple[Type[SaxenaABC], ...] = field(
         init=False,
         default=(
