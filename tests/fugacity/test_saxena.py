@@ -7,7 +7,12 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.eos.interfaces import FugacityModelABC
-from atmodeller.eos.saxena import H2SF87, H2LowPressureSS92, get_saxena_fugacity_models
+from atmodeller.eos.saxena import (
+    H2SF87,
+    H2HighPressureSS92Broken,
+    H2LowPressureSS92,
+    get_saxena_fugacity_models,
+)
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = debug_logger()
@@ -58,23 +63,37 @@ def test_O2(check_values) -> None:
 
 def test_H2_low_pressure_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
-    expected: float = 7279.356114821697
+    expected: float = 7266.667473994427
     expected = UnitConversion.cm3_to_J_per_bar(expected)
     check_values.volume(873, 10, H2LowPressureSS92(), expected)
 
 
 def test_H2_medium_pressure_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
-    expected: float = 164.388310378618
+    expected: float = 151.89189115166624
     expected = UnitConversion.cm3_to_J_per_bar(expected)
     check_values.volume(873, 500, H2LowPressureSS92(), expected)
 
 
-# def test_H2_high_pressure_SS92(check_values) -> None:
-#     """Comparison with Figure 1 in Shi and Saxena (1992)"""
-#     expected: float = 164.388310378618
-#     expected = UnitConversion.cm3_to_J_per_bar(expected)
-#     check_values.volume(1473, 4000, H2HighPressureSS92(), expected)
+def test_H2_high_pressure_SS92(check_values) -> None:
+    """Comparison with Figure 1 in Shi and Saxena (1992)"""
+    expected: float = 41.97871061892679
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(1473, 4000, H2HighPressureSS92Broken(), expected)
+
+
+def test_H2_high_pressure2_SS92(check_values) -> None:
+    """Comparison with Figure 1 in Shi and Saxena (1992)"""
+    expected: float = 20.80659506779327
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(1073, 10000, H2HighPressureSS92Broken(), expected)
+
+
+def test_H2_high_pressure3_SS92(check_values) -> None:
+    """Comparison with Figure 1 in Shi and Saxena (1992)"""
+    expected: float = 71.50153474005483
+    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    check_values.volume(673, 1000, H2HighPressureSS92Broken(), expected)
 
 
 # H2S
