@@ -83,8 +83,8 @@ class H2LowPressureSS92(SaxenaFiveCoefficients):
     """
 
     # TODO: Fit improved if the non reduced parameters are used.
-    Tc: float = 1  # critical_data_dictionary["H2"].Tc
-    Pc: float = 1  # critical_data_dictionary["H2"].Pc
+    Tc: float = critical_data_dictionary["H2"].Tc
+    Pc: float = critical_data_dictionary["H2"].Pc
     a_coefficients: tuple[float, ...] = field(init=False, default=(1, 0, 0, 0, 0, 0))
     b_coefficients: tuple[float, ...] = field(init=False, default=(0, 0.9827e-1, 0, -0.2709, 0))
     c_coefficients: tuple[float, ...] = field(init=False, default=(0, 0, -0.1030e-2, 0, 0.1427e-1))
