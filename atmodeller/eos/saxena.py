@@ -455,20 +455,20 @@ H2SSS92: FugacityModelABC = CombinedFugacityModel(
 )
 
 
-def get_corresponding_states_SS92(
-    critical_temperature: float, critical_pressure: float
-) -> FugacityModelABC:
-    """Corresponding states for O2, CO2, CO, CH4, S2, and COS, from Shi and Saxena (1992)
+def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
+    """Corresponding states from Shi and Saxena (1992)
 
     Table 1(a)
 
     Args:
-        critical_temperature: Critical temperature
-        critical_pressure: Critical pressure
+        species: Species name. Must corresponding to an entry (key) in critical_data_dictionary.
 
     Returns:
         Corresponding states fugacity model
     """
+
+    critical_temperature: float = critical_data_dictionary[species].Tc
+    critical_pressure: float = critical_data_dictionary[species].Pc
 
     # Table 1(a), <1000 bar
     low_pressure: FugacityModelABC = SaxenaFiveCoefficients(
@@ -510,56 +510,19 @@ def get_corresponding_states_SS92(
     return combined_model
 
 
-# O2 from Shi and Saxena (1992)
-O2SS92: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["O2"].Tc, critical_data_dictionary["O2"].Pc
-)
+# Corresponding states fugacity models from Shi and Saxena (1992)
+O2SS92: FugacityModelABC = get_corresponding_states_SS92("O2")
+CO2SS92: FugacityModelABC = get_corresponding_states_SS92("CO2")
+COSS92: FugacityModelABC = get_corresponding_states_SS92("CO")
+CH4SS92: FugacityModelABC = get_corresponding_states_SS92("CH4")
+S2SS92: FugacityModelABC = get_corresponding_states_SS92("S2")
+COSSS92: FugacityModelABC = get_corresponding_states_SS92("COS")
 
-# CO2 from Shi and Saxena (1992)
-CO2SS92: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["CO2"].Tc, critical_data_dictionary["CO2"].Pc
-)
-
-# CO from Shi and Saxena (1992)
-COSS92: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["CO"].Tc, critical_data_dictionary["CO"].Pc
-)
-
-# CH4 from Shi and Saxena (1992)
-CH4SS92: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["CH4"].Tc, critical_data_dictionary["CH4"].Pc
-)
-
-# S2 from Shi and Saxena (1992)
-S2SS92: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["S2"].Tc, critical_data_dictionary["S2"].Pc
-)
-
-# COS from Shi and Saxena (1992)
-COSSS92: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["COS"].Tc, critical_data_dictionary["COS"].Pc
-)
-
-# N2 from Saxena and Fei (1987)
-# This extends the model for N2 over the same pressure range, although the original model in
-# Saxena and Fei (1987) was only the high pressure fit.
-N2SF87: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["N2"].Tc, critical_data_dictionary["N2"].Pc
-)
-
-# H2 from Saxena and Fei (1987)
-# This extends the model for H2 over the same pressure range, although the original model in
-# Saxena and Fei (1987) was only the high pressure fit.
-H2SF87: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["H2"].Tc, critical_data_dictionary["H2"].Pc
-)
-
-# Ar from Saxena and Fei (1987)
-# This extends the model for Ar over the same pressure range, although the original model in
-# Saxena and Fei (1987) was only the high pressure fit.
-ArSF87: FugacityModelABC = get_corresponding_states_SS92(
-    critical_data_dictionary["Ar"].Tc, critical_data_dictionary["Ar"].Pc
-)
+# N2, H2, Ar are presented in Saxena and Fei for the high pressure fit only, but here we adopt the
+# same low pressure extension as in Shi and Saxena (1992).
+N2SF87: FugacityModelABC = get_corresponding_states_SS92("N2")
+H2SF87: FugacityModelABC = get_corresponding_states_SS92("H2")
+ArSF87: FugacityModelABC = get_corresponding_states_SS92("Ar")
 
 
 def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
