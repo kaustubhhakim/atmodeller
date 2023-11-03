@@ -353,6 +353,8 @@ H2SS92: FugacityModelABC = CombinedFugacityModel(
 )
 
 # High pressure model for H2 from Saxena and Fei (1988). Table on p1196
+# TODO: Fix. DJB: The coefficients seem more reasonable when the critical data is provided, but the
+# values are still quite different compared to the SS92 version.
 H2HighPressureSF88: FugacityModelABC = SaxenaEightCoefficients(
     critical_temperature=critical_data_dictionary["H2"].Tc,
     critical_pressure=critical_data_dictionary["H2"].Pc,
