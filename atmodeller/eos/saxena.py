@@ -2,20 +2,17 @@
 
 See the LICENSE file for licensing information.
 
-This module contains concrete classes for the fugacity models presented in Shi and Saxena (1992), 
-Saxena and Fei (1988), and Saxena and Fei (1987).
-
 Concrete classes:
-    H2LowPressureSS92: Low pressure model for H2 from Shi and Saxena (1992)
-    H2HighPressureSS92: High pressure model for H2 from Shi and Saxena (1992)
-    H2HighPressureSS92_Refit: Refit of high pressure model for H2 from Shi and Saxena (1992)
+    H2LowPressureSS92: Low pressure for H2 from Shi and Saxena (1992)
+    H2HighPressureSS92: High pressure for H2 from Shi and Saxena (1992)
+    H2HighPressureSS92_Refit: Refit of high pressure for H2 from Shi and Saxena (1992)
     H2SS92: Full model for H2 from Shi and Saxena (1992)
-    H2HighPressureSF88: High pressure model for H2 from Saxena and Fei (1988)
-    H2HighPressureSF88_Refit: Refit of high pressure model for H2 from Saxena and Fei (1988)
-    SO2SS92: Model for SO2 from Shi and Saxena (1992)
-    H2SLowPressureSS92: Low pressure model for H2S from Shi and Saxena (1992)
-    H2SHighPressureSS92: High pressure model for H2S from Shi and Saxena (1992)
-    H2SSS92: Model for H2S from Shi and Saxena (1992)
+    H2HighPressureSF88: High pressure for H2 from Saxena and Fei (1988)
+    H2HighPressureSF88_Refit: Refit of high pressure for H2 from Saxena and Fei (1988)
+    SO2SS92: SO2 from Shi and Saxena (1992)
+    H2SLowPressureSS92: Low pressure for H2S from Shi and Saxena (1992)
+    H2SHighPressureSS92: High pressure for H2S from Shi and Saxena (1992)
+    H2SSS92: H2S from Shi and Saxena (1992)
     O2SS92: Corresponding states for O2 from Shi and Saxena (1992)
     CO2SS92: Corresponding states for CO2 from Shi and Saxena (1992)
     COSS92: Corresponding states for CO from Shi and Saxena (1992)
@@ -32,8 +29,7 @@ Examples:
 
     ```python
     >>> from atmodeller.eos.saxena import CO2SS92
-    >>> model = CO2SS92()
-    >>> fugacity_coefficient = model.get_value(temperature=2000, pressure=1000)
+    >>> fugacity_coefficient = CO2SS92.get_value(temperature=2000, pressure=1000)
     >>> print(fugacity_coefficient)
     1.09669352805837
     ```
