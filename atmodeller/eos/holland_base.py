@@ -641,7 +641,8 @@ class CORKABC(FugacityModelABC):
     virial: VirialCompensation = field(init=False)
 
     def __post_init__(self):
-        super().__post_init__()
+        # TODO: Remove?
+        # super().__post_init__()
         self.virial = VirialCompensation(
             a_coefficients=self.a_virial,
             b_coefficients=self.b_virial,

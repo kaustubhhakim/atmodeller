@@ -5,7 +5,6 @@ See the LICENSE file for licensing information.
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Type
 
 import numpy as np
 
@@ -17,38 +16,79 @@ from atmodeller.interfaces import GetValueABC
 class FugacityModelABC(GetValueABC):
     """A fugacity model.
 
-    This base class requires a specification for the volume and volume integral, since then the
+    This base class requires a specification for the volume and volume integral. Then the
     fugacity and related quantities can be computed using the standard relation:
 
     RTlnf = integral(VdP).
 
+    If critical_temperature and critical_pressure are set to their default value of unity, then
+    these quantities are effectively not used, and the model coefficients should be in terms of
+    the real temperature and pressure. But for corresponding state models, which are formulated in
+    terms of a reduced temperature and a reduced pressure, the critical_temperature and
+    critical_pressure must be set to appropriate values for the species under consideration.
+
     Args:
+        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used).
+        critical_pressure: Critical pressure in bar. Defaults to unity (not used).
         scaling: Scaling depending on the units of the coefficients that are used in this model.
             For pressure in bar this is unity and for pressure in kbar this is kilo. Defaults to
             unity.
 
     Attributes:
-        scaling: Scaling depending on the units of pressure.
-        GAS_CONSTANT: Gas constant with the appropriate units.
-        standard_state_pressure: Standard state pressure with the appropriate units. Set to 1 bar.
+        critical_temperature: Critical temperature in kelvin
+        critical_pressure: Critical pressure in bar
+        scaling: Scaling depending on the units of pressure
+        GAS_CONSTANT: Gas constant
+        standard_state_pressure: Standard state pressure
     """
 
+    critical_temperature: float = 1  # Default of one is equivalent to not used
+    critical_pressure: float = 1  # Default of one is equivalent to not used
     scaling: float = 1
+    # TODO: If this quantity is not scaled in the end, can remove as an attribute
     GAS_CONSTANT: float = field(init=False, default=GAS_CONSTANT)
     standard_state_pressure: float = field(init=False, default=1)  # 1 bar
 
-    def __post_init__(self):
-        """Scales pressure quantities to ensure they use the internal pressure units."""
-        self.GAS_CONSTANT /= self.scaling
-        self.standard_state_pressure /= self.scaling
+    # TODO: Remove?
+    # def __post_init__(self):
+    #     """Scales pressure quantities to ensure they use the internal pressure units."""
+    #     self.GAS_CONSTANT /= self.scaling
+    #     # TODO: Is this correct to scale by self.scaling below?
+    #     self.standard_state_pressure /= self.critical_pressure
+
+    def scaled_pressure(self, pressure: float) -> float:
+        """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity.
+
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            The scaled (reduced) pressure, which is dimensionless
+        """
+        scaled_pressure: float = pressure / self.critical_pressure
+
+        return scaled_pressure
+
+    def scaled_temperature(self, temperature: float) -> float:
+        """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity.
+
+        Args:
+            temperature: Temperature in kelvin
+
+        Returns:
+            The scaled (reduced) temperature, which is dimensionless.
+        """
+        scaled_temperature: float = temperature / self.critical_temperature
+
+        return scaled_temperature
 
     def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
         """Compressibility parameter at temperature and pressure.
 
         Args:
             temperature: Temperature in kelvin
-            pressure: Pressure
-            **kwargs: Catches unused keyword arguments, but used for overrides in subclasses.
+            pressure: Pressure in bar
+            **kwargs: Catches unused keyword arguments. Used for overrides in subclasses.
 
         Returns:
             The compressibility parameter, Z
@@ -63,17 +103,15 @@ class FugacityModelABC(GetValueABC):
     def get_value(self, *, temperature: float, pressure: float) -> float:
         """Evaluates the fugacity coefficient at temperature and pressure.
 
-        Note that the input 'pressure' must ALWAYS be in bar, so it is scaled here using
-        'self.scaling' since self.fugacity_coefficient requires the internal units of pressure.
-
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in bar.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
             Fugacity coefficient evaluated at temperature and pressure, which is dimensionaless.
         """
-        pressure /= self.scaling
+        # TODO: Remove
+        # pressure /= self.scaling
         fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure)
 
         return fugacity_coefficient
@@ -85,11 +123,11 @@ class FugacityModelABC(GetValueABC):
         pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            fugacity.
+            natural log of the fugacity
         """
         ln_fugacity: float = self.volume_integral(temperature, pressure) / (
             self.GAS_CONSTANT * temperature
@@ -104,14 +142,15 @@ class FugacityModelABC(GetValueABC):
         f0 is the pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            fugacity.
+            fugacity
         """
         fugacity: float = np.exp(self.ln_fugacity(temperature, pressure))  # bar
-        fugacity /= self.scaling  # to units of input pressure for consistency.
+        # TODO: Remove
+        # fugacity /= self.scaling  # to units of input pressure for consistency.
 
         return fugacity
 
@@ -119,8 +158,8 @@ class FugacityModelABC(GetValueABC):
         """Fugacity coefficient.
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
             fugacity coefficient, which is non-dimensional.
@@ -134,7 +173,7 @@ class FugacityModelABC(GetValueABC):
 
         Args:
             temperature: Temperature in kelvin
-            pressure: Pressure.
+            pressure: Pressure in bar
 
         Returns:
             ideal volume
@@ -149,10 +188,10 @@ class FugacityModelABC(GetValueABC):
 
         Args:
             temperature: Temperature in kelvin.
-            pressure: Pressure.
+            pressure: Pressure in bar
 
         Returns:
-            Volume.
+            Volume
         """
         ...
 
@@ -161,123 +200,41 @@ class FugacityModelABC(GetValueABC):
         """Volume integral (VdP).
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Volume integral.
+            Volume integral
         """
         ...
 
 
 @dataclass(kw_only=True)
-class ReducedFugacityModelABC(FugacityModelABC):
-    """A fugacity model that is formulated in terms of reduced temperature and pressure.
-
-    See base class.
-
-    Args:
-        Tc: Critical temperature in kelvin
-        Pc: Critical pressure
-        scaling: Scaling depending on the units of the coefficients that are used in this model.
-            For pressure in bar this is unity and for pressure in kbar this is kilo. Defaults to
-            unity.
-
-    Attributes:
-        Tc: Critical temperature in kelvin
-        Pc: Critical pressure
-        scaling: Scaling depending on the units of pressure
-        GAS_CONSTANT: Gas constant with the appropriate units
-        standard_state_pressure: Standard state pressure with the appropriate units. Set to 1 bar.
-    """
-
-    Tc: float
-    Pc: float
-
-    def reduced_pressure(self, pressure: float) -> float:
-        """Reduced pressure.
-
-        Args:
-            pressure: Pressure.
-
-        Returns:
-            The reduced pressure, which is dimensionless.
-        """
-        Pr: float = pressure / self.Pc
-
-        return Pr
-
-    def reduced_temperature(self, temperature: float) -> float:
-        """Reduced temperature.
-
-        Args:
-            temperature: Temperature in kelvin.
-
-        Returns:
-            The reduced temperature, which is dimensionless.
-        """
-        Tr: float = temperature / self.Tc
-
-        return Tr
-
-    @property
-    def reduced_standard_state_pressure(self) -> float:
-        """Reduced standard state pressure.
-
-        Args:
-            pressure: Pressure.
-
-        Returns:
-            The reduced standard state pressure, which is dimensionless.
-        """
-        Pr0: float = self.standard_state_pressure / self.Pc
-
-        return Pr0
-
-
-@dataclass(kw_only=True)
-class CombinedReducedFugacityModel(ReducedFugacityModelABC):
+class CombinedFugacityModel(FugacityModelABC):
     """Combines multiple fugacity models for different pressure ranges into a single model.
 
     Args:
-        Tc: Critical temperature in kelvin.
-        Pc: Critical pressure.
-        classes: Reduced fugacity classes with coefficients specified and ordered by increasing
-            pressure.
-        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
-        scaling: Scaling depending on the units of the coefficients that are used in this model.
-            For pressure in bar this is unity and for pressure in kbar this is kilo. Defaults to
-            unity.
+        models: Fugacity models with coefficients specified and ordered by increasing pressure
+        upper_pressure_bounds: Upper pressure bound in bar relevant to the fugacity class by
+            position
 
     Attributes:
-        Tc: Critical temperature in kelvin.
-        Pc: Critical pressure.
-        classes: Reduced fugacity classes with coefficients specified and ordered by increasing
-            pressure.
-        upper_pressure_bounds: The upper pressure bound relevant to the fugacity class by position.
-        models: Instantiated fugacity classes.
-        scaling: Scaling depending on the units of pressure
-        GAS_CONSTANT: Gas constant with the appropriate units
-        standard_state_pressure: Standard state pressure with the appropriate units. Set to 1 bar.
+        models: Fugacity models with coefficients specified and ordered by increasing pressure
+        upper_pressure_bounds: Upper pressure bound in bar relevant to the fugacity class by
+            position
     """
 
-    classes: tuple[Type[ReducedFugacityModelABC], ...]
+    models: tuple[FugacityModelABC, ...]
     upper_pressure_bounds: tuple[float, ...]
-    models: list[FugacityModelABC] = field(init=False, default_factory=list)
-
-    def __post_init__(self):
-        super().__post_init__()
-        for fugacity_class in self.classes:
-            self.models.append(fugacity_class(Tc=self.Tc, Pc=self.Pc))
 
     def _get_index(self, pressure: float) -> int:
-        """Gets the index of the appropriate fugacity model using the pressure.
+        """Gets the index of the appropriate fugacity model using the pressure
 
         Args:
-            pressure: Pressure.
+            pressure: Pressure in bar
 
         Returns:
-            Index of the relevant fugacity model.
+            Index of the relevant fugacity model
         """
         for index, pressure_high in enumerate(self.upper_pressure_bounds):
             if pressure < pressure_high:
@@ -286,14 +243,14 @@ class CombinedReducedFugacityModel(ReducedFugacityModelABC):
         return len(self.models) - 1
 
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume.
+        """Volume
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Volume.
+            Volume
         """
         index: int = self._get_index(pressure)
         volume: float = self.models[index].volume(temperature, pressure)
@@ -301,14 +258,14 @@ class CombinedReducedFugacityModel(ReducedFugacityModelABC):
         return volume
 
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP).
+        """Volume integral (VdP)
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Volume integral.
+            Volume integral
         """
         index: int = self._get_index(pressure)
         volume: float = self.models[index].volume_integral(temperature, pressure)
