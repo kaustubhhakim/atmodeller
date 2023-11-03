@@ -1,4 +1,4 @@
-"""Fugacity models from Shi and Saxena (1992), Saxena and Fei (1988), and Saxena and Fei (1987)
+"""Fugacity models from Shi and Saxena (1992), Saxena and Fei (1988), and Saxena and Fei (1987a,b)
 
 See the LICENSE file for licensing information.
 
@@ -311,14 +311,15 @@ class SaxenaEightCoefficients(SaxenaABC):
 
 
 # Low pressure model for H2 from Shi and Saxena (1992)
-# The coefficients are the same as for the corresponding states model in Table 1(a), suggesting
-# that the critical data for H2 is required. Table 1(b), <1000 bar
+# The coefficients are the same as for the corresponding states model in Table 1(a) because they
+# originate from Saxena and Fei (1987a). Table 1(b), <1000 bar
 H2LowPressureSS92: FugacityModelABC = SaxenaFiveCoefficients(
     critical_temperature=critical_data_dictionary["H2"].Tc,
     critical_pressure=critical_data_dictionary["H2"].Pc,
     a_coefficients=(1, 0, 0, 0, 0, 0),
     b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
-    c_coefficients=(0, 0, -0.1030e-2, 0, 0.1427e-1),
+    # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
+    c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
     d_coefficients=(0, 0, 0, 0, 0),
 )
 
@@ -331,9 +332,9 @@ H2HighPressureSS92: FugacityModelABC = SaxenaEightCoefficients(
     d_coefficients=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0),
 )
 
-# High pressure model for H2 from Shi and Saxena (1992), Refitted using V, P, T Data from
-# Presnall 1969 and Ross & Ree 1983, assuming same functional form as Shi & Saxena, including which
-# coefficients they put at zero. Table 1(b), >1 kbar
+# High pressure model for H2 from Shi and Saxena (1992), refitted using V, P, T data from
+# Presnall (1969) and Ross and Ree (1983). We assume the same functional form as Shi and Saxena,
+# including which coefficients are set to zero. Table 1(b), >1 kbar
 H2HighPressureSS92_Refit: FugacityModelABC = SaxenaEightCoefficients(
     critical_temperature=critical_data_dictionary["H2"].Tc,
     critical_pressure=critical_data_dictionary["H2"].Pc,
@@ -363,9 +364,9 @@ H2HighPressureSF88: FugacityModelABC = SaxenaEightCoefficients(
     d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
 )
 
-# High pressure model for H2 from Saxena and Fei (1988), Refitted with Data from Presnall 1969 and
-# Ross and Ree 1983. Using same functional form as Saxena & Fei, including which coefficient is
-# zero
+# High pressure model for H2 from Saxena and Fei (1988), refitted with data from Presnall (1969)
+# and Ross and Ree (1983). We assume the same functional form as Saxena and Fei (1988), including
+# which coefficients are set to zero.
 H2HighPressureSF88_Refit: FugacityModelABC = SaxenaEightCoefficients(
     critical_temperature=critical_data_dictionary["H2"].Tc,
     critical_pressure=critical_data_dictionary["H2"].Pc,
@@ -455,6 +456,12 @@ H2SSS92: FugacityModelABC = CombinedFugacityModel(
 def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
     """Corresponding states from Shi and Saxena (1992)
 
+    The coefficients for the low and medium pressure regime are actually lifted from Saxena and
+    Fei (1987a), although some values disagree in either value or sign with Table 1(a) in the 1992
+    paper. We need to decide which one is right, probably by computing the RMSE and taking the
+    best-fitting combination. I'd assume the 1987 study is correct and the error is copying the
+    data into the 1992 paper?  To be investigated.
+
     Table 1(a)
 
     Args:
@@ -473,7 +480,8 @@ def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
         critical_pressure=critical_pressure,
         a_coefficients=(1, 0, 0, 0, 0, 0),
         b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
-        c_coefficients=(0, 0, -0.1030e-2, 0, 0.1427e-1),
+        # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
+        c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
         d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
     )
 
@@ -483,11 +491,14 @@ def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
         critical_pressure=critical_pressure,
         a_coefficients=(1, 0, 0, 0, -5.917e-1, 0, 0, 0),
         b_coefficients=(0, 0, 9.122e-2, 0, 0, 0, 0, 0),
-        c_coefficients=(0, 0, 0, 0, -1.416e-4, 0, 0, -2.835e-6),
+        # Saxena and Fei (1987a), Eq. 21, C first coefficient = 1.4164e-4 (not negative)
+        c_coefficients=(0, 0, 0, 0, 1.4164e-4, 0, 0, -2.8349e-6),
         d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
     )
 
     # Table 1(a), >5000 bar
+    # Higher precision coefficients taken from Saxena and Fei (1987b), but agrees with Table 1(a)
+    # in the 1992 paper.
     high_pressure: FugacityModelABC = SaxenaEightCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
@@ -516,7 +527,7 @@ S2SS92: FugacityModelABC = get_corresponding_states_SS92("S2")
 COSSS92: FugacityModelABC = get_corresponding_states_SS92("COS")
 
 # N2, H2, Ar are presented in Saxena and Fei for the high pressure fit only, but here we adopt the
-# same low pressure extension as in Shi and Saxena (1992).
+# same low pressure extension as in Shi and Saxena (1992), Table 1(a).
 N2SF87: FugacityModelABC = get_corresponding_states_SS92("N2")
 H2SF87: FugacityModelABC = get_corresponding_states_SS92("H2")
 ArSF87: FugacityModelABC = get_corresponding_states_SS92("Ar")
