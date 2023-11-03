@@ -226,7 +226,6 @@ class SaxenaABC(FugacityModelABC):
         Returns:
             Volume integral
         """
-        # TODO: Check this works with scaled temperature and scaled pressure
         Tr: float = self.scaled_temperature(temperature)
         Pr: float = self.scaled_pressure(pressure)
         P0r: float = self.scaled_pressure(self.standard_state_pressure)
