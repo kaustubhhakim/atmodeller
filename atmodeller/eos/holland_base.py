@@ -14,6 +14,7 @@ from scipy.optimize import root
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.eos.interfaces import ModifiedRedlichKwongABC, RealGasABC
+from atmodeller.utilities import debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -366,6 +367,7 @@ class VirialCompensation:
         1  # Defaults to 1, which effectively means unused (i.e. not corresponding states).
     )
 
+    @debug_decorator(logger)
     def a(self, temperature: float) -> float:
         """a parameter.
 
@@ -387,6 +389,7 @@ class VirialCompensation:
 
         return a
 
+    @debug_decorator(logger)
     def b(self, temperature: float) -> float:
         """b parameter.
 
@@ -407,6 +410,7 @@ class VirialCompensation:
 
         return b
 
+    @debug_decorator(logger)
     def c(self, temperature: float) -> float:
         """c parameter.
 
@@ -426,6 +430,7 @@ class VirialCompensation:
 
         return c
 
+    @debug_decorator(logger)
     def ln_fugacity_coefficient(self, temperature: float, pressure: float) -> float:
         """Natural log of the virial contribution to the fugacity coefficient.
 
@@ -447,6 +452,7 @@ class VirialCompensation:
 
         return ln_fugacity_coefficient
 
+    @debug_decorator(logger)
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
         """Fugacity coefficient of the virial contribution.
 
@@ -461,6 +467,7 @@ class VirialCompensation:
 
         return fugacity_coefficient
 
+    @debug_decorator(logger)
     def volume(self, temperature: float, pressure: float) -> float:
         """Volume contribution.
 
@@ -479,6 +486,7 @@ class VirialCompensation:
 
         return volume
 
+    @debug_decorator(logger)
     def volume_integral(self, temperature: float, pressure: float) -> float:
         """Volume integral (VdP) contribution.
 
