@@ -3,6 +3,9 @@
 See the LICENSE file for licensing information.
 """
 
+from __future__ import annotations
+
+import logging
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
@@ -10,16 +13,19 @@ import numpy as np
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.interfaces import GetValueABC
+from atmodeller.utilities import debug_decorator
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
 class FugacityModelABC(GetValueABC):
-    """A fugacity model.
+    """A fugacity model
 
     This base class requires a specification for the volume and volume integral. Then the
     fugacity and related quantities can be computed using the standard relation:
 
-    RTlnf = integral(VdP).
+    RTlnf = integral(VdP)
 
     If critical_temperature and critical_pressure are set to their default value of unity, then
     these quantities are effectively not used, and the model coefficients should be in terms of
@@ -28,34 +34,20 @@ class FugacityModelABC(GetValueABC):
     critical_pressure must be set to appropriate values for the species under consideration.
 
     Args:
-        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used).
-        critical_pressure: Critical pressure in bar. Defaults to unity (not used).
-        scaling: Scaling depending on the units of the coefficients that are used in this model.
-            For pressure in bar this is unity and for pressure in kbar this is kilo. Defaults to
-            unity.
+        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
+        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
 
     Attributes:
         critical_temperature: Critical temperature in kelvin
         critical_pressure: Critical pressure in bar
-        scaling: Scaling depending on the units of pressure
-        GAS_CONSTANT: Gas constant
         standard_state_pressure: Standard state pressure
     """
 
     critical_temperature: float = 1  # Default of one is equivalent to not used
     critical_pressure: float = 1  # Default of one is equivalent to not used
-    scaling: float = 1
-    # TODO: If this quantity is not scaled in the end, can remove as an attribute
-    GAS_CONSTANT: float = field(init=False, default=GAS_CONSTANT)
     standard_state_pressure: float = field(init=False, default=1)  # 1 bar
 
-    # TODO: Remove?
-    # def __post_init__(self):
-    #     """Scales pressure quantities to ensure they use the internal pressure units."""
-    #     self.GAS_CONSTANT /= self.scaling
-    #     # TODO: Is this correct to scale by self.scaling below?
-    #     self.standard_state_pressure /= self.critical_pressure
-
+    @debug_decorator(logger)
     def scaled_pressure(self, pressure: float) -> float:
         """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity.
 
@@ -69,6 +61,7 @@ class FugacityModelABC(GetValueABC):
 
         return scaled_pressure
 
+    @debug_decorator(logger)
     def scaled_temperature(self, temperature: float) -> float:
         """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity.
 
@@ -82,6 +75,7 @@ class FugacityModelABC(GetValueABC):
 
         return scaled_temperature
 
+    @debug_decorator(logger)
     def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
         """Compressibility parameter at temperature and pressure.
 
@@ -91,7 +85,7 @@ class FugacityModelABC(GetValueABC):
             **kwargs: Catches unused keyword arguments. Used for overrides in subclasses.
 
         Returns:
-            The compressibility parameter, Z
+            The compressibility parameter, Z, which is dimensionless.
         """
         del kwargs
         volume: float = self.volume(temperature, pressure)
@@ -100,6 +94,7 @@ class FugacityModelABC(GetValueABC):
 
         return Z
 
+    @debug_decorator(logger)
     def get_value(self, *, temperature: float, pressure: float) -> float:
         """Evaluates the fugacity coefficient at temperature and pressure.
 
@@ -110,12 +105,11 @@ class FugacityModelABC(GetValueABC):
         Returns:
             Fugacity coefficient evaluated at temperature and pressure, which is dimensionaless.
         """
-        # TODO: Remove
-        # pressure /= self.scaling
         fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure)
 
         return fugacity_coefficient
 
+    @debug_decorator(logger)
     def ln_fugacity(self, temperature: float, pressure: float) -> float:
         """Natural log of the fugacity.
 
@@ -127,14 +121,15 @@ class FugacityModelABC(GetValueABC):
             pressure: Pressure in bar
 
         Returns:
-            natural log of the fugacity
+            Natural log of the fugacity
         """
         ln_fugacity: float = self.volume_integral(temperature, pressure) / (
-            self.GAS_CONSTANT * temperature
+            GAS_CONSTANT * temperature
         )
 
         return ln_fugacity
 
+    @debug_decorator(logger)
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Fugacity in the same units as the input pressure.
 
@@ -146,14 +141,13 @@ class FugacityModelABC(GetValueABC):
             pressure: Pressure in bar
 
         Returns:
-            fugacity
+            Fugacity in bar
         """
-        fugacity: float = np.exp(self.ln_fugacity(temperature, pressure))  # bar
-        # TODO: Remove
-        # fugacity /= self.scaling  # to units of input pressure for consistency.
+        fugacity: float = np.exp(self.ln_fugacity(temperature, pressure))
 
         return fugacity
 
+    @debug_decorator(logger)
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
         """Fugacity coefficient.
 
@@ -168,6 +162,7 @@ class FugacityModelABC(GetValueABC):
 
         return fugacity_coefficient
 
+    @debug_decorator(logger)
     def ideal_volume(self, temperature: float, pressure: float) -> float:
         """Ideal volume
 
@@ -176,9 +171,9 @@ class FugacityModelABC(GetValueABC):
             pressure: Pressure in bar
 
         Returns:
-            ideal volume
+            ideal volume in m^3 mol^(-1)
         """
-        volume_ideal: float = self.GAS_CONSTANT * temperature / pressure
+        volume_ideal: float = GAS_CONSTANT * temperature / pressure
 
         return volume_ideal
 
@@ -191,7 +186,7 @@ class FugacityModelABC(GetValueABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume
+            Volume in m^3 mol^(-1)
         """
         ...
 
@@ -204,7 +199,7 @@ class FugacityModelABC(GetValueABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral
+            Volume integral in J mol^(-1)
         """
         ...
 
@@ -250,7 +245,7 @@ class CombinedFugacityModel(FugacityModelABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume
+            Volume in m^3 mol^(-1)
         """
         index: int = self._get_index(pressure)
         volume: float = self.models[index].volume(temperature, pressure)
@@ -265,7 +260,7 @@ class CombinedFugacityModel(FugacityModelABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral
+            Volume integral in J mol^(-1)
         """
         index: int = self._get_index(pressure)
         volume: float = self.models[index].volume_integral(temperature, pressure)
@@ -286,6 +281,7 @@ class critical_data:
         Pc: Critical pressure in bar
     """
 
+    # TODO: Make this attribute names more descriptive (temperature and pressure).
     Tc: float
     Pc: float
 

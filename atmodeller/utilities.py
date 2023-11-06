@@ -5,9 +5,10 @@ See the LICENSE file for licensing information.
 
 from __future__ import annotations
 
+import functools
 import logging
 from collections import OrderedDict, abc
-from typing import Type, TypeVar
+from typing import Callable, Type, TypeVar
 
 from molmass import Formula
 from scipy.constants import kilo, mega
@@ -17,6 +18,23 @@ from atmodeller import OCEAN_MOLES
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+def debug_decorator(logger: logging.Logger) -> Callable:
+    """A decorator to print the result of a function to a debug logger."""
+
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # logger.info(f"Executing {func.__name__}")
+            result = func(*args, **kwargs)
+            logger.debug("%s = %s", func.__name__, result)
+            # logger.info(f"Finished executing {func.__name__}")
+            return result
+
+        return wrapper
+
+    return decorator
 
 
 def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> dict[int, T]:
