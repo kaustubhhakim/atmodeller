@@ -19,8 +19,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class FugacityModelABC(GetValueABC):
-    """A fugacity model
+class RealGasABC(GetValueABC):
+    """A real gas equation of state (EOS)
 
     This base class requires a specification for the volume and volume integral. Then the
     fugacity and related quantities can be computed using the standard relation:
@@ -205,7 +205,7 @@ class FugacityModelABC(GetValueABC):
 
 
 @dataclass(kw_only=True)
-class CombinedFugacityModel(FugacityModelABC):
+class CombinedFugacityModel(RealGasABC):
     """Combines multiple fugacity models for different pressure ranges into a single model.
 
     Args:
@@ -219,7 +219,7 @@ class CombinedFugacityModel(FugacityModelABC):
             position
     """
 
-    models: tuple[FugacityModelABC, ...]
+    models: tuple[RealGasABC, ...]
     upper_pressure_bounds: tuple[float, ...]
 
     def _get_index(self, pressure: float) -> int:
@@ -281,9 +281,8 @@ class critical_data:
         Pc: Critical pressure in bar
     """
 
-    # TODO: Make this attribute names more descriptive (temperature and pressure).
-    Tc: float
-    Pc: float
+    temperature: float
+    pressure: float
 
 
 # Critical temperature and pressure data for a corresponding states model, based on Table 2 in

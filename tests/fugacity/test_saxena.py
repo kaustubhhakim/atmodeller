@@ -6,7 +6,7 @@ See the LICENSE file for licensing information.
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.eos.saxena import (
     H2SF87,
     H2HighPressureSS92,
@@ -17,7 +17,7 @@ from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = debug_logger()
 
-fugacity_models: dict[str, FugacityModelABC] = get_saxena_fugacity_models()
+fugacity_models: dict[str, RealGasABC] = get_saxena_fugacity_models()
 
 
 def test_version():

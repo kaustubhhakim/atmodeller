@@ -59,9 +59,10 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from atmodeller import GAS_CONSTANT
 from atmodeller.eos.interfaces import (
     CombinedFugacityModel,
-    FugacityModelABC,
+    RealGasABC,
     critical_data_dictionary,
 )
 
@@ -69,7 +70,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class SaxenaABC(FugacityModelABC):
+class SaxenaABC(RealGasABC):
     """Shi and Saxena (1992) fugacity model.
 
     The model presented in Shi and Saxena (1992) is a general form that can be adapted to the
@@ -236,7 +237,7 @@ class SaxenaABC(FugacityModelABC):
                 + (1.0 / 2) * self._c(Tr) * (Pr**2 - P0r**2)
                 + (1.0 / 3) * self._d(Tr) * (Pr**3 - P0r**3)
             )
-            * self.GAS_CONSTANT
+            * GAS_CONSTANT
             * temperature
         )
 
@@ -313,9 +314,9 @@ class SaxenaEightCoefficients(SaxenaABC):
 # Low pressure model for H2 from Shi and Saxena (1992)
 # The coefficients are the same as for the corresponding states model in Table 1(a) because they
 # originate from Saxena and Fei (1987a). Table 1(b), <1000 bar
-H2LowPressureSS92: FugacityModelABC = SaxenaFiveCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].Tc,
-    critical_pressure=critical_data_dictionary["H2"].Pc,
+H2LowPressureSS92: RealGasABC = SaxenaFiveCoefficients(
+    critical_temperature=critical_data_dictionary["H2"].temperature,
+    critical_pressure=critical_data_dictionary["H2"].pressure,
     a_coefficients=(1, 0, 0, 0, 0, 0),
     b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
@@ -325,7 +326,7 @@ H2LowPressureSS92: FugacityModelABC = SaxenaFiveCoefficients(
 
 # High pressure model for H2 from Shi and Saxena (1992)
 # Coefficients require the actual temperature and pressure. Table 1(b), >1 kbar
-H2HighPressureSS92: FugacityModelABC = SaxenaEightCoefficients(
+H2HighPressureSS92: RealGasABC = SaxenaEightCoefficients(
     a_coefficients=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1),
     b_coefficients=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5),
     c_coefficients=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10),
@@ -335,9 +336,9 @@ H2HighPressureSS92: FugacityModelABC = SaxenaEightCoefficients(
 # High pressure model for H2 from Shi and Saxena (1992), refitted using V, P, T data from
 # Presnall (1969) and Ross and Ree (1983). We assume the same functional form as Shi and Saxena,
 # including which coefficients are set to zero. Table 1(b), >1 kbar
-H2HighPressureSS92_Refit: FugacityModelABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].Tc,
-    critical_pressure=critical_data_dictionary["H2"].Pc,
+H2HighPressureSS92_Refit: RealGasABC = SaxenaEightCoefficients(
+    critical_temperature=critical_data_dictionary["H2"].temperature,
+    critical_pressure=critical_data_dictionary["H2"].pressure,
     a_coefficients=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
     b_coefficients=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
     c_coefficients=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
@@ -346,18 +347,18 @@ H2HighPressureSS92_Refit: FugacityModelABC = SaxenaEightCoefficients(
 
 # H2 fugacity model from Shi and Saxena (1992)
 # Combines the low pressure and high pressure models into a single model. Table 1(b)
-models: tuple[FugacityModelABC, ...] = (H2LowPressureSS92, H2HighPressureSS92)
+models: tuple[RealGasABC, ...] = (H2LowPressureSS92, H2HighPressureSS92)
 upper_pressure_bounds: tuple[float, ...] = (1000,)
-H2SS92: FugacityModelABC = CombinedFugacityModel(
+H2SS92: RealGasABC = CombinedFugacityModel(
     models=models, upper_pressure_bounds=upper_pressure_bounds
 )
 
 # High pressure model for H2 from Saxena and Fei (1988). Table on p1196
 # TODO: Fix. DJB: The coefficients seem more reasonable when the critical data is provided, but the
 # values are still quite different compared to the SS92 version.
-H2HighPressureSF88: FugacityModelABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].Tc,
-    critical_pressure=critical_data_dictionary["H2"].Pc,
+H2HighPressureSF88: RealGasABC = SaxenaEightCoefficients(
+    critical_temperature=critical_data_dictionary["H2"].temperature,
+    critical_pressure=critical_data_dictionary["H2"].pressure,
     a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
     b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
     c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
@@ -367,9 +368,9 @@ H2HighPressureSF88: FugacityModelABC = SaxenaEightCoefficients(
 # High pressure model for H2 from Saxena and Fei (1988), refitted with data from Presnall (1969)
 # and Ross and Ree (1983). We assume the same functional form as Saxena and Fei (1988), including
 # which coefficients are set to zero.
-H2HighPressureSF88_Refit: FugacityModelABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].Tc,
-    critical_pressure=critical_data_dictionary["H2"].Pc,
+H2HighPressureSF88_Refit: RealGasABC = SaxenaEightCoefficients(
+    critical_temperature=critical_data_dictionary["H2"].temperature,
+    critical_pressure=critical_data_dictionary["H2"].pressure,
     a_coefficients=(1.00574429e00, 0, 1.93017653e-03, 0, -3.79261119e-01, 0, 0, -2.44218196e-03),
     b_coefficients=(1.31517894e-03, 0, 7.22328436e-02, 0, 4.84354184e-02, 0, 0, -4.19624518e-04),
     c_coefficients=(2.64454394e-06, 0, -5.18445624e-05, 0, -2.05045980e-04, 0, 0, -3.64843202e-07),
@@ -377,9 +378,9 @@ H2HighPressureSF88_Refit: FugacityModelABC = SaxenaEightCoefficients(
 )
 
 # Fugacity model for SO2 from Shi and Saxena (1992). Table 1(c)
-SO2SS92: FugacityModelABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["SO2"].Tc,
-    critical_pressure=critical_data_dictionary["SO2"].Pc,
+SO2SS92: RealGasABC = SaxenaEightCoefficients(
+    critical_temperature=critical_data_dictionary["SO2"].temperature,
+    critical_pressure=critical_data_dictionary["SO2"].pressure,
     a_coefficients=(0.92854, 0.43269e-1, -0.24671, 0, 0.24999, 0, -0.53182, -0.16461e-1),
     b_coefficients=(
         0.84866e-3,
@@ -406,9 +407,9 @@ SO2SS92: FugacityModelABC = SaxenaEightCoefficients(
 
 # Fugacity model for H2S from Shi and Saxena (1992)
 # Table 1(d), 1-500 bar
-H2SLowPressureSS92: FugacityModelABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2S"].Tc,
-    critical_pressure=critical_data_dictionary["H2S"].Pc,
+H2SLowPressureSS92: RealGasABC = SaxenaEightCoefficients(
+    critical_temperature=critical_data_dictionary["H2S"].temperature,
+    critical_pressure=critical_data_dictionary["H2S"].pressure,
     a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
     b_coefficients=(0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515),
     c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
@@ -417,9 +418,9 @@ H2SLowPressureSS92: FugacityModelABC = SaxenaEightCoefficients(
 
 # Fugacity model for H2S from Shi and Saxena (1992).
 # Table 1(d), 500-10000 bar
-H2SHighPressureSS92: FugacityModelABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2S"].Tc,
-    critical_pressure=critical_data_dictionary["H2S"].Pc,
+H2SHighPressureSS92: RealGasABC = SaxenaEightCoefficients(
+    critical_temperature=critical_data_dictionary["H2S"].temperature,
+    critical_pressure=critical_data_dictionary["H2S"].pressure,
     a_coefficients=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
     b_coefficients=(
         0.22545e-1,
@@ -448,12 +449,12 @@ H2SHighPressureSS92: FugacityModelABC = SaxenaEightCoefficients(
 # Combines the low pressure and high pressure models into a single model. See Table 1(d)
 models = (H2SLowPressureSS92, H2SHighPressureSS92)
 upper_pressure_bounds = (500,)
-H2SSS92: FugacityModelABC = CombinedFugacityModel(
+H2SSS92: RealGasABC = CombinedFugacityModel(
     models=models, upper_pressure_bounds=upper_pressure_bounds
 )
 
 
-def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
+def get_corresponding_states_SS92(species: str) -> RealGasABC:
     """Corresponding states from Shi and Saxena (1992)
 
     The coefficients for the low and medium pressure regime are actually lifted from Saxena and
@@ -471,11 +472,11 @@ def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
         Corresponding states fugacity model
     """
 
-    critical_temperature: float = critical_data_dictionary[species].Tc
-    critical_pressure: float = critical_data_dictionary[species].Pc
+    critical_temperature: float = critical_data_dictionary[species].temperature
+    critical_pressure: float = critical_data_dictionary[species].pressure
 
     # Table 1(a), <1000 bar
-    low_pressure: FugacityModelABC = SaxenaFiveCoefficients(
+    low_pressure: RealGasABC = SaxenaFiveCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
         a_coefficients=(1, 0, 0, 0, 0, 0),
@@ -486,7 +487,7 @@ def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
     )
 
     # Table 1(a), 1000-5000 bar
-    medium_pressure: FugacityModelABC = SaxenaEightCoefficients(
+    medium_pressure: RealGasABC = SaxenaEightCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
         a_coefficients=(1, 0, 0, 0, -5.917e-1, 0, 0, 0),
@@ -499,7 +500,7 @@ def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
     # Table 1(a), >5000 bar
     # Higher precision coefficients taken from Saxena and Fei (1987b), but agrees with Table 1(a)
     # in the 1992 paper.
-    high_pressure: FugacityModelABC = SaxenaEightCoefficients(
+    high_pressure: RealGasABC = SaxenaEightCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
         a_coefficients=(2.0614, 0, 0, 0, -2.2351, 0, 0, -3.9411e-1),
@@ -508,10 +509,10 @@ def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
         d_coefficients=(0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0),
     )
 
-    models: tuple[FugacityModelABC, ...] = (low_pressure, medium_pressure, high_pressure)
+    models: tuple[RealGasABC, ...] = (low_pressure, medium_pressure, high_pressure)
     upper_pressure_bounds: tuple[float, ...] = (1000, 5000)
 
-    combined_model: FugacityModelABC = CombinedFugacityModel(
+    combined_model: RealGasABC = CombinedFugacityModel(
         models=models, upper_pressure_bounds=upper_pressure_bounds
     )
 
@@ -519,27 +520,27 @@ def get_corresponding_states_SS92(species: str) -> FugacityModelABC:
 
 
 # Corresponding states fugacity models from Shi and Saxena (1992)
-O2SS92: FugacityModelABC = get_corresponding_states_SS92("O2")
-CO2SS92: FugacityModelABC = get_corresponding_states_SS92("CO2")
-COSS92: FugacityModelABC = get_corresponding_states_SS92("CO")
-CH4SS92: FugacityModelABC = get_corresponding_states_SS92("CH4")
-S2SS92: FugacityModelABC = get_corresponding_states_SS92("S2")
-COSSS92: FugacityModelABC = get_corresponding_states_SS92("COS")
+O2SS92: RealGasABC = get_corresponding_states_SS92("O2")
+CO2SS92: RealGasABC = get_corresponding_states_SS92("CO2")
+COSS92: RealGasABC = get_corresponding_states_SS92("CO")
+CH4SS92: RealGasABC = get_corresponding_states_SS92("CH4")
+S2SS92: RealGasABC = get_corresponding_states_SS92("S2")
+COSSS92: RealGasABC = get_corresponding_states_SS92("COS")
 
 # N2, H2, Ar are presented in Saxena and Fei for the high pressure fit only, but here we adopt the
 # same low pressure extension as in Shi and Saxena (1992), Table 1(a).
-N2SF87: FugacityModelABC = get_corresponding_states_SS92("N2")
-H2SF87: FugacityModelABC = get_corresponding_states_SS92("H2")
-ArSF87: FugacityModelABC = get_corresponding_states_SS92("Ar")
+N2SF87: RealGasABC = get_corresponding_states_SS92("N2")
+H2SF87: RealGasABC = get_corresponding_states_SS92("H2")
+ArSF87: RealGasABC = get_corresponding_states_SS92("Ar")
 
 
-def get_saxena_fugacity_models() -> dict[str, FugacityModelABC]:
+def get_saxena_fugacity_models() -> dict[str, RealGasABC]:
     """Gets a dictionary of the preferred fugacity models to use for each species.
 
     Returns:
         Dictionary of preferred fugacity models for each species.
     """
-    models: dict[str, FugacityModelABC] = {}
+    models: dict[str, RealGasABC] = {}
     models["Ar"] = ArSF87
     models["CH4"] = CH4SS92
     models["CO"] = COSS92
