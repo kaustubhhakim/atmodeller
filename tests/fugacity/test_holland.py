@@ -20,9 +20,7 @@ from atmodeller.eos.holland import (
     CORKH2OHP98,
     CORKSimpleCO2HP91,
     MRKSimpleCO2HP91,
-    get_holland_fugacity_models,
 )
-from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.interfaces import (
     GasSpecies,
     IdealityConstant,
@@ -31,7 +29,7 @@ from atmodeller.interfaces import (
     ThermodynamicDataBase,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import BasaltDixonCO2, BasaltH2, PeridotiteH2O
+from atmodeller.solubilities import PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
 # Tolerances to compare the test results with target output.
