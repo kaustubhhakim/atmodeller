@@ -655,12 +655,13 @@ class critical_data:
 # Powell
 critical_data_dictionary: dict[str, critical_data] = {
     "H2O": critical_data(647.25, 221.1925),
-    "CO2": critical_data(304.15, 73.8659),  # 304.2, 0.0738
-    "CH4": critical_data(191.05, 46.4069),  # 190.6, 0.0460
-    "CO": critical_data(133.15, 34.9571),  # 132.9, 0.0350
+    "CO2": critical_data(304.15, 73.8659),  # 304.2, 73.8 from Holland and Powell (1991)
+    "CH4": critical_data(191.05, 46.4069),  # 190.6, 46 from Holland and Powell (1991)
+    "CO": critical_data(133.15, 34.9571),  # 132.9, 35 from Holland and Powell (1991)
     "O2": critical_data(154.75, 50.7638),
-    # FIXME: Second set of data give closer to expected, but where did I get that from?
-    "H2": critical_data(33.25, 12.9696),  # 41.2, 0.0211
+    "H2": critical_data(33.25, 12.9696),
+    # Holland and Powell (1991) require different critical parameters
+    "H2_Holland": critical_data(41.2, 21.1),
     # Holland and Powell (2011) state that the critical constants for S2 are taken from:
     # Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.
     # McGraw-Hill, New York.

@@ -167,7 +167,7 @@ class CORKCorrespondingStatesHP91(CORKABC):
 # MRK concrete classes
 MRKSimpleCO2HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO2")
 MRKCH4HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CH4")
-MRKH2HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2")
+MRKH2HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2_Holland")
 MRKCOHP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO")
 MRKS2HP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("S2")
 MRKH2SHP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2S")
@@ -175,7 +175,7 @@ MRKH2SHP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2S")
 # CORK concrete classes
 CORKSimpleCO2HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO2")
 CORKCH4HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CH4")
-CORKH2HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2")
+CORKH2HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2_Holland")
 CORKCOHP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO")
 CORKS2HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("S2")
 CORKH2SHP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")

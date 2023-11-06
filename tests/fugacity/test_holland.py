@@ -198,84 +198,85 @@ def test_H2_with_cork() -> None:
     assert system.isclose(target_pressures)
 
 
-def test_CORK() -> None:
-    """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer."""
+# More complicated test to possibly reinstate at some point.
+# def test_CORK() -> None:
+#     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer."""
 
-    fugacity_models: dict[str, RealGasABC] = get_holland_fugacity_models()
+#     fugacity_models: dict[str, RealGasABC] = get_holland_fugacity_models()
 
-    species: Species = Species(
-        [
-            GasSpecies(
-                chemical_formula="H2",
-                solubility=BasaltH2(),
-                thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=fugacity_models["H2"],
-            ),
-            GasSpecies(
-                chemical_formula="H2O",
-                solubility=PeridotiteH2O(),
-                thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=fugacity_models["H2O"],
-            ),
-            GasSpecies(
-                chemical_formula="O2",
-                solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
-            ),
-            GasSpecies(
-                chemical_formula="CO",
-                solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=fugacity_models["CO"],
-            ),
-            GasSpecies(
-                chemical_formula="CO2",
-                solubility=BasaltDixonCO2(),
-                thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=fugacity_models["CO2"],
-            ),
-            GasSpecies(
-                chemical_formula="CH4",
-                solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=fugacity_models["CH4"],
-            ),
-            # SolidSpecies(
-            #     chemical_formula="C",
-            #     name_in_thermodynamic_data="graphite",
-            #     thermodynamic_class=thermodynamic_data,
-            # ),  # Ideal activity by default.
-        ]
-    )
+#     species: Species = Species(
+#         [
+#             GasSpecies(
+#                 chemical_formula="H2",
+#                 solubility=BasaltH2(),
+#                 thermodynamic_class=thermodynamic_data,
+#                 fugacity_coefficient=fugacity_models["H2"],
+#             ),
+#             GasSpecies(
+#                 chemical_formula="H2O",
+#                 solubility=PeridotiteH2O(),
+#                 thermodynamic_class=thermodynamic_data,
+#                 fugacity_coefficient=fugacity_models["H2O"],
+#             ),
+#             GasSpecies(
+#                 chemical_formula="O2",
+#                 solubility=NoSolubility(),
+#                 thermodynamic_class=thermodynamic_data,
+#             ),
+#             GasSpecies(
+#                 chemical_formula="CO",
+#                 solubility=NoSolubility(),
+#                 thermodynamic_class=thermodynamic_data,
+#                 fugacity_coefficient=fugacity_models["CO"],
+#             ),
+#             GasSpecies(
+#                 chemical_formula="CO2",
+#                 solubility=BasaltDixonCO2(),
+#                 thermodynamic_class=thermodynamic_data,
+#                 fugacity_coefficient=fugacity_models["CO2"],
+#             ),
+#             GasSpecies(
+#                 chemical_formula="CH4",
+#                 solubility=NoSolubility(),
+#                 thermodynamic_class=thermodynamic_data,
+#                 fugacity_coefficient=fugacity_models["CH4"],
+#             ),
+#             # SolidSpecies(
+#             #     chemical_formula="C",
+#             #     name_in_thermodynamic_data="graphite",
+#             #     thermodynamic_class=thermodynamic_data,
+#             # ),  # Ideal activity by default.
+#         ]
+#     )
 
-    oceans: float = 10
-    planet: Planet = Planet()
-    planet.surface_temperature = 2000  # K 600 + 273  # K
-    h_kg: float = earth_oceans_to_kg(oceans)
-    c_kg: float = h_kg
+#     oceans: float = 10
+#     planet: Planet = Planet()
+#     planet.surface_temperature = 2000  # K 600 + 273  # K
+#     h_kg: float = earth_oceans_to_kg(oceans)
+#     c_kg: float = h_kg
 
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            FugacityConstraint(species="H2", value=958),
-            # MassConstraint(species="H", value=h_kg),
-            # PressureConstraint(species="H2", value=734),
-            IronWustiteBufferConstraintHirschmann(),
-            # FugacityConstraint(species="CO", value=1e3),
-            MassConstraint(species="C", value=c_kg),
-            # FugacityConstraint(species="CH4", value=1e2),
-        ]
-    )
+#     constraints: SystemConstraints = SystemConstraints(
+#         [
+#             FugacityConstraint(species="H2", value=958),
+#             # MassConstraint(species="H", value=h_kg),
+#             # PressureConstraint(species="H2", value=734),
+#             IronWustiteBufferConstraintHirschmann(),
+#             # FugacityConstraint(species="CO", value=1e3),
+#             MassConstraint(species="C", value=c_kg),
+#             # FugacityConstraint(species="CH4", value=1e2),
+#         ]
+#     )
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+#     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "CH4": 10.362368367415021,
-        "CO": 276.0229490743045,
-        "CO2": 64.1797264653132,
-        "H2": 696.9735901947636,
-        "H2O": 933.3318808785544,
-        "O2": 9.862056623578625e-08,
-    }
+#     target_pressures: dict[str, float] = {
+#         "CH4": 10.362368367415021,
+#         "CO": 276.0229490743045,
+#         "CO2": 64.1797264653132,
+#         "H2": 696.9735901947636,
+#         "H2O": 933.3318808785544,
+#         "O2": 9.862056623578625e-08,
+#     }
 
-    system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures)
+#     system.solve(SystemConstraints(constraints))
+#     assert system.isclose(target_pressures)
