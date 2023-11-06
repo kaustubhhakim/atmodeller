@@ -348,6 +348,226 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
 
 @dataclass(kw_only=True)
+class VirialCompensation(RealGasABC):
+    """A compensation term for the increasing deviation of the MRK volumes with pressure
+
+    General form of the equation from Holland and Powell (1998), and also see Holland and Powell
+    (1991) Equations 4 and 9:
+
+        V_virial = a(P-P0) + b(P-P0)**0.5 + c(P-P0)**0.25
+
+    This form also works for the virial compensation term from Holland and Powell (1991), in which
+    case c=0. critical_pressure and critical_temperature are required for gases which are known to
+    obey approximately the principle of corresponding states.
+
+    Although this looks similar to an EOS, it's important to remember that for Holland and Powell
+    it only calculates an additional perturbation to the volume and the volume integral of an MRK
+    EOS, and hence it does not return a meaningful volume or volume integral by itself.
+
+    Args:
+        a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
+            may be scaled (internally) by critical parameters for corresponding states
+        b_coefficients: As above for the b coefficients
+        c_coefficients: As above for the c coefficients
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data. Defaults to zero, which is
+            appropriate for the corresponding states case.
+        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
+        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
+
+    Attributes:
+        a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
+            may be additionally (internally) scaled by Tc and Pc in the case of corresponding
+            states.
+        b_coefficients: As above for the b coefficients
+        c_coefficients: As above for the c coefficients
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data
+        critical_temperature: Critical temperature in kelvin
+        critical_pressure: Critical pressure in bar
+        standard_state_pressure: Standard state pressure
+    """
+
+    a_coefficients: tuple[float, float]
+    b_coefficients: tuple[float, float]
+    c_coefficients: tuple[float, float]
+    P0: float
+
+    @debug_decorator(logger)
+    def a(self, temperature: float) -> float:
+        """a parameter in Holland and Powell (1998)
+
+        Args:
+            temperature: Temperature in kelvin
+
+        Returns:
+            a parameter in J bar^(-2) mol^(-1)
+        """
+        a: float = (
+            self.a_coefficients[0] * self.critical_temperature
+            + self.a_coefficients[1] * temperature
+        )
+        a /= self.critical_pressure**2
+
+        return a
+
+    @debug_decorator(logger)
+    def b(self, temperature: float) -> float:
+        """b parameter in Holland and Powell (1998)
+
+        Args:
+            temperature: Temperature in kelvin
+
+        Returns:
+            b parameter in J bar^(-3/2) mol^(-1)
+        """
+        b: float = (
+            self.b_coefficients[0] * self.critical_temperature
+            + self.b_coefficients[1] * temperature
+        )
+        b /= self.critical_pressure ** (3 / 2)
+
+        return b
+
+    @debug_decorator(logger)
+    def c(self, temperature: float) -> float:
+        """c parameter in Holland and Powell (1998)
+
+        Note the scalings by self.Tc and self.Pc to accommodate corresponding states.
+
+        Args:
+            temperature: Temperature in kelvin
+
+        Returns:
+            c parameter in J bar^(-5/4) mol^(-1)
+        """
+        c: float = (
+            self.c_coefficients[0] * self.critical_temperature
+            + self.c_coefficients[1] * temperature
+        )
+        c /= self.critical_pressure ** (5 / 4)
+
+        return c
+
+    @debug_decorator(logger)
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume contribution
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume contribution
+        """
+        volume: float = (
+            self.a(temperature) * (pressure - self.P0)
+            + self.b(temperature) * (pressure - self.P0) ** 0.5
+            + self.c(temperature) * (pressure - self.P0) ** 0.25
+        )
+
+        return volume
+
+    @debug_decorator(logger)
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (VdP) contribution
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral contribution
+        """
+        volume_integral: float = (
+            self.a(temperature) / 2.0 * (pressure - self.P0) ** 2
+            + 2.0 / 3.0 * self.b(temperature) * (pressure - self.P0) ** (3.0 / 2.0)
+            + 4.0 / 5.0 * self.c(temperature) * (pressure - self.P0) ** (5.0 / 4.0)
+        )
+
+        return volume_integral
+
+
+@dataclass(kw_only=True)
+class CORKABC(RealGasABC):
+    """A Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991)
+
+    Args:
+        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
+        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
+        P0: Pressure in bar at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data
+        mrk: MRK model for computing the MRK contribution
+        a_virial: a coefficients for the virial compensation. Defaults to zero coefficients
+        b_virial: b coefficients for the virial compensation. Defaults to zero coefficients
+        c_virial: c coefficients for the virial compensation. Defaults to zero coefficients
+
+    Attributes:
+        critical_temperature: Critical temperature in kelvin
+        critical_pressure: Critical pressure in bar
+        standard_state_pressure: Standard state pressure
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly, and may be determined from experimental data
+        mrk: MRK model for computing the MRK contribution
+        a_virial: a coefficients for the virial compensation
+        b_virial: b coefficients for the virial compensation
+        c_virial: c coefficients for the virial compensation
+        virial: A VirialCompensation instance
+    """
+
+    P0: float
+    mrk: RealGasABC
+    a_virial: tuple[float, float] = field(init=False, default=(0, 0))
+    b_virial: tuple[float, float] = field(init=False, default=(0, 0))
+    c_virial: tuple[float, float] = field(init=False, default=(0, 0))
+    virial: VirialCompensation = field(init=False)
+
+    def __post_init__(self):
+        self.virial = VirialCompensation(
+            a_coefficients=self.a_virial,
+            b_coefficients=self.b_virial,
+            c_coefficients=self.c_virial,
+            P0=self.P0,
+            critical_temperature=self.critical_temperature,
+            critical_pressure=self.critical_pressure,
+        )
+
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume including virial compensation. Equation 7a, Holland and Powell (1991)
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume including the virial compensation in m^3 mol^(-1)
+        """
+        volume: float = self.mrk.volume(temperature, pressure)
+
+        if pressure > self.P0:
+            volume += self.virial.volume(temperature, pressure)
+
+        return volume
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral including virial compensation. Equation 8, Holland and Powell (1991)
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral including the virial compensation in J mol^(-1)
+        """
+        volume_integral: float = self.mrk.volume_integral(temperature, pressure)
+
+        if pressure > self.P0:
+            volume_integral += self.virial.volume_integral(temperature, pressure)
+
+        return volume_integral
+
+
+@dataclass(kw_only=True)
 class CombinedFugacityModel(RealGasABC):
     """Combines multiple fugacity models for different pressure ranges into a single model.
 
@@ -435,10 +655,11 @@ class critical_data:
 # Powell
 critical_data_dictionary: dict[str, critical_data] = {
     "H2O": critical_data(647.25, 221.1925),
-    "CO2": critical_data(304.2, 73.8),  # (304.15, 73.8659),  # 304.2, 0.0738
+    "CO2": critical_data(304.15, 73.8659),  # 304.2, 0.0738
     "CH4": critical_data(191.05, 46.4069),  # 190.6, 0.0460
     "CO": critical_data(133.15, 34.9571),  # 132.9, 0.0350
     "O2": critical_data(154.75, 50.7638),
+    # FIXME: Second set of data give closer to expected, but where did I get that from?
     "H2": critical_data(33.25, 12.9696),  # 41.2, 0.0211
     # Holland and Powell (2011) state that the critical constants for S2 are taken from:
     # Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.

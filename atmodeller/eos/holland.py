@@ -66,19 +66,121 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-import numpy as np
 from scipy.constants import kilo
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.eos.holland_base import (
-    CORKABC,
-    MRKCriticalBehaviour,
-    MRKImplicitABC,
-    RealGasABC,
-)
-from atmodeller.eos.interfaces import MRKExplicitABC, critical_data_dictionary
+from atmodeller.eos.holland_base import MRKCriticalBehaviour, MRKImplicitABC, RealGasABC
+from atmodeller.eos.interfaces import CORKABC, MRKExplicitABC, critical_data_dictionary
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+# region MRK Corresponding States
+
+
+@dataclass(kw_only=True)
+class MRKCorrespondingStatesHP91(MRKExplicitABC):
+    """A MRK simplified model used for corresponding states from Holland and Powell (1991).
+
+    Universal constants from Table 2, Holland and Powell (1991). Note the unit conversion to SI.
+
+    a coefficients have been multiplied by 1e6 to convert kJ^2 to J^2 in the numerator. The
+        pressure units effectively cancel because the ratio a/b is calculated.
+    b coefficients have been multiplied by 1e3 to convert kJ to J in the numerator. The pressure
+        units also cancel because b is multiplied by a pressure.
+
+    See base class.
+    """
+
+    a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e1, -8.63920e0, 0))
+    b0: float = field(init=False, default=9.18301e-1)
+
+    @classmethod
+    def get_species(cls, species: str) -> RealGasABC:
+        """Instantiates a MRK corresponding states model for a given species.
+
+        Args:
+            species: A species which is a key in the critical_data_dictionary
+
+        Returns:
+            A corresponding states model for the species
+        """
+        return cls(
+            critical_temperature=critical_data_dictionary[species].temperature,
+            critical_pressure=critical_data_dictionary[species].pressure,
+        )
+
+
+@dataclass(kw_only=True)
+class CORKCorrespondingStatesHP91(CORKABC):
+    """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
+
+    Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
+    gases which are known to obey approximately the principle of corresponding states. The
+    corresponding states parameters are from Table 2 in Holland and Powell (1991). Note also in
+    this case it appears P0 is always zero, even though for the full CORK equations it determines
+    whether or not the virial contribution is added. It assumes there are no complications of
+    critical behaviour in the P-T range considered.
+
+    The unit conversions to SI mean that every coefficient has been multiplied by 1e3 to convert
+    kJ to J in the numerator. The pressure units cancel in the calculation.
+
+    Args:
+        critical_temperature: Critical temperature in kelvin.
+        critical_pressure: Critical pressure.
+        mrk: Fugacity model for computing the MRK contribution.
+
+    Attributes:
+        critical_temperature: Critical temperature in kelvin.
+        critical_pressure: Critical pressure.
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume. Set to 0.
+        a_virial: Constants for the virial contribution (d0 and d1 in Table 2).
+        b_virial: Constants for the virial contribution (c0 and c1 in Table 2).
+        c_virial: Constants for the virial contribution (unused).
+        virial: Virial contribution object.
+    """
+
+    P0: float = field(init=False, default=0)
+    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-4, -8.38293e-5))
+    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-2, 2.30524e-3))
+    c_virial: tuple[float, float] = field(init=False, default=(0, 0))
+
+    @classmethod
+    def get_species(cls, species: str) -> RealGasABC:
+        """Instantiates a CORK corresponding states model for a given species.
+
+        Args:
+            species: A species which is a key in the critical_data_dictionary
+
+        Returns:
+            A corresponding states model for the species
+        """
+        mrk: RealGasABC = MRKCorrespondingStatesHP91.get_species(species)
+
+        return cls(
+            mrk=mrk,
+            critical_temperature=critical_data_dictionary[species].temperature,
+            critical_pressure=critical_data_dictionary[species].pressure,
+        )
+
+
+# MRK concrete classes
+MRKSimpleCO2HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO2")
+MRKCH4HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CH4")
+MRKH2HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2")
+MRKCOHP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO")
+MRKS2HP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("S2")
+MRKH2SHP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2S")
+
+# CORK concrete classes
+CORKSimpleCO2HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO2")
+CORKCH4HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CH4")
+CORKH2HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2")
+CORKCOHP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO")
+CORKS2HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("S2")
+CORKH2SHP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")
+
+# endregion
 
 # The critical temperature for the CORK H2O model.
 Tc_H2O: float = 695  # K
@@ -402,178 +504,6 @@ class CORKH2OHP98(Unitskbar, CORKABC):
     c_virial: tuple[float, float] = field(init=False, default=(8.0331e-2, 0))
 
 
-@dataclass(kw_only=True)
-class MRKCorrespondingStatesHP91(MRKExplicitABC):
-    """A MRK simplified model used for corresponding states from Holland and Powell (1991).
-
-    Universal constants from Table 2, Holland and Powell (1991). Note the unit conversion to SI.
-
-    See base class.
-    """
-
-    a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e1, -8.63920e0, 0))
-    b0: float = field(init=False, default=9.18301e-1)
-
-
-def get_MRK_corresponding_states_HP91(species: str) -> RealGasABC:
-    eos: RealGasABC = MRKCorrespondingStatesHP91(
-        critical_temperature=critical_data_dictionary[species].temperature,
-        critical_pressure=critical_data_dictionary[species].pressure,
-    )
-
-    return eos
-
-
-MRKSimpleCO2HP91: RealGasABC = get_MRK_corresponding_states_HP91("CO2")
-MRKCH4HP91: RealGasABC = get_MRK_corresponding_states_HP91("CH4")
-MRKH2HP91: RealGasABC = get_MRK_corresponding_states_HP91("H2")
-MRKCOHP91: RealGasABC = get_MRK_corresponding_states_HP91("CO")
-MRKS2HP11: RealGasABC = get_MRK_corresponding_states_HP91("S2")
-MRKH2SHP11: RealGasABC = get_MRK_corresponding_states_HP91("H2S")
-
-
-@dataclass(kw_only=True)
-class CORKCorrespondingStatesHP91(CORKABC):
-    """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
-
-    Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
-    gases which are known to obey approximately the principle of corresponding states. The
-    corresponding states parameters are from Table 2 in Holland and Powell (1991). Note also in
-    this case it appears P0 is always zero, even though for the full CORK equations it determines
-    whether or not the virial contribution is added. It assumes there are no complications of
-    critical behaviour in the P-T range considered.
-
-    Args:
-        critical_temperature: Critical temperature in kelvin.
-        critical_pressure: Critical pressure.
-        mrk: Fugacity model for computing the MRK contribution.
-
-    Attributes:
-        critical_temperature: Critical temperature in kelvin.
-        critical_pressure: Critical pressure.
-        P0: Pressure at which the MRK equation begins to overestimate the molar volume. Set to 0.
-        a_virial: Constants for the virial contribution (d0 and d1 in Table 2).
-        b_virial: Constants for the virial contribution (c0 and c1 in Table 2).
-        c_virial: Constants for the virial contribution (unused).
-        virial: Virial contribution object.
-    """
-
-    P0: float = field(init=False, default=0)
-    # FIXME: Unit convert these parameters to SI.
-    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-7, -8.38293e-8))
-    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-5, 2.30524e-6))
-    c_virial: tuple[float, float] = field(init=False, default=(0, 0))
-
-    def __post_init__(self):
-        a: list[float] = [0, 0]
-        fac: float = 1
-        a[0] = fac * self.a_virial[0]
-        a[1] = fac * self.a_virial[1]
-        self.a_virial = tuple(a)
-        print(self.a_virial)
-        logger.debug("a_virial = %s", self.a_virial)
-        b: list[float] = [0, 0]
-        fac = np.sqrt(1000)
-        b[0] = fac * self.b_virial[0]
-        b[1] = fac * self.b_virial[1]
-        self.b_virial = tuple(b)
-        print(self.b_virial)
-        logger.debug("b_virial = %s", self.b_virial)
-        super().__post_init__()
-
-
-CORKSimpleCO2HP91: RealGasABC = CORKCorrespondingStatesHP91(
-    mrk=MRKSimpleCO2HP91,
-    critical_temperature=critical_data_dictionary["CO2"].temperature,
-    critical_pressure=critical_data_dictionary["CO2"].pressure,
-)
-
-
-# @dataclass(kw_only=True)
-# class CORKSimpleCO2HP91(CORKCorrespondingStatesHP91):
-#     """CORK for CO2. See base class.
-
-#     See Table below Figure 8 in Holland and Powell (1991).
-#     """
-
-#     mrk: RealGasABC = field(init=False, default_factory=MRKSimpleCO2HP91)
-#     Tc: float = field(init=False, default=critical_data_dictionary["CO2"].temperature)
-#     Pc: float = field(init=False, default=critical_data_dictionary["CO2"].pressure)
-
-
-@dataclass(kw_only=True)
-class CORKCH4HP91(CORKCorrespondingStatesHP91):
-    """CORK for CH4. See base class.
-
-    See Table below Figure 8 in Holland and Powell (1991).
-    """
-
-    mrk: RealGasABC = field(init=False, default_factory=MRKCH4HP91)
-    Tc: float = field(init=False, default=critical_data_dictionary["CH4"].temperature)  # K
-    Pc: float = field(init=False, default=critical_data_dictionary["CH4"].pressure)
-
-
-@dataclass(kw_only=True)
-class CORKH2HP91(CORKCorrespondingStatesHP91):
-    """CORK for H2. See base class.
-
-    See Table below Figure 8 in Holland and Powell (1991).
-    """
-
-    mrk: RealGasABC = field(init=False, default_factory=MRKH2HP91)
-    Tc: float = field(init=False, default=critical_data_dictionary["H2"].temperature)
-    Pc: float = field(init=False, default=critical_data_dictionary["H2"].pressure)
-
-
-@dataclass(kw_only=True)
-class CORKCOHP91(CORKCorrespondingStatesHP91):
-    """CORK for CO. See base class.
-
-    See Table below Figure 8 in Holland and Powell (1991).
-    """
-
-    mrk: RealGasABC = field(init=False, default_factory=MRKCOHP91)
-    Tc: float = field(init=False, default=critical_data_dictionary["CO"].temperature)
-    Pc: float = field(init=False, default=critical_data_dictionary["CO"].pressure)
-
-
-@dataclass(kw_only=True)
-class CORKS2HP11(CORKCorrespondingStatesHP91):
-    """CORK for S2. See base class.
-
-    Holland and Powell (2011) state that the critical constants for S2 are taken from:
-
-        Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.
-        McGraw-Hill, New York.
-
-    In the fifth edition of this book S2 is not given (only S is), so instead the critical
-    constants for S2 are taken from:
-
-        Shi and Saxena, Thermodynamic modeling of the C-H-O-S fluid system, American Mineralogist,
-        Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid phases.
-        http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
-    """
-
-    mrk: RealGasABC = field(init=False, default_factory=MRKS2HP11)
-    Tc: float = field(init=False, default=critical_data_dictionary["S2"].temperature)
-    Pc: float = field(init=False, default=critical_data_dictionary["S2"].pressure)
-
-
-@dataclass(kw_only=True)
-class CORKH2SHP11(CORKCorrespondingStatesHP91):
-    """CORK for H2S. See base class.
-
-    Appendix A.19 in:
-
-        Poling, Prausnitz, and O'Connell, 2001. The Properties of Gases and Liquids, 5th edition.
-        McGraw-Hill, New York. DOI: 10.1036/0070116822.
-    """
-
-    mrk: RealGasABC = field(init=False, default_factory=MRKH2SHP11)
-    Tc: float = field(init=False, default=critical_data_dictionary["H2S"].temperature)
-    Pc: float = field(init=False, default=critical_data_dictionary["H2S"].pressure)
-
-
 def get_holland_fugacity_models() -> dict[str, RealGasABC]:
     """Gets a dictionary of the preferred fugacity models to use for each species.
 
@@ -581,12 +511,12 @@ def get_holland_fugacity_models() -> dict[str, RealGasABC]:
         Dictionary of preferred fugacity models for each species.
     """
     models: dict[str, RealGasABC] = {}
-    models["CH4"] = CORKCH4HP91()
-    models["CO"] = CORKCOHP91()
+    models["CH4"] = CORKCH4HP91
+    models["CO"] = CORKCOHP91
     models["CO2"] = CORKCO2HP98()
-    models["H2"] = CORKH2HP91()
+    models["H2"] = CORKH2HP91
     models["H2O"] = CORKH2OHP98()
-    models["H2S"] = CORKH2SHP11()
-    models["S2"] = CORKS2HP11()
+    models["H2S"] = CORKH2SHP11
+    models["S2"] = CORKS2HP11
 
     return models

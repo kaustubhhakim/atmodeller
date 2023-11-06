@@ -49,23 +49,23 @@ def test_version():
 
 
 def test_MRK(check_values) -> None:
-    check_values.fugacity_coefficient(2000, 10e3, MRKSimpleCO2HP91, 9.828631613568316)
+    check_values.fugacity_coefficient(2000, 10e3, MRKSimpleCO2HP91, 9.80535714428564)
 
 
 def test_CorkH2(check_values) -> None:
-    check_values.fugacity_coefficient(2000, 10, CORKH2HP91(), 4.672042007568433)
+    check_values.fugacity_coefficient(2000, 10e3, CORKH2HP91, 4.672042007568433)
 
 
 def test_CorkCO(check_values) -> None:
-    check_values.fugacity_coefficient(2000, 10, CORKCOHP91(), 7.698485559533069)
+    check_values.fugacity_coefficient(2000, 10e3, CORKCOHP91, 7.737070657107842)
 
 
 def test_CorkCH4(check_values) -> None:
-    check_values.fugacity_coefficient(2000, 10, CORKCH4HP91(), 8.116070626285136)
+    check_values.fugacity_coefficient(2000, 10e3, CORKCH4HP91, 8.013532244610671)
 
 
 def test_simple_CorkCO2(check_values) -> None:
-    check_values.fugacity_coefficient(2000, 10e3, CORKSimpleCO2HP91, 7.1335509191383455)
+    check_values.fugacity_coefficient(2000, 10e3, CORKSimpleCO2HP91, 7.120242298956865)
 
 
 def test_CorkCO2_at_P0(check_values) -> None:
@@ -165,7 +165,7 @@ def test_H2_with_cork() -> None:
                 chemical_formula="H2",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CORKH2HP91(),
+                fugacity_coefficient=CORKH2HP91,
             ),
             GasSpecies(
                 chemical_formula="O2",
