@@ -19,9 +19,10 @@ from atmodeller.eos.holland import (
     CORKH2HP91,
     CORKH2OHP98,
     CORKSimpleCO2HP91,
+    MRKSimpleCO2HP91,
     get_holland_fugacity_models,
 )
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.interfaces import (
     GasSpecies,
     IdealityConstant,
@@ -47,6 +48,10 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
+def test_MRK(check_values) -> None:
+    check_values.fugacity_coefficient(2000, 10e3, MRKSimpleCO2HP91, 9.828631613568316)
+
+
 def test_CorkH2(check_values) -> None:
     check_values.fugacity_coefficient(2000, 10, CORKH2HP91(), 4.672042007568433)
 
@@ -60,7 +65,7 @@ def test_CorkCH4(check_values) -> None:
 
 
 def test_simple_CorkCO2(check_values) -> None:
-    check_values.fugacity_coefficient(2000, 10, CORKSimpleCO2HP91(), 7.1335509191383455)
+    check_values.fugacity_coefficient(2000, 10e3, CORKSimpleCO2HP91, 7.1335509191383455)
 
 
 def test_CorkCO2_at_P0(check_values) -> None:
@@ -196,7 +201,7 @@ def test_H2_with_cork() -> None:
 def test_CORK() -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer."""
 
-    fugacity_models: dict[str, FugacityModelABC] = get_holland_fugacity_models()
+    fugacity_models: dict[str, RealGasABC] = get_holland_fugacity_models()
 
     species: Species = Species(
         [
