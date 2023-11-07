@@ -431,10 +431,10 @@ class MRKH2OHP91(MRKCriticalBehaviour):
         """Saturation curve. Equation 5, Holland and Powell (1991).
 
         Args:
-            temperature: Temperature in kelvin.
+            temperature: Temperature in kelvin
 
         Returns:
-            Saturation curve pressure in kbar.
+            Saturation curve pressure in bar
         """
         Psat: float = (
             -13.627
