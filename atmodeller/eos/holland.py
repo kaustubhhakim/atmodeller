@@ -473,8 +473,14 @@ class CORKCO2HP98(CORKABC):
 
     P0: float = field(init=False, default=5.0e3)
     mrk: RealGasABC = field(init=False, default_factory=MRKCO2HP98)
-    a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
-    b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
+    # a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
+    # TODO: virial divided by k
+    a_virial: tuple[float, float] = field(init=False, default=(5.40776e-6, -1.59046e-9))
+    # b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
+    # TODO: virial multipled by k**-(1/2)
+    b_virial: tuple[float, float] = field(
+        init=False, default=(-0.005635115544866848, 7.757604687595263e-07)
+    )
 
 
 @dataclass(kw_only=True)
