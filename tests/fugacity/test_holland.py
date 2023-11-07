@@ -9,7 +9,6 @@ from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
-    MassConstraint,
     SystemConstraints,
 )
 from atmodeller.eos.holland import (
@@ -23,14 +22,13 @@ from atmodeller.eos.holland import (
 )
 from atmodeller.interfaces import (
     GasSpecies,
-    IdealityConstant,
+    IdealGas,
     NoSolubility,
     ThermodynamicData,
     ThermodynamicDataBase,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import PeridotiteH2O
-from atmodeller.utilities import earth_oceans_to_kg
 
 # Tolerances to compare the test results with target output.
 rtol: float = 1.0e-8
@@ -103,50 +101,51 @@ def test_CorkH2O_below_Tc_above_P0(check_values) -> None:
     check_values.fugacity_coefficient(600, 10, CORKH2OHP98(), 0.40066985009753664)
 
 
-def test_H_fO2() -> None:
-    """Tests H2-H2O at the IW buffer."""
+# TODO: Test is just for an ideal gas so not particularly useful
+# def test_H_fO2() -> None:
+#     """Tests H2-H2O at the IW buffer."""
 
-    species: Species = Species(
-        [
-            GasSpecies(
-                chemical_formula="H2O",
-                solubility=PeridotiteH2O(),
-                thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=IdealityConstant(value=2),
-            ),
-            GasSpecies(
-                chemical_formula="H2",
-                solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=IdealityConstant(value=2),
-            ),
-            GasSpecies(
-                chemical_formula="O2",
-                solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
-            ),
-        ]
-    )
+#     species: Species = Species(
+#         [
+#             GasSpecies(
+#                 chemical_formula="H2O",
+#                 solubility=PeridotiteH2O(),
+#                 thermodynamic_class=thermodynamic_data,
+#                 eos=IdealGas(),
+#             ),
+#             GasSpecies(
+#                 chemical_formula="H2",
+#                 solubility=NoSolubility(),
+#                 thermodynamic_class=thermodynamic_data,
+#                 eos=IdealGas(),
+#             ),
+#             GasSpecies(
+#                 chemical_formula="O2",
+#                 solubility=NoSolubility(),
+#                 thermodynamic_class=thermodynamic_data,
+#             ),
+#         ]
+#     )
 
-    oceans: float = 1
-    planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+#     oceans: float = 1
+#     planet: Planet = Planet()
+#     h_kg: float = earth_oceans_to_kg(oceans)
 
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(),
-        ]
-    )
+#     constraints: SystemConstraints = SystemConstraints(
+#         [
+#             MassConstraint(species="H", value=h_kg),
+#             IronWustiteBufferConstraintHirschmann(),
+#         ]
+#     )
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+#     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = dict(
-        [("H2O", 0.19626421729663665), ("H2", 0.19386112601058758), ("O2", 8.69970008669977e-08)]
-    )
+#     target_pressures: dict[str, float] = dict(
+#         [("H2O", 0.19626421729663665), ("H2", 0.19386112601058758), ("O2", 8.69970008669977e-08)]
+#     )
 
-    system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures)
+#     system.solve(SystemConstraints(constraints))
+#     assert system.isclose(target_pressures)
 
 
 def test_H2_with_cork() -> None:
@@ -158,17 +157,19 @@ def test_H2_with_cork() -> None:
                 chemical_formula="H2O",
                 solubility=PeridotiteH2O(),
                 thermodynamic_class=thermodynamic_data,
+                eos=IdealGas(),  # This is the default if nothing specified
             ),
             GasSpecies(
                 chemical_formula="H2",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
-                fugacity_coefficient=CORKH2HP91,
+                eos=CORKH2HP91,
             ),
             GasSpecies(
                 chemical_formula="O2",
                 solubility=NoSolubility(),
                 thermodynamic_class=thermodynamic_data,
+                eos=IdealGas(),  # This is the default if nothing specified
             ),
         ]
     )

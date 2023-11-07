@@ -494,7 +494,7 @@ class ReactionNetwork:
         # above to unity ensures that the coefficients are all zero for solid species, once the log
         # is taken.
         for index, gas_species in self.species.gas_species.items():
-            fugacity_coefficients[index] = gas_species.fugacity_coefficient.get_value(
+            fugacity_coefficients[index] = gas_species.eos.get_value(
                 temperature=system.planet.surface_temperature, pressure=system.total_pressure
             )
         log_fugacity_coefficients: np.ndarray = np.log10(fugacity_coefficients)
@@ -587,7 +587,7 @@ class InteriorAtmosphereSystem:
     def fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients (relevant for gas species only) in a dictionary."""
         output: dict[str, float] = {
-            species.chemical_formula: species.fugacity_coefficient.get_value(
+            species.chemical_formula: species.eos.get_value(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
             for species in self.species.gas_species.values()
