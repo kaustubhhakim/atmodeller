@@ -76,29 +76,29 @@ def test_CorkCO2_above_P0(check_values) -> None:
 
 def test_CorkH2O_above_Tc_below_P0(check_values) -> None:
     """Above Tc and below P0."""
-    check_values.fugacity_coefficient(2000, 1, CORKH2OHP98(), 1.048278616058322)
+    check_values.fugacity_coefficient(2000, 1e3, CORKH2OHP98(), 1.048278616058322)
 
 
 def test_CorkH2O_above_Tc_above_P0(check_values) -> None:
     """Above Tc and above P0."""
-    check_values.fugacity_coefficient(2000, 5, CORKH2OHP98(), 1.3444013638026706)
+    check_values.fugacity_coefficient(2000, 5e3, CORKH2OHP98(), 1.3444013638026706)
 
 
 def test_CorkH2O_below_Tc_below_Psat(check_values) -> None:
     """Below Tc and below Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_values.fugacity_coefficient(600, 0.1, CORKH2OHP98(), 0.7910907770688191)
+    check_values.fugacity_coefficient(600, 0.1e3, CORKH2OHP98(), 0.7910907770688191)
 
 
 def test_CorkH2O_below_Tc_above_Psat(check_values) -> None:
     """Below Tc and above Psat."""
     # Psat = 0.118224 at T = 600 K.
-    check_values.fugacity_coefficient(600, 1, CORKH2OHP98(), 0.14052644311851598)
+    check_values.fugacity_coefficient(600, 1e3, CORKH2OHP98(), 0.14052644311851598)
 
 
 def test_CorkH2O_below_Tc_above_P0(check_values) -> None:
     """Below Tc and above P0."""
-    check_values.fugacity_coefficient(600, 10, CORKH2OHP98(), 0.40066985009753664)
+    check_values.fugacity_coefficient(600, 10e3, CORKH2OHP98(), 0.40066985009753664)
 
 
 # TODO: Test is just for an ideal gas so not particularly useful

@@ -203,7 +203,7 @@ class MRKH2OLiquidHP91(MRKImplicitABC):
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
-        default=(1113.4, -0.88517, 4.53e-3, -1.3183e-5),
+        default=(1113.4e3, -0.88517e3, 4.53, -1.3183e-2),
     )
     b0: float = field(init=False, default=b0_H2O)
     Ta: float = field(init=False, default=Ta_H2O)
@@ -258,10 +258,10 @@ class MRKH2OGasHP91(MRKImplicitABC):
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(
-            1113.4,
-            5.8487,
-            -2.1370e-2,
-            6.8133e-5,
+            1113.4e3,
+            5.8487e3,
+            -2.1370e1,
+            6.8133e-2,
         ),
     )
     b0: float = field(init=False, default=b0_H2O)
@@ -314,10 +314,10 @@ class MRKH2OFluidHP91(MRKImplicitABC):
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(
-            1113.4,
-            -0.22291,
-            -3.8022e-4,
-            1.7791e-7,
+            1113.4e3,
+            -0.22291e3,
+            -3.8022e-1,
+            1.7791e-4,
         ),
     )
     b0: float = field(init=False, default=b0_H2O)
@@ -432,10 +432,10 @@ class MRKH2OHP91(MRKCriticalBehaviour):
             Saturation curve pressure in kbar.
         """
         Psat: float = (
-            -13.627e-3
-            + 7.29395e-7 * temperature**2
-            - 2.34622e-9 * temperature**3
-            + 4.83607e-15 * temperature**5
+            -13.627
+            + 7.29395e-4 * temperature**2
+            - 2.34622e-6 * temperature**3
+            + 4.83607e-12 * temperature**5
         )
         return Psat
 
@@ -479,7 +479,7 @@ class CORKH2OHP91(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=2.0)
+    P0: float = field(init=False, default=2.0e3)
     mrk: RealGasABC = field(init=False, default_factory=MRKH2OHP91)
     a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
     b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))
@@ -494,7 +494,7 @@ class CORKH2OHP98(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=2.0)
+    P0: float = field(init=False, default=2.0e3)
     mrk: RealGasABC = field(init=False, default_factory=MRKH2OHP98)
     a_virial: tuple[float, float] = field(init=False, default=(1.9853e-3, 0))
     b_virial: tuple[float, float] = field(init=False, default=(-8.9090e-2, 0))
