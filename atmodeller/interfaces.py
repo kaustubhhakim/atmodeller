@@ -17,8 +17,8 @@ import pandas as pd
 from molmass import Formula
 from thermochem import janaf
 
-from atmodeller import DATA_ROOT_PATH
-from atmodeller.utilities import UnitConversion
+from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT
+from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -40,6 +40,223 @@ class GetValueABC(ABC):
             An evaluation based on the provided arguments.
         """
         ...
+
+
+@dataclass(kw_only=True)
+class RealGasABC(GetValueABC):
+    """A real gas equation of state (EOS)
+
+    This base class requires a specification for the volume and volume integral. Then the
+    fugacity and related quantities can be computed using the standard relation:
+
+    RTlnf = integral(VdP)
+
+    If critical_temperature and critical_pressure are set to their default value of unity, then
+    these quantities are effectively not used, and the model coefficients should be in terms of
+    the real temperature and pressure. But for corresponding state models, which are formulated in
+    terms of a reduced temperature and a reduced pressure, the critical_temperature and
+    critical_pressure must be set to appropriate values for the species under consideration.
+
+    Args:
+        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
+        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
+
+    Attributes:
+        critical_temperature: Critical temperature in kelvin
+        critical_pressure: Critical pressure in bar
+        standard_state_pressure: Standard state pressure
+    """
+
+    critical_temperature: float = 1  # Default of one is equivalent to not used
+    critical_pressure: float = 1  # Default of one is equivalent to not used
+    standard_state_pressure: float = field(init=False, default=1)  # 1 bar
+
+    @debug_decorator(logger)
+    def scaled_pressure(self, pressure: float) -> float:
+        """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity.
+
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            The scaled (reduced) pressure, which is dimensionless
+        """
+        scaled_pressure: float = pressure / self.critical_pressure
+
+        return scaled_pressure
+
+    @debug_decorator(logger)
+    def scaled_temperature(self, temperature: float) -> float:
+        """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity.
+
+        Args:
+            temperature: Temperature in kelvin
+
+        Returns:
+            The scaled (reduced) temperature, which is dimensionless.
+        """
+        scaled_temperature: float = temperature / self.critical_temperature
+
+        return scaled_temperature
+
+    @debug_decorator(logger)
+    def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
+        """Compressibility parameter at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+            **kwargs: Catches unused keyword arguments. Used for overrides in subclasses.
+
+        Returns:
+            The compressibility parameter, Z, which is dimensionless.
+        """
+        del kwargs
+        volume: float = self.volume(temperature, pressure)
+        volume_ideal: float = self.ideal_volume(temperature, pressure)
+        Z: float = volume / volume_ideal
+
+        return Z
+
+    @debug_decorator(logger)
+    def get_value(self, *, temperature: float, pressure: float) -> float:
+        """Evaluates the fugacity coefficient at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity coefficient evaluated at temperature and pressure, which is dimensionaless.
+        """
+        fugacity_coefficient: float = self.fugacity_coefficient(temperature, pressure)
+
+        return fugacity_coefficient
+
+    @debug_decorator(logger)
+    def ln_fugacity(self, temperature: float, pressure: float) -> float:
+        """Natural log of the fugacity.
+
+        The fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and f0 is the
+        pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Natural log of the fugacity
+        """
+        ln_fugacity: float = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT * temperature
+        )
+
+        return ln_fugacity
+
+    @debug_decorator(logger)
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Fugacity in the same units as the input pressure.
+
+        Note that the fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and
+        f0 is the pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity in bar
+        """
+        fugacity: float = np.exp(self.ln_fugacity(temperature, pressure))
+
+        return fugacity
+
+    @debug_decorator(logger)
+    def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
+        """Fugacity coefficient.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            fugacity coefficient, which is non-dimensional.
+        """
+        fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
+
+        return fugacity_coefficient
+
+    @debug_decorator(logger)
+    def ideal_volume(self, temperature: float, pressure: float) -> float:
+        """Ideal volume
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            ideal volume in m^3 mol^(-1)
+        """
+        volume_ideal: float = GAS_CONSTANT * temperature / pressure
+
+        return volume_ideal
+
+    @abstractmethod
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume.
+
+        Args:
+            temperature: Temperature in kelvin.
+            pressure: Pressure in bar
+
+        Returns:
+            Volume in m^3 mol^(-1)
+        """
+        ...
+
+    @abstractmethod
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (VdP).
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral in J mol^(-1)
+        """
+        ...
+
+
+@dataclass(kw_only=True)
+class IdealGas(RealGasABC):
+    """An ideal gas, PV=RT"""
+
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume in m^3 mol^(-1)
+        """
+        return self.ideal_volume(temperature, pressure)
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral in J mol^(-1)
+        """
+        volume_integral: float = GAS_CONSTANT * temperature * np.log(pressure)
+
+        return volume_integral
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -702,30 +919,30 @@ class GasSpecies(ChemicalComponent):
     """A gas species.
 
     Args:
-        chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.).
-        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
-        solubility: Solubility model. Defaults to no solubility.
+        chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.)
+        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF
+        solubility: Solubility model. Defaults to no solubility
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
-            Defaults to 0.
-        fugacity_coefficient: Fugacity coefficient object. Defaults to ideal gas (i.e. unity).
+            Defaults to 0
+        eos: A gas equation of state. Defaults to an ideal gas.
 
     Attributes:
-        chemical_formula: Chemical formula.
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        formula: Formula object derived from the chemical formula.
-        thermodynamic_class: The class for thermodynamic data.
-        thermodynamic_data: Instance of thermodynamic_class for this chemical component.
-        solubility: Solubility model.
-        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
-        fugacity_coefficient: Fugacity coefficient object.
-        output: Stores calculated values for output.
+        chemical_formula: Chemical formula
+        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
+        formula: Formula object derived from the chemical formula
+        thermodynamic_class: The class for thermodynamic data
+        thermodynamic_data: Instance of thermodynamic_class for this chemical component
+        solubility: Solubility model
+        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt
+        eos: A gas equation of state
+        output: Stores calculated values for output
     """
 
     name_in_thermodynamic_data: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     output: Union[GasSpeciesOutput, None] = field(init=False, default=None)
-    fugacity_coefficient: GetValueABC = field(default_factory=IdealityConstant)
+    eos: RealGasABC = field(default_factory=IdealGas)
 
     def __post_init__(self):
         self.name_in_thermodynamic_data = self.chemical_formula

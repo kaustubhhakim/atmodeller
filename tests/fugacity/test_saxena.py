@@ -6,7 +6,7 @@ See the LICENSE file for licensing information.
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.eos.interfaces import FugacityModelABC
+from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.eos.saxena import (
     H2SF87,
     H2HighPressureSS92,
@@ -17,7 +17,7 @@ from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = debug_logger()
 
-fugacity_models: dict[str, FugacityModelABC] = get_saxena_fugacity_models()
+fugacity_models: dict[str, RealGasABC] = get_saxena_fugacity_models()
 
 
 def test_version():
@@ -70,7 +70,7 @@ def test_H2_low_pressure_SS92(check_values) -> None:
 
 def test_H2_medium_pressure_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
-    expected: float = 164.388310378618
+    expected: float = 164.38851468757488
     expected = UnitConversion.cm3_to_J_per_bar(expected)
     check_values.volume(873, 500, H2LowPressureSS92, expected)
 
