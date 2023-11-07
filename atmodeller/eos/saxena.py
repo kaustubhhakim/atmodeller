@@ -1,4 +1,4 @@
-"""Fugacity models from Shi and Saxena (1992), Saxena and Fei (1988), and Saxena and Fei (1987a,b)
+"""Real gas EOSs from Shi and Saxena (1992), Saxena and Fei (1988), and Saxena and Fei (1987a,b)
 
 See the LICENSE file for licensing information.
 
@@ -34,15 +34,15 @@ Examples:
     1.09669352805837
     ```
 
-    Get the preferred fugacity models for various species from the Saxena models. Note that the 
-    input pressure should always be in bar:
+    Get the preferred EOS models for various species from the Saxena models. Note that the input 
+    pressure should always be in bar:
     
     ```python
     >>> from atmodeller.eos.saxena import get_saxena_eos_models
     >>> models = get_saxena_eos_models()
     >>> # list the available species
     >>> models.keys()
-    >>> # Get the fugacity model for CO
+    >>> # Get the EOS model for CO
     >>> co_model = models['CO']
     >>> # Determine the fugacity coefficient at 2000 K and 1000 bar
     >>> fugacity_coefficient = co_model.get_value(temperature=2000, pressure=1000)
