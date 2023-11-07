@@ -186,6 +186,11 @@ CORKH2SHP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")
 
 # endregion
 
+# For any subclass of MRKImplicitABC, note the unit conversion to SI compared to the values that
+# Holland and Powell present
+# a coefficients have been multiplied by 1e3.
+# b coefficients remain the same
+
 # The critical temperature for the CORK H2O model.
 Tc_H2O: float = 695  # K
 # The temperature at which a_gas = a; hence the critical point is handled by a single a parameter.
