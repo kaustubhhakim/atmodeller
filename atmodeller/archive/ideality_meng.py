@@ -230,7 +230,7 @@ def main():
     # print("H2O: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
     # print("\n")
     print("Dan Full CORK:\n")
-    cork = CORKCO2HP98()
+    cork = CORKCO2HP98
     fugacity_coeff = cork.get_value(temperature=temperature, pressure=pressure * kilo)
     fugacity = cork.fugacity(temperature=temperature, pressure=pressure)
     volume = cork.volume(temperature=temperature, pressure=pressure)
@@ -270,7 +270,7 @@ def main():
     # volume_integral = cork.volume_integral(temperature=temperature, pressure=pressure)
     # print("CO2: V = %f, RTlnf = %f" % (volume, volume_integral))
     # print("CO2: fugacity = %f, fugacity_coefficient = %f" % (fugacity, fugacity_coeff))
-    cork = CORKH2OHP98()
+    cork = CORKH2OHP98
     fugacity_coeff = cork.get_value(temperature=temperature, pressure=pressure * kilo)
     fugacity = cork.fugacity(temperature=temperature, pressure=pressure)
     volume = cork.volume(temperature=temperature, pressure=pressure)
