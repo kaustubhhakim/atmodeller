@@ -66,12 +66,12 @@ def test_simple_CorkCO2(check_values) -> None:
 
 def test_CorkCO2_at_P0(check_values) -> None:
     """Below P0 so virial contribution excluded."""
-    check_values.fugacity_coefficient(2000, 2, CORKCO2HP98(), 1.6063624424808558)
+    check_values.fugacity_coefficient(2000, 2e3, CORKCO2HP98(), 1.6063624424808558)
 
 
 def test_CorkCO2_above_P0(check_values) -> None:
     """Above P0 so virial contribution included."""
-    check_values.fugacity_coefficient(2000, 10, CORKCO2HP98(), 7.4492345831832525)
+    check_values.fugacity_coefficient(2000, 10e3, CORKCO2HP98(), 7.4492345831832525)
 
 
 def test_CorkH2O_above_Tc_below_P0(check_values) -> None:

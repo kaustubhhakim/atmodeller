@@ -371,7 +371,7 @@ class MRKCO2HP91(MRKImplicitABC):
     See base class.
     """
 
-    a_coefficients: tuple[float, ...] = field(init=False, default=(741.2, -0.10891, -3.903e-4))
+    a_coefficients: tuple[float, ...] = field(init=False, default=(741.2e3, -0.10891e3, -3.903e-1))
     b0: float = field(init=False, default=3.057)
 
     def a(self, temperature: float) -> float:
@@ -451,7 +451,7 @@ class CORKCO2HP91(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=5.0)
+    P0: float = field(init=False, default=5.0e3)
     mrk: RealGasABC = field(init=False, default_factory=MRKCO2HP91)
     a_virial: tuple[float, float] = field(init=False, default=(1.33790e-2, -1.01740e-5))
     b_virial: tuple[float, float] = field(init=False, default=(-2.26924e-1, 7.73793e-5))
@@ -466,7 +466,7 @@ class CORKCO2HP98(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=5.0)
+    P0: float = field(init=False, default=5.0e3)
     mrk: RealGasABC = field(init=False, default_factory=MRKCO2HP98)
     a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
     b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
