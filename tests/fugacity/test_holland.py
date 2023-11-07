@@ -1,4 +1,4 @@
-"""Tests for the fugacity coefficients.
+"""Tests for the Holland and Powell EOS models
 
 See the LICENSE file for licensing information.
 """
@@ -31,8 +31,8 @@ from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Spe
 from atmodeller.solubilities import PeridotiteH2O
 
 # Tolerances to compare the test results with target output.
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
+# rtol: float = 1.0e-8
+# atol: float = 1.0e-8
 
 thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 
@@ -86,13 +86,13 @@ def test_CorkH2O_above_Tc_above_P0(check_values) -> None:
 
 def test_CorkH2O_below_Tc_below_Psat(check_values) -> None:
     """Below Tc and below Psat."""
-    # Psat = 0.118224 at T = 600 K.
+    # Psat = 0.118224 kbar at T = 600 K.
     check_values.fugacity_coefficient(600, 0.1e3, CORKH2OHP98, 0.7910907770688191)
 
 
 def test_CorkH2O_below_Tc_above_Psat(check_values) -> None:
     """Below Tc and above Psat."""
-    # Psat = 0.118224 at T = 600 K.
+    # Psat = 0.118224 kbar at T = 600 K.
     check_values.fugacity_coefficient(600, 1e3, CORKH2OHP98, 0.14052644311851598)
 
 
