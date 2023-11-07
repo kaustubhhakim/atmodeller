@@ -456,10 +456,12 @@ class CORKCO2HP91(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=5.0e3)
+    P0: float = field(init=False, default=5000)
     mrk: RealGasABC = field(init=False, default_factory=MRKCO2HP91)
-    a_virial: tuple[float, float] = field(init=False, default=(1.33790e-2, -1.01740e-5))
-    b_virial: tuple[float, float] = field(init=False, default=(-2.26924e-1, 7.73793e-5))
+    a_virial: tuple[float, float] = field(init=False, default=(1.33790e-5, -1.01740e-8))
+    b_virial: tuple[float, float] = field(
+        init=False, default=(-0.0071759669575604925, 2.4469483174946707e-06)
+    )
 
 
 @dataclass(kw_only=True)
@@ -471,13 +473,9 @@ class CORKCO2HP98(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=5.0e3)
+    P0: float = field(init=False, default=5000)
     mrk: RealGasABC = field(init=False, default_factory=MRKCO2HP98)
-    # a_virial: tuple[float, float] = field(init=False, default=(5.40776e-3, -1.59046e-6))
-    # TODO: virial divided by k
     a_virial: tuple[float, float] = field(init=False, default=(5.40776e-6, -1.59046e-9))
-    # b_virial: tuple[float, float] = field(init=False, default=(-1.78198e-1, 2.45317e-5))
-    # TODO: virial multipled by k**-(1/2)
     b_virial: tuple[float, float] = field(
         init=False, default=(-0.005635115544866848, 7.757604687595263e-07)
     )
@@ -490,10 +488,12 @@ class CORKH2OHP91(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=2.0e3)
+    P0: float = field(init=False, default=2000)
     mrk: RealGasABC = field(init=False, default_factory=MRKH2OHP91)
-    a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-3, 2.2215221e-6))
-    b_virial: tuple[float, float] = field(init=False, default=(-3.025650e-2, -5.343144e-6))
+    a_virial: tuple[float, float] = field(init=False, default=(-3.2297554e-6, 2.2215221e-9))
+    b_virial: tuple[float, float] = field(
+        init=False, default=(-0.0009567945402488456, -1.6896504906262715e-07)
+    )
 
 
 @dataclass(kw_only=True)
@@ -505,11 +505,11 @@ class CORKH2OHP98(CORKABC):
     See base class.
     """
 
-    P0: float = field(init=False, default=2.0e3)
+    P0: float = field(init=False, default=2000)
     mrk: RealGasABC = field(init=False, default_factory=MRKH2OHP98)
-    a_virial: tuple[float, float] = field(init=False, default=(1.9853e-3, 0))
-    b_virial: tuple[float, float] = field(init=False, default=(-8.9090e-2, 0))
-    c_virial: tuple[float, float] = field(init=False, default=(8.0331e-2, 0))
+    a_virial: tuple[float, float] = field(init=False, default=(1.9853e-6, 0))
+    b_virial: tuple[float, float] = field(init=False, default=(-0.002817273167444009, 0))
+    c_virial: tuple[float, float] = field(init=False, default=(0.014285096328783671, 0))
 
 
 def get_holland_fugacity_models() -> dict[str, RealGasABC]:

@@ -387,14 +387,14 @@ class MRKCriticalBehaviour(RealGasABC):
         ...
 
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume.
+        """Volume
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Volume.
+            Volume
         """
         Psat: float = self.Psat(temperature)
 
@@ -422,11 +422,11 @@ class MRKCriticalBehaviour(RealGasABC):
         """Volume integral. Appendix A, Holland and Powell (1991).
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            volume integral.
+            volume integral
         """
         Psat: float = self.Psat(temperature)
 
