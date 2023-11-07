@@ -66,11 +66,15 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from scipy.constants import kilo
-
 from atmodeller import GAS_CONSTANT
-from atmodeller.eos.holland_base import MRKCriticalBehaviour, MRKImplicitABC, RealGasABC
-from atmodeller.eos.interfaces import CORKABC, MRKExplicitABC, critical_data_dictionary
+from atmodeller.eos.interfaces import (
+    CORKABC,
+    MRKCriticalBehaviour,
+    MRKExplicitABC,
+    MRKImplicitABC,
+    RealGasABC,
+    critical_data_dictionary,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -191,14 +195,7 @@ b0_H2O: float = 1.465
 
 
 @dataclass(kw_only=True)
-class Unitskbar:
-    """Mixin to use kbar for the pressure units, which is required for Holland and Powell data."""
-
-    scaling: float = field(init=False, default=kilo)
-
-
-@dataclass(kw_only=True)
-class MRKH2OLiquidHP91(Unitskbar, MRKImplicitABC):
+class MRKH2OLiquidHP91(MRKImplicitABC):
     """MRK for liquid H2O. Equation 6, Holland and Powell (1991).
 
     See base class.
@@ -252,7 +249,7 @@ class MRKH2OLiquidHP91(Unitskbar, MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKH2OGasHP91(Unitskbar, MRKImplicitABC):
+class MRKH2OGasHP91(MRKImplicitABC):
     """MRK for gaseous H2O. Equation 6a, Holland and Powell (1991).
 
     See base class.
@@ -308,7 +305,7 @@ class MRKH2OGasHP91(Unitskbar, MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKH2OFluidHP91(Unitskbar, MRKImplicitABC):
+class MRKH2OFluidHP91(MRKImplicitABC):
     """MRK a parameter for supercritical H2O. Equation 6, Holland and Powell (1991).
 
     See base class.
@@ -368,7 +365,7 @@ class MRKH2OFluidHP91(Unitskbar, MRKImplicitABC):
 
 
 @dataclass(kw_only=True)
-class MRKCO2HP91(Unitskbar, MRKImplicitABC):
+class MRKCO2HP91(MRKImplicitABC):
     """MRK for CO2. Holland and Powell (1991).
 
     See base class.
@@ -413,7 +410,7 @@ MRKCO2HP98 = MRKCO2HP91
 
 
 @dataclass(kw_only=True)
-class MRKH2OHP91(Unitskbar, MRKCriticalBehaviour):
+class MRKH2OHP91(MRKCriticalBehaviour):
     """MRK for H2O that spans the range across the critical behaviour.
 
     See base class.
@@ -448,7 +445,7 @@ MRKH2OHP98 = MRKH2OHP91
 
 
 @dataclass(kw_only=True)
-class CORKCO2HP91(Unitskbar, CORKABC):
+class CORKCO2HP91(CORKABC):
     """Full CORK equation for CO2 from Holland and Powell (1991).
 
     See base class.
@@ -461,7 +458,7 @@ class CORKCO2HP91(Unitskbar, CORKABC):
 
 
 @dataclass(kw_only=True)
-class CORKCO2HP98(Unitskbar, CORKABC):
+class CORKCO2HP98(CORKABC):
     """Full CORK equation for CO2 from Holland and Powell (1998).
 
     Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
@@ -476,7 +473,7 @@ class CORKCO2HP98(Unitskbar, CORKABC):
 
 
 @dataclass(kw_only=True)
-class CORKH2OHP91(Unitskbar, CORKABC):
+class CORKH2OHP91(CORKABC):
     """Full CORK equation for H2O from Holland and Powell (1991).
 
     See base class.
@@ -489,7 +486,7 @@ class CORKH2OHP91(Unitskbar, CORKABC):
 
 
 @dataclass(kw_only=True)
-class CORKH2OHP98(Unitskbar, CORKABC):
+class CORKH2OHP98(CORKABC):
     """Full CORK equation for H2O from Holland and Powell (1998).
 
     Holland and Powell (1998) updated the virial-like terms compared to their 1991 paper.
