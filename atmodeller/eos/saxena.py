@@ -325,9 +325,11 @@ H2HighPressureSS92: RealGasABC = SaxenaEightCoefficients(
     d_coefficients=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0),
 )
 
-# High pressure model for H2 from Shi and Saxena (1992), refitted using V, P, T data from
-# Presnall (1969) and Ross and Ree (1983). We assume the same functional form as Shi and Saxena,
-# including which coefficients are set to zero. Table 1(b), >1 kbar
+# High pressure model for H2 from Shi and Saxena (1992) refitted using the experimental volume,
+# pressure, and temperature data from Presnall (1969) and Ross, Ree and Young (1983).
+# For this fit, we assume the same functional form as Shi and Saxena for pressures above 1 kbar
+# (Equation 2 and Equation 3a), including which coefficients are set to zero
+# (as in Table 1b at pressures > 1 kbar) and a least squares regression.
 H2HighPressureSS92_Refit: RealGasABC = SaxenaEightCoefficients(
     critical_temperature=critical_data_dictionary["H2"].temperature,
     critical_pressure=critical_data_dictionary["H2"].pressure,
@@ -339,15 +341,9 @@ H2HighPressureSS92_Refit: RealGasABC = SaxenaEightCoefficients(
 
 # H2 fugacity model from Shi and Saxena (1992)
 # Combines the low pressure and high pressure models into a single model. Table 1(b)
-models: tuple[RealGasABC, ...] = (H2LowPressureSS92, H2HighPressureSS92)
-upper_pressure_bounds: tuple[float, ...] = (1000,)
-H2SS92: RealGasABC = CombinedFugacityModel(
-    models=models, upper_pressure_bounds=upper_pressure_bounds
-)
-
 models: tuple[RealGasABC, ...] = (H2LowPressureSS92, H2HighPressureSS92_Refit)
 upper_pressure_bounds: tuple[float, ...] = (1000,)
-H2SS92_Refit: RealGasABC = CombinedFugacityModel(
+H2SS92: RealGasABC = CombinedFugacityModel(
     models=models, upper_pressure_bounds=upper_pressure_bounds
 )
 
@@ -361,18 +357,6 @@ H2HighPressureSF88: RealGasABC = SaxenaEightCoefficients(
     b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
     c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
     d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
-)
-
-# High pressure model for H2 from Saxena and Fei (1988), refitted with data from Presnall (1969)
-# and Ross and Ree (1983). We assume the same functional form as Saxena and Fei (1988), including
-# which coefficients are set to zero.
-H2HighPressureSF88_Refit: RealGasABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].temperature,
-    critical_pressure=critical_data_dictionary["H2"].pressure,
-    a_coefficients=(1.00574429e00, 0, 1.93017653e-03, 0, -3.79261119e-01, 0, 0, -2.44218196e-03),
-    b_coefficients=(1.31517894e-03, 0, 7.22328436e-02, 0, 4.84354184e-02, 0, 0, -4.19624518e-04),
-    c_coefficients=(2.64454394e-06, 0, -5.18445624e-05, 0, -2.05045980e-04, 0, 0, -3.64843202e-07),
-    d_coefficients=(2.28281092e-11, 0, -1.07138600e-08, 0, 3.67720812e-07, 0, 0, 0),
 )
 
 # Fugacity model for SO2 from Shi and Saxena (1992). Table 1(c)
