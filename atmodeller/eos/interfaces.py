@@ -79,10 +79,10 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
     @debug_decorator(logger)
     def a(self, temperature: float) -> float:
-        """Parameter a in Equation 9, Holland and Powell (1991).
+        """Parameter a in Equation 9, Holland and Powell (1991)
 
         Args:
-            temperature: Temperature in kelvin.
+            temperature: Temperature in kelvin
 
         Returns:
             Parameter a in J^2 bar^(-1) K^(1/2) mol^(-2)
@@ -99,7 +99,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
     @property
     @debug_decorator(logger)
     def b(self) -> float:
-        """Parameter b in Equation 9, Holland and Powell (1991).
+        """Parameter b in Equation 9, Holland and Powell (1991)
 
         Returns:
             Parameter b in J bar^(-1) mol^(-1)
@@ -164,10 +164,36 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
 @dataclass(kw_only=True)
 class MRKImplicitABC(ModifiedRedlichKwongABC):
-    """A Modified Redlich Kwong (MRK) EOS in an implicit form.
+    """A Modified Redlich Kwong (MRK) EOS in an implicit form
 
-    See base class.
+    See base class
     """
+
+    Ta: float = 0
+
+    def a(self, temperature: float) -> float:
+        """MRK a parameter for Equation 6, Holland and Powell (1991).
+
+        Args:
+            temperature: Temperature in kelvin
+
+        Returns:
+            MRK a parameter
+        """
+
+        a: float = (
+            self.a_coefficients[0]
+            + self.a_coefficients[1] * self.delta_temperature_for_a(temperature)
+            + self.a_coefficients[2] * self.delta_temperature_for_a(temperature) ** 2
+            + self.a_coefficients[3] * self.delta_temperature_for_a(temperature) ** 3
+        )
+
+        return a
+
+    @abstractmethod
+    def delta_temperature_for_a(self, temperature: float) -> float:
+        """Temperature difference for the calculation of the a parameter"""
+        ...
 
     @property
     def b(self) -> float:
@@ -178,11 +204,11 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         """A factor in Appendix A of Holland and Powell (1991).
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            A factor, which is non-dimensional.
+            A factor, which is non-dimensional
         """
         del pressure
         A: float = self.a(temperature) / (self.b * GAS_CONSTANT * temperature**1.5)
@@ -190,14 +216,14 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         return A
 
     def B_factor(self, temperature: float, pressure: float) -> float:
-        """B factor in Appendix A of Holland and Powell (1991).
+        """B factor in Appendix A of Holland and Powell (1991)
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            B factor, which is non-dimensional.
+            B factor, which is non-dimensional
         """
         B: float = self.b * pressure / (GAS_CONSTANT * temperature)
 
@@ -212,9 +238,9 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         correct compressibility parameter is returned.
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
-            volume_init: Initial volume estimate. Defaults to None.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+            volume_init: Initial volume estimate. Defaults to None
 
         Returns:
             The compressibility parameter, Z
@@ -232,15 +258,15 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         *,
         volume_init: float | None = None,
     ) -> float:
-        """Volume integral. Equation A.2., Holland and Powell (1991).
+        """Volume integral. Equation A.2., Holland and Powell (1991)
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
-            volume_init: Initial volume estimate. Defaults to None.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+            volume_init: Initial volume estimate. Defaults to None
 
         Returns:
-            Volume integral.
+            Volume integral
         """
         z: float = self.compressibility_parameter(temperature, pressure, volume_init=volume_init)
         A: float = self.A_factor(temperature, pressure)
@@ -255,14 +281,14 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
     @abstractmethod
     def initial_solution_volume(self, temperature: float, pressure: float) -> float:
-        """Initial guess volume for the solution to ensure convergence to the correct root.
+        """Initial guess volume for the solution to ensure convergence to the correct root
 
         Args:
-            temperature: Temperature.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Initial solution volume.
+            Initial solution volume
         """
         ...
 
@@ -272,14 +298,14 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         """Solves the MRK equation numerically to compute the volume.
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
             volume_init: Initial volume estimate. Defaults to a value to find the single root above
                 the critical temperature, Tc. Other initial values may be necessary for multi-root
                 systems (e.g., relating to the critical behaviour of H2O).
 
         Returns:
-            volume.
+            volume
         """
         if volume_init is None:
             volume_init = self.initial_solution_volume(temperature, pressure)
@@ -297,15 +323,15 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
     def _objective_function_volume(
         self, volume: float, temperature: float, pressure: float
     ) -> float:
-        """Residual function for the MRK volume from Equation A.1, Holland and Powell (1991).
+        """Residual function for the MRK volume from Equation A.1, Holland and Powell (1991)
 
         Args:
-            volume: Volume.
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            volume: Volume
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Residual of the MRK volume.
+            Residual of the MRK volume
         """
         residual: float = (
             pressure * volume**3
@@ -325,12 +351,12 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         """Jacobian of Equation A.1, Holland and Powell (1991).
 
         Args:
-            volume: Volume.
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            volume: Volume
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Jacobian of the MRK volume.
+            Jacobian of the MRK volume
         """
         jacobian: float = (
             3 * pressure * volume**2
@@ -347,25 +373,21 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
 @dataclass(kw_only=True)
 class MRKCriticalBehaviour(RealGasABC):
-    """A MRK model that accommodates critical behaviour.
+    """A MRK model that accommodates critical behaviour
 
     Args:
-        mrk_fluid: The MRK for the supercritical fluid.
-        mrk_gas: The MRK for the subcritical gas.
-        mrk_liquid: The MRK for the subcritical liquid.
-        scaling: See base class.
-        Ta: Temperature at which a_gas = a in the MRK formulation.
-        Tc: Critical temperature.
+        mrk_fluid: The MRK for the supercritical fluid
+        mrk_gas: The MRK for the subcritical gas
+        mrk_liquid: The MRK for the subcritical liquid
+        Ta: Temperature at which a_gas = a in the MRK formulation
+        Tc: Critical temperature
 
     Attributes:
-        mrk_fluid: The MRK for the supercritical fluid.
-        mrk_gas: The MRK for the subcritical gas.
-        mrk_liquid: The MRK for the subcritical liquid.
-        Ta: Temperature at which a_gas = a in the MRK formulation.
-        Tc: Critical temperature.
-        scaling: See base class.
-        GAS_CONSTANT: See base class.
-
+        mrk_fluid: The MRK for the supercritical fluid
+        mrk_gas: The MRK for the subcritical gas
+        mrk_liquid: The MRK for the subcritical liquid
+        Ta: Temperature at which a_gas = a in the MRK formulation
+        Tc: Critical temperature
     """
 
     mrk_fluid: MRKImplicitABC
@@ -376,25 +398,25 @@ class MRKCriticalBehaviour(RealGasABC):
 
     @abstractmethod
     def Psat(self, temperature: float) -> float:
-        """Saturation curve. Equation 5, Holland and Powell (1991).
+        """Saturation curve. Equation 5, Holland and Powell (1991)
 
         Args:
-            temperature: Temperature in kelvin.
+            temperature: Temperature in kelvin
 
         Returns:
-            Saturation curve pressure.
+            Saturation curve pressure in bar
         """
         ...
 
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume.
+        """Volume
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            Volume.
+            Volume
         """
         Psat: float = self.Psat(temperature)
 
@@ -419,14 +441,14 @@ class MRKCriticalBehaviour(RealGasABC):
         return volume
 
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral. Appendix A, Holland and Powell (1991).
+        """Volume integral. Appendix A, Holland and Powell (1991)
 
         Args:
-            temperature: Temperature in kelvin.
-            pressure: Pressure in kbar.
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
-            volume integral.
+            volume integral
         """
         Psat: float = self.Psat(temperature)
 
@@ -600,7 +622,7 @@ class VirialCompensation(RealGasABC):
 
 
 @dataclass(kw_only=True)
-class CORKABC(RealGasABC):
+class CORK(RealGasABC):
     """A Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991)
 
     Args:
@@ -628,9 +650,9 @@ class CORKABC(RealGasABC):
 
     P0: float
     mrk: RealGasABC
-    a_virial: tuple[float, float] = field(init=False, default=(0, 0))
-    b_virial: tuple[float, float] = field(init=False, default=(0, 0))
-    c_virial: tuple[float, float] = field(init=False, default=(0, 0))
+    a_virial: tuple[float, float] = (0, 0)
+    b_virial: tuple[float, float] = (0, 0)
+    c_virial: tuple[float, float] = (0, 0)
     virial: VirialCompensation = field(init=False)
 
     def __post_init__(self):

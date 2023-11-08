@@ -1,4 +1,4 @@
-"""Fugacity models from Shi and Saxena (1992), Saxena and Fei (1988), and Saxena and Fei (1987a,b)
+"""Real gas EOSs from Shi and Saxena (1992), Saxena and Fei (1988), and Saxena and Fei (1987a,b)
 
 See the LICENSE file for licensing information.
 
@@ -34,15 +34,15 @@ Examples:
     1.09669352805837
     ```
 
-    Get the preferred fugacity models for various species from the Saxena models. Note that the 
-    input pressure should always be in bar:
+    Get the preferred EOS models for various species from the Saxena models. Note that the input 
+    pressure should always be in bar:
     
     ```python
-    >>> from atmodeller.eos.saxena import get_saxena_fugacity_models
-    >>> models = get_saxena_fugacity_models()
+    >>> from atmodeller.eos.saxena import get_saxena_eos_models
+    >>> models = get_saxena_eos_models()
     >>> # list the available species
     >>> models.keys()
-    >>> # Get the fugacity model for CO
+    >>> # Get the EOS model for CO
     >>> co_model = models['CO']
     >>> # Determine the fugacity coefficient at 2000 K and 1000 bar
     >>> fugacity_coefficient = co_model.get_value(temperature=2000, pressure=1000)
@@ -71,7 +71,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True)
 class SaxenaABC(RealGasABC):
-    """Shi and Saxena (1992) fugacity model.
+    """Shi and Saxena (1992) fugacity model
 
     The model presented in Shi and Saxena (1992) is a general form that can be adapted to the
     previous work of Saxena and Fei (1988) and Saxena and Fei (1987).
@@ -83,23 +83,21 @@ class SaxenaABC(RealGasABC):
     http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
 
     Args:
-        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used).
-        critical_pressure: Critical pressure in bar. Defaults to unity (not used).
-        a_coefficients: a coefficients (see paper). Defaults to empty.
-        b_coefficients: b coefficients (see paper). Defaults to empty.
-        c_coefficients: c coefficients (see paper). Defaults to empty.
-        d_coefficients: d coefficients (see paper). Defaults to empty.
+        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
+        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
+        a_coefficients: a coefficients (see paper). Defaults to empty
+        b_coefficients: b coefficients (see paper). Defaults to empty
+        c_coefficients: c coefficients (see paper). Defaults to empty
+        d_coefficients: d coefficients (see paper). Defaults to empty
 
     Attributes:
         critical_temperature: Critical temperature in kelvin
         critical_pressure: Critical pressure in bar
-        a_coefficients: a coefficients.
-        b_coefficients: b coefficients.
-        c_coefficients: c coefficients.
-        d_coefficients: d coefficients.
-        scaling: See base class.
-        GAS_CONSTANT: See base class.
-        standard_state_pressure: Scaled standard state pressure with the appropriate units.
+        a_coefficients: a coefficients
+        b_coefficients: b coefficients
+        c_coefficients: c coefficients
+        d_coefficients: d coefficients
+        standard_state_pressure: Scaled standard state pressure with the appropriate units
     """
 
     a_coefficients: tuple[float, ...] = field(default_factory=tuple)
@@ -111,79 +109,79 @@ class SaxenaABC(RealGasABC):
     def _get_compressibility_coefficient(
         self, scaled_temperature: float, coefficients: tuple[float, ...]
     ) -> float:
-        """General form of the coefficients for the compressibility calculation.
+        """General form of the coefficients for the compressibility calculation
 
-        Shi and Saxena (1992), Equation 1.
+        Shi and Saxena (1992), Equation 1
 
         Args:
             temperature: Scaled temperature
-            coefficients: Tuple of the coefficients a, b, c, or d.
+            coefficients: Tuple of the coefficients a, b, c, or d
 
         Returns
-            The relevant coefficient.
+            The relevant coefficient
         """
         ...
 
     def _a(self, scaled_temperature: float) -> float:
-        """a parameter.
+        """a parameter
 
         Args:
             scaled_temperature: Scaled temperature
 
         Returns:
-            a parameter.
+            a parameter
         """
         a: float = self._get_compressibility_coefficient(scaled_temperature, self.a_coefficients)
 
         return a
 
     def _b(self, scaled_temperature: float) -> float:
-        """b parameter.
+        """b parameter
 
         Args:
             scaled_temperature: Scaled temperature
 
         Returns:
-            b parameter.
+            b parameter
         """
         b: float = self._get_compressibility_coefficient(scaled_temperature, self.b_coefficients)
 
         return b
 
     def _c(self, scaled_temperature: float) -> float:
-        """c parameter.
+        """c parameter
 
         Args:
             scaled_temperature: Scaled temperature
 
         Returns:
-            c parameter.
+            c parameter
         """
         c: float = self._get_compressibility_coefficient(scaled_temperature, self.c_coefficients)
 
         return c
 
     def _d(self, scaled_temperature: float) -> float:
-        """d parameter.
+        """d parameter
 
         Args:
             scaled_temperature: Scaled temperature
 
         Returns:
-            d parameter.
+            d parameter
         """
         d: float = self._get_compressibility_coefficient(scaled_temperature, self.d_coefficients)
 
         return d
 
     def compressibility_parameter(self, temperature: float, pressure: float) -> float:
-        """Compressibility parameter at temperature and pressure.
+        """Compressibility parameter at temperature and pressure
 
         This overrides the base class because the compressibility factor is used to determine the
         volume, whereas in the base class the volume is used to determine the compressibility
         factor.
 
-        Shi and Saxena (1992), Equation 2.
+        Shi and Saxena (1992), Equation 2
 
         Args:
             temperature: Temperature in kelvin
@@ -199,7 +197,7 @@ class SaxenaABC(RealGasABC):
         return Z
 
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume.
+        """Volume
 
         Shi and Saxena (1992), Equation 1.
 
@@ -216,7 +214,7 @@ class SaxenaABC(RealGasABC):
         return volume
 
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP).
+        """Volume integral (VdP)
 
         Shi and Saxena (1992), Equation 11.
 
@@ -246,24 +244,21 @@ class SaxenaABC(RealGasABC):
 
 @dataclass(kw_only=True)
 class SaxenaFiveCoefficients(SaxenaABC):
-    """Fugacity model with five coefficients, which is generally used for low pressures.
-
-    See base class.
-    """
+    """Fugacity model with five coefficients, which is generally used for low pressures"""
 
     def _get_compressibility_coefficient(
         self, scaled_temperature: float, coefficients: tuple[float, ...]
     ) -> float:
-        """General form of the coefficients for the compressibility calculation.
+        """General form of the coefficients for the compressibility calculation
 
-        Shi and Saxena (1992), Equation 3b.
+        Shi and Saxena (1992), Equation 3b
 
         Args:
             scaled_temperature: Temperature
-            coefficients: Tuple of the coefficients a, b, c, or d.
+            coefficients: Tuple of the coefficients a, b, c, or d
 
         Returns
-            The relevant coefficient.
+            The relevant coefficient
         """
         coefficient: float = (
             coefficients[0]
@@ -278,24 +273,21 @@ class SaxenaFiveCoefficients(SaxenaABC):
 
 @dataclass(kw_only=True)
 class SaxenaEightCoefficients(SaxenaABC):
-    """Fugacity model with eight coefficients, which is generally used for high pressures.
-
-    See base class.
-    """
+    """Fugacity model with eight coefficients, which is generally used for high pressures"""
 
     def _get_compressibility_coefficient(
         self, scaled_temperature: float, coefficients: tuple[float, ...]
     ) -> float:
-        """General form of the coefficients for the compressibility calculation.
+        """General form of the coefficients for the compressibility calculation
 
-        Shi and Saxena (1992), Equation 3a.
+        Shi and Saxena (1992), Equation 3a
 
         Args:
             scaled_temperature: Temperature
-            coefficients: Tuple of the coefficients a, b, c, or d.
+            coefficients: Tuple of the coefficients a, b, c, or d
 
         Returns
-            The relevant coefficient.
+            The relevant coefficient
         """
         coefficient: float = (
             coefficients[0]
@@ -453,8 +445,8 @@ H2SHighPressureSS92: RealGasABC = SaxenaEightCoefficients(
 
 # H2S fugacity model from Shi and Saxena (1992).
 # Combines the low pressure and high pressure models into a single model. See Table 1(d)
-models = (H2SLowPressureSS92, H2SHighPressureSS92)
-upper_pressure_bounds = (500,)
+models: tuple[RealGasABC, ...] = (H2SLowPressureSS92, H2SHighPressureSS92)
+upper_pressure_bounds: tuple[float, ...] = (500,)
 H2SSS92: RealGasABC = CombinedFugacityModel(
     models=models, upper_pressure_bounds=upper_pressure_bounds
 )
@@ -472,7 +464,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasABC:
     Table 1(a)
 
     Args:
-        species: Species name. Must corresponding to an entry (key) in critical_data_dictionary.
+        species: Species name. Must corresponding to an entry (key) in critical_data_dictionary
 
     Returns:
         Corresponding states fugacity model
@@ -540,11 +532,11 @@ H2SF87: RealGasABC = get_corresponding_states_SS92("H2")
 ArSF87: RealGasABC = get_corresponding_states_SS92("Ar")
 
 
-def get_saxena_fugacity_models() -> dict[str, RealGasABC]:
-    """Gets a dictionary of the preferred fugacity models to use for each species.
+def get_saxena_eos_models() -> dict[str, RealGasABC]:
+    """Gets a dictionary of the preferred EOS models to use for each species.
 
     Returns:
-        Dictionary of preferred fugacity models for each species.
+        Dictionary of preferred EOS models for each species
     """
     models: dict[str, RealGasABC] = {}
     models["Ar"] = ArSF87
