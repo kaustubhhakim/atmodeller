@@ -353,6 +353,12 @@ H2SS92: RealGasABC = CombinedFugacityModel(
     models=models, upper_pressure_bounds=upper_pressure_bounds
 )
 
+models: tuple[RealGasABC, ...] = (H2LowPressureSS92, H2HighPressureSS92_Refit)
+upper_pressure_bounds: tuple[float, ...] = (1000,)
+H2SS92_Refit: RealGasABC = CombinedFugacityModel(
+    models=models, upper_pressure_bounds=upper_pressure_bounds
+)
+
 # High pressure model for H2 from Saxena and Fei (1988). Table on p1196
 # TODO: Fix. DJB: The coefficients seem more reasonable when the critical data is provided, but the
 # values are still quite different compared to the SS92 version.
