@@ -701,31 +701,29 @@ class CORK(RealGasABC):
 
 
 @dataclass(kw_only=True)
-class CombinedFugacityModel(RealGasABC):
-    """Combines multiple fugacity models for different pressure ranges into a single model.
+class CombinedEOSModel(RealGasABC):
+    """Combines multiple EOS models for different pressure ranges into a single model.
 
     Args:
-        models: Fugacity models with coefficients specified and ordered by increasing pressure
-        upper_pressure_bounds: Upper pressure bound in bar relevant to the fugacity class by
-            position
+        models: EOS models ordered by increasing pressure from lowest to highest
+        upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
 
     Attributes:
-        models: Fugacity models with coefficients specified and ordered by increasing pressure
-        upper_pressure_bounds: Upper pressure bound in bar relevant to the fugacity class by
-            position
+        models: EOS models ordered by increasing pressure from lowest to highest
+        upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
     """
 
     models: tuple[RealGasABC, ...]
     upper_pressure_bounds: tuple[float, ...]
 
     def _get_index(self, pressure: float) -> int:
-        """Gets the index of the appropriate fugacity model using the pressure
+        """Gets the index of the appropriate EOS model using the pressure
 
         Args:
             pressure: Pressure in bar
 
         Returns:
-            Index of the relevant fugacity model
+            Index of the relevant EOS model
         """
         for index, pressure_high in enumerate(self.upper_pressure_bounds):
             if pressure < pressure_high:
@@ -784,8 +782,11 @@ class critical_data:
 # Critical temperature and pressure data for a corresponding states model, based on Table 2 in
 # Shi and Saxena (1992) with some additions. For simplicity, we just compile one set of critical
 # data, even though they vary a little between studies which could result in subtle differences.
-# TODO: Commented values are Kelvin, pressure (kbar) to compare with old test data for Holland and
-# Powell
+
+# Holland and Powell use slightly different critical data in their 1991 paper, which makes
+# insignificant differences in most cases, but their values are give in comments for completeness.
+# However, for H2 their critical values are significantly different and are therefore retained as
+# a separate entry.
 critical_data_dictionary: dict[str, critical_data] = {
     "H2O": critical_data(647.25, 221.1925),
     "CO2": critical_data(304.15, 73.8659),  # 304.2, 73.8 from Holland and Powell (1991)
