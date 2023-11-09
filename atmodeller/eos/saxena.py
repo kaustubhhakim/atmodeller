@@ -3,25 +3,18 @@
 See the LICENSE file for licensing information.
 
 Concrete classes:
-    H2LowPressureSS92: Low pressure for H2 from Shi and Saxena (1992)
-    H2HighPressureSS92: High pressure for H2 from Shi and Saxena (1992)
-    H2HighPressureSS92_Refit: Refit of high pressure for H2 from Shi and Saxena (1992)
-    H2SS92: Full model for H2 from Shi and Saxena (1992)
-    H2HighPressureSF88: High pressure for H2 from Saxena and Fei (1988)
-    H2HighPressureSF88_Refit: Refit of high pressure for H2 from Saxena and Fei (1988)
-    SO2SS92: SO2 from Shi and Saxena (1992)
-    H2SLowPressureSS92: Low pressure for H2S from Shi and Saxena (1992)
-    H2SHighPressureSS92: High pressure for H2S from Shi and Saxena (1992)
-    H2SSS92: H2S from Shi and Saxena (1992)
-    O2SS92: Corresponding states for O2 from Shi and Saxena (1992)
-    CO2SS92: Corresponding states for CO2 from Shi and Saxena (1992)
-    COSS92: Corresponding states for CO from Shi and Saxena (1992)
-    CH4SS92: Corresponding states for CH4 from Shi and Saxena (1992)
-    S2SS92: Corresponding states for S2 from Shi and Saxena (1992)
-    COSSS92: Correponding states for COS from Shi and Saxena (1992)
-    N2SF87: Corresponding states for N2 from Saxena and Fei (1987)
-    H2SF87: Corresponding states for H2 from Saxena and Fei (1987)
     ArSF87: Corresponding states for Ar from Saxena and Fei (1987)
+    CH4SS92: Corresponding states for CH4 from Shi and Saxena (1992)
+    COSS92: Corresponding states for CO from Shi and Saxena (1992)
+    CO2SS92: Corresponding states for CO2 from Shi and Saxena (1992)
+    COSSS92: Correponding states for COS from Shi and Saxena (1992)
+    H2SF87: Corresponding states for H2 from Saxena and Fei (1987)
+    H2SS92: H2 from Shi and Saxena with refitted high pressure data (1992)
+    H2SSS92: H2S from Shi and Saxena (1992)
+    N2SF87: Corresponding states for N2 from Saxena and Fei (1987)
+    O2SS92: Corresponding states for O2 from Shi and Saxena (1992)
+    S2SS92: Corresponding states for S2 from Shi and Saxena (1992)
+    SO2SS92: SO2 from Shi and Saxena (1992)
 
 Examples:
     Get the fugacity coefficient for the CO2 corresponding states model from Shi and Saxena (1992)
@@ -29,7 +22,7 @@ Examples:
 
     ```python
     >>> from atmodeller.eos.saxena import CO2SS92
-    >>> fugacity_coefficient = CO2SS92.get_value(temperature=2000, pressure=1000)
+    >>> fugacity_coefficient = CO2SS92.fugacity_coefficient(temperature=2000, pressure=1000)
     >>> print(fugacity_coefficient)
     1.09669352805837
     ```
@@ -45,7 +38,7 @@ Examples:
     >>> # Get the EOS model for CO
     >>> co_model = models['CO']
     >>> # Determine the fugacity coefficient at 2000 K and 1000 bar
-    >>> fugacity_coefficient = co_model.get_value(temperature=2000, pressure=1000)
+    >>> fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
     >>> print(fugacity_coefficient)
     1.164203382026238
     ```
@@ -306,7 +299,7 @@ class SaxenaEightCoefficients(SaxenaABC):
 # Low pressure model for H2 from Shi and Saxena (1992)
 # The coefficients are the same as for the corresponding states model in Table 1(a) because they
 # originate from Saxena and Fei (1987a). Table 1(b), <1000 bar
-H2LowPressureSS92: RealGasABC = SaxenaFiveCoefficients(
+_H2LowPressureSS92: RealGasABC = SaxenaFiveCoefficients(
     critical_temperature=critical_data_dictionary["H2"].temperature,
     critical_pressure=critical_data_dictionary["H2"].pressure,
     a_coefficients=(1, 0, 0, 0, 0, 0),
@@ -317,8 +310,9 @@ H2LowPressureSS92: RealGasABC = SaxenaFiveCoefficients(
 )
 
 # High pressure model for H2 from Shi and Saxena (1992)
+# This model is currently not used because it has been superseded by the refitted model
 # Coefficients require the actual temperature and pressure. Table 1(b), >1 kbar
-H2HighPressureSS92: RealGasABC = SaxenaEightCoefficients(
+_H2HighPressureSS92: RealGasABC = SaxenaEightCoefficients(
     a_coefficients=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1),
     b_coefficients=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5),
     c_coefficients=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10),
@@ -329,8 +323,9 @@ H2HighPressureSS92: RealGasABC = SaxenaEightCoefficients(
 # pressure, and temperature data from Presnall (1969) and Ross, Ree and Young (1983).
 # For this fit, we assume the same functional form as Shi and Saxena for pressures above 1 kbar
 # (Equation 2 and Equation 3a), including which coefficients are set to zero
-# (as in Table 1b at pressures > 1 kbar) and a least squares regression.
-H2HighPressureSS92_Refit: RealGasABC = SaxenaEightCoefficients(
+# (as in Table 1b at pressures > 1 kbar) and a least squares regression. The refitting is performed
+# using reduced temperature and pressure.
+_H2HighPressureSS92Refit: RealGasABC = SaxenaEightCoefficients(
     critical_temperature=critical_data_dictionary["H2"].temperature,
     critical_pressure=critical_data_dictionary["H2"].pressure,
     a_coefficients=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
@@ -341,23 +336,24 @@ H2HighPressureSS92_Refit: RealGasABC = SaxenaEightCoefficients(
 
 # H2 fugacity model from Shi and Saxena (1992)
 # Combines the low pressure and high pressure models into a single model. Table 1(b)
-models: tuple[RealGasABC, ...] = (H2LowPressureSS92, H2HighPressureSS92_Refit)
+models: tuple[RealGasABC, ...] = (_H2LowPressureSS92, _H2HighPressureSS92Refit)
 upper_pressure_bounds: tuple[float, ...] = (1000,)
 H2SS92: RealGasABC = CombinedFugacityModel(
     models=models, upper_pressure_bounds=upper_pressure_bounds
 )
 
 # High pressure model for H2 from Saxena and Fei (1988). Table on p1196
-# TODO: Fix. DJB: The coefficients seem more reasonable when the critical data is provided, but the
-# values are still quite different compared to the SS92 version.
-H2HighPressureSF88: RealGasABC = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].temperature,
-    critical_pressure=critical_data_dictionary["H2"].pressure,
-    a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
-    b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
-    c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
-    d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
-)
+# This model does not at all agree with Shi and Saxena or data, regardless of whether the
+# temperature and pressure are the actual values or reduced values. Since this model cannot be
+# trusted it is commented out.
+# H2HighPressureSF88: RealGasABC = SaxenaEightCoefficients(
+#     critical_temperature=critical_data_dictionary["H2"].temperature,
+#     critical_pressure=critical_data_dictionary["H2"].pressure,
+#     a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
+#     b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
+#     c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
+#     d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
+# )
 
 # Fugacity model for SO2 from Shi and Saxena (1992). Table 1(c)
 SO2SS92: RealGasABC = SaxenaEightCoefficients(
@@ -389,7 +385,7 @@ SO2SS92: RealGasABC = SaxenaEightCoefficients(
 
 # Fugacity model for H2S from Shi and Saxena (1992)
 # Table 1(d), 1-500 bar
-H2SLowPressureSS92: RealGasABC = SaxenaEightCoefficients(
+_H2SLowPressureSS92: RealGasABC = SaxenaEightCoefficients(
     critical_temperature=critical_data_dictionary["H2S"].temperature,
     critical_pressure=critical_data_dictionary["H2S"].pressure,
     a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
@@ -400,7 +396,7 @@ H2SLowPressureSS92: RealGasABC = SaxenaEightCoefficients(
 
 # Fugacity model for H2S from Shi and Saxena (1992).
 # Table 1(d), 500-10000 bar
-H2SHighPressureSS92: RealGasABC = SaxenaEightCoefficients(
+_H2SHighPressureSS92: RealGasABC = SaxenaEightCoefficients(
     critical_temperature=critical_data_dictionary["H2S"].temperature,
     critical_pressure=critical_data_dictionary["H2S"].pressure,
     a_coefficients=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
@@ -429,7 +425,7 @@ H2SHighPressureSS92: RealGasABC = SaxenaEightCoefficients(
 
 # H2S fugacity model from Shi and Saxena (1992).
 # Combines the low pressure and high pressure models into a single model. See Table 1(d)
-models: tuple[RealGasABC, ...] = (H2SLowPressureSS92, H2SHighPressureSS92)
+models: tuple[RealGasABC, ...] = (_H2SLowPressureSS92, _H2SHighPressureSS92)
 upper_pressure_bounds: tuple[float, ...] = (500,)
 H2SSS92: RealGasABC = CombinedFugacityModel(
     models=models, upper_pressure_bounds=upper_pressure_bounds
@@ -502,18 +498,18 @@ def get_corresponding_states_SS92(species: str) -> RealGasABC:
 
 
 # Corresponding states fugacity models from Shi and Saxena (1992)
-O2SS92: RealGasABC = get_corresponding_states_SS92("O2")
-CO2SS92: RealGasABC = get_corresponding_states_SS92("CO2")
-COSS92: RealGasABC = get_corresponding_states_SS92("CO")
 CH4SS92: RealGasABC = get_corresponding_states_SS92("CH4")
-S2SS92: RealGasABC = get_corresponding_states_SS92("S2")
+COSS92: RealGasABC = get_corresponding_states_SS92("CO")
+CO2SS92: RealGasABC = get_corresponding_states_SS92("CO2")
 COSSS92: RealGasABC = get_corresponding_states_SS92("COS")
+O2SS92: RealGasABC = get_corresponding_states_SS92("O2")
+S2SS92: RealGasABC = get_corresponding_states_SS92("S2")
 
 # N2, H2, Ar are presented in Saxena and Fei for the high pressure fit only, but here we adopt the
 # same low pressure extension as in Shi and Saxena (1992), Table 1(a).
-N2SF87: RealGasABC = get_corresponding_states_SS92("N2")
-H2SF87: RealGasABC = get_corresponding_states_SS92("H2")
 ArSF87: RealGasABC = get_corresponding_states_SS92("Ar")
+H2SF87: RealGasABC = get_corresponding_states_SS92("H2")
+N2SF87: RealGasABC = get_corresponding_states_SS92("N2")
 
 
 def get_saxena_eos_models() -> dict[str, RealGasABC]:
