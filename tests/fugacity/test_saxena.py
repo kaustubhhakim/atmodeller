@@ -7,7 +7,7 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.eos.interfaces import RealGasABC
-from atmodeller.eos.saxena import H2SF87, get_saxena_eos_models
+from atmodeller.eos.saxena import H2_SF87, get_saxena_eos_models
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = debug_logger()
@@ -39,7 +39,7 @@ def test_CO2(check_values) -> None:
 
 def test_H2_SF87(check_values) -> None:
     """Comparison with Table 1 in Saxena and Fei (1987)"""
-    check_values.compressibility(1222, 41.66e3, H2SF87, 4.975497264839999)
+    check_values.compressibility(1222, 41.66e3, H2_SF87, 4.975497264839999)
 
 
 def test_N2(check_values) -> None:
