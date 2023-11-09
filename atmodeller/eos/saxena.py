@@ -54,7 +54,7 @@ import numpy as np
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.eos.interfaces import (
-    CombinedFugacityModel,
+    CombinedEOSModel,
     RealGasABC,
     critical_data_dictionary,
 )
@@ -338,9 +338,7 @@ _H2_high_pressure_SS92_refit: RealGasABC = SaxenaEightCoefficients(
 # Combines the low pressure and high pressure models into a single model. Table 1(b)
 models: tuple[RealGasABC, ...] = (_H2_low_pressure_SS92, _H2_high_pressure_SS92_refit)
 upper_pressure_bounds: tuple[float, ...] = (1000,)
-H2_SS92: RealGasABC = CombinedFugacityModel(
-    models=models, upper_pressure_bounds=upper_pressure_bounds
-)
+H2_SS92: RealGasABC = CombinedEOSModel(models=models, upper_pressure_bounds=upper_pressure_bounds)
 
 # High pressure model for H2 from Saxena and Fei (1988). Table on p1196
 # This model does not at all agree with Shi and Saxena or data, regardless of whether the
@@ -427,9 +425,7 @@ _H2S_high_pressure_SS92: RealGasABC = SaxenaEightCoefficients(
 # Combines the low pressure and high pressure models into a single model. See Table 1(d)
 models: tuple[RealGasABC, ...] = (_H2S_low_pressure_SS92, _H2S_high_pressure_SS92)
 upper_pressure_bounds: tuple[float, ...] = (500,)
-H2S_SS92: RealGasABC = CombinedFugacityModel(
-    models=models, upper_pressure_bounds=upper_pressure_bounds
-)
+H2S_SS92: RealGasABC = CombinedEOSModel(models=models, upper_pressure_bounds=upper_pressure_bounds)
 
 
 def get_corresponding_states_SS92(species: str) -> RealGasABC:
@@ -490,7 +486,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasABC:
     models: tuple[RealGasABC, ...] = (low_pressure, medium_pressure, high_pressure)
     upper_pressure_bounds: tuple[float, ...] = (1000, 5000)
 
-    combined_model: RealGasABC = CombinedFugacityModel(
+    combined_model: RealGasABC = CombinedEOSModel(
         models=models, upper_pressure_bounds=upper_pressure_bounds
     )
 

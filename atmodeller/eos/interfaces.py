@@ -701,31 +701,29 @@ class CORK(RealGasABC):
 
 
 @dataclass(kw_only=True)
-class CombinedFugacityModel(RealGasABC):
-    """Combines multiple fugacity models for different pressure ranges into a single model.
+class CombinedEOSModel(RealGasABC):
+    """Combines multiple eos models for different pressure ranges into a single model.
 
     Args:
-        models: Fugacity models with coefficients specified and ordered by increasing pressure
-        upper_pressure_bounds: Upper pressure bound in bar relevant to the fugacity class by
-            position
+        models: EOS models ordered by increasing pressure from lowest to highest
+        upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
 
     Attributes:
-        models: Fugacity models with coefficients specified and ordered by increasing pressure
-        upper_pressure_bounds: Upper pressure bound in bar relevant to the fugacity class by
-            position
+        models: EOS models ordered by increasing pressure from lowest to highest
+        upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
     """
 
     models: tuple[RealGasABC, ...]
     upper_pressure_bounds: tuple[float, ...]
 
     def _get_index(self, pressure: float) -> int:
-        """Gets the index of the appropriate fugacity model using the pressure
+        """Gets the index of the appropriate EOS model using the pressure
 
         Args:
             pressure: Pressure in bar
 
         Returns:
-            Index of the relevant fugacity model
+            Index of the relevant EOS model
         """
         for index, pressure_high in enumerate(self.upper_pressure_bounds):
             if pressure < pressure_high:
