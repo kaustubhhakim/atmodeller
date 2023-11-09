@@ -2,6 +2,9 @@
 
 See the LICENSE file for licensing information.
 
+Functions:
+    get_saxena_eos_models: Gets the preferred EOS models to use for each species
+
 Real gas EOSs (class instances) in this module that can be imported:
     Ar_SF87: Corresponding states for Ar from Saxena and Fei (1987)
     CH4_SS92: Corresponding states for CH4 from Shi and Saxena (1992)

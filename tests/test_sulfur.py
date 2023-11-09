@@ -5,6 +5,8 @@ See the LICENSE file for licensing information.
 Tests using the JANAF data for simple interior-atmosphere systems that include sulfur.
 """
 
+import logging
+
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
@@ -24,10 +26,10 @@ from atmodeller.solubilities import (
     BasaltS2_Sulfide,
 )
 
+logger: logging.Logger = debug_logger()
+
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
-
-debug_logger()
 
 
 def test_version():
@@ -373,7 +375,7 @@ def test_COS_Species_IW() -> None:
         "CO2": 47.437207165120746,
     }
 
-    # initial_solution: np.ndarray = np.log10([0.003, 0.003, 1e-6, 0.005, 230, 47])
+    # initial_solution: np.ndarray = np.array([0.003, 0.003, 1e-6, 0.005, 230, 47])
     system.solve(constraints, factor=1)  # , initial_solution=initial_solution)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
@@ -422,6 +424,6 @@ def test_CHOS_Species_IW() -> None:
         "CO2": 47.22814633265304,
     }
 
-    # initial_solution: np.ndarray = np.log10([1, 1, 1e-3, 1e-3, 1e-6, 1e-3, 1e2, 1])
+    # initial_solution: np.ndarray = np.array([1, 1, 1e-3, 1e-3, 1e-6, 1e-3, 1e2, 1])
     system.solve(constraints, factor=1)  # , initial_solution=initial_solution)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)

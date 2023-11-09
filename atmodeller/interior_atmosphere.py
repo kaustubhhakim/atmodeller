@@ -656,7 +656,7 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations.
-            initial_solution: Initial guess for the log10 pressures. Defaults to None.
+            initial_solution: Initial guess for the pressures. Defaults to None.
             factor: A parameter determining the initial step bound (factor * || diag * x||). Should
                 be in the interval (0.1, 100). Defaults to 100.
             https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
@@ -753,7 +753,7 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations.
-            initial_solution: Initial guess for the log10 pressures.
+            initial_solution: Initial guess for the pressures.
             factor: A parameter determining the initial step bound (factor * || diag * x||). Should
                 be in the interval (0.1, 100).
             https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
@@ -764,6 +764,8 @@ class InteriorAtmosphereSystem:
         # Initial guess for gas species is 1 log10 unit, i.e. 10 bar.
         if initial_solution is None:
             initial_solution = np.ones_like(self.species, dtype=np.float_)
+        else:
+            initial_solution = np.log10(initial_solution)
 
         self._conform_initial_solution_to_solid_activities(initial_solution)
         self._conform_initial_solution_to_constraints(initial_solution, constraints)
