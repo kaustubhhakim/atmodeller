@@ -21,10 +21,10 @@ Examples:
     Note that the input pressure should always be in bar:
 
     ```python
-    >>> from atmodeller.eos.saxena import CO2SS92
+    >>> from atmodeller.eos.saxena import CO2_SS92
     >>> fugacity_coefficient = CO2SS92.fugacity_coefficient(temperature=2000, pressure=1000)
     >>> print(fugacity_coefficient)
-    1.09669352805837
+    1.0973520647000174
     ```
 
     Get the preferred EOS models for various species from the Saxena models. Note that the input 
@@ -40,7 +40,7 @@ Examples:
     >>> # Determine the fugacity coefficient at 2000 K and 1000 bar
     >>> fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
     >>> print(fugacity_coefficient)
-    1.164203382026238
+    1.1648016694290084
     ```
 """
 
