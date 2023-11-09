@@ -10,6 +10,7 @@ from functools import wraps
 from typing import Callable
 
 import numpy as np
+from molmass import Formula
 
 from atmodeller.interfaces import Solubility
 from atmodeller.utilities import UnitConversion
@@ -420,7 +421,7 @@ class RhyoliteCO(Solubility):
 class BasaltHe(Solubility):
     """Jambon et al. 1986, Assuming Henry's Law
 
-    Valid for 1 bar and temperatures from 1250-1600 C.
+    Valid for partial pressures up to ~100 bar and temperatures from 1250-1600 C.
     """
 
     def _solubility(
@@ -428,10 +429,13 @@ class BasaltHe(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
+        Henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
         He_conc: float = (
-            56e-5 * fugacity
-        )  # units cm3*STP/g, I think something is up with the units here
-        ppmw: float = (1 / He_conc) * 1e6
+            Henry_sol_constant / 2.24e4
+        ) * fugacity  # converts to Henry sol constant to mol/g*bar, 2.24e4 cm^3/mol at STP
+        ppmw: float = (
+            He_conc * 4.0026 * 1e6
+        )  # converts He conc from mol/g to g H2/g Total and then to ppmw
         return ppmw
 
 
