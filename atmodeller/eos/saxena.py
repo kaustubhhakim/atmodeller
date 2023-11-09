@@ -2,7 +2,7 @@
 
 See the LICENSE file for licensing information.
 
-Concrete classes:
+Real gas EOSs (class instances) in this module that can be imported:
     ArSF87: Corresponding states for Ar from Saxena and Fei (1987)
     CH4SS92: Corresponding states for CH4 from Shi and Saxena (1992)
     COSS92: Corresponding states for CO from Shi and Saxena (1992)
@@ -514,6 +514,8 @@ N2SF87: RealGasABC = get_corresponding_states_SS92("N2")
 
 def get_saxena_eos_models() -> dict[str, RealGasABC]:
     """Gets a dictionary of the preferred EOS models to use for each species.
+
+    The keys are the species and the values are class instances.
 
     Returns:
         Dictionary of preferred EOS models for each species
