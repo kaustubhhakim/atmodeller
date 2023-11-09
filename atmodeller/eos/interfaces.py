@@ -702,7 +702,7 @@ class CORK(RealGasABC):
 
 @dataclass(kw_only=True)
 class CombinedEOSModel(RealGasABC):
-    """Combines multiple eos models for different pressure ranges into a single model.
+    """Combines multiple EOS models for different pressure ranges into a single model.
 
     Args:
         models: EOS models ordered by increasing pressure from lowest to highest
@@ -782,8 +782,11 @@ class critical_data:
 # Critical temperature and pressure data for a corresponding states model, based on Table 2 in
 # Shi and Saxena (1992) with some additions. For simplicity, we just compile one set of critical
 # data, even though they vary a little between studies which could result in subtle differences.
-# TODO: Commented values are Kelvin, pressure (kbar) to compare with old test data for Holland and
-# Powell
+
+# Holland and Powell use slightly different critical data in their 1991 paper, which makes
+# insignificant differences in most cases, but their values are give in comments for completeness.
+# However, for H2 their critical values are significantly different and are therefore retained as
+# a separate entry.
 critical_data_dictionary: dict[str, critical_data] = {
     "H2O": critical_data(647.25, 221.1925),
     "CO2": critical_data(304.15, 73.8659),  # 304.2, 73.8 from Holland and Powell (1991)
