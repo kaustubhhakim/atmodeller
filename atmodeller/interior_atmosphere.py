@@ -651,6 +651,7 @@ class InteriorAtmosphereSystem:
         *,
         initial_solution: Union[np.ndarray, None] = None,
         factor: float = 100,
+        tolerance: float = 1.0e-6,
     ) -> None:
         """Solves the system to determine the partial pressures with provided constraints.
 
@@ -660,6 +661,7 @@ class InteriorAtmosphereSystem:
             factor: A parameter determining the initial step bound (factor * || diag * x||). Should
                 be in the interval (0.1, 100). Defaults to 100.
             https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
+            tolerance: Tolerance. Defaults to 1e-6.
 
         Returns:
             The pressures in bar.
@@ -667,7 +669,10 @@ class InteriorAtmosphereSystem:
 
         constraints = self._assemble_constraints(constraints)
         self._log_solution = self._solve_fsolve(
-            constraints=constraints, initial_solution=initial_solution, factor=factor
+            constraints=constraints,
+            initial_solution=initial_solution,
+            factor=factor,
+            tolerance=tolerance,
         )
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
@@ -748,6 +753,7 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         initial_solution: Union[np.ndarray, None],
         factor: float,
+        tolerance: float,
     ) -> np.ndarray:
         """Solves the non-linear system of equations.
 
@@ -757,6 +763,7 @@ class InteriorAtmosphereSystem:
             factor: A parameter determining the initial step bound (factor * || diag * x||). Should
                 be in the interval (0.1, 100).
             https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
+            tolerance: Tolerance
 
         Returns:
             The solution array.
@@ -809,6 +816,7 @@ class InteriorAtmosphereSystem:
                 initial_solution,
                 args=(constraints, coefficient_matrix),
                 options={"factor": factor},
+                tol=tolerance,
             )
             sol = solarray.x
 
