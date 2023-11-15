@@ -650,29 +650,30 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         *,
         initial_solution: Union[np.ndarray, None] = None,
-        factor: float = 100,
-        tolerance: float = 1.0e-6,
+        method: str = "hybr",
+        tol: Union[float, None] = None,
+        **options,
     ) -> None:
         """Solves the system to determine the partial pressures with provided constraints.
 
         Args:
-            constraints: Constraints for the system of equations.
+            constraints: Constraints for the system of equations
             initial_solution: Initial guess for the pressures. Defaults to None.
-            factor: A parameter determining the initial step bound (factor * || diag * x||). Should
-                be in the interval (0.1, 100). Defaults to 100.
-            https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
-            tolerance: Tolerance. Defaults to 1e-6.
+            method: Type of solver. Defaults to 'hybr'.
+            tol: Tolerance for termination. Defaults to None.
+            **options: Keyword arguments for solver options. Available keywords depend on method.
 
         Returns:
-            The pressures in bar.
+            The pressures in bar
         """
 
         constraints = self._assemble_constraints(constraints)
-        self._log_solution = self._solve_fsolve(
+        self._log_solution = self._solve(
             constraints=constraints,
             initial_solution=initial_solution,
-            factor=factor,
-            tolerance=tolerance,
+            method=method,
+            tol=tol,
+            **options,
         )
 
         # Recompute quantities that depend on the solution, since species.mass is not called for
@@ -747,28 +748,28 @@ class InteriorAtmosphereSystem:
             )
         logger.debug("Conforming initial solution to constraints = %s", initial_solution)
 
-    def _solve_fsolve(
+    def _solve(
         self,
         *,
         constraints: SystemConstraints,
         initial_solution: Union[np.ndarray, None],
-        factor: float,
-        tolerance: float,
+        method: str,
+        tol: Union[float, None],
+        **options,
     ) -> np.ndarray:
         """Solves the non-linear system of equations.
 
         Args:
-            constraints: Constraints for the system of equations.
-            initial_solution: Initial guess for the pressures.
-            factor: A parameter determining the initial step bound (factor * || diag * x||). Should
-                be in the interval (0.1, 100).
-            https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html#optimize-root-hybr
-            tolerance: Tolerance
+            constraints: Constraints for the system of equations
+            initial_solution: Initial guess for the pressures
+            method: Type of solver
+            tol: Tolerance for termination
+            **options: Keyword arguments for solver options. Available keywords depend on method.
 
         Returns:
-            The solution array.
+            The solution array
         """
-        # Initial guess for gas species is 1 log10 unit, i.e. 10 bar.
+        # Initial guess for gas species, if not specified, is 1 log10 unit, i.e. 10 bar.
         if initial_solution is None:
             initial_solution = np.ones_like(self.species, dtype=np.float_)
         else:
@@ -777,76 +778,25 @@ class InteriorAtmosphereSystem:
         self._conform_initial_solution_to_solid_activities(initial_solution)
         self._conform_initial_solution_to_constraints(initial_solution, constraints)
 
-        ier: int = 0
-        # Count the number of attempts to solve the system by randomising the initial condition.
-        ic_count: int = 1
-        # Maximum number of attempts to solve the system by randomising the initial condition.
-        ic_count_max: int = 10
-        sol: np.ndarray = np.zeros_like(initial_solution)
-        infodict: dict = {}
-
-        # Hard-coded for testing different solvers, but should either be an option for the user to
-        # change or the 'best' solver should be used. Dan will clean this up once testing is
-        # complete.
-        LEAST_SQUARES: bool = False
-        ROOT: bool = True
-        FSOLVE: bool = False
-
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=constraints
         )
 
-        if LEAST_SQUARES:
-            # FIXME: Hacked bounds for test_COS_Species_IW
-            # bounds = [
-            #    [-np.inf, -np.inf, -9, -np.inf, -np.inf, -np.inf],
-            #    [np.inf, np.inf, -3, np.inf, np.inf, np.inf],
-            # ]
-            result = least_squares(
-                self._objective_func,
-                initial_solution,
-                args=(constraints, coefficient_matrix),
-                # bounds=bounds,
-            )
-            sol = result.x
+        sol = root(
+            self._objective_func,
+            initial_solution,
+            args=(constraints, coefficient_matrix),
+            method=method,
+            tol=tol,
+            options=options,
+        )
 
-        if ROOT:
-            solarray = root(
-                self._objective_func,
-                initial_solution,
-                args=(constraints, coefficient_matrix),
-                options={"factor": factor},
-                tol=tolerance,
-            )
-            sol = solarray.x
+        logger.info("sol = %s", sol)
 
-        if FSOLVE:
-            while ier != 1 and ic_count <= ic_count_max:
-                sol, infodict, ier, mesg = fsolve(
-                    self._objective_func,
-                    initial_solution,
-                    args=(constraints, coefficient_matrix),
-                    full_output=True,
-                )
-                logger.info(mesg)
-                if ier != 1:
-                    logger.info(
-                        "Retrying with a new randomised initial condition (attempt %d)",
-                        ic_count,
-                    )
-                    # Increase or decrease the magnitude of all pressures.
-                    initial_solution *= 2 * np.random.random_sample()
-                    self._conform_initial_solution_to_solid_activities(initial_solution)
-                    self._conform_initial_solution_to_constraints(initial_solution, constraints)
-                    logger.debug("initial_solution = %s", initial_solution)
-                    ic_count += 1
+        if not sol.success:
+            raise SystemExit()
 
-            if ic_count == ic_count_max:
-                logger.error("Maximum number of randomised initial conditions has been exceeded")
-                raise RuntimeError("Solution cannot be found (ic_count == ic_count_max)")
-
-            logger.info("Number of function calls = %d", infodict["nfev"])
-            logger.info("Final objective function evaluation = %s", infodict["fvec"])
+        sol = sol.x
 
         return sol
 
