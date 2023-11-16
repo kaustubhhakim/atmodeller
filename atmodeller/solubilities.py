@@ -397,7 +397,7 @@ class BasaltCO(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
-        CO_wtp: float = 10 ** (-5.20 + (0.8 * np.log(fugacity)))
+        CO_wtp: float = 10 ** (-5.20 + (0.8 * np.log10(fugacity)))
         ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
         return ppmw
 
@@ -413,7 +413,7 @@ class RhyoliteCO(Solubility):
     ) -> float:
         del temperature
         del fugacities_dict
-        CO_wtp: float = 10 ** (-4.08 + (0.52 * np.log(fugacity)))
+        CO_wtp: float = 10 ** (-4.08 + (0.52 * np.log10(fugacity)))
         ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
         return ppmw
 
