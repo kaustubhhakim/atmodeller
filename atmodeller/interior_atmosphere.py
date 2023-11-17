@@ -839,7 +839,9 @@ class InteriorAtmosphereSystem:
         logger.debug("Residual_mass = %s", residual_mass)
 
         # Compute residual for the total pressure (if relevant).
-        residual_total_pressure: np.ndarray = np.zeros(len(constraints.total_pressure_constraint))
+        residual_total_pressure: np.ndarray = np.zeros(
+            len(constraints.total_pressure_constraint), dtype=np.float_
+        )
         if len(constraints.total_pressure_constraint):
             constraint: ConstraintABC = constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += (
