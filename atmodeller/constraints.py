@@ -37,8 +37,12 @@ class PressureConstraint(ConstantConstraint):
 
 @dataclass(kw_only=True, frozen=True)
 class TotalPressureConstraint(ConstantConstraint):
-    """Total pressure constraint. See base class."""
+    """Total pressure constraint. See base class.
 
+    'species' is not required so is set to an empty string
+    """
+
+    species: str = field(init=False, default="")
     name: str = field(init=False, default="total_pressure")
 
 
