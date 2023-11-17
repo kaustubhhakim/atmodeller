@@ -6,51 +6,17 @@ See the LICENSE file for licensing information.
 from __future__ import annotations
 
 import logging
-from functools import wraps
-from typing import Callable
 
 import numpy as np
-from molmass import Formula
 
-from atmodeller.interfaces import Solubility
+from atmodeller.interfaces import Solubility, limit_solubility
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 # Solubility limiters.
-MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight.
 # Maximum sulfur solubility.
 SULFUR_MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(1)  # 1% by weight
-
-
-def limit_solubility(bound: float = MAXIMUM_PPMW) -> Callable:
-    """A decorator to limit the solubility in ppmw.
-
-    Args:
-        bound: The maximum limit of the solubility in ppmw. Defaults to MAXIMUM_PPMW.
-
-    Returns:
-        The decorator.
-    """
-
-    def decorator(func) -> Callable:
-        @wraps(func)
-        def wrapper(self: Solubility, *args, **kwargs):
-            result: float = func(self, *args, **kwargs)
-            if result > bound:
-                msg: str = "%s solubility (%d ppmw) will be limited to %d ppmw" % (
-                    self.__class__.__name__,
-                    result,
-                    bound,
-                )
-                logger.warning(msg)
-
-            return min(result, bound)  # Limit the result to 'bound'
-
-        return wrapper
-
-    return decorator
-
 
 # region Andesite solubility
 
@@ -149,6 +115,7 @@ class AnorthiteDiopsideH2O(Solubility):
 class BasaltDixonCO2(Solubility):
     """Dixon et al. (1995)."""
 
+    @limit_solubility()
     def _solubility(
         self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:

@@ -317,12 +317,11 @@ class ConstantConstraint(ConstraintABC):
 
 @dataclass(kw_only=True, frozen=True)
 class IdealityConstant(ConstantConstraint):
-    """A constant fugacity coefficient or activity.
+    """A constant activity.
 
     The constructor must accept no arguments to enable it to be used as a default factory when the
-    user does not specify a fugacity coefficient model for a gas species or an activity model for
-    a solid species. Therefore, the name and species arguments are set to empty strings because
-    they are not used.
+    user does not specify an activity model for a solid species. Therefore, the name and species
+    arguments are set to empty strings because they are not used.
 
     Args:
         value: The constant value. Defaults to 1 (i.e. ideal behaviour).
@@ -334,6 +333,39 @@ class IdealityConstant(ConstantConstraint):
     name: str = field(init=False, default="")
     species: str = field(init=False, default="")
     value: float = 1.0
+
+
+# Solubility limiter applied universally
+MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight.
+
+
+def limit_solubility(bound: float = MAXIMUM_PPMW) -> Callable:
+    """A decorator to limit the solubility in ppmw.
+
+    Args:
+        bound: The maximum limit of the solubility in ppmw. Defaults to MAXIMUM_PPMW.
+
+    Returns:
+        The decorator.
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(self: Solubility, *args, **kwargs):
+            result: float = func(self, *args, **kwargs)
+            if result > bound:
+                msg: str = "%s solubility (%d ppmw) will be limited to %d ppmw" % (
+                    self.__class__.__name__,
+                    result,
+                    bound,
+                )
+                logger.warning(msg)
+
+            return np.clip(result, 0, bound)  # Limit the result between 0 and 'bound'
+
+        return wrapper
+
+    return decorator
 
 
 class Solubility(GetValueABC):
@@ -368,6 +400,7 @@ class Solubility(GetValueABC):
         """
         raise NotImplementedError
 
+    @limit_solubility()  # Note this limiter is always applied.
     def get_value(
         self, *, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:

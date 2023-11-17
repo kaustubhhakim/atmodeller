@@ -27,6 +27,7 @@ from atmodeller.solubilities import (
 )
 
 logger: logging.Logger = debug_logger()
+logger.setLevel(logging.WARNING)
 
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
