@@ -136,21 +136,38 @@ class RedoxBuffer(ConstraintABC):
     name: str = field(init=False, default="fugacity")
 
     @abstractmethod
-    def get_log10_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def get_buffer_log10_value(
+        self, *, temperature: float, pressure: float = 1, **kwargs
+    ) -> float:
         """Log10 value at the buffer
 
         Args:
             temperature: Temperature
-            pressure: Pressure
+            pressure: Pressure. Defaults to 1 bar.
             **kwargs: Arbitrary keyword arguments
 
         Returns:
-            Log10 of the fugacity at the buffer
+            log10 of the fugacity at the buffer
         """
 
-    def get_value(self, **kwargs) -> float:
-        log10_value: float = self.get_log10_value(**kwargs)
+    def get_log10_value(self, **kwargs) -> float:
+        """Log10 value including any shift
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure. Defaults to 1 bar.
+            **kwargs: Arbitrary keyword arguments
+
+        Returns:
+            Log10 of the fugacity including any shift
+        """
+        log10_value: float = self.get_buffer_log10_value(**kwargs)
         log10_value += self.log10_shift
+        return log10_value
+
+    def get_value(self, **kwargs) -> float:
+        """See base class"""
+        log10_value: float = self.get_log10_value(**kwargs)
         value: float = 10**log10_value
         return value
 
@@ -171,7 +188,9 @@ class IronWustiteBufferConstraintHirschmann(OxygenFugacityBuffer):
     See base class.
     """
 
-    def get_log10_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def get_buffer_log10_value(
+        self, *, temperature: float, pressure: float = 1, **kwargs
+    ) -> float:
         """See base class."""
 
         del kwargs
@@ -195,7 +214,9 @@ class IronWustiteBufferConstraintOneill(OxygenFugacityBuffer):
     See base class.
     """
 
-    def get_log10_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def get_buffer_log10_value(
+        self, *, temperature: float, pressure: float = 1, **kwargs
+    ) -> float:
         """See base class."""
 
         del pressure
@@ -218,7 +239,9 @@ class IronWustiteBufferConstraintBallhaus(OxygenFugacityBuffer):
     See base class.
     """
 
-    def get_log10_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def get_buffer_log10_value(
+        self, *, temperature: float, pressure: float = 1, **kwargs
+    ) -> float:
         """See base class."""
 
         del kwargs
@@ -243,7 +266,9 @@ class IronWustiteBufferConstraintFischer(OxygenFugacityBuffer):
     See base class.
     """
 
-    def get_log10_value(self, *, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def get_buffer_log10_value(
+        self, *, temperature: float, pressure: float = 1, **kwargs
+    ) -> float:
         """See base class."""
 
         del kwargs

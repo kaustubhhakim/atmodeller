@@ -34,12 +34,23 @@ class GetValueABC(ABC):
         """Computes the value for given input arguments.
 
         Args:
-            **kwargs: Keyword arguments only.
+            **kwargs: Keyword arguments only
 
         Returns:
-            An evaluation based on the provided arguments.
+            An evaluation based on the provided arguments
         """
         ...
+
+    def get_log10_value(self, **kwargs) -> float:
+        """Computes the log10 value for given input arguments.
+
+        Args:
+            **kwargs: Keyword arguments only
+
+        Returns:
+            An evaluation of the log10 value based on the provided arguments
+        """
+        return np.log10(self.get_value(**kwargs))
 
 
 @dataclass(kw_only=True)
@@ -972,7 +983,9 @@ class GasSpecies(ChemicalComponent):
 
         pressure: float = system.solution_dict[self.chemical_formula]
         fugacity: float = system.fugacities_dict[self.chemical_formula]
-        fugacity_coefficient: float = system.fugacity_coefficients_dict[self.chemical_formula]
+        fugacity_coefficient: float = (
+            10 ** system.log10_fugacity_coefficients_dict[self.chemical_formula]
+        )
 
         # Atmosphere.
         mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity

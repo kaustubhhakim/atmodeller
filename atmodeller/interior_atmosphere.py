@@ -463,13 +463,11 @@ class ReactionNetwork:
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
             logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
-            rhs[row_index] = np.log10(
-                constraint.get_value(
-                    temperature=system.planet.surface_temperature, pressure=system.total_pressure
-                )
+            rhs[row_index] = constraint.get_log10_value(
+                temperature=system.planet.surface_temperature, pressure=system.total_pressure
             )
             if constraint.name == "pressure":
-                rhs[row_index] += np.log10(system.fugacity_coefficients_dict[constraint.species])
+                rhs[row_index] += system.log10_fugacity_coefficients_dict[constraint.species]
 
         logger.debug("RHS vector = %s", rhs)
 
@@ -584,10 +582,10 @@ class InteriorAtmosphereSystem:
         return output
 
     @property
-    def fugacity_coefficients_dict(self) -> dict[str, float]:
+    def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients (relevant for gas species only) in a dictionary."""
         output: dict[str, float] = {
-            species.chemical_formula: species.eos.get_value(
+            species.chemical_formula: species.eos.get_log10_value(
                 temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
             for species in self.species.gas_species.values()
@@ -598,8 +596,8 @@ class InteriorAtmosphereSystem:
     def fugacities_dict(self) -> dict[str, float]:
         """Fugacities of all species in a dictionary."""
         output: dict[str, float] = {}
-        for key, value in self.fugacity_coefficients_dict.items():
-            output[key] = value * self.solution_dict[key]
+        for key, value in self.log10_fugacity_coefficients_dict.items():
+            output[key] = 10**value * self.solution_dict[key]
         return output
 
     @property
