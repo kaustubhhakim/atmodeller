@@ -596,9 +596,9 @@ class InteriorAtmosphereSystem:
     @property
     def fugacities_dict(self) -> dict[str, float]:
         """Fugacities of all species in a dictionary."""
-        output: dict[str, float] = {}
-        for key, value in self.log10_fugacity_coefficients_dict.items():
-            output[key] = 10**value * self.solution_dict[key]
+        output: dict[str, float] = {
+            key: 10**value for key, value in self.log10_fugacities_dict.items()
+        }
         return output
 
     @property
