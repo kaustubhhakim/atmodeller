@@ -198,6 +198,7 @@ class BasaltLibourelN2(Solubility):
     ) -> float:
         del temperature
         ppmw: float = self.power_law(fugacity, 0.0611, 1.0)
+        # Below is correct, i.e. fO2 and NOT log10(fO2), unlike most other formulations
         constant: float = ((10 ** log10_fugacities_dict["O2"]) ** -0.75) * 5.97e-10
         ppmw += self.power_law(fugacity, constant, 0.5)
 
