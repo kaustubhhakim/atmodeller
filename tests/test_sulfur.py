@@ -334,7 +334,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
         "N2": 2.3491951394429105,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 

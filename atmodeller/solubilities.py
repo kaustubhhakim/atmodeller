@@ -62,10 +62,10 @@ class AndesiteH2(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         ppmw: float = 10 ** (0.60128868 * np.log10(fugacity) + 1.01058631)
         return ppmw
 
@@ -79,13 +79,11 @@ class AndesiteS2_Sulfate(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = -12.948 + (31586.2393 / temperature)
-        logS_wtp: float = (
-            logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        )
+        logS_wtp: float = logCs + (0.5 * np.log10(fugacity)) + (1.5 * log10_fugacities_dict["O2"])
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
 
@@ -101,11 +99,11 @@ class AndesiteS2_Sulfide(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         """fugacity is fS2."""
         logCs: float = 0.225 - (8921.0927 / temperature)
-        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        logS_wtp: float = logCs - (0.5 * (log10_fugacities_dict["O2"] - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
 
@@ -137,10 +135,10 @@ class AnorthiteDiopsideH2O(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
 
         return self.power_law(fugacity, 727, 0.5)
 
@@ -152,9 +150,9 @@ class BasaltDixonCO2(Solubility):
     """Dixon et al. (1995)."""
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
-        del fugacities_dict
+        del log10_fugacities_dict
         ppmw: float = (3.8e-7) * fugacity * np.exp(-23 * (fugacity - 1) / (83.15 * temperature))
         ppmw = 1.0e4 * (4400 * ppmw) / (36.6 - 44 * ppmw)
 
@@ -165,10 +163,10 @@ class BasaltDixonH2O(Solubility):
     """Dixon et al. (1995) refit by Paolo Sossi."""
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
 
         return self.power_law(fugacity, 965, 0.5)
 
@@ -180,10 +178,10 @@ class BasaltH2(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         ppmw: float = 10 ** (0.52413928 * np.log10(fugacity) + 1.10083602)
 
         return ppmw
@@ -196,11 +194,11 @@ class BasaltLibourelN2(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
         ppmw: float = self.power_law(fugacity, 0.0611, 1.0)
-        constant: float = (fugacities_dict["O2"] ** -0.75) * 5.97e-10
+        constant: float = ((10 ** log10_fugacities_dict["O2"]) ** -0.75) * 5.97e-10
         ppmw += self.power_law(fugacity, constant, 0.5)
 
         return ppmw
@@ -215,12 +213,12 @@ class BasaltS2_Sulfate(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = -12.948 + (32333.5635 / temperature)
         logSO4_wtp: float = (
-            logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
+            logCs + (0.5 * np.log10(fugacity)) + (1.5 * log10_fugacities_dict["O2"])
         )
         SO4_wtp: float = 10**logSO4_wtp
         S_wtp: float = SO4_wtp * (32.065 / 96.06)
@@ -238,11 +236,11 @@ class BasaltS2_Sulfide(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = 0.225 - (8045.7465 / temperature)
-        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        logS_wtp: float = logCs - (0.5 * (log10_fugacities_dict["O2"] - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
 
@@ -268,10 +266,10 @@ class BasaltWilsonH2O(Solubility):
     """Hamilton (1964) and Wilson and Head (1981)."""
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         return self.power_law(fugacity, 215, 0.7)
 
 
@@ -284,13 +282,11 @@ class TBasaltS2_Sulfate(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = -12.948 + (32446.366 / temperature)
-        logS_wtp: float = (
-            logCs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fugacities_dict["O2"]))
-        )
+        logS_wtp: float = logCs + (0.5 * np.log10(fugacity)) + (1.5 * log10_fugacities_dict["O2"])
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
 
@@ -306,11 +302,11 @@ class TBasaltS2_Sulfide(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         """Fugacity is fS2."""
         logCs: float = 0.225 - (7842.5 / temperature)
-        logS_wtp: float = logCs - (0.5 * (np.log10(fugacities_dict["O2"]) - np.log10(fugacity)))
+        logS_wtp: float = logCs - (0.5 * (log10_fugacities_dict["O2"] - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
         ppmw: float = UnitConversion.weight_percent_to_ppmw(S_wtp)
 
@@ -327,10 +323,10 @@ class LunarGlassH2O(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         return self.power_law(fugacity, 683, 0.5)
 
 
@@ -342,14 +338,14 @@ class MercuryMagmaS(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # Coeffs from eq. 10 (Namur et al., 2016).
         wt_perc: float = np.exp(
             a
             + (b / temperature)
             + ((c * fugacity) / temperature)
-            + (d * np.log10(fugacities_dict["O2"]))
+            + (d * log10_fugacities_dict["O2"])
         )
         ppmw: float = UnitConversion.weight_percent_to_ppmw(wt_perc)
 
@@ -364,10 +360,10 @@ class PeridotiteH2O(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         return self.power_law(fugacity, 524, 0.5)
 
 
@@ -378,10 +374,10 @@ class SilicicMeltsH2(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         ppmw: float = self.power_law(fugacity, 0.163, 1.252)
         return ppmw
 
@@ -393,10 +389,10 @@ class BasaltCO(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         CO_wtp: float = 10 ** (-5.20 + (0.8 * np.log10(fugacity)))
         ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
         return ppmw
@@ -409,10 +405,10 @@ class RhyoliteCO(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         CO_wtp: float = 10 ** (-4.08 + (0.52 * np.log10(fugacity)))
         ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
         return ppmw
@@ -425,10 +421,10 @@ class BasaltHe(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         Henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
         He_conc: float = (
             Henry_sol_constant / 2.24e4
@@ -446,10 +442,10 @@ class BasaltCl2(Solubility):
     Valid at 1400 C and 1.5 GPa"""
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         Cl_wtp: float = 78.56 * np.sqrt(fugacity)
         ppmw: float = UnitConversion.weight_percent_to_ppmw(Cl_wtp)
         return ppmw
@@ -462,10 +458,10 @@ class AnorthiteDiopsideForsteriteCl2(Solubility):
     Valid at 1400 C and 1.5 GPa"""
 
     def _solubility(
-        self, fugacity: float, temperature: float, fugacities_dict: dict[str, float]
+        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
     ) -> float:
         del temperature
-        del fugacities_dict
+        del log10_fugacities_dict
         Cl_wtp: float = 140.52 * np.sqrt(fugacity)
         ppmw: float = UnitConversion.weight_percent_to_ppmw(Cl_wtp)
         return ppmw

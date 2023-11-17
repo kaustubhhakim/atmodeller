@@ -602,6 +602,14 @@ class InteriorAtmosphereSystem:
         return output
 
     @property
+    def log10_fugacities_dict(self) -> dict[str, float]:
+        """Log10 fugacities of all species in a dictionary."""
+        output: dict[str, float] = {}
+        for key, value in self.log10_fugacity_coefficients_dict.items():
+            output[key] = np.log10(self.solution_dict[key]) + value
+        return output
+
+    @property
     def total_pressure(self) -> float:
         """Total pressure."""
         indices: list[int] = list(self.species.gas_species.keys())
