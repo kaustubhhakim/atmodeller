@@ -108,7 +108,13 @@ class SystemConstraints(UserList):
     @property
     def total_pressure_constraint(self) -> list[ConstraintABC]:
         """Total pressure constraint."""
-        return self._filter_by_name("total_pressure")
+        total_pressure: list[ConstraintABC] = self._filter_by_name("total_pressure")
+        if len(total_pressure) > 1:
+            msg: str = "You can only specify zero or one total pressure constraints"
+            logger.error(msg)
+            raise ValueError(msg)
+
+        return total_pressure
 
     @property
     def reaction_network_constraints(self) -> list[ConstraintABC]:

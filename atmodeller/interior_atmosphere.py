@@ -19,6 +19,7 @@ from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.interfaces import (
     ChemicalComponent,
+    ConstraintABC,
     GasSpecies,
     NoSolubility,
     SolidSpecies,
@@ -837,14 +838,13 @@ class InteriorAtmosphereSystem:
             residual_mass[constraint_index] /= constraint.get_value()
         logger.debug("Residual_mass = %s", residual_mass)
 
-        # Compute residual for the total pressure (if relevant)
+        # Compute residual for the total pressure (if relevant).
         residual_total_pressure: np.ndarray = np.zeros(len(constraints.total_pressure_constraint))
-        for constraint_index, constraint in enumerate(constraints.total_pressure_constraint):
-            # To calculate in log10 space instead like other pressures?
-            residual_total_pressure[constraint_index] += (
-                self.total_pressure - constraint.get_value()
+        if len(constraints.total_pressure_constraint):
+            constraint: ConstraintABC = constraints.total_pressure_constraint[0]
+            residual_total_pressure[0] += (
+                np.log10(self.total_pressure) - constraint.get_log10_value()
             )
-            residual_total_pressure[constraint_index] /= constraint.get_value()
 
         # Combined residual.
         residual: np.ndarray = np.concatenate(
