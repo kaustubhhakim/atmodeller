@@ -35,6 +35,13 @@ class PressureConstraint(ConstantConstraint):
 
 
 @dataclass(kw_only=True, frozen=True)
+class TotalPressureConstraint(ConstantConstraint):
+    """Total pressure constraint. See base class."""
+
+    name: str = field(init=False, default="total_pressure")
+
+
+@dataclass(kw_only=True, frozen=True)
 class MassConstraint(ConstantConstraint):
     """A constant mass constraint. See base class."""
 
@@ -92,6 +99,11 @@ class SystemConstraints(UserList):
     def pressure_constraints(self) -> list[ConstraintABC]:
         """Constraints related to pressure."""
         return self._filter_by_name("pressure")
+
+    @property
+    def total_pressure_constraint(self) -> list[ConstraintABC]:
+        """Total pressure constraint."""
+        return self._filter_by_name("total_pressure")
 
     @property
     def reaction_network_constraints(self) -> list[ConstraintABC]:
