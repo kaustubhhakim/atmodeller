@@ -18,16 +18,18 @@ Real gas EOSs (class instances) in this module that can be imported:
     CH4_CORK_HP91: CORK corresponding states for CH4 in Holland and Powell (1991)
     H2_CORK_HP91: CORK corresponding states for H2 in Holland and Powell (1991)
     CO_CORK_HP91: CORK corresponding states for CO in Holland and Powell (1991)
+    N2_CORK_HP91: CORK corresponding states for N2 in Holland and Powell (1991)
     S2_CORK_HP11: CORK corresponding states for S2 in Holland and Powell (2011)
-    H2_CORK_SHP11: CORK corresponding states for H2S in Holland and Powell (2011)
-    H2O_MRK_HP91: MRK for H2O with critical behaviour in Holland and Powell (1991)
-    H2O_MRK_HP98: MRK for H2O with critical behaviour in Holland and Powell (1998)
+    H2S_CORK_HP11: CORK corresponding states for H2S in Holland and Powell (2011)
     CO2_MRK_HP91: Full MRK for CO2 in Holland and Powell (1991)
     CO2_MRK_HP98: Full MRK for CO2 in Holland and Powell (1998)
     CO2_MRK_simple_HP91: Simple MRK for CO2 in Holland and Powell (1991)
+    H2O_MRK_HP91: MRK for H2O with critical behaviour in Holland and Powell (1991)
+    H2O_MRK_HP98: MRK for H2O with critical behaviour in Holland and Powell (1998)
     CH4_MRK_HP91: MRK corresponding states for CH4 in Holland and Powell (1991)
     H2_MRK_HP91: MRK corresponding states for H2 in Holland and Powell (1991)
     CO_MRK_HP91: MRK corresponding states for CO in Holland and Powell (1991)
+    N2_MRK_HP91: MRK corresponding states for N2 in Holland and Powell (1991)
     S2_MRK_HP11: MRK corresponding states for S2 in Holland and Powell (2011)
     H2S_MRK_HP11: MRK corresponding states for H2S in Holland and Powell (2011)
 
@@ -171,6 +173,7 @@ CO2_MRK_simple_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO2")
 CH4_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CH4")
 H2_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2_Holland")
 CO_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO")
+N2_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("N2")
 S2_MRK_HP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("S2")
 H2S_MRK_HP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2S")
 
@@ -179,8 +182,9 @@ CO2_CORK_simple_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO2"
 CH4_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CH4")
 H2_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2_Holland")
 CO_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO")
+N2_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("N2")
 S2_CORK_HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("S2")
-H2_CORK_SHP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")
+H2S_CORK_HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")
 
 # endregion
 
@@ -431,7 +435,8 @@ def get_holland_eos_models() -> dict[str, RealGasABC]:
     models["CO2"] = CO2_CORK_HP98
     models["H2"] = H2_CORK_HP91
     models["H2O"] = H2O_CORK_HP98
-    models["H2S"] = H2_CORK_SHP11
+    models["H2S"] = H2S_CORK_HP11
+    models["N2"] = N2_CORK_HP91
     models["S2"] = S2_CORK_HP11
 
     return models
