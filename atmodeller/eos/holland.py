@@ -66,9 +66,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Type
 
-from atmodeller import GAS_CONSTANT
+import numpy as np
+
 from atmodeller.eos.interfaces import (
     CORK,
     MRKCriticalBehaviour,
@@ -218,24 +218,19 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
         """Temperature difference for the calculation of the a parameter"""
         return self.Ta - temperature
 
-    def initial_solution_volume(self, *args, **kwargs) -> float:
-        """Initial guess volume for the solution to ensure convergence to the correct root.
-
-        For the liquid phase a suitably low value must be chosen. See appendix in Holland and
-        Powell (1991).
+    def volume(self, *args, **kwargs) -> float:
+        """Volume
 
         Args:
-            *args: Unused positional arguments
-            **kwargs: Unused keyword arguments
+            *args: Positional arguments to pass to self.volume_roots
+            **kwargs: Keyword arguments to pass to self.volume_roots
 
         Returns:
-            Initial solution volume
+            Volume in m^3/mol
         """
-        del args
-        del kwargs
-        initial_volume = self.b / 2
+        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        return initial_volume
+        return np.min(volume_roots)
 
 
 @dataclass(kw_only=True)
@@ -258,21 +253,19 @@ class _MRKH2OGasHP91(MRKImplicitABC):
         """Temperature difference for the calculation of the a parameter"""
         return self.Ta - temperature
 
-    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
-        """Initial guess volume for the solution to ensure convergence to the correct root.
-
-        See appendix in Holland and Powell (1991)
+    def volume(self, *args, **kwargs) -> float:
+        """Volume
 
         Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
+            *args: Positional arguments to pass to self.volume_roots
+            **kwargs: Keyword arguments to pass to self.volume_roots
 
         Returns:
-            Initial solution volume
+            Volume in m^3/mol
         """
-        initial_volume: float = GAS_CONSTANT * temperature / pressure + 10 * self.b
+        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        return initial_volume
+        return np.max(volume_roots)
 
 
 @dataclass(kw_only=True)
@@ -296,24 +289,33 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
         """Temperature difference for the calculation of the a parameter"""
         return temperature - self.Ta
 
-    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
-        """Initial guess volume for the solution to ensure convergence to the correct root.
-
-        See appendix in Holland and Powell (1991)
+    def volume(self, *args, **kwargs) -> float:
+        """Volume
 
         Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
+            *args: Positional arguments to pass to self.volume_roots
+            **kwargs: Keyword arguments to pass to self.volume_roots
 
         Returns:
-            Initial solution volume
+            Volume in m^3/mol
         """
-        if temperature >= self.Tc:
-            initial_volume: float = GAS_CONSTANT * temperature / pressure + self.b
-        else:
-            initial_volume = self.b / 2
+        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        return initial_volume
+        # TODO: Kept for reference since the region > Tc and Ta<region<Tc might be treated
+        # with a different root?  Only one root exists above Tc, but three below?
+        # if temperature >= self.Tc:
+        #     initial_volume: float = GAS_CONSTANT * temperature / pressure + self.b
+        # else:
+        #     initial_volume = self.b / 2
+
+        # TODO: Above Tc there is only one root, so this min/max can be chosen to pick up the
+        # correct root below Tc and above Ta.
+        # volume = np.min(volume_roots)
+
+        # DJB: Subsequent code assumes there is only one root, which seems to be true
+        assert volume_roots.size == 1
+
+        return volume_roots[0]
 
 
 @dataclass(kw_only=True)
@@ -328,19 +330,20 @@ class MRKCO2HP91(MRKImplicitABC):
     def delta_temperature_for_a(self, temperature: float) -> float:
         return temperature - self.Ta
 
-    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
-        """Initial guess volume for the solution to ensure convergence to the correct root
+    def volume(self, *args, **kwargs) -> float:
+        """Volume
 
         Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
+            *args: Positional arguments to pass to self.volume_roots
+            **kwargs: Keyword arguments to pass to self.volume_roots
 
         Returns:
-            Initial solution volume
+            Volume in m^3/mol
         """
-        initial_volume: float = GAS_CONSTANT * temperature / pressure + self.b
+        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        return initial_volume
+        # TODO: Holland and Powell don't say which root to take, but max passes previous tests.
+        return np.max(volume_roots)
 
 
 CO2_MRK_HP91: RealGasABC = MRKCO2HP91()

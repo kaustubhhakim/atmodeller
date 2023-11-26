@@ -10,7 +10,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
-from scipy.optimize import root
+from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.interfaces import RealGasABC
@@ -229,46 +229,21 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
         return B
 
-    def compressibility_parameter(
-        self, temperature: float, pressure: float, *, volume_init: float | None = None
-    ) -> float:
-        """Compressibility parameter at temperature and pressure
-
-        Overrides the base class because an extra keyword argument is required to ensure the
-        correct compressibility parameter is returned.
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-            volume_init: Initial volume estimate. Defaults to None
-
-        Returns:
-            The compressibility parameter, Z
-        """
-        volume: float = self.volume(temperature, pressure, volume_init=volume_init)
-        volume_ideal: float = self.ideal_volume(temperature, pressure)
-        Z: float = volume / volume_ideal
-
-        return Z
-
     def volume_integral(
         self,
         temperature: float,
         pressure: float,
-        *,
-        volume_init: float | None = None,
     ) -> float:
         """Volume integral. Equation A.2., Holland and Powell (1991)
 
         Args:
             temperature: Temperature in kelvin
             pressure: Pressure in bar
-            volume_init: Initial volume estimate. Defaults to None
 
         Returns:
             Volume integral
         """
-        z: float = self.compressibility_parameter(temperature, pressure, volume_init=volume_init)
+        z: float = self.compressibility_parameter(temperature, pressure)
         A: float = self.A_factor(temperature, pressure)
         B: float = self.B_factor(temperature, pressure)
         # The base class requires a specification of the volume_integral, but the equations in
@@ -279,98 +254,37 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
         return volume_integral
 
-    @abstractmethod
-    def initial_solution_volume(self, temperature: float, pressure: float) -> float:
-        """Initial guess volume for the solution to ensure convergence to the correct root
+    def volume_roots(self, temperature: float, pressure: float) -> np.ndarray:
+        """Volume roots of the MRK equation
 
         Args:
             temperature: Temperature in kelvin
             pressure: Pressure in bar
 
         Returns:
-            Initial solution volume
+            Volume roots of the MRK equation
         """
-        ...
-
-    def volume(
-        self, temperature: float, pressure: float, *, volume_init: float | None = None
-    ) -> float:
-        """Solves the MRK equation numerically to compute the volume.
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-            volume_init: Initial volume estimate. Defaults to a value to find the single root above
-                the critical temperature, Tc. Other initial values may be necessary for multi-root
-                systems (e.g., relating to the critical behaviour of H2O).
-
-        Returns:
-            volume
-        """
-        if volume_init is None:
-            volume_init = self.initial_solution_volume(temperature, pressure)
-
-        sol = root(
-            self._objective_function_volume,
-            volume_init,
-            args=(temperature, pressure),
-            jac=self._volume_jacobian,
+        coefficients: list[float] = []
+        coefficients.append(-self.a(temperature) * self.b / np.sqrt(temperature))
+        coefficients.append(
+            -self.b * GAS_CONSTANT * temperature
+            - self.b**2 * pressure
+            + self.a(temperature) / np.sqrt(temperature)
         )
-        volume: float = sol.x[0]
+        coefficients.append(-GAS_CONSTANT * temperature)
+        coefficients.append(pressure)
 
-        logger.debug("volume = %f", volume)
+        polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="VMRK")
+        logger.debug("MRK equation = %s", polynomial)
+        volume_roots: np.ndarray = polynomial.roots()
+        # Numerical solution could result in a small imaginery component, even though the real
+        # root is purely real.
+        real_roots: np.ndarray = np.real(volume_roots[np.isclose(volume_roots.imag, 0)])
+        # Physically meaningful volumes must be positive.
+        positive_roots: np.ndarray = real_roots[real_roots > 0]
+        logger.debug("V_MRK = %s", positive_roots)
 
-        return volume
-
-    def _objective_function_volume(
-        self, volume: float, temperature: float, pressure: float
-    ) -> float:
-        """Residual function for the MRK volume from Equation A.1, Holland and Powell (1991)
-
-        Args:
-            volume: Volume
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Residual of the MRK volume
-        """
-        residual: float = (
-            pressure * volume**3
-            - GAS_CONSTANT * temperature * volume**2
-            - (
-                self.b * GAS_CONSTANT * temperature
-                + self.b**2 * pressure
-                - self.a(temperature) / np.sqrt(temperature)
-            )
-            * volume
-            - self.a(temperature) * self.b / np.sqrt(temperature)
-        )
-
-        return residual
-
-    def _volume_jacobian(self, volume: float, temperature: float, pressure: float):
-        """Jacobian of Equation A.1, Holland and Powell (1991).
-
-        Args:
-            volume: Volume
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Jacobian of the MRK volume
-        """
-        jacobian: float = (
-            3 * pressure * volume**2
-            - 2 * GAS_CONSTANT * temperature * volume
-            - (
-                self.b * GAS_CONSTANT * temperature
-                + self.b**2 * pressure
-                - self.a(temperature) / np.sqrt(temperature)
-            )
-        )
-
-        return jacobian
+        return positive_roots
 
 
 @dataclass(kw_only=True)
@@ -418,27 +332,23 @@ class MRKCriticalBehaviour(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume
+            Volume in m^3/mol
         """
         Psat: float = self.Psat(temperature)
 
-        if temperature >= self.Tc:
-            logger.debug("temperature >= critical temperature of %f", self.Tc)
-            volume: float = self.mrk_fluid.volume(temperature, pressure)
-
-        elif temperature <= self.Ta and pressure <= Psat:
+        if temperature <= self.Ta and pressure <= Psat:
             logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
+            logger.debug("Gas phase")
             volume = self.mrk_gas.volume(temperature, pressure)
 
-        elif temperature < self.Tc and pressure <= Psat:
-            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
-            volume = self.mrk_fluid.volume(temperature, pressure)
+        elif temperature <= self.Ta and pressure > Psat:
+            logger.debug("temperature <= %f and pressure > %f", self.Ta, Psat)
+            logger.debug("Liquid phase")
+            volume = self.mrk_liquid.volume(temperature, pressure)
 
-        else:  # temperature < self.Tc and pressure > Psat:
-            if temperature <= self.Ta:
-                volume = self.mrk_liquid.volume(temperature, pressure)
-            else:
-                volume = self.mrk_fluid.volume(temperature, pressure)
+        else:
+            logger.debug("Fluid phase")
+            volume = self.mrk_fluid.volume(temperature, pressure)
 
         return volume
 
@@ -468,10 +378,10 @@ class MRKCriticalBehaviour(RealGasABC):
 
         else:  # temperature < self.Tc and pressure > Psat:
             if temperature <= self.Ta:
-                volume_init: float = GAS_CONSTANT * temperature / Psat + 10 * self.mrk_gas.b
-                volume_integral = self.mrk_gas.volume_integral(
-                    temperature, Psat, volume_init=volume_init
-                )
+                # To converge to the correct root the actual pressure must be used to compute the
+                # initial volume, not Psat.
+                # volume_init: float = GAS_CONSTANT * temperature / pressure + 10 * self.mrk_gas.b
+                volume_integral = self.mrk_gas.volume_integral(temperature, Psat)
                 logger.debug("volume_integral = %f", volume_integral)
                 volume_integral -= self.mrk_liquid.volume_integral(temperature, Psat)
                 logger.debug("volume_integral = %f", volume_integral)
