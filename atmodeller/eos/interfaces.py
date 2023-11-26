@@ -77,7 +77,6 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
     See base class.
     """
 
-    @debug_decorator(logger)
     def a(self, temperature: float) -> float:
         """Parameter a in Equation 9, Holland and Powell (1991)
 
@@ -97,7 +96,6 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
         return a
 
     @property
-    @debug_decorator(logger)
     def b(self) -> float:
         """Parameter b in Equation 9, Holland and Powell (1991)
 
@@ -110,7 +108,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
     @debug_decorator(logger)
     def volume(self, temperature: float, pressure: float) -> float:
-        """Convenient volume-explicit equation. Equation 7, Holland and Powell (1991).
+        """Volume-explicit equation. Equation 7, Holland and Powell (1991).
 
         Without complications of critical phenomena the MRK equation can be simplified using the
         approximation:
@@ -166,13 +164,13 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 class MRKImplicitABC(ModifiedRedlichKwongABC):
     """A Modified Redlich Kwong (MRK) EOS in an implicit form
 
-    See base class
+    See base class.
     """
 
     Ta: float = 0
 
     def a(self, temperature: float) -> float:
-        """MRK a parameter for Equation 6, Holland and Powell (1991).
+        """MRK a parameter for Equation 6, Holland and Powell (1991)
 
         Args:
             temperature: Temperature in kelvin
@@ -201,7 +199,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         return self.b0
 
     def A_factor(self, temperature: float, pressure: float) -> float:
-        """A factor in Appendix A of Holland and Powell (1991).
+        """A factor in Appendix A of Holland and Powell (1991)
 
         Args:
             temperature: Temperature in kelvin
@@ -229,6 +227,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
         return B
 
+    @debug_decorator(logger)
     def volume_integral(
         self,
         temperature: float,
@@ -241,7 +240,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral
+            Volume integral in J mol^(-1)
         """
         z: float = self.compressibility_parameter(temperature, pressure)
         A: float = self.A_factor(temperature, pressure)
@@ -255,14 +254,14 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         return volume_integral
 
     def volume_roots(self, temperature: float, pressure: float) -> np.ndarray:
-        """Volume roots of the MRK equation
+        """Real and (potentially) physically meaningful volume solutions of the MRK equation
 
         Args:
             temperature: Temperature in kelvin
             pressure: Pressure in bar
 
         Returns:
-            Volume roots of the MRK equation
+            Volume solutions of the MRK equation in m^3/mol
         """
         coefficients: list[float] = []
         coefficients.append(-self.a(temperature) * self.b / np.sqrt(temperature))
@@ -282,7 +281,9 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         real_roots: np.ndarray = np.real(volume_roots[np.isclose(volume_roots.imag, 0)])
         # Physically meaningful volumes must be positive.
         positive_roots: np.ndarray = real_roots[real_roots > 0]
-        logger.debug("V_MRK = %s", positive_roots)
+        # In general, several roots could be returned, and subclasses will need to determine which
+        # is the correct volume to use.
+        logger.debug("VMRK = %s", positive_roots)
 
         return positive_roots
 
@@ -337,12 +338,24 @@ class MRKCriticalBehaviour(RealGasABC):
         Psat: float = self.Psat(temperature)
 
         if temperature <= self.Ta and pressure <= Psat:
-            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
+            logger.debug(
+                "temperature (%.1f) <= Ta (%.1f) and pressure (%.1f) <= Psat (%.1f)",
+                temperature,
+                self.Ta,
+                pressure,
+                Psat,
+            )
             logger.debug("Gas phase")
             volume = self.mrk_gas.volume(temperature, pressure)
 
         elif temperature <= self.Ta and pressure > Psat:
-            logger.debug("temperature <= %f and pressure > %f", self.Ta, Psat)
+            logger.debug(
+                "temperature (%.1f) <= Ta (%.1f) and pressure (%.1f) > Psat (%.1f)",
+                temperature,
+                self.Ta,
+                pressure,
+                Psat,
+            )
             logger.debug("Liquid phase")
             volume = self.mrk_liquid.volume(temperature, pressure)
 
@@ -360,35 +373,37 @@ class MRKCriticalBehaviour(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            volume integral
+            volume integral in J mol^(-1)
         """
         Psat: float = self.Psat(temperature)
 
-        if temperature >= self.Tc:
-            logger.debug("temperature >= critical temperature of %f", self.Tc)
-            volume_integral: float = self.mrk_fluid.volume_integral(temperature, pressure)
-
-        elif temperature <= self.Ta and pressure <= Psat:
-            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
+        if temperature <= self.Ta and pressure <= Psat:
+            logger.debug(
+                "temperature (%.1f) <= Ta (%.1f) and pressure (%.1f) <= Psat (%.1f)",
+                temperature,
+                self.Ta,
+                pressure,
+                Psat,
+            )
+            logger.debug("Gas phase")
             volume_integral = self.mrk_gas.volume_integral(temperature, pressure)
 
-        elif temperature < self.Tc and pressure <= Psat:
-            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
-            volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
+        elif temperature <= self.Ta and pressure > Psat:
+            logger.debug(
+                "temperature (%.1f) <= Ta (%.1f) and pressure (%.1f) > Psat (%.1f)",
+                temperature,
+                self.Ta,
+                pressure,
+                Psat,
+            )
+            logger.debug("Performing pressure integration")
+            volume_integral = self.mrk_gas.volume_integral(temperature, Psat)
+            volume_integral -= self.mrk_liquid.volume_integral(temperature, Psat)
+            volume_integral += self.mrk_liquid.volume_integral(temperature, pressure)
 
-        else:  # temperature < self.Tc and pressure > Psat:
-            if temperature <= self.Ta:
-                # To converge to the correct root the actual pressure must be used to compute the
-                # initial volume, not Psat.
-                # volume_init: float = GAS_CONSTANT * temperature / pressure + 10 * self.mrk_gas.b
-                volume_integral = self.mrk_gas.volume_integral(temperature, Psat)
-                logger.debug("volume_integral = %f", volume_integral)
-                volume_integral -= self.mrk_liquid.volume_integral(temperature, Psat)
-                logger.debug("volume_integral = %f", volume_integral)
-                volume_integral += self.mrk_liquid.volume_integral(temperature, pressure)
-                logger.debug("volume_integral = %f", volume_integral)
-            else:
-                volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
+        else:
+            logger.debug("Fluid phase")
+            volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
 
         return volume_integral
 

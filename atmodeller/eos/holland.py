@@ -301,18 +301,9 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        # TODO: Kept for reference since the region > Tc and Ta<region<Tc might be treated
-        # with a different root?  Only one root exists above Tc, but three below?
-        # if temperature >= self.Tc:
-        #     initial_volume: float = GAS_CONSTANT * temperature / pressure + self.b
-        # else:
-        #     initial_volume = self.b / 2
-
-        # TODO: Above Tc there is only one root, so this min/max can be chosen to pick up the
-        # correct root below Tc and above Ta.
-        # volume = np.min(volume_roots)
-
-        # DJB: Subsequent code assumes there is only one root, which seems to be true
+        # DJB: it appears that there is only ever a single root, even if Ta < temperature < Tc.
+        # Holland and Powell state that a single root exists if temperature > Tc, but this appears
+        # to be true if temperature > Ta.
         assert volume_roots.size == 1
 
         return volume_roots[0]
@@ -342,7 +333,9 @@ class MRKCO2HP91(MRKImplicitABC):
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        # TODO: Holland and Powell don't say which root to take, but max passes previous tests.
+        # In some cases there are more than a single root, in which case the maximum value
+        # maintains continuity/monotonicity with the single root cases. Furthermore, the max value
+        # passed the tests that were previously configured when Newton's method was used instead.
         return np.max(volume_roots)
 
 

@@ -104,12 +104,6 @@ def test_CorkH2O_below_Tc_above_P0(check_values) -> None:
     check_values.fugacity_coefficient(600, 10e3, eos_models["H2O"], 0.39074941260585533)
 
 
-# TODO: Temporary for testing existence of roots
-# def test_CorkH2O_below_Tc_684(check_values) -> None:
-#     """Below Tc and above P0."""
-#     check_values.fugacity_coefficient(784, 5e3, eos_models["H2O"], 0.40066985009753664)
-
-
 def test_H2_with_cork() -> None:
     """Tests H2-H2O at the IW buffer."""
 
