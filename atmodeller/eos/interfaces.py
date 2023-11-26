@@ -318,6 +318,8 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         )
         volume: float = sol.x[0]
 
+        logger.debug("volume = %f", volume)
+
         return volume
 
     def _objective_function_volume(
@@ -466,14 +468,15 @@ class MRKCriticalBehaviour(RealGasABC):
 
         else:  # temperature < self.Tc and pressure > Psat:
             if temperature <= self.Ta:
-                # To converge to the correct root the actual pressure must be used to compute the
-                # initial volume, not Psat.
-                volume_init: float = GAS_CONSTANT * temperature / pressure + 10 * self.mrk_gas.b
+                volume_init: float = GAS_CONSTANT * temperature / Psat + 10 * self.mrk_gas.b
                 volume_integral = self.mrk_gas.volume_integral(
                     temperature, Psat, volume_init=volume_init
                 )
+                logger.debug("volume_integral = %f", volume_integral)
                 volume_integral -= self.mrk_liquid.volume_integral(temperature, Psat)
+                logger.debug("volume_integral = %f", volume_integral)
                 volume_integral += self.mrk_liquid.volume_integral(temperature, pressure)
+                logger.debug("volume_integral = %f", volume_integral)
             else:
                 volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
 
