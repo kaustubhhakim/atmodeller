@@ -22,16 +22,21 @@ SULFUR_MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(1)  # 1% by w
 
 
 class AndesiteH2(Solubility):
-    """Hirschmann et al. 2012.
+    """Hirschmann et al. 2012
 
     Fit to fH2 vs. H2 concentration from Table 2.
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         ppmw: float = 10 ** (0.60128868 * np.log10(fugacity) + 1.01058631)
         return ppmw
 
@@ -45,9 +50,14 @@ class AndesiteS2_Sulfate(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """Fugacity is fS2."""
+        del pressure
         logCs: float = -12.948 + (31586.2393 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fugacity)) + (1.5 * log10_fugacities_dict["O2"])
         S_wtp: float = 10**logS_wtp
@@ -65,9 +75,14 @@ class AndesiteS2_Sulfide(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """fugacity is fS2."""
+        del pressure
         logCs: float = 0.225 - (8921.0927 / temperature)
         logS_wtp: float = logCs - (0.5 * (log10_fugacities_dict["O2"] - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
@@ -95,16 +110,21 @@ class AndesiteS2(Solubility):
 
 
 class AnorthiteDiopsideH2O(Solubility):
-    """Newcombe et al. (2017).
+    """Newcombe et al. (2017)
 
     https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
 
         return self.power_law(fugacity, 727, 0.5)
 
@@ -113,13 +133,18 @@ class AnorthiteDiopsideH2O(Solubility):
 
 
 class BasaltDixonCO2(Solubility):
-    """Dixon et al. (1995)."""
+    """Dixon et al. (1995)"""
 
     @limit_solubility()
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del log10_fugacities_dict
+        del pressure
         ppmw: float = (3.8e-7) * fugacity * np.exp(-23 * (fugacity - 1) / (83.15 * temperature))
         ppmw = 1.0e4 * (4400 * ppmw) / (36.6 - 44 * ppmw)
 
@@ -130,10 +155,15 @@ class BasaltDixonH2O(Solubility):
     """Dixon et al. (1995) refit by Paolo Sossi."""
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
 
         return self.power_law(fugacity, 965, 0.5)
 
@@ -145,10 +175,15 @@ class BasaltH2(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         ppmw: float = 10 ** (0.52413928 * np.log10(fugacity) + 1.10083602)
 
         return ppmw
@@ -161,9 +196,14 @@ class BasaltLibourelN2(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
+        del pressure
         ppmw: float = self.power_law(fugacity, 0.0611, 1.0)
         # Below is correct, i.e. fO2 and NOT log10(fO2), unlike most other formulations
         constant: float = ((10 ** log10_fugacities_dict["O2"]) ** -0.75) * 5.97e-10
@@ -181,9 +221,14 @@ class BasaltS2_Sulfate(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """Fugacity is fS2."""
+        del pressure
         logCs: float = -12.948 + (32333.5635 / temperature)
         logSO4_wtp: float = (
             logCs + (0.5 * np.log10(fugacity)) + (1.5 * log10_fugacities_dict["O2"])
@@ -204,9 +249,14 @@ class BasaltS2_Sulfide(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """Fugacity is fS2."""
+        del pressure
         logCs: float = 0.225 - (8045.7465 / temperature)
         logS_wtp: float = logCs - (0.5 * (log10_fugacities_dict["O2"] - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
@@ -234,10 +284,15 @@ class BasaltWilsonH2O(Solubility):
     """Hamilton (1964) and Wilson and Head (1981)."""
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         return self.power_law(fugacity, 215, 0.7)
 
 
@@ -250,9 +305,14 @@ class TBasaltS2_Sulfate(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """Fugacity is fS2."""
+        del pressure
         logCs: float = -12.948 + (32446.366 / temperature)
         logS_wtp: float = logCs + (0.5 * np.log10(fugacity)) + (1.5 * log10_fugacities_dict["O2"])
         S_wtp: float = 10**logS_wtp
@@ -270,9 +330,14 @@ class TBasaltS2_Sulfide(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """Fugacity is fS2."""
+        del pressure
         logCs: float = 0.225 - (7842.5 / temperature)
         logS_wtp: float = logCs - (0.5 * (log10_fugacities_dict["O2"] - np.log10(fugacity)))
         S_wtp: float = 10**logS_wtp
@@ -291,10 +356,15 @@ class LunarGlassH2O(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         return self.power_law(fugacity, 683, 0.5)
 
 
@@ -306,8 +376,13 @@ class MercuryMagmaS(Solubility):
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
+        del pressure
         a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # Coeffs from eq. 10 (Namur et al., 2016).
         wt_perc: float = np.exp(
             a
@@ -328,10 +403,15 @@ class PeridotiteH2O(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         return self.power_law(fugacity, 524, 0.5)
 
 
@@ -342,10 +422,15 @@ class SilicicMeltsH2(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         ppmw: float = self.power_law(fugacity, 0.163, 1.252)
         return ppmw
 
@@ -357,28 +442,64 @@ class BasaltCO(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         CO_wtp: float = 10 ** (-5.20 + (0.8 * np.log10(fugacity)))
         ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
         return ppmw
 
 
 class RhyoliteCO(Solubility):
-    """Yoshioka et al. 2019. https://www.sciencedirect.com/science/article/pii/S0016703719303461
+    """Yoshioka et al. 2019
+
+    https://www.sciencedirect.com/science/article/pii/S0016703719303461
 
     Valid for pressures up to 3 GPa. Using their CO expression for Rhyolite.
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         CO_wtp: float = 10 ** (-4.08 + (0.52 * np.log10(fugacity)))
         ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
+        return ppmw
+
+
+class BasaltCH4(Solubility):
+    """Ardia et al. 2013, composition is for haplobasalt (Fe-free) silicate melt.
+
+    https://ui.adsabs.harvard.edu/abs/2013GeCoA.114...52A/abstract
+
+    Experiments conducted at 0.7-3 GPa and 1400-1450 C
+    """
+
+    def _solubility(
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
+    ) -> float:
+        del temperature
+        del log10_fugacities_dict
+        P_GPa: float = UnitConversion.bar_to_GPa(pressure)
+        one_bar_in_GPa: float = UnitConversion.bar_to_GPa(1)
+        K: float = np.exp(4.93 - (1.93 * (P_GPa - one_bar_in_GPa)))
+        ppmw: float = K * UnitConversion.bar_to_GPa(fugacity)
         return ppmw
 
 
@@ -389,10 +510,15 @@ class BasaltHe(Solubility):
     """
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         Henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
         He_conc: float = (
             Henry_sol_constant / 2.24e4
@@ -410,10 +536,15 @@ class BasaltCl2(Solubility):
     Valid at 1400 C and 1.5 GPa"""
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         Cl_wtp: float = 78.56 * np.sqrt(fugacity)
         ppmw: float = UnitConversion.weight_percent_to_ppmw(Cl_wtp)
         return ppmw
@@ -426,10 +557,15 @@ class AnorthiteDiopsideForsteriteCl2(Solubility):
     Valid at 1400 C and 1.5 GPa"""
 
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         del temperature
         del log10_fugacities_dict
+        del pressure
         Cl_wtp: float = 140.52 * np.sqrt(fugacity)
         ppmw: float = UnitConversion.weight_percent_to_ppmw(Cl_wtp)
         return ppmw
@@ -451,6 +587,7 @@ basalt_solubilities: dict[str, Solubility] = {
     "CO": BasaltCO(),
     "He": BasaltHe(),
     "Cl2": BasaltCl2(),
+    "CH4": BasaltCH4(),
 }
 rhyolite_solubilities: dict[str, Solubility] = {
     "CO": RhyoliteCO(),

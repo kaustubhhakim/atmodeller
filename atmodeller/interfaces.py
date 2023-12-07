@@ -386,14 +386,19 @@ class Solubility(GetValueABC):
 
     @abstractmethod
     def _solubility(
-        self, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """Dissolved volatile concentration in the melt in ppmw.
 
         Args:
-            fugacity: Fugacity of the species in bar.
-            temperature: Temperature in kelvin.
-            log10_fugacities_dict: Log10 fugacities of all species in the system.
+            fugacity: Fugacity of the species in bar
+            temperature: Temperature in kelvin
+            log10_fugacities_dict: Log10 fugacities of all species in the system
+            pressure: Total pressure
 
         Returns:
             Dissolved volatile concentration in the melt in ppmw.
@@ -402,13 +407,20 @@ class Solubility(GetValueABC):
 
     @limit_solubility()  # Note this limiter is always applied.
     def get_value(
-        self, *, fugacity: float, temperature: float, log10_fugacities_dict: dict[str, float]
+        self,
+        *,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
     ) -> float:
         """Dissolved volatile concentration in the melt in ppmw.
 
         See self._solubility.
         """
-        solubility: float = self._solubility(fugacity, temperature, log10_fugacities_dict)
+        solubility: float = self._solubility(
+            fugacity, temperature, log10_fugacities_dict, pressure
+        )
         logger.debug(
             "%s, f = %f, T = %f, ppmw = %f",
             self.__class__.__name__,
@@ -1034,6 +1046,7 @@ class GasSpecies(ChemicalComponent):
             fugacity=fugacity,
             temperature=planet.surface_temperature,
             log10_fugacities_dict=system.log10_fugacities_dict,
+            pressure=system.total_pressure,
         )
         mass_in_melt: float = prefactor * ppmw_in_melt * UnitConversion.ppm_to_fraction()
         moles_in_melt: float = mass_in_melt / self.molar_mass
