@@ -100,6 +100,11 @@ class UnitConversion:
         """cm^3 to J/bar"""
         return cm_cubed / cls.J_per_bar_to_cm3()
 
+    @classmethod
+    def litre_to_m3(cls, litre: float = 1) -> float:
+        """litre to m^3"""
+        return litre * 1e-3
+
     @staticmethod
     def weight_percent_to_ppmw(value_weight_percent: float = 1) -> float:
         """Weight percent to parts-per-million by weight"""

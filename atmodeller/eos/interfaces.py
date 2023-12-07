@@ -273,7 +273,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         coefficients.append(-GAS_CONSTANT * temperature)
         coefficients.append(pressure)
 
-        polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="VMRK")
+        polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="V")
         logger.debug("MRK equation = %s", polynomial)
         volume_roots: np.ndarray = polynomial.roots()
         # Numerical solution could result in a small imaginery component, even though the real
@@ -283,7 +283,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         positive_roots: np.ndarray = real_roots[real_roots > 0]
         # In general, several roots could be returned, and subclasses will need to determine which
         # is the correct volume to use.
-        logger.debug("VMRK = %s", positive_roots)
+        logger.debug("V = %s", positive_roots)
 
         return positive_roots
 

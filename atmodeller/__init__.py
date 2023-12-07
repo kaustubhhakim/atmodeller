@@ -15,6 +15,8 @@ from scipy import constants
 # Module constants.
 GAS_CONSTANT: float = constants.gas_constant  # J/K/mol.
 GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant  # m^3/kg/s^2.
+ATMOSPHERE: float = constants.atmosphere / constants.bar  # bar
+
 OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
 
 DATA_ROOT_PATH = importlib.resources.files("%s.data" % __package__)
