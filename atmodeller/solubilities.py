@@ -22,9 +22,12 @@ SULFUR_MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(1)  # 1% by w
 
 
 class AndesiteH2(Solubility):
-    """Hirschmann et al. 2012
+    """Hirschmann et al. 2012, H2 solubility in silicate melts
 
-    Fit to fH2 vs. H2 concentration from Table 2.
+    https://ui.adsabs.harvard.edu/abs/2012E%26PSL.345...38H/abstract
+
+    Log-scale linear fit to fH2 vs. H2 concentration for andesite in Table 2
+    Experiments conducted from 0.7-3 GPa, 1400 C
     """
 
     def _solubility(
@@ -44,8 +47,13 @@ class AndesiteH2(Solubility):
 class AndesiteS2_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
-    Using expression in the abstract and the corrected expression for sulfate capacity in
-    corrigendum. Composition for Andesite from Table 1.
+    https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
+
+    Using the first equation in the abstract and the corrected expression for sulfate capacity (C_S6+)
+    in corrigendum (https://ui.adsabs.harvard.edu/abs/2023GeCoA.343..420B/abstract).
+    Composition for Andesite from Table 1.
+    Experiments conducted at 1 atm pressure, temperatures from 1473-1773 K for silicate melts equilibrated
+    with Air/SO2 mixtures
     """
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
@@ -67,10 +75,14 @@ class AndesiteS2_Sulfate(Solubility):
 
 
 class AndesiteS2_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-).
+    """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
 
-    Using expression in abstract for S wt% and the expression for sulfide capacity. Composition
+    https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
+
+    Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition
     for Andesite from Table 1.
+    Experiments conducted at 1 atm pressure and temperatures from 1473-1773 K in a controlled CO-CO2-SO2 atmosphere
+    fO2 conditions were greater than 1 log unit below FMQ
     """
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
@@ -92,7 +104,10 @@ class AndesiteS2_Sulfide(Solubility):
 
 
 class AndesiteS2(Solubility):
-    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+    """Boulliung & Wood 2022, 2023. Total S solubility accounting for both sulfide and sulfate dissolution.
+
+    Adding sufate solubility (Boulliung & Wood 2022) and sulfide solubility (Boulliun & Wood 2023)
+    """
 
     def __init__(self):
         self.sulfide_solubility: Solubility = AndesiteS2_Sulfide()
@@ -110,9 +125,13 @@ class AndesiteS2(Solubility):
 
 
 class AnorthiteDiopsideH2O(Solubility):
-    """Newcombe et al. (2017)
+    """Newcombe et al. (2017). Water solubility in lunar basalt and Anorthite-Diopside-Eutectic compositions.
 
     https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
+
+    Power law from Figure 5(A) for Anorthite-Diopside glass
+    Experiments conducted at 1 atm and 1350 C. Melts equilibrated in 1-atm furnace with H2/CO2 gas mixtures
+    that spanned fO2 from IW-3 to IW+4.8 and pH2/pH2O from 0.003-24
     """
 
     def _solubility(
@@ -133,7 +152,13 @@ class AnorthiteDiopsideH2O(Solubility):
 
 
 class BasaltDixonCO2(Solubility):
-    """Dixon et al. (1995)"""
+    """Dixon et al. (1995). H2O and CO2 solubilities in MORB liquids
+
+    https://academic.oup.com/petrology/article/36/6/1607/1493308?login=true
+
+    Equation 6 for mole fraction of dissolved carbonate (CO3^2-) and then converting to ppmw for CO2
+    Experiments conducted at 1200 C, 210-980 bars with mixed H2O-CO2 vapor phase (CO2 vapor mole fraction varied from 0.42-0.97)
+    """
 
     @limit_solubility()
     def _solubility(
@@ -152,7 +177,13 @@ class BasaltDixonCO2(Solubility):
 
 
 class BasaltDixonH2O(Solubility):
-    """Dixon et al. (1995) refit by Paolo Sossi."""
+    """Dixon et al. (1995). H2O and CO2 solubilities in MORB liquids
+
+    https://academic.oup.com/petrology/article/36/6/1607/1493308?login=true
+
+    Refit data to a power law by Paolo Sossi (fitting Figure 4, CHECK)
+    Experiments conducted at 1200 C, 200-717 bars with pure H2O
+    """
 
     def _solubility(
         self,
@@ -169,9 +200,12 @@ class BasaltDixonH2O(Solubility):
 
 
 class BasaltH2(Solubility):
-    """Hirschmann et al. 2012 for Basalt.
+    """Hirschmann et al. 2012, H2 solubility in silicate melts
 
-    Fit to fH2 vs. H2 concentration from Table 2.
+    https://ui.adsabs.harvard.edu/abs/2012E%26PSL.345...38H/abstract
+
+    Log-scale linear fit to fH2 vs. H2 concentration for basalt in Table 2
+    Experiments conducted from 0.7-3 GPa, 1400 C
     """
 
     def _solubility(
@@ -192,7 +226,11 @@ class BasaltH2(Solubility):
 class BasaltLibourelN2(Solubility):
     """Libourel et al. (2003), basalt (tholeiitic) magmas.
 
-    Eq. 23, includes dependence on pressure and fO2.
+    https://ui.adsabs.harvard.edu/abs/2003GeCoA..67.4123L/abstract
+
+    Equation 23, includes dependencies on fN2 and fO2.
+    Experiments conducted at 1 atm and 1425 C (two experiments at 1400 C), fO2 from IW-8.3 to IW+8.7
+    using mixtures of CO, CO2 and N2 gases
     """
 
     def _solubility(
@@ -215,8 +253,13 @@ class BasaltLibourelN2(Solubility):
 class BasaltS2_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
-    Using expression in the abstract and the corrected expression for sulfate capacity in
-    corrigendum. Composition for NIB (natural Icelandic basalt) from Table 1.
+    https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
+
+    Using the first equation in the abstract and the corrected expression for sulfate capacity (C_S6+)
+    in corrigendum (https://ui.adsabs.harvard.edu/abs/2023GeCoA.343..420B/abstract).
+    Composition for Basalt from Table 1.
+    Experiments conducted at 1 atm pressure, temperatures from 1473-1773 K for silicate melts equilibrated
+    with Air/SO2 mixtures
     """
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
@@ -241,10 +284,14 @@ class BasaltS2_Sulfate(Solubility):
 
 
 class BasaltS2_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
+    """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
 
-    Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for NIB (natural Icelandic basalt) from Table 1.
+    https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
+
+    Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition
+    for Basalt from Table 1.
+    Experiments conducted at 1 atm pressure and temperatures from 1473-1773 K in a controlled CO-CO2-SO2 atmosphere
+    fO2 conditions were greater than 1 log unit below FMQ
     """
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
@@ -266,7 +313,10 @@ class BasaltS2_Sulfide(Solubility):
 
 
 class BasaltS2(Solubility):
-    """Total S solubility accounting for both sulfide and sulfate dissolution."""
+    """Total S solubility accounting for both sulfide and sulfate dissolution.
+
+    Adding sufate solubility (Boulliung & Wood 2022) and sulfide solubility (Boulliun & Wood 2023)
+    """
 
     def __init__(self):
         self.sulfide_solubility: Solubility = BasaltS2_Sulfide()
@@ -281,7 +331,15 @@ class BasaltS2(Solubility):
 
 
 class BasaltWilsonH2O(Solubility):
-    """Hamilton (1964) and Wilson and Head (1981)."""
+    """Wilson and Head (1981) and Hamilton et al. (1964)
+
+    https://ui.adsabs.harvard.edu/abs/1981JGR....86.2971W/abstract
+    https://doi.org/10.1093/petrology/5.1.21
+
+    Equation 30, and converting from weight % to ppmw.
+    Not clear what all experimental data is used to derive this fit,
+    but it fits data at 1100 C and 1000-6000 bars H2O from Hamilton et al. 1964 decently well (their Table 3)
+    """
 
     def _solubility(
         self,
@@ -299,8 +357,13 @@ class BasaltWilsonH2O(Solubility):
 class TBasaltS2_Sulfate(Solubility):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
-    Using expression in the abstract and the corrected expression for sulfate capacity in
-    corrigendum. Composition for Trachy-Basalt from Table 1.
+    https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
+
+    Using the first equation in the abstract and the corrected expression for sulfate capacity (C_S6+)
+    in corrigendum (https://ui.adsabs.harvard.edu/abs/2023GeCoA.343..420B/abstract).
+    Composition for Basalt from Table 1.
+    Experiments conducted at 1 atm pressure, temperatures from 1473-1773 K for silicate melts equilibrated
+    with Air/SO2 mixtures. Composition for Trachy-Basalt from Table 1.
     """
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
@@ -322,10 +385,14 @@ class TBasaltS2_Sulfate(Solubility):
 
 
 class TBasaltS2_Sulfide(Solubility):
-    """Boulliung & Wood 2023 (preprint). Solubility of sulfur as sulfide (S^2-)
+    """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
 
-    Using expression in abstract for S wt% and the expression for sulfide capacity
-    Composition for Trachy-basalt from Table 1.
+    https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
+
+    Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition
+    for Basalt from Table 1.
+    Experiments conducted at 1 atm pressure and temperatures from 1473-1773 K in a controlled CO-CO2-SO2 atmosphere
+    fO2 conditions were greater than 1 log unit below FMQ. Composition for Trachy-basalt from Table 1.
     """
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
@@ -350,9 +417,13 @@ class TBasaltS2_Sulfide(Solubility):
 
 
 class LunarGlassH2O(Solubility):
-    """Newcombe et al. (2017).
+    """Newcombe et al. (2017). Water solubility in lunar basalt and Anorthite-Diopside-Eutectic compositions.
 
     https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
+
+    Power law from Figure 5(A) for Lunar glass
+    Experiments conducted at 1 atm and 1350 C. Melts equilibrated in 1-atm furnace with H2/CO2 gas mixtures
+    that spanned fO2 from IW-3 to IW+4.8
     """
 
     def _solubility(
@@ -369,9 +440,14 @@ class LunarGlassH2O(Solubility):
 
 
 class MercuryMagmaS(Solubility):
-    """Namur et al. 2016.
+    """Namur et al. 2016. Sulfur solubility in reduced mafic silicate melts relevant for Mercury
 
-    S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like magmas.
+    https://ui.adsabs.harvard.edu/abs/2016E%26PSL.448..102N/abstract
+
+    Dissolved S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like magmas
+    Equation 10, with coefficients from Table 2, assumed composition is Northern Volcanic Plains (NVP)
+    Experiments on Mercurian lavas and enstatite chondrites at 1200-1750 C and pressures from 1 bar to 4 GPa
+    Equilibrated silicate melts with sulfide and metallic melts at reducing conditions (fO2 at IW-1.5 to IW-9.4)
     """
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
@@ -383,23 +459,26 @@ class MercuryMagmaS(Solubility):
         pressure: float,
     ) -> float:
         del pressure
-        a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]  # Coeffs from eq. 10 (Namur et al., 2016).
+        a, b, c, d = [7.25, -2.54e4, 0.04, -0.551]
         wt_perc: float = np.exp(
             a
             + (b / temperature)
             + ((c * fugacity) / temperature)
             + (d * log10_fugacities_dict["O2"])
+            - 0.136
         )
         ppmw: float = UnitConversion.weight_percent_to_ppmw(wt_perc)
 
         return ppmw
 
 
-class PeridotiteH2O(Solubility):
-    """Sossi et al. (2023).
+class BasaltH2OSossi(Solubility):
+    """Sossi et al. (2023). Solubility of water in peridotite and basalt liquids
 
-    Power law parameters are in the abstract:
     https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
+
+    Power law parameters in the abstract for basaltic glasses.
+    Experiments conducted at 2173 K and 1 bar and range of fO2 from IW-1.9 to IW+6.0
     """
 
     def _solubility(
@@ -415,10 +494,35 @@ class PeridotiteH2O(Solubility):
         return self.power_law(fugacity, 524, 0.5)
 
 
-class SilicicMeltsH2(Solubility):
-    """Gaillard et al. 2003.
+class PeridotiteH2O(Solubility):
+    """Sossi et al. (2023). Solubility of water in peridotite and basalt liquids
 
-    Valid for pressures from 0.02-70 bar; power law fit to Table 4 data.
+    https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
+
+    Power law parameters in the abstract for peridotitic glasses.
+    Experiments conducted at 2173 K and 1 bar and range of fO2 from IW-1.9 to IW+6.0
+    """
+
+    def _solubility(
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
+    ) -> float:
+        del temperature
+        del log10_fugacities_dict
+        del pressure
+        return self.power_law(fugacity, 647, 0.5)
+
+
+class SilicicMeltsH2(Solubility):
+    """Gaillard et al. 2003. Fe-H redox exchange in silicate glasses
+
+    https://ui.adsabs.harvard.edu/abs/2003GeCoA..67.2427G/abstract
+
+    Power law fit for fH2 vs. H2 (ppm-wt) from Table 4 data
+    Experiments at pressures from 0.02-70 bar, temperatures from 300-1000C.
     """
 
     def _solubility(
@@ -436,9 +540,13 @@ class SilicicMeltsH2(Solubility):
 
 
 class BasaltCO(Solubility):
-    """Yoshioka et al. 2019. https://www.sciencedirect.com/science/article/pii/S0016703719303461
+    """Yoshioka et al. 2019. Carbon solubility in silicate melts
 
-    Valid for pressures up to 3 GPa. Using their CO expression for MORB.
+    https://ui.adsabs.harvard.edu/abs/2019GeCoA.259..129Y/abstract
+
+    Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
+    CO-CO2 fluid phase at 3 GPa and 1500 C
+    Henry's Law, their expression for solubility of CO in MORB in the abstract.
     """
 
     def _solubility(
@@ -457,11 +565,13 @@ class BasaltCO(Solubility):
 
 
 class RhyoliteCO(Solubility):
-    """Yoshioka et al. 2019
+    """Yoshioka et al. 2019. Carbon solubility in silicate melts
 
-    https://www.sciencedirect.com/science/article/pii/S0016703719303461
+    https://ui.adsabs.harvard.edu/abs/2019GeCoA.259..129Y/abstract
 
-    Valid for pressures up to 3 GPa. Using their CO expression for Rhyolite.
+    Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
+    CO-CO2 fluid phase at 3 GPa and 1500 C
+    Henry's Law, their expression for solubility of CO in rhyolite in the abstract.
     """
 
     def _solubility(
@@ -480,11 +590,12 @@ class RhyoliteCO(Solubility):
 
 
 class BasaltCH4(Solubility):
-    """Ardia et al. 2013, composition is for haplobasalt (Fe-free) silicate melt.
+    """Ardia et al. 2013, CH4 solubility in haplobasalt (Fe-free) silicate melt.
 
     https://ui.adsabs.harvard.edu/abs/2013GeCoA.114...52A/abstract
 
     Experiments conducted at 0.7-3 GPa and 1400-1450 C
+    Equations 7a and 8, values for lnK0 and deltaV from the text.
     """
 
     def _solubility(
@@ -504,9 +615,12 @@ class BasaltCH4(Solubility):
 
 
 class BasaltHe(Solubility):
-    """Jambon et al. 1986, Assuming Henry's Law
+    """Jambon et al. 1986, Solubility of He in tholeittic basalt melt
 
-    Valid for partial pressures up to ~100 bar and temperatures from 1250-1600 C.
+    https://ui.adsabs.harvard.edu/abs/1986GeCoA..50..401J/abstract
+
+    Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and 1250-1600 C
+    Using Henry's Law solubility constant for He from the abstract, convert from STP units to mol/g*bar
     """
 
     def _solubility(
@@ -522,7 +636,7 @@ class BasaltHe(Solubility):
         Henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
         He_conc: float = (
             Henry_sol_constant / 2.24e4
-        ) * fugacity  # converts to Henry sol constant to mol/g*bar, 2.24e4 cm^3/mol at STP
+        ) * fugacity  # converts Henry sol constant to mol/g*bar, 2.24e4 cm^3/mol at STP
         ppmw: float = (
             He_conc * 4.0026 * 1e6
         )  # converts He conc from mol/g to g H2/g Total and then to ppmw
@@ -530,10 +644,14 @@ class BasaltHe(Solubility):
 
 
 class BasaltCl2(Solubility):
-    """Thomas & Wood 2021, Figure 4: relation between dissolved Cl concentration and Cl fugacity.
-    Icelandic basalt
+    """Thomas & Wood 2021. Solubility of chlorine in silicate melts
 
-    Valid at 1400 C and 1.5 GPa"""
+    https://ui.adsabs.harvard.edu/abs/2021GeCoA.294...28T/abstract
+
+    Solubility law from Figure 4 showing relation between dissolved Cl concentration and Cl fugacity
+    for Icelandic basalt at 1400 C and 1.5 GPa
+    Experiments from 0.5-2 GPa and 1200-1500 C
+    """
 
     def _solubility(
         self,
@@ -551,10 +669,15 @@ class BasaltCl2(Solubility):
 
 
 class AnorthiteDiopsideForsteriteCl2(Solubility):
-    """Thomas & Wood 2021, Figure 4: relation between dissolved Cl concentration and Cl fugacity.
-    CMAS composition: An50Di28Fo22 (anorthite-diopside-forsterite), Fe-free low-degree mantle melt
+    """Thomas & Wood 2021. Solubility of chlorine in silicate melts
 
-    Valid at 1400 C and 1.5 GPa"""
+    https://ui.adsabs.harvard.edu/abs/2021GeCoA.294...28T/abstract
+
+    Solubility law from Figure 4 showing relation between dissolved Cl concentration and Cl fugacity
+    for CMAS composition (An50Di28Fo22 (anorthite-diopside-forsterite), Fe-free low-degree mantle melt)
+    at 1400 C and 1.5 GPa
+    Experiments from 0.5-2 GPa and 1200-1500 C
+    """
 
     def _solubility(
         self,
