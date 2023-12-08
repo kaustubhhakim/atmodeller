@@ -91,14 +91,9 @@ class UnitConversion:
         return value_ppm / cls.fraction_to_ppm()
 
     @classmethod
-    def J_per_bar_to_cm3(cls, J_per_bar: float = 1) -> float:
-        """J/bar (or kJ/kbar) to cm^3."""
-        return J_per_bar * 10
-
-    @classmethod
-    def cm3_to_J_per_bar(cls, cm_cubed: float = 1) -> float:
-        """cm^3 to J/bar"""
-        return cm_cubed / cls.J_per_bar_to_cm3()
+    def cm3_to_m3(cls, cm_cubed: float = 1) -> float:
+        """cm^3 to m^3"""
+        return cm_cubed * 1.0e-6
 
     @classmethod
     def litre_to_m3(cls, litre: float = 1) -> float:

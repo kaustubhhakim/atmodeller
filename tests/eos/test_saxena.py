@@ -58,35 +58,35 @@ def test_O2(check_values) -> None:
 def test_H2_low_pressure_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
     expected: float = 7279.356114821697
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(873, 10, eos_models["H2"], expected)
 
 
 def test_H2_medium_pressure_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
     expected: float = 164.38851468757488
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(873, 500, eos_models["H2"], expected)
 
 
 def test_H2_high_pressure_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
     expected: float = 43.46585841223779
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(1473, 4000, eos_models["H2"], expected)
 
 
 def test_H2_high_pressure2_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
     expected: float = 21.547766750104773
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(1073, 10000, eos_models["H2"], expected)
 
 
 def test_H2_high_pressure3_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
     expected: float = 71.46244038505347
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(673, 1000, eos_models["H2"], expected)
 
 
@@ -96,14 +96,14 @@ def test_H2_high_pressure3_SS92(check_values) -> None:
 def test_H2S_low_pressure_SS92(check_values) -> None:
     """Comparison with Figure 3 in Shi and Saxena (1992)"""
     expected: float = 272.7266232763035
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(673, 200, eos_models["H2S"], expected)
 
 
 def test_H2S_medium_pressure_SS92(check_values) -> None:
     """Comparison with Figure 3 in Shi and Saxena (1992)"""
     expected: float = 116.55537998390933
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(1873, 2000, eos_models["H2S"], expected)
 
 
@@ -113,12 +113,12 @@ def test_H2S_medium_pressure_SS92(check_values) -> None:
 def test_SO2_low_pressure_SS92(check_values) -> None:
     """Comparison with Figure 2 in Shi and Saxena (1992)"""
     expected: float = 8308.036738813245
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(1073, 10, eos_models["SO2"], expected)
 
 
 def test_SO2_high_pressure_SS92(check_values) -> None:
     """Comparison with Figure 2 in Shi and Saxena (1992)"""
     expected: float = 70.86864302460566
-    expected = UnitConversion.cm3_to_J_per_bar(expected)
+    expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(1873, 4000, eos_models["SO2"], expected)

@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
+from atmodeller import ATMOSPHERE, GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion, debug_decorator
 
@@ -134,7 +135,7 @@ class BeattieBridgeman(RealGasABC):
         # Volume evaluated at T and P conditions
         vol: float = self.volume(temperature, pressure)
         volume_integral: float = (
-            GAS_CONSTANT_BAR  # FIXME: Should be GAS_CONSTANT?
+            GAS_CONSTANT
             * temperature
             * (
                 np.log(GAS_CONSTANT_BAR * temperature / vol)
@@ -155,40 +156,18 @@ class BeattieBridgeman(RealGasABC):
                 + (self.c * self.b * self.B0 / temperature**3) * 4 / (3 * vol**3)
             )
         )
-        # Equation 8 is below for reference, but does not explicitly include choices for the
-        # integration limits.
-        # volume_integral: float = (
-        #     -GAS_CONSTANT_BAR * temperature * np.log(vol)
-        #     + (
-        #         GAS_CONSTANT_BAR * temperature * self.B0
-        #         - GAS_CONSTANT_BAR * self.c / temperature**2
-        #         - self.A0
-        #     )
-        #     * 2
-        #     / vol
-        #     - (
-        #         GAS_CONSTANT_BAR * temperature * self.b * self.B0
-        #         + GAS_CONSTANT_BAR * self.c * self.B0 / temperature**2
-        #         - self.a * self.A0
-        #     )
-        #     * 3
-        #     / (2 * vol**2)
-        #     + (GAS_CONSTANT_BAR * self.c * self.b * self.B0 / temperature**2)
-        #     * 4
-        #     / (3 * vol**3)
-        # )
 
         return volume_integral
 
 
-# Coefficients from Table 1, which must be converted to the correct units scheme (SI and pressure
+# Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure
 # in bar). Using the original table values below allows easy visual comparison and ensures that
 # the base class does not have to figure out how to correctly convert units.
 
 # Converts volumes from litres to m^3
-volume_conversion = UnitConversion.litre_to_m3
+volume_conversion: Callable = UnitConversion.litre_to_m3
 # Converts PV**2 coefficient to be in terms of m^3 and bar
-A0_conversion = lambda x: x * ATMOSPHERE * UnitConversion.litre_to_m3() ** 2
+A0_conversion: Callable = lambda x: x * ATMOSPHERE * UnitConversion.litre_to_m3() ** 2
 
 H2_Beattie_holley: RealGasABC = BeattieBridgeman(
     A0=A0_conversion(0.1975),

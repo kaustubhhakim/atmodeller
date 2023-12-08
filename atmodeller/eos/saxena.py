@@ -202,7 +202,7 @@ class SaxenaABC(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume
+            Volume in m^3 mol^(-1)
         """
         Z: float = self.compressibility_parameter(temperature, pressure)
         volume: float = Z * self.ideal_volume(temperature, pressure)
@@ -219,7 +219,7 @@ class SaxenaABC(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral
+            Volume integral in J mol^(-1)
         """
         Tr: float = self.scaled_temperature(temperature)
         Pr: float = self.scaled_pressure(pressure)

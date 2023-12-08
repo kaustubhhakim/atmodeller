@@ -146,7 +146,7 @@ class RealGasABC(GetValueABC):
 
     @debug_decorator(logger)
     def ln_fugacity(self, temperature: float, pressure: float) -> float:
-        """Natural log of the fugacity.
+        """Natural log of the fugacity
 
         The fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and f0 is the
         pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
@@ -158,8 +158,6 @@ class RealGasABC(GetValueABC):
         Returns:
             Natural log of the fugacity
         """
-        # FIXME: Should below be GAS_CONSTANT_BAR?
-        # This requires that volume_integral returns units of J/mol
         ln_fugacity: float = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT * temperature
         )
@@ -168,10 +166,10 @@ class RealGasABC(GetValueABC):
 
     @debug_decorator(logger)
     def fugacity(self, temperature: float, pressure: float) -> float:
-        """Fugacity in the same units as the input pressure.
+        """Fugacity
 
-        Note that the fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and
-        f0 is the pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
+        The fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and f0 is the
+        pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
 
         Args:
             temperature: Temperature in kelvin
