@@ -7,7 +7,7 @@ nevertheless useful for comparison and understanding the influence of the virial
 that is encapsulated within the CORK model.
 
 Functions:
-    get_holland_eos_models: Gets the preferred EOS models to use for each species
+    get_holland_eos_models: Gets the preferred EOS models to use for each species.
 
 Real gas EOSs (class instances) in this module that can be imported:
     CO2_CORK_HP91: Full CORK for CO2 in Holland and Powell (1991)

@@ -1,12 +1,41 @@
 """Real gas EOSs from Holley et al. (1958)
 
+See the LICENSE file for licensing information.
+
 Compressibility factors and fugacity coefficients calculated from the Beattie-Bridgeman equation
 of state for hydrogen, nitrogen, oxygen, carbon dioxide, ammonia, methane, and helium.
 C. E. Holley, Jr., W. J. Worlton, and R. K. Zeigler (1958), doi: 10.2172/4289497
 
 https://www.osti.gov/biblio/4289497
 
-See the LICENSE file for licensing information.
+Functions:
+    get_holley_eos_models: Gets the preferred EOS models to use for each species.
+
+Real gas EOSs (class instances) in this module that can be imported:
+    H2_Beattie_holley: Beattie-Bridgeman for H2
+    N2_Beattie_holley: Beattie-Bridgeman for N2
+    O2_Beattie_holley: Beattie-Bridgeman for O2
+    CO2_Beattie_holley: Beattie-Bridgeman for CO2
+    NH3_Beattie_holley: Beattie-Bridgeman for NH3
+    CH4_Beattie_holley: Beattie-Bridgeman for CH4
+    He_Beattie_holley: Beattie-Bridgeman for He
+
+Examples:
+    Get the preferred EOS models for various species. Note that the input pressure should always be
+    in bar:
+    
+    ```python
+    >>> from atmodeller.eos.holley import get_holley_eos_models
+    >>> models = get_holley_eos_models()
+    >>> # list the available species
+    >>> models.keys()
+    >>> # Get the EOS model for He
+    >>> he_model = models['He']
+    >>> # Determine the fugacity coefficient at 1000 K and 100 bar
+    >>> fugacity_coefficient = he_model.get_value(temperature=1000, pressure=100)
+    >>> print(fugacity_coefficient)
+    1.0165341564229526
+    ```
 """
 
 from __future__ import annotations
