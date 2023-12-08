@@ -1,5 +1,11 @@
 """Real gas EOSs from Holley et al. (1958)
 
+Compressibility factors and fugacity coefficients calculated from the Beattie-Bridgeman equation
+of state for hydrogen, nitrogen, oxygen, carbon dioxide, ammonia, methane, and helium.
+C. E. Holley, Jr., W. J. Worlton, and R. K. Zeigler (1958), doi: 10.2172/4289497
+
+https://www.osti.gov/biblio/4289497
+
 See the LICENSE file for licensing information.
 """
 
@@ -11,7 +17,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import ATMOSPHERE, GAS_CONSTANT
+from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion, debug_decorator
 
@@ -20,14 +26,22 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True)
 class BeattieBridgeman(RealGasABC):
-    """Beattie-Bridgeman model
+    """Beattie-Bridgeman equation
 
-    Args must have the same units as Holley et al. (1958) because they are converted within the
-    class to SI and pressure in bar.
+    Compressibility factors and fugacity coefficients calculated from the Beattie-Bridgeman
+    equation of state for hydrogen, nitrogen, oxygen, carbon dioxide, ammonia, methane, and helium.
+    C. E. Holley, Jr., W. J. Worlton, and R. K. Zeigler (1958), doi: 10.2172/4289497
 
-    Holley et al (1958) units are atmospheres and litres per mole.
+    https://www.osti.gov/biblio/4289497
 
     Args:
+        A0: A0 constant
+        a: a constant
+        B0: B0 constant
+        b: b constant
+        c: c constant
+
+    Attributes:
         A0: A0 constant
         a: a constant
         B0: B0 constant
@@ -41,53 +55,32 @@ class BeattieBridgeman(RealGasABC):
     b: float
     c: float
 
-    def __post_init__(self):
-        """Scale the coefficients to SI and pressure in bar
-
-        Based on dimensional analysis of Equation 1, we can see that the constants must have the
-        following units:
-
-            c-> V*T**3
-            B0 -> V
-            b -> V
-            A0 -> P*V**2
-            a -> V
-        """
-        print(self)
-        self.c = UnitConversion.litre_to_m3(self.c)  # Temperature already in K
-        self.B0 = UnitConversion.litre_to_m3(self.B0)
-        self.b = UnitConversion.litre_to_m3(self.b)
-        self.A0 /= ATMOSPHERE
-        self.A0 *= UnitConversion.litre_to_m3() ** 2
-        self.a = UnitConversion.litre_to_m3(self.a)
-        print(self)
-
     @debug_decorator(logger)
     def volume_roots(self, temperature: float, pressure: float) -> np.ndarray:
         """Real and (potentially) physically meaningful volume solutions
 
-        Equation 2
+        E.g. Equation 2, Holley et al. (1958), https://www.osti.gov/biblio/4289497
 
         Args:
             temperature: Temperature in kelvin
             pressure: Pressure in bar
 
         Returns:
-            Volume solutions of the MRK equation in m^3/mol
+            Volume solutions of the Beattie-Bridgeman equation in m^3/mol
         """
         coefficients: list[float] = []
-        coefficients.append(-GAS_CONSTANT * self.c * self.b * self.B0 / temperature**2)
+        coefficients.append(-GAS_CONSTANT_BAR * self.c * self.b * self.B0 / temperature**2)
         coefficients.append(
-            GAS_CONSTANT * temperature * self.b * self.B0
-            + GAS_CONSTANT * self.c * self.B0 / temperature**2
+            GAS_CONSTANT_BAR * temperature * self.b * self.B0
+            + GAS_CONSTANT_BAR * self.c * self.B0 / temperature**2
             - self.a * self.A0
         )
         coefficients.append(
-            -GAS_CONSTANT * temperature * self.B0
-            + GAS_CONSTANT * self.c / temperature**2
+            -GAS_CONSTANT_BAR * temperature * self.B0
+            + GAS_CONSTANT_BAR * self.c / temperature**2
             + self.A0
         )
-        coefficients.append(-GAS_CONSTANT * temperature)
+        coefficients.append(-GAS_CONSTANT_BAR * temperature)
         coefficients.append(pressure)
 
         polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="V")
@@ -109,6 +102,9 @@ class BeattieBridgeman(RealGasABC):
     def volume(self, *args, **kwargs) -> float:
         """Volume
 
+        The paper doesn't say which root to take, but one root is very small and the maximum root
+        gives a volume that agrees with the tabulated compressibility factor for all species.
+
         Args:
             *args: Positional arguments to pass to self.volume_roots
             **kwargs: Keyword arguments to pass to self.volume_roots
@@ -118,12 +114,15 @@ class BeattieBridgeman(RealGasABC):
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        # FIXME: Which root to return?  May require trial and error and comparison to the data.
         return np.max(volume_roots)
 
     @debug_decorator(logger)
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral. Equation 8. Holley et al. (1958)
+        """Volume integral.
+
+        Equation 11 (Holley et al., 1958) because it includes the limits of integration.  It's
+        necessary to multiply ln f by RT to get the volume integral. In practice though, due to the
+        choice of integration limits, I don't think this formulation differs from Equation 8.
 
         Args:
             temperature: Temperature in kelvin
@@ -132,67 +131,114 @@ class BeattieBridgeman(RealGasABC):
         Returns:
             Volume integral in J mol^(-1)
         """
-        vol: float = self.volume(temperature, pressure)  # Volume evaluated at T and P conditions
-        # This is equation 11. Update docstring.
-        # volume_integral: float = (
-        #     GAS_CONSTANT
-        #     * temperature
-        #     * (
-        #         np.log(GAS_CONSTANT * temperature / vol)
-        #         + (self.B0 - self.c / temperature**3 - self.A0 / (GAS_CONSTANT * temperature))
-        #         * 2
-        #         / vol
-        #         - (
-        #             self.b * self.B0
-        #             + self.c * self.B0 / temperature**3
-        #             - self.a * self.A0 / (GAS_CONSTANT * temperature)
-        #         )
-        #         * 3
-        #         / (2 * vol**2)
-        #         + (self.c * self.b * self.B0 / temperature**3) * 4 / (3 * vol**3)
-        #     )
-        # )
+        # Volume evaluated at T and P conditions
+        vol: float = self.volume(temperature, pressure)
         volume_integral: float = (
-            -GAS_CONSTANT * temperature * np.log(vol)
-            + (
-                GAS_CONSTANT * temperature * self.B0
-                - GAS_CONSTANT * self.c / temperature**2
-                - self.A0
+            GAS_CONSTANT_BAR  # FIXME: Should be GAS_CONSTANT?
+            * temperature
+            * (
+                np.log(GAS_CONSTANT_BAR * temperature / vol)
+                + (
+                    self.B0
+                    - self.c / temperature**3
+                    - self.A0 / (GAS_CONSTANT_BAR * temperature)
+                )
+                * 2
+                / vol
+                - (
+                    self.b * self.B0
+                    + self.c * self.B0 / temperature**3
+                    - self.a * self.A0 / (GAS_CONSTANT_BAR * temperature)
+                )
+                * 3
+                / (2 * vol**2)
+                + (self.c * self.b * self.B0 / temperature**3) * 4 / (3 * vol**3)
             )
-            * 2
-            / vol
-            - (
-                GAS_CONSTANT * temperature * self.b * self.B0
-                + GAS_CONSTANT * self.c * self.B0 / temperature**2
-                - self.a * self.A0
-            )
-            * 3
-            / (2 * vol**2)
-            + (GAS_CONSTANT * self.c * self.b * self.B0 / temperature**2) * 4 / (3 * vol**3)
         )
+        # Equation 8 is below for reference, but does not explicitly include choices for the
+        # integration limits.
+        # volume_integral: float = (
+        #     -GAS_CONSTANT_BAR * temperature * np.log(vol)
+        #     + (
+        #         GAS_CONSTANT_BAR * temperature * self.B0
+        #         - GAS_CONSTANT_BAR * self.c / temperature**2
+        #         - self.A0
+        #     )
+        #     * 2
+        #     / vol
+        #     - (
+        #         GAS_CONSTANT_BAR * temperature * self.b * self.B0
+        #         + GAS_CONSTANT_BAR * self.c * self.B0 / temperature**2
+        #         - self.a * self.A0
+        #     )
+        #     * 3
+        #     / (2 * vol**2)
+        #     + (GAS_CONSTANT_BAR * self.c * self.b * self.B0 / temperature**2)
+        #     * 4
+        #     / (3 * vol**3)
+        # )
 
         return volume_integral
 
 
-H2_BEATTIE_HWZ58: RealGasABC = BeattieBridgeman(
-    A0=0.1975, a=-0.00506, B0=0.02096, b=-0.04359, c=0.0504e4
+# Coefficients from Table 1, which must be converted to the correct units scheme (SI and pressure
+# in bar). Using the original table values below allows easy visual comparison and ensures that
+# the base class does not have to figure out how to correctly convert units.
+
+# Converts volumes from litres to m^3
+volume_conversion = UnitConversion.litre_to_m3
+# Converts PV**2 coefficient to be in terms of m^3 and bar
+A0_conversion = lambda x: x * ATMOSPHERE * UnitConversion.litre_to_m3() ** 2
+
+H2_Beattie_holley: RealGasABC = BeattieBridgeman(
+    A0=A0_conversion(0.1975),
+    a=volume_conversion(-0.00506),
+    B0=volume_conversion(0.02096),
+    b=volume_conversion(-0.04359),
+    c=volume_conversion(0.0504e4),
 )
-N2_BEATTIE_HWZ58: RealGasABC = BeattieBridgeman(
-    A0=1.3445, a=0.02617, B0=0.05046, b=-0.00691, c=4.2e4
+N2_Beattie_holley: RealGasABC = BeattieBridgeman(
+    A0=A0_conversion(1.3445),
+    a=volume_conversion(0.02617),
+    B0=volume_conversion(0.05046),
+    b=volume_conversion(-0.00691),
+    c=volume_conversion(4.2e4),
 )
-O2_BEATTIE_HWZ58: RealGasABC = BeattieBridgeman(
-    A0=1.4911, a=0.02562, B0=0.04624, b=0.004208, c=4.8e4
+O2_Beattie_holley: RealGasABC = BeattieBridgeman(
+    A0=A0_conversion(1.4911),
+    a=volume_conversion(0.02562),
+    B0=volume_conversion(0.04624),
+    b=volume_conversion(0.004208),
+    c=volume_conversion(4.8e4),
 )
-CO2_BEATTIE_HWZ58: RealGasABC = BeattieBridgeman(
-    A0=5.0065, a=0.07132, B0=0.10476, b=0.07235, c=66e4
+CO2_Beattie_holley: RealGasABC = BeattieBridgeman(
+    A0=A0_conversion(5.0065),
+    a=volume_conversion(0.07132),
+    B0=volume_conversion(0.10476),
+    b=volume_conversion(0.07235),
+    c=volume_conversion(66e4),
 )
-NH3_BEATTIE_HWZ58: RealGasABC = BeattieBridgeman(
-    A0=2.3930, a=0.17031, B0=0.03415, b=0.19112, c=476.87e4
+NH3_Beattie_holley: RealGasABC = BeattieBridgeman(
+    A0=A0_conversion(2.3930),
+    a=volume_conversion(0.17031),
+    B0=volume_conversion(0.03415),
+    b=volume_conversion(0.19112),
+    c=volume_conversion(476.87e4),
 )
-CH4_BEATTIE_HWZ58: RealGasABC = BeattieBridgeman(
-    A0=2.2769, a=0.01855, B0=0.05587, b=-0.01587, c=12.83e4
+CH4_Beattie_holley: RealGasABC = BeattieBridgeman(
+    A0=A0_conversion(2.2769),
+    a=volume_conversion(0.01855),
+    B0=volume_conversion(0.05587),
+    b=volume_conversion(-0.01587),
+    c=volume_conversion(12.83e4),
 )
-He_BEATTIE_HWZ58: RealGasABC = BeattieBridgeman(A0=0.0216, a=0.05984, B0=0.01400, b=0, c=0.004e4)
+He_Beattie_holley: RealGasABC = BeattieBridgeman(
+    A0=A0_conversion(0.0216),
+    a=volume_conversion(0.05984),
+    B0=volume_conversion(0.01400),
+    b=0,
+    c=volume_conversion(0.004e4),
+)
 
 
 def get_holley_eos_models() -> dict[str, RealGasABC]:
@@ -202,12 +248,12 @@ def get_holley_eos_models() -> dict[str, RealGasABC]:
         Dictionary of prefered EOS models for each species
     """
     models: dict[str, RealGasABC] = {}
-    models["CH4"] = CH4_BEATTIE_HWZ58
-    models["CO2"] = CO2_BEATTIE_HWZ58
-    models["H2"] = H2_BEATTIE_HWZ58
-    models["He"] = He_BEATTIE_HWZ58
-    models["N2"] = N2_BEATTIE_HWZ58
-    models["NH3"] = NH3_BEATTIE_HWZ58
-    models["O2"] = O2_BEATTIE_HWZ58
+    models["CH4"] = CH4_Beattie_holley
+    models["CO2"] = CO2_Beattie_holley
+    models["H2"] = H2_Beattie_holley
+    models["He"] = He_Beattie_holley
+    models["N2"] = N2_Beattie_holley
+    models["NH3"] = NH3_Beattie_holley
+    models["O2"] = O2_Beattie_holley
 
     return models

@@ -17,7 +17,7 @@ import pandas as pd
 from molmass import Formula
 from thermochem import janaf
 
-from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT
+from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -158,6 +158,8 @@ class RealGasABC(GetValueABC):
         Returns:
             Natural log of the fugacity
         """
+        # FIXME: Should below be GAS_CONSTANT_BAR?
+        # This requires that volume_integral returns units of J/mol
         ln_fugacity: float = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT * temperature
         )
@@ -208,7 +210,7 @@ class RealGasABC(GetValueABC):
         Returns:
             ideal volume in m^3 mol^(-1)
         """
-        volume_ideal: float = GAS_CONSTANT * temperature / pressure
+        volume_ideal: float = GAS_CONSTANT_BAR * temperature / pressure
 
         return volume_ideal
 

@@ -14,6 +14,7 @@ from scipy import constants
 
 # Module constants.
 GAS_CONSTANT: float = constants.gas_constant  # J/K/mol.
+GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5  # m^3 bar/K/mol
 GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant  # m^3/kg/s^2.
 ATMOSPHERE: float = constants.atmosphere / constants.bar  # bar
 

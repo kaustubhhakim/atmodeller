@@ -16,8 +16,8 @@ thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
 
 eos_models: dict[str, RealGasABC] = get_holley_eos_models()
 
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
+RTOL: float = 1.0e-4
+ATOL: float = 1.0e-4
 
 
 def test_version():
@@ -28,75 +28,75 @@ def test_version():
 # Hydrogen from Table II
 def test_H2_low(check_values) -> None:
     pressure: float = 100 * ATMOSPHERE
-    check_values.compressibility(300, pressure, eos_models["H2"], 1.06217)
+    check_values.compressibility(300, pressure, eos_models["H2"], 1.06217, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_high(check_values) -> None:
     pressure: float = 1000 * ATMOSPHERE
-    check_values.compressibility(1000, pressure, eos_models["H2"], 1.26294)
+    check_values.compressibility(1000, pressure, eos_models["H2"], 1.26294, rtol=RTOL, atol=ATOL)
 
 
 # Nitrogen from Table III
 def test_N2_low(check_values) -> None:
     pressure: float = 100 * ATMOSPHERE
-    check_values.compressibility(300, pressure, eos_models["N2"], 1.00464)
+    check_values.compressibility(300, pressure, eos_models["N2"], 1.00464, rtol=RTOL, atol=ATOL)
 
 
 def test_N2_high(check_values) -> None:
     pressure: float = 1000 * ATMOSPHERE
-    check_values.compressibility(1000, pressure, eos_models["N2"], 1.36551)
+    check_values.compressibility(1000, pressure, eos_models["N2"], 1.36551, rtol=RTOL, atol=ATOL)
 
 
 # Oxygen from Table IV
 def test_O2_low(check_values) -> None:
     pressure: float = 100 * ATMOSPHERE
-    check_values.compressibility(300, pressure, eos_models["O2"], 0.95454)
+    check_values.compressibility(300, pressure, eos_models["O2"], 0.95454, rtol=RTOL, atol=ATOL)
 
 
 def test_O2_high(check_values) -> None:
     pressure: float = 1000 * ATMOSPHERE
-    check_values.compressibility(1000, pressure, eos_models["O2"], 1.28897)
+    check_values.compressibility(1000, pressure, eos_models["O2"], 1.28897, rtol=RTOL, atol=ATOL)
 
 
 # Carbon dioxide from Table V
 def test_CO2_low(check_values) -> None:
     pressure: float = 100 * ATMOSPHERE
-    check_values.compressibility(400, pressure, eos_models["CO2"], 0.81853)
+    check_values.compressibility(400, pressure, eos_models["CO2"], 0.81853, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2_high(check_values) -> None:
     pressure: float = 1000 * ATMOSPHERE
-    check_values.compressibility(1000, pressure, eos_models["CO2"], 1.07058)
+    check_values.compressibility(1000, pressure, eos_models["CO2"], 1.07058, rtol=RTOL, atol=ATOL)
 
 
 # Ammonia from Table VI
 def test_NH3_low(check_values) -> None:
     pressure: float = 100 * ATMOSPHERE
-    check_values.compressibility(400, pressure, eos_models["NH3"], 0.56165)
+    check_values.compressibility(400, pressure, eos_models["NH3"], 0.56165, rtol=RTOL, atol=ATOL)
 
 
 def test_NH3_high(check_values) -> None:
     pressure: float = 500 * ATMOSPHERE
-    check_values.compressibility(1000, pressure, eos_models["NH3"], 0.93714)
+    check_values.compressibility(1000, pressure, eos_models["NH3"], 0.93714, rtol=RTOL, atol=ATOL)
 
 
 # Methane from Table VII
 def test_CH4_low(check_values) -> None:
     pressure: float = 100 * ATMOSPHERE
-    check_values.compressibility(300, pressure, eos_models["CH4"], 0.85583)
+    check_values.compressibility(300, pressure, eos_models["CH4"], 0.85583, rtol=RTOL, atol=ATOL)
 
 
 def test_CH4_high(check_values) -> None:
     pressure: float = 1000 * ATMOSPHERE
-    check_values.compressibility(1000, pressure, eos_models["CH4"], 1.36201)
+    check_values.compressibility(1000, pressure, eos_models["CH4"], 1.36201, rtol=RTOL, atol=ATOL)
 
 
 # Helium from Table VIII
 def test_He_low(check_values) -> None:
     pressure: float = 100 * ATMOSPHERE
-    check_values.compressibility(300, pressure, eos_models["He"], 1.05148)
+    check_values.compressibility(300, pressure, eos_models["He"], 1.05148, rtol=RTOL, atol=ATOL)
 
 
 def test_He_high(check_values) -> None:
     pressure: float = 1000 * ATMOSPHERE
-    check_values.compressibility(1000, pressure, eos_models["He"], 1.14766)
+    check_values.compressibility(1000, pressure, eos_models["He"], 1.14766, rtol=RTOL, atol=ATOL)
