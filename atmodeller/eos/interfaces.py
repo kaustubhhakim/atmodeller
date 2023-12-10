@@ -454,9 +454,9 @@ class VirialCompensation(RealGasABC):
         standard_state_pressure: Standard state pressure
     """
 
-    a_coefficients: tuple[float, float]
-    b_coefficients: tuple[float, float]
-    c_coefficients: tuple[float, float]
+    a_coefficients: tuple[float, ...]
+    b_coefficients: tuple[float, ...]
+    c_coefficients: tuple[float, ...]
     P0: float
 
     @debug_decorator(logger)
@@ -586,9 +586,9 @@ class CORK(RealGasABC):
 
     P0: float
     mrk: RealGasABC
-    a_virial: tuple[float, float] = (0, 0)
-    b_virial: tuple[float, float] = (0, 0)
-    c_virial: tuple[float, float] = (0, 0)
+    a_virial: tuple[float, ...] = (0, 0)
+    b_virial: tuple[float, ...] = (0, 0)
+    c_virial: tuple[float, ...] = (0, 0)
     virial: VirialCompensation = field(init=False)
 
     def __post_init__(self):
