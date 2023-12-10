@@ -273,7 +273,8 @@ class IdealGas(RealGasABC):
         Returns:
             Volume integral in J mol^(-1)
         """
-        volume_integral: float = GAS_CONSTANT * temperature * np.log(pressure)
+        volume_integral: float = GAS_CONSTANT_BAR * temperature * np.log(pressure)
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 

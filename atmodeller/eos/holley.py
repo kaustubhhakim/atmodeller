@@ -47,7 +47,7 @@ from typing import Callable
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import ATMOSPHERE, GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion, debug_decorator
 
@@ -164,7 +164,7 @@ class BeattieBridgeman(RealGasABC):
         # Volume evaluated at T and P conditions
         vol: float = self.volume(temperature, pressure)
         volume_integral: float = (
-            GAS_CONSTANT
+            GAS_CONSTANT_BAR
             * temperature
             * (
                 np.log(GAS_CONSTANT_BAR * temperature / vol)
@@ -185,6 +185,7 @@ class BeattieBridgeman(RealGasABC):
                 + (self.c * self.b * self.B0 / temperature**3) * 4 / (3 * vol**3)
             )
         )
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 
