@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion, debug_decorator
 
@@ -180,7 +180,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             temperature: Temperature in kelvin
 
         Returns:
-            MRK a parameter
+            MRK a parameter in units of (m^3/mol)^2 K^(1/2) bar
         """
 
         a: float = (
@@ -213,7 +213,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             A factor, which is non-dimensional
         """
         del pressure
-        A: float = self.a(temperature) / (self.b * GAS_CONSTANT * temperature**1.5)
+        A: float = self.a(temperature) / (self.b * GAS_CONSTANT_BAR * temperature**1.5)
 
         return A
 
@@ -227,7 +227,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         Returns:
             B factor, which is non-dimensional
         """
-        B: float = self.b * pressure / (GAS_CONSTANT * temperature)
+        B: float = self.b * pressure / (GAS_CONSTANT_BAR * temperature)
 
         return B
 
@@ -253,7 +253,8 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         # Holland and Powell (1991) are in terms of the fugacity coefficient.
         ln_fugacity_coefficient: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
         ln_fugacity: float = np.log(pressure) + ln_fugacity_coefficient
-        volume_integral: float = GAS_CONSTANT * temperature * ln_fugacity
+        volume_integral: float = GAS_CONSTANT_BAR * temperature * ln_fugacity
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 
@@ -265,16 +266,16 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume solutions of the MRK equation in m^3/mol
+            Volume solutions of the MRK equation in m^3 mol^(-1)
         """
         coefficients: list[float] = []
         coefficients.append(-self.a(temperature) * self.b / np.sqrt(temperature))
         coefficients.append(
-            -self.b * GAS_CONSTANT * temperature
+            -self.b * GAS_CONSTANT_BAR * temperature
             - self.b**2 * pressure
             + self.a(temperature) / np.sqrt(temperature)
         )
-        coefficients.append(-GAS_CONSTANT * temperature)
+        coefficients.append(-GAS_CONSTANT_BAR * temperature)
         coefficients.append(pressure)
 
         polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="V")
@@ -337,7 +338,7 @@ class MRKCriticalBehaviour(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume in m^3/mol
+            Volume in m^3 mol^(-1)
         """
         Psat: float = self.Psat(temperature)
 

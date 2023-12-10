@@ -88,12 +88,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 class MRKCorrespondingStatesHP91(MRKExplicitABC):
     """A MRK simplified model used for corresponding states from Holland and Powell (1991)
 
-    Universal constants from Table 2, Holland and Powell (1991). Note the unit conversion to SI
+    Universal constants from Table 2, Holland and Powell (1991).
 
-    a coefficients have been multiplied by 1e6 to convert kJ^2 to J^2 in the numerator. The
-        pressure units effectively cancel because the ratio a/b is calculated.
-    b coefficients have been multiplied by 1e3 to convert kJ to J in the numerator. The pressure
-        units also cancel because b is multiplied by a pressure.
+    Note the unit conversion to SI and pressure in bar. Compared to the original constants:
+        a coefficients have been multiplied by 1e-4
+        b0 has been multiplied by 1e-2
     """
 
     a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e-9, -8.63920e-10, 0))
@@ -126,8 +125,8 @@ class CORKCorrespondingStatesHP91(CORK):
     whether or not the virial contribution is added. It assumes there are no complications of
     critical behaviour in the P-T range considered.
 
-    The unit conversions to SI mean that every virial coefficient has been multiplied by 1e3 to
-    convert kJ to J in the numerator. The pressure units cancel in the calculation.
+    The unit conversions to SI and pressure in bar mean that every virial coefficient has been
+    multiplied by 1e-2 compared to the values in Table 2 in Holland and Powell (1991).
 
     Args:
         critical_temperature: Critical temperature in kelvin
@@ -200,7 +199,7 @@ Tc_H2O: float = 695  # K
 # The temperature at which a_gas = a; hence the critical point is handled by a single a parameter
 Ta_H2O: float = 673  # K
 # b parameter value is the same across all phases (i.e. gas, fluid, liquid)
-b0_H2O: float = 1.465
+b0_H2O: float = 1.465e-5
 
 
 @dataclass(kw_only=True)
@@ -209,7 +208,7 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
-        default=(1113.4e3, -0.88517e3, 4.53, -1.3183e-2),
+        default=(1113.4e-7, -0.88517e-7, 4.53e-10, -1.3183e-12),
     )
     b0: float = field(init=False, default=b0_H2O)
     Ta: float = field(init=False, default=Ta_H2O)
@@ -240,10 +239,10 @@ class _MRKH2OGasHP91(MRKImplicitABC):
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(
-            1113.4e3,
-            5.8487e3,
-            -2.1370e1,
-            6.8133e-2,
+            1113.4e-7,
+            5.8487e-7,
+            -2.1370e-9,
+            6.8133e-12,
         ),
     )
     b0: float = field(init=False, default=b0_H2O)
@@ -275,10 +274,10 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(
-            1113.4e3,
-            -0.22291e3,
-            -3.8022e-1,
-            1.7791e-4,
+            1113.4e-7,
+            -0.22291e-7,
+            -3.8022e-11,
+            1.7791e-14,
         ),
     )
     b0: float = field(init=False, default=b0_H2O)
@@ -314,9 +313,10 @@ class MRKCO2HP91(MRKImplicitABC):
     """MRK for CO2. Holland and Powell (1991)"""
 
     a_coefficients: tuple[float, ...] = field(
-        init=False, default=(741.2e3, -0.10891e3, -3.903e-1, 0)
+        init=False,
+        default=(741.2e-7, -0.10891e-7, -3.903e-11, 0),  # FIXME: Penultimate coeff wrong?
     )
-    b0: float = field(init=False, default=3.057)
+    b0: float = field(init=False, default=3.057e-5)
 
     def delta_temperature_for_a(self, temperature: float) -> float:
         return temperature - self.Ta
@@ -384,7 +384,7 @@ H2O_MRK_HP98: RealGasABC = MRKH2OHP91()
 #    b_virial (SI) = b_virial (Holland and Powell) / k**(1/2)
 #    c_virial (SI) = c_virial (Holland and Powell) / k**(1/4)
 
-# FIXME: All need rescaling
+# FIXME: All virial coefficients need rescaling
 
 CO2_CORK_HP91: RealGasABC = CORK(
     P0=5000,
