@@ -96,8 +96,8 @@ class MRKCorrespondingStatesHP91(MRKExplicitABC):
         units also cancel because b is multiplied by a pressure.
     """
 
-    a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e1, -8.63920e0, 0))
-    b0: float = field(init=False, default=9.18301e-1)
+    a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e-9, -8.63920e-10, 0))
+    b0: float = field(init=False, default=9.18301e-6)
 
     @classmethod
     def get_species(cls, species: str) -> RealGasABC:
@@ -145,8 +145,13 @@ class CORKCorrespondingStatesHP91(CORK):
     """
 
     P0: float = field(init=False, default=0)
-    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-4, -8.38293e-5))
-    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-2, 2.30524e-3))
+    # TODO: Previous
+    # a_virial: tuple[float, float] = field(init=False, default=(6.93054e-4, -8.38293e-5))
+    # b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-2, 2.30524e-3))
+    # c_virial: tuple[float, float] = field(init=False, default=(0, 0))
+    # TODO: New
+    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-9, -8.38293e-10))
+    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-7, 2.30524e-8))
     c_virial: tuple[float, float] = field(init=False, default=(0, 0))
 
     @classmethod

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import GAS_CONSTANT
+from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasABC
 from atmodeller.utilities import debug_decorator
 
@@ -53,20 +53,23 @@ class ModifiedRedlichKwongABC(RealGasABC):
 
     @abstractmethod
     def a(self, temperature: float) -> float:
-        """MRK a parameter computed from self.a_coefficients
+        """MRK a parameter computed from self.a_coefficients.
 
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            MRK a parameter
+            MRK a parameter in units of (m^3/mol)^2 K^(1/2) bar
         """
         raise NotImplementedError
 
     @property
     @abstractmethod
     def b(self) -> float:
-        """MRK b parameter, which is is independent of temperature, computed from self.b0."""
+        """MRK b parameter computed from self.b0.
+
+        Independent of temperature. Units are volume (m^3/mol).
+        """
         raise NotImplementedError
 
 
@@ -84,7 +87,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
             temperature: Temperature in kelvin
 
         Returns:
-            Parameter a in J^2 bar^(-1) K^(1/2) mol^(-2)
+            Parameter a in (m^3/mol)^2 K^(1/2) bar
         """
         a: float = (
             self.a_coefficients[0] * self.critical_temperature ** (5.0 / 2)
@@ -100,7 +103,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
         """Parameter b in Equation 9, Holland and Powell (1991)
 
         Returns:
-            Parameter b in J bar^(-1) mol^(-1)
+            Parameter b in m^3/mol
         """
         b: float = self.b0 * self.critical_temperature / self.critical_pressure
 
@@ -123,13 +126,13 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
             MRK volume in m^3/mol
         """
         volume: float = (
-            GAS_CONSTANT * temperature / pressure
+            GAS_CONSTANT_BAR * temperature / pressure
             + self.b
             - self.a(temperature)
-            * GAS_CONSTANT
+            * GAS_CONSTANT_BAR
             * np.sqrt(temperature)
-            / (GAS_CONSTANT * temperature + self.b * pressure)
-            / (GAS_CONSTANT * temperature + 2.0 * self.b * pressure)
+            / (GAS_CONSTANT_BAR * temperature + self.b * pressure)
+            / (GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
         )
 
         return volume
@@ -146,16 +149,20 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
             Volume integral in J mol^(-1)
         """
         volume_integral: float = (
-            GAS_CONSTANT * temperature * np.log(pressure)
+            GAS_CONSTANT_BAR * temperature * np.log(pressure)
             + self.b * pressure
             + self.a(temperature)
             / self.b
             / np.sqrt(temperature)
             * (
-                np.log(GAS_CONSTANT * temperature + self.b * pressure)
-                - np.log(GAS_CONSTANT * temperature + 2.0 * self.b * pressure)
+                np.log(GAS_CONSTANT_BAR * temperature + self.b * pressure)
+                - np.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
             )
         )
+        # FIXME: Below is clunky. Because volume computations require GAS_CONSTANT_BAR but energy
+        # requires GAS_CONSTANT, we have to scale again here.
+        # FIXME: Clean up units
+        volume_integral *= GAS_CONSTANT / GAS_CONSTANT_BAR
 
         return volume_integral
 
@@ -545,6 +552,7 @@ class VirialCompensation(RealGasABC):
             + 2.0 / 3.0 * self.b(temperature) * (pressure - self.P0) ** (3.0 / 2.0)
             + 4.0 / 5.0 * self.c(temperature) * (pressure - self.P0) ** (5.0 / 4.0)
         )
+        volume_integral *= GAS_CONSTANT / GAS_CONSTANT_BAR
 
         return volume_integral
 

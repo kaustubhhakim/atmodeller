@@ -16,6 +16,9 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.eos.holland import (
+    CO_CORK_HP91,
+    CO_MRK_HP91,
+    H2_MRK_HP91,
     CO2_CORK_simple_HP91,
     CO2_MRK_simple_HP91,
     get_holland_eos_models,
@@ -30,7 +33,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltDixonCO2, BasaltH2, PeridotiteH2O
-from atmodeller.utilities import earth_oceans_to_kg
+from atmodeller.utilities import UnitConversion, earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
 
@@ -45,6 +48,78 @@ atol: float = 1.0e-8
 def test_version():
     """Test version."""
     assert __version__ == "0.1.0"
+
+
+# FIXME: Below should be CORK, i.e. including virial behaviour
+# TODO: New test to try to figure out coefficient units
+# Figure 8a
+def test_MRKCO_volume1(check_values) -> None:
+    expected: float = 75.81642504505678
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(973, 2000, CO_MRK_HP91, expected)
+
+
+# TODO: New test to try to figure out coefficient units
+# Figure 8a
+def test_MRKCO_volume2(check_values) -> None:
+    expected: float = 134.12165987787207
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(1173, 1000, CO_MRK_HP91, expected)
+
+
+# TODO: New test to try to figure out coefficient units
+# Figure 8a
+def test_MRKCO_volume3(check_values) -> None:
+    expected: float = 66.32063111779561
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(1473, 4000, CO_MRK_HP91, expected)
+
+
+# Figure 8a
+def test_CORKCO_volume1(check_values) -> None:
+    expected: float = 71.32153159834933
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(973, 2000, CO_CORK_HP91, expected)
+
+
+# TODO: New test to try to figure out coefficient units
+# Figure 8a
+def test_CORKCO_volume2(check_values) -> None:
+    expected: float = 131.475184896045
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(1173, 1000, CO_CORK_HP91, expected)
+
+
+# TODO: New test to try to figure out coefficient units
+# Figure 8a
+def test_CORKCO_volume3(check_values) -> None:
+    expected: float = 62.22167162862537
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(1473, 4000, CO_CORK_HP91, expected)
+
+
+# TODO: New test to try to figure out coefficient units
+# Figure 8c
+def test_MRKH2_volume1(check_values) -> None:
+    expected: float = 148.60377800997657
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(773, 500, H2_MRK_HP91, expected)
+
+
+# TODO: New test to try to figure out coefficient units
+# Figure 8c
+def test_MRKH2_volume2(check_values) -> None:
+    expected: float = 54.668478046040985
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(773, 1800, H2_MRK_HP91, expected)
+
+
+# TODO: New test to try to figure out coefficient units
+# Figure 8c
+def test_MRKH2_volume3(check_values) -> None:
+    expected: float = 24.482452874266167
+    expected = UnitConversion.cm3_to_m3(expected)
+    check_values.volume(773, 10000, H2_MRK_HP91, expected)
 
 
 def test_MRKCO2(check_values) -> None:
