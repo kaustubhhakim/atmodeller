@@ -382,9 +382,9 @@ H2O_MRK_HP98: RealGasABC = MRKH2OHP91()
 
 # For the Full CORK models below, the virial coefficients needed to be converted to SI units and
 # pressure in bar as follows, where k = kilo = 1000:
-#    a_virial (SI) = a_virial (Holland and Powell) * 10**(-5) / k
-#    b_virial (SI) = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
-#    c_virial (SI) = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
+#    a_virial = a_virial (Holland and Powell) * 10**(-5) / k
+#    b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
+#    c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
 
 CO2_CORK_HP91: RealGasABC = CORK(
     P0=5000,
