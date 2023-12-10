@@ -96,6 +96,16 @@ class UnitConversion:
         return cm_cubed * 1.0e-6
 
     @classmethod
+    def m3_bar_to_J(cls, m3_bar: float = 1) -> float:
+        """m^3 bar to J"""
+        return m3_bar * 1e5
+
+    @classmethod
+    def J_to_m3_bar(cls, joules: float = 1) -> float:
+        """J to m^3 bar"""
+        return joules / cls.m3_bar_to_J()
+
+    @classmethod
     def litre_to_m3(cls, litre: float = 1) -> float:
         """litre to m^3"""
         return litre * 1e-3

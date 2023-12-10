@@ -14,7 +14,7 @@ from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasABC
-from atmodeller.utilities import debug_decorator
+from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -159,10 +159,8 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
                 - np.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
             )
         )
-        # FIXME: Below is clunky. Because volume computations require GAS_CONSTANT_BAR but energy
-        # requires GAS_CONSTANT, we have to scale again here.
-        # FIXME: Clean up units
-        volume_integral *= GAS_CONSTANT / GAS_CONSTANT_BAR
+
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 

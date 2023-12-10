@@ -84,7 +84,7 @@ class RealGasABC(GetValueABC):
 
     @debug_decorator(logger)
     def scaled_pressure(self, pressure: float) -> float:
-        """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity.
+        """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity
 
         Args:
             pressure: Pressure in bar
@@ -98,13 +98,13 @@ class RealGasABC(GetValueABC):
 
     @debug_decorator(logger)
     def scaled_temperature(self, temperature: float) -> float:
-        """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity.
+        """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity
 
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            The scaled (reduced) temperature, which is dimensionless.
+            The scaled (reduced) temperature, which is dimensionless
         """
         scaled_temperature: float = temperature / self.critical_temperature
 
@@ -184,14 +184,14 @@ class RealGasABC(GetValueABC):
 
     @debug_decorator(logger)
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
-        """Fugacity coefficient.
+        """Fugacity coefficient
 
         Args:
             temperature: Temperature in kelvin
             pressure: Pressure in bar
 
         Returns:
-            fugacity coefficient, which is non-dimensional.
+            fugacity coefficient, which is non-dimensional
         """
         fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
 
@@ -214,10 +214,10 @@ class RealGasABC(GetValueABC):
 
     @abstractmethod
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume.
+        """Volume
 
         Args:
-            temperature: Temperature in kelvin.
+            temperature: Temperature in kelvin
             pressure: Pressure in bar
 
         Returns:
@@ -227,7 +227,15 @@ class RealGasABC(GetValueABC):
 
     @abstractmethod
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP).
+        """Volume integral (VdP)
+
+        Be careful with units. If this function uses the same constants (and GAS_CONSTANT_BAR) as
+        volume() then the units will be m^3 mol^(-1) bar. But this method requires that the units
+        returned are J mol^(-1). Hence the following conversion is often necessary:
+
+            1 J = 10^(-5) m^(3) bar
+
+        There are functions to do this conversion in utilities.py.
 
         Args:
             temperature: Temperature in kelvin

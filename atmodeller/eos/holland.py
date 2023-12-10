@@ -145,11 +145,6 @@ class CORKCorrespondingStatesHP91(CORK):
     """
 
     P0: float = field(init=False, default=0)
-    # TODO: Previous
-    # a_virial: tuple[float, float] = field(init=False, default=(6.93054e-4, -8.38293e-5))
-    # b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-2, 2.30524e-3))
-    # c_virial: tuple[float, float] = field(init=False, default=(0, 0))
-    # TODO: New
     a_virial: tuple[float, float] = field(init=False, default=(6.93054e-9, -8.38293e-10))
     b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-7, 2.30524e-8))
     c_virial: tuple[float, float] = field(init=False, default=(0, 0))
@@ -389,6 +384,7 @@ H2O_MRK_HP98: RealGasABC = MRKH2OHP91()
 #    b_virial (SI) = b_virial (Holland and Powell) / k**(1/2)
 #    c_virial (SI) = c_virial (Holland and Powell) / k**(1/4)
 
+# FIXME: All need rescaling
 
 CO2_CORK_HP91: RealGasABC = CORK(
     P0=5000,

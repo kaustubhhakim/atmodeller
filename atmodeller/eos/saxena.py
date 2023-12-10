@@ -231,7 +231,7 @@ class SaxenaABC(RealGasABC):
                 + (1.0 / 2) * self._c(Tr) * (Pr**2 - P0r**2)
                 + (1.0 / 3) * self._d(Tr) * (Pr**3 - P0r**3)
             )
-            * GAS_CONSTANT
+            * GAS_CONSTANT  # FIXME: Or GAS_CONSTANT_BAR?
             * temperature
         )
 
