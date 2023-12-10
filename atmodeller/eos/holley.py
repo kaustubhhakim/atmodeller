@@ -96,7 +96,7 @@ class BeattieBridgeman(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume solutions of the Beattie-Bridgeman equation in m^3/mol
+            Volume solutions of the Beattie-Bridgeman equation in m^3 mol^(-1)
         """
         coefficients: list[float] = []
         coefficients.append(-GAS_CONSTANT_BAR * self.c * self.b * self.B0 / temperature**2)
@@ -140,7 +140,7 @@ class BeattieBridgeman(RealGasABC):
             **kwargs: Keyword arguments to pass to self.volume_roots
 
         Returns:
-            Volume in m^3/mol
+            Volume in m^3 mol^(-1)
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
