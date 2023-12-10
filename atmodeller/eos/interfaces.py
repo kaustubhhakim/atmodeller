@@ -432,7 +432,7 @@ class VirialCompensation(RealGasABC):
 
     Args:
         a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
-            may be scaled (internally) by critical parameters for corresponding states
+            may be scaled (internally) by critical parameters for corresponding states.
         b_coefficients: As above for the b coefficients
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
@@ -469,7 +469,7 @@ class VirialCompensation(RealGasABC):
             temperature: Temperature in kelvin
 
         Returns:
-            For corresponding states: a parameter in m^3 mol^(-1) bar^(-1)
+            a parameter in m^3 mol^(-1) bar^(-1)
         """
         a: float = (
             self.a_coefficients[0] * self.critical_temperature
@@ -489,7 +489,7 @@ class VirialCompensation(RealGasABC):
             temperature: Temperature in kelvin
 
         Returns:
-            For corresponding states: b parameter in m^3 mol^(-1) bar^(-1/2)
+            b parameter in m^3 mol^(-1) bar^(-1/2)
         """
         b: float = (
             self.b_coefficients[0] * self.critical_temperature
@@ -507,7 +507,7 @@ class VirialCompensation(RealGasABC):
             temperature: Temperature in kelvin
 
         Returns:
-            For corresponding states: c parameter in m^3 mol^(-1) bar^(-1/4)
+            c parameter in m^3 mol^(-1) bar^(-1/4)
         """
         c: float = (
             self.c_coefficients[0] * self.critical_temperature

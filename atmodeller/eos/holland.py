@@ -380,43 +380,39 @@ H2O_MRK_HP91: RealGasABC = MRKH2OHP91()
 # For completeness, the MRK model for H2O in 1998 is the same as the 1991 paper.
 H2O_MRK_HP98: RealGasABC = MRKH2OHP91()
 
-# For the Full CORK models below, the virial coefficients needed to be converted to SI units as
-# follows, where k = kilo = 1000:
-#    a_virial (SI) = a_virial (Holland and Powell) / k
-#    b_virial (SI) = b_virial (Holland and Powell) / k**(1/2)
-#    c_virial (SI) = c_virial (Holland and Powell) / k**(1/4)
-
-# FIXME: All virial coefficients need rescaling
+# For the Full CORK models below, the virial coefficients needed to be converted to SI units and
+# pressure in bar as follows, where k = kilo = 1000:
+#    a_virial (SI) = a_virial (Holland and Powell) * 10**(-5) / k
+#    b_virial (SI) = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
+#    c_virial (SI) = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
 
 CO2_CORK_HP91: RealGasABC = CORK(
     P0=5000,
     mrk=CO2_MRK_HP91,
-    a_virial=(1.33790e-5, -1.01740e-8),
-    b_virial=(-0.0071759669575604925, 2.4469483174946707e-06),
+    a_virial=(1.33790e-10, -1.01740e-13),
+    b_virial=(-0.0071759669575604925e-5, 2.4469483174946707e-11),
 )
-
 
 CO2_CORK_HP98: RealGasABC = CORK(
     P0=5000,
     mrk=CO2_MRK_HP98,
-    a_virial=(5.40776e-6, -1.59046e-9),
-    b_virial=(-0.005635115544866848, 7.757604687595263e-07),
+    a_virial=(5.40776e-11, -1.59046e-14),
+    b_virial=(-0.005635115544866848e-5, 7.757604687595263e-12),
 )
-
 
 H2O_CORK_HP91: RealGasABC = CORK(
     P0=2000,
     mrk=MRKH2OHP91(),
-    a_virial=(-3.2297554e-6, 2.2215221e-9),
-    b_virial=(-0.0009567945402488456, -1.6896504906262715e-07),
+    a_virial=(-3.2297554e-11, 2.2215221e-14),
+    b_virial=(-0.0009567945402488456e-5, -1.6896504906262715e-12),
 )
 
 H2O_CORK_HP98: RealGasABC = CORK(
     P0=2000,
     mrk=H2O_MRK_HP98,
-    a_virial=(1.9853e-6, 0),
-    b_virial=(-0.002817273167444009, 0),
-    c_virial=(0.014285096328783671, 0),
+    a_virial=(1.9853e-11, 0),
+    b_virial=(-0.002817273167444009e-5, 0),
+    c_virial=(0.014285096328783671e-5, 0),
 )
 
 # endregion
