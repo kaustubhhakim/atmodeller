@@ -189,10 +189,12 @@ H2S_CORK_HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")
 
 # region Full CORK models
 
-# For any subclass of MRKImplicitABC, note the unit conversion to SI compared to the values that
-# Holland and Powell present
-#   a coefficients have been multiplied by 1e3
-#   b coefficients remain the same
+# For any subclass of MRKImplicitABC, note the unit conversion to SI and pressure in bar compared
+# to the values that Holland and Powell present in Table 1. These are different by 1000 compared to
+# the corresponding states scaling, because in the corresponding states formulation the
+# coefficients contain a (kilo) pressure scaling as well.
+#   a coefficients have been multiplied by 1e-7
+#   b0 coefficient has been multiplied by 1e-5
 
 # The critical temperature for the CORK H2O model
 Tc_H2O: float = 695  # K
@@ -300,9 +302,9 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        # DJB: it appears that there is only ever a single root, even if Ta < temperature < Tc.
-        # Holland and Powell state that a single root exists if temperature > Tc, but this appears
-        # to be true if temperature > Ta.
+        # It appears that there is only ever a single root, even if Ta < temperature < Tc. Holland
+        # and Powell state that a single root exists if temperature > Tc, but this appears to be
+        # true if temperature > Ta.
         assert volume_roots.size == 1
 
         return volume_roots[0]
