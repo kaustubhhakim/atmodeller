@@ -159,7 +159,6 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
                 - np.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
             )
         )
-
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
@@ -463,11 +462,13 @@ class VirialCompensation(RealGasABC):
     def a(self, temperature: float) -> float:
         """a parameter in Holland and Powell (1998)
 
+        This is the d parameter in Holland and Powell (1991).
+
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            a parameter in J bar^(-2) mol^(-1)
+            For corresponding states: a parameter in m^3 mol^(-1) bar^(-1)
         """
         a: float = (
             self.a_coefficients[0] * self.critical_temperature
@@ -481,11 +482,13 @@ class VirialCompensation(RealGasABC):
     def b(self, temperature: float) -> float:
         """b parameter in Holland and Powell (1998)
 
+        This is the c parameter in Holland and Powell (1991).
+
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            b parameter in J bar^(-3/2) mol^(-1)
+            For corresponding states: b parameter in m^3 mol^(-1) bar^(-1/2)
         """
         b: float = (
             self.b_coefficients[0] * self.critical_temperature
@@ -499,13 +502,11 @@ class VirialCompensation(RealGasABC):
     def c(self, temperature: float) -> float:
         """c parameter in Holland and Powell (1998)
 
-        Note the scalings by self.Tc and self.Pc to accommodate corresponding states.
-
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            c parameter in J bar^(-5/4) mol^(-1)
+            For corresponding states: c parameter in m^3 mol^(-1) bar^(-1/4)
         """
         c: float = (
             self.c_coefficients[0] * self.critical_temperature
@@ -524,7 +525,7 @@ class VirialCompensation(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume contribution
+            Volume contribution in m^3 mol^(-1)
         """
         volume: float = (
             self.a(temperature) * (pressure - self.P0)
@@ -543,14 +544,14 @@ class VirialCompensation(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral contribution
+            Volume integral contribution in J mol^(-1)
         """
         volume_integral: float = (
             self.a(temperature) / 2.0 * (pressure - self.P0) ** 2
             + 2.0 / 3.0 * self.b(temperature) * (pressure - self.P0) ** (3.0 / 2.0)
             + 4.0 / 5.0 * self.c(temperature) * (pressure - self.P0) ** (5.0 / 4.0)
         )
-        volume_integral *= GAS_CONSTANT / GAS_CONSTANT_BAR
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 
