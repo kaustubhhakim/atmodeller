@@ -4,18 +4,17 @@ See the LICENSE file for licensing information.
 """
 
 import logging
-from typing import Type
 
 from atmodeller import ATMOSPHERE, __version__, debug_logger
 from atmodeller.eos.holley import get_holley_eos_models
-from atmodeller.interfaces import RealGasABC, ThermodynamicData, ThermodynamicDataBase
+from atmodeller.interfaces import RealGasABC
 
 logger: logging.Logger = debug_logger()
 
-thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
-
 eos_models: dict[str, RealGasABC] = get_holley_eos_models()
 
+# Probably due to rounding of the model parameters in the paper, some compressibilities in the
+# table in the paper don't quite match exactly with what we compute. Hence relax the tolerance.
 RTOL: float = 1.0e-4
 ATOL: float = 1.0e-4
 

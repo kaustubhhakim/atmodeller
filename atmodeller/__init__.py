@@ -12,7 +12,7 @@ import logging
 
 from scipy import constants
 
-# Module constants.
+# Module constants
 GAS_CONSTANT: float = constants.gas_constant  # J/K/mol
 GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5  # m^3 bar/K/mol
 GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant  # m^3/kg/s^2
@@ -46,7 +46,7 @@ def simple_formatter() -> logging.Formatter:
 
 def debug_logger() -> logging.Logger:
     """Setup the logging for debugging: DEBUG to the console."""
-    # Console logger.
+    # Console logger
     logger: logging.Logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     logger.handlers = []
@@ -60,7 +60,7 @@ def debug_logger() -> logging.Logger:
 
 def debug_file_logger() -> logging.Logger:
     """Setup the logging to a file (DEBUG) and to the console (INFO)."""
-    # Console logger.
+    # Console logger
     logger: logging.Logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     logger.handlers = []
@@ -69,7 +69,7 @@ def debug_file_logger() -> logging.Logger:
     console_handler.setFormatter(console_formatter)
     console_handler.setLevel(logging.INFO)
     logger.addHandler(console_handler)
-    # File logger.
+    # File logger
     file_handler: logging.Handler = logging.FileHandler("%s.log" % __package__)
     file_formatter: logging.Formatter = complex_formatter()
     file_handler.setFormatter(file_formatter)
