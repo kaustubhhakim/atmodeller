@@ -12,9 +12,9 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import GAS_CONSTANT
+from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasABC
-from atmodeller.utilities import debug_decorator
+from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -53,20 +53,23 @@ class ModifiedRedlichKwongABC(RealGasABC):
 
     @abstractmethod
     def a(self, temperature: float) -> float:
-        """MRK a parameter computed from self.a_coefficients
+        """MRK a parameter computed from self.a_coefficients.
 
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            MRK a parameter
+            MRK a parameter in units of (m^3/mol)^2 K^(1/2) bar
         """
         raise NotImplementedError
 
     @property
     @abstractmethod
     def b(self) -> float:
-        """MRK b parameter, which is is independent of temperature, computed from self.b0."""
+        """MRK b parameter computed from self.b0.
+
+        Independent of temperature. Units are volume (m^3/mol).
+        """
         raise NotImplementedError
 
 
@@ -84,7 +87,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
             temperature: Temperature in kelvin
 
         Returns:
-            Parameter a in J^2 bar^(-1) K^(1/2) mol^(-2)
+            Parameter a in (m^3/mol)^2 K^(1/2) bar
         """
         a: float = (
             self.a_coefficients[0] * self.critical_temperature ** (5.0 / 2)
@@ -100,7 +103,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
         """Parameter b in Equation 9, Holland and Powell (1991)
 
         Returns:
-            Parameter b in J bar^(-1) mol^(-1)
+            Parameter b in m^3/mol
         """
         b: float = self.b0 * self.critical_temperature / self.critical_pressure
 
@@ -123,13 +126,13 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
             MRK volume in m^3/mol
         """
         volume: float = (
-            GAS_CONSTANT * temperature / pressure
+            GAS_CONSTANT_BAR * temperature / pressure
             + self.b
             - self.a(temperature)
-            * GAS_CONSTANT
+            * GAS_CONSTANT_BAR
             * np.sqrt(temperature)
-            / (GAS_CONSTANT * temperature + self.b * pressure)
-            / (GAS_CONSTANT * temperature + 2.0 * self.b * pressure)
+            / (GAS_CONSTANT_BAR * temperature + self.b * pressure)
+            / (GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
         )
 
         return volume
@@ -146,16 +149,17 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
             Volume integral in J mol^(-1)
         """
         volume_integral: float = (
-            GAS_CONSTANT * temperature * np.log(pressure)
+            GAS_CONSTANT_BAR * temperature * np.log(pressure)
             + self.b * pressure
             + self.a(temperature)
             / self.b
             / np.sqrt(temperature)
             * (
-                np.log(GAS_CONSTANT * temperature + self.b * pressure)
-                - np.log(GAS_CONSTANT * temperature + 2.0 * self.b * pressure)
+                np.log(GAS_CONSTANT_BAR * temperature + self.b * pressure)
+                - np.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
             )
         )
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 
@@ -176,7 +180,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             temperature: Temperature in kelvin
 
         Returns:
-            MRK a parameter
+            MRK a parameter in units of (m^3/mol)^2 K^(1/2) bar
         """
 
         a: float = (
@@ -209,7 +213,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             A factor, which is non-dimensional
         """
         del pressure
-        A: float = self.a(temperature) / (self.b * GAS_CONSTANT * temperature**1.5)
+        A: float = self.a(temperature) / (self.b * GAS_CONSTANT_BAR * temperature**1.5)
 
         return A
 
@@ -223,7 +227,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         Returns:
             B factor, which is non-dimensional
         """
-        B: float = self.b * pressure / (GAS_CONSTANT * temperature)
+        B: float = self.b * pressure / (GAS_CONSTANT_BAR * temperature)
 
         return B
 
@@ -249,7 +253,8 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         # Holland and Powell (1991) are in terms of the fugacity coefficient.
         ln_fugacity_coefficient: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
         ln_fugacity: float = np.log(pressure) + ln_fugacity_coefficient
-        volume_integral: float = GAS_CONSTANT * temperature * ln_fugacity
+        volume_integral: float = GAS_CONSTANT_BAR * temperature * ln_fugacity
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 
@@ -261,16 +266,16 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume solutions of the MRK equation in m^3/mol
+            Volume solutions of the MRK equation in m^3 mol^(-1)
         """
         coefficients: list[float] = []
         coefficients.append(-self.a(temperature) * self.b / np.sqrt(temperature))
         coefficients.append(
-            -self.b * GAS_CONSTANT * temperature
+            -self.b * GAS_CONSTANT_BAR * temperature
             - self.b**2 * pressure
             + self.a(temperature) / np.sqrt(temperature)
         )
-        coefficients.append(-GAS_CONSTANT * temperature)
+        coefficients.append(-GAS_CONSTANT_BAR * temperature)
         coefficients.append(pressure)
 
         polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="V")
@@ -333,7 +338,7 @@ class MRKCriticalBehaviour(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume in m^3/mol
+            Volume in m^3 mol^(-1)
         """
         Psat: float = self.Psat(temperature)
 
@@ -427,7 +432,7 @@ class VirialCompensation(RealGasABC):
 
     Args:
         a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
-            may be scaled (internally) by critical parameters for corresponding states
+            may be scaled (internally) by critical parameters for corresponding states.
         b_coefficients: As above for the b coefficients
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
@@ -449,20 +454,22 @@ class VirialCompensation(RealGasABC):
         standard_state_pressure: Standard state pressure
     """
 
-    a_coefficients: tuple[float, float]
-    b_coefficients: tuple[float, float]
-    c_coefficients: tuple[float, float]
+    a_coefficients: tuple[float, ...]
+    b_coefficients: tuple[float, ...]
+    c_coefficients: tuple[float, ...]
     P0: float
 
     @debug_decorator(logger)
     def a(self, temperature: float) -> float:
         """a parameter in Holland and Powell (1998)
 
+        This is the d parameter in Holland and Powell (1991).
+
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            a parameter in J bar^(-2) mol^(-1)
+            a parameter in m^3 mol^(-1) bar^(-1)
         """
         a: float = (
             self.a_coefficients[0] * self.critical_temperature
@@ -476,11 +483,13 @@ class VirialCompensation(RealGasABC):
     def b(self, temperature: float) -> float:
         """b parameter in Holland and Powell (1998)
 
+        This is the c parameter in Holland and Powell (1991).
+
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            b parameter in J bar^(-3/2) mol^(-1)
+            b parameter in m^3 mol^(-1) bar^(-1/2)
         """
         b: float = (
             self.b_coefficients[0] * self.critical_temperature
@@ -494,13 +503,11 @@ class VirialCompensation(RealGasABC):
     def c(self, temperature: float) -> float:
         """c parameter in Holland and Powell (1998)
 
-        Note the scalings by self.Tc and self.Pc to accommodate corresponding states.
-
         Args:
             temperature: Temperature in kelvin
 
         Returns:
-            c parameter in J bar^(-5/4) mol^(-1)
+            c parameter in m^3 mol^(-1) bar^(-1/4)
         """
         c: float = (
             self.c_coefficients[0] * self.critical_temperature
@@ -519,7 +526,7 @@ class VirialCompensation(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume contribution
+            Volume contribution in m^3 mol^(-1)
         """
         volume: float = (
             self.a(temperature) * (pressure - self.P0)
@@ -538,13 +545,14 @@ class VirialCompensation(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral contribution
+            Volume integral contribution in J mol^(-1)
         """
         volume_integral: float = (
             self.a(temperature) / 2.0 * (pressure - self.P0) ** 2
             + 2.0 / 3.0 * self.b(temperature) * (pressure - self.P0) ** (3.0 / 2.0)
             + 4.0 / 5.0 * self.c(temperature) * (pressure - self.P0) ** (5.0 / 4.0)
         )
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 
@@ -578,9 +586,9 @@ class CORK(RealGasABC):
 
     P0: float
     mrk: RealGasABC
-    a_virial: tuple[float, float] = (0, 0)
-    b_virial: tuple[float, float] = (0, 0)
-    c_virial: tuple[float, float] = (0, 0)
+    a_virial: tuple[float, ...] = (0, 0)
+    b_virial: tuple[float, ...] = (0, 0)
+    c_virial: tuple[float, ...] = (0, 0)
     virial: VirialCompensation = field(init=False)
 
     def __post_init__(self):

@@ -55,12 +55,13 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from atmodeller import GAS_CONSTANT
+from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import (
     CombinedEOSModel,
     RealGasABC,
     critical_data_dictionary,
 )
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ class SaxenaABC(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume
+            Volume in m^3 mol^(-1)
         """
         Z: float = self.compressibility_parameter(temperature, pressure)
         volume: float = Z * self.ideal_volume(temperature, pressure)
@@ -219,7 +220,7 @@ class SaxenaABC(RealGasABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral
+            Volume integral in J mol^(-1)
         """
         Tr: float = self.scaled_temperature(temperature)
         Pr: float = self.scaled_pressure(pressure)
@@ -231,9 +232,10 @@ class SaxenaABC(RealGasABC):
                 + (1.0 / 2) * self._c(Tr) * (Pr**2 - P0r**2)
                 + (1.0 / 3) * self._d(Tr) * (Pr**3 - P0r**3)
             )
-            * GAS_CONSTANT
+            * GAS_CONSTANT_BAR
             * temperature
         )
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 

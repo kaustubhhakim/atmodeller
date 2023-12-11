@@ -7,7 +7,7 @@ nevertheless useful for comparison and understanding the influence of the virial
 that is encapsulated within the CORK model.
 
 Functions:
-    get_holland_eos_models: Gets the preferred EOS models to use for each species
+    get_holland_eos_models: Gets the preferred EOS models to use for each species.
 
 Real gas EOSs (class instances) in this module that can be imported:
     CO2_CORK_HP91: Full CORK for CO2 in Holland and Powell (1991)
@@ -66,8 +66,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Callable
 
 import numpy as np
+from scipy.constants import kilo
 
 from atmodeller.eos.interfaces import (
     CORK,
@@ -88,16 +90,15 @@ logger: logging.Logger = logging.getLogger(__name__)
 class MRKCorrespondingStatesHP91(MRKExplicitABC):
     """A MRK simplified model used for corresponding states from Holland and Powell (1991)
 
-    Universal constants from Table 2, Holland and Powell (1991). Note the unit conversion to SI
+    Universal constants from Table 2, Holland and Powell (1991).
 
-    a coefficients have been multiplied by 1e6 to convert kJ^2 to J^2 in the numerator. The
-        pressure units effectively cancel because the ratio a/b is calculated.
-    b coefficients have been multiplied by 1e3 to convert kJ to J in the numerator. The pressure
-        units also cancel because b is multiplied by a pressure.
+    Note the unit conversion to SI and pressure in bar. Compared to the original constants:
+        a coefficients have been multiplied by 1e-4
+        b0 has been multiplied by 1e-2
     """
 
-    a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e1, -8.63920e0, 0))
-    b0: float = field(init=False, default=9.18301e-1)
+    a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e-9, -8.63920e-10, 0))
+    b0: float = field(init=False, default=9.18301e-6)
 
     @classmethod
     def get_species(cls, species: str) -> RealGasABC:
@@ -126,8 +127,8 @@ class CORKCorrespondingStatesHP91(CORK):
     whether or not the virial contribution is added. It assumes there are no complications of
     critical behaviour in the P-T range considered.
 
-    The unit conversions to SI mean that every virial coefficient has been multiplied by 1e3 to
-    convert kJ to J in the numerator. The pressure units cancel in the calculation.
+    The unit conversions to SI and pressure in bar mean that every virial coefficient has been
+    multiplied by 1e-2 compared to the values in Table 2 in Holland and Powell (1991).
 
     Args:
         critical_temperature: Critical temperature in kelvin
@@ -145,8 +146,8 @@ class CORKCorrespondingStatesHP91(CORK):
     """
 
     P0: float = field(init=False, default=0)
-    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-4, -8.38293e-5))
-    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-2, 2.30524e-3))
+    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-9, -8.38293e-10))
+    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-7, 2.30524e-8))
     c_virial: tuple[float, float] = field(init=False, default=(0, 0))
 
     @classmethod
@@ -190,17 +191,19 @@ H2S_CORK_HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")
 
 # region Full CORK models
 
-# For any subclass of MRKImplicitABC, note the unit conversion to SI compared to the values that
-# Holland and Powell present
-#   a coefficients have been multiplied by 1e3
-#   b coefficients remain the same
+# For any subclass of MRKImplicitABC, note the unit conversion to SI and pressure in bar compared
+# to the values that Holland and Powell present in Table 1. These are different by 1000 compared to
+# the corresponding states scaling, because in the corresponding states formulation the
+# coefficients contain a (kilo) pressure scaling as well.
+#   a coefficients have been multiplied by 1e-7
+#   b0 coefficient has been multiplied by 1e-5
 
 # The critical temperature for the CORK H2O model
 Tc_H2O: float = 695  # K
 # The temperature at which a_gas = a; hence the critical point is handled by a single a parameter
 Ta_H2O: float = 673  # K
 # b parameter value is the same across all phases (i.e. gas, fluid, liquid)
-b0_H2O: float = 1.465
+b0_H2O: float = 1.465e-5
 
 
 @dataclass(kw_only=True)
@@ -209,7 +212,7 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
-        default=(1113.4e3, -0.88517e3, 4.53, -1.3183e-2),
+        default=(1113.4e-7, -0.88517e-7, 4.53e-10, -1.3183e-12),
     )
     b0: float = field(init=False, default=b0_H2O)
     Ta: float = field(init=False, default=Ta_H2O)
@@ -240,10 +243,10 @@ class _MRKH2OGasHP91(MRKImplicitABC):
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(
-            1113.4e3,
-            5.8487e3,
-            -2.1370e1,
-            6.8133e-2,
+            1113.4e-7,
+            5.8487e-7,
+            -2.1370e-9,
+            6.8133e-12,
         ),
     )
     b0: float = field(init=False, default=b0_H2O)
@@ -275,10 +278,10 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
     a_coefficients: tuple[float, ...] = field(
         init=False,
         default=(
-            1113.4e3,
-            -0.22291e3,
-            -3.8022e-1,
-            1.7791e-4,
+            1113.4e-7,
+            -0.22291e-7,
+            -3.8022e-11,
+            1.7791e-14,
         ),
     )
     b0: float = field(init=False, default=b0_H2O)
@@ -301,9 +304,9 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
-        # DJB: it appears that there is only ever a single root, even if Ta < temperature < Tc.
-        # Holland and Powell state that a single root exists if temperature > Tc, but this appears
-        # to be true if temperature > Ta.
+        # It appears that there is only ever a single root, even if Ta < temperature < Tc. Holland
+        # and Powell state that a single root exists if temperature > Tc, but this appears to be
+        # true if temperature > Ta.
         assert volume_roots.size == 1
 
         return volume_roots[0]
@@ -314,9 +317,10 @@ class MRKCO2HP91(MRKImplicitABC):
     """MRK for CO2. Holland and Powell (1991)"""
 
     a_coefficients: tuple[float, ...] = field(
-        init=False, default=(741.2e3, -0.10891e3, -3.903e-1, 0)
+        init=False,
+        default=(741.2e-7, -0.10891e-7, -3.903e-11, 0),  # FIXME: Penultimate coeff wrong?
     )
-    b0: float = field(init=False, default=3.057)
+    b0: float = field(init=False, default=3.057e-5)
 
     def delta_temperature_for_a(self, temperature: float) -> float:
         return temperature - self.Ta
@@ -378,42 +382,49 @@ H2O_MRK_HP91: RealGasABC = MRKH2OHP91()
 # For completeness, the MRK model for H2O in 1998 is the same as the 1991 paper.
 H2O_MRK_HP98: RealGasABC = MRKH2OHP91()
 
-# For the Full CORK models below, the virial coefficients needed to be converted to SI units as
-# follows, where k = kilo = 1000:
-#    a_virial (SI) = a_virial (Holland and Powell) / k
-#    b_virial (SI) = b_virial (Holland and Powell) / k**(1/2)
-#    c_virial (SI) = c_virial (Holland and Powell) / k**(1/4)
+# For the Full CORK models below, the virial coefficients in the Holland and Powell papers need
+# converting to SI units and pressure in bar as follows, where k = kilo = 1000:
+#    a_virial = a_virial (Holland and Powell) * 10**(-5) / k
+#    b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
+#    c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
 
+a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
+    map(lambda y: y * 1e-5 / kilo, x)
+)
+b_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
+    map(lambda y: y * 1e-5 / kilo**0.5, x)
+)
+c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
+    map(lambda y: y * 1e-5 / kilo**0.25, x)
+)
 
 CO2_CORK_HP91: RealGasABC = CORK(
     P0=5000,
     mrk=CO2_MRK_HP91,
-    a_virial=(1.33790e-5, -1.01740e-8),
-    b_virial=(-0.0071759669575604925, 2.4469483174946707e-06),
+    a_virial=a_conversion((1.33790e-2, -1.01740e-5)),
+    b_virial=b_conversion((-2.26924e-1, 7.73793e-5)),
 )
-
 
 CO2_CORK_HP98: RealGasABC = CORK(
     P0=5000,
     mrk=CO2_MRK_HP98,
-    a_virial=(5.40776e-6, -1.59046e-9),
-    b_virial=(-0.005635115544866848, 7.757604687595263e-07),
+    a_virial=a_conversion((5.40776e-3, -1.59046e-6)),
+    b_virial=b_conversion((-1.78198e-1, 2.45317e-5)),
 )
-
 
 H2O_CORK_HP91: RealGasABC = CORK(
     P0=2000,
     mrk=MRKH2OHP91(),
-    a_virial=(-3.2297554e-6, 2.2215221e-9),
-    b_virial=(-0.0009567945402488456, -1.6896504906262715e-07),
+    a_virial=a_conversion((-3.2297554e-3, 2.2215221e-6)),
+    b_virial=b_conversion((-3.025650e-2, -5.343144e-6)),
 )
 
 H2O_CORK_HP98: RealGasABC = CORK(
     P0=2000,
     mrk=H2O_MRK_HP98,
-    a_virial=(1.9853e-6, 0),
-    b_virial=(-0.002817273167444009, 0),
-    c_virial=(0.014285096328783671, 0),
+    a_virial=a_conversion((1.9853e-3, 0)),
+    b_virial=b_conversion((-8.9090e-2, 0)),
+    c_virial=c_conversion((8.0331e-2, 0)),
 )
 
 # endregion

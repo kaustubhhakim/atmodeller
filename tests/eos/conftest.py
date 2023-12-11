@@ -4,8 +4,8 @@ from pytest import approx
 from atmodeller.eos.interfaces import RealGasABC
 
 # Tolerances to compare the test results with target output.
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
+RTOL: float = 1.0e-8
+ATOL: float = 1.0e-8
 
 
 class CheckValues:
@@ -17,6 +17,9 @@ class CheckValues:
         pressure: float,
         fugacity_model: RealGasABC,
         expected: float,
+        *,
+        rtol=RTOL,
+        atol=ATOL
     ) -> None:
         """Checks the compressibility parameter
 
@@ -25,6 +28,8 @@ class CheckValues:
             pressure: Pressure
             fugacity_model: Fugacity model
             expected: The expected value
+            rtol: Relative tolerance
+            atol: Absolute tolerance
         """
         compressibility: float = fugacity_model.compressibility_parameter(temperature, pressure)
 
@@ -36,6 +41,9 @@ class CheckValues:
         pressure: float,
         fugacity_model: RealGasABC,
         expected: float,
+        *,
+        rtol=RTOL,
+        atol=ATOL
     ) -> None:
         """Checks the fugacity coefficient.
 
@@ -44,6 +52,8 @@ class CheckValues:
             pressure: Pressure
             fugacity_model: Fugacity model
             expected: The expected value
+            rtol: Relative tolerance
+            atol: Absolute tolerance
         """
 
         fugacity_coeff: float = fugacity_model.fugacity_coefficient(temperature, pressure)
@@ -56,6 +66,9 @@ class CheckValues:
         pressure: float,
         fugacity_model: RealGasABC,
         expected: float,
+        *,
+        rtol=RTOL,
+        atol=ATOL
     ) -> None:
         """Checks the volume.
 
