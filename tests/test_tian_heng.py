@@ -4,6 +4,7 @@ See the LICENSE file for licensing information.
 """
 
 
+import logging
 from typing import Type
 
 from atmodeller import __version__, debug_logger
@@ -17,17 +18,18 @@ from atmodeller.interfaces import (
     SolidSpecies,
     ThermodynamicData,
     ThermodynamicDataBase,
+    ThermodynamicDataJANAF,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 
 # This data uses the Holland and Powell data of preference, but then uses JANAF if species cannot
 # be found in Holland and Powell.
-thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
+thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicDataJANAF  # ThermodynamicData
 
 rtol: float = 1.0e-8
 atol: float = 1.0e-8
 
-debug_logger()
+logger: logging.Logger = debug_logger()
 
 
 def test_version():
@@ -72,12 +74,12 @@ def test_graphite() -> None:
 
     target_pressures: dict[str, float] = {
         "C": 1.0,
-        "CH4": 941.8712626308082,
-        "CO": 0.08171351242186498,
-        "CO2": 0.07149671191170186,
-        "H2": 44.493349981766066,
-        "H2O": 14.609207391097847,
-        "O2": 1.4546209065940728e-25,
+        "CH4": 900.3912797397132,
+        "CO": 0.07741709702165529,
+        "CO2": 0.0685518295157825,
+        "H2": 44.493349981766045,
+        "H2O": 14.708340036418534,
+        "O2": 1.4458158511932372e-25,
     }
 
     system.solve(constraints)
