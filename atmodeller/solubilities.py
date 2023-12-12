@@ -472,30 +472,8 @@ class MercuryMagmaS(Solubility):
         return ppmw
 
 
-class BasaltH2OSossi(Solubility):
-    """Sossi et al. (2023). Solubility of water in peridotite and basalt liquids
-
-    https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
-
-    Power law parameters in the abstract for basaltic glasses.
-    Experiments conducted at 2173 K and 1 bar and range of fO2 from IW-1.9 to IW+6.0
-    """
-
-    def _solubility(
-        self,
-        fugacity: float,
-        temperature: float,
-        log10_fugacities_dict: dict[str, float],
-        pressure: float,
-    ) -> float:
-        del temperature
-        del log10_fugacities_dict
-        del pressure
-        return self.power_law(fugacity, 524, 0.5)
-
-
 class PeridotiteH2O(Solubility):
-    """Sossi et al. (2023). Solubility of water in peridotite and basalt liquids
+    """Sossi et al. (2023). Solubility of water in peridotite liquids
 
     https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
 
