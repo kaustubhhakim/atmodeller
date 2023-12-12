@@ -8,6 +8,8 @@ Tests using the JANAF data for simple SiHO interior-atmosphere systems.
 import logging
 from typing import Type
 
+import numpy as np
+
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
@@ -168,7 +170,6 @@ def test_Si_O_H_gas_liquid_totalpressure() -> None:
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
-# FIXME: Something here is now different with the output results.
 def test_Si_O_H_gas_liquid_mixed_nonideality() -> None:
     """Tests H2-H2O and SiO-SiH4."""
 
@@ -209,7 +210,9 @@ def test_Si_O_H_gas_liquid_mixed_nonideality() -> None:
         "OSi": 168.14557222531593,
     }
 
-    system.solve(constraints)
+    initial_solution: np.ndarray = np.array([30, 250, 1e-4, 1, 5e-3, 1])
+
+    system.solve(constraints, initial_solution=initial_solution)
     assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
