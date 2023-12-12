@@ -329,8 +329,8 @@ class IdealityConstant(ConstantConstraint):
     """A constant activity.
 
     The constructor must accept no arguments to enable it to be used as a default factory when the
-    user does not specify an activity model for a solid species. Therefore, the name and species
-    arguments are set to empty strings because they are not used.
+    user does not specify an activity model for a condensed species. Therefore, the name and
+    species arguments are set to empty strings because they are not used.
 
     Args:
         value: The constant value. Defaults to 1 (i.e. ideal behaviour).
@@ -604,7 +604,7 @@ class ThermodynamicDataJANAF(ThermodynamicDataBase):
                     logger.warning(msg)
                     raise KeyError(msg)
         elif isinstance(self.species, LiquidSpecies):
-            phase = get_phase_data("l") 
+            phase = get_phase_data("l")
             if phase is None:
                 msg: str = "Thermodynamic data for %s (%s) is not available in %s" % (
                     self.species.name_in_thermodynamic_data,
@@ -824,7 +824,7 @@ class ThermodynamicDataHollandAndPowell(ThermodynamicDataBase):
 
         gibbs: float = self.get_enthalpy(temperature) - temperature * self.get_entropy(temperature)
 
-        if isinstance(self.species, SolidSpecies):
+        if isinstance(self.species, CondensedSpecies):
             gibbs += self.get_volume_pressure_integral(temperature, pressure)
 
         logger.debug(
@@ -1095,18 +1095,18 @@ class GasSpecies(ChemicalComponent):
 
 
 @dataclass(kw_only=True)
-class SolidSpeciesOutput:
-    """Output for a solid species."""
+class CondensedSpeciesOutput:
+    """Output for a condensed species."""
 
     activity: float
 
 
 @dataclass(kw_only=True)
-class SolidSpecies(ChemicalComponent):
-    """A solid species.
+class CondensedSpecies(ChemicalComponent):
+    """A condensed species.
 
     Args:
-        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
+        chemical_formula: Chemical formula (e.g., C, SiO2, etc.).
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
         thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
         activity: Activity object. Defaults to ideal (i.e. unity).
@@ -1121,35 +1121,13 @@ class SolidSpecies(ChemicalComponent):
         output: Stores calculated values for output.
     """
 
-    output: Union[SolidSpeciesOutput, None] = field(init=False, default=None)
+    output: Union[CondensedSpeciesOutput, None] = field(init=False, default=None)
     activity: ConstraintABC = field(default_factory=IdealityConstant)
 
-@dataclass(kw_only=True)
-class LiquidSpeciesOutput:
-    """Output for a liquid species (copy of SolidSpeciesOutput)"""
 
-    activity: float
+class SolidSpecies(CondensedSpecies):
+    """Solid species"""
 
 
-@dataclass(kw_only=True)
-class LiquidSpecies(ChemicalComponent):
-    """A liquid species  (copy of SolidSpecies)
-
-    Args:
-        chemical_formula: Chemical formula (e.g., SiO2.).
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
-        activity: Activity object. Defaults to ideal (i.e. unity).
-
-    Attributes:
-        chemical_formula: Chemical formula.
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        formula: Formula object derived from the chemical formula.
-        thermodynamic_class: The class for thermodynamic data.
-        thermodynamic_data: Instance of thermodynamic_class for this chemical component.
-        activity: Activity object.
-        output: Stores calculated values for output.
-    """
-
-    output: Union[LiquidSpeciesOutput, None] = field(init=False, default=None)
-    activity: ConstraintABC = field(default_factory=IdealityConstant)
+class LiquidSpecies(CondensedSpecies):
+    """Liquid species"""

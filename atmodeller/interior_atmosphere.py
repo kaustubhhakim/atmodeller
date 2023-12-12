@@ -19,11 +19,11 @@ from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.interfaces import (
     ChemicalComponent,
+    CondensedSpecies,
+    CondensedSpeciesOutput,
     ConstraintABC,
     GasSpecies,
     NoSolubility,
-    SolidSpecies,
-    SolidSpeciesOutput,
     Solubility,
 )
 from atmodeller.solubilities import composition_solubilities
@@ -94,8 +94,8 @@ class Planet:
 class Species(UserList):
     """Collections of species for an interior-atmosphere system.
 
-    A collection of species. It provides methods to filter species based on their phases (solid,
-    gas).
+    A collection of species. It provides methods to filter species based on their phases (gas,
+    condensed).
 
     Args:
         initlist: Initial list of species. Defaults to None.
@@ -124,14 +124,14 @@ class Species(UserList):
         return len(self.gas_species)
 
     @property
-    def solid_species(self) -> dict[int, SolidSpecies]:
-        """Solid species."""
-        return filter_by_type(self, SolidSpecies)
+    def condensed_species(self) -> dict[int, CondensedSpecies]:
+        """Condensed species."""
+        return filter_by_type(self, CondensedSpecies)
 
     @property
-    def number_solid_species(self) -> int:
-        """Number of solid species."""
-        return len(self.solid_species)
+    def number_condensed_species(self) -> int:
+        """Number of condensed species."""
+        return len(self.condensed_species)
 
     @property
     def indices(self) -> dict[str, int]:
@@ -398,7 +398,7 @@ class ReactionNetwork:
         nrows: int = (
             constraints.number_reaction_network_constraints
             + self.number_reactions
-            + self.species.number_solid_species
+            + self.species.number_condensed_species
         )
 
         if nrows == self.species.number:
@@ -442,7 +442,7 @@ class ReactionNetwork:
         nrows: int = (
             constraints.number_reaction_network_constraints
             + self.number_reactions
-            + self.species.number_solid_species
+            + self.species.number_condensed_species
         )
         rhs: np.ndarray = np.zeros(nrows, dtype=float)
 
@@ -490,8 +490,8 @@ class ReactionNetwork:
         fugacity_coefficients: np.ndarray = np.ones_like(self.species, dtype=float)
 
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
-        # above to unity ensures that the coefficients are all zero for solid species, once the log
-        # is taken.
+        # above to unity ensures that the coefficients are all zero for condensed species, once the
+        # log is taken.
         for index, gas_species in self.species.gas_species.items():
             fugacity_coefficients[index] = gas_species.eos.get_value(
                 temperature=system.planet.surface_temperature, pressure=system.total_pressure
@@ -553,7 +553,7 @@ class InteriorAtmosphereSystem:
     planet: Planet = field(default_factory=Planet)
     _reaction_network: ReactionNetwork = field(init=False)
     # The solution is log10 of the partial pressure for gas phases and log10 of the activity for
-    # solid phases. The order aligns with the species.
+    # condensed phases. The order aligns with the species.
     _log_solution: np.ndarray = field(init=False)
 
     def __post_init__(self):
@@ -565,7 +565,7 @@ class InteriorAtmosphereSystem:
 
     @property
     def log_solution(self) -> np.ndarray:
-        """Log10 partial pressure for gas phases and log10 activity for solid phases."""
+        """Log10 partial pressure for gas phases and log10 activity for condensed phases."""
         return self._log_solution
 
     @property
@@ -690,8 +690,8 @@ class InteriorAtmosphereSystem:
                 planet=self.planet,
                 system=self,
             )
-        for species in self.species.solid_species.values():
-            species.output = SolidSpeciesOutput(
+        for species in self.species.condensed_species.values():
+            species.output = CondensedSpeciesOutput(
                 activity=species.activity.get_value(
                     temperature=self.planet.surface_temperature, pressure=self.total_pressure
                 )
@@ -700,38 +700,41 @@ class InteriorAtmosphereSystem:
         logger.info(pprint.pformat(self.solution_dict))
 
     def _assemble_constraints(self, constraints: SystemConstraints) -> SystemConstraints:
-        """Combines the user-prescribed constraints with intrinsic constraints (solid activities).
+        """Combines the user-prescribed constraints with intrinsic constraints (condensed species
+        activities).
 
         Args:
             constraints: Constraints as prescribed by the user.
 
         Returns:
-            Constraints including solid activities.
+            Constraints including condensed species activities.
         """
         logger.info("Assembling constraints")
-        for solid in self.species.solid_species.values():
-            constraints.append(solid.activity)
+        for condensed_species in self.species.condensed_species.values():
+            constraints.append(condensed_species.activity)
         logger.info("Constraints: %s", pprint.pformat(constraints))
 
         return constraints
 
-    def _conform_initial_solution_to_solid_activities(self, initial_solution: np.ndarray) -> None:
-        """Conforms the initial solution (estimate) to the solid activities.
+    def _conform_initial_solution_to_condensed_activities(
+        self, initial_solution: np.ndarray
+    ) -> None:
+        """Conforms the initial solution (estimate) to the condensed species activities.
 
-        Solid activities are known a priori so they can be included as solutions in the initial
+        Condensed activities are known a priori so they can be included as solutions in the initial
         solution estimate.
 
         Args:
             initial_solution: Initial estimate of the solution.
         """
-        for index, solid in self.species.solid_species.items():
-            logger.debug("Setting %s %d", solid.chemical_formula, index)
+        for index, condensed_species in self.species.condensed_species.items():
+            logger.debug("Setting %s %d", condensed_species.chemical_formula, index)
             initial_solution[index] = np.log10(
-                solid.activity.get_value(
+                condensed_species.activity.get_value(
                     temperature=self.planet.surface_temperature, pressure=self.total_pressure
                 )
             )
-        logger.debug("Conforming initial solution to solid activities = %s", initial_solution)
+        logger.debug("Conforming initial solution to condensed activities = %s", initial_solution)
 
     def _conform_initial_solution_to_constraints(
         self, initial_solution: np.ndarray, constraints: SystemConstraints
@@ -782,7 +785,7 @@ class InteriorAtmosphereSystem:
         else:
             initial_solution = np.log10(initial_solution)
 
-        self._conform_initial_solution_to_solid_activities(initial_solution)
+        self._conform_initial_solution_to_condensed_activities(initial_solution)
         self._conform_initial_solution_to_constraints(initial_solution, constraints)
 
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
