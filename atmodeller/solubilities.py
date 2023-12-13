@@ -566,6 +566,30 @@ class RhyoliteCO(Solubility):
         ppmw: float = UnitConversion.weight_percent_to_ppmw(CO_wtp)
         return ppmw
 
+class BasaltArmstrongCO(Solubility):
+    """Armstrong et al. 2015. Solubility of volatiles in mafic melts under reduced conditions
+
+    https://ui.adsabs.harvard.edu/abs/2015GeCoA.171..283A/abstract
+
+    Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
+    IW-3.65 to IW+1.46
+    Equation 10, log-scale linear fit for CO and includes dependence on total pressure
+    The fitting coefficients also use data from Stanley et al. 2014 (experiments from 1-1.2 GPa)
+    """
+
+    def _solubility(
+        self,
+        fugacity: float,
+        temperature: float,
+        log10_fugacities_dict: dict[str, float],
+        pressure: float,
+    ) -> float:
+        del temperature
+        del log10_fugacities_dict
+        logCO_ppm: float = -0.738 + (0.876 * np.log10(fugacity)) - (5.44e-5 * pressure)
+        ppmw: float = 10**logCO_ppm
+        return ppmw
+
 
 class BasaltCH4(Solubility):
     """Ardia et al. 2013, CH4 solubility in haplobasalt (Fe-free) silicate melt.
