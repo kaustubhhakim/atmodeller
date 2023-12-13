@@ -1,4 +1,4 @@
-"""Interfaces.
+"""Interfaces
 
 See the LICENSE file for licensing information.
 """
@@ -333,10 +333,10 @@ class IdealityConstant(ConstantConstraint):
     species arguments are set to empty strings because they are not used.
 
     Args:
-        value: The constant value. Defaults to 1 (i.e. ideal behaviour).
+        value: The constant value. Defaults to 1 (i.e. ideal behaviour)
 
     Attributes:
-        value: The constant value.
+        value: The constant value
     """
 
     name: str = field(init=False, default="")
@@ -483,7 +483,8 @@ class ThermodynamicDatasetABC(ABC):
     """Thermodynamic dataset base class"""
 
     _DATA_SOURCE: str
-    _ENTHALPY_REFERENCE_TEMPERATURE: float  # K
+    # JANAF standards below. May be overwritten by child classes.
+    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
     @abstractmethod
@@ -499,17 +500,6 @@ class ThermodynamicDatasetABC(ABC):
             Thermodynamic data for the species, otherwise None is not available
         """
         ...
-
-    @abstractmethod
-    class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesProtocol):
-        """See base class (protocol)"""
-
-        species: ChemicalComponent
-        data: Any
-
-        def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-            """See base class (protocol)"""
-            ...
 
     @property
     def DATA_SOURCE(self) -> str:
@@ -686,12 +676,12 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
         Args:
             species: Species
             data: Data used to compute the Gibbs energy of formation
-            ENTHALPY_REFERENCE_TEMPERATURE: Enthalpy reference temperature
+            enthalpy_reference_temperature: Enthalpy reference temperature
 
         Attributes:
             species: Species
             data: Data used to compute the Gibbs energy of formation
-            ENTHALPY_REFERENCE_TEMPERATURE: Enthalpy reference temperature
+            enthalpy_reference_temperature: Enthalpy reference temperature
             dKdP: Derivative of bulk modulus (K) with respect to pressure. Set to 4.
             dKdT_factor: Factor for computing the temperature-dependence of K. Set to 1.5e-4.
         """
@@ -891,71 +881,49 @@ def _mass_decorator(func) -> Callable:
     return mass_wrapper
 
 
-# FIXME: Need to redo this
-# class ThermodynamicData(ThermodynamicDataBase):
-#     """Combines thermodynamic data from multiple datasets.
+class ThermodynamicDataset(ThermodynamicDatasetABC):
+    """Combines thermodynamic data from multiple datasets.
 
-#     Args:
-#         species: Chemical component.
-#         datasets: A list of thermodynamic data to use. Defaults to Holland and Powell, and JANAF.
-#     """
+    Args:
+        datasets: A list of thermodynamic data to use. Defaults to Holland and Powell, and JANAF.
+    """
 
-#     _DATA_SOURCE: str = "Combined"
-#     _STANDARD_STATE_PRESSURE: float = 1  # bar
-#     # We assume the JANAF reference temperature, which is close enough to the reference temperature
-#     # of Holland and Powell of 298 K (which could in fact be the same, if they simply decided to
-#     # drop the decimal points when reporting the reference temperature?).
-#     _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
+    _DATA_SOURCE: str = "Combined"
 
-#     def __init__(
-#         self,
-#         species: ChemicalComponent,
-#         datasets: Union[list[ThermodynamicDataBase], None] = None,
-#     ):
-#         super().__init__(species)
-#         if datasets is None:
-#             self.datasets: list[ThermodynamicDataBase] = []
-#             self.add_dataset(ThermodynamicDataHollandAndPowell(species))
-#             self.add_dataset(ThermodynamicDataJANAF(species))
-#         else:
-#             self.datasets = datasets
+    def __init__(
+        self,
+        datasets: Union[list[ThermodynamicDatasetABC], None] = None,
+    ):
+        if datasets is None:
+            self.datasets: list[ThermodynamicDatasetABC] = []
+            self.add_dataset(ThermodynamicDatasetHollandAndPowell())
+            self.add_dataset(ThermodynamicDatasetJANAF())
+        else:
+            self.datasets = datasets
 
-#     def add_dataset(self, dataset: ThermodynamicDataBase) -> None:
-#         """Adds a thermodynamic dataset.
+    def add_dataset(self, dataset: ThermodynamicDatasetABC) -> None:
+        """Adds a thermodynamic dataset
 
-#         Args:
-#             dataset: A thermodynamic dataset.
-#         """
-#         if len(self.datasets) >= 1:
-#             logger.warning("Combining different thermodynamic data may result in inconsistencies")
-#         logger.info("Adding thermodynamic data: %s", dataset.DATA_SOURCE)
-#         self.datasets.append(dataset)
+        Args:
+            dataset: A thermodynamic dataset
+        """
+        if len(self.datasets) >= 1:
+            logger.warning("Combining different thermodynamic data may result in inconsistencies")
+        logger.info("Adding thermodynamic data: %s", dataset.DATA_SOURCE)
+        self.datasets.append(dataset)
 
-#     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-#         """The standard Gibbs free energy of formation in J/mol.
+    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
+        """See base class."""
+        for dataset in self.datasets:
+            if dataset is not None:
+                return dataset.get_data(species)
 
-#         Args:
-#             temperature: Temperature in kelvin.
-#             pressure: Pressure (total) in bar.
-
-#         Returns:
-#             The standard Gibbs free energy of formation in J/mol.
-#         """
-#         for dataset in self.datasets:
-#             try:
-#                 gibbs: float = dataset.get_formation_gibbs(
-#                     temperature=temperature, pressure=pressure
-#                 )
-#                 return gibbs
-#             except KeyError:
-#                 continue
-
-#         msg: str = "Thermodynamic data for %s (%s) is not available in any dataset" % (
-#             self.species.name_in_thermodynamic_data,
-#             self.species.hill_formula,
-#         )
-#         logger.error(msg)
-#         raise KeyError(msg)
+        msg: str = "Thermodynamic data for %s (%s) is not available in any dataset" % (
+            species.name_in_thermodynamic_data,
+            species.hill_formula,
+        )
+        logger.error(msg)
+        raise KeyError(msg)
 
 
 @dataclass(kw_only=True)
@@ -977,7 +945,7 @@ class ChemicalComponent(ABC):
 
     chemical_formula: str
     name_in_thermodynamic_data: str
-    thermodynamic_dataset: ThermodynamicDatasetBase = field(
+    thermodynamic_dataset: ThermodynamicDatasetABC = field(
         default_factory=ThermodynamicDatasetJANAF
     )
     formula: Formula = field(init=False)

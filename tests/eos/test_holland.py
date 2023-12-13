@@ -4,7 +4,6 @@ See the LICENSE file for licensing information.
 """
 
 import logging
-from typing import Type
 
 import numpy as np
 
@@ -30,8 +29,8 @@ from atmodeller.interfaces import (
     IdealGas,
     NoSolubility,
     RealGasABC,
-    ThermodynamicData,
-    ThermodynamicDataBase,
+    ThermodynamicDataset,
+    ThermodynamicDatasetABC,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltDixonCO2, BasaltH2, PeridotiteH2O
@@ -39,7 +38,7 @@ from atmodeller.utilities import UnitConversion, earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
 
-thermodynamic_data: Type[ThermodynamicDataBase] = ThermodynamicData
+thermodynamic_dataset: ThermodynamicDatasetABC = ThermodynamicDataset()
 
 eos_models: dict[str, RealGasABC] = get_holland_eos_models()
 
@@ -212,19 +211,19 @@ def test_H2_with_cork() -> None:
             GasSpecies(
                 chemical_formula="H2O",
                 solubility=PeridotiteH2O(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=IdealGas(),  # This is the default if nothing specified
             ),
             GasSpecies(
                 chemical_formula="H2",
                 solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=eos_models["H2"],
             ),
             GasSpecies(
                 chemical_formula="O2",
                 solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=IdealGas(),  # This is the default if nothing specified
             ),
         ]
@@ -261,36 +260,36 @@ def test_non_ideal() -> None:
             GasSpecies(
                 chemical_formula="H2",
                 solubility=BasaltH2(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=eos_models["H2"],
             ),
             GasSpecies(
                 chemical_formula="H2O",
                 solubility=PeridotiteH2O(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=eos_models["H2O"],
             ),
             GasSpecies(
                 chemical_formula="O2",
                 solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
             ),
             GasSpecies(
                 chemical_formula="CO",
                 solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=eos_models["CO"],
             ),
             GasSpecies(
                 chemical_formula="CO2",
                 solubility=BasaltDixonCO2(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=eos_models["CO2"],
             ),
             GasSpecies(
                 chemical_formula="CH4",
                 solubility=NoSolubility(),
-                thermodynamic_class=thermodynamic_data,
+                thermodynamic_dataset=thermodynamic_dataset,
                 eos=eos_models["CH4"],
             ),
         ]
