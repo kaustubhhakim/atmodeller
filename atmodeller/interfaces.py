@@ -284,8 +284,8 @@ class ConstraintABC(GetValueABC):
     """A constraint to apply to an interior-atmosphere system.
 
     Args:
-        name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
-            'mass'.
+        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
+            'pressure', or 'mass'.
         species: The species to constrain, typically representing a species for 'pressure' or
             'fugacity' constraints or an element for 'mass' constraints.
 
@@ -300,11 +300,11 @@ class ConstraintABC(GetValueABC):
 
 @dataclass(kw_only=True, frozen=True)
 class ConstantConstraint(ConstraintABC):
-    """A constraint of a constant value.
+    """A constraint of a constant value
 
     Args:
-        name: The name of the constraint, which should be one of: 'fugacity', 'pressure', or
-            'mass'.
+        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
+            'pressure', or 'mass'.
         species: The species to constrain, typically representing a species for 'pressure' or
             'fugacity' constraints or an element for 'mass' constraints.
         value: The constant value, which is usually in kg for masses and bar for pressures or
@@ -325,27 +325,24 @@ class ConstantConstraint(ConstraintABC):
 
 
 @dataclass(kw_only=True, frozen=True)
-class IdealityConstant(ConstantConstraint):
-    """A constant activity.
-
-    The constructor must accept no arguments to enable it to be used as a default factory when the
-    user does not specify an activity model for a condensed species. Therefore, the name and
-    species arguments are set to empty strings because they are not used.
+class ActivityConstant(ConstantConstraint):
+    """A constant activity
 
     Args:
-        value: The constant value. Defaults to 1 (i.e. ideal behaviour)
+        species: The species to constrain
+        value: The constant value. Defaults to unity for ideal behaviour.
 
     Attributes:
+        species: The species to constrain
         value: The constant value
     """
 
-    name: str = field(init=False, default="")
-    species: str = field(init=False, default="")
+    name: str = field(init=False, default="activity")
     value: float = 1.0
 
 
 # Solubility limiter applied universally
-MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight.
+MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight
 
 
 def limit_solubility(bound: float = MAXIMUM_PPMW) -> Callable:
@@ -928,19 +925,20 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
 
 @dataclass(kw_only=True)
 class ChemicalComponent(ABC):
-    """A chemical component and its properties.
+    """A chemical component and its properties
 
     Args:
-        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.).
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF.
+        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.)
+        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
+        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
 
     Attributes:
-        chemical_formula: Chemical formula.
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        formula: Formula object derived from the chemical formula.
-        thermodynamic_dataset: The thermodynamic dataset.
-        thermodynamic_data: Thermodynamic data for this chemical component.
+        chemical_formula: Chemical formula
+        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
+        formula: Formula object derived from the chemical formula
+        thermodynamic_dataset: The thermodynamic dataset
+        thermodynamic_data: Thermodynamic data for this chemical component
+        output: Stores calculated values for output
     """
 
     chemical_formula: str
@@ -1017,11 +1015,11 @@ class ChemicalComponent(ABC):
 
 @dataclass(kw_only=True)
 class GasSpecies(ChemicalComponent):
-    """A gas species.
+    """A gas species
 
     Args:
         chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.)
-        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF
+        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF.
         solubility: Solubility model. Defaults to no solubility
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
             Defaults to 0
@@ -1031,8 +1029,8 @@ class GasSpecies(ChemicalComponent):
         chemical_formula: Chemical formula
         name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
         formula: Formula object derived from the chemical formula
-        thermodynamic_class: The class for thermodynamic data
-        thermodynamic_data: Instance of thermodynamic_class for this chemical component
+        thermodynamic_dataset: The thermodynamic dataset
+        thermodynamic_data: Thermodynamic data for this chemical component
         solubility: Solubility model
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt
         eos: A gas equation of state
@@ -1122,38 +1120,43 @@ class GasSpecies(ChemicalComponent):
 
 @dataclass(kw_only=True)
 class CondensedSpeciesOutput:
-    """Output for a condensed species."""
+    """Output for a condensed species"""
 
     activity: float
 
 
 @dataclass(kw_only=True)
 class CondensedSpecies(ChemicalComponent):
-    """A condensed species.
+    """A condensed species
 
     Args:
-        chemical_formula: Chemical formula (e.g., C, SiO2, etc.).
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        thermodynamic_class: The class for thermodynamic data. Defaults to JANAF.
-        activity: Activity object. Defaults to ideal (i.e. unity).
+        chemical_formula: Chemical formula (e.g., C, SiO2, etc.)
+        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
+        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
 
     Attributes:
-        chemical_formula: Chemical formula.
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data.
-        formula: Formula object derived from the chemical formula.
-        thermodynamic_class: The class for thermodynamic data.
-        thermodynamic_data: Instance of thermodynamic_class for this chemical component.
-        activity: Activity object.
-        output: Stores calculated values for output.
+        chemical_formula: Chemical formula
+        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
+        formula: Formula object derived from the chemical formula
+        thermodynamic_dataset: The thermodynamic dataset
+        thermodynamic_data: Thermodynamic data for this chemical component
+        activity: Activity, which is ideal.
+        output: Stores calculated values for output
     """
 
-    output: Union[CondensedSpeciesOutput, None] = field(init=False, default=None)
-    activity: ConstraintABC = field(default_factory=IdealityConstant)
+    output: CondensedSpeciesOutput | None = field(init=False, default=None)
+    activity: ConstraintABC = field(init=False)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.activity = ActivityConstant(species=self.chemical_formula)
 
 
+@dataclass(kw_only=True)
 class SolidSpecies(CondensedSpecies):
     """Solid species"""
 
 
+@dataclass(kw_only=True)
 class LiquidSpecies(CondensedSpecies):
     """Liquid species"""
