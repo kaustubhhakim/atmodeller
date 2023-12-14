@@ -11,7 +11,6 @@ import logging
 from abc import abstractmethod
 from collections import UserList
 from dataclasses import dataclass, field
-from typing import Union
 
 import numpy as np
 
@@ -148,7 +147,7 @@ class RedoxBuffer(ConstraintABC):
     """
 
     log10_shift: float = 0
-    pressure: Union[float, None] = None
+    pressure: float | None = None
     name: str = field(init=False, default="fugacity")
 
     @abstractmethod

@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
 
 import numpy as np
 import pandas as pd
@@ -485,9 +485,7 @@ class ThermodynamicDatasetABC(ABC):
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
     @abstractmethod
-    def get_data(
-        self, species: ChemicalComponent
-    ) -> Union[ThermodynamicDataForSpeciesProtocol, None]:
+    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
         """Gets the thermodynamic data for a species, otherwise None if not available
 
         Args:
@@ -521,14 +519,12 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
     _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    def get_data(
-        self, species: ChemicalComponent
-    ) -> Union[ThermodynamicDataForSpeciesProtocol, None]:
+    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
         """See base class"""
 
         db: janaf.Janafdb = janaf.Janafdb()
 
-        def get_phase_data(phases: list[str]) -> Union[janaf.JanafPhase, None]:
+        def get_phase_data(phases: list[str]) -> janaf.JanafPhase | None:
             """Gets the phase data for a list of phases in order of priority.
 
             Args:
@@ -538,7 +534,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
                 Phase data if it exists in JANAF, otherwise None
             """
             try:
-                phase_data: Union[janaf.JanafPhase, None] = db.getphasedata(
+                phase_data: janaf.JanafPhase | None = db.getphasedata(
                     formula=species.modified_hill_formula, phase=phases[0]
                 )
             except ValueError:
@@ -639,11 +635,9 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
         self.data = self.data.loc[:, :"Vmax"]
         self.data = self.data.astype(float)
 
-    def get_data(
-        self, species: ChemicalComponent
-    ) -> Union[ThermodynamicDataForSpeciesProtocol, None]:
+    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
         try:
-            phase_data: Union[pd.Series, None] = self.data.loc[species.name_in_thermodynamic_data]
+            phase_data: pd.Series | None = self.data.loc[species.name_in_thermodynamic_data]
             msg = "Thermodynamic data for %s (%s) = %s" % (
                 species.name_in_thermodynamic_data,
                 species.modified_hill_formula,
@@ -889,7 +883,7 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
 
     def __init__(
         self,
-        datasets: Union[list[ThermodynamicDatasetABC], None] = None,
+        datasets: list[ThermodynamicDatasetABC] | None = None,
     ):
         if datasets is None:
             self.datasets: list[ThermodynamicDatasetABC] = []
@@ -948,7 +942,7 @@ class ChemicalComponent(ABC):
     )
     formula: Formula = field(init=False)
     output: Any = field(init=False, default=None)
-    thermodynamic_data: Union[ThermodynamicDataForSpeciesProtocol, None] = field(init=False)
+    thermodynamic_data: ThermodynamicDataForSpeciesProtocol | None = field(init=False)
 
     def __post_init__(self):
         logger.info(
@@ -1040,7 +1034,7 @@ class GasSpecies(ChemicalComponent):
     name_in_thermodynamic_data: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
-    output: Union[GasSpeciesOutput, None] = field(init=False, default=None)
+    output: GasSpeciesOutput | None = field(init=False, default=None)
     eos: RealGasABC = field(default_factory=IdealGas)
 
     def __post_init__(self):
