@@ -657,7 +657,7 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
-        initial_solution: np.ndarray | None = None,
+        initial_solution: list[float] | np.ndarray | None = None,
         method: str = "hybr",
         tol: float | None = None,
         **options,
@@ -732,7 +732,7 @@ class InteriorAtmosphereSystem:
         self,
         *,
         constraints: SystemConstraints,
-        initial_solution: np.ndarray | None,
+        initial_solution: list[float] | np.ndarray | None,
         method: str,
         tol: float | None,
         **options,
@@ -753,7 +753,7 @@ class InteriorAtmosphereSystem:
         if initial_solution is None:
             self._log_solution = np.ones_like(self.species, dtype=np.float_)
         else:
-            self._log_solution = np.log10(initial_solution)
+            self._log_solution = np.log10(np.array(initial_solution))
 
         self._conform_initial_solution_to_constraints(constraints)
 
