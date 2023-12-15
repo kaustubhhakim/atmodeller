@@ -25,6 +25,7 @@ from atmodeller.interfaces import (
     NoSolubility,
     Solubility,
 )
+from atmodeller.output import Output
 from atmodeller.solubilities import composition_solubilities
 from atmodeller.utilities import filter_by_type
 
@@ -539,6 +540,7 @@ class InteriorAtmosphereSystem:
     Attributes:
         species: A list of species
         planet: A planet
+        output: Output
     """
 
     species: Species
@@ -547,6 +549,7 @@ class InteriorAtmosphereSystem:
     # The solution is log10 of the partial pressure for gas phases and log10 of the activity for
     # condensed phases. The order aligns with the species.
     _log_solution: np.ndarray = field(init=False)
+    output: Output = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
@@ -554,6 +557,7 @@ class InteriorAtmosphereSystem:
         self._reaction_network = ReactionNetwork(species=self.species)
         # Initialise solution to zero.
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
+        self.output = Output(self)
 
     @property
     def log_solution(self) -> np.ndarray:
@@ -562,12 +566,12 @@ class InteriorAtmosphereSystem:
 
     @property
     def solution(self) -> np.ndarray:
-        """Solution."""
+        """Single (last) solution."""
         return 10**self.log_solution
 
     @property
     def solution_dict(self) -> dict[str, float]:
-        """Solution for all species in a dictionary."""
+        """Solution for all species in a dictionary"""
         output: dict[str, float] = {}
         for chemical_formula, solution in zip(self.species.chemical_formulas, self.solution):
             output[chemical_formula] = solution
@@ -616,18 +620,6 @@ class InteriorAtmosphereSystem:
         mu_atmosphere /= self.total_pressure
 
         return mu_atmosphere
-
-    @property
-    def output(self) -> dict:
-        """Outputs for analysis."""
-        output_dict: dict = {}
-        output_dict["temperature"] = self.planet.surface_temperature
-        output_dict["total_pressure_in_atmosphere"] = self.total_pressure
-        output_dict["mean_molar_mass_in_atmosphere"] = self.atmospheric_mean_molar_mass
-        for species in self.species.data:
-            output_dict[species.chemical_formula] = species.output
-        # TODO: Dan to add elemental outputs as well.
-        return output_dict
 
     def isclose(
         self, target_dict: dict[str, float], rtol: float = 1.0e-5, atol: float = 1.0e-8
@@ -695,13 +687,14 @@ class InteriorAtmosphereSystem:
                 )
             )
 
+        self.output.add(constraints)
         logger.info(pprint.pformat(self.solution_dict))
 
     def _assemble_constraints(self, constraints: SystemConstraints) -> None:
         """Combines user-prescribed constraints with intrinsic (activity) constraints.
 
         Args:
-            constraints: Constraints as prescribed by the user, which is updated in place.
+            constraints: Constraints as prescribed by the user, which are updated in place.
         """
         logger.info("Assembling constraints")
         for condensed_species in self.species.condensed_species.values():

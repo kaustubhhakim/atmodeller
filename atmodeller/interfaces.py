@@ -18,6 +18,7 @@ from molmass import Formula
 from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller.output import CondensedSpeciesOutput, GasSpeciesOutput
 from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -821,28 +822,6 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             return integral_VP
 
 
-@dataclass(kw_only=True)
-class GasSpeciesOutput:
-    """Output for a gas species."""
-
-    mass_in_atmosphere: float  # kg
-    mass_in_solid: float  # kg
-    mass_in_melt: float  # kg
-    moles_in_atmosphere: float  # moles
-    moles_in_melt: float  # moles
-    moles_in_solid: float  # moles
-    ppmw_in_solid: float  # ppm by weight
-    ppmw_in_melt: float  # ppm by weight
-    fugacity: float  # bar
-    fugacity_coefficient: float  # dimensionless
-    pressure_in_atmosphere: float  # bar
-    volume_mixing_ratio: float  # dimensionless
-    mass_in_total: float = field(init=False)
-
-    def __post_init__(self):
-        self.mass_in_total = self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
-
-
 def _mass_decorator(func) -> Callable:
     """A decorator to return the mass of either the gas species or one of its elements."""
 
@@ -1105,18 +1084,11 @@ class GasSpecies(ChemicalComponent):
             ppmw_in_melt=ppmw_in_melt,
             fugacity=fugacity,
             fugacity_coefficient=fugacity_coefficient,
-            pressure_in_atmosphere=pressure,
+            pressure=pressure,
             volume_mixing_ratio=volume_mixing_ratio,
         )
 
         return self.output.mass_in_total
-
-
-@dataclass(kw_only=True)
-class CondensedSpeciesOutput:
-    """Output for a condensed species"""
-
-    activity: float
 
 
 @dataclass(kw_only=True)
