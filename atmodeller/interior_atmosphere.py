@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 import numpy as np
+import pandas as pd
 from scipy.optimize import root
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
@@ -25,6 +26,7 @@ from atmodeller.interfaces import (
     NoSolubility,
     Solubility,
 )
+from atmodeller.learning import Learning
 from atmodeller.output import Output
 from atmodeller.solubilities import composition_solubilities
 from atmodeller.utilities import filter_by_type
@@ -654,6 +656,8 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         *,
         initial_solution: list[float] | np.ndarray | None = None,
+        constraints_dataframe: pd.DataFrame | None = None,
+        solution_dataframe: pd.DataFrame | None = None,
         method: str = "hybr",
         tol: float | None = None,
         **options,
@@ -663,6 +667,8 @@ class InteriorAtmosphereSystem:
         Args:
             constraints: Constraints for the system of equations
             initial_solution: Initial guess for the solution. Defaults to None.
+            constraints_dataframe: Dataframe of constraints
+            solution_dataframe: Dataframe of solution
             method: Type of solver. Defaults to 'hybr'.
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -672,6 +678,8 @@ class InteriorAtmosphereSystem:
         self._log_solution = self._solve(
             constraints=constraints,
             initial_solution=initial_solution,
+            constraints_dataframe=constraints_dataframe,
+            solution_dataframe=solution_dataframe,
             method=method,
             tol=tol,
             **options,
@@ -730,6 +738,8 @@ class InteriorAtmosphereSystem:
         *,
         constraints: SystemConstraints,
         initial_solution: list[float] | np.ndarray | None,
+        constraints_dataframe: pd.DataFrame | None,
+        solution_dataframe: pd.DataFrame | None,
         method: str,
         tol: float | None,
         **options,
@@ -739,6 +749,8 @@ class InteriorAtmosphereSystem:
         Args:
             constraints: Constraints for the system of equations
             initial_solution: Initial guess for the solution
+            constraints_dataframe: Dataframe of constraints
+            solution_dataframe: Dataframe of solution
             method: Type of solver
             tol: Tolerance for termination
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -746,13 +758,43 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution array
         """
-        # Initial guess for gas species, if not specified, is 1 log10 unit, i.e. 10 bar.
-        if initial_solution is None:
-            self._log_solution = np.ones_like(self.species, dtype=np.float_)
+
+        # FIXME: Working here
+        if constraints_dataframe is not None and solution_dataframe is not None:
+            # Get current constraints
+            dummy_pressure = 10  # 10 bar
+            temp_dict = {}
+            for constraint in constraints.data:
+                if constraint.species:
+                    key: str = f"{constraint.species}_{constraint.name}"
+                    # These constraints are in the same order
+                    temp_dict[key] = np.log10(
+                        constraint.get_value(
+                            temperature=self.planet.surface_temperature,
+                            pressure=dummy_pressure,
+                        )
+                    )
+            logger.warning("temp_dict = %s", temp_dict)
+            learning: Learning = Learning(constraints_dataframe, solution_dataframe)
+            for index, species in self.species.gas_species.items():
+                reg = learning.get_regressor(species.chemical_formula)
+                value = reg.predict(np.array(list(temp_dict.values())).reshape(1, -1))
+                logger.warning("Value = %s, %s", value, type(value))
+                self._log_solution[index] = value
+                logger.warning(
+                    "Species = %s, index = %d, value = %f", species.chemical_formula, index, value
+                )
         else:
-            self._log_solution = np.log10(np.array(initial_solution))
+            # Previous standard approach
+            # Initial guess for gas species, if not specified, is 1 log10 unit, i.e. 10 bar.
+            if initial_solution is None:
+                self._log_solution = np.ones_like(self.species, dtype=np.float_)
+            else:
+                self._log_solution = np.log10(np.array(initial_solution))
 
         self._conform_initial_solution_to_constraints(constraints)
+
+        logger.warning(self._log_solution)
 
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=constraints
@@ -774,6 +816,8 @@ class InteriorAtmosphereSystem:
             raise SystemExit()
 
         sol = sol.x
+
+        logger.warning(self._log_solution)
 
         return sol
 

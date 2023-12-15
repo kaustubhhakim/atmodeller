@@ -125,6 +125,7 @@ class Output:
         """
         input_dict: dict[str, float] = {}
         for constraint in constraints.data:
+            # FIXME: Might not work well when species is an empty string (e.g. total pressure)
             key: str = f"{constraint.species}_{constraint.name}"
             input_dict[key] = constraint.get_value(
                 temperature=self._interior_atmosphere.planet.surface_temperature,
