@@ -108,6 +108,7 @@ class Output:
         self._add_constraints(constraints)
         self._add_planet()
         self._add_gas_species()
+        self._add_solution()
 
     def _add_atmosphere(self) -> None:
         """Adds atmosphere."""
@@ -131,24 +132,26 @@ class Output:
             )
         self._constraints.append(input_dict)
 
+    def _add_planet(self) -> None:
+        """Adds the planetary properties."""
+        planet_dict: dict[str, float] = asdict(self._interior_atmosphere.planet)
+        self._planet_properties.append(planet_dict)
+
     def _add_gas_species(self) -> None:
         """Adds gas species."""
         for species in self._interior_atmosphere.species.gas_species.values():
             assert species.output is not None
             self._gas_species[species.chemical_formula].append(asdict(species.output))
 
-    def _add_planet(self) -> None:
-        """Adds the planetary properties."""
-        planet_dict: dict[str, float] = asdict(self._interior_atmosphere.planet)
-        self._planet_properties.append(planet_dict)
-
     def _add_solution(self):
-        ...
+        """Adds the solution."""
+        self._solution.append(self._interior_atmosphere.solution_dict)
 
     def __call__(self) -> dict[str, pd.DataFrame]:
         """Returns all dataframes in a dictionary"""
 
         out: dict[str, pd.DataFrame] = {}
+        out["solution"] = self.solution
         out["atmosphere"] = self.atmosphere
         out["constraints"] = self.constraints
         out["planet"] = self.planet

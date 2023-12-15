@@ -540,7 +540,7 @@ class InteriorAtmosphereSystem:
     Attributes:
         species: A list of species
         planet: A planet
-        output: Output
+        output: All output data for this system. Access the dictionary by (calling) output().
     """
 
     species: Species
@@ -566,12 +566,16 @@ class InteriorAtmosphereSystem:
 
     @property
     def solution(self) -> np.ndarray:
-        """Single (last) solution."""
+        """Solution."""
         return 10**self.log_solution
 
     @property
     def solution_dict(self) -> dict[str, float]:
-        """Solution for all species in a dictionary"""
+        """Solution for all species in a dictionary.
+
+        This is convenient for a quick check of the solution, but in general you will want to use
+        `self.output()` to return a dictionary of all the data.
+        """
         output: dict[str, float] = {}
         for chemical_formula, solution in zip(self.species.chemical_formulas, self.solution):
             output[chemical_formula] = solution
