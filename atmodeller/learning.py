@@ -6,7 +6,8 @@ See the LICENSE file for licensing information.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
 import pandas as pd
 from sklearn.linear_model import SGDRegressor
@@ -14,6 +15,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 logger: logging.Logger = logging.getLogger(__name__)
+import pickle
+
 import numpy as np
 
 
@@ -22,17 +25,22 @@ class Learning:
     """Machine learning
 
     Args:
-        constraints: Constraints dataframe
-        solution: Solution dataframe
+        pickle_file: Output pickle file
     """
 
-    constraints: pd.DataFrame
-    solution: pd.DataFrame
+    pickle_file: Path | str
+    data: dict[str, pd.DataFrame] = field(init=False)
 
     def __post_init__(self):
+        self._load_pickle()
         # We actually solve for log10
-        self.constraints = np.log10(self.constraints)
-        self.solution = np.log10(self.solution)
+        self.constraints = self.data["constraints"]
+        self.solution = self.data["solution"]
+
+    def _load_pickle(self):
+        """Loads the output data from the pickle file."""
+        with open(self.pickle_file, "rb") as handle:
+            self.data = pickle.load(handle)
 
     def get_regressor(self, species: str):
         """Gets the regressor.
@@ -51,12 +59,12 @@ class Learning:
         outcome: pd.Series = self.solution[species]
         # print(self.constraints.values)
         # print(outcome.values)
-        reg.fit(self.constraints.values, outcome.values)
+        reg.fit(np.log10(self.constraints.values), np.log10(outcome.values))
 
         # Below is for a quick sanity check to make sure the predictions and training compare
         # reasonably. For chemical network, probably don't need a super-accurate initial guess
         # anyway
-        logger.warning("predictions = %s'", reg.predict(self.constraints.values))
+        logger.warning("predictions = %s'", reg.predict(np.log10(self.constraints.values)))
         logger.warning("original = %s", outcome)
 
         return reg

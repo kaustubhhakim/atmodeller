@@ -11,6 +11,7 @@ import logging
 from abc import abstractmethod
 from collections import UserList
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -19,6 +20,9 @@ from atmodeller.interfaces import ConstantConstraint, ConstraintABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -134,6 +138,44 @@ class SystemConstraints(UserList):
     def number_reaction_network_constraints(self) -> int:
         """Number of constraints related to the reaction network"""
         return len(self.reaction_network_constraints)
+
+    def evaluate(self, interior_atmosphere: InteriorAtmosphereSystem) -> dict[str, float]:
+        """Evaluates all constraints.
+
+        Args:
+            interior_atmosphere: Model that defines the conditions to evaluate at.
+
+        Returns:
+            A dictionary of the evaluated constraints in the same order as the underlying list.
+        """
+        evaluate_dict: dict[str, float] = {}
+        for constraint in self.data:
+            if constraint.species:
+                key: str = f"{constraint.species}_"
+            else:
+                key = ""
+            key += constraint.name
+            evaluate_dict[key] = constraint.get_value(
+                temperature=interior_atmosphere.planet.surface_temperature,
+                pressure=interior_atmosphere.total_pressure,
+            )
+
+        return evaluate_dict
+
+    def evaluate_log10(self, interior_atmosphere: InteriorAtmosphereSystem) -> dict[str, float]:
+        """Evaluates all constraints in log10 units.
+
+        Args:
+            interior_atmosphere: Model that defines the conditions to evaluate at.
+
+        Returns:
+            A dictionary of the evaluated constraints in the same order as the underlying list.
+        """
+        evaluate_log10_dict: dict[str, float] = {
+            key: np.log10(value) for key, value in self.evaluate(interior_atmosphere).items()
+        }
+
+        return evaluate_log10_dict
 
 
 @dataclass(kw_only=True, frozen=True)

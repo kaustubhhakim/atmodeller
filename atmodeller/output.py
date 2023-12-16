@@ -11,9 +11,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import openpyxl
 import pandas as pd
-from openpyxl import Workbook
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -127,15 +125,8 @@ class Output:
         Args:
             constraints: Constraints
         """
-        input_dict: dict[str, float] = {}
-        for constraint in constraints.data:
-            # FIXME: Might not work well when species is an empty string (e.g. total pressure)
-            key: str = f"{constraint.species}_{constraint.name}"
-            input_dict[key] = constraint.get_value(
-                temperature=self._interior_atmosphere.planet.surface_temperature,
-                pressure=self._interior_atmosphere.total_pressure,
-            )
-        self._constraints.append(input_dict)
+        evaluate_dict = constraints.evaluate(self._interior_atmosphere)
+        self._constraints.append(evaluate_dict)
 
     def _add_planet(self) -> None:
         """Adds the planetary properties."""
@@ -193,7 +184,7 @@ class Output:
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             for df_name, df in out.items():
-                df.to_excel(writer, sheet_name=df_name, index=False)
+                df.to_excel(writer, sheet_name=df_name, index=True)
 
         logger.info("Output data written to %s", output_file)
 

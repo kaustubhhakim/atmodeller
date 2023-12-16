@@ -10,9 +10,9 @@ import pprint
 from collections import UserList
 from dataclasses import dataclass, field
 from functools import cached_property
+from pathlib import Path
 
 import numpy as np
-import pandas as pd
 from scipy.optimize import root
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
@@ -559,8 +559,9 @@ class InteriorAtmosphereSystem:
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_planet_composition(self.planet)
         self._reaction_network = ReactionNetwork(species=self.species)
-        # Initialise solution to zero.
-        self._log_solution = np.zeros_like(self.species, dtype=np.float_)
+        # Initialise solution to one log unit (i.e. 10 bar for gas species).
+        # Condensed phase activities over-write the relevant entries during the solve.
+        self._log_solution = np.ones_like(self.species, dtype=np.float_)
         self.output = Output(self)
 
     @property
@@ -663,8 +664,7 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         *,
         initial_solution: list[float] | np.ndarray | None = None,
-        constraints_dataframe: pd.DataFrame | None = None,
-        solution_dataframe: pd.DataFrame | None = None,
+        initial_pickle: Path | str | None = None,
         method: str = "hybr",
         tol: float | None = None,
         **options,
@@ -674,8 +674,8 @@ class InteriorAtmosphereSystem:
         Args:
             constraints: Constraints for the system of equations
             initial_solution: Initial guess for the solution. Defaults to None.
-            constraints_dataframe: Dataframe of constraints. Defaults to None.
-            solution_dataframe: Dataframe of solution. Defaults to None.
+            initial_pickle: Pickle file containing the output data for an identical run. Defaults
+                to None.
             method: Type of solver. Defaults to 'hybr'.
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -683,8 +683,7 @@ class InteriorAtmosphereSystem:
         self.set_constraints(constraints)
         self._log_solution = self._solve(
             initial_solution=initial_solution,
-            constraints_dataframe=constraints_dataframe,
-            solution_dataframe=solution_dataframe,
+            initial_pickle=initial_pickle,
             method=method,
             tol=tol,
             **options,
@@ -726,7 +725,7 @@ class InteriorAtmosphereSystem:
         Pressure and fugacity constraints can be imposed directly on the initial solution
         estimate. For simplicity we impose both as pressure constraints.
         """
-        for constraint in self._constraints.reaction_network_constraints:
+        for constraint in self.constraints.reaction_network_constraints:
             index: int = self.species.indices[constraint.species]
             logger.debug("Setting %s %d", constraint.species, index)
             self._log_solution[index] = np.log10(
@@ -740,9 +739,8 @@ class InteriorAtmosphereSystem:
     def _solve(
         self,
         *,
-        initial_solution: list[float] | np.ndarray | None,
-        constraints_dataframe: pd.DataFrame | None,
-        solution_dataframe: pd.DataFrame | None,
+        initial_solution: list[float] | np.ndarray | None = None,
+        initial_pickle: Path | str | None = None,
         method: str,
         tol: float | None,
         **options,
@@ -751,8 +749,8 @@ class InteriorAtmosphereSystem:
 
         Args:
             initial_solution: Initial guess for the solution
-            constraints_dataframe: Dataframe of constraints
-            solution_dataframe: Dataframe of solution
+            initial_pickle: Pickle file containing the output data for an identical run. Defaults
+                to None.
             method: Type of solver
             tol: Tolerance for termination
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -762,22 +760,10 @@ class InteriorAtmosphereSystem:
         """
 
         # FIXME: Working here
-        if constraints_dataframe is not None and solution_dataframe is not None:
-            # Get current constraints
-            dummy_pressure = 10  # 10 bar
-            temp_dict = {}
-            for constraint in self.constraints.data:
-                if constraint.species:
-                    key: str = f"{constraint.species}_{constraint.name}"
-                    # These constraints are in the same order
-                    temp_dict[key] = np.log10(
-                        constraint.get_value(
-                            temperature=self.planet.surface_temperature,
-                            pressure=dummy_pressure,
-                        )
-                    )
+        if initial_pickle is not None:
+            temp_dict = self.constraints.evaluate_log10(self)
             logger.warning("temp_dict = %s", temp_dict)
-            learning: Learning = Learning(constraints_dataframe, solution_dataframe)
+            learning: Learning = Learning(initial_pickle)
             for index, species in self.species.gas_species.items():
                 reg = learning.get_regressor(species.chemical_formula)
                 value = reg.predict(np.array(list(temp_dict.values())).reshape(1, -1))
