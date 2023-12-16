@@ -6,10 +6,14 @@ See the LICENSE file for licensing information.
 from __future__ import annotations
 
 import logging
+import pickle
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+import openpyxl
 import pandas as pd
+from openpyxl import Workbook
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -52,7 +56,7 @@ class CondensedSpeciesOutput:
 
 @dataclass
 class Output:
-    """Store inputs and outputs of the models.
+    """Stores inputs and outputs of the models.
 
     Args:
         interior_atmosphere: An interior-atmosphere system
@@ -148,9 +152,12 @@ class Output:
         """Adds the solution."""
         self._solution.append(self._interior_atmosphere.solution_dict)
 
-    def __call__(self) -> dict[str, pd.DataFrame]:
-        """Returns all dataframes in a dictionary"""
+    def get(self) -> dict[str, pd.DataFrame]:
+        """Gets the output dictionary of dataframes.
 
+        Returns:
+            An output dictionary
+        """
         out: dict[str, pd.DataFrame] = {}
         out["solution"] = self.solution
         out["atmosphere"] = self.atmosphere
@@ -160,3 +167,62 @@ class Output:
             out[gas_species] = data
 
         return out
+
+    def to_pickle(self, file_prefix: Path | str = "atmodeller_out") -> None:
+        """Writes the output to a pickle file.
+
+        Args:
+            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+        """
+        out: dict[str, pd.DataFrame] = self.get()
+        output_file: Path = Path(f"{file_prefix}.pkl")
+
+        with open(output_file, "wb") as handle:
+            pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        logger.info("Output data written to %s", output_file)
+
+    def to_excel(self, file_prefix: Path | str = "atmodeller_out") -> None:
+        """Writes the output to an Excel file.
+
+        Args:
+            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+        """
+        out: dict[str, pd.DataFrame] = self.get()
+        output_file: Path = Path(f"{file_prefix}.xlsx")
+
+        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+            for df_name, df in out.items():
+                df.to_excel(writer, sheet_name=df_name, index=False)
+
+        logger.info("Output data written to %s", output_file)
+
+    def __call__(
+        self,
+        file_prefix: Path | str = "atmodeller_out",
+        to_dict: bool = True,
+        to_pickle: bool = False,
+        to_excel: bool = False,
+    ) -> dict[str, pd.DataFrame] | None:
+        """Gets the output and/or optionally write it to a pickle or Excel file.
+
+        Args:
+            file_prefix: Prefix of the output file if writing to a pickle or Excel. Defaults to
+                'atmodeller_out'
+            to_dict: Returns the output data in a dictionary. Defaults to True.
+            to_pickle: Writes a pickle file. Defaults to False.
+            to_excel: Writes an Excel file. Defaults to False.
+
+        Returns:
+            A dictionary of the output if `to_dict = True`, otherwise None.
+        """
+
+        if to_pickle:
+            self.to_pickle(file_prefix)
+
+        if to_excel:
+            self.to_excel(file_prefix)
+
+        if to_dict:
+            out: dict[str, pd.DataFrame] = self.get()
+            return out
