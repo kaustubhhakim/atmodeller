@@ -10,13 +10,14 @@ import pprint
 from collections import UserList
 from dataclasses import dataclass, field
 from functools import cached_property
-from pathlib import Path
 
 import numpy as np
 from scipy.optimize import root
+from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
+from atmodeller.initial_condition import InitialCondition, InitialConditionConstant
 from atmodeller.interfaces import (
     ChemicalComponent,
     CondensedSpecies,
@@ -26,7 +27,6 @@ from atmodeller.interfaces import (
     NoSolubility,
     Solubility,
 )
-from atmodeller.learning import Learning
 from atmodeller.output import Output
 from atmodeller.solubilities import composition_solubilities
 from atmodeller.utilities import filter_by_type
@@ -443,7 +443,7 @@ class ReactionNetwork:
 
         # Reactions
         for reaction_index in range(self.number_reactions):
-            logger.info(
+            logger.debug(
                 "Row %02d: Reaction %d: %s",
                 reaction_index,
                 reaction_index,
@@ -458,7 +458,7 @@ class ReactionNetwork:
         # Constraints
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
-            logger.info("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
+            logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = constraint.get_log10_value(
                 temperature=system.planet.surface_temperature, pressure=system.total_pressure
             )
@@ -538,6 +538,7 @@ class InteriorAtmosphereSystem:
     Args:
         species: A list of species
         planet: A planet. Defaults to a molten Earth
+        initial_condition: Initial condition. Defaults to a constant for all species.
 
     Attributes:
         species: A list of species
@@ -547,6 +548,7 @@ class InteriorAtmosphereSystem:
 
     species: Species
     planet: Planet = field(default_factory=Planet)
+    initial_condition: InitialCondition = field(default_factory=InitialConditionConstant)
     _reaction_network: ReactionNetwork = field(init=False)
     # Convenient to set and update constraints on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
@@ -559,9 +561,8 @@ class InteriorAtmosphereSystem:
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_planet_composition(self.planet)
         self._reaction_network = ReactionNetwork(species=self.species)
-        # Initialise solution to one log unit (i.e. 10 bar for gas species).
-        # Condensed phase activities over-write the relevant entries during the solve.
-        self._log_solution = np.ones_like(self.species, dtype=np.float_)
+        # Initialise solution
+        self._log_solution = np.zeros_like(self.species, dtype=np.float_)
         self.output = Output(self)
 
     @property
@@ -664,7 +665,6 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         *,
         initial_solution: list[float] | np.ndarray | None = None,
-        initial_pickle: Path | str | None = None,
         method: str = "hybr",
         tol: float | None = None,
         **options,
@@ -674,8 +674,6 @@ class InteriorAtmosphereSystem:
         Args:
             constraints: Constraints for the system of equations
             initial_solution: Initial guess for the solution. Defaults to None.
-            initial_pickle: Pickle file containing the output data for an identical run. Defaults
-                to None.
             method: Type of solver. Defaults to 'hybr'.
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -683,7 +681,6 @@ class InteriorAtmosphereSystem:
         self.set_constraints(constraints)
         self._log_solution = self._solve(
             initial_solution=initial_solution,
-            initial_pickle=initial_pickle,
             method=method,
             tol=tol,
             **options,
@@ -740,7 +737,6 @@ class InteriorAtmosphereSystem:
         self,
         *,
         initial_solution: list[float] | np.ndarray | None = None,
-        initial_pickle: Path | str | None = None,
         method: str,
         tol: float | None,
         **options,
@@ -749,8 +745,6 @@ class InteriorAtmosphereSystem:
 
         Args:
             initial_solution: Initial guess for the solution
-            initial_pickle: Pickle file containing the output data for an identical run. Defaults
-                to None.
             method: Type of solver
             tol: Tolerance for termination
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -759,30 +753,23 @@ class InteriorAtmosphereSystem:
             The solution array
         """
 
-        # FIXME: Working here
-        if initial_pickle is not None:
-            temp_dict = self.constraints.evaluate_log10(self)
-            logger.warning("temp_dict = %s", temp_dict)
-            learning: Learning = Learning(initial_pickle)
+        # Manual override trumps self.initial_condition
+        if initial_solution is not None:
+            self._log_solution = np.log10(np.array(initial_solution))
+
+        else:
+            eval_dict: dict[str, float] = self.constraints.evaluate_log10(self)
             for index, species in self.species.gas_species.items():
-                reg = learning.get_regressor(species.chemical_formula)
-                value = reg.predict(np.array(list(temp_dict.values())).reshape(1, -1))
-                logger.warning("Value = %s, %s", value, type(value))
-                self._log_solution[index] = value
-                logger.warning(
+                value = self.initial_condition(species.chemical_formula, eval_dict)
+                logger.debug(
                     "Species = %s, index = %d, value = %f", species.chemical_formula, index, value
                 )
-        else:
-            # Previous standard approach
-            # Initial guess for gas species, if not specified, is 1 log10 unit, i.e. 10 bar.
-            if initial_solution is None:
-                self._log_solution = np.ones_like(self.species, dtype=np.float_)
-            else:
-                self._log_solution = np.log10(np.array(initial_solution))
+                self._log_solution[index] = value
 
         self._conform_initial_solution_to_constraints()
 
-        logger.warning(self._log_solution)
+        # For outputting to the logger below.
+        initial_guess: np.ndarray = self._log_solution.copy()
 
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
@@ -805,7 +792,10 @@ class InteriorAtmosphereSystem:
 
         sol = sol.x
 
-        logger.warning(self._log_solution)
+        logger.info("Initial guess solution = %s", initial_guess)
+        logger.info("Actual solution = %s", sol)
+        error: np.ndarray = np.sqrt(mean_squared_error(sol, initial_guess))
+        logger.info("RMSE = %s", error)
 
         return sol
 
