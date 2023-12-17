@@ -758,15 +758,10 @@ class InteriorAtmosphereSystem:
         # Manual override trumps self.initial_condition
         if initial_solution is not None:
             self._log_solution = np.log10(np.array(initial_solution))
-
         else:
             eval_dict: dict[str, float] = self.constraints.evaluate_log10(self)
-            for index, species in self.species.gas_species.items():
-                value = self.initial_condition.get_log10_value(species.chemical_formula, eval_dict)
-                logger.debug(
-                    "Species = %s, index = %d, value = %f", species.chemical_formula, index, value
-                )
-                self._log_solution[index] = value
+            log10_value: float | np.ndarray = self.initial_condition.get_log10_value(eval_dict)
+            self._log_solution = log10_value * np.ones(self.species.number)
 
         self._conform_initial_solution_to_constraints()
 

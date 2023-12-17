@@ -7,11 +7,13 @@ import logging
 import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import SGDRegressor
-from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.interfaces import GetValueABC
@@ -21,15 +23,30 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass
 class InitialConditionABC(GetValueABC):
-    """Initial condition base class"""
+    """Initial condition base class
+
+    The return types accommodate np.ndarray whereas the base class only accommodates float.
+    """
 
     def __post_init__(self):
         logger.info("Creating %s", self.__class__.__name__)
 
-    def get_value(self, species: str, **kwargs) -> float:
+    def get_value(self, *args, **kwargs) -> np.ndarray | float:
+        """Computes the value for given input arguments.
+
+        See base class.
+        """
         ...
 
+    def get_log10_value(self, *args, **kwargs) -> np.ndarray | float:
+        """Computes the log10 value for given input arguments.
+
+        See base class.
+        """
+        return super().get_log10_value(*args, **kwargs)
+
     def update(self, *args, **kwargs) -> None:
+        """Updates the initial condition"""
         ...
 
 
@@ -38,7 +55,8 @@ class InitialConditionRegressor(InitialConditionABC):
     """Applies a regressor to compute the initial condition"""
 
     pickle_file: Path | str
-    data: dict[str, Pipeline] = field(init=False, default_factory=dict)
+    species_names: list[str] = field(init=False)
+    _reg: MultiOutputRegressor = field(init=False)
 
     def __post_init__(self):
         super().__post_init__()
@@ -49,37 +67,30 @@ class InitialConditionRegressor(InitialConditionABC):
         constraints: pd.DataFrame = output_data["constraints"]
 
         logger.info("Reading data from %s", self.pickle_file)
-        solution_species: list[str] = list(solution.columns)
-        logger.info("Found species = %s", solution_species)
+        self.species_names = list(solution.columns)
+        logger.info("Found species = %s", self.species_names)
 
-        for species in solution_species:
-            reg: Pipeline = make_pipeline(StandardScaler(), SGDRegressor(max_iter=1000, tol=1e-3))
-            pressure: pd.Series = solution[species]
-            reg.fit(np.log10(constraints.values), np.log10(pressure))
-            self.data[species] = reg
+        base_regressor = SGDRegressor(max_iter=1000, tol=1e-3)
+        multi_output_regressor = MultiOutputRegressor(
+            make_pipeline(StandardScaler(), base_regressor)
+        )
+        multi_output_regressor.fit(np.log10(constraints.values), np.log10(solution.values))
+        self._reg = multi_output_regressor
 
-        logger.info(self.data)
-
-    def get_value(self, species: str, constraints_evaluate_log10: dict[str, float]) -> float:
+    def get_value(self, constraints_evaluate_log10: dict[str, float]) -> np.ndarray:
         """Computes the value.
 
         Args:
-            species: Species (chemical formula)
             constraints_evaluate_log10: Log10 of the constraints evaluated at current conditions
 
         Returns:
-            An initial guess for the species
+            A guess for the initial solution
         """
         predict_in: np.ndarray = np.array(list(constraints_evaluate_log10.values())).reshape(1, -1)
-        reg: Pipeline = self.data[species]
-        # Since predict_in is always a np.ndarray I think the return type is also always a
-        # np.ndarray. But in general it could be a tuple.
-        prediction: np.ndarray | tuple = reg.predict(predict_in)
-        prediction_array: np.ndarray = np.array(prediction)
-        assert prediction_array.size == 1
-        value = 10 ** float(prediction_array)
+        prediction: np.ndarray = cast(np.ndarray, self._reg.predict(predict_in)).flatten()
+        value = 10**prediction
 
-        logger.debug("%s: species = %s, value = %s", self.__class__.__name__, species, value)
+        logger.debug("%s: value = %s", self.__class__.__name__, value)
 
         return value
 
@@ -101,11 +112,11 @@ class InitialConditionConstant(InitialConditionABC):
 
     value: float = 10
 
-    def get_value(self, species: str, *args, **kwargs) -> float:
+    def get_value(self, *args, **kwargs) -> float:
         del args
         del kwargs
 
-        logger.debug("%s: species = %s, value = %s", self.__class__.__name__, species, self.value)
+        logger.debug("%s: value = %s", self.__class__.__name__, self.value)
 
         return self.value
 
