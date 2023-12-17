@@ -31,10 +31,11 @@ class GetValueABC(ABC):
     """An object with a get_value method."""
 
     @abstractmethod
-    def get_value(self, **kwargs) -> float:
+    def get_value(self, *args, **kwargs) -> float:
         """Computes the value for given input arguments.
 
         Args:
+            *args: Positional arguments only
             **kwargs: Keyword arguments only
 
         Returns:
@@ -42,16 +43,17 @@ class GetValueABC(ABC):
         """
         ...
 
-    def get_log10_value(self, **kwargs) -> float:
+    def get_log10_value(self, *args, **kwargs) -> float:
         """Computes the log10 value for given input arguments.
 
         Args:
+            *args: Positional arguments only
             **kwargs: Keyword arguments only
 
         Returns:
             An evaluation of the log10 value based on the provided arguments
         """
-        return np.log10(self.get_value(**kwargs))
+        return np.log10(self.get_value(*args, **kwargs))
 
 
 @dataclass(kw_only=True)

@@ -17,7 +17,7 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.initial_condition import InitialCondition, InitialConditionConstant
+from atmodeller.initial_condition import InitialConditionABC, InitialConditionConstant
 from atmodeller.interfaces import (
     ChemicalComponent,
     CondensedSpecies,
@@ -242,7 +242,9 @@ class ReactionNetwork:
                  [2, 0, 1]]
             if the columns represent the elements H, C, and O, respectively.
         """
-        matrix: np.ndarray = np.zeros((self.species.number, self.number_unique_elements))
+        matrix: np.ndarray = np.zeros(
+            (self.species.number, self.number_unique_elements), dtype=int
+        )
         for species_index, species in enumerate(self.species):
             for element_index, element in enumerate(self.unique_elements):
                 try:
@@ -275,7 +277,7 @@ class ReactionNetwork:
             if augmented_matrix[i, i] == 0:
                 # Swap rows to get a non-zero pivot element.
                 nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
-                augmented_matrix[[i, nonzero_row]] = augmented_matrix[[nonzero_row, i]]
+                augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
             # Perform row operations to eliminate values below the pivot.
             for j in range(i + 1, self.species.number):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
@@ -548,7 +550,7 @@ class InteriorAtmosphereSystem:
 
     species: Species
     planet: Planet = field(default_factory=Planet)
-    initial_condition: InitialCondition = field(default_factory=InitialConditionConstant)
+    initial_condition: InitialConditionABC = field(default_factory=InitialConditionConstant)
     _reaction_network: ReactionNetwork = field(init=False)
     # Convenient to set and update constraints on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
@@ -624,7 +626,7 @@ class InteriorAtmosphereSystem:
     def total_pressure(self) -> float:
         """Total pressure."""
         indices: list[int] = list(self.species.gas_species.keys())
-        return sum(self.solution[indices])
+        return sum(float(self.solution[index]) for index in indices)
 
     @property
     def atmospheric_mean_molar_mass(self) -> float:
@@ -760,7 +762,7 @@ class InteriorAtmosphereSystem:
         else:
             eval_dict: dict[str, float] = self.constraints.evaluate_log10(self)
             for index, species in self.species.gas_species.items():
-                value = self.initial_condition(species.chemical_formula, eval_dict)
+                value = self.initial_condition.get_log10_value(species.chemical_formula, eval_dict)
                 logger.debug(
                     "Species = %s, index = %d, value = %f", species.chemical_formula, index, value
                 )
