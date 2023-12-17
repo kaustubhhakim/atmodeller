@@ -52,6 +52,7 @@ class CondensedSpeciesOutput:
     activity: float
 
 
+# TODO: Subclass UserDict?
 @dataclass
 class Output:
     """Stores inputs and outputs of the models.
@@ -99,6 +100,11 @@ class Output:
     def solution(self) -> pd.DataFrame:
         """Solution data"""
         return pd.DataFrame(self._solution)
+
+    @property
+    def size(self) -> int:
+        """Number of rows"""
+        return len(self._solution)
 
     def add(self, constraints: SystemConstraints) -> None:
         """Adds all outputs.

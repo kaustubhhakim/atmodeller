@@ -703,6 +703,10 @@ class InteriorAtmosphereSystem:
             )
 
         self.output.add(constraints)
+
+        # TODO: Working here to update initial condition
+        self.initial_condition.update(self.output)
+
         logger.info(pprint.pformat(self.solution_dict))
 
     def set_constraints(self, constraints: SystemConstraints) -> None:
@@ -792,7 +796,7 @@ class InteriorAtmosphereSystem:
         logger.info("Initial guess solution = %s", initial_guess)
         logger.info("Actual solution = %s", sol)
         error: np.ndarray = np.sqrt(mean_squared_error(sol, initial_guess))
-        logger.info("RMSE = %s", error)
+        logger.warning("RMSE = %s", error)
 
         return sol
 

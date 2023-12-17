@@ -13,10 +13,10 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.interfaces import GetValueABC
+from atmodeller.output import Output
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -45,9 +45,8 @@ class InitialConditionABC(GetValueABC):
         """
         return super().get_log10_value(*args, **kwargs)
 
-    def update(self, *args, **kwargs) -> None:
+    def update(self, output: Output, *args, **kwargs) -> None:
         """Updates the initial condition"""
-        ...
 
 
 @dataclass
@@ -55,26 +54,38 @@ class InitialConditionRegressor(InitialConditionABC):
     """Applies a regressor to compute the initial condition"""
 
     pickle_file: Path | str
+    partial_fit_batch_size: int = 10
     species_names: list[str] = field(init=False)
     _reg: MultiOutputRegressor = field(init=False)
+    _solution_scalar: StandardScaler = field(init=False)
+    _constraints_scalar: StandardScaler = field(init=False)
 
     def __post_init__(self):
         super().__post_init__()
         with open(self.pickle_file, "rb") as handle:
             output_data: dict[str, pd.DataFrame] = pickle.load(handle)
 
-        solution: pd.DataFrame = output_data["solution"]
-        constraints: pd.DataFrame = output_data["constraints"]
-
         logger.info("Reading data from %s", self.pickle_file)
+
+        constraints: pd.DataFrame = output_data["constraints"]
+        constraints_log10_values: np.ndarray = np.log10(constraints.values)
+        self._constraints_scalar = StandardScaler().fit(constraints_log10_values)
+        constraints_scaled = self._constraints_scalar.transform(constraints_log10_values)
+
+        solution: pd.DataFrame = output_data["solution"]
+        solution_log10_values: np.ndarray = np.log10(solution.values)
+        self._solution_scalar = StandardScaler().fit(solution_log10_values)
+        solution_scaled = self._solution_scalar.transform(solution_log10_values)
+
         self.species_names = list(solution.columns)
         logger.info("Found species = %s", self.species_names)
 
         base_regressor = SGDRegressor(max_iter=1000, tol=1e-3)
-        multi_output_regressor = MultiOutputRegressor(
-            make_pipeline(StandardScaler(), base_regressor)
-        )
-        multi_output_regressor.fit(np.log10(constraints.values), np.log10(solution.values))
+
+        multi_output_regressor = MultiOutputRegressor(base_regressor)
+
+        multi_output_regressor.partial_fit(constraints_scaled, solution_scaled)
+
         self._reg = multi_output_regressor
 
     def get_value(self, constraints_evaluate_log10: dict[str, float]) -> np.ndarray:
@@ -87,12 +98,34 @@ class InitialConditionRegressor(InitialConditionABC):
             A guess for the initial solution
         """
         predict_in: np.ndarray = np.array(list(constraints_evaluate_log10.values())).reshape(1, -1)
-        prediction: np.ndarray = cast(np.ndarray, self._reg.predict(predict_in)).flatten()
-        value = 10**prediction
+        predict_in_scaled: np.ndarray = cast(
+            np.ndarray, self._constraints_scalar.transform(predict_in)
+        )
+        solution_scaled: np.ndarray = cast(np.ndarray, self._reg.predict(predict_in_scaled))
+        solution_original: np.ndarray = cast(
+            np.ndarray, self._solution_scalar.inverse_transform(solution_scaled)
+        )
 
-        logger.debug("%s: value = %s", self.__class__.__name__, value)
+        value = 10 ** solution_original.flatten()
+
+        logger.warning("%s: value = %s", self.__class__.__name__, value)
 
         return value
+
+    def update(self, output: Output) -> None:
+        if not (output.size % self.partial_fit_batch_size):
+            count: int = output.size // self.partial_fit_batch_size - 1
+            logger.warning("%s: partial refit (%d)", self.__class__.__name__, count)
+            start_index: int = count * self.partial_fit_batch_size
+            end_index: int = start_index + self.partial_fit_batch_size
+            logger.warning("start_index = %d, end_index = %d", start_index, end_index)
+            constraints: pd.DataFrame = output.constraints.iloc[start_index:end_index]
+            logger.warning(constraints)
+            constraints_scaled = self._constraints_scalar.transform(np.log10(constraints.values))
+            solution: pd.DataFrame = output.solution.iloc[start_index:end_index]
+            solution_scaled = self._solution_scalar.transform(np.log10(solution.values))
+            logger.warning("Refitting initial condition regressor (%d)", count)
+            self._reg.fit(constraints_scaled, solution_scaled)
 
 
 @dataclass
@@ -120,7 +153,4 @@ class InitialConditionConstant(InitialConditionABC):
 
         return self.value
 
-    def update(self, *args, **kwargs) -> None:
-        """Update does nothing for a constant value"""
-        del args
-        del kwargs
+    # def updates does nothing for a constant value (see base class)
