@@ -72,29 +72,30 @@ class InitialConditionRegressor(InitialConditionABC):
         pickle_file: Pickle file of the output from a previous (or similar) model run. Importantly,
             the reaction network must be the same (same number of species in the same order) and
             the constraints must be the same (also in the same order).
-        partial_fit: Update (partial refit) the regressor during the model run. Defaults to True.
-        partial_fit_batch_size: Number of solutions to calculate before updating (partial
-            refitting) the regressor. Defaults to 10.
-        keep_original: Keep the original regressor that was trained on data in the pickle file.
-            Otherwise, the original regressor is replaced by a regressor trained on only the data
-            from the current model. Defaults to False.
+        fit: Fit the regressor during the model run. This will replace the original regressor by a
+            regressor trained only on the data from the current model. Defaults to False.
+        fit_batch_size: Number of solutions to calculate before fitting model data if fit = True.
+        partial_fit: Partial fit the regressor during the model run. Defaults to True.
+        partial_fit_batch_size: Number of solutions to calculate before partial refit of the
+            regressor. Defaults to 10.
 
     Attributes:
         pickle_file: Pickle file
-        partial_fit: Update (partial refit) the regressor during the model run.
-        partial_fit_batch_size: Number of solutions before updating the regressor
-        keep_original: Keep the original regressor that was trained on data in the pickle file.
-            Otherwise, the original regressor is replaced by a regressor trained on only the data
-            from the current model.
+        fit: Fit the regressor during the model run. This will replace the original regressor by a
+            regressor trained only on the data from the current model.
+        fit_batch_size: Number of solutions to calculate before fitting model data if fit = True.
+        partial_fit: Partial fit the regressor during the model run.
+        partial_fit_batch_size: Number of solutions before partial refit of the regressor
         constraint_names: Names of the constraints (and their order) in the output
         species_names: Names of the species (and their order) in the output
     """
 
     pickle_file: Path | str
     _: KW_ONLY
+    fit: bool = True
+    fit_batch_size: int = 20
     partial_fit: bool = True
     partial_fit_batch_size: int = 10
-    keep_original: bool = False
     constraint_names: list[str] = field(init=False)
     species_names: list[str] = field(init=False)
     _reg: MultiOutputRegressor = field(init=False)
@@ -103,20 +104,33 @@ class InitialConditionRegressor(InitialConditionABC):
 
     def __post_init__(self):
         super().__post_init__()
+        # Ensure consistency of arguments and correct handling of fit versus partial refit.
+        if not self.fit:
+            self.fit_batch_size = 0
         with open(self.pickle_file, "rb") as handle:
             output_data: dict[str, pd.DataFrame] = pickle.load(handle)
 
         logger.info("Reading data from %s", self.pickle_file)
-        self._train(output_data)
+        self._fit(output_data)
 
-    def _train(self, output_data: dict[str, pd.DataFrame]) -> None:
-        """Trains the regressor
+    def _fit(
+        self,
+        output_data: dict[str, pd.DataFrame],
+        start_index: int | None = None,
+        end_index: int | None = None,
+    ) -> None:
+        """Fits the regressor
 
         Args:
             output_data: Output data
+            start_index: Start index for fit. Defaults to None, meaning use all available data.
+            end_index: End index for fit. Defaults to None, meaning use all available data.
         """
-        logger.info("%s: Fit", self.__class__.__name__)
+        logger.info("%s: Fit (%s, %s)", self.__class__.__name__, start_index, end_index)
+
         constraints: pd.DataFrame = output_data["constraints"]
+        if start_index is not None and end_index is not None:
+            constraints = constraints.iloc[start_index:end_index]
         constraints_log10_values: np.ndarray = np.log10(constraints.values)
         self._constraints_scalar = StandardScaler().fit(constraints_log10_values)
         constraints_scaled: np.ndarray | spmatrix = self._constraints_scalar.transform(
@@ -124,6 +138,8 @@ class InitialConditionRegressor(InitialConditionABC):
         )
 
         solution: pd.DataFrame = output_data["solution"]
+        if start_index is not None and end_index is not None:
+            solution = solution.iloc[start_index:end_index]
         solution_log10_values: np.ndarray = np.log10(solution.values)
         self._solution_scalar = StandardScaler().fit(solution_log10_values)
         solution_scaled: np.ndarray | spmatrix = self._solution_scalar.transform(
@@ -140,6 +156,37 @@ class InitialConditionRegressor(InitialConditionABC):
         multi_output_regressor.partial_fit(constraints_scaled, solution_scaled)
 
         self._reg = multi_output_regressor
+
+    def _partial_fit(
+        self,
+        output_data: dict[str, pd.DataFrame],
+        start_index: int,
+        end_index: int,
+    ) -> None:
+        """Partial fits the regressor
+
+        Args:
+            output_data: Output data
+            start_index: Start index for partial fit
+            end_index: End index for partial fit
+        """
+        logger.info("%s: Partial fit (%d, %d)", self.__class__.__name__, start_index, end_index)
+
+        constraints: pd.DataFrame = output_data["constraints"].iloc[start_index:end_index]
+        logger.debug(constraints)
+        constraints_log10_values: np.ndarray = np.log10(constraints.values)
+        constraints_scaled: np.ndarray | spmatrix = self._constraints_scalar.transform(
+            constraints_log10_values
+        )
+
+        solution: pd.DataFrame = output_data["solution"].iloc[start_index:end_index]
+        logger.debug(solution)
+        solution_log10_values: np.ndarray = np.log10(solution.values)
+        solution_scaled: np.ndarray | spmatrix = self._solution_scalar.transform(
+            solution_log10_values
+        )
+
+        self._reg.partial_fit(constraints_scaled, solution_scaled)
 
     def get_value(self, evaluated_log10_constraints: np.ndarray) -> np.ndarray:
         """Computes the value.
@@ -163,32 +210,54 @@ class InitialConditionRegressor(InitialConditionABC):
 
         return value
 
+    def action_fit(self, output: Output) -> tuple[int, int] | None:
+        """Is a fit required.
+
+        Args:
+            output: Output
+
+        Returns:
+            A tuple: (start_index, end_index) or None if nothing to do
+        """
+        trigger_fit: bool = self.fit_batch_size == output.size
+        if self.fit and trigger_fit:
+            return (0, output.size)
+
+    def action_partial_fit(self, output: Output) -> tuple[int, int] | None:
+        """Is a partial fit required.
+
+        Args:
+            output: Output
+
+        Returns:
+            A tuple: (start_index, end_index) or None if nothing to do
+        """
+        trigger_partial_fit: bool = (
+            not (output.size - self.fit_batch_size) % self.partial_fit_batch_size
+            and (output.size - self.fit_batch_size) > 0
+        )
+        if self.partial_fit and trigger_partial_fit:
+            batch_number: int = (output.size - self.fit_batch_size) // self.partial_fit_batch_size
+            start_index: int = (
+                self.fit_batch_size + (batch_number - 1) * self.partial_fit_batch_size
+            )
+            end_index: int = start_index + self.partial_fit_batch_size
+            return (start_index, end_index)
+
     def update(self, output: Output) -> None:
         """See base class."""
-        is_update: bool = not output.size % self.partial_fit_batch_size
+        action_fit: tuple[int, int] | None = self.action_fit(output)
+        action_partial_fit: tuple[int, int] | None = self.action_partial_fit(output)
 
-        if self.partial_fit and is_update:
-            batch_number: int = output.size // self.partial_fit_batch_size
-            if batch_number == 1 and not self.keep_original:
-                output_data: dict[str, pd.DataFrame] = output.get()
-                self._train(output_data)
-            else:
-                logger.info("%s: partial refit (%d)", self.__class__.__name__, batch_number)
-                start_index: int = (batch_number - 1) * self.partial_fit_batch_size
-                end_index: int = start_index + self.partial_fit_batch_size
-                logger.debug(
-                    "start_index (inclusive) = %d, end_index (exclusive) = %d",
-                    start_index,
-                    end_index,
-                )
-                constraints: pd.DataFrame = output.constraints.iloc[start_index:end_index]
-                logger.debug(constraints)
-                constraints_scaled = self._constraints_scalar.transform(
-                    np.log10(constraints.values)
-                )
-                solution: pd.DataFrame = output.solution.iloc[start_index:end_index]
-                solution_scaled = self._solution_scalar.transform(np.log10(solution.values))
-                self._reg.fit(constraints_scaled, solution_scaled)
+        if action_fit is not None:
+            output_data: dict[str, pd.DataFrame] = output.as_dict()
+            self._fit(output_data, start_index=action_fit[0], end_index=action_fit[1])
+
+        if action_partial_fit is not None:
+            output_data: dict[str, pd.DataFrame] = output.as_dict()
+            self._partial_fit(
+                output_data, start_index=action_partial_fit[0], end_index=action_partial_fit[1]
+            )
 
 
 @dataclass

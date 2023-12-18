@@ -9,7 +9,7 @@ import logging
 import pickle
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import pandas as pd
 
@@ -52,7 +52,6 @@ class CondensedSpeciesOutput:
     activity: float
 
 
-# TODO: Subclass UserDict?
 @dataclass
 class Output:
     """Stores inputs and outputs of the models.
@@ -149,7 +148,7 @@ class Output:
         """Adds the solution."""
         self._solution.append(self._interior_atmosphere.solution_dict)
 
-    def get(self) -> dict[str, pd.DataFrame]:
+    def as_dict(self) -> dict[str, pd.DataFrame]:
         """Gets the output dictionary of dataframes.
 
         Returns:
@@ -171,7 +170,7 @@ class Output:
         Args:
             file_prefix: Prefix of the output file. Defaults to atmodeller_out.
         """
-        out: dict[str, pd.DataFrame] = self.get()
+        out: dict[str, pd.DataFrame] = self.as_dict()
         output_file: Path = Path(f"{file_prefix}.pkl")
 
         with open(output_file, "wb") as handle:
@@ -185,7 +184,7 @@ class Output:
         Args:
             file_prefix: Prefix of the output file. Defaults to atmodeller_out.
         """
-        out: dict[str, pd.DataFrame] = self.get()
+        out: dict[str, pd.DataFrame] = self.as_dict()
         output_file: Path = Path(f"{file_prefix}.xlsx")
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
@@ -221,5 +220,5 @@ class Output:
             self.to_excel(file_prefix)
 
         if to_dict:
-            out: dict[str, pd.DataFrame] = self.get()
+            out: dict[str, pd.DataFrame] = self.as_dict()
             return out
