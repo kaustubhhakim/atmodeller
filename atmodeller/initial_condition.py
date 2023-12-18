@@ -9,9 +9,11 @@ import logging
 import pickle
 from dataclasses import KW_ONLY, dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
+from numpy import ndarray
 from scipy.sparse import spmatrix
 from sklearn.linear_model import SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -56,16 +58,13 @@ class InitialConditionABC(GetValueABC):
         """
         return super().get_log10_value(evaluated_log10_constraints, *args, **kwargs)
 
-    def update(self, output: Output, *args, **kwargs) -> InitialConditionABC:
-        """Updates the current initial condition (i.e. self) or returns a new initial condition.
+    def update(self, output: Output, *args, **kwargs) -> None:
+        """Updates the initial condition.
 
         Args;
             output: output
             *args: Arbitrary positional arguments
             **kwargs: Arbitrary keyword arguments
-
-        Returns:
-            An InitialConditionABC (can be self)
         """
         ...
 
@@ -117,7 +116,7 @@ class InitialConditionRegressor(InitialConditionABC):
         with open(self.pickle_file, "rb") as handle:
             output_data: dict[str, pd.DataFrame] = pickle.load(handle)
 
-        logger.info("%a: Reading data from %s", self.__class__.__name__, self.pickle_file)
+        logger.info("%s: Reading data from %s", self.__class__.__name__, self.pickle_file)
         self._fit(output_data)
 
     def _fit(
@@ -251,7 +250,7 @@ class InitialConditionRegressor(InitialConditionABC):
             end_index: int = start_index + self.partial_fit_batch_size
             return (start_index, end_index)
 
-    def update(self, output: Output) -> InitialConditionABC:
+    def update(self, output: Output) -> None:
         """See base class."""
         action_fit: tuple[int, int] | None = self.action_fit(output)
         action_partial_fit: tuple[int, int] | None = self.action_partial_fit(output)
@@ -265,8 +264,6 @@ class InitialConditionRegressor(InitialConditionABC):
             self._partial_fit(
                 output_data, start_index=action_partial_fit[0], end_index=action_partial_fit[1]
             )
-
-        return self
 
 
 @dataclass
@@ -294,15 +291,37 @@ class InitialConditionConstant(InitialConditionABC):
         return self.value
 
 
-# TODO: New class to switch from constant to regressor
+class InitialConditionSwitchRegressor(InitialConditionABC):
+    """An initial condition that is a constant value before switching to a regressor.
 
-# def updates does nothing for a constant value (see base class)
+    Args:
+        value: Value for InitialConditionConstant
+        *args: Arbitrary positional arguments to pass to InitialConditionRegressor constructor
+        **kwargs: Arbitrary keyword arguments to pass to InitialConditionRegressor constructor
+    """
 
-# if output.size == 10:
-#     logger.warning("here")
-#     file_prefix: Path | str = Path("test_restart")
-#     output.to_pickle(file_prefix)
-#     test = InitialConditionRegressor(file_prefix.with_suffix(".pkl"), fit=False)
-#     return test
-# else:
-#     return self
+    def __init__(self, value: float, *args, **kwargs):
+        self._ic_constant: InitialConditionConstant = InitialConditionConstant(value)
+        # Store to instantiate regressor once the switch occurs.
+        self._ic_regressor_args: tuple[Any, ...] = args
+        self._ic_regressor_kwargs: dict[str, Any] = kwargs
+        self._ic_regressor: InitialConditionRegressor  # For typing
+        # fit_batch_size argument of InitialConditionRegressor controls how much data must be
+        # present before switching to the regressor
+        self._switch: int = kwargs["fit_batch_size"]
+        self._ic: InitialConditionABC = self._ic_constant
+
+    def get_value(self, *args, **kwargs) -> ndarray | float:
+        return self._ic.get_value(*args, **kwargs)
+
+    def update(self, output: Output, *args, **kwargs) -> None:
+        if output.size == self._switch:
+            file_prefix: Path | str = Path("test_restart")
+            output.to_pickle(file_prefix)
+            filename = file_prefix.with_suffix(".pkl")
+            self._ic_regressor = InitialConditionRegressor(
+                filename, *self._ic_regressor_args, **self._ic_regressor_kwargs
+            )
+            self._ic = self._ic_regressor
+        else:
+            self._ic.update(output, *args, **kwargs)

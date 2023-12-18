@@ -703,7 +703,7 @@ class InteriorAtmosphereSystem:
 
         self.output.add(constraints)
 
-        self.initial_condition = self.initial_condition.update(self.output)
+        self.initial_condition.update(self.output)
 
         logger.info(pprint.pformat(self.solution_dict))
 
