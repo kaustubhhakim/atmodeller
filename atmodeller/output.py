@@ -9,7 +9,7 @@ import logging
 import pickle
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
 import pandas as pd
 

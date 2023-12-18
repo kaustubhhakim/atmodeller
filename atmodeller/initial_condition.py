@@ -66,7 +66,7 @@ class InitialConditionABC(GetValueABC):
 
 @dataclass
 class InitialConditionRegressor(InitialConditionABC):
-    """Applies a regressor to compute the initial condition.
+    """A regressor to compute the initial condition.
 
     Args:
         pickle_file: Pickle file of the output from a previous (or similar) model run. Importantly,
@@ -110,7 +110,7 @@ class InitialConditionRegressor(InitialConditionABC):
         with open(self.pickle_file, "rb") as handle:
             output_data: dict[str, pd.DataFrame] = pickle.load(handle)
 
-        logger.info("Reading data from %s", self.pickle_file)
+        logger.info("%a: Reading data from %s", self.__class__.__name__, self.pickle_file)
         self._fit(output_data)
 
     def _fit(
@@ -280,7 +280,6 @@ class InitialConditionConstant(InitialConditionABC):
     def get_value(self, *args, **kwargs) -> float:
         del args
         del kwargs
-
         logger.debug("%s: value = %s", self.__class__.__name__, self.value)
 
         return self.value
