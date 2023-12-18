@@ -797,7 +797,9 @@ class InteriorAtmosphereSystem:
         logger.debug("Initial guess solution = %s", initial_guess)
         logger.debug("Actual solution = %s", sol)
         error: np.ndarray = np.sqrt(mean_squared_error(sol, initial_guess))
-        logger.debug("RMSE (actual vs initial) = %s", error)
+        logger.info(
+            "%s: RMSE (actual vs initial) = %s", self.initial_condition.__class__.__name__, error
+        )
 
         return sol
 
