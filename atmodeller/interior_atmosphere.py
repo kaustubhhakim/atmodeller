@@ -405,19 +405,19 @@ class ReactionNetwork:
         if nrows == self.species.number:
             msg: str = "The necessary number of constraints will be applied to "
             msg += "the reaction network to solve the system"
-            logger.info(msg)
+            logger.debug(msg)
         else:
             num: int = self.species.number - nrows
             # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
             msg = "%d additional (mass) constraint(s) are necessary " % num
             msg += "to solve the system"
-            logger.info(msg)
+            logger.debug(msg)
 
         coeff: np.ndarray = np.zeros((nrows, self.species.number))
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
         for index, constraint in enumerate(constraints.reaction_network_constraints):
-            logger.info("Apply %s constraint for %s", constraint.name, constraint.species)
+            logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
             species_index: int = self.species.indices[constraint.species]
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
@@ -551,19 +551,18 @@ class InteriorAtmosphereSystem:
     species: Species
     planet: Planet = field(default_factory=Planet)
     initial_condition: InitialConditionABC = field(default_factory=InitialConditionConstant)
+    output: Output = field(init=False)
     _reaction_network: ReactionNetwork = field(init=False)
-    # Convenient to set and update constraints on this instance.
+    # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
     # The solution is log10 of the partial pressure for gas phases and log10 of the activity for
     # condensed phases. The order aligns with the species.
     _log_solution: np.ndarray = field(init=False)
-    output: Output = field(init=False)
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_planet_composition(self.planet)
         self._reaction_network = ReactionNetwork(species=self.species)
-        # Initialise solution
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
         self.output = Output(self)
 
@@ -704,7 +703,6 @@ class InteriorAtmosphereSystem:
 
         self.output.add(constraints)
 
-        # TODO: Working here to update initial condition
         self.initial_condition.update(self.output)
 
         logger.info(pprint.pformat(self.solution_dict))
@@ -715,12 +713,12 @@ class InteriorAtmosphereSystem:
         Args;
             constraints: Constraints for the system of equations
         """
-        logger.info("Assembling constraints")
+        logger.info("Set constraints")
         self._constraints = constraints
 
         for condensed_species in self.species.condensed_species.values():
             self._constraints.append(condensed_species.activity)
-        logger.info("Constraints: %s", pprint.pformat(self._constraints))
+        logger.debug("Constraints: %s", pprint.pformat(self._constraints))
 
     def _conform_initial_solution_to_constraints(self) -> None:
         """Conforms the initial solution (estimate) to activity, pressure and fugacity constraints.
@@ -763,8 +761,10 @@ class InteriorAtmosphereSystem:
         if initial_solution is not None:
             self._log_solution = np.log10(np.array(initial_solution))
         else:
-            eval_dict: dict[str, float] = self.constraints.evaluate_log10(self)
-            log10_value: float | np.ndarray = self.initial_condition.get_log10_value(eval_dict)
+            constraints_eval: np.ndarray = self.constraints.evaluate_log10_values(self)
+            log10_value: float | np.ndarray = self.initial_condition.get_log10_value(
+                constraints_eval
+            )
             self._log_solution = log10_value * np.ones(self.species.number)
 
         self._conform_initial_solution_to_constraints()
@@ -785,7 +785,8 @@ class InteriorAtmosphereSystem:
             options=options,
         )
 
-        logger.info("sol = %s", sol)
+        logger.info(sol["message"])
+        logger.debug("sol = %s", sol)
 
         # TODO: Raise a more descriptive exception.
         if not sol.success:
@@ -793,10 +794,10 @@ class InteriorAtmosphereSystem:
 
         sol = sol.x
 
-        logger.info("Initial guess solution = %s", initial_guess)
-        logger.info("Actual solution = %s", sol)
+        logger.debug("Initial guess solution = %s", initial_guess)
+        logger.debug("Actual solution = %s", sol)
         error: np.ndarray = np.sqrt(mean_squared_error(sol, initial_guess))
-        logger.warning("RMSE = %s", error)
+        logger.debug("RMSE (actual vs initial) = %s", error)
 
         return sol
 

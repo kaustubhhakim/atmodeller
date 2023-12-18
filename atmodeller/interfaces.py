@@ -300,6 +300,17 @@ class ConstraintABC(GetValueABC):
     name: str
     species: str
 
+    @property
+    def full_name(self) -> str:
+        """Combines the species name and constraint name to give a unique descriptive name."""
+        if self.species:
+            full_name: str = f"{self.species}_"
+        else:
+            full_name = ""
+        full_name += self.name
+
+        return full_name
+
 
 @dataclass(kw_only=True, frozen=True)
 class ConstantConstraint(ConstraintABC):
@@ -795,7 +806,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             Returns:
                 Bulk modulus in bar
             """
-            K = self.data["K"]  # Bulk modulus in bar.
+            K = self.data["K"]  # Bulk modulus in bar
             bulk_modulus_T: float = K * (
                 1 + self.dKdT_factor * (temperature - self.enthalpy_reference_temperature)
             )
