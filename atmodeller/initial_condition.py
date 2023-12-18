@@ -312,16 +312,27 @@ class InitialConditionSwitchRegressor(InitialConditionABC):
         self._ic: InitialConditionABC = self._ic_constant
 
     def get_value(self, *args, **kwargs) -> ndarray | float:
+        """See base class."""
         return self._ic.get_value(*args, **kwargs)
 
     def update(self, output: Output, *args, **kwargs) -> None:
+        """See base class.
+
+        The `fit` keyword argument of InitialConditionRegressor is ignored because the fit is done
+        once when the InitialConditionRegressor is instantiated. Hence `action_fit` is never
+        triggered and so fitting is never done again, regardless of the value of `fit`.
+        """
+        # Determine whether to switch from constant to regressor.
         if output.size == self._switch:
-            file_prefix: Path | str = Path("test_restart")
+            file_prefix: Path | str = Path("atmodeller_switch_regressor_restart")
             output.to_pickle(file_prefix)
             filename = file_prefix.with_suffix(".pkl")
+            # All data is fit when the regressor is instantiated (this is effectively the 'update')
+            # so we do not need to call the update method (hence the if-else block).
             self._ic_regressor = InitialConditionRegressor(
                 filename, *self._ic_regressor_args, **self._ic_regressor_kwargs
             )
+            filename.unlink()
             self._ic = self._ic_regressor
         else:
             self._ic.update(output, *args, **kwargs)
