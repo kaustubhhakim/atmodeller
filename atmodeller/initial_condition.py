@@ -3,6 +3,8 @@
 See the LICENSE file for licensing information.
 """
 
+from __future__ import annotations
+
 import logging
 import pickle
 from dataclasses import KW_ONLY, dataclass, field
@@ -54,14 +56,18 @@ class InitialConditionABC(GetValueABC):
         """
         return super().get_log10_value(evaluated_log10_constraints, *args, **kwargs)
 
-    def update(self, output: Output, *args, **kwargs) -> None:
-        """Updates the initial condition
+    def update(self, output: Output, *args, **kwargs) -> InitialConditionABC:
+        """Updates the current initial condition (i.e. self) or returns a new initial condition.
 
         Args;
             output: output
             *args: Arbitrary positional arguments
             **kwargs: Arbitrary keyword arguments
+
+        Returns:
+            An InitialConditionABC (can be self)
         """
+        ...
 
 
 @dataclass
@@ -73,11 +79,12 @@ class InitialConditionRegressor(InitialConditionABC):
             the reaction network must be the same (same number of species in the same order) and
             the constraints must be the same (also in the same order).
         fit: Fit the regressor during the model run. This will replace the original regressor by a
-            regressor trained only on the data from the current model. Defaults to False.
+            regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit = True.
+            Defaults to 50.
         partial_fit: Partial fit the regressor during the model run. Defaults to True.
         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
-            regressor. Defaults to 10.
+            regressor. Defaults to 50.
 
     Attributes:
         pickle_file: Pickle file
@@ -93,9 +100,9 @@ class InitialConditionRegressor(InitialConditionABC):
     pickle_file: Path | str
     _: KW_ONLY
     fit: bool = True
-    fit_batch_size: int = 20
+    fit_batch_size: int = 50
     partial_fit: bool = True
-    partial_fit_batch_size: int = 10
+    partial_fit_batch_size: int = 50
     constraint_names: list[str] = field(init=False)
     species_names: list[str] = field(init=False)
     _reg: MultiOutputRegressor = field(init=False)
@@ -244,7 +251,7 @@ class InitialConditionRegressor(InitialConditionABC):
             end_index: int = start_index + self.partial_fit_batch_size
             return (start_index, end_index)
 
-    def update(self, output: Output) -> None:
+    def update(self, output: Output) -> InitialConditionABC:
         """See base class."""
         action_fit: tuple[int, int] | None = self.action_fit(output)
         action_partial_fit: tuple[int, int] | None = self.action_partial_fit(output)
@@ -258,6 +265,8 @@ class InitialConditionRegressor(InitialConditionABC):
             self._partial_fit(
                 output_data, start_index=action_partial_fit[0], end_index=action_partial_fit[1]
             )
+
+        return self
 
 
 @dataclass
@@ -284,4 +293,16 @@ class InitialConditionConstant(InitialConditionABC):
 
         return self.value
 
-    # def updates does nothing for a constant value (see base class)
+
+# TODO: New class to switch from constant to regressor
+
+# def updates does nothing for a constant value (see base class)
+
+# if output.size == 10:
+#     logger.warning("here")
+#     file_prefix: Path | str = Path("test_restart")
+#     output.to_pickle(file_prefix)
+#     test = InitialConditionRegressor(file_prefix.with_suffix(".pkl"), fit=False)
+#     return test
+# else:
+#     return self
