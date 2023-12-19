@@ -125,7 +125,7 @@ class InitialConditionRegressor(InitialConditionABC):
         start_index: int | None = None,
         end_index: int | None = None,
     ) -> None:
-        """Fits the regressor
+        """Fits and sets the regressor.
 
         Args:
             output_data: Output data
@@ -159,7 +159,7 @@ class InitialConditionRegressor(InitialConditionABC):
 
         base_regressor: SGDRegressor = SGDRegressor()
         multi_output_regressor: MultiOutputRegressor = MultiOutputRegressor(base_regressor)
-        multi_output_regressor.partial_fit(constraints_scaled, solution_scaled)
+        multi_output_regressor.fit(constraints_scaled, solution_scaled)
 
         self._reg = multi_output_regressor
 
@@ -169,7 +169,7 @@ class InitialConditionRegressor(InitialConditionABC):
         start_index: int,
         end_index: int,
     ) -> None:
-        """Partial fits the regressor
+        """Partial fits the regressor.
 
         Args:
             output_data: Output data
