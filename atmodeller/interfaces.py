@@ -17,7 +17,7 @@ import pandas as pd
 from molmass import Formula
 from thermochem import janaf
 
-from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GAS_CONSTANT_BAR, NOBLE_GASES
 from atmodeller.output import CondensedSpeciesOutput, GasSpeciesOutput
 from atmodeller.utilities import UnitConversion, debug_decorator
 
@@ -561,7 +561,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             return phase_data
 
         if isinstance(species, GasSpecies):
-            if species.is_homonuclear_diatomic:
+            if species.is_homonuclear_diatomic or species.chemical_formula in NOBLE_GASES:
                 # Quoting from the JANAF documentation: In the JANAF tables, we have generally
                 # chosen the ideal diatomic gas for the reference state of permanent gases such as
                 # O2, N2, Cl2 etc.
@@ -570,7 +570,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
                 phase_data = get_phase_data(["g"])
 
         elif isinstance(species, SolidSpecies):
-            phase_data = get_phase_data(["ref"])
+            phase_data = get_phase_data(["cr", "ref"])  # ref included for C (graphite)
 
         elif isinstance(species, LiquidSpecies):
             phase_data = get_phase_data(["l"])
