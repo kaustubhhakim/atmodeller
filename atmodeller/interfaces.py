@@ -467,14 +467,17 @@ class ThermodynamicDataForSpeciesProtocol(Protocol):
 
     Args:
         species: Species
+        data_source: Source of the thermodynamic data
         data: Data used to compute the Gibbs energy of formation
 
     Attributes:
         species: Species
+        data_source: Source of the thermodynamic data
         data: Data used to compute the Gibbs energy of formation
     """
 
     species: ChemicalComponent
+    data_source: str
     data: Any
 
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
@@ -594,16 +597,17 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             )
             logger.debug(msg)
 
-            return self.ThermodynamicDataForSpecies(species, phase_data)
+            return self.ThermodynamicDataForSpecies(species, self.DATA_SOURCE, phase_data)
 
     @dataclass(frozen=True)
     class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesProtocol):
         """JANAF thermodynamic data for a species
 
-        See base class
+        See base class.
         """
 
         species: ChemicalComponent
+        data_source: str
         data: janaf.JanafPhase
 
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
@@ -657,7 +661,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             logger.debug(msg)
 
             return self.ThermodynamicDataForSpecies(
-                species, phase_data, self._ENTHALPY_REFERENCE_TEMPERATURE
+                species, self.DATA_SOURCE, phase_data, self._ENTHALPY_REFERENCE_TEMPERATURE
             )
 
         except KeyError:
@@ -677,11 +681,13 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
         Args:
             species: Species
+            data_source: Source of the thermodynamic data
             data: Data used to compute the Gibbs energy of formation
             enthalpy_reference_temperature: Enthalpy reference temperature
 
         Attributes:
             species: Species
+            data_source: Source of the thermodynamic data
             data: Data used to compute the Gibbs energy of formation
             enthalpy_reference_temperature: Enthalpy reference temperature
             dKdP: Derivative of bulk modulus (K) with respect to pressure. Set to 4.
@@ -689,6 +695,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
         """
 
         species: ChemicalComponent
+        data_source: str
         data: pd.Series
         enthalpy_reference_temperature: float
         dKdP: float = field(init=False, default=4.0)
@@ -934,14 +941,17 @@ class ChemicalComponent(ABC):
     thermodynamic_data: ThermodynamicDataForSpeciesProtocol | None = field(init=False)
 
     def __post_init__(self):
+        self.formula = Formula(self.chemical_formula)
+        self.thermodynamic_data = self.thermodynamic_dataset.get_data(self)
+        # TODO: FIXME: below
+        assert self.thermodynamic_data is not None
         logger.info(
-            "Creating a %s: %s (%s)",
+            "Creating %s: %s (%s) using thermodynamic data in %s",
             self.__class__.__name__,
             self.name_in_thermodynamic_data,
             self.chemical_formula,
+            self.thermodynamic_data.data_source,
         )
-        self.formula = Formula(self.chemical_formula)
-        self.thermodynamic_data = self.thermodynamic_dataset.get_data(self)
 
     @property
     def molar_mass(self) -> float:
@@ -1009,6 +1019,7 @@ class GasSpecies(ChemicalComponent):
         output: Stores calculated values for output
     """
 
+    # TODO: Check consistency
     name_in_thermodynamic_data: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
