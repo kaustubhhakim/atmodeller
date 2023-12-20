@@ -561,10 +561,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             return phase_data
 
         if isinstance(species, GasSpecies):
-            if species.is_homonuclear_diatomic or species.chemical_formula in NOBLE_GASES:
-                # Quoting from the JANAF documentation: In the JANAF tables, we have generally
-                # chosen the ideal diatomic gas for the reference state of permanent gases such as
-                # O2, N2, Cl2 etc.
+            if species.is_homonuclear_diatomic or species.is_noble:
                 phase_data = get_phase_data(["ref", "g"])
             else:
                 phase_data = get_phase_data(["g"])
@@ -956,17 +953,6 @@ class ChemicalComponent(ABC):
         """Hill formula."""
         return self.formula.formula
 
-    @property
-    def is_homonuclear_diatomic(self) -> bool:
-        """True if the species is homonuclear diatomic otherwise False."""
-
-        composition = self.formula.composition()
-
-        if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
-            return True
-        else:
-            return False
-
     @cached_property
     def modified_hill_formula(self) -> str:
         """Modified Hill formula.
@@ -1032,6 +1018,25 @@ class GasSpecies(ChemicalComponent):
     def __post_init__(self):
         self.name_in_thermodynamic_data = self.chemical_formula
         super().__post_init__()
+
+    @property
+    def is_homonuclear_diatomic(self) -> bool:
+        """True if the species is homonuclear diatomic otherwise False."""
+
+        composition = self.formula.composition()
+
+        if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
+            return True
+        else:
+            return False
+
+    @property
+    def is_noble(self) -> bool:
+        """True if the species is a noble gas, otherwise False."""
+        if self.chemical_formula in NOBLE_GASES:
+            return True
+        else:
+            return False
 
     @_mass_decorator
     def mass(
