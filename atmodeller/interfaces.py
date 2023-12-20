@@ -1071,13 +1071,13 @@ class GasSpecies(ChemicalComponent):
         """Calculates the total mass of the species or element.
 
         Args:
-            planet: Planet properties.
-            system: Interior atmosphere system.
+            planet: Planet properties
+            system: Interior atmosphere system
             element: Returns the mass for an element. Defaults to None to return the species mass.
                This argument is used by the @_mass_decorator.
 
         Returns:
-            Total mass of the species (element=None) or element (element=element).
+            Total mass of the species (element=None) or element (element=element)
         """
 
         del element
@@ -1142,7 +1142,7 @@ class CondensedSpecies(ChemicalComponent):
         formula: Chemical formula
         thermodynamic_dataset: The thermodynamic dataset
         name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
-        activity: Activity, which is always ideal.
+        activity: Activity, which is always ideal
     """
 
     activity: ConstraintABC = field(init=False)

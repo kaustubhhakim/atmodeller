@@ -548,7 +548,7 @@ class InteriorAtmosphereSystem:
     species: Species
     planet: Planet = field(default_factory=Planet)
     initial_condition: InitialConditionABC = field(default_factory=InitialConditionConstant)
-    output: Output = field(init=False)
+    output: Output = field(init=False, default_factory=Output)
     _reaction_network: ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
@@ -561,7 +561,6 @@ class InteriorAtmosphereSystem:
         self.species.conform_solubilities_to_planet_composition(self.planet)
         self._reaction_network = ReactionNetwork(species=self.species)
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
-        self.output = Output(self)
 
     @property
     def constraints(self) -> SystemConstraints:
@@ -700,7 +699,7 @@ class InteriorAtmosphereSystem:
                 )
             )
 
-        self.output.add(constraints, extra_output)
+        self.output.add(self, extra_output)
 
         self.initial_condition.update(self.output)
 
@@ -712,7 +711,7 @@ class InteriorAtmosphereSystem:
         Args;
             constraints: Constraints for the system of equations
         """
-        logger.info("Set constraints")
+        logger.debug("Set constraints")
         self._constraints = constraints
 
         for condensed_species in self.species.condensed_species.values():
