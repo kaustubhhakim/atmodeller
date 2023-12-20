@@ -361,10 +361,10 @@ class ReactionNetwork:
         """
         gibbs_energy: float = 0
         for species_index, species in enumerate(self.species.data):
-            assert species.thermodynamic_data is not None
+            assert species._thermodynamic_data is not None
             gibbs_energy += self.reaction_matrix[
                 reaction_index, species_index
-            ] * species.thermodynamic_data.get_formation_gibbs(
+            ] * species._thermodynamic_data.get_formation_gibbs(
                 temperature=temperature, pressure=pressure
             )
         return gibbs_energy
@@ -662,6 +662,7 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
+        extra_output: dict[str, float] | None = None,
         initial_solution: list[float] | np.ndarray | None = None,
         method: str = "hybr",
         tol: float | None = None,
@@ -671,6 +672,7 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations
+            extra_ouput: Extra data to write to the output
             initial_solution: Initial guess for the solution. Defaults to None.
             method: Type of solver. Defaults to 'hybr'.
             tol: Tolerance for termination. Defaults to None.
@@ -698,7 +700,7 @@ class InteriorAtmosphereSystem:
                 )
             )
 
-        self.output.add(constraints)
+        self.output.add(constraints, extra_output)
 
         self.initial_condition.update(self.output)
 

@@ -984,14 +984,14 @@ class ChemicalComponent(ABC):
         if not self.name_in_dataset:  # Empty string
             self.name_in_dataset = self.formula
         self._formula = Formula(self.formula)
-        self.thermodynamic_data = self.thermodynamic_dataset.get_data(self)
-        assert self.thermodynamic_data is not None
+        self._thermodynamic_data = self.thermodynamic_dataset.get_data(self)
+        assert self._thermodynamic_data is not None
         logger.info(
             "Creating %s %s using thermodynamic data in %s (%s name = %s)",
             self.__class__.__name__,
             self.formula,
-            self.thermodynamic_data.data_source,
-            self.thermodynamic_data.data_source,
+            self._thermodynamic_data.data_source,
+            self._thermodynamic_data.data_source,
             self.name_in_dataset,
         )
 

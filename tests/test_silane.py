@@ -27,7 +27,7 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)
 
 
 def test_version():

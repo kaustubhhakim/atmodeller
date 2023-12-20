@@ -66,6 +66,7 @@ class Output:
     _constraints: list[dict[str, float]] = field(init=False, default_factory=list)
     _planet_properties: list[dict[str, float]] = field(init=False, default_factory=list)
     _solution: list[dict[str, float]] = field(init=False, default_factory=list)
+    _extra: list[dict[str, float]] = field(init=False, default_factory=list)
 
     def __post_init__(self):
         # Initialises the dictionary to store the detailed gas species outputs.
@@ -81,6 +82,11 @@ class Output:
     def constraints(self) -> pd.DataFrame:
         """Constraints data"""
         return pd.DataFrame(self._constraints)
+
+    @property
+    def extra(self) -> pd.DataFrame:
+        """Extra data"""
+        return pd.DataFrame(self._extra)
 
     @property
     def gas_species(self) -> dict[str, pd.DataFrame]:
@@ -105,17 +111,20 @@ class Output:
         """Number of rows"""
         return len(self._solution)
 
-    def add(self, constraints: SystemConstraints) -> None:
+    def add(self, constraints: SystemConstraints, extra_output: dict[str, float] | None) -> None:
         """Adds all outputs.
 
         Args:
             constraints: Constraints
+            extra_output: Extra data to write to the output
         """
         self._add_atmosphere()
         self._add_constraints(constraints)
         self._add_planet()
         self._add_gas_species()
         self._add_solution()
+        if extra_output is not None:
+            self._extra.append(extra_output)
 
     def _add_atmosphere(self) -> None:
         """Adds atmosphere."""
@@ -159,6 +168,7 @@ class Output:
         out["atmosphere"] = self.atmosphere
         out["constraints"] = self.constraints
         out["planet"] = self.planet
+        out["extra"] = self.extra
         for gas_species, data in self.gas_species.items():
             out[gas_species] = data
 
