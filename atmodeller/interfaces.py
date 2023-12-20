@@ -8,13 +8,13 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property, wraps
+from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
 
 import numpy as np
 import pandas as pd
-from molmass import Formula
+from molmass import Composition, Formula
 from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GAS_CONSTANT_BAR, NOBLE_GASES
@@ -395,9 +395,9 @@ class Solubility(GetValueABC):
         """Computes solubility from a power law.
 
         Args:
-            fugacity: Fugacity of the species in bar.
-            constant: Constant for the power law.
-            exponent: Exponent for the power law.
+            fugacity: Fugacity of the species in bar
+            constant: Constant for the power law
+            exponent: Exponent for the power law
 
         Returns:
             Dissolved volatile concentration in the melt in ppmw.
@@ -536,10 +536,50 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
     _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
+    @staticmethod
+    def get_modified_hill_formula(species: ChemicalComponent) -> str:
+        """Gets the modified Hill formula.
+
+        JANAF uses the modified Hill formula to index its data tables. In short, H, if present,
+        should appear after C (if C is present), otherwise it must be the first element.
+
+        Args:
+            species: Species
+
+        Returns:
+            The species represented in the JANAF format
+        """
+        elements: dict[str, int] = {
+            element: properties.count for element, properties in species.composition().items()
+        }
+
+        if "C" in elements:
+            ordered_elements: list[str] = ["C"]
+        else:
+            ordered_elements = []
+
+        if "H" in elements:
+            ordered_elements.append("H")
+
+        ordered_elements.extend(sorted(elements.keys() - {"C", "H"}))
+
+        formula_string: str = "".join(
+            [
+                element + (str(elements[element]) if elements[element] > 1 else "")
+                for element in ordered_elements
+            ]
+        )
+        logger.debug("Modified Hill formula = %s", formula_string)
+
+        return formula_string
+
     def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
         """See base class"""
 
         db: janaf.Janafdb = janaf.Janafdb()
+
+        # Regardless of the user input for name_in_dataset, this is defined by JANAF convention.
+        species.name_in_dataset = self.get_modified_hill_formula(species)
 
         def get_phase_data(phases: list[str]) -> janaf.JanafPhase | None:
             """Gets the phase data for a list of phases in order of priority.
@@ -552,7 +592,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             """
             try:
                 phase_data: janaf.JanafPhase | None = db.getphasedata(
-                    formula=species.modified_hill_formula, phase=phases[0]
+                    formula=species.name_in_dataset, phase=phases[0]
                 )
             except ValueError:
                 # Cannot find the phase, so keep iterating through the list of options
@@ -581,19 +621,21 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             raise ValueError(msg)
 
         if phase_data is None:
-            msg = "Thermodynamic data for %s (%s) is not available in %s" % (
-                species.name_in_thermodynamic_data,
-                species.modified_hill_formula,
+            msg = "Thermodynamic data for %s is not available in %s (%s name = %s)" % (
+                species.formula,
                 self.DATA_SOURCE,
+                self.DATA_SOURCE,
+                species.name_in_dataset,
             )
             logger.warning(msg)
 
             return None
         else:
-            msg = "Thermodynamic data for %s (%s) = %s" % (
-                species.name_in_thermodynamic_data,
-                species.modified_hill_formula,
-                phase_data,
+            msg = "Thermodynamic data for %s found in %s (%s name = %s)" % (
+                species.formula,
+                self.DATA_SOURCE,
+                self.DATA_SOURCE,
+                species.name_in_dataset,
             )
             logger.debug(msg)
 
@@ -620,7 +662,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
 
             logger.debug(
                 "Species = %s, standard Gibbs energy of formation = %f",
-                self.species.name_in_thermodynamic_data,
+                self.species.name_in_dataset,
                 gibbs,
             )
 
@@ -652,11 +694,12 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
     def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
         try:
-            phase_data: pd.Series | None = self.data.loc[species.name_in_thermodynamic_data]
-            msg = "Thermodynamic data for %s (%s) = %s" % (
-                species.name_in_thermodynamic_data,
-                species.modified_hill_formula,
-                phase_data,
+            phase_data: pd.Series | None = self.data.loc[species.name_in_dataset]
+            msg = "Thermodynamic data for %s found in %s (%s name = %s)" % (
+                species.formula,
+                self.DATA_SOURCE,
+                self.DATA_SOURCE,
+                species.name_in_dataset,
             )
             logger.debug(msg)
 
@@ -666,10 +709,11 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
         except KeyError:
             phase_data = None
-            msg: str = "Thermodynamic data for %s (%s) is not available in %s" % (
-                species.name_in_thermodynamic_data,
-                species.hill_formula,
+            msg = "Thermodynamic data for %s is not available in %s (%s name = %s)" % (
+                species.formula,
                 self.DATA_SOURCE,
+                self.DATA_SOURCE,
+                species.name_in_dataset,
             )
             logger.warning(msg)
 
@@ -720,7 +764,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
             logger.debug(
                 "Species = %s, standard Gibbs energy of formation = %f",
-                self.species.name_in_thermodynamic_data,
+                self.species.name_in_dataset,
                 gibbs,
             )
 
@@ -856,10 +900,7 @@ def _mass_decorator(func) -> Callable:
         mass: float = func(self, **kwargs)
         if element is not None:
             try:
-                mass *= (
-                    UnitConversion.g_to_kg(self.formula.composition()[element].mass)
-                    / self.molar_mass
-                )
+                mass *= UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
             except KeyError:  # Element not in formula so mass is zero.
                 mass = 0
 
@@ -905,10 +946,7 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
             if dataset is not None:
                 return dataset.get_data(species)
 
-        msg: str = "Thermodynamic data for %s (%s) is not available in any dataset" % (
-            species.name_in_thermodynamic_data,
-            species.hill_formula,
-        )
+        msg: str = "Thermodynamic data for %s is not available in any dataset" % (species.formula)
         logger.error(msg)
         raise KeyError(msg)
 
@@ -918,81 +956,63 @@ class ChemicalComponent(ABC):
     """A chemical component and its properties
 
     Args:
-        chemical_formula: Chemical formula (e.g., CO2, C, CH4, etc.)
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
+        formula: Chemical formula (e.g., CO2, C, CH4, etc.)
         thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
+        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset. Defaults to an
+            empty string which means the `formula` should be used.
 
     Attributes:
-        chemical_formula: Chemical formula
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
-        formula: Formula object derived from the chemical formula
+        formula: Chemical formula
         thermodynamic_dataset: The thermodynamic dataset
-        thermodynamic_data: Thermodynamic data for this chemical component
-        output: Stores calculated values for output
+        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        atoms: Number of atoms
+        composition: Composition
+        hill_formula: Hill formula
+        molar_mass: Molar mass
     """
 
-    chemical_formula: str
-    name_in_thermodynamic_data: str
+    formula: str
     thermodynamic_dataset: ThermodynamicDatasetABC = field(
         default_factory=ThermodynamicDatasetJANAF
     )
-    formula: Formula = field(init=False)
-    output: Any = field(init=False, default=None)
-    thermodynamic_data: ThermodynamicDataForSpeciesProtocol | None = field(init=False)
+    name_in_dataset: str = ""  # Empty string to maintain type for type checking
+    _formula: Formula = field(init=False)
+    _thermodynamic_data: ThermodynamicDataForSpeciesProtocol | None = field(init=False)
+    _output: Any = field(init=False, default=None)
 
     def __post_init__(self):
-        self.formula = Formula(self.chemical_formula)
+        if not self.name_in_dataset:  # Empty string
+            self.name_in_dataset = self.formula
+        self._formula = Formula(self.formula)
         self.thermodynamic_data = self.thermodynamic_dataset.get_data(self)
-        # TODO: FIXME: below
         assert self.thermodynamic_data is not None
         logger.info(
-            "Creating %s: %s (%s) using thermodynamic data in %s",
+            "Creating %s %s using thermodynamic data in %s (%s name = %s)",
             self.__class__.__name__,
-            self.name_in_thermodynamic_data,
-            self.chemical_formula,
+            self.formula,
             self.thermodynamic_data.data_source,
+            self.thermodynamic_data.data_source,
+            self.name_in_dataset,
         )
 
     @property
-    def molar_mass(self) -> float:
-        """Molar mass in kg/mol."""
-        return UnitConversion.g_to_kg(self.formula.mass)
+    def atoms(self) -> int:
+        """Number of atoms"""
+        return self._formula.atoms
+
+    def composition(self) -> Composition:
+        """Composition"""
+        return self._formula.composition()
 
     @property
     def hill_formula(self) -> str:
-        """Hill formula."""
-        return self.formula.formula
+        """Hill formula"""
+        return self._formula.formula
 
-    @cached_property
-    def modified_hill_formula(self) -> str:
-        """Modified Hill formula.
-
-        JANAF uses the modified Hill formula to index its data tables. In short, H, if present,
-        should appear after C (if C is present), otherwise it must be the first element.
-        """
-        elements: dict[str, int] = {
-            element: properties.count for element, properties in self.formula.composition().items()
-        }
-
-        if "C" in elements:
-            ordered_elements: list[str] = ["C"]
-        else:
-            ordered_elements = []
-
-        if "H" in elements:
-            ordered_elements.append("H")
-
-        ordered_elements.extend(sorted(elements.keys() - {"C", "H"}))
-
-        formula_string: str = "".join(
-            [
-                element + (str(elements[element]) if elements[element] > 1 else "")
-                for element in ordered_elements
-            ]
-        )
-        logger.debug("Modified Hill formula = %s", formula_string)
-
-        return formula_string
+    @property
+    def molar_mass(self) -> float:
+        """Molar mass in kg/mol"""
+        return UnitConversion.g_to_kg(self._formula.mass)
 
 
 @dataclass(kw_only=True)
@@ -1000,42 +1020,33 @@ class GasSpecies(ChemicalComponent):
     """A gas species
 
     Args:
-        chemical_formula: Chemical formula (e.g. CO2, C, CH4, etc.)
-        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF.
+        formula: Chemical formula (e.g. CO2, C, CH4, etc.)
+        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
+        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset. Defaults to an
+            empty string which means the `formula` should be used.
         solubility: Solubility model. Defaults to no solubility
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
             Defaults to 0
         eos: A gas equation of state. Defaults to an ideal gas.
 
     Attributes:
-        chemical_formula: Chemical formula
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
-        formula: Formula object derived from the chemical formula
+        formula: Chemical formula
         thermodynamic_dataset: The thermodynamic dataset
-        thermodynamic_data: Thermodynamic data for this chemical component
+        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
         solubility: Solubility model
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt
         eos: A gas equation of state
-        output: Stores calculated values for output
     """
 
-    # TODO: Check consistency
-    name_in_thermodynamic_data: str = field(init=False)
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
-    output: GasSpeciesOutput | None = field(init=False, default=None)
     eos: RealGasABC = field(default_factory=IdealGas)
-
-    def __post_init__(self):
-        self.name_in_thermodynamic_data = self.chemical_formula
-        super().__post_init__()
+    _output: GasSpeciesOutput | None = field(init=False, default=None)
 
     @property
     def is_homonuclear_diatomic(self) -> bool:
         """True if the species is homonuclear diatomic otherwise False."""
-
-        composition = self.formula.composition()
-
+        composition = self.composition()
         if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
             return True
         else:
@@ -1044,7 +1055,7 @@ class GasSpecies(ChemicalComponent):
     @property
     def is_noble(self) -> bool:
         """True if the species is a noble gas, otherwise False."""
-        if self.chemical_formula in NOBLE_GASES:
+        if self.formula in NOBLE_GASES:
             return True
         else:
             return False
@@ -1071,11 +1082,9 @@ class GasSpecies(ChemicalComponent):
 
         del element
 
-        pressure: float = system.solution_dict[self.chemical_formula]
-        fugacity: float = system.fugacities_dict[self.chemical_formula]
-        fugacity_coefficient: float = (
-            10 ** system.log10_fugacity_coefficients_dict[self.chemical_formula]
-        )
+        pressure: float = system.solution_dict[self.formula]
+        fugacity: float = system.fugacities_dict[self.formula]
+        fugacity_coefficient: float = 10 ** system.log10_fugacity_coefficients_dict[self.formula]
 
         # Atmosphere.
         mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
@@ -1125,26 +1134,23 @@ class CondensedSpecies(ChemicalComponent):
     """A condensed species
 
     Args:
-        chemical_formula: Chemical formula (e.g., C, SiO2, etc.)
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
+        formula: Chemical formula (e.g., C, SiO2, etc.)
         thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
+        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
 
     Attributes:
-        chemical_formula: Chemical formula
-        name_in_thermodynamic_data: Name for locating Gibbs data in the thermodynamic data
-        formula: Formula object derived from the chemical formula
+        formula: Chemical formula
         thermodynamic_dataset: The thermodynamic dataset
-        thermodynamic_data: Thermodynamic data for this chemical component
-        activity: Activity, which is ideal.
-        output: Stores calculated values for output
+        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        activity: Activity, which is always ideal.
     """
 
-    output: CondensedSpeciesOutput | None = field(init=False, default=None)
     activity: ConstraintABC = field(init=False)
+    _output: CondensedSpeciesOutput | None = field(init=False, default=None)
 
     def __post_init__(self):
         super().__post_init__()
-        self.activity = ActivityConstant(species=self.chemical_formula)
+        self.activity = ActivityConstant(species=self.formula)
 
 
 @dataclass(kw_only=True)

@@ -70,7 +70,7 @@ class Output:
     def __post_init__(self):
         # Initialises the dictionary to store the detailed gas species outputs.
         for species in self._interior_atmosphere.species.gas_species.values():
-            self._gas_species[species.chemical_formula] = []
+            self._gas_species[species.formula] = []
 
     @property
     def atmosphere(self) -> pd.DataFrame:
@@ -142,7 +142,7 @@ class Output:
         """Adds gas species."""
         for species in self._interior_atmosphere.species.gas_species.values():
             assert species.output is not None
-            self._gas_species[species.chemical_formula].append(asdict(species.output))
+            self._gas_species[species.formula].append(asdict(species.output))
 
     def _add_solution(self):
         """Adds the solution."""
