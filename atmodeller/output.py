@@ -68,7 +68,10 @@ class Output(UserDict):
     @property
     def size(self) -> int:
         """Number of rows"""
-        return len(self.data["solution"])
+        try:
+            return len(self.data["solution"])
+        except KeyError:
+            return 0
 
     @classmethod
     def read_pickle(cls, pickle_file: Path | str) -> Self:

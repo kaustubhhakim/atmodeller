@@ -542,6 +542,7 @@ class InteriorAtmosphereSystem:
     Attributes:
         species: A list of species
         planet: A planet
+        initial_condition: Initial condition. Defaults to a constant for all species.
         output: All output data for this system. Access the dictionary by (calling) output().
     """
 
@@ -561,6 +562,11 @@ class InteriorAtmosphereSystem:
         self.species.conform_solubilities_to_planet_composition(self.planet)
         self._reaction_network = ReactionNetwork(species=self.species)
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
+
+    @property
+    def number_of_solves(self) -> int:
+        """The total number of systems solved"""
+        return self.output.size
 
     @property
     def constraints(self) -> SystemConstraints:
@@ -677,6 +683,7 @@ class InteriorAtmosphereSystem:
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
         """
+        logger.info("Solving system number %d", self.number_of_solves)
         self.set_constraints(constraints)
         self._log_solution = self._solve(
             initial_solution=initial_solution,
