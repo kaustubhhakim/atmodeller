@@ -1,43 +1,15 @@
 # atmodeller
 A Python package for computing the partitioning of volatiles between a planetary atmosphere and its interior.
 
+See [this setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3) for setting up your system to develop *pySPIDER*. If you are a Windows or Linux user (or use a different IDE such as Spyder), please send me your installation instructions so I can update this README. Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *atmodeller* as a community.
+
 See the Jupyter notebook tutorials in the package directory `docs/`.
-
-You are encouraged to fork this repository or create your own branch to add new features. You will need to issue a pull request to be able to merge your code into the main branch. Follow the [Google Python style guide](https://google.github.io/styleguide/pyguide.html) and familiarise yourself with [SOLID principles](https://realpython.com/solid-principles-python/).
-
-If you are a Windows or Linux user (or use a different IDE such as Spyder), please send me your installation instructions so I can update this README. Formally you don't have to use VSCode or Poetry, but using them makes it easier to develop *atmodeller* as a community.
 
 ## Installation
 
 ### General / MacOS (VSCode)
 
-1. Install [VSCode](https://code.visualstudio.com) if you don't already have it.
-1. In VSCode you are recommended to install the following extensions:
-	- Black Formatter
-	- Code Spell Checker
- 	- IntelliCode
-	- isort
-	- Jupyter
-	- Pylance
-	- Pylint
-	- Region Viewer
-	- Todo Tree
-1. Install [Poetry](https://python-poetry.org) if you don't already have it.
-1. Clone this repository (*atmodeller*) to a local directory
-1. In VSCode, go to *File* and *Open Folder...* and select the *atmodeller* directory
-1. We want to set up a virtual Python environment in the root directory of *atmodeller*. An advantage of using a virtual environment is that it remains completely isolated from any other Python environments on your system (e.g. Conda or otherwise). You must have a Python interpreter available to build the virtual environment according to the dependency in `pyproject.toml`, which could be a native version on your machine or a version from a Conda environment that is currently active. You only need a Python binary so it is not required to install any packages. You can create a virtual environment by using the terminal in VSCode, where you may need to update `python` to reflect the location of the Python binary file. This will create a local Python environment in the `.venv` directory:
-	
-    ```
-    python -m venv .venv
-    ```
-1. Open a new terminal window in VSCode and VSCode should recognise that you have a virtual environment in .venv, and load this environment automatically. You should see `(.venv)` as the prefix in the terminal prompt.
-1. Install the project using poetry to install all the required Python package dependencies:
-
-    ```
-    poetry install
-    ```
-
-To ensure that all developers are using the same settings for linting and formatting (e.g., using pylint, black, isort, as installed as extensions in step 2) there is a `settings.json` file in the `.vscode` directory. These settings will take precedence over your user settings for this project only.
+See [this setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3) for setting up your system to develop *pySPIDER*.
 
 ### Windows PowerShell installation (VSCode or PyCharm)
 
