@@ -1,6 +1,8 @@
 # atmodeller
 A Python package for computing the partitioning of volatiles between a planetary atmosphere and its interior.
 
+Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2024), Unravelling the atmospheres of rocky planets with solubility and real gas equations of state, Astrophysical Journal, submitted.
+
 See the Jupyter notebook tutorials in the package directory `notebooks/`.
 
 ## Installation
@@ -85,3 +87,5 @@ The following provides some guidance if you are facing challenges with obtaining
 1. Simplify your system by systematically removing species and/or removing non-linear dependences. For example, oxygen fugacity buffers, real gas equations of state, and solubility relations can depend on the total pressure, which adds an additional pressure coupling between the system of equations compared to simpler ideal-gas only systems. Swapping mass constraints for pressure constraints can also help, as long as the pressure constraints are compatible with a solution (see point 1 above). In short, starting with a simple ideal-gas only reaction network and adding incremental complexity is a good approach narrow down reasons why a solution cannot be found.
 
 1. Choose an appropriate initial guess. Providing an initial guess closer to the true solution will improve the chances that the solver can locate and converge to the correct (global) minimum. You can specify the initial guess using the `initial_solution` argument of `solve()` on an instance of `InteriorAtmosphereSystem`. If you are systematically iterating over a set of parameters, you can often use the previous solution to the system as the initial guess for the next system with perturbed parameters.
+
+1. The notebook `notebooks/3_monte_carlo.ipynb` shows several examples of training a regressor to improve the initial solution guess and therefore improve the performance of the solver.
