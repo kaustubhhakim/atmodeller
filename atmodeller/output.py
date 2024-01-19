@@ -10,7 +10,7 @@ import pickle
 from collections import UserDict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -74,7 +74,7 @@ class Output(UserDict):
             return 0
 
     @classmethod
-    def read_pickle(cls, pickle_file: Path | str) -> Self:
+    def read_pickle(cls, pickle_file: Path | str) -> Output:
         """Reads output data from a pickle file and creates an Output instance.
 
         Args:
@@ -225,7 +225,7 @@ class Output(UserDict):
         Args:
             file_prefix: Prefix of the output file if writing to a pickle or Excel. Defaults to
                 'atmodeller_out'
-            to_dict: Returns the output data in a dictionary. Defaults to False.
+            to_dict: Returns the output data in a dictionary. Defaults to True.
             to_dataframes: Returns the output data in a dictionary of dataframes. Defaults to
                 False.
             to_pickle: Writes a pickle file. Defaults to False.

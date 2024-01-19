@@ -868,12 +868,6 @@ class InteriorAtmosphereSystem:
                     system=self,
                     element=constraint.species,
                 )
-            # Below was previously used to compute the mass residual.
-            # Mass values are constant so no need to pass any arguments to get_value().
-            # residual_mass[constraint_index] -= constraint.get_value()
-            # Normalise by target mass to compute a relative residual.
-            # residual_mass[constraint_index] /= constraint.get_value()
-            # Instead, now we use log mass
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_log10_value()

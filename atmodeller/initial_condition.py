@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from dataclasses import KW_ONLY, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -150,7 +150,7 @@ class InitialConditionRegressor(InitialConditionABC):
         self._fit(self.output)
 
     @classmethod
-    def from_pickle(cls, pickle_file: Path | str, *args, **kwargs) -> Self:
+    def from_pickle(cls, pickle_file: Path | str, *args, **kwargs) -> InitialConditionRegressor:
         """Creates a regressor from output read from a pickle file.
 
         Args:
