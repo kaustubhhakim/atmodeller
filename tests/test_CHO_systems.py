@@ -1,20 +1,22 @@
-"""Tests for simple CHO interior-atmosphere systems
+"""Tests for simple C-H-O interior-atmosphere systems
 
 See the LICENSE file for licensing information.
 
-Tests using the JANAF data for simple CHO interior-atmosphere systems.
+Tests using the JANAF data for simple C-H-O interior-atmosphere systems.
 """
 
 import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    IronWustiteBufferConstraintBallhaus,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraints,
+    FugacityConstraint,
     TotalPressureConstraint,
 )
-from atmodeller.interfaces import GasSpecies, NoSolubility
+from atmodeller.interfaces import GasSpecies, NoSolubility, SolidSpecies, ThermodynamicDatasetABC, ThermodynamicDatasetJANAF
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
@@ -314,4 +316,50 @@ def test_H_and_C_total_pressure() -> None:
     }
 
     system.solve(constraints, factor=1)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+
+def test_graphite() -> None:
+    """Tests including graphite."""
+
+    thermodynamic_data: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF()
+
+    species: Species = Species(
+        [
+            GasSpecies(formula="H2", thermodynamic_dataset=thermodynamic_data),
+            GasSpecies(formula="H2O", thermodynamic_dataset=thermodynamic_data),
+            GasSpecies(formula="CO", thermodynamic_dataset=thermodynamic_data),
+            GasSpecies(formula="CO2", thermodynamic_dataset=thermodynamic_data),
+            GasSpecies(formula="CH4", thermodynamic_dataset=thermodynamic_data),
+            GasSpecies(formula="O2", thermodynamic_dataset=thermodynamic_data),
+            SolidSpecies(
+                formula="C",
+                thermodynamic_dataset=thermodynamic_data,
+                name_in_dataset="graphite",
+            ),
+        ]
+    )
+
+    planet: Planet = Planet()
+    planet.surface_temperature = 600 + 273  # K
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            IronWustiteBufferConstraintBallhaus(),
+            FugacityConstraint(species="H2", value=44.49334998176607),
+        ]
+    )
+
+    target_pressures: dict[str, float] = {
+        "C": 1.0,
+        "CH4": 900.3912797397132,
+        "CO": 0.07741709702165529,
+        "CO2": 0.0685518295157825,
+        "H2": 44.493349981766045,
+        "H2O": 14.708340036418534,
+        "O2": 1.4458158511932372e-25,
+    }
+
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)

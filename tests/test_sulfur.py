@@ -29,8 +29,8 @@ from atmodeller.solubilities import (
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.INFO)
 
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
+RTOL: float = 1.0e-8
+ATOL: float = 1.0e-8
 
 
 def test_version():
@@ -67,7 +67,7 @@ def test_S2_SO_Sulfide_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_Sulfide_IW() -> None:
@@ -102,7 +102,7 @@ def test_AllS_Sulfide_IW() -> None:
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_Sulfate_IW() -> None:
@@ -137,7 +137,7 @@ def test_AllS_Sulfate_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IW() -> None:
@@ -172,7 +172,7 @@ def test_AllS_TotalSolubility_IW() -> None:
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IWp3() -> None:
@@ -207,7 +207,7 @@ def test_AllS_TotalSolubility_IWp3() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IWm3() -> None:
@@ -242,7 +242,7 @@ def test_AllS_TotalSolubility_IWm3() -> None:
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_HOS_Species_IW() -> None:
@@ -284,7 +284,7 @@ def test_HOS_Species_IW() -> None:
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_CHONS_Species_IW_MixConstraints() -> None:
@@ -336,7 +336,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_COS_Species_IW() -> None:
@@ -376,9 +376,8 @@ def test_COS_Species_IW() -> None:
         "CO2": 47.437207165120746,
     }
 
-    # initial_solution: np.ndarray = np.array([0.003, 0.003, 1e-6, 0.005, 230, 47])
-    system.solve(constraints, factor=1)  # , initial_solution=initial_solution)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    system.solve(constraints, factor=1)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_CHOS_Species_IW() -> None:
@@ -425,6 +424,5 @@ def test_CHOS_Species_IW() -> None:
         "CO2": 47.22814633265304,
     }
 
-    # initial_solution: np.ndarray = np.array([1, 1, 1e-3, 1e-3, 1e-6, 1e-3, 1e2, 1])
-    system.solve(constraints, factor=1)  # , initial_solution=initial_solution)
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    system.solve(constraints, factor=1)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)

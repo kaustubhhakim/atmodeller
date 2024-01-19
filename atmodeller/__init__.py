@@ -4,6 +4,7 @@ See the LICENSE file for licensing information.
 """
 
 from __future__ import annotations
+from importlib.abc import Traversable
 
 __version__: str = "0.1.0"
 
@@ -23,7 +24,7 @@ NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
 
 OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
 
-DATA_ROOT_PATH = importlib.resources.files("%s.data" % __package__)
+DATA_ROOT_PATH: Traversable = importlib.resources.files("%s.data" % __package__)
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config
@@ -36,6 +37,7 @@ def complex_formatter() -> logging.Formatter:
     fmt: str = "[%(asctime)s - %(name)-30s - %(lineno)03d - %(levelname)-9s - %(funcName)s()] - %(message)s"
     datefmt: str = "%Y-%m-%d %H:%M:%S"
     formatter: logging.Formatter = logging.Formatter(fmt, datefmt=datefmt)
+
     return formatter
 
 
@@ -44,6 +46,7 @@ def simple_formatter() -> logging.Formatter:
     fmt: str = "[%(asctime)s - %(name)-30s - %(levelname)-9s] - %(message)s"
     datefmt: str = "%H:%M:%S"
     formatter: logging.Formatter = logging.Formatter(fmt, datefmt=datefmt)
+    
     return formatter
 
 
