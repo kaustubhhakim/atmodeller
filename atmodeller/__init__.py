@@ -17,12 +17,12 @@ see <https://www.gnu.org/licenses/>.
 """
 
 from __future__ import annotations
-from importlib.abc import Traversable
 
 __version__: str = "0.1.0"
 
 import importlib.resources
 import logging
+from importlib.abc import Traversable
 
 from scipy import constants
 
