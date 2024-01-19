@@ -823,6 +823,7 @@ class InteriorAtmosphereSystem:
 
         # TODO: Raise a more descriptive exception.
         if not sol.success:
+            logger.error("constraints = %s", self.constraints)
             raise SystemExit()
 
         logger.debug("Initial guess solution = %s", initial_guess)
@@ -874,6 +875,7 @@ class InteriorAtmosphereSystem:
             # residual_mass[constraint_index] /= constraint.get_value()
             # Instead, now we use log mass
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
+            # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_log10_value()
         logger.debug("Residual_mass = %s", residual_mass)
 
