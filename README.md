@@ -1,72 +1,62 @@
-# atmodeller
-A Python package for computing the partitioning of volatiles between a planetary atmosphere and its interior.
+# About
+Atmodeller is a Python package that computes the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under The GNU General Public License v3.0 or later.
 
-Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2024), Unravelling the atmospheres of rocky planets with solubility and real gas equations of state, Astrophysical Journal, submitted.
+Authors:
 
-See the Jupyter notebook tutorials in the package directory `notebooks/`.
+- Dan J. Bower (main developer)
+- Maggie A. Thompson
+- Meng Tian
+- Paolo Sossi
+
+# Citation
+
+If you use Atmodeller please cite:
+
+- Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2024), Unravelling the atmospheres of rocky planets with solubility and real gas equations of state, Astrophysical Journal, submitted.
 
 ## Installation
 
-### General / MacOS (VSCode)
+Atmodeller is a Python package that can be installed on a variety of platforms (e.g. Mac, Windows, Linux).
 
-See [this setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3) for setting up your system to develop *atmodeller*.
+### Quick install
 
-### Windows PowerShell installation (VSCode or PyCharm)
+The instructions are given in terms of terminal commands for a Mac, but equivalents exist for other systems.
 
-1. Install Python if you do not already have it. Powershell will open the windows store where python versions are free for download and install by typing:
-   
-    ```
-    python
-    ```
-1. Install [Poetry](https://python-poetry.org) if you do not already have it, preferentially using [pipx](https://pypa.github.io/pipx/installation/).
-1. Clone this repository (*atmodeller*) to a local directory
-1. Create a poetry environment in your IDE of choice
-   - In VSCode, go to *File* and *Open Folder...* and select the *atmodeller* directory
-   - In PyCharm, add a new project and select the *atmodeller* directory
-1. We want to set up a virtual Python environment in the root directory of *atmodeller*. An advantage of using a virtual environment is that it remains completely isolated from any other Python environments on your system (e.g. Conda or otherwise). You must have a Python interpreter available to build the virtual environment according to the dependency in `pyproject.toml`, which could be a native version on your machine or a version from a Conda environment that is currently active. You only need a Python binary, so it is not required to install any packages. 
-2. Create a virtual environment by using the terminal (you can also use the terminal in your IDE of preference). This command will create a local Python environment in the `.venv` directory:
-    
-    ```
-    python -m venv .venv
-    ```
-3. Add virtual Python environment as interpreter in your IDE.
-   - Open a new terminal window in VSCode and VSCode should recognise that you have a virtual environment in .venv and load this environment automatically. 
-   - PyCharm should recognize the virtual environment and the poetry `pyproject.toml` file and propose the installation. If not, manually set up a _Poetry Environment_ under _Add New Interpreter > Add Local Interpreter_. Obtain the installation path of poetry in PowerShell with:
+Navigate to a location on your computer and obtain the Atmodeller source code:
 
-      ```
-      gcm poetry
-      ```
-   You should now see `(.venv)` as the prefix in the terminal prompt.
-8. Install the project using poetry to install all the required Python package dependencies:
+```
+git clone git@github.com:ExPlanetology/atmodeller.git
+cd atmodeller
+```
 
-    ```
-    poetry install
-    ```
+The basic procedure is to install Atmodeller into a virtual environment. For example, if you are using a variant of Conda to create Python environments ([Anaconda](https://www.anaconda.com/download) is recommended), create a new environment to install Atmodeller. Atmodeller requires Python >= 3.10:
 
-#### Determine path to Jupyter Notebooks
-1. To locate the example Jupyter notebooks, enter python:
- 
-    ```
-    python
-    ````
-2. Once in python type:
- 
-    ```
-    import SpuBase
-    SpuBase.__file__
-    ```
-This will report the location of the *atmodeller* package on your system, from which you can determine the path to *atmodeller/docs*. This directory contains the Jupyter notebook tutorials, which you can copy to a different location if you wish. Then, exit the Python command line using `exit()`.
- 
- 
-#### Running Jupyter Notebooks
-1. When located within the *atmodeller* location, you can access the Jupyter notebook tutorials with:
-    ```
-    jupyter notebook /docs/<FILENAME>.ipynb
-    ```
-    with `<Filename>` being `1_basics` for example.
-   * An alternative to changing directories is to give the absolute path to the notebook you want to open instead.
- 
-2. In the Jupyter notebook window you may have to *trust* the notebook for all features to work.
+```
+conda create -n atmodeller python
+conda activate atmodeller
+```
+
+Install Atmodeller, where you can additionally include the `-e` option if you want an [editable install](https://setuptools.pypa.io/en/latest/userguide/development_mode.html):
+
+```
+pip install .
+```
+
+You can load the tutorials by specifying the path to the Jupyter notebook. For example, the first tutorial can be loaded as:
+
+```
+jupyter notebook notebooks/1_basics.ipynb
+```
+
+You may need to *trust* the notebook before it will run.
+
+### Developer install
+
+See [this setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3) to setup your system to develop *Atmodeller* using [VS Code](https://code.visualstudio.com) and [Poetry](https://python-poetry.org).
+
+## Tutorial
+
+Several Jupyter notebook tutorials are provided in the package directory `notebooks/`.
 
 ## Tests
 

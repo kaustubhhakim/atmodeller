@@ -98,7 +98,6 @@ class RealGasABC(GetValueABC):
     critical_pressure: float = 1  # Default of one is equivalent to not used
     standard_state_pressure: float = field(init=False, default=1)  # 1 bar
 
-    @debug_decorator(logger)
     def scaled_pressure(self, pressure: float) -> float:
         """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity
 
@@ -112,7 +111,6 @@ class RealGasABC(GetValueABC):
 
         return scaled_pressure
 
-    @debug_decorator(logger)
     def scaled_temperature(self, temperature: float) -> float:
         """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity
 
@@ -126,7 +124,6 @@ class RealGasABC(GetValueABC):
 
         return scaled_temperature
 
-    @debug_decorator(logger)
     def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
         """Compressibility parameter at temperature and pressure.
 
@@ -145,7 +142,6 @@ class RealGasABC(GetValueABC):
 
         return Z
 
-    # @debug_decorator(logger)
     def get_value(self, *, temperature: float, pressure: float) -> float:
         """Evaluates the fugacity coefficient at temperature and pressure.
 
@@ -160,7 +156,6 @@ class RealGasABC(GetValueABC):
 
         return fugacity_coefficient
 
-    # @debug_decorator(logger)
     def ln_fugacity(self, temperature: float, pressure: float) -> float:
         """Natural log of the fugacity
 
@@ -180,7 +175,6 @@ class RealGasABC(GetValueABC):
 
         return ln_fugacity
 
-    # @debug_decorator(logger)
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Fugacity
 
@@ -198,7 +192,6 @@ class RealGasABC(GetValueABC):
 
         return fugacity
 
-    # @debug_decorator(logger)
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
         """Fugacity coefficient
 
@@ -213,7 +206,6 @@ class RealGasABC(GetValueABC):
 
         return fugacity_coefficient
 
-    @debug_decorator(logger)
     def ideal_volume(self, temperature: float, pressure: float) -> float:
         """Ideal volume
 
