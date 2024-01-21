@@ -36,13 +36,13 @@ conda create -n atmodeller python
 conda activate atmodeller
 ```
 
-Install Atmodeller, where you can additionally include the `-e` option if you want an [editable install](https://setuptools.pypa.io/en/latest/userguide/development_mode.html):
+Install Atmodeller into the virtual environment, where you can include the `-e` option if you want an [editable install](https://setuptools.pypa.io/en/latest/userguide/development_mode.html):
 
 ```
 pip install .
 ```
 
-You can load the tutorials by specifying the path to the Jupyter notebook. For example, the first tutorial can be loaded as:
+You can load the tutorials by specifying the path to the Jupyter notebook. For example, the first tutorial can be loaded with
 
 ```
 jupyter notebook notebooks/1_basics.ipynb
@@ -56,11 +56,11 @@ See [this setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b9
 
 ## Tutorial
 
-Several Jupyter notebook tutorials are provided in the package directory `notebooks/`.
+Several Jupyter notebook tutorials are provided in `notebooks/`.
 
 ## Tests
 
-You can confirm that all tests pass by running `pytest` in the root directory. Please add more tests if you add new features.
+You can confirm that all tests pass by running `pytest` in the root directory. Please add more tests if you add new features. Note that `pip install .` in the *Quick install* instructions above will not install `pytest`, in which case you will need to install `pytest` separately.
 
 ## Troubleshooting
 
