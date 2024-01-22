@@ -34,27 +34,66 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class GasSpeciesOutput:
-    """Output for a gas species"""
+class ReservoirOutput:
+    """Mass and moles of a species or element in a reservoir
 
-    mass_in_atmosphere: float  # kg
-    mass_in_solid: float  # kg
-    mass_in_melt: float  # kg
-    moles_in_atmosphere: float  # moles
-    moles_in_melt: float  # moles
-    moles_in_solid: float  # moles
-    ppmw_in_solid: float  # ppm by weight
-    ppmw_in_melt: float  # ppm by weight
-    fugacity: float  # bar
-    fugacity_coefficient: float  # dimensionless
-    pressure: float  # bar
-    volume_mixing_ratio: float  # dimensionless
-    mass_in_total: float = field(init=False)
-    moles_in_total: float = field(init=False)
+    Args:
+        name: Species or element name
+        reservoir: Reservoir name (e.g., atmosphere, (silicate) melt, (silicate) solid)
+        mass: Mass in kg
+        moles: Moles
 
-    def __post_init__(self):
-        self.mass_in_total = self.mass_in_atmosphere + self.mass_in_melt + self.mass_in_solid
-        self.moles_in_total = self.moles_in_atmosphere + self.moles_in_melt + self.moles_in_solid
+    Attributes:
+        See Args.
+    """
+
+    # TODO: Might need species to get molar mass for mass <--> moles conversion
+    name: str
+    reservoir: str
+    mass: float
+    moles: float
+
+
+@dataclass(kw_only=True)
+class MantleReservoirOutput(ReservoirOutput):
+    """A species or element in a mantle reservoir
+
+    Args:
+        name: Species or element name
+        reservoir: Reservoir name (e.g., atmosphere, (silicate) melt, (silicate) solid)
+        mass: Mass in kg
+        moles: Moles
+        ppmw: Part-per-million by weight
+
+    Attributes:
+        See Args.
+    """
+
+    ppmw: float
+
+
+@dataclass(kw_only=True)
+class SpeciesAtmosphereOutput(ReservoirOutput):
+    """A species in the atmosphere
+
+    Args:
+        name: Species name
+        mass: Mass in kg
+        moles: Moles
+        fugacity: Fugacity in bar
+        fugacity_coefficient: Fugacity coefficient
+        pressure: Pressure in bar
+        volume_mixing_ratio: Volume mixing ratio
+
+    Attributes:
+        See Args.
+    """
+
+    fugacity: float
+    fugacity_coefficient: float
+    pressure: float
+    volume_mixing_ratio: float
+    reservoir: str = field(init=False, default="atmosphere")
 
 
 @dataclass(kw_only=True)
@@ -65,6 +104,25 @@ class CondensedSpeciesOutput:
     """
 
     activity: float
+
+
+@dataclass(kw_only=True)
+class GasSpeciesOutput:
+    """Output for a gas species"""
+
+    atmosphere: SpeciesAtmosphereOutput
+    melt: MantleReservoirOutput
+    solid: MantleReservoirOutput
+
+    @property
+    def mass_total(self) -> float:
+        return self.atmosphere.mass + self.melt.mass + self.solid.mass
+
+    @property
+    def moles_total(self) -> float:
+        return self.atmosphere.moles + self.melt.moles + self.solid.moles
+
+    # TODO: Compute elemental breakdowns.
 
 
 class Output(UserDict):

@@ -64,12 +64,14 @@ class Planet:
         melt_composition: Melt composition of the planet. Default is None.
 
     Attributes:
-        mantle_mass: Mass of the planetary mantle.
-        mantle_melt_fraction: mass fraction of the mantle that is molten.
-        core_mass_fraction: Mass fraction of the core relative to the planetary mass.
-        surface_radius: Radius of the planetary surface.
-        surface_temperature: Temperature of the planetary surface.
-        melt_composition: Melt composition of the planet.
+        mantle_mass: Mass of the planetary mantle
+        mantle_melt_fraction: Mass fraction of the mantle that is molten
+        mass_melt_mass: Mass of the mantle that is molten
+        mass_solid_mass: Mass of the mantle that is solid
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass
+        surface_radius: Radius of the planetary surface
+        surface_temperature: Temperature of the planetary surface
+        melt_composition: Melt composition of the planet
     """
 
     mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
@@ -92,8 +94,18 @@ class Planet:
 
     @property
     def planet_mass(self) -> float:
-        """Mass of the planet in SI units"""
+        """Mass of the planet"""
         return self.mantle_mass / (1 - self.core_mass_fraction)
+
+    @property
+    def mantle_melt_mass(self) -> float:
+        """Mass of the molten mantle"""
+        return self.mantle_mass * self.mantle_melt_fraction
+
+    @property
+    def mantle_solid_mass(self) -> float:
+        """Mass of the solid mantle"""
+        return self.mantle_mass * (1 - self.mantle_melt_fraction)
 
     @property
     def surface_area(self) -> float:
@@ -736,10 +748,8 @@ class InteriorAtmosphereSystem:
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the reaction network but this sets the solution for the gas phase.
         for species in self.species.gas_species.values():
-            species.mass(
-                planet=self.planet,
-                system=self,
-            )
+            species.mass(planet=self.planet, system=self, store_output=True)
+
         for species in self.species.condensed_species.values():
             species._output = CondensedSpeciesOutput(
                 activity=species.activity.get_value(
