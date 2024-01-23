@@ -31,12 +31,6 @@ from molmass import Composition, Formula
 from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GAS_CONSTANT_BAR, NOBLE_GASES
-from atmodeller.output import (
-    AtmosphereReservoirOutput,
-    CondensedSpeciesOutput,
-    GasSpeciesOutput,
-    MantleReservoirOutput,
-)
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -986,7 +980,6 @@ class ChemicalComponent(ABC):
         is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
         is_noble: True if a noble gas, otherwise False
         molar_mass: Molar mass
-        output: Output data
     """
 
     formula: str
@@ -996,7 +989,6 @@ class ChemicalComponent(ABC):
     name_in_dataset: str = ""  # Empty string to maintain type for type checking
     _formula: Formula = field(init=False)
     _thermodynamic_data: ThermodynamicDataForSpeciesProtocol | None = field(init=False)
-    output: Any = field(init=False, default=None)
 
     def __post_init__(self):
         if not self.name_in_dataset:  # Empty string
@@ -1049,13 +1041,6 @@ class ChemicalComponent(ABC):
         """Molar mass in kg/mol"""
         return UnitConversion.g_to_kg(self._formula.mass)
 
-    @abstractmethod
-    def set_output(self, system: InteriorAtmosphereSystem) -> None:
-        """Sets the output
-
-        Should set self.output
-        """
-
 
 @dataclass(kw_only=True)
 class GasSpecies(ChemicalComponent):
@@ -1089,7 +1074,6 @@ class GasSpecies(ChemicalComponent):
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     eos: RealGasABC = field(default_factory=IdealGas)
-    output: GasSpeciesOutput | None = field(init=False, default=None)
 
     @_mass_decorator
     def mass(
@@ -1146,41 +1130,6 @@ class GasSpecies(ChemicalComponent):
 
         return output
 
-    def set_output(self, system: InteriorAtmosphereSystem) -> None:
-        """Sets the output.
-
-        Args:
-            system: Interior atmosphere system
-        """
-
-        species_masses: dict[str, float] = self.mass(system)
-
-        pressure: float = system.solution_dict[self.formula]
-        fugacity: float = system.fugacities_dict[self.formula]
-        fugacity_coefficient: float = 10 ** system.log10_fugacity_coefficients_dict[self.formula]
-        volume_mixing_ratio: float = pressure / system.total_pressure
-
-        atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
-            molar_mass=self.molar_mass,
-            mass=species_masses["atmosphere"],
-            fugacity=fugacity,
-            fugacity_coefficient=fugacity_coefficient,
-            pressure=pressure,
-            volume_mixing_ratio=volume_mixing_ratio,
-        )
-        melt: MantleReservoirOutput = MantleReservoirOutput(
-            molar_mass=self.molar_mass,
-            reservoir_mass=system.planet.mantle_melt_mass,
-            mass=species_masses["melt"],
-        )
-        solid: MantleReservoirOutput = MantleReservoirOutput(
-            molar_mass=self.molar_mass,
-            reservoir_mass=system.planet.mantle_solid_mass,
-            mass=species_masses["solid"],
-        )
-
-        self.output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
-
 
 @dataclass(kw_only=True)
 class CondensedSpecies(ChemicalComponent):
@@ -1205,23 +1154,10 @@ class CondensedSpecies(ChemicalComponent):
     """
 
     activity: ConstraintABC = field(init=False)
-    output: CondensedSpeciesOutput | None = field(init=False, default=None)
 
     def __post_init__(self):
         super().__post_init__()
         self.activity = ActivityConstant(species=self.formula)
-
-    def set_output(self, system: InteriorAtmosphereSystem) -> None:
-        """Sets the output.
-
-        Args:
-            system: Interior atmosphere system
-        """
-        self.output = CondensedSpeciesOutput(
-            activity=self.activity.get_value(
-                temperature=system.planet.surface_temperature, pressure=system.total_pressure
-            )
-        )
 
 
 @dataclass(kw_only=True)

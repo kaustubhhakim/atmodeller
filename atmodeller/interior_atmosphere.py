@@ -23,10 +23,8 @@ import pprint
 from collections import UserList
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any
 
 import numpy as np
-from molmass import Formula
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
@@ -41,9 +39,9 @@ from atmodeller.interfaces import (
     NoSolubility,
     Solubility,
 )
-from atmodeller.output import GasSpeciesOutput, Output, ReservoirOutput
+from atmodeller.output import Output
 from atmodeller.solubilities import composition_solubilities
-from atmodeller.utilities import UnitConversion, dataclass_to_logger, filter_by_type
+from atmodeller.utilities import dataclass_to_logger, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -726,9 +724,6 @@ class InteriorAtmosphereSystem:
         )
         self._log_solution = result.x
         self._residual = result.fun
-
-        for species in self.species.data:
-            species.set_output(self)
 
         self.output.add(self, extra_output)
         self.initial_condition.update(self.output)

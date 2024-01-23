@@ -112,6 +112,12 @@ class CondensedSpeciesOutput:
 
     activity: float
 
+    def output(self) -> dict[str, float]:
+        """Output dictionary"""
+        output_dict: dict[str, Any] = asdict(self)
+
+        return output_dict
+
 
 @dataclass(kw_only=True)
 class GasSpeciesOutput:
@@ -127,12 +133,12 @@ class GasSpeciesOutput:
         self.mass_total = self.atmosphere.mass + self.melt.mass + self.solid.mass
         self.moles_total = self.atmosphere.moles + self.melt.moles + self.solid.moles
 
-    def output(self) -> dict[str, Any]:
+    def output(self) -> dict[str, float]:
         """Output dictionary
 
         Deletes some entries to avoid duplication of output quantities
         """
-        output_dict: dict[str, Any] = flatten(asdict(self))
+        output_dict: dict[str, float] = flatten(asdict(self))
         output_dict = delete_entries_with_suffix(output_dict, "molar_mass")
         output_dict = delete_entries_with_suffix(output_dict, "reservoir_mass")
 
@@ -187,6 +193,7 @@ class Output(UserDict):
             extra_output: Extra data to write to the output
         """
         self._add_atmosphere(interior_atmosphere)
+        self._add_condensed_species(interior_atmosphere)
         self._add_constraints(interior_atmosphere)
         self._add_elements(interior_atmosphere)
         self._add_planet(interior_atmosphere)
@@ -209,6 +216,21 @@ class Output(UserDict):
 
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere_dict)
+
+    def _add_condensed_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+        """Adds condensed species.
+
+        Args:
+            interior_atmosphere: Interior atmosphere system
+        """
+        for species in interior_atmosphere.species.condensed_species.values():
+            activity: float = species.activity.get_value(
+                temperature=interior_atmosphere.planet.surface_temperature,
+                pressure=interior_atmosphere.total_pressure,
+            )
+            output = CondensedSpeciesOutput(activity=activity)
+            data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
+            data_list.append(output.output())
 
     def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds constraints.
@@ -275,9 +297,36 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         for species in interior_atmosphere.species.gas_species.values():
-            assert species.output is not None
+            species_masses: dict[str, float] = species.mass(interior_atmosphere)
+
+            pressure: float = interior_atmosphere.solution_dict[species.formula]
+            fugacity: float = interior_atmosphere.fugacities_dict[species.formula]
+            fugacity_coefficient: float = (
+                10 ** interior_atmosphere.log10_fugacity_coefficients_dict[species.formula]
+            )
+            volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
+
+            atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
+                molar_mass=species.molar_mass,
+                mass=species_masses["atmosphere"],
+                fugacity=fugacity,
+                fugacity_coefficient=fugacity_coefficient,
+                pressure=pressure,
+                volume_mixing_ratio=volume_mixing_ratio,
+            )
+            melt: MantleReservoirOutput = MantleReservoirOutput(
+                molar_mass=species.molar_mass,
+                reservoir_mass=interior_atmosphere.planet.mantle_melt_mass,
+                mass=species_masses["melt"],
+            )
+            solid: MantleReservoirOutput = MantleReservoirOutput(
+                molar_mass=species.molar_mass,
+                reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
+                mass=species_masses["solid"],
+            )
+            output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
             data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
-            data_list.append(species.output.output())
+            data_list.append(output.output())
 
     def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem):
         """Adds the residual.
