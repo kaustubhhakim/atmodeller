@@ -170,3 +170,17 @@ def dataclass_to_logger(data_instance, logger: logging.Logger, log_level=logging
 
     for key, value in data.items():
         logger.log(log_level, "%s = %s", key, value)
+
+
+def delete_entries_with_suffix(input_dict: dict[Any, Any], suffix: str) -> dict[Any, Any]:
+    """Deletes entries from a dictionary for keys that have a particular suffix
+
+    Args:
+        input_dict: Input dictionary
+        suffix: Suffix of the keys that defines the entries to remove
+
+    Returns:
+        A dictionary with the entries removed
+    """
+
+    return {key: value for key, value in input_dict.items() if not key.endswith(suffix)}

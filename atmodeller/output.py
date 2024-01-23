@@ -23,11 +23,11 @@ import pickle
 from collections import UserDict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from atmodeller.utilities import UnitConversion, flatten
+from atmodeller.utilities import UnitConversion, delete_entries_with_suffix, flatten
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
@@ -107,15 +107,11 @@ class AtmosphereReservoirOutput(ReservoirOutput):
 
 @dataclass(kw_only=True)
 class CondensedSpeciesOutput:
-    """Output for a condensed species
-
-    These data are not currently output because all condensed phases have an activity of unity
-    """
+    """Output for a condensed species"""
 
     activity: float
 
 
-# TODO: Compute elemental breakdowns.
 @dataclass(kw_only=True)
 class GasSpeciesOutput:
     """Output for a gas species"""
@@ -123,17 +119,23 @@ class GasSpeciesOutput:
     atmosphere: AtmosphereReservoirOutput
     melt: MantleReservoirOutput
     solid: MantleReservoirOutput
+    mass_total: float = field(init=False)
+    moles_total: float = field(init=False)
 
-    @property
-    def mass_total(self) -> float:
-        return self.atmosphere.mass + self.melt.mass + self.solid.mass
+    def __post_init__(self):
+        self.mass_total = self.atmosphere.mass + self.melt.mass + self.solid.mass
+        self.moles_total = self.atmosphere.moles + self.melt.moles + self.solid.moles
 
-    @property
-    def moles_total(self) -> float:
-        return self.atmosphere.moles + self.melt.moles + self.solid.moles
+    def output(self) -> dict[str, Any]:
+        """Output dictionary
 
-    def asdict(self) -> dict:
-        return flatten(asdict(self))
+        Deletes some entries to avoid duplication of output quantities
+        """
+        output_dict: dict[str, Any] = flatten(asdict(self))
+        output_dict = delete_entries_with_suffix(output_dict, "molar_mass")
+        output_dict = delete_entries_with_suffix(output_dict, "reservoir_mass")
+
+        return output_dict
 
 
 class Output(UserDict):
@@ -239,8 +241,7 @@ class Output(UserDict):
         for species in interior_atmosphere.species.gas_species.values():
             assert species.output is not None
             data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
-            data_list.append(species.output.asdict())
-            print(species.output.asdict())
+            data_list.append(species.output.output())
 
     def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem):
         """Adds the residual.

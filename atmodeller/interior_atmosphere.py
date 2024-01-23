@@ -23,6 +23,7 @@ import pprint
 from collections import UserList
 from dataclasses import dataclass, field
 from functools import cached_property
+from typing import Any
 
 import numpy as np
 from scipy.optimize import OptimizeResult, root
@@ -34,7 +35,6 @@ from atmodeller.initial_condition import InitialConditionABC, InitialConditionCo
 from atmodeller.interfaces import (
     ChemicalComponent,
     CondensedSpecies,
-    CondensedSpeciesOutput,
     ConstraintABC,
     GasSpecies,
     NoSolubility,
@@ -716,30 +716,34 @@ class InteriorAtmosphereSystem:
         """
         logger.info("Solving system number %d", self.number_of_solves)
         self.set_constraints(constraints)
+
         result: OptimizeResult = self._solve(
             initial_solution=initial_solution,
             method=method,
             tol=tol,
             **options,
         )
-
         self._log_solution = result.x
         self._residual = result.fun
 
-        # Recompute quantities that depend on the solution, since species.mass is not called for
-        # the reaction network but this sets the solution for the gas phase.
-        for species in self.species.gas_species.values():
-            species.store_output(planet=self.planet, system=self)
+        for species in self.species.data:
+            species.set_output(self)
 
-        for species in self.species.condensed_species.values():
-            species._output = CondensedSpeciesOutput(
-                activity=species.activity.get_value(
-                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
-                )
-            )
+        # TODO: Clean up element totals
+        elements: dict[str, Any] = {}
+        for element in self._reaction_network.unique_elements:
+            data: dict[str, Any] = elements.setdefault(element, {})
+            for species in self.species.gas_species.values():
+                species_masses: dict[str, float] = species.mass(self, element=element)
+                data.setdefault("atmosphere", 0)
+                data["atmosphere"] += species_masses["atmosphere"]
+                data.setdefault("melt", 0)
+                data["melt"] += species_masses["melt"]
+                data.setdefault("solid", 0)
+                data["solid"] += species_masses["solid"]
+                data["total"] = data["atmosphere"] + data["melt"] + data["solid"]
 
         self.output.add(self, extra_output)
-
         self.initial_condition.update(self.output)
 
         logger.info(pprint.pformat(self.solution_dict))
@@ -869,7 +873,6 @@ class InteriorAtmosphereSystem:
             for species in self.species.gas_species.values():
                 residual_mass[constraint_index] += sum(
                     species.mass(
-                        planet=self.planet,
                         system=self,
                         element=constraint.species,
                     ).values()

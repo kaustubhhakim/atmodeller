@@ -23,14 +23,20 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    FugacityConstraint,
     IronWustiteBufferConstraintBallhaus,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraints,
-    FugacityConstraint,
     TotalPressureConstraint,
 )
-from atmodeller.interfaces import GasSpecies, NoSolubility, SolidSpecies, ThermodynamicDatasetABC, ThermodynamicDatasetJANAF
+from atmodeller.interfaces import (
+    GasSpecies,
+    NoSolubility,
+    SolidSpecies,
+    ThermodynamicDatasetABC,
+    ThermodynamicDatasetJANAF,
+)
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
@@ -331,6 +337,7 @@ def test_H_and_C_total_pressure() -> None:
 
     system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+
 
 def test_graphite() -> None:
     """Tests including graphite."""
