@@ -26,6 +26,7 @@ from functools import cached_property
 from typing import Any
 
 import numpy as np
+from molmass import Formula
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
@@ -40,9 +41,9 @@ from atmodeller.interfaces import (
     NoSolubility,
     Solubility,
 )
-from atmodeller.output import Output
+from atmodeller.output import GasSpeciesOutput, Output, ReservoirOutput
 from atmodeller.solubilities import composition_solubilities
-from atmodeller.utilities import dataclass_to_logger, filter_by_type
+from atmodeller.utilities import UnitConversion, dataclass_to_logger, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -728,20 +729,6 @@ class InteriorAtmosphereSystem:
 
         for species in self.species.data:
             species.set_output(self)
-
-        # TODO: Clean up element totals
-        elements: dict[str, Any] = {}
-        for element in self._reaction_network.unique_elements:
-            data: dict[str, Any] = elements.setdefault(element, {})
-            for species in self.species.gas_species.values():
-                species_masses: dict[str, float] = species.mass(self, element=element)
-                data.setdefault("atmosphere", 0)
-                data["atmosphere"] += species_masses["atmosphere"]
-                data.setdefault("melt", 0)
-                data["melt"] += species_masses["melt"]
-                data.setdefault("solid", 0)
-                data["solid"] += species_masses["solid"]
-                data["total"] = data["atmosphere"] + data["melt"] + data["solid"]
 
         self.output.add(self, extra_output)
         self.initial_condition.update(self.output)

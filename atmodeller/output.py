@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
+from molmass import Formula
 
 from atmodeller.utilities import UnitConversion, delete_entries_with_suffix, flatten
 
@@ -116,9 +117,9 @@ class CondensedSpeciesOutput:
 class GasSpeciesOutput:
     """Output for a gas species"""
 
-    atmosphere: AtmosphereReservoirOutput
-    melt: MantleReservoirOutput
-    solid: MantleReservoirOutput
+    atmosphere: ReservoirOutput
+    melt: ReservoirOutput
+    solid: ReservoirOutput
     mass_total: float = field(init=False)
     moles_total: float = field(init=False)
 
@@ -187,6 +188,7 @@ class Output(UserDict):
         """
         self._add_atmosphere(interior_atmosphere)
         self._add_constraints(interior_atmosphere)
+        self._add_elements(interior_atmosphere)
         self._add_planet(interior_atmosphere)
         self._add_gas_species(interior_atmosphere)
         self._add_residual(interior_atmosphere)
@@ -220,6 +222,40 @@ class Output(UserDict):
 
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
+
+    def _add_elements(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+        """Adds element totals for each reservoir.
+
+        Args:
+            interior_atmosphere: Interior atmosphere system
+        """
+
+        mass: dict[str, Any] = {}
+        for element in interior_atmosphere._reaction_network.unique_elements:
+            mass[element] = {"atmosphere": 0, "melt": 0, "solid": 0}
+            for species in interior_atmosphere.species.gas_species.values():
+                species_masses: dict[str, float] = species.mass(
+                    interior_atmosphere, element=element
+                )
+                mass[element]["atmosphere"] += species_masses["atmosphere"]
+                mass[element]["melt"] += species_masses["melt"]
+                mass[element]["solid"] += species_masses["solid"]
+
+        for element, element_mass in mass.items():
+            formula: Formula = Formula(element)
+            molar_mass: float = UnitConversion.g_to_kg(formula.mass)
+            atmosphere: ReservoirOutput = ReservoirOutput(
+                molar_mass=molar_mass, mass=element_mass["atmosphere"]
+            )
+            melt: ReservoirOutput = ReservoirOutput(
+                molar_mass=molar_mass, mass=element_mass["melt"]
+            )
+            solid: ReservoirOutput = ReservoirOutput(
+                molar_mass=molar_mass, mass=element_mass["solid"]
+            )
+            output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
+            data_list: list[dict[str, float]] = self.data.setdefault(element, [])
+            data_list.append(output.output())
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the planetary properties.
