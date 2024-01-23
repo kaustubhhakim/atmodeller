@@ -727,7 +727,7 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations
-            extra_ouput: Extra data to write to the output
+            extra_output: Extra data to write to the output
             initial_solution: Initial guess for the solution. Defaults to None.
             method: Type of solver. Defaults to 'hybr'.
             tol: Tolerance for termination. Defaults to None.
@@ -748,7 +748,7 @@ class InteriorAtmosphereSystem:
         # Recompute quantities that depend on the solution, since species.mass is not called for
         # the reaction network but this sets the solution for the gas phase.
         for species in self.species.gas_species.values():
-            species.mass(planet=self.planet, system=self, store_output=True)
+            species.store_output(planet=self.planet, system=self)
 
         for species in self.species.condensed_species.values():
             species._output = CondensedSpeciesOutput(
@@ -757,7 +757,7 @@ class InteriorAtmosphereSystem:
                 )
             )
 
-        self.output.add(self, extra_output)
+        # self.output.add(self, extra_output)
 
         self.initial_condition.update(self.output)
 
@@ -886,10 +886,12 @@ class InteriorAtmosphereSystem:
         )
         for constraint_index, constraint in enumerate(self.constraints.mass_constraints):
             for species in self.species.gas_species.values():
-                residual_mass[constraint_index] += species.mass(
-                    planet=self.planet,
-                    system=self,
-                    element=constraint.species,
+                residual_mass[constraint_index] += sum(
+                    species.mass(
+                        planet=self.planet,
+                        system=self,
+                        element=constraint.species,
+                    ).values()
                 )
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
             # Mass values are constant so no need to pass any arguments to get_value().

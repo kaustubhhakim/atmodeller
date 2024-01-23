@@ -670,12 +670,6 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             del pressure
             gibbs: float = self.data.DeltaG(temperature)
 
-            # logger.debug(
-            #    "Species = %s, standard Gibbs energy of formation = %f",
-            #    self.species.name_in_dataset,
-            #    gibbs,
-            # )
-
             return gibbs
 
 
@@ -693,7 +687,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
     def __init__(self):
-        data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
+        data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")
         self.data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         self.data["name of phase component"] = self.data["name of phase component"].str.strip()
         self.data.rename(columns={"Unnamed: 1": "Abbreviation"}, inplace=True)
@@ -790,10 +784,11 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
                 Enthalpy in J
             """
             H = self.data["Hf"]  # J
-            a = self.data["a"]  # J/K           Coeff for calc heat capacity.
-            b = self.data["b"]  # J/K^2         Coeff for calc heat capacity.
-            c = self.data["c"]  # J K           Coeff for calc heat capacity.
-            d = self.data["d"]  # J K^(-1/2)    Coeff for calc heat capacity.
+            # Coefficients for calculating the heat capacity
+            a = self.data["a"]  # J/K
+            b = self.data["b"]  # J/K^2
+            c = self.data["c"]  # J K
+            d = self.data["d"]  # J K^(-1/2)
 
             integral_H: float = (
                 H
@@ -814,10 +809,11 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
                 Entropy in J/K
             """
             S = self.data["S"]  # J/K
-            a = self.data["a"]  # J/K           Coeff for calc heat capacity.
-            b = self.data["b"]  # J/K^2         Coeff for calc heat capacity.
-            c = self.data["c"]  # J K           Coeff for calc heat capacity.
-            d = self.data["d"]  # J K^(-1/2)    Coeff for calc heat capacity.
+            # Coefficients for calculating the heat capacity
+            a = self.data["a"]  # J/K
+            b = self.data["b"]  # J/K^2
+            c = self.data["c"]  # J K
+            d = self.data["d"]  # J K^(-1/2)
 
             integral_S: float = (
                 S
@@ -900,14 +896,15 @@ def _mass_decorator(func) -> Callable:
     def mass_wrapper(
         self: GasSpecies, element: Optional[str] = None, **kwargs
     ) -> dict[str, float]:
-        """Wrapper to return the mass of either the gas species or one of its elements.
+        """Wrapper to return the reservoir masses of either the gas species or one of its elements.
 
         Args:
-            element: Returns the mass of this element. Defaults to None to return the species mass.
+            element: Returns the reservoir masses of this element. Defaults to None to return the
+                species masses.
             **kwargs: Catches keyword arguments to forward to func.
 
         Returns:
-            Mass of either the gas species or one of its elements.
+            Reservoir masses of either the gas species or one of its elements.
         """
         mass: dict[str, float] = func(self, **kwargs)
         if element is not None:
@@ -915,10 +912,10 @@ def _mass_decorator(func) -> Callable:
                 factor: float = (
                     UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
                 )
+                # TODO: Old below. Can remove.
                 # mass *= UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
             except KeyError:  # Element not in formula so mass is zero.
                 factor = 0
-            # TODO: Check
             for key in mass:
                 mass[key] *= factor
 
@@ -1086,7 +1083,7 @@ class GasSpecies(ChemicalComponent):
         system: InteriorAtmosphereSystem,
         element: Optional[str] = None,
     ) -> dict[str, float]:
-        """Calculates the total mass of the species or element.
+        """Calculates the total mass of the species or element in each reservoir
 
         Args:
             planet: Planet properties
@@ -1095,9 +1092,10 @@ class GasSpecies(ChemicalComponent):
                This argument is used by the @_mass_decorator.
 
         Returns:
-            Total mass of the species (element=None) or element (element=element)
+            Total reservoir masses of the species (element=None) or element (element=element)
         """
 
+        # Only used by the decorator.
         del element
 
         pressure: float = system.solution_dict[self.formula]
@@ -1155,7 +1153,11 @@ class GasSpecies(ChemicalComponent):
             Total mass of the species (element=None) or element (element=element)
         """
 
-        del element
+        reservoir_masses: dict[str, float] = self.mass(
+            planet=planet,
+            system=system,
+            element=element,
+        )
 
         pressure: float = system.solution_dict[self.formula]
         fugacity: float = system.fugacities_dict[self.formula]
@@ -1165,7 +1167,7 @@ class GasSpecies(ChemicalComponent):
 
         atmosphere: SpeciesAtmosphereOutput = SpeciesAtmosphereOutput(
             species=self,
-            mass=mass_in_atmosphere,
+            mass=reservoir_masses["atmosphere"],
             fugacity=fugacity,
             fugacity_coefficient=fugacity_coefficient,
             pressure=pressure,
@@ -1174,16 +1176,17 @@ class GasSpecies(ChemicalComponent):
         melt: MantleReservoirOutput = MantleReservoirOutput(
             species=self,
             reservoir="melt",
-            mass=mass_in_melt,
-            ppmw=ppmw_in_melt,
+            reservoir_mass=planet.mantle_melt_mass,
+            mass=reservoir_masses["melt"],
         )
         solid: MantleReservoirOutput = MantleReservoirOutput(
             species=self,
             reservoir="solid",
-            mass=mass_in_solid,
-            ppmw=ppmw_in_solid,
+            reservoir_mass=planet.mantle_solid_mass,
+            mass=reservoir_masses["solid"],
         )
-        self.output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
+        # self.output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
+        self.output = atmosphere  # GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
 
 
 @dataclass(kw_only=True)

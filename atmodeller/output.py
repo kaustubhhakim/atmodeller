@@ -62,17 +62,21 @@ class MantleReservoirOutput(ReservoirOutput):
     """A species or element in a mantle reservoir
 
     Args:
-        name: Species or element name
+        species: GasSpecies
         reservoir: Reservoir name (e.g., atmosphere, (silicate) melt, (silicate) solid)
+        reservoir_mass: Mass of the mantle reservoir
         mass: Mass in kg
-        moles: Moles
         ppmw: Part-per-million by weight
 
     Attributes:
         See Args.
     """
 
-    ppmw: float
+    reservoir_mass: float
+
+    @property
+    def ppmw(self) -> float:
+        return self.mass / self.reservoir_mass
 
 
 @dataclass(kw_only=True)
