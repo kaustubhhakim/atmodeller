@@ -42,11 +42,12 @@ class ReservoirOutput:
 
     Args:
         mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species
+        molar_mass: Molar mass of the species in kg/mol
 
     Attributes:
-        See Args.
-        moles: Moles
+        mass: Mass of the species in the reservoir in kg
+        molar_mass: Molar mass of the species in kg/mol
+        moles: Number of moles
     """
 
     mass: float
@@ -67,8 +68,10 @@ class MantleReservoirOutput(ReservoirOutput):
         reservoir_mass: Mass of the mantle reservoir in kg
 
     Attributes:
-        See Args.
-        moles: Moles
+        mass: Mass of the species in the reservoir in kg
+        molar_mass: Molar mass of the species in kg/mol
+        reservoir_mass: Mass of the mantle reservoir in kg
+        moles: Number of moles
         ppmw: Parts-per-million by weight
     """
 
@@ -96,8 +99,9 @@ class AtmosphereReservoirOutput(ReservoirOutput):
         volume_mixing_ratio: Volume mixing ratio
 
     Attributes:
-        See Args.
-        moles: Moles
+        mass: Mass of the species in the reservoir in kg
+        molar_mass: Molar mass of the species in kg/mol
+        moles: Number of moles
     """
 
     fugacity: float
@@ -108,12 +112,16 @@ class AtmosphereReservoirOutput(ReservoirOutput):
 
 @dataclass(kw_only=True)
 class CondensedSpeciesOutput:
-    """Output for a condensed species"""
+    """Output for a condensed species
+
+    Args:
+        activity: Activity
+    """
 
     activity: float
 
-    def output(self) -> dict[str, float]:
-        """Output dictionary"""
+    def asdict(self) -> dict[str, float]:
+        """Data as a dictionary"""
         output_dict: dict[str, Any] = asdict(self)
 
         return output_dict
@@ -133,13 +141,18 @@ class GasSpeciesOutput:
         self.mass_total = self.atmosphere.mass + self.melt.mass + self.solid.mass
         self.moles_total = self.atmosphere.moles + self.melt.moles + self.solid.moles
 
-    def output(self) -> dict[str, float]:
-        """Output dictionary
+    def asdict(self) -> dict[str, float]:
+        """Data as a dictionary
 
-        Deletes some entries to avoid duplication of output quantities
+        Deletes some entries to avoid duplication of output quantities. For example, the reservoir
+        masses also appear in the 'planet' output.
         """
         output_dict: dict[str, float] = flatten(asdict(self))
+        # It's useful to see the exact value of the molar mass for calculations, but we only need
+        # to output it once.
+        molar_mass: float = output_dict["atmosphere_molar_mass"]
         output_dict = delete_entries_with_suffix(output_dict, "molar_mass")
+        output_dict["molar_mass"] = molar_mass
         output_dict = delete_entries_with_suffix(output_dict, "reservoir_mass")
 
         return output_dict
@@ -190,7 +203,7 @@ class Output(UserDict):
 
         Args:
             interior_atmosphere: Interior atmosphere system
-            extra_output: Extra data to write to the output
+            extra_output: Extra data to write to the output. Defaults to None.
         """
         self._add_atmosphere(interior_atmosphere)
         self._add_condensed_species(interior_atmosphere)
@@ -213,7 +226,6 @@ class Output(UserDict):
         atmosphere_dict: dict[str, float] = {}
         atmosphere_dict["total_pressure"] = interior_atmosphere.total_pressure
         atmosphere_dict["mean_molar_mass"] = interior_atmosphere.atmospheric_mean_molar_mass
-
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere_dict)
 
@@ -230,7 +242,7 @@ class Output(UserDict):
             )
             output = CondensedSpeciesOutput(activity=activity)
             data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
-            data_list.append(output.output())
+            data_list.append(output.asdict())
 
     def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds constraints.
@@ -241,17 +253,16 @@ class Output(UserDict):
         evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
             interior_atmosphere
         )
-
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
 
     def _add_elements(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds element totals for each reservoir.
+        """Adds elements for each reservoir.
 
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-
+        # Sum all the elements across the species.
         mass: dict[str, Any] = {}
         for element in interior_atmosphere._reaction_network.unique_elements:
             mass[element] = {"atmosphere": 0, "melt": 0, "solid": 0}
@@ -263,6 +274,7 @@ class Output(UserDict):
                 mass[element]["melt"] += species_masses["melt"]
                 mass[element]["solid"] += species_masses["solid"]
 
+        # Create and add the output.
         for element, element_mass in mass.items():
             formula: Formula = Formula(element)
             molar_mass: float = UnitConversion.g_to_kg(formula.mass)
@@ -277,7 +289,7 @@ class Output(UserDict):
             )
             output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
             data_list: list[dict[str, float]] = self.data.setdefault(element, [])
-            data_list.append(output.output())
+            data_list.append(output.asdict())
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the planetary properties.
@@ -286,7 +298,6 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         planet_dict: dict[str, float] = asdict(interior_atmosphere.planet)
-
         data_list: list[dict[str, float]] = self.data.setdefault("planet", [])
         data_list.append(planet_dict)
 
@@ -297,8 +308,6 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         for species in interior_atmosphere.species.gas_species.values():
-            species_masses: dict[str, float] = species.mass(interior_atmosphere)
-
             pressure: float = interior_atmosphere.solution_dict[species.formula]
             fugacity: float = interior_atmosphere.fugacities_dict[species.formula]
             fugacity_coefficient: float = (
@@ -306,6 +315,7 @@ class Output(UserDict):
             )
             volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
 
+            species_masses: dict[str, float] = species.mass(interior_atmosphere)
             atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
                 molar_mass=species.molar_mass,
                 mass=species_masses["atmosphere"],
@@ -326,9 +336,9 @@ class Output(UserDict):
             )
             output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
             data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
-            data_list.append(output.output())
+            data_list.append(output.asdict())
 
-    def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem):
+    def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the residual.
 
         Args:
@@ -337,7 +347,7 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
         data_list.append(interior_atmosphere.residual_dict)
 
-    def _add_solution(self, interior_atmosphere: InteriorAtmosphereSystem):
+    def _add_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the solution.
 
         Args:
@@ -347,7 +357,11 @@ class Output(UserDict):
         data_list.append(interior_atmosphere.solution_dict)
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
-        """Output as a dictionary of dataframes"""
+        """Output as a dictionary of dataframes
+
+        Returns:
+            The output as a dictionary of dataframes
+        """
         out: dict[str, pd.DataFrame] = {
             key: pd.DataFrame(value) for key, value in self.data.items()
         }
