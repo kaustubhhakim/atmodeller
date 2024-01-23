@@ -42,7 +42,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.output import Output
 from atmodeller.solubilities import composition_solubilities
-from atmodeller.utilities import filter_by_type
+from atmodeller.utilities import dataclass_to_logger, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -66,12 +66,15 @@ class Planet:
     Attributes:
         mantle_mass: Mass of the planetary mantle
         mantle_melt_fraction: Mass fraction of the mantle that is molten
-        mass_melt_mass: Mass of the mantle that is molten
-        mass_solid_mass: Mass of the mantle that is solid
         core_mass_fraction: Mass fraction of the core relative to the planetary mass
         surface_radius: Radius of the planetary surface
         surface_temperature: Temperature of the planetary surface
         melt_composition: Melt composition of the planet
+        planet_mass: Mass of the planet
+        mass_melt_mass: Mass of the mantle that is molten
+        mass_solid_mass: Mass of the mantle that is solid
+        surface_area: Surface area of the planet
+        surface_gravity: Surface gravity of the planet
     """
 
     mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
@@ -80,42 +83,20 @@ class Planet:
     surface_radius: float = 6371000.0  # m, Earth's radius
     surface_temperature: float = 2000.0  # K
     melt_composition: str | None = None
+    planet_mass: float = field(init=False)
+    mantle_melt_mass: float = field(init=False)
+    mantle_solid_mass: float = field(init=False)
+    surface_area: float = field(init=False)
+    surface_gravity: float = field(init=False)
 
     def __post_init__(self):
+        self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
+        self.mantle_melt_mass = self.mantle_mass * self.mantle_melt_fraction
+        self.mantle_solid_mass = self.mantle_mass * (1 - self.mantle_melt_fraction)
+        self.surface_area = 4.0 * np.pi * self.surface_radius**2
+        self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
         logger.info("Creating a new planet")
-        logger.info("Mantle mass (kg) = %f", self.mantle_mass)
-        logger.info("Mantle melt fraction = %f", self.mantle_melt_fraction)
-        logger.info("Core mass fraction = %f", self.core_mass_fraction)
-        logger.info("Planetary radius (m) = %f", self.surface_radius)
-        logger.info("Planetary mass (kg) = %f", self.planet_mass)
-        logger.info("Surface temperature (K) = %f", self.surface_temperature)
-        logger.info("Surface gravity (m/s^2) = %f", self.surface_gravity)
-        logger.info("Melt Composition = %s", self.melt_composition)
-
-    @property
-    def planet_mass(self) -> float:
-        """Mass of the planet"""
-        return self.mantle_mass / (1 - self.core_mass_fraction)
-
-    @property
-    def mantle_melt_mass(self) -> float:
-        """Mass of the molten mantle"""
-        return self.mantle_mass * self.mantle_melt_fraction
-
-    @property
-    def mantle_solid_mass(self) -> float:
-        """Mass of the solid mantle"""
-        return self.mantle_mass * (1 - self.mantle_melt_fraction)
-
-    @property
-    def surface_area(self) -> float:
-        """Surface area of the planet in SI units"""
-        return 4.0 * np.pi * self.surface_radius**2
-
-    @property
-    def surface_gravity(self) -> float:
-        """Surface gravity of the planet in SI units"""
-        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
+        dataclass_to_logger(self, logger)
 
 
 class Species(UserList):
@@ -757,7 +738,7 @@ class InteriorAtmosphereSystem:
                 )
             )
 
-        # self.output.add(self, extra_output)
+        self.output.add(self, extra_output)
 
         self.initial_condition.update(self.output)
 

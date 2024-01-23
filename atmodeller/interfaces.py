@@ -32,10 +32,10 @@ from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT, GAS_CONSTANT_BAR, NOBLE_GASES
 from atmodeller.output import (
+    AtmosphereReservoirOutput,
     CondensedSpeciesOutput,
     GasSpeciesOutput,
     MantleReservoirOutput,
-    SpeciesAtmosphereOutput,
 )
 from atmodeller.utilities import UnitConversion
 
@@ -687,7 +687,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
     def __init__(self):
-        data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")
+        data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
         self.data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         self.data["name of phase component"] = self.data["name of phase component"].str.strip()
         self.data.rename(columns={"Unnamed: 1": "Abbreviation"}, inplace=True)
@@ -912,8 +912,6 @@ def _mass_decorator(func) -> Callable:
                 factor: float = (
                     UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
                 )
-                # TODO: Old below. Can remove.
-                # mass *= UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
             except KeyError:  # Element not in formula so mass is zero.
                 factor = 0
             for key in mass:
@@ -967,8 +965,11 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
 
 
 @dataclass(kw_only=True)
-class ChemicalComponent(ABC):
+class ChemicalComponent:
     """A chemical component and its properties
+
+    You should not instantiate this class, but rather use GasSpecies, SolidSpecies, or
+    LiquidSpecies because these are required to source the appropriate JANAF data.
 
     Args:
         formula: Chemical formula (e.g., CO2, C, CH4, etc.)
@@ -983,6 +984,8 @@ class ChemicalComponent(ABC):
         atoms: Number of atoms
         composition: Composition
         hill_formula: Hill formula
+        is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
+        is_noble: True if a noble gas, otherwise False
         molar_mass: Molar mass
     """
 
@@ -1025,6 +1028,23 @@ class ChemicalComponent(ABC):
         return self._formula.formula
 
     @property
+    def is_homonuclear_diatomic(self) -> bool:
+        """True if homonuclear diatomic, otherwise False."""
+        composition = self.composition()
+        if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
+            return True
+        else:
+            return False
+
+    @property
+    def is_noble(self) -> bool:
+        """True if a noble gas, otherwise False."""
+        if self.formula in NOBLE_GASES:
+            return True
+        else:
+            return False
+
+    @property
     def molar_mass(self) -> float:
         """Molar mass in kg/mol"""
         return UnitConversion.g_to_kg(self._formula.mass)
@@ -1048,6 +1068,12 @@ class GasSpecies(ChemicalComponent):
         formula: Chemical formula
         thermodynamic_dataset: The thermodynamic dataset
         name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        atoms: Number of atoms
+        composition: Composition
+        hill_formula: Hill formula
+        is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
+        is_noble: True if a noble gas, otherwise False
+        molar_mass: Molar mass
         solubility: Solubility model
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt
         eos: A gas equation of state
@@ -1057,23 +1083,6 @@ class GasSpecies(ChemicalComponent):
     solid_melt_distribution_coefficient: float = 0
     eos: RealGasABC = field(default_factory=IdealGas)
     _output: GasSpeciesOutput | None = field(init=False, default=None)
-
-    @property
-    def is_homonuclear_diatomic(self) -> bool:
-        """True if the species is homonuclear diatomic otherwise False."""
-        composition = self.composition()
-        if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
-            return True
-        else:
-            return False
-
-    @property
-    def is_noble(self) -> bool:
-        """True if the species is a noble gas, otherwise False."""
-        if self.formula in NOBLE_GASES:
-            return True
-        else:
-            return False
 
     @_mass_decorator
     def mass(
@@ -1147,13 +1156,12 @@ class GasSpecies(ChemicalComponent):
             system: Interior atmosphere system
             element: Returns the mass for an element. Defaults to None to return the species mass.
                This argument is used by the @_mass_decorator.
-            store_output: Store the output.
 
         Returns:
             Total mass of the species (element=None) or element (element=element)
         """
 
-        reservoir_masses: dict[str, float] = self.mass(
+        species_masses: dict[str, float] = self.mass(
             planet=planet,
             system=system,
             element=element,
@@ -1165,28 +1173,26 @@ class GasSpecies(ChemicalComponent):
         fugacity_coefficient: float = 10 ** system.log10_fugacity_coefficients_dict[self.formula]
         volume_mixing_ratio: float = pressure / system.total_pressure
 
-        atmosphere: SpeciesAtmosphereOutput = SpeciesAtmosphereOutput(
-            species=self,
-            mass=reservoir_masses["atmosphere"],
+        atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
+            molar_mass=self.molar_mass,
+            mass=species_masses["atmosphere"],
             fugacity=fugacity,
             fugacity_coefficient=fugacity_coefficient,
             pressure=pressure,
             volume_mixing_ratio=volume_mixing_ratio,
         )
         melt: MantleReservoirOutput = MantleReservoirOutput(
-            species=self,
-            reservoir="melt",
+            molar_mass=self.molar_mass,
             reservoir_mass=planet.mantle_melt_mass,
-            mass=reservoir_masses["melt"],
+            mass=species_masses["melt"],
         )
         solid: MantleReservoirOutput = MantleReservoirOutput(
-            species=self,
-            reservoir="solid",
+            molar_mass=self.molar_mass,
             reservoir_mass=planet.mantle_solid_mass,
-            mass=reservoir_masses["solid"],
+            mass=species_masses["solid"],
         )
-        # self.output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
-        self.output = atmosphere  # GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
+
+        self.output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
 
 
 @dataclass(kw_only=True)
@@ -1202,6 +1208,12 @@ class CondensedSpecies(ChemicalComponent):
         formula: Chemical formula
         thermodynamic_dataset: The thermodynamic dataset
         name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        atoms: Number of atoms
+        composition: Composition
+        hill_formula: Hill formula
+        is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
+        is_noble: True if a noble gas, otherwise False
+        molar_mass: Molar mass
         activity: Activity, which is always ideal
     """
 

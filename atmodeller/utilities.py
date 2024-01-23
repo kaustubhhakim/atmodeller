@@ -20,7 +20,10 @@ from __future__ import annotations
 
 import functools
 import logging
+import pprint
 from collections import OrderedDict, abc
+from collections.abc import MutableMapping
+from dataclasses import asdict
 from typing import Any, Callable, Type, TypeVar
 
 from molmass import Formula
@@ -127,3 +130,43 @@ class UnitConversion:
     def weight_percent_to_ppmw(value_weight_percent: float = 1) -> float:
         """Weight percent to parts-per-million by weight"""
         return value_weight_percent * 1.0e4
+
+
+def flatten(
+    dictionary: MutableMapping[Any, Any], parent_key: str = "", separator: str = "_"
+) -> dict[Any, Any]:
+    """Flattens a nested dictionary and compresses keys
+
+    https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
+
+    Args:
+        dictionary: A MutableMapping
+        parent_key: Parent key
+        separator: Separator for keys
+
+    Returns:
+        A flattened dictionary
+    """
+    items: list = []
+    for key, value in dictionary.items():
+        new_key: str = parent_key + separator + key if parent_key else key
+        if isinstance(value, MutableMapping):
+            items.extend(flatten(value, new_key, separator=separator).items())
+        else:
+            items.append((new_key, value))
+
+    return dict(items)
+
+
+def dataclass_to_logger(data_instance, logger: logging.Logger, log_level=logging.INFO) -> None:
+    """Logs the attributes of a dataclass.
+
+    Args:
+        data_instance: A dataclass
+        logger: The logger to log to
+        log_level: Log level to use. Defaults to INFO.
+    """
+    data: dict[Any, Any] = flatten(asdict(data_instance))
+
+    for key, value in data.items():
+        logger.log(log_level, "%s = %s", key, value)

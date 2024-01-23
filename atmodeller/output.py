@@ -27,8 +27,9 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from atmodeller.utilities import UnitConversion, flatten
+
 if TYPE_CHECKING:
-    from atmodeller.interfaces import GasSpecies
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -36,57 +37,58 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True)
 class ReservoirOutput:
-    """Mass and moles of a species or element in a reservoir
+    """Mass and moles of a species in a reservoir
 
     Args:
-        species: GasSpecies
-        reservoir: Reservoir name (e.g., atmosphere, (silicate) melt, (silicate) solid)
-        mass: Mass in kg
+        mass: Mass of the species in the reservoir in kg
+        molar_mass: Molar mass of the species
 
     Attributes:
         See Args.
         moles: Moles
     """
 
-    species: GasSpecies
-    reservoir: str
     mass: float
+    molar_mass: float
+    moles: float = field(init=False)
 
-    @property
-    def moles(self) -> float:
-        return self.mass / self.species.molar_mass
+    def __post_init__(self):
+        self.moles = self.mass / self.molar_mass
 
 
 @dataclass(kw_only=True)
 class MantleReservoirOutput(ReservoirOutput):
-    """A species or element in a mantle reservoir
+    """A species in a mantle reservoir
 
     Args:
-        species: GasSpecies
-        reservoir: Reservoir name (e.g., atmosphere, (silicate) melt, (silicate) solid)
-        reservoir_mass: Mass of the mantle reservoir
-        mass: Mass in kg
-        ppmw: Part-per-million by weight
+        mass: Mass of the species in the reservoir in kg
+        molar_mass: Molar mass of the species
+        reservoir_mass: Mass of the mantle reservoir in kg
 
     Attributes:
         See Args.
+        moles: Moles
+        ppmw: Parts-per-million by weight
     """
 
     reservoir_mass: float
+    ppmw: float = field(init=False)
 
-    @property
-    def ppmw(self) -> float:
-        return self.mass / self.reservoir_mass
+    def __post_init__(self):
+        super().__post_init__()
+        if self.reservoir_mass > 0:
+            self.ppmw = UnitConversion.fraction_to_ppm(self.mass / self.reservoir_mass)
+        else:
+            self.ppmw = 0
 
 
 @dataclass(kw_only=True)
-class SpeciesAtmosphereOutput(ReservoirOutput):
+class AtmosphereReservoirOutput(ReservoirOutput):
     """A species in the atmosphere
 
     Args:
-        name: Species name
-        mass: Mass in kg
-        moles: Moles
+        mass: Mass of the species in the reservoir in kg
+        molar_mass: Molar mass of the species
         fugacity: Fugacity in bar
         fugacity_coefficient: Fugacity coefficient
         pressure: Pressure in bar
@@ -94,13 +96,13 @@ class SpeciesAtmosphereOutput(ReservoirOutput):
 
     Attributes:
         See Args.
+        moles: Moles
     """
 
     fugacity: float
     fugacity_coefficient: float
     pressure: float
     volume_mixing_ratio: float
-    reservoir: str = field(init=False, default="atmosphere")
 
 
 @dataclass(kw_only=True)
@@ -113,11 +115,12 @@ class CondensedSpeciesOutput:
     activity: float
 
 
+# TODO: Compute elemental breakdowns.
 @dataclass(kw_only=True)
 class GasSpeciesOutput:
     """Output for a gas species"""
 
-    atmosphere: SpeciesAtmosphereOutput
+    atmosphere: AtmosphereReservoirOutput
     melt: MantleReservoirOutput
     solid: MantleReservoirOutput
 
@@ -129,7 +132,8 @@ class GasSpeciesOutput:
     def moles_total(self) -> float:
         return self.atmosphere.moles + self.melt.moles + self.solid.moles
 
-    # TODO: Compute elemental breakdowns.
+    def asdict(self) -> dict:
+        return flatten(asdict(self))
 
 
 class Output(UserDict):
@@ -235,7 +239,8 @@ class Output(UserDict):
         for species in interior_atmosphere.species.gas_species.values():
             assert species.output is not None
             data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
-            data_list.append(asdict(species.output))
+            data_list.append(species.output.asdict())
+            print(species.output.asdict())
 
     def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem):
         """Adds the residual.
