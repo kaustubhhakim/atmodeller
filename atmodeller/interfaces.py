@@ -35,7 +35,6 @@ from atmodeller.output import (
     CondensedSpeciesOutput,
     GasSpeciesOutput,
     MantleReservoirOutput,
-    ReservoirOutput,
     SpeciesAtmosphereOutput,
 )
 from atmodeller.utilities import UnitConversion
@@ -898,7 +897,9 @@ def _mass_decorator(func) -> Callable:
     """A decorator to return the mass of either the gas species or one of its elements."""
 
     @wraps(func)
-    def mass_wrapper(self: GasSpecies, element: Optional[str] = None, **kwargs) -> float:
+    def mass_wrapper(
+        self: GasSpecies, element: Optional[str] = None, **kwargs
+    ) -> dict[str, float]:
         """Wrapper to return the mass of either the gas species or one of its elements.
 
         Args:
@@ -908,12 +909,18 @@ def _mass_decorator(func) -> Callable:
         Returns:
             Mass of either the gas species or one of its elements.
         """
-        mass: float = func(self, **kwargs)
+        mass: dict[str, float] = func(self, **kwargs)
         if element is not None:
             try:
-                mass *= UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
+                factor: float = (
+                    UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
+                )
+                # mass *= UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
             except KeyError:  # Element not in formula so mass is zero.
-                mass = 0
+                factor = 0
+            # TODO: Check
+            for key in mass:
+                mass[key] *= factor
 
         return mass
 
@@ -1078,8 +1085,63 @@ class GasSpecies(ChemicalComponent):
         planet: Planet,
         system: InteriorAtmosphereSystem,
         element: Optional[str] = None,
-        store_output: bool = False,
-    ) -> float:
+    ) -> dict[str, float]:
+        """Calculates the total mass of the species or element.
+
+        Args:
+            planet: Planet properties
+            system: Interior atmosphere system
+            element: Returns the mass for an element. Defaults to None to return the species mass.
+               This argument is used by the @_mass_decorator.
+
+        Returns:
+            Total mass of the species (element=None) or element (element=element)
+        """
+
+        del element
+
+        pressure: float = system.solution_dict[self.formula]
+        fugacity: float = system.fugacities_dict[self.formula]
+
+        # Atmosphere
+        mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
+        mass_in_atmosphere *= (
+            planet.surface_area * self.molar_mass / system.atmospheric_mean_molar_mass
+        )
+
+        # Melt
+        ppmw_in_melt: float = self.solubility.get_value(
+            fugacity=fugacity,
+            temperature=planet.surface_temperature,
+            log10_fugacities_dict=system.log10_fugacities_dict,
+            pressure=system.total_pressure,
+        )
+        mass_in_melt: float = (
+            system.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
+        )
+
+        # Solid
+        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
+        mass_in_solid: float = (
+            system.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+        )
+
+        output: dict[str, float] = {
+            "atmosphere": mass_in_atmosphere,
+            "melt": mass_in_melt,
+            "solid": mass_in_solid,
+        }
+
+        return output
+
+    @_mass_decorator
+    def store_output(
+        self,
+        *,
+        planet: Planet,
+        system: InteriorAtmosphereSystem,
+        element: Optional[str] = None,
+    ) -> None:
         """Calculates the total mass of the species or element.
 
         Args:
@@ -1097,76 +1159,31 @@ class GasSpecies(ChemicalComponent):
 
         pressure: float = system.solution_dict[self.formula]
         fugacity: float = system.fugacities_dict[self.formula]
+
         fugacity_coefficient: float = 10 ** system.log10_fugacity_coefficients_dict[self.formula]
-
-        # Atmosphere
-        mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
-        mass_in_atmosphere *= (
-            planet.surface_area * self.molar_mass / system.atmospheric_mean_molar_mass
-        )
         volume_mixing_ratio: float = pressure / system.total_pressure
-        moles_in_atmosphere: float = mass_in_atmosphere / self.molar_mass
 
-        # Melt
-        ppmw_in_melt: float = self.solubility.get_value(
+        atmosphere: SpeciesAtmosphereOutput = SpeciesAtmosphereOutput(
+            species=self,
+            mass=mass_in_atmosphere,
             fugacity=fugacity,
-            temperature=planet.surface_temperature,
-            log10_fugacities_dict=system.log10_fugacities_dict,
-            pressure=system.total_pressure,
+            fugacity_coefficient=fugacity_coefficient,
+            pressure=pressure,
+            volume_mixing_ratio=volume_mixing_ratio,
         )
-        mass_in_melt: float = (
-            system.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
+        melt: MantleReservoirOutput = MantleReservoirOutput(
+            species=self,
+            reservoir="melt",
+            mass=mass_in_melt,
+            ppmw=ppmw_in_melt,
         )
-        moles_in_melt: float = mass_in_melt / self.molar_mass
-
-        # Solid
-        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
-        mass_in_solid: float = (
-            system.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+        solid: MantleReservoirOutput = MantleReservoirOutput(
+            species=self,
+            reservoir="solid",
+            mass=mass_in_solid,
+            ppmw=ppmw_in_solid,
         )
-        moles_in_solid: float = mass_in_solid / self.molar_mass
-
-        if store_output:
-            atmosphere: SpeciesAtmosphereOutput = SpeciesAtmosphereOutput(
-                name=self.formula,
-                mass=mass_in_atmosphere,
-                moles=moles_in_atmosphere,
-                fugacity=fugacity,
-                fugacity_coefficient=fugacity_coefficient,
-                pressure=pressure,
-                volume_mixing_ratio=volume_mixing_ratio,
-            )
-            melt: MantleReservoirOutput = MantleReservoirOutput(
-                name=self.formula,
-                reservoir="melt",
-                mass=mass_in_melt,
-                moles=moles_in_melt,
-                ppmw=ppmw_in_melt,
-            )
-            solid: MantleReservoirOutput = MantleReservoirOutput(
-                name=self.formula,
-                reservoir="solid",
-                mass=mass_in_solid,
-                moles=moles_in_solid,
-                ppmw=ppmw_in_solid,
-            )
-            self.output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
-            # self.output = GasSpeciesOutput(
-            #     mass_in_atmosphere=mass_in_atmosphere,
-            #     mass_in_solid=mass_in_solid,
-            #     mass_in_melt=mass_in_melt,
-            #     moles_in_atmosphere=moles_in_atmosphere,
-            #     moles_in_melt=moles_in_melt,
-            #     moles_in_solid=moles_in_solid,
-            #     ppmw_in_solid=ppmw_in_solid,
-            #     ppmw_in_melt=ppmw_in_melt,
-            #     fugacity=fugacity,
-            #     fugacity_coefficient=fugacity_coefficient,
-            #     pressure=pressure,
-            #     volume_mixing_ratio=volume_mixing_ratio,
-            # )
-
-        return mass_in_atmosphere + mass_in_melt + mass_in_solid
+        self.output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
 
 
 @dataclass(kw_only=True)

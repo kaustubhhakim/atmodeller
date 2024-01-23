@@ -27,10 +27,11 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-logger: logging.Logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
+    from atmodeller.interfaces import GasSpecies
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
@@ -38,20 +39,22 @@ class ReservoirOutput:
     """Mass and moles of a species or element in a reservoir
 
     Args:
-        name: Species or element name
+        species: GasSpecies
         reservoir: Reservoir name (e.g., atmosphere, (silicate) melt, (silicate) solid)
         mass: Mass in kg
-        moles: Moles
 
     Attributes:
         See Args.
+        moles: Moles
     """
 
-    # TODO: Might need species to get molar mass for mass <--> moles conversion
-    name: str
+    species: GasSpecies
     reservoir: str
     mass: float
-    moles: float
+
+    @property
+    def moles(self) -> float:
+        return self.mass / self.species.molar_mass
 
 
 @dataclass(kw_only=True)
