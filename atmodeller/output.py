@@ -288,7 +288,9 @@ class Output(UserDict):
                 molar_mass=molar_mass, mass=element_mass["solid"]
             )
             output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
-            data_list: list[dict[str, float]] = self.data.setdefault(element, [])
+            # Create a unique key name to avoid a potential name conflict with atomic species
+            key_name: str = f"{element}_totals"
+            data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
             data_list.append(output.asdict())
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
