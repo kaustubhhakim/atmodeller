@@ -325,17 +325,17 @@ def test_non_ideal() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "CH4": 10.374185001822335,
-        "CO": 275.1721430723753,
-        "CO2": 65.30951836095214,
-        "H2": 696.9435961399346,
-        "H2O": 933.3255567030764,
-        "O2": 9.862215541051231e-08,
+        "CH4": 10.475707268187382,
+        "CO": 277.8942949175459,
+        "CO2": 65.96337637262027,
+        "H2": 696.5849953455706,
+        "H2O": 933.2499010489084,
+        "O2": 9.864116211201776e-08,
     }
 
     # Initial solution (i.e. estimates) must correspond by position to the order in the species
     # You don't actually need to specify initial estimates for this test to find a solution, but
-    # it is here to show the user how to implement them if desired. Remember that the initial
+    # it is here to show the user how to implement them if desired.
     initial_solution: np.ndarray = np.array([1000, 1000, 1e-7, 100, 10, 1])
 
     system.solve(constraints, factor=1, initial_solution=initial_solution)

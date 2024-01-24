@@ -289,11 +289,11 @@ def test_H_and_C() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "CO": 59.65949387634169,
-        "CO2": 13.399727189920911,
-        "H2": 0.2521808713740826,
-        "H2O": 0.2582435801202491,
-        "O2": 8.740106362890969e-08,
+        "CO": 59.6819921102523,
+        "CO2": 13.404792068284909,
+        "H2": 0.2521806525810137,
+        "H2O": 0.25824358142493425,
+        "O2": 8.740121617121534e-08,
     }
 
     system.solve(SystemConstraints(constraints))

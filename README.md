@@ -60,17 +60,26 @@ Several Jupyter notebook tutorials are provided in `notebooks/`.
 
 ## Tests
 
-You can confirm that all tests pass by running `pytest` in the root directory. Please add more tests if you add new features. Note that `pip install .` in the *Quick install* instructions above will not install `pytest`, in which case you will need to install `pytest` separately.
+You can confirm that all tests pass by running `pytest` in the root directory. Please add more tests if you add new features. Note that `pip install .` in the *Quick install* instructions will not install `pytest` so you will need to install `pytest` separately.
 
-## Troubleshooting
+## User tips and troubleshooting
 
-At its core, *atmodeller* assembles and solves a system of non-linear equations and is therefore subject to the same considerations when solving any system of non-linear equations. *atmodeller* uses `scipy.optimize.root` to select and drive the behaviour of the solver. Arguments can be passed to this function by specifiying arguments when you call `solve()` on an instance of `InteriorAtmosphereSystem`. The default solver is `hybr`, but you can experiment with other solvers as well as the tolerance parameter `tol`.
+### 1. JANAF data
+
+*Atmodeller* downloads and caches JANAF data, which means that the first time you construct and solve a model (using JANAF data) you must have access to the internet to download the thermodynamic data for each species you include. Subsequent models will run faster and will not require internet access, unless you add additional species that are not already cached, in which case these will also need to be downloaded.
+
+Also note that the cached data is stored in the [Thermochem](https://thermochem.readthedocs.io/en/latest/) package directory, which means you will need to download JANAF data every time you run *Atmodeller* in a Python environment that doesn't already have data cached.
+
+
+### 2. Solving interior-atmosphere systems
+
+At its core, *Atmodeller* assembles and solves a system of non-linear equations and is therefore subject to the same considerations when solving any system of non-linear equations. *Atmodeller* uses `scipy.optimize.root` to select and drive the behaviour of the solver. Arguments can be passed to this function by specifiying arguments when you call `solve()` on an instance of `InteriorAtmosphereSystem`. The default solver is `hybr`, but you can experiment with other solvers as well as the tolerance parameter `tol`.
 
 The following provides some guidance if you are facing challenges with obtaining a solution to your interior-atmosphere system:
 
-1. Confirm that a solution exists. Although *atmodeller* allows you to build a system of arbitrary user-imposed constraints (pressure, fugacity, mass, etc.) this does not necessarily mean that there is a physical solution to the system. If *atmodeller* cannot find a solution it might simply be because a solution does not exist for your imposed constraints. In this regard, it can help to impose a total pressure constraint to first uncover the general behaviour of the solution before imposing pressure or fugacity constraints on individual species.
+1. Confirm that a solution exists. Although *Atmodeller* allows you to build a system of arbitrary user-imposed constraints (pressure, fugacity, mass, etc.) this does not necessarily mean that there is a physical solution to the system. If *Atmodeller* cannot find a solution it might simply be because a solution does not exist for your imposed constraints. In this regard, it can help to impose a total pressure constraint to first uncover the general behaviour of the solution before imposing pressure or fugacity constraints on individual species.
 
-1. Confirm that the species chosen for your reaction network are appropriate for the pressure and temperature conditions of interest. We recall that *atmodeller* does not perform any internal tests to determine whether or not the species you have chosen are thermodynamically stable at the specified conditions. Hence prior knowledge, intuition, or calculations with a Gibbs minimiser are required to guide the choice of species. Related, if the dynamic range of the species abundances is too large then you may encounter problems.
+1. Confirm that the species chosen for your reaction network are appropriate for the pressure and temperature conditions of interest. We recall that *Atmodeller* does not perform any internal tests to determine whether or not the species you have chosen are thermodynamically stable at the specified conditions. Hence prior knowledge, intuition, or calculations with a Gibbs minimiser are required to guide the choice of species. Related, if the dynamic range of the species abundances is too large then you may encounter problems.
 
 1. Numerical overflow can occur when the solver steps to a region of parameter space that causes the pressure to become too large. This is because the reaction network component of the non-linear system is formulated in terms of log10(pressure), but the actual pressure is required for mass balance and hence 10**log10(pressure) is computed. In this regard, reducing the `factor` parameter can prevent the solver from stepping too far [(read more)](https://docs.scipy.org/doc/scipy/reference/optimize.root-hybr.html).
 
