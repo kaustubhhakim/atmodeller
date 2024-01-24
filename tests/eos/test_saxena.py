@@ -19,8 +19,8 @@ see <https://www.gnu.org/licenses/>.
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.eos.interfaces import RealGasABC
 from atmodeller.eos.saxena import H2_SF87, get_saxena_eos_models
+from atmodeller.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = debug_logger()

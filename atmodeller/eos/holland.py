@@ -90,9 +90,9 @@ from atmodeller.eos.interfaces import (
     MRKCriticalBehaviour,
     MRKExplicitABC,
     MRKImplicitABC,
-    RealGasABC,
     critical_data_dictionary,
 )
+from atmodeller.interfaces import RealGasABC
 
 logger: logging.Logger = logging.getLogger(__name__)
 

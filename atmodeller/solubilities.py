@@ -23,7 +23,7 @@ import logging
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import Solubility, limit_solubility
+from atmodeller.interfaces import SolubilityABC, limit_solubility
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ SULFUR_MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(1)  # 1% by w
 # region Andesite solubility
 
 
-class AndesiteH2(Solubility):
+class AndesiteH2(SolubilityABC):
     """Hirschmann et al. 2012, H2 solubility in silicate melts
 
     https://ui.adsabs.harvard.edu/abs/2012E%26PSL.345...38H/abstract
@@ -58,7 +58,7 @@ class AndesiteH2(Solubility):
         return ppmw
 
 
-class AndesiteS2_Sulfate(Solubility):
+class AndesiteS2_Sulfate(SolubilityABC):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
     https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
@@ -88,7 +88,7 @@ class AndesiteS2_Sulfate(Solubility):
         return ppmw
 
 
-class AndesiteS2_Sulfide(Solubility):
+class AndesiteS2_Sulfide(SolubilityABC):
     """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
 
     https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
@@ -117,15 +117,15 @@ class AndesiteS2_Sulfide(Solubility):
         return ppmw
 
 
-class AndesiteS2(Solubility):
+class AndesiteS2(SolubilityABC):
     """Boulliung & Wood 2022, 2023. Total S solubility accounting for both sulfide and sulfate dissolution.
 
     Adding sufate solubility (Boulliung & Wood 2022) and sulfide solubility (Boulliun & Wood 2023)
     """
 
     def __init__(self):
-        self.sulfide_solubility: Solubility = AndesiteS2_Sulfide()
-        self.sulfate_solubility: Solubility = AndesiteS2_Sulfate()
+        self.sulfide_solubility: SolubilityABC = AndesiteS2_Sulfide()
+        self.sulfate_solubility: SolubilityABC = AndesiteS2_Sulfate()
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(self, *args, **kwargs) -> float:
@@ -138,7 +138,7 @@ class AndesiteS2(Solubility):
 # endregion
 
 
-class AnorthiteDiopsideH2O(Solubility):
+class AnorthiteDiopsideH2O(SolubilityABC):
     """Newcombe et al. (2017). Water solubility in lunar basalt and Anorthite-Diopside-Eutectic compositions.
 
     https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
@@ -165,7 +165,7 @@ class AnorthiteDiopsideH2O(Solubility):
 # region Basalt solubility
 
 
-class BasaltDixonCO2(Solubility):
+class BasaltDixonCO2(SolubilityABC):
     """Dixon et al. (1995). H2O and CO2 solubilities in MORB liquids
 
     https://academic.oup.com/petrology/article/36/6/1607/1493308?login=true
@@ -188,7 +188,7 @@ class BasaltDixonCO2(Solubility):
         return ppmw
 
 
-class BasaltDixonH2O(Solubility):
+class BasaltDixonH2O(SolubilityABC):
     """Dixon et al. (1995). H2O and CO2 solubilities in MORB liquids
 
     https://academic.oup.com/petrology/article/36/6/1607/1493308?login=true
@@ -211,7 +211,7 @@ class BasaltDixonH2O(Solubility):
         return self.power_law(fugacity, 965, 0.5)
 
 
-class BasaltH2(Solubility):
+class BasaltH2(SolubilityABC):
     """Hirschmann et al. 2012, H2 solubility in silicate melts
 
     https://ui.adsabs.harvard.edu/abs/2012E%26PSL.345...38H/abstract
@@ -235,7 +235,7 @@ class BasaltH2(Solubility):
         return ppmw
 
 
-class BasaltLibourelN2(Solubility):
+class BasaltLibourelN2(SolubilityABC):
     """Libourel et al. (2003), basalt (tholeiitic) magmas.
 
     https://ui.adsabs.harvard.edu/abs/2003GeCoA..67.4123L/abstract
@@ -262,7 +262,7 @@ class BasaltLibourelN2(Solubility):
         return ppmw
 
 
-class BasaltDasguptaN2(Solubility):
+class BasaltDasguptaN2(SolubilityABC):
     """Dasgupta et al. 2022. Solubility of N in silicate melts.
 
     https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..291D/abstract
@@ -301,7 +301,7 @@ class BasaltDasguptaN2(Solubility):
         return ppmw
 
 
-class BasaltBernadouN2(Solubility):
+class BasaltBernadouN2(SolubilityABC):
     """Bernadou et al. 2021.Solubility of Nitrogen in basaltic silicate melt
 
     https://ui.adsabs.harvard.edu/abs/2021ChGeo.57320192B/abstract
@@ -333,7 +333,7 @@ class BasaltBernadouN2(Solubility):
         return ppmw
 
 
-class BasaltS2_Sulfate(Solubility):
+class BasaltS2_Sulfate(SolubilityABC):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
     https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
@@ -366,7 +366,7 @@ class BasaltS2_Sulfate(Solubility):
         return ppmw
 
 
-class BasaltS2_Sulfide(Solubility):
+class BasaltS2_Sulfide(SolubilityABC):
     """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
 
     https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
@@ -395,15 +395,15 @@ class BasaltS2_Sulfide(Solubility):
         return ppmw
 
 
-class BasaltS2(Solubility):
+class BasaltS2(SolubilityABC):
     """Total S solubility accounting for both sulfide and sulfate dissolution.
 
     Adding sufate solubility (Boulliung & Wood 2022) and sulfide solubility (Boulliun & Wood 2023)
     """
 
     def __init__(self):
-        self.sulfide_solubility: Solubility = BasaltS2_Sulfide()
-        self.sulfate_solubility: Solubility = BasaltS2_Sulfate()
+        self.sulfide_solubility: SolubilityABC = BasaltS2_Sulfide()
+        self.sulfate_solubility: SolubilityABC = BasaltS2_Sulfate()
 
     @limit_solubility(SULFUR_MAXIMUM_PPMW)
     def _solubility(self, *args, **kwargs) -> float:
@@ -413,7 +413,7 @@ class BasaltS2(Solubility):
         return solubility
 
 
-class BasaltWilsonH2O(Solubility):
+class BasaltWilsonH2O(SolubilityABC):
     """Wilson and Head (1981) and Hamilton et al. (1964)
 
     https://ui.adsabs.harvard.edu/abs/1981JGR....86.2971W/abstract
@@ -437,7 +437,7 @@ class BasaltWilsonH2O(Solubility):
         return self.power_law(fugacity, 215, 0.7)
 
 
-class TBasaltS2_Sulfate(Solubility):
+class TBasaltS2_Sulfate(SolubilityABC):
     """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
 
     https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
@@ -467,7 +467,7 @@ class TBasaltS2_Sulfate(Solubility):
         return ppmw
 
 
-class TBasaltS2_Sulfide(Solubility):
+class TBasaltS2_Sulfide(SolubilityABC):
     """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
 
     https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
@@ -499,7 +499,7 @@ class TBasaltS2_Sulfide(Solubility):
 # endregion
 
 
-class LunarGlassH2O(Solubility):
+class LunarGlassH2O(SolubilityABC):
     """Newcombe et al. (2017). Water solubility in lunar basalt and Anorthite-Diopside-Eutectic compositions.
 
     https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
@@ -522,7 +522,7 @@ class LunarGlassH2O(Solubility):
         return self.power_law(fugacity, 683, 0.5)
 
 
-class MercuryMagmaS(Solubility):
+class MercuryMagmaS(SolubilityABC):
     """Namur et al. 2016. Sulfur solubility in reduced mafic silicate melts relevant for Mercury
 
     https://ui.adsabs.harvard.edu/abs/2016E%26PSL.448..102N/abstract
@@ -555,7 +555,7 @@ class MercuryMagmaS(Solubility):
         return ppmw
 
 
-class PeridotiteH2O(Solubility):
+class PeridotiteH2O(SolubilityABC):
     """Sossi et al. (2023). Solubility of water in peridotite liquids
 
     https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
@@ -577,7 +577,7 @@ class PeridotiteH2O(Solubility):
         return self.power_law(fugacity, 647, 0.5)
 
 
-class SilicicMeltsH2(Solubility):
+class SilicicMeltsH2(SolubilityABC):
     """Gaillard et al. 2003. Fe-H redox exchange in silicate glasses
 
     https://ui.adsabs.harvard.edu/abs/2003GeCoA..67.2427G/abstract
@@ -600,7 +600,7 @@ class SilicicMeltsH2(Solubility):
         return ppmw
 
 
-class BasaltCO(Solubility):
+class BasaltCO(SolubilityABC):
     """Yoshioka et al. 2019. Carbon solubility in silicate melts
 
     https://ui.adsabs.harvard.edu/abs/2019GeCoA.259..129Y/abstract
@@ -625,7 +625,7 @@ class BasaltCO(Solubility):
         return ppmw
 
 
-class RhyoliteCO(Solubility):
+class RhyoliteCO(SolubilityABC):
     """Yoshioka et al. 2019. Carbon solubility in silicate melts
 
     https://ui.adsabs.harvard.edu/abs/2019GeCoA.259..129Y/abstract
@@ -650,7 +650,7 @@ class RhyoliteCO(Solubility):
         return ppmw
 
 
-class BasaltArmstrongCO(Solubility):
+class BasaltArmstrongCO(SolubilityABC):
     """Armstrong et al. 2015. Solubility of volatiles in mafic melts under reduced conditions
 
     https://ui.adsabs.harvard.edu/abs/2015GeCoA.171..283A/abstract
@@ -675,7 +675,7 @@ class BasaltArmstrongCO(Solubility):
         return ppmw
 
 
-class BasaltCH4(Solubility):
+class BasaltCH4(SolubilityABC):
     """Ardia et al. 2013, CH4 solubility in haplobasalt (Fe-free) silicate melt.
 
     https://ui.adsabs.harvard.edu/abs/2013GeCoA.114...52A/abstract
@@ -700,7 +700,7 @@ class BasaltCH4(Solubility):
         return ppmw
 
 
-class BasaltHe(Solubility):
+class BasaltHe(SolubilityABC):
     """Jambon et al. 1986, Solubility of He in tholeittic basalt melt
 
     https://ui.adsabs.harvard.edu/abs/1986GeCoA..50..401J/abstract
@@ -729,7 +729,7 @@ class BasaltHe(Solubility):
         return ppmw
 
 
-class BasaltCl2(Solubility):
+class BasaltCl2(SolubilityABC):
     """Thomas & Wood 2021. Solubility of chlorine in silicate melts
 
     https://ui.adsabs.harvard.edu/abs/2021GeCoA.294...28T/abstract
@@ -754,7 +754,7 @@ class BasaltCl2(Solubility):
         return ppmw
 
 
-class AnorthiteDiopsideForsteriteCl2(Solubility):
+class AnorthiteDiopsideForsteriteCl2(SolubilityABC):
     """Thomas & Wood 2021. Solubility of chlorine in silicate melts
 
     https://ui.adsabs.harvard.edu/abs/2021GeCoA.294...28T/abstract
@@ -781,13 +781,13 @@ class AnorthiteDiopsideForsteriteCl2(Solubility):
 
 
 # Dictionaries of self-consistent solubility laws for a given composition.
-andesite_solubilities: dict[str, Solubility] = {
+andesite_solubilities: dict[str, SolubilityABC] = {
     "H2": AndesiteH2(),
     "S2": AndesiteS2(),
 }
 
-anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
-basalt_solubilities: dict[str, Solubility] = {
+anorthdiop_solubilities: dict[str, SolubilityABC] = {"H2O": AnorthiteDiopsideH2O()}
+basalt_solubilities: dict[str, SolubilityABC] = {
     "H2O": BasaltDixonH2O(),
     "CO2": BasaltDixonCO2(),
     "H2": BasaltH2(),
@@ -798,16 +798,16 @@ basalt_solubilities: dict[str, Solubility] = {
     "Cl2": BasaltCl2(),
     "CH4": BasaltCH4(),
 }
-rhyolite_solubilities: dict[str, Solubility] = {
+rhyolite_solubilities: dict[str, SolubilityABC] = {
     "CO": RhyoliteCO(),
 }
-peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O()}
-reducedmagma_solubilities: dict[str, Solubility] = {"H2S": MercuryMagmaS()}
+peridotite_solubilities: dict[str, SolubilityABC] = {"H2O": PeridotiteH2O()}
+reducedmagma_solubilities: dict[str, SolubilityABC] = {"H2S": MercuryMagmaS()}
 
 # Dictionary of all the composition solubilities. Lowercase key name by convention. All of the
 # dictionaries with self-consistent solubility laws for a given composition (above) should be
 # included in this dictionary.
-composition_solubilities: dict[str, dict[str, Solubility]] = {
+composition_solubilities: dict[str, dict[str, SolubilityABC]] = {
     "basalt": basalt_solubilities,
     "andesite": andesite_solubilities,
     "peridotite": peridotite_solubilities,

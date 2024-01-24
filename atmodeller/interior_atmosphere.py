@@ -30,15 +30,14 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.initial_condition import InitialConditionABC, InitialConditionConstant
-from atmodeller.interfaces import (
+from atmodeller.core import (
     ChemicalComponent,
     CondensedSpecies,
-    ConstraintABC,
     GasSpecies,
     NoSolubility,
-    Solubility,
 )
+from atmodeller.initial_condition import InitialConditionConstant
+from atmodeller.interfaces import ConstraintABC, InitialConditionABC, SolubilityABC
 from atmodeller.output import Output
 from atmodeller.solubilities import composition_solubilities
 from atmodeller.utilities import dataclass_to_logger, filter_by_type
@@ -164,7 +163,7 @@ class Species(UserList):
             )
             logger.info(msg)
             try:
-                solubilities: dict[str, Solubility] = composition_solubilities[
+                solubilities: dict[str, SolubilityABC] = composition_solubilities[
                     planet.melt_composition.casefold()
                 ]
             except KeyError:

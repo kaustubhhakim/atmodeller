@@ -31,57 +31,13 @@ from sklearn.linear_model import SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
-from atmodeller.interfaces import GetValueABC
+from atmodeller.interfaces import InitialConditionABC
 from atmodeller.output import Output
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import Species
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass
-class InitialConditionABC(GetValueABC):
-    """Initial condition base class
-
-    The return type also permits np.ndarray whereas the base class only permits float.
-    """
-
-    def __post_init__(self):
-        logger.info("Creating %s", self.__class__.__name__)
-
-    def get_value(self, *args, **kwargs) -> np.ndarray | float:
-        """Computes the value for given input arguments.
-
-        See base class.
-        """
-        ...
-
-    def get_log10_value(
-        self, evaluated_log10_constraints: np.ndarray, *args, **kwargs
-    ) -> np.ndarray | float:
-        """Computes the log10 value for given input arguments.
-
-        Args:
-            evaluated_log10_constraints: An array of the log10 constraints evaluated at current
-                conditions
-            *args: Arbitrary positional arguments
-            **kwargs: Arbitrary keyword arguments
-
-        Returns
-            The initial condition
-        """
-        return super().get_log10_value(evaluated_log10_constraints, *args, **kwargs)
-
-    def update(self, output: Output, *args, **kwargs) -> None:
-        """Updates the initial condition.
-
-        Args;
-            output: output
-            *args: Arbitrary positional arguments
-            **kwargs: Arbitrary keyword arguments
-        """
-        ...
 
 
 @dataclass

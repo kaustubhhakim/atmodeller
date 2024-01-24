@@ -70,11 +70,8 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from atmodeller import GAS_CONSTANT_BAR
-from atmodeller.eos.interfaces import (
-    CombinedEOSModel,
-    RealGasABC,
-    critical_data_dictionary,
-)
+from atmodeller.eos.interfaces import CombinedEOSModel, critical_data_dictionary
+from atmodeller.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)

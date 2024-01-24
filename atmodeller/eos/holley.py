@@ -62,7 +62,7 @@ import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
-from atmodeller.eos.interfaces import RealGasABC
+from atmodeller.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)

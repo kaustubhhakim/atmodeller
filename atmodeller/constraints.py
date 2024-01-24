@@ -30,7 +30,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import ConstantConstraint, ConstraintABC
+from atmodeller.core import ConstantConstraint
+from atmodeller.interfaces import ConstraintABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import pprint
 from collections import OrderedDict, abc
 from collections.abc import MutableMapping
 from dataclasses import asdict
