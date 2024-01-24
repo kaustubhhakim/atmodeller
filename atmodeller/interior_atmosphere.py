@@ -54,20 +54,20 @@ class Planet:
     values suitable for modelling a fully molten Earth-like planet.
 
     Args:
-        mantle_mass: Mass of the planetary mantle. Defaults to Earth.
+        mantle_mass: Mass of the planetary mantle in kg. Defaults to Earth.
         mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
         core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
             Earth.
-        surface_radius: Radius of the planetary surface. Defaults to Earth.
+        surface_radius: Radius of the planetary surface in m. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
         melt_composition: Melt composition of the planet. Default is None.
 
     Attributes:
-        mantle_mass: Mass of the planetary mantle
+        mantle_mass: Mass of the planetary mantle in kg
         mantle_melt_fraction: Mass fraction of the mantle that is molten
-        core_mass_fraction: Mass fraction of the core relative to the planetary mass
-        surface_radius: Radius of the planetary surface
-        surface_temperature: Temperature of the planetary surface
+        core_mass_fraction: Mass fraction of the core relative to the planetary mass (kg/kg)
+        surface_radius: Radius of the planetary surface in m
+        surface_temperature: Temperature of the planetary surface in kelvin
         melt_composition: Melt composition of the planet
         planet_mass: Mass of the planet
         mass_melt_mass: Mass of the mantle that is molten
@@ -76,11 +76,11 @@ class Planet:
         surface_gravity: Surface gravity of the planet
     """
 
-    mantle_mass: float = 4.208261222595111e24  # kg, Earth's mantle mass
-    mantle_melt_fraction: float = 1.0  # Completely molten
-    core_mass_fraction: float = 0.295334691460966  # Earth's core mass fraction
-    surface_radius: float = 6371000.0  # m, Earth's radius
-    surface_temperature: float = 2000.0  # K
+    mantle_mass: float = 4.208261222595111e24
+    mantle_melt_fraction: float = 1.0
+    core_mass_fraction: float = 0.295334691460966
+    surface_radius: float = 6371000.0
+    surface_temperature: float = 2000.0
     melt_composition: str | None = None
     planet_mass: float = field(init=False)
     mantle_melt_mass: float = field(init=False)
