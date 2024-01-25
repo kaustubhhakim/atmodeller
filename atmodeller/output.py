@@ -226,6 +226,7 @@ class Output(UserDict):
         atmosphere_dict: dict[str, float] = {}
         atmosphere_dict["total_pressure"] = interior_atmosphere.total_pressure
         atmosphere_dict["mean_molar_mass"] = interior_atmosphere.atmospheric_mean_molar_mass
+        atmosphere_dict["total_mass"] = interior_atmosphere.total_mass
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere_dict)
 

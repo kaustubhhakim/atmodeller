@@ -40,7 +40,7 @@ from atmodeller.initial_condition import InitialConditionConstant
 from atmodeller.interfaces import ConstraintABC, InitialConditionABC, SolubilityABC
 from atmodeller.output import Output
 from atmodeller.solubilities import composition_solubilities
-from atmodeller.utilities import dataclass_to_logger, filter_by_type
+from atmodeller.utilities import UnitConversion, dataclass_to_logger, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -651,6 +651,13 @@ class InteriorAtmosphereSystem:
         for key, value in self.log10_fugacity_coefficients_dict.items():
             output[key] = np.log10(self.solution_dict[key]) + value
         return output
+
+    @property
+    def total_mass(self) -> float:
+        """Total mass."""
+        mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
+        mass *= self.planet.surface_area
+        return mass
 
     @property
     def total_pressure(self) -> float:
