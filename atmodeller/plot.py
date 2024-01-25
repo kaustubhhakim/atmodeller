@@ -27,17 +27,15 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from atmodeller import debug_logger
 from atmodeller.output import Output
+from atmodeller.utilities import UnitConversion
 
 # Reinstate below when preliminary development and testing is complete
 # logger: logging.Logger = logging.getLogger(__name__)
 logger: logging.Logger = debug_logger()
-
-# TODO: From Maggie. Use constants already in atmodeller.
-OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
-OCEAN_MASS: float = OCEAN_MOLES * (2.016 / 1000)
 
 
 @dataclass
@@ -62,7 +60,7 @@ class Plotter:
 
     def get_element_ratio_in_reservoir(
         self, element1: str, element2: str, reservoir: str = "melt"
-    ) -> pd.Series:
+    ) -> np.ndarray:
         """Gets the mass ratio of two elements in a reservoir
 
         Args:
@@ -81,27 +79,43 @@ class Plotter:
 
         element1_mass: pd.Series = self.dataframes[f"{element1}_totals"][column_name]
         element2_mass: pd.Series = self.dataframes[f"{element2}_totals"][column_name]
+        mass_ratio: pd.Series = element1_mass / element2_mass
 
-        return element1_mass / element2_mass
+        return mass_ratio.to_numpy(copy=True)
 
-    def plot_element_ratio_grid(self, reservoir: str = "melt") -> None:
-        """Plots a grid of the data in element ratio space.
+    @staticmethod
+    def fO2_categorise(fo2_shift: pd.Series) -> str:
+        if fo2_shift < -1:
+            return "reduced (IW<1)"
+        elif fo2_shift < 1:
+            return "IW"
+        else:
+            return "oxidised (IW>1)"
 
-        Args:
-            reservoir: Can be 'atmosphere', 'solid', 'melt', or 'total'
-        """
-        # TODO: Generalise, but to get up and running just work with C/H and C/O
-        CH_ratio: pd.Series = self.get_element_ratio_in_reservoir("C", "H", reservoir)
-        CO_ratio: pd.Series = self.get_element_ratio_in_reservoir("C", "O", reservoir)
+    def element_pairplot(self, elements: tuple[str, ...] = ("C", "O", "H", "N")):
+        """Pair plot of C-H-O elements"""
 
-        X, Y = np.meshgrid(CO_ratio, CH_ratio)
-        logger.info("number of data points = %d", CO_ratio.size)
-        _, ax = plt.subplots()
-        ax.scatter(X.flatten(), Y.flatten(), s=0.1)
-        ax.set_xlabel("C/O")
-        ax.set_ylabel("C/H")
-        ax.set_title("Data points")
-        # plt.savefig("Ratio_Grid.jpg", dpi=500)
+        # Categorise by oxygen fugacity
+        fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
+        fO2_categorise = fO2_shift.apply(self.fO2_categorise)
+        fO2_categorise.name = "Oxygen fugacity"
+
+        to_weight_percent: float = UnitConversion.ppm_to_wt_percent()
+        output: list[pd.Series] = [fO2_categorise]
+
+        for element in elements:
+            totals: pd.DataFrame = self.dataframes[f"{element}_totals"]
+            atmos: pd.Series = totals["atmosphere_ppmw"] * to_weight_percent
+            atmos.name = f"{element} atmos (wt %)"
+            melt: pd.Series = totals["melt_ppmw"]
+            melt.name = f"{element} melt (ppmw)"
+            output.extend([atmos, melt])
+
+        data = pd.concat(output, axis=1)
+
+        ax = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
+        sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
+
         plt.show()
 
 
@@ -112,8 +126,140 @@ def main():
     # file location (i.e. plot.py)
     filename: Path = Path("../notebooks/simpleHCsystem.pkl")
     plotter: Plotter = Plotter.read_pickle(filename)
-    plotter.plot_element_ratio_grid("total")
+    # plotter.plot_element_ratio_grid("total")
+
+    plotter.element_pairplot()
 
 
 if __name__ == "__main__":
     main()
+
+
+# Below is previous code, but I'm not sure we'd ever use this approach compared to plotting corner
+# plots
+
+# def plot_element_ratio_grid(self, reservoir: str = "melt") -> None:
+#     """Plots a grid of the data in element ratio space.
+
+#     Args:
+#         reservoir: Can be 'atmosphere', 'solid', 'melt', or 'total'
+#     """
+#     # TODO: Generalise, but to get up and running just work with C/H and C/O
+#     CH_ratio: np.ndarray = self.get_element_ratio_in_reservoir("C", "H", reservoir)
+#     CO_ratio: np.ndarray = self.get_element_ratio_in_reservoir("C", "O", reservoir)
+
+#     H_total: np.ndarray = self.dataframes["H_totals"]["total_mass"].to_numpy(copy=True)
+#     H_total /= earth_oceans_to_kg()
+
+#     fO2_shift: np.ndarray = self.dataframes["extra"]["fO2_shift"].to_numpy(copy=True)
+
+#     # X, Y = np.meshgrid(CO_ratio, CH_ratio)
+#     # logger.info("Number of data points = %d", CO_ratio.size)
+#     # _, ax = plt.subplots()
+#     # ax.scatter(X.flatten(), Y.flatten(), s=0.1)
+#     # ax.set_xlabel("C/O")
+#     # ax.set_ylabel("C/H")
+#     # ax.set_title("Data points")
+#     # plt.savefig("Ratio_Grid.jpg", dpi=500)
+#     # plt.show()
+
+#     # Some test quantity to plot
+#     values: np.ndarray = self.dataframes["H2O"]["atmosphere_pressure"].values
+#     # triang = mtri.Triangulation(CO_ratio, CH_ratio)
+
+#     # Interpolate to regular grid
+#     # x: np.ndarray = np.linspace(0.01, 0.15, 100)
+#     y: np.ndarray = np.linspace(1, 10, 100)
+#     x: np.ndarray = np.linspace(-4, 4, 100)
+#     # y: np.ndarray = np.linspace(0.1, 1, 50)
+#     xi, yi = np.meshgrid(x, y)
+#     # xf = xi.flatten()
+#     # yf = yi.flatten()
+#     # interpolate_points = np.hstack((xf, yf))
+#     # print(xi)
+#     # print(yi)
+
+#     points = np.column_stack((fO2_shift, H_total))
+
+#     print(points.shape)
+#     print(values.size)
+
+#     z_cubic = griddata(points, values, (xi, yi), method="cubic")
+
+#     print(z_cubic.shape)
+
+#     print(z_cubic)
+
+#     # interp_cubic_geom = mtri.CubicTriInterpolator(triang, z, kind="geom")
+#     # zi_cubic_geom = interp_cubic_geom(xi, yi)
+
+#     _, axs = plt.subplots()
+#     # axs = axs.flatten()
+
+#     # axs[0].tricontourf(triang, z)
+#     # axs[0].triplot(triang, "ko-")
+#     # axs[0].set_title("Triangular grid")
+
+#     # z_cubic = z_cubic.reshape(100, 100)
+
+#     axs.scatter(xi, yi, z_cubic)
+#     axs.contour(xi, yi, z_cubic, levels=[1, 5, 10])
+#     axs.set_xlabel("fO2_shift")
+#     axs.set_ylabel("H_total")
+
+#     # plt.tricontourf(triang, z, cmap="viridis")
+#     # plt.colorbar(label="H in Melt (Earth Oceans)")
+#     # plt.xlabel("C/O")
+#     # plt.ylabel("C/H")
+#     # plt.savefig("T1e_CHONSCl_CHSols_500Its_TotalMassRatios_HMeltContour.jpg", dpi=500)
+#     plt.show()
+
+# Class probably originally wrote by Aaron for SPIDER datatable interpolation?
+# class TwoDFunc_irreg(object):
+
+#     """For 2-D lookup with irregularly spaced input data"""
+
+#     def __init__(self, *args):
+#         x_a = args[0].astype(float)
+#         y_a = args[1].astype(float)
+#         z_a = args[2].astype(float)
+
+#         # exit the code if NaNs since user should ensure that the
+#         # input arrays do not contain NaNs prior to calling this
+#         # function.
+#         for val_a in (x_a, y_a, z_a):
+#             if np.isnan(np.sum(val_a)):
+#                 logging.critical("TwoDFunc_irreg:")
+#                 logging.critical("input arrays cannot contain NaNs")
+#                 sys.exit(1)
+
+#         self.xbnds = (np.min(x_a), np.max(x_a))
+#         self.ybnds = (np.min(y_a), np.max(y_a))
+#         self.zbnds = (np.min(z_a), np.max(z_a))
+
+#         triang = tri.Triangulation(
+#             self._relval(x_a, self.xbnds), self._relval(y_a, self.ybnds)
+#         )
+#         self.tci = tri.CubicTriInterpolator(triang, self._relval(z_a, self.zbnds), kind="geom")
+
+#     def __call__(self, *args):
+#         x_a = args[0]
+#         y_a = args[1]
+#         relz = self.tci(self._relval(x_a, self.xbnds), self._relval(y_a, self.ybnds))
+#         z = (self.zbnds[1] - self.zbnds[0]) * relz + self.zbnds[0]
+#         return z
+
+#     def _relval(self, v, bnds):
+#         return (v - bnds[0]) / (bnds[1] - bnds[0])
+
+#     def gradient(self, *args):
+#         x_a = args[0]
+#         y_a = args[1]
+#         relzgrad = self.tci.gradient(
+#             self._relval(x_a, self.xbnds), self._relval(y_a, self.ybnds)
+#         )
+#         zgrad = [
+#             (self.zbnds[1] - self.zbnds[0]) / (self.xbnds[1] - self.xbnds[0]) * relzgrad[0],
+#             (self.zbnds[1] - self.zbnds[0]) / (self.ybnds[1] - self.ybnds[0]) * relzgrad[1],
+#         ]
+#         return zgrad

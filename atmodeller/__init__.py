@@ -24,6 +24,7 @@ import importlib.resources
 import logging
 from importlib.abc import Traversable
 
+from molmass import Formula
 from scipy import constants
 
 # Module constants
@@ -36,6 +37,7 @@ ATMOSPHERE: float = constants.atmosphere / constants.bar  # bar
 NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
 
 OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
+OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 
 DATA_ROOT_PATH: Traversable = importlib.resources.files("%s.data" % __package__)
 

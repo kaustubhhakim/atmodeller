@@ -28,7 +28,7 @@ from typing import Any, Callable, Type, TypeVar
 from molmass import Formula
 from scipy.constants import kilo, mega
 
-from atmodeller import OCEAN_MOLES
+from atmodeller import OCEAN_MASS_H2, OCEAN_MOLES
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> dict
 
 
 def earth_oceans_to_kg(number_of_earth_oceans: float = 1) -> float:
-    h_grams: float = number_of_earth_oceans * OCEAN_MOLES * Formula("H2").mass
+    h_grams: float = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: float = UnitConversion().g_to_kg(h_grams)
     return h_kg
 
@@ -104,6 +104,11 @@ class UnitConversion:
     def ppm_to_fraction(cls, value_ppm: float = 1) -> float:
         """Parts-per-million by mole or mass to mole or mass fraction, respectively."""
         return value_ppm / cls.fraction_to_ppm()
+
+    @classmethod
+    def ppm_to_wt_percent(cls, value_ppm: float = 1) -> float:
+        """Parts-per-million by mass to weight percent"""
+        return cls.ppm_to_fraction(value_ppm) * 100
 
     @classmethod
     def cm3_to_m3(cls, cm_cubed: float = 1) -> float:
