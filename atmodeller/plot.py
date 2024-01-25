@@ -92,43 +92,55 @@ class Plotter:
         else:
             return "oxidised (IW>1)"
 
-    def element_pairplot(self, elements: tuple[str, ...] = ("C", "O", "H", "N")):
-        """Pair plot of C-H-O elements"""
+    def species_pairplot(self, species: tuple[str, ...] = ("C", "O", "H", "N")) -> None:
+        """Pair plot of species"""
 
         # Categorise by oxygen fugacity
         fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
         fO2_categorise = fO2_shift.apply(self.fO2_categorise)
         fO2_categorise.name = "Oxygen fugacity"
+        threshold: float = 1e-5
 
         to_weight_percent: float = UnitConversion.ppm_to_wt_percent()
         output: list[pd.Series] = [fO2_categorise]
 
-        for element in elements:
-            totals: pd.DataFrame = self.dataframes[f"{element}_totals"]
+        for entry in species:
+            # First, try to find species totals (assuming elemental)
+            try:
+                totals: pd.DataFrame = self.dataframes[f"{entry}_totals"]
+            # Otherwise, get the species directly
+            except KeyError:
+                totals = self.dataframes[entry]
             atmos: pd.Series = totals["atmosphere_ppmw"] * to_weight_percent
-            atmos.name = f"{element} atmos (wt %)"
+            atmos.name = f"{entry} atmos (wt %)"
+            output.append(atmos)
             melt: pd.Series = totals["melt_ppmw"]
-            melt.name = f"{element} melt (ppmw)"
-            output.extend([atmos, melt])
+            all_close_to_zero = np.all(np.isclose(melt, 0, atol=threshold))
+            if not all_close_to_zero:
+                melt.name = f"{entry} melt (ppmw)"
+                output.append(melt)
 
         data = pd.concat(output, axis=1)
 
         ax = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
-        plt.show()
+        # plt.show()
 
 
 def main():
-    """Test area"""
+    """Test area for development"""
 
-    # Let's say you have some model output in a directory. The path must be relative to this
-    # file location (i.e. plot.py)
     filename: Path = Path("../notebooks/simpleHCsystem.pkl")
     plotter: Plotter = Plotter.read_pickle(filename)
-    # plotter.plot_element_ratio_grid("total")
 
-    plotter.element_pairplot()
+    # By elements
+    plotter.species_pairplot()
+
+    # By species
+    plotter.species_pairplot(("H2O", "H2", "CO2", "CO"))
+
+    plt.show()
 
 
 if __name__ == "__main__":
