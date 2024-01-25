@@ -60,7 +60,7 @@ class Plotter:
 
     def get_element_ratio_in_reservoir(
         self, element1: str, element2: str, reservoir: str = "melt"
-    ) -> np.ndarray:
+    ) -> pd.Series:
         """Gets the mass ratio of two elements in a reservoir
 
         Args:
@@ -80,8 +80,9 @@ class Plotter:
         element1_mass: pd.Series = self.dataframes[f"{element1}_totals"][column_name]
         element2_mass: pd.Series = self.dataframes[f"{element2}_totals"][column_name]
         mass_ratio: pd.Series = element1_mass / element2_mass
+        mass_ratio.name = f"{element1}/{element2} {reservoir}"
 
-        return mass_ratio.to_numpy(copy=True)
+        return mass_ratio
 
     @staticmethod
     def fO2_categorise(fo2_shift: pd.Series) -> str:
@@ -120,12 +121,31 @@ class Plotter:
                 melt.name = f"{entry} melt (ppmw)"
                 output.append(melt)
 
-        data = pd.concat(output, axis=1)
-
+        data: pd.DataFrame = pd.concat(output, axis=1)
         ax = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
-        # plt.show()
+    def ratios_pairplot(self) -> None:
+        """Pair plots of C/H and C/O ratios in the reservoirs"""
+
+        # Categorise by oxygen fugacity
+        fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
+        fO2_categorise = fO2_shift.apply(self.fO2_categorise)
+        fO2_categorise.name = "Oxygen fugacity"
+
+        reservoirs: tuple[str, ...] = ("atmosphere", "melt", "total")
+        output: list[pd.Series] = [fO2_categorise]
+
+        for element in ("H", "O"):
+            for reservoir in reservoirs:
+                series_data: pd.Series = self.get_element_ratio_in_reservoir(
+                    "C", element, reservoir
+                )
+                output.append(series_data)
+
+        data: pd.DataFrame = pd.concat(output, axis=1)
+        ax = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
+        sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
 
 def main():
@@ -139,6 +159,9 @@ def main():
 
     # By species
     plotter.species_pairplot(("H2O", "H2", "CO2", "CO"))
+
+    # By ratios
+    plotter.ratios_pairplot()
 
     plt.show()
 
