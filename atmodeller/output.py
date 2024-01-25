@@ -120,12 +120,12 @@ class SpeciesOutput:
     atmosphere: ReservoirOutput
     melt: ReservoirOutput
     solid: ReservoirOutput
-    mass_total: float = field(init=False)
-    moles_total: float = field(init=False)
+    total_mass: float = field(init=False)
+    total_moles: float = field(init=False)
 
     def __post_init__(self):
-        self.mass_total = self.atmosphere.mass + self.melt.mass + self.solid.mass
-        self.moles_total = self.atmosphere.moles + self.melt.moles + self.solid.moles
+        self.total_mass = self.atmosphere.mass + self.melt.mass + self.solid.mass
+        self.total_moles = self.atmosphere.moles + self.melt.moles + self.solid.moles
 
     def asdict(self) -> dict[str, float]:
         """Data as a dictionary
