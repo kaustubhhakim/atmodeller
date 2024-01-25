@@ -38,48 +38,31 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True)
 class ReservoirOutput:
-    """Mass and moles of a species in a reservoir
+    """Mass and moles of a species (or element) in a reservoir
 
     Args:
         mass: Mass of the species in the reservoir in kg
         molar_mass: Molar mass of the species in kg/mol
+        reservoir_mass: Mass of the reservoir in kg. For the atmosphere reservoir this is the total
+            mass of the atmosphere. For a mantle reservoir this is the total mass of the silicate
+            component only (i.e. not including the volatile mass).
 
     Attributes:
         mass: Mass of the species in the reservoir in kg
         molar_mass: Molar mass of the species in kg/mol
+        reservoir_mass: Mass of the mantle reservoir in kg
         moles: Number of moles
+        ppmw: Parts-per-million by weight (of the species relative to the reservoir)
     """
 
     mass: float
     molar_mass: float
-    moles: float = field(init=False)
-
-    def __post_init__(self):
-        self.moles = self.mass / self.molar_mass
-
-
-@dataclass(kw_only=True)
-class MantleReservoirOutput(ReservoirOutput):
-    """A species in a mantle reservoir
-
-    Args:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species
-        reservoir_mass: Mass of the mantle reservoir in kg
-
-    Attributes:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in kg/mol
-        reservoir_mass: Mass of the mantle reservoir in kg
-        moles: Number of moles
-        ppmw: Parts-per-million by weight
-    """
-
     reservoir_mass: float
+    moles: float = field(init=False)
     ppmw: float = field(init=False)
 
     def __post_init__(self):
-        super().__post_init__()
+        self.moles = self.mass / self.molar_mass
         if self.reservoir_mass > 0:
             self.ppmw = UnitConversion.fraction_to_ppm(self.mass / self.reservoir_mass)
         else:
@@ -93,6 +76,7 @@ class AtmosphereReservoirOutput(ReservoirOutput):
     Args:
         mass: Mass of the species in the reservoir in kg
         molar_mass: Molar mass of the species
+        reservoir_mass: Total mass of the atmosphere
         fugacity: Fugacity in bar
         fugacity_coefficient: Fugacity coefficient
         pressure: Pressure in bar
@@ -101,7 +85,9 @@ class AtmosphereReservoirOutput(ReservoirOutput):
     Attributes:
         mass: Mass of the species in the reservoir in kg
         molar_mass: Molar mass of the species in kg/mol
+        reservoir_mass: Total mass of the atmosphere
         moles: Number of moles
+        ppmw: Parts-per-million by weight (of the species relative to the reservoir)
     """
 
     fugacity: float
@@ -128,8 +114,8 @@ class CondensedSpeciesOutput:
 
 
 @dataclass(kw_only=True)
-class GasSpeciesOutput:
-    """Output for a gas species"""
+class SpeciesOutput:
+    """Output for a species"""
 
     atmosphere: ReservoirOutput
     melt: ReservoirOutput
@@ -210,7 +196,7 @@ class Output(UserDict):
         self._add_constraints(interior_atmosphere)
         self._add_elements(interior_atmosphere)
         self._add_planet(interior_atmosphere)
-        self._add_gas_species(interior_atmosphere)
+        self._add_species(interior_atmosphere)
         self._add_residual(interior_atmosphere)
         self._add_solution(interior_atmosphere)
         if extra_output is not None:
@@ -280,15 +266,21 @@ class Output(UserDict):
             formula: Formula = Formula(element)
             molar_mass: float = UnitConversion.g_to_kg(formula.mass)
             atmosphere: ReservoirOutput = ReservoirOutput(
-                molar_mass=molar_mass, mass=element_mass["atmosphere"]
+                molar_mass=molar_mass,
+                mass=element_mass["atmosphere"],
+                reservoir_mass=interior_atmosphere.total_mass,
             )
             melt: ReservoirOutput = ReservoirOutput(
-                molar_mass=molar_mass, mass=element_mass["melt"]
+                molar_mass=molar_mass,
+                mass=element_mass["melt"],
+                reservoir_mass=interior_atmosphere.planet.mantle_melt_mass,
             )
             solid: ReservoirOutput = ReservoirOutput(
-                molar_mass=molar_mass, mass=element_mass["solid"]
+                molar_mass=molar_mass,
+                mass=element_mass["solid"],
+                reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
             )
-            output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
+            output = SpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
             # Create a unique key name to avoid a potential name conflict with atomic species
             key_name: str = f"{element}_totals"
             data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
@@ -304,8 +296,8 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("planet", [])
         data_list.append(planet_dict)
 
-    def _add_gas_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds gas species.
+    def _add_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+        """Adds species.
 
         Args:
             interior_atmosphere: Interior atmosphere system
@@ -322,22 +314,23 @@ class Output(UserDict):
             atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
                 molar_mass=species.molar_mass,
                 mass=species_masses["atmosphere"],
+                reservoir_mass=interior_atmosphere.total_mass,
                 fugacity=fugacity,
                 fugacity_coefficient=fugacity_coefficient,
                 pressure=pressure,
                 volume_mixing_ratio=volume_mixing_ratio,
             )
-            melt: MantleReservoirOutput = MantleReservoirOutput(
+            melt: ReservoirOutput = ReservoirOutput(
                 molar_mass=species.molar_mass,
                 reservoir_mass=interior_atmosphere.planet.mantle_melt_mass,
                 mass=species_masses["melt"],
             )
-            solid: MantleReservoirOutput = MantleReservoirOutput(
+            solid: ReservoirOutput = ReservoirOutput(
                 molar_mass=species.molar_mass,
                 reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
                 mass=species_masses["solid"],
             )
-            output = GasSpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
+            output = SpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
             data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
             data_list.append(output.asdict())
 
