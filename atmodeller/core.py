@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from collections import UserList
-from dataclasses import dataclass, field
+from dataclasses import KW_ONLY, dataclass, field
 from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional
@@ -529,7 +529,7 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
         raise KeyError(msg)
 
 
-@dataclass(kw_only=True)
+@dataclass
 class ChemicalComponent:
     """A chemical component and its properties
 
@@ -552,6 +552,7 @@ class ChemicalComponent:
     """
 
     formula: str
+    _: KW_ONLY
     thermodynamic_dataset: ThermodynamicDatasetABC = field(
         default_factory=ThermodynamicDatasetJANAF
     )
@@ -646,7 +647,7 @@ def _mass_decorator(func) -> Callable:
     return mass_wrapper
 
 
-@dataclass(kw_only=True)
+@dataclass
 class GasSpecies(ChemicalComponent):
     """A gas species
 
@@ -675,6 +676,7 @@ class GasSpecies(ChemicalComponent):
         eos: A gas equation of state
     """
 
+    _: KW_ONLY
     solubility: SolubilityABC = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     eos: RealGasABC = field(default_factory=IdealGas)
@@ -735,7 +737,7 @@ class GasSpecies(ChemicalComponent):
         return output
 
 
-@dataclass(kw_only=True)
+@dataclass
 class CondensedSpecies(ChemicalComponent):
     """A condensed species
 
@@ -757,6 +759,7 @@ class CondensedSpecies(ChemicalComponent):
         activity: Activity, which is always ideal
     """
 
+    _: KW_ONLY
     activity: ConstraintABC = field(init=False)
 
     def __post_init__(self):

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Plotting
 
 Copyright 2024 Dan J. Bower
@@ -24,18 +22,14 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from atmodeller import debug_logger
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion
 
-# Reinstate below when preliminary development and testing is complete
-# logger: logging.Logger = logging.getLogger(__name__)
-logger: logging.Logger = debug_logger()
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -147,11 +141,12 @@ class Plotter:
             atmos: pd.Series = totals["atmosphere_ppmw"] * to_weight_percent
             atmos.name = f"{entry} atmos (wt %)"
             output.append(atmos)
-            melt: pd.Series = totals["melt_ppmw"]
-            all_close_to_zero = np.all(np.isclose(melt, 0, atol=threshold))
-            if not all_close_to_zero:
-                melt.name = f"{entry} melt (ppmw)"
-                output.append(melt)
+            # Plotting the melt as well is overwhelming for one figure.
+            # melt: pd.Series = totals["melt_ppmw"]
+            # all_close_to_zero = np.all(np.isclose(melt, 0, atol=threshold))
+            # if not all_close_to_zero:
+            #     melt.name = f"{entry} melt (ppmw)"
+            #     output.append(melt)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
         ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
@@ -173,25 +168,3 @@ class Plotter:
         data: pd.DataFrame = pd.concat(output, axis=1)
         ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
-
-
-def main():
-    """Test area for development"""
-
-    filename: Path = Path("../notebooks/simpleHCsystem.pkl")
-    plotter: Plotter = Plotter.read_pickle(filename)
-
-    # By elements
-    plotter.species_pairplot()
-
-    # By species
-    plotter.species_pairplot(("H2O", "H2", "CO2", "CO"))
-
-    # By ratios
-    plotter.ratios_pairplot()
-
-    plt.show()
-
-
-if __name__ == "__main__":
-    main()

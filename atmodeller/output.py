@@ -160,6 +160,11 @@ class Output(UserDict):
             self.update(kwargs)
 
     @property
+    def species(self) -> list[str]:
+        """Species in the output"""
+        return list(self.data["solution"][0].keys())
+
+    @property
     def size(self) -> int:
         """Number of rows"""
         try:

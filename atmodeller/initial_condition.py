@@ -53,6 +53,9 @@ class InitialConditionConstant(InitialConditionABC):
 
     Args:
         value: A constant pressure for the initial condition in bar. Defaults to 10.
+
+    Attributes:
+        See Args.
     """
 
     value: float = 10
@@ -63,6 +66,49 @@ class InitialConditionConstant(InitialConditionABC):
         logger.debug("%s: value = %s", self.__class__.__name__, self.value)
 
         return self.value
+
+
+@dataclass
+class InitialConditionDict(InitialConditionABC):
+    """A dictionary of values for the initial condition
+
+    Args:
+        values: A dictionary of initial values for one or several species
+        species: Species in the interior atmosphere model
+        fill_value: Initial value for species that are not specified in the 'values' dictionary.
+            Defaults to 1 bar.
+
+    Attributes:
+        see Args.
+    """
+
+    values: dict[str, float]
+    _: KW_ONLY
+    species: Species
+    fill_value: float = 1
+    _initial_condition: np.ndarray = field(init=False)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._set_initial_condition_values()
+
+    def _set_initial_condition_values(self) -> None:
+        """Sets the initial condition values"""
+        initial_condition: list[float] = []
+        for species in self.species.formulas:
+            try:
+                value: float = self.values[species]
+            except KeyError:
+                value = self.fill_value
+            initial_condition.append(value)
+
+        self._initial_condition = np.array(initial_condition)
+
+    def get_value(self, *args, **kwargs) -> np.ndarray:
+        del args
+        del kwargs
+        logger.debug("%s: value = %s", self.__class__.__name__, self._initial_condition)
+        return self._initial_condition
 
 
 @dataclass
@@ -145,31 +191,28 @@ class InitialConditionRegressor(InitialConditionABC):
         """
         output_dataframes: dict[str, pd.DataFrame] = self.output.to_dataframes()
         solution_df: pd.DataFrame = output_dataframes["solution"]
+        conformed_solution_df = solution_df.copy()
 
         if self.species is None:
-            # Species of the new interior atmosphere are unknown so do nothing. This assumes that
-            # the species list and species order is identical in the output as the new model.
-            return
-
+            species_formulas: list[str] = self.output.species
         else:
-            # Create a DataFrame with missing species and their user-prescribed values
-            missing_df: pd.DataFrame = pd.DataFrame(
-                {
-                    col: [self.species_fill[col]] * len(solution_df)
-                    for col in self.species_fill
-                    if col not in solution_df.columns  # columns in output are used by priority
-                }
+            species_formulas = self.species.formulas
+
+        if self.species_fill:
+            fill_df: pd.DataFrame = pd.DataFrame(
+                {col: [self.species_fill[col]] * len(solution_df) for col in self.species_fill}
             )
-            logger.debug("missing_df = %s", missing_df)
+            logger.debug("fill_df = %s", fill_df)
 
-        # Concatenate the original DataFrame and the DataFrame with the missing species
-        conformed_solution_df = pd.concat([missing_df, solution_df], axis=1)
+            # Add columns that don't exist and replace those that do.
+            for column in fill_df.columns:
+                conformed_solution_df[column] = fill_df[column]
 
-        # Reorder the columns based on the order of the species for the new model
-        conformed_solution_df = conformed_solution_df[self.species.formulas]
-        logger.debug("conformed_solution_df = %s", conformed_solution_df)
+            # Reorder the columns based on the order of the species for the new model
+            conformed_solution_df = conformed_solution_df[species_formulas]
+            logger.debug("conformed_solution_df = %s", conformed_solution_df)
 
-        assert self.species.formulas == list(conformed_solution_df.columns)
+            assert species_formulas == list(conformed_solution_df.columns)
 
         # Set the conformed solution to the output so it is used to construct the initial regressor
         self.output["solution"] = conformed_solution_df.to_dict(orient="records")
@@ -324,16 +367,19 @@ class InitialConditionRegressor(InitialConditionABC):
 
 
 class InitialConditionSwitchRegressor(InitialConditionABC):
-    """An initial condition that is a constant value before switching to a regressor.
+    """An initial condition that uses some initial value(s) before switching to a regressor.
 
     Args:
-        value: Value for InitialConditionConstant
+        initial_regressor: Initial regressor to use. Defaults to a constant value regressor.
         *args: Arbitrary positional arguments to pass to InitialConditionRegressor constructor
         **kwargs: Arbitrary keyword arguments to pass to InitialConditionRegressor constructor
     """
 
-    def __init__(self, value: float, *args, **kwargs):
-        self._ic: InitialConditionABC = InitialConditionConstant(value)
+    def __init__(self, initial_regressor: InitialConditionABC | None = None, *args, **kwargs):
+        if initial_regressor is None:
+            self._ic: InitialConditionABC = InitialConditionConstant()
+        else:
+            self._ic = initial_regressor
         # Store to instantiate regressor once the switch occurs.
         self._ic_regressor_args: tuple[Any, ...] = args
         self._ic_regressor_kwargs: dict[str, Any] = kwargs

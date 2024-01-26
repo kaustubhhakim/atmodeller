@@ -791,7 +791,7 @@ basalt_solubilities: dict[str, SolubilityABC] = {
     "H2O": BasaltDixonH2O(),
     "CO2": BasaltDixonCO2(),
     "H2": BasaltH2(),
-    "N2": BasaltDasguptaN2(),
+    "N2": BasaltLibourelN2(),
     "S2": BasaltS2(),
     "CO": BasaltCO(),
     "He": BasaltHe(),

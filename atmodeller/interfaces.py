@@ -366,13 +366,13 @@ class SolubilityABC(GetValueABC):
         solubility: float = self._solubility(
             fugacity, temperature, log10_fugacities_dict, pressure
         )
-        logger.debug(
-            "%s, f = %f, T = %f, ppmw = %f",
-            self.__class__.__name__,
-            fugacity,
-            temperature,
-            solubility,
-        )
+        # logger.debug(
+        #     "%s, f = %f, T = %f, ppmw = %f",
+        #     self.__class__.__name__,
+        #     fugacity,
+        #     temperature,
+        #     solubility,
+        # )
         return solubility
 
 
