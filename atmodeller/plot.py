@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -152,10 +153,13 @@ class Plotter:
         ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
-    def ratios_pairplot(self) -> None:
-        """Pair plots of C/H and C/O ratios in the reservoirs"""
+    def ratios_pairplot(self, reservoirs: Iterable[str] = ("atmosphere", "melt", "total")) -> None:
+        """Pair plots of C/H and C/O ratios in the reservoirs
 
-        reservoirs: tuple[str, ...] = ("atmosphere", "melt", "total")
+        Args:
+            reservoirs: Reservoirs to plot. Defaults to all reservoirs.
+        """
+
         output: list[pd.Series] = [self.fO2_categorise()]
 
         for element in ("H", "O"):
