@@ -145,7 +145,11 @@ class SpeciesOutput:
 
 
 class Output(UserDict):
-    """Stores inputs and outputs of the models."""
+    """Stores inputs and outputs of the models.
+
+    Changing the dictionary keys or entries may require downstream changes to the Plotter class,
+    which uses Output to source data to plot.
+    """
 
     def __init__(self, dict=None, /, **kwargs):
         """Init definition from the base class provided for clarity."""

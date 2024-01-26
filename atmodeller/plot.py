@@ -55,18 +55,26 @@ class Plotter:
 
     @classmethod
     def read_pickle(cls, pickle_file: Path | str) -> Plotter:
+        """Reads output data from a pickle file and creates a Plotter instance.
+
+        Args:
+            pickle_file: Pickle file of the output from a model run.
+
+        Returns:
+            Plotter
+        """
         output: Output = Output.read_pickle(pickle_file)
         return cls(output)
 
     def get_element_ratio_in_reservoir(
-        self, element1: str, element2: str, reservoir: str = "melt"
+        self, element1: str, element2: str, reservoir: str = "total"
     ) -> pd.Series:
         """Gets the mass ratio of two elements in a reservoir
 
         Args:
             element1: Element in the numerator
             element2: Element in the denominator
-            reservoir: Can be 'atmosphere', 'solid', 'melt', or 'total'
+            reservoir: Can be 'atmosphere', 'solid', 'melt', or 'total'. Defaults to 'total'
 
         Returns:
             A series of the ratio
@@ -85,28 +93,52 @@ class Plotter:
         return mass_ratio
 
     @staticmethod
-    def fO2_categorise(fo2_shift: pd.Series) -> str:
+    def _get_fO2_category(fo2_shift: float) -> str:
+        """Gets the atmosphere category based on fO2.
+
+        The bounds are somewhat arbitrary, but centered around IW.
+
+        Args:
+            fO2_shift: fO2_shift relative to the IW buffer
+
+        Returns:
+            Category of the atmosphere
+        """
         if fo2_shift < -1:
-            return "reduced (IW<1)"
+            return "Reduced (IW<1)"
         elif fo2_shift < 1:
             return "IW"
         else:
-            return "oxidised (IW>1)"
+            return "Oxidised (IW>1)"
+
+    def fO2_categorise(self) -> pd.Series:
+        """Gets a series of the atmosphere category based on fO2.
+
+        Returns:
+            Category of the atmosphere as a series.
+        """
+        fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
+        fO2_categorise = fO2_shift.apply(self._get_fO2_category)
+        fO2_categorise.name = "Oxygen fugacity"
+
+        return fO2_categorise
 
     def species_pairplot(self, species: tuple[str, ...] = ("C", "O", "H", "N")) -> None:
-        """Pair plot of species"""
+        """Pair plot of species
 
-        # Categorise by oxygen fugacity
-        fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
-        fO2_categorise = fO2_shift.apply(self.fO2_categorise)
-        fO2_categorise.name = "Oxygen fugacity"
+        Args:
+            species: A tuple of species to pairplot. Defaults to (C, O, H, N).
+        """
+
+        # Threshold to determine whether to plot melt ppmw, since if all values are basically
+        # zero then no solubility was applied and we don't need to plot these data.
         threshold: float = 1e-5
 
         to_weight_percent: float = UnitConversion.ppm_to_wt_percent()
-        output: list[pd.Series] = [fO2_categorise]
+        output: list[pd.Series] = [self.fO2_categorise()]
 
         for entry in species:
-            # First, try to find species totals (assuming elemental)
+            # Try to find species totals (i.e. assume species is an elemental total)
             try:
                 totals: pd.DataFrame = self.dataframes[f"{entry}_totals"]
             # Otherwise, get the species directly
@@ -122,19 +154,14 @@ class Plotter:
                 output.append(melt)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
-        ax = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
+        ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
     def ratios_pairplot(self) -> None:
         """Pair plots of C/H and C/O ratios in the reservoirs"""
 
-        # Categorise by oxygen fugacity
-        fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
-        fO2_categorise = fO2_shift.apply(self.fO2_categorise)
-        fO2_categorise.name = "Oxygen fugacity"
-
         reservoirs: tuple[str, ...] = ("atmosphere", "melt", "total")
-        output: list[pd.Series] = [fO2_categorise]
+        output: list[pd.Series] = [self.fO2_categorise()]
 
         for element in ("H", "O"):
             for reservoir in reservoirs:
@@ -144,7 +171,7 @@ class Plotter:
                 output.append(series_data)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
-        ax = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
+        ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
 
@@ -168,133 +195,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# Below is previous code, but I'm not sure we'd ever use this approach compared to plotting corner
-# plots
-
-# def plot_element_ratio_grid(self, reservoir: str = "melt") -> None:
-#     """Plots a grid of the data in element ratio space.
-
-#     Args:
-#         reservoir: Can be 'atmosphere', 'solid', 'melt', or 'total'
-#     """
-#     # TODO: Generalise, but to get up and running just work with C/H and C/O
-#     CH_ratio: np.ndarray = self.get_element_ratio_in_reservoir("C", "H", reservoir)
-#     CO_ratio: np.ndarray = self.get_element_ratio_in_reservoir("C", "O", reservoir)
-
-#     H_total: np.ndarray = self.dataframes["H_totals"]["total_mass"].to_numpy(copy=True)
-#     H_total /= earth_oceans_to_kg()
-
-#     fO2_shift: np.ndarray = self.dataframes["extra"]["fO2_shift"].to_numpy(copy=True)
-
-#     # X, Y = np.meshgrid(CO_ratio, CH_ratio)
-#     # logger.info("Number of data points = %d", CO_ratio.size)
-#     # _, ax = plt.subplots()
-#     # ax.scatter(X.flatten(), Y.flatten(), s=0.1)
-#     # ax.set_xlabel("C/O")
-#     # ax.set_ylabel("C/H")
-#     # ax.set_title("Data points")
-#     # plt.savefig("Ratio_Grid.jpg", dpi=500)
-#     # plt.show()
-
-#     # Some test quantity to plot
-#     values: np.ndarray = self.dataframes["H2O"]["atmosphere_pressure"].values
-#     # triang = mtri.Triangulation(CO_ratio, CH_ratio)
-
-#     # Interpolate to regular grid
-#     # x: np.ndarray = np.linspace(0.01, 0.15, 100)
-#     y: np.ndarray = np.linspace(1, 10, 100)
-#     x: np.ndarray = np.linspace(-4, 4, 100)
-#     # y: np.ndarray = np.linspace(0.1, 1, 50)
-#     xi, yi = np.meshgrid(x, y)
-#     # xf = xi.flatten()
-#     # yf = yi.flatten()
-#     # interpolate_points = np.hstack((xf, yf))
-#     # print(xi)
-#     # print(yi)
-
-#     points = np.column_stack((fO2_shift, H_total))
-
-#     print(points.shape)
-#     print(values.size)
-
-#     z_cubic = griddata(points, values, (xi, yi), method="cubic")
-
-#     print(z_cubic.shape)
-
-#     print(z_cubic)
-
-#     # interp_cubic_geom = mtri.CubicTriInterpolator(triang, z, kind="geom")
-#     # zi_cubic_geom = interp_cubic_geom(xi, yi)
-
-#     _, axs = plt.subplots()
-#     # axs = axs.flatten()
-
-#     # axs[0].tricontourf(triang, z)
-#     # axs[0].triplot(triang, "ko-")
-#     # axs[0].set_title("Triangular grid")
-
-#     # z_cubic = z_cubic.reshape(100, 100)
-
-#     axs.scatter(xi, yi, z_cubic)
-#     axs.contour(xi, yi, z_cubic, levels=[1, 5, 10])
-#     axs.set_xlabel("fO2_shift")
-#     axs.set_ylabel("H_total")
-
-#     # plt.tricontourf(triang, z, cmap="viridis")
-#     # plt.colorbar(label="H in Melt (Earth Oceans)")
-#     # plt.xlabel("C/O")
-#     # plt.ylabel("C/H")
-#     # plt.savefig("T1e_CHONSCl_CHSols_500Its_TotalMassRatios_HMeltContour.jpg", dpi=500)
-#     plt.show()
-
-# Class probably originally wrote by Aaron for SPIDER datatable interpolation?
-# class TwoDFunc_irreg(object):
-
-#     """For 2-D lookup with irregularly spaced input data"""
-
-#     def __init__(self, *args):
-#         x_a = args[0].astype(float)
-#         y_a = args[1].astype(float)
-#         z_a = args[2].astype(float)
-
-#         # exit the code if NaNs since user should ensure that the
-#         # input arrays do not contain NaNs prior to calling this
-#         # function.
-#         for val_a in (x_a, y_a, z_a):
-#             if np.isnan(np.sum(val_a)):
-#                 logging.critical("TwoDFunc_irreg:")
-#                 logging.critical("input arrays cannot contain NaNs")
-#                 sys.exit(1)
-
-#         self.xbnds = (np.min(x_a), np.max(x_a))
-#         self.ybnds = (np.min(y_a), np.max(y_a))
-#         self.zbnds = (np.min(z_a), np.max(z_a))
-
-#         triang = tri.Triangulation(
-#             self._relval(x_a, self.xbnds), self._relval(y_a, self.ybnds)
-#         )
-#         self.tci = tri.CubicTriInterpolator(triang, self._relval(z_a, self.zbnds), kind="geom")
-
-#     def __call__(self, *args):
-#         x_a = args[0]
-#         y_a = args[1]
-#         relz = self.tci(self._relval(x_a, self.xbnds), self._relval(y_a, self.ybnds))
-#         z = (self.zbnds[1] - self.zbnds[0]) * relz + self.zbnds[0]
-#         return z
-
-#     def _relval(self, v, bnds):
-#         return (v - bnds[0]) / (bnds[1] - bnds[0])
-
-#     def gradient(self, *args):
-#         x_a = args[0]
-#         y_a = args[1]
-#         relzgrad = self.tci.gradient(
-#             self._relval(x_a, self.xbnds), self._relval(y_a, self.ybnds)
-#         )
-#         zgrad = [
-#             (self.zbnds[1] - self.zbnds[0]) / (self.xbnds[1] - self.xbnds[0]) * relzgrad[0],
-#             (self.zbnds[1] - self.zbnds[0]) / (self.ybnds[1] - self.ybnds[0]) * relzgrad[1],
-#         ]
-#         return zgrad

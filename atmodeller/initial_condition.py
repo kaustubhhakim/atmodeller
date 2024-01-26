@@ -35,7 +35,7 @@ from atmodeller.interfaces import InitialConditionABC
 from atmodeller.output import Output
 
 if TYPE_CHECKING:
-    from atmodeller.interior_atmosphere import Species
+    from atmodeller.core import Species
 
 logger: logging.Logger = logging.getLogger(__name__)
 

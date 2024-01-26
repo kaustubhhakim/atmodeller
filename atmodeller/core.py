@@ -19,6 +19,7 @@ see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
 import logging
+from collections import UserList
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
@@ -37,7 +38,8 @@ from atmodeller.interfaces import (
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
 )
-from atmodeller.utilities import UnitConversion
+from atmodeller.solubilities import composition_solubilities
+from atmodeller.utilities import UnitConversion, dataclass_to_logger, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -770,3 +772,102 @@ class SolidSpecies(CondensedSpecies):
 @dataclass(kw_only=True)
 class LiquidSpecies(CondensedSpecies):
     """Liquid species"""
+
+
+class Species(UserList):
+    """Collections of species for an interior-atmosphere system
+
+    A collection of species. It provides methods to filter species based on their phases (gas,
+    condensed).
+
+    Args:
+        initlist: Initial list of species. Defaults to None.
+
+    Attributes:
+        data: List of species contained in the system.
+    """
+
+    def __init__(self, initlist: list[ChemicalComponent] | None = None):
+        self.data: list[ChemicalComponent]  # For typing.
+        super().__init__(initlist)
+
+    @property
+    def number(self) -> int:
+        """Number of species"""
+        return len(self.data)
+
+    @property
+    def gas_species(self) -> dict[int, GasSpecies]:
+        """Gas species"""
+        return filter_by_type(self, GasSpecies)
+
+    @property
+    def number_gas_species(self) -> int:
+        """Number of gas species"""
+        return len(self.gas_species)
+
+    @property
+    def condensed_species(self) -> dict[int, CondensedSpecies]:
+        """Condensed species."""
+        return filter_by_type(self, CondensedSpecies)
+
+    @property
+    def number_condensed_species(self) -> int:
+        """Number of condensed species"""
+        return len(self.condensed_species)
+
+    @property
+    def indices(self) -> dict[str, int]:
+        """Indices of the species"""
+        return {formula: index for index, formula in enumerate(self.formulas)}
+
+    @property
+    def formulas(self) -> list[str]:
+        """Chemical formulas of the species"""
+        return [species.formula for species in self.data]
+
+    def conform_solubilities_to_planet_composition(self, planet: Planet) -> None:
+        """Ensure that the solubilities of the species are consistent with the planet composition.
+
+        Args:
+            planet: A planet.
+        """
+        if planet.melt_composition is not None:
+            msg: str = (
+                # pylint: disable=consider-using-f-string
+                "Setting solubilities to be consistent with the melt composition (%s)"
+                % planet.melt_composition
+            )
+            logger.info(msg)
+            try:
+                solubilities: dict[str, SolubilityABC] = composition_solubilities[
+                    planet.melt_composition.casefold()
+                ]
+            except KeyError:
+                logger.error("Cannot find solubilities for %s", planet.melt_composition)
+                raise
+
+            for species in self.gas_species.values():
+                try:
+                    species.solubility = solubilities[species.formula]
+                    logger.info(
+                        "Found solubility law for %s: %s",
+                        species.formula,
+                        species.solubility.__class__.__name__,
+                    )
+                except KeyError:
+                    logger.info("No solubility law for %s", species.formula)
+                    species.solubility = NoSolubility()
+
+    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
+        """Sorter for the species
+
+        Sorts first by species complexity and second by species name.
+
+        Args:
+            species: Species
+
+        Returns:
+            A tuple to sort first by number of elements and second by species name.
+        """
+        return (species.atoms, species.formula)
