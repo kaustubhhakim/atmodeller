@@ -26,6 +26,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib import pyplot as plt
 
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion
@@ -106,11 +107,11 @@ class Plotter:
             Category of the atmosphere
         """
         if fo2_shift < -1:
-            return "Reduced (IW<-1)"
+            return "Reduced (-4 < IW < -1)"
         elif fo2_shift < 1:
-            return "IW"
+            return "IW (-1 < IW < 1)"
         else:
-            return "Oxidised (IW>1)"
+            return "Oxidised (1 < IW < 4)"
 
     def fO2_categorise(self) -> pd.Series:
         """Gets a series of the atmosphere category based on fO2.
@@ -124,21 +125,104 @@ class Plotter:
 
         return fO2_categorise
 
+    @staticmethod
+    def _get_CH_category(CH_ratio: float) -> str:
+        """Gets the atmosphere category based on C/H.
+
+        The bounds are somewhat arbitrary.
+
+        Args:
+            CH_ratio: C/H ratio
+
+        Returns:
+            Category of the atmosphere
+        """
+        if CH_ratio < 1:
+            return "C/H < 1"
+        elif CH_ratio < 5:
+            return "1 < C/H < 5"
+        elif CH_ratio < 8:
+            return "5 < C/H < 8"
+        elif CH_ratio < 9:
+            return "8 < C/H < 9"
+        else:
+            return "9 < C/H < 10"
+
+    def CH_categorise(self) -> pd.Series:
+        """Gets a series of the atmosphere category based on C/H.
+
+        Returns:
+            Category of the atmosphere as a series.
+        """
+        CH_ratio: pd.Series = self.dataframes["extra"]["C/H ratio"]
+        CH_categorise = CH_ratio.apply(self._get_CH_category)
+        CH_categorise.name = "C/H ratio"
+
+        return CH_categorise
+
+    @staticmethod
+    def _get_H_category(H: float) -> str:
+        """Gets the atmosphere category based on H.
+
+        The bounds are somewhat arbitrary.
+
+        Args:
+            H: Ocean moles of H
+
+        Returns:
+            Category of the atmosphere
+        """
+        if H < 3:
+            return "H < 3"
+        elif H < 5:
+            return "3 < H < 5"
+        else:
+            return "5 < H < 10"
+
+    def H_oceans(self) -> pd.Series:
+        """Gets a series of the atmosphere category based on total H
+
+        Returns:
+            Category of the atmosphere as a series.
+        """
+        H_oceans: pd.Series = self.dataframes["extra"]["Number of ocean moles"]
+        H_oceans = H_oceans.apply(self._get_H_category)
+        H_oceans.name = "Oceans"
+
+        return H_oceans
+
     def species_pairplot(
-        self, species: tuple[str, ...] = ("C", "O", "H", "N"), *, mass_or_moles: str = "mass"
-    ) -> None:
+        self,
+        species: tuple[str, ...] = ("C", "H", "O", "N"),
+        *,
+        mass_or_moles: str = "mass",
+        category: str = "fO2",
+    ) -> sns.PairGrid:
         """Pair plot of species
 
         Args:
-            species: A tuple of species to plot. Defaults to (C, O, H, N).
+            species: A tuple of species to plot. Defaults to (C, H, O, N).
             mass_or_moles: Can be 'mass' or 'moles'. Defaults to 'mass'.
+            category: Can be 'fO2', 'CH', or 'H'. Defaults to 'fO2'.
         """
-
         # Threshold to determine whether to plot melt ppmw, since if all values are basically
         # zero then no solubility was applied and we don't need to plot these data.
         # threshold: float = 1e-5
 
-        output: list[pd.Series] = [self.fO2_categorise()]
+        output: list[pd.Series] = []
+
+        if category == "fO2":
+            colour_category = self.fO2_categorise()
+        elif category == "CH":
+            colour_category = self.CH_categorise()
+        elif category == "H":
+            colour_category = self.H_oceans()
+        else:
+            msg: str = "{category} is unknown"
+            logger.error(msg)
+            raise ValueError(msg)
+        output.append(colour_category)
+
         to_percent: float = UnitConversion.ppm_to_percent()
 
         if mass_or_moles == "mass":
@@ -170,8 +254,13 @@ class Plotter:
             #     output.append(melt)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
-        ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
+        ax: sns.PairGrid = sns.pairplot(data, hue=str(colour_category.name), corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
+        ticks: Iterable[float] = range(0, 101, 25)
+        ax.set(xlim=(0, 100), ylim=(0, 100), xticks=ticks, yticks=ticks)
+        plt.subplots_adjust(hspace=0.15, wspace=0.15)
+
+        return ax
 
     def ratios_pairplot(
         self,
