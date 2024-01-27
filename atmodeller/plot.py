@@ -62,19 +62,25 @@ class Plotter:
         return cls(output)
 
     def get_element_ratio_in_reservoir(
-        self, element1: str, element2: str, reservoir: str = "total"
+        self,
+        element1: str,
+        element2: str,
+        *,
+        reservoir: str = "total",
+        mass_or_moles: str = "mass",
     ) -> pd.Series:
-        """Gets the mass ratio of two elements in a reservoir
+        """Gets the mass or mole ratio of two elements in a reservoir
 
         Args:
             element1: Element in the numerator
             element2: Element in the denominator
             reservoir: Can be 'atmosphere', 'solid', 'melt', or 'total'. Defaults to 'total'
+            mass_or_moles: Can be 'mass' or 'moles'. Defaults to 'mass'
 
         Returns:
             A series of the ratio
         """
-        column_name: str = f"{reservoir}_mass"
+        column_name: str = f"{reservoir}_{mass_or_moles}"
 
         required_elements: list = [element1, element2]
         for elements in required_elements:
@@ -83,7 +89,7 @@ class Plotter:
         element1_mass: pd.Series = self.dataframes[f"{element1}_totals"][column_name]
         element2_mass: pd.Series = self.dataframes[f"{element2}_totals"][column_name]
         mass_ratio: pd.Series = element1_mass / element2_mass
-        mass_ratio.name = f"{element1}/{element2} {reservoir}"
+        mass_ratio.name = f"{element1}/{element2} (by {mass_or_moles}) {reservoir}"
 
         return mass_ratio
 
@@ -100,7 +106,7 @@ class Plotter:
             Category of the atmosphere
         """
         if fo2_shift < -1:
-            return "Reduced (IW<1)"
+            return "Reduced (IW<-1)"
         elif fo2_shift < 1:
             return "IW"
         else:
@@ -118,19 +124,33 @@ class Plotter:
 
         return fO2_categorise
 
-    def species_pairplot(self, species: tuple[str, ...] = ("C", "O", "H", "N")) -> None:
+    def species_pairplot(
+        self, species: tuple[str, ...] = ("C", "O", "H", "N"), *, mass_or_moles: str = "mass"
+    ) -> None:
         """Pair plot of species
 
         Args:
-            species: A tuple of species to pairplot. Defaults to (C, O, H, N).
+            species: A tuple of species to plot. Defaults to (C, O, H, N).
+            mass_or_moles: Can be 'mass' or 'moles'. Defaults to 'mass'.
         """
 
         # Threshold to determine whether to plot melt ppmw, since if all values are basically
         # zero then no solubility was applied and we don't need to plot these data.
-        threshold: float = 1e-5
+        # threshold: float = 1e-5
 
-        to_weight_percent: float = UnitConversion.ppm_to_wt_percent()
         output: list[pd.Series] = [self.fO2_categorise()]
+        to_percent: float = UnitConversion.ppm_to_percent()
+
+        if mass_or_moles == "mass":
+            suffix: str = "ppmw"
+            units: str = "wt.%"
+        elif mass_or_moles == "moles":
+            suffix = "ppm"
+            units = "mol.%"
+        else:
+            msg: str = "{mass_or_moles} is unknown (expecting 'mass' or 'moles')"
+            logger.error(msg)
+            raise ValueError(msg)
 
         for entry in species:
             # Try to find species totals (i.e. assume species is an elemental total)
@@ -139,8 +159,8 @@ class Plotter:
             # Otherwise, get the species directly
             except KeyError:
                 totals = self.dataframes[entry]
-            atmos: pd.Series = totals["atmosphere_ppmw"] * to_weight_percent
-            atmos.name = f"{entry} atmos (wt %)"
+            atmos: pd.Series = totals[f"atmosphere_{suffix}"] * to_percent
+            atmos.name = f"{entry} atmos ({units})"
             output.append(atmos)
             # Plotting the melt as well is overwhelming for one figure.
             # melt: pd.Series = totals["melt_ppmw"]
@@ -153,11 +173,16 @@ class Plotter:
         ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
-    def ratios_pairplot(self, reservoirs: Iterable[str] = ("atmosphere", "melt", "total")) -> None:
+    def ratios_pairplot(
+        self,
+        reservoirs: Iterable[str] = ("atmosphere", "melt", "total"),
+        mass_or_moles: str = "mass",
+    ) -> None:
         """Pair plots of C/H and C/O ratios in the reservoirs
 
         Args:
             reservoirs: Reservoirs to plot. Defaults to all reservoirs.
+            mass_or_moles: Compute ratios by mass or moles. Defaults to mass.
         """
 
         output: list[pd.Series] = [self.fO2_categorise()]
@@ -165,7 +190,7 @@ class Plotter:
         for element in ("H", "O"):
             for reservoir in reservoirs:
                 series_data: pd.Series = self.get_element_ratio_in_reservoir(
-                    "C", element, reservoir
+                    "C", element, reservoir=reservoir, mass_or_moles=mass_or_moles
                 )
                 output.append(series_data)
 

@@ -106,8 +106,8 @@ class UnitConversion:
         return value_ppm / cls.fraction_to_ppm()
 
     @classmethod
-    def ppm_to_wt_percent(cls, value_ppm: float = 1) -> float:
-        """Parts-per-million by mass to weight percent"""
+    def ppm_to_percent(cls, value_ppm: float = 1) -> float:
+        """Parts-per-million by percent"""
         return cls.ppm_to_fraction(value_ppm) * 100
 
     @classmethod
