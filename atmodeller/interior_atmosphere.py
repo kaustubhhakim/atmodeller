@@ -384,12 +384,27 @@ class ReactionNetwork:
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
+        temperature: float = system.planet.surface_temperature
+        pressure: float = system.total_pressure
         for index, gas_species in self.species.gas_species.items():
-            fugacity_coefficients[index] = gas_species.eos.get_value(
-                temperature=system.planet.surface_temperature, pressure=system.total_pressure
+            fugacity_coefficient = gas_species.eos.get_value(
+                temperature=temperature, pressure=pressure
             )
-        log_fugacity_coefficients: np.ndarray = np.log10(fugacity_coefficients)
+            if fugacity_coefficient == np.inf:
+                name: str = gas_species.formula
+                msg: str = "Fugacity coefficient for %s has blown up (inf)" % name
+                logger.warning(msg)
+                msg = "Conditions at blow-up: temperature = %f, pressure = %f" % (
+                    temperature,
+                    pressure,
+                )
+                logger.warning(msg)
+                logger.warning("Setting fugacity coefficient for %s to unity (ideal gas)" % name)
+                fugacity_coefficient = 1
 
+            fugacity_coefficients[index] = fugacity_coefficient
+
+        log_fugacity_coefficients: np.ndarray = np.log10(fugacity_coefficients)
         logger.debug("Fugacity coefficient vector = %s", log_fugacity_coefficients)
 
         return log_fugacity_coefficients
@@ -411,7 +426,6 @@ class ReactionNetwork:
         Returns:
             The residual vector of the reaction network
         """
-
         rhs: np.ndarray = self.assemble_right_hand_side_values(
             system=system, constraints=constraints
         )
@@ -599,6 +613,9 @@ class InteriorAtmosphereSystem:
         *,
         extra_output: dict[str, float] | None = None,
         initial_solution: list[float] | np.ndarray | None = None,
+        max_attempts: int = 50,
+        log10_perturb: float = 0.5,
+        errors: str = "raise",
         method: str = "hybr",
         tol: float | None = None,
         **options,
@@ -610,6 +627,11 @@ class InteriorAtmosphereSystem:
             extra_output: Extra data to write to the output
             initial_solution: Initial guess for the solution. Defaults to None.
             method: Type of solver. Defaults to 'hybr'.
+            max_attempts: Maximum number of attempts to randomise the initial condition to find a
+                solution if the initial guess fails.
+            log10_perturb: Maximum log10 perturbation (plus or minus) to apply to the initial
+                condition on failure. Defaults to 1.0.
+            errors: Either 'raise' solver errors or 'ignore'. Defaults to 'raise'.
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
         """
@@ -618,17 +640,30 @@ class InteriorAtmosphereSystem:
 
         result: OptimizeResult = self._solve(
             initial_solution=initial_solution,
+            max_attempts=max_attempts,
+            log10_perturb=log10_perturb,
             method=method,
             tol=tol,
             **options,
         )
-        self._log_solution = result.x
-        self._residual = result.fun
 
-        self.output.add(self, extra_output)
-        self.initial_condition.update(self.output)
+        if result.success:
+            self._log_solution = result.x
+            self._residual = result.fun
+            self.output.add(self, extra_output)
+            self.initial_condition.update(self.output)
+            logger.info(pprint.pformat(self.solution_dict))
 
-        logger.info(pprint.pformat(self.solution_dict))
+        else:
+            msg: str = "Solver failed after %d attempts (errors = %s)" % (max_attempts, errors)
+            if errors == "raise":
+                logger.error(msg)
+                logger.error("constraints = %s", self.constraints)
+                raise RuntimeError(msg)
+            else:
+                logger.warning(msg)
+                logger.warning("constraints = %s", self.constraints)
+                logger.warning("Continuing with next solve")
 
     def set_constraints(self, constraints: SystemConstraints) -> None:
         """Combines user-prescribed constraints with intrinsic (activity) constraints.
@@ -658,12 +693,14 @@ class InteriorAtmosphereSystem:
                 )
             )
         logger.debug("total_pressure = %s", self.total_pressure)
-        logger.debug("Conforming initial solution to constraints = %s", self._log_solution)
+        logger.info("Conforming initial solution to constraints = %s", self._log_solution)
 
     def _solve(
         self,
         *,
         initial_solution: list[float] | np.ndarray | None = None,
+        max_attempts: int,
+        log10_perturb: float,
         method: str,
         tol: float | None,
         **options,
@@ -672,6 +709,10 @@ class InteriorAtmosphereSystem:
 
         Args:
             initial_solution: Initial guess for the solution
+            max_attempts: Maximum number of attempts to randomise the initial condition to find a
+                solution if the initial guess fails.
+            log10_perturb: Maximum log10 perturbation (plus or minus) to apply to the initial
+                condition on failure.
             method: Type of solver
             tol: Tolerance for termination
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -679,7 +720,6 @@ class InteriorAtmosphereSystem:
         Returns:
             The result
         """
-
         # Manual override trumps self.initial_condition
         if initial_solution is not None:
             self._log_solution = np.log10(np.array(initial_solution))
@@ -692,38 +732,46 @@ class InteriorAtmosphereSystem:
 
         self._conform_initial_solution_to_constraints()
 
-        # For outputting to the logger below.
-        initial_guess: np.ndarray = self._log_solution.copy()
-
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
 
-        sol = root(
-            self._objective_func,
-            self._log_solution,
-            args=(coefficient_matrix,),
-            method=method,
-            tol=tol,
-            options=options,
-        )
+        for attempt in range(1, max_attempts):
+            logger.info("Attempt %d/%d", attempt, max_attempts)
+            initial_guess: np.ndarray = self._log_solution.copy()
+            logger.debug("initial_guess = %s", initial_guess)
+            sol = root(
+                self._objective_func,
+                self._log_solution,
+                args=(coefficient_matrix,),
+                method=method,
+                tol=tol,
+                options=options,
+            )
+            logger.info(sol["message"])
+            logger.debug("sol = %s", sol)
 
-        logger.info(sol["message"])
-        logger.debug("sol = %s", sol)
+            if sol.success:
+                logger.debug("Initial guess solution = %s", initial_guess)
+                logger.debug("Actual solution = %s", sol.x)
+                error: np.ndarray = np.sqrt(mean_squared_error(sol.x, initial_guess))
+                logger.info(
+                    "%s: RMSE (actual vs initial) = %s",
+                    self.initial_condition.__class__.__name__,
+                    error,
+                )
+                return sol
 
-        # TODO: Raise a more descriptive exception.
-        if not sol.success:
-            logger.error("constraints = %s", self.constraints)
-            raise SystemExit()
+            else:
+                logger.warning("The solver failed on attempt %d/%d", attempt, max_attempts)
+                # Perturb initial guess by log10_perturb either side of the previous guess.
+                logger.info("Perturbing initial guess solution")
+                self._log_solution += log10_perturb * (
+                    2 * np.random.rand(self.log_solution.size) - 1
+                )
+                self._conform_initial_solution_to_constraints()
 
-        logger.debug("Initial guess solution = %s", initial_guess)
-        logger.debug("Actual solution = %s", sol.x)
-        error: np.ndarray = np.sqrt(mean_squared_error(sol.x, initial_guess))
-        logger.info(
-            "%s: RMSE (actual vs initial) = %s", self.initial_condition.__class__.__name__, error
-        )
-
-        return sol
+        return OptimizeResult({"success": False})
 
     def _objective_func(
         self,

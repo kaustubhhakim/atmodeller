@@ -82,10 +82,10 @@ class InitialConditionDict(InitialConditionABC):
         see Args.
     """
 
-    values: dict[str, float]
+    values: dict[str, float | int]
     _: KW_ONLY
     species: Species
-    fill_value: float = 1
+    fill_value: float | int = 1
     _initial_condition: np.ndarray = field(init=False)
 
     def __post_init__(self):
