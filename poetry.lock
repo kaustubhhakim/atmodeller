@@ -388,6 +388,22 @@ files = [
 ]
 
 [[package]]
+name = "cmcrameri"
+version = "1.7"
+description = "Perceptually uniform colormaps by Fabio Crameri"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "cmcrameri-1.7-py3-none-any.whl", hash = "sha256:97f9ae687253bfdaab06081172db4ba14c6638eb3ca0a6c82a5874e99b6ee344"},
+    {file = "cmcrameri-1.7.tar.gz", hash = "sha256:581f459809ce1951bbd305b7992d56185bab33a79efd40059d414365ef97abfe"},
+]
+
+[package.dependencies]
+matplotlib = "*"
+numpy = "*"
+packaging = "*"
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -2903,4 +2919,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "af571692b637c3ea0a63991065c567a22991141662459437340163c01b6d6ad0"
+content-hash = "2ac313479f2cc26a68954e4bff56047b7e241110cace313576535c5b6c6b38db"

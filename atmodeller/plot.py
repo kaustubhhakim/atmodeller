@@ -26,6 +26,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from cmcrameri import cm
 from matplotlib import pyplot as plt
 
 from atmodeller.output import Output
@@ -107,23 +108,24 @@ class Plotter:
             Category of the atmosphere
         """
         if fo2_shift < -1:
-            return "Reduced (-4 < IW < -1)"
+            return "Reduced"
         elif fo2_shift < 1:
-            return "IW (-1 < IW < 1)"
+            return "IW"
         else:
-            return "Oxidised (1 < IW < 4)"
+            return "Oxidised"
 
-    def fO2_categorise(self) -> pd.Series:
+    def fO2_categorise(self) -> tuple[pd.Series, tuple[str, ...]]:
         """Gets a series of the atmosphere category based on fO2.
 
         Returns:
-            Category of the atmosphere as a series.
+            Category of the atmosphere as a series and the order of the categories
         """
         fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
         fO2_categorise = fO2_shift.apply(self._get_fO2_category)
         fO2_categorise.name = "Oxygen fugacity"
+        category_order: tuple[str, ...] = ("Reduced", "IW", "Oxidised")
 
-        return fO2_categorise
+        return fO2_categorise, category_order
 
     @staticmethod
     def _get_CH_category(CH_ratio: float) -> str:
@@ -138,27 +140,24 @@ class Plotter:
             Category of the atmosphere
         """
         if CH_ratio < 1:
-            return "C/H < 1"
+            return "Low C/H"
         elif CH_ratio < 5:
-            return "1 < C/H < 5"
-        elif CH_ratio < 8:
-            return "5 < C/H < 8"
-        elif CH_ratio < 9:
-            return "8 < C/H < 9"
+            return "Medium C/H"
         else:
-            return "9 < C/H < 10"
+            return "High C/H"
 
-    def CH_categorise(self) -> pd.Series:
+    def CH_categorise(self) -> tuple[pd.Series, tuple[str, ...]]:
         """Gets a series of the atmosphere category based on C/H.
 
         Returns:
-            Category of the atmosphere as a series.
+            Category of the atmosphere as a series and the order of the categories
         """
         CH_ratio: pd.Series = self.dataframes["extra"]["C/H ratio"]
         CH_categorise = CH_ratio.apply(self._get_CH_category)
         CH_categorise.name = "C/H ratio"
+        category_order: tuple[str, ...] = ("Low C/H", "Medium C/H", "High C/H")
 
-        return CH_categorise
+        return CH_categorise, category_order
 
     @staticmethod
     def _get_H_category(H: float) -> str:
@@ -173,23 +172,24 @@ class Plotter:
             Category of the atmosphere
         """
         if H < 3:
-            return "H < 3"
+            return "Low oceans"
         elif H < 5:
-            return "3 < H < 5"
+            return "Medium oceans"
         else:
-            return "5 < H < 10"
+            return "High oceans"
 
-    def H_oceans(self) -> pd.Series:
+    def H_oceans(self) -> tuple[pd.Series, tuple[str, ...]]:
         """Gets a series of the atmosphere category based on total H
 
         Returns:
-            Category of the atmosphere as a series.
+            Category of the atmosphere as a series and the order of the categories
         """
         H_oceans: pd.Series = self.dataframes["extra"]["Number of ocean moles"]
         H_oceans = H_oceans.apply(self._get_H_category)
         H_oceans.name = "Oceans"
+        category_order: tuple[str, ...] = ("Low oceans", "Medium oceans", "High oceans")
 
-        return H_oceans
+        return H_oceans, category_order
 
     def species_pairplot(
         self,
@@ -212,11 +212,11 @@ class Plotter:
         output: list[pd.Series] = []
 
         if category == "fO2":
-            colour_category = self.fO2_categorise()
+            colour_category, category_order = self.fO2_categorise()
         elif category == "CH":
-            colour_category = self.CH_categorise()
+            colour_category, category_order = self.CH_categorise()
         elif category == "H":
-            colour_category = self.H_oceans()
+            colour_category, category_order = self.H_oceans()
         else:
             msg: str = "{category} is unknown"
             logger.error(msg)
@@ -254,10 +254,31 @@ class Plotter:
             #     output.append(melt)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
-        ax: sns.PairGrid = sns.pairplot(data, hue=str(colour_category.name), corner=True)
+
+        colormap = cm.batlowS  # type: ignore
+        colormap_values: list = [colormap(4), colormap(2), colormap(3)]
+        custom_palette = {name: value for name, value in zip(category_order, colormap_values)}
+        plot_kws: dict = {
+            "fill": True,
+            "alpha": 0.7,
+            "thresh": 0.1,
+            "levels": 4,
+            "clip": (0, 100),
+            "common_norm": False,
+        }
+        ax: sns.PairGrid = sns.pairplot(
+            data,
+            hue=str(colour_category.name),
+            corner=True,
+            plot_kws=plot_kws,
+            palette=custom_palette,
+            kind="kde",
+            hue_order=custom_palette.keys(),
+        )
+
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
         ticks: Iterable[float] = range(0, 101, 25)
-        ax.set(xlim=(0, 100), ylim=(0, 100), xticks=ticks, yticks=ticks)
+        ax.set(xlim=(-5, 100), ylim=(-5, 105), xticks=ticks, yticks=ticks)
         plt.subplots_adjust(hspace=0.15, wspace=0.15)
 
         return ax
@@ -266,15 +287,15 @@ class Plotter:
         self,
         reservoirs: Iterable[str] = ("atmosphere", "melt", "total"),
         mass_or_moles: str = "mass",
-    ) -> None:
+    ) -> sns.PairGrid:
         """Pair plots of C/H and C/O ratios in the reservoirs
 
         Args:
             reservoirs: Reservoirs to plot. Defaults to all reservoirs.
             mass_or_moles: Compute ratios by mass or moles. Defaults to mass.
         """
-
-        output: list[pd.Series] = [self.fO2_categorise()]
+        colour_category, category_order = self.fO2_categorise()
+        output: list[pd.Series] = [colour_category]
 
         for element in ("H", "O"):
             for reservoir in reservoirs:
@@ -284,5 +305,27 @@ class Plotter:
                 output.append(series_data)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
-        ax: sns.PairGrid = sns.pairplot(data, hue="Oxygen fugacity", corner=True)
+
+        colormap = cm.batlowS  # type: ignore
+        colormap_values: list = [colormap(4), colormap(2), colormap(3)]
+        custom_palette = {name: value for name, value in zip(category_order, colormap_values)}
+        plot_kws: dict = {
+            "fill": True,
+            "alpha": 0.7,
+            "thresh": 0.1,
+            "levels": 4,
+            "common_norm": False,
+        }
+        ax: sns.PairGrid = sns.pairplot(
+            data,
+            hue=str(colour_category.name),
+            corner=True,
+            plot_kws=plot_kws,
+            palette=custom_palette,
+            kind="kde",
+            hue_order=custom_palette.keys(),
+        )
+
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
+
+        return ax
