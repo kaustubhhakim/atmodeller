@@ -26,7 +26,12 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol
 
 import numpy as np
 
-from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller import (
+    GAS_CONSTANT,
+    GAS_CONSTANT_BAR,
+    INITIAL_CONDITION_LOG10_MAX_CLIP,
+    INITIAL_CONDITION_LOG10_MIN_CLIP,
+)
 from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
@@ -407,7 +412,26 @@ class InitialConditionABC(GetValueABC):
         Returns
             The initial condition
         """
-        return super().get_log10_value(evaluated_log10_constraints, *args, **kwargs)
+        log10_value: np.ndarray | float = super().get_log10_value(
+            evaluated_log10_constraints, *args, **kwargs
+        )
+
+        if np.any(
+            (log10_value < INITIAL_CONDITION_LOG10_MIN_CLIP)
+            | (log10_value > INITIAL_CONDITION_LOG10_MAX_CLIP)
+        ):
+            msg: str = "Initial condition has values outside the clip thresholds"
+            logger.warning(msg)
+            msg = "Clipping the initial condition between %d and %d" % (
+                INITIAL_CONDITION_LOG10_MIN_CLIP,
+                INITIAL_CONDITION_LOG10_MAX_CLIP,
+            )
+            logger.warning(msg)
+            log10_value = np.clip(
+                log10_value, INITIAL_CONDITION_LOG10_MIN_CLIP, INITIAL_CONDITION_LOG10_MAX_CLIP
+            )
+
+        return log10_value
 
     def update(self, output: Output, *args, **kwargs) -> None:
         """Updates the initial condition.

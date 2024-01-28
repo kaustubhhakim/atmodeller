@@ -682,16 +682,18 @@ class InteriorAtmosphereSystem:
         """Conforms the initial solution (estimate) to activity, pressure and fugacity constraints.
 
         Pressure and fugacity constraints can be imposed directly on the initial solution
-        estimate. For simplicity we impose both as pressure constraints.
+        estimate. For simplicity impose both as pressure constraints and ignore the total pressure.
+        Assuming a pressure of 1 bar is adequate for a reasonable first guess and avoids the
+        potential blow-up of the constraint if the initial solution gives rise to a large total
+        pressure.
         """
         for constraint in self.constraints.reaction_network_constraints:
             index: int = self.species.indices[constraint.species]
             logger.debug("Setting %s %d", constraint.species, index)
             self._log_solution[index] = np.log10(
-                constraint.get_value(
-                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
-                )
+                constraint.get_value(temperature=self.planet.surface_temperature, pressure=1)
             )
+
         logger.debug("total_pressure = %s", self.total_pressure)
         logger.info("Conforming initial solution to constraints = %s", self._log_solution)
 
