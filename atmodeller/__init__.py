@@ -45,7 +45,7 @@ DATA_ROOT_PATH: Traversable = importlib.resources.files("%s.data" % __package__)
 # can be large, which causes a blow up when the pressure is computed. Hence specify clipping
 # criteria.
 INITIAL_CONDITION_LOG10_MIN_CLIP: int = -11
-INITIAL_CONDITION_LOG10_MAX_CLIP: int = 5
+INITIAL_CONDITION_LOG10_MAX_CLIP: int = 4
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config

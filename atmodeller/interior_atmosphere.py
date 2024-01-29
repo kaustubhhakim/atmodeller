@@ -27,7 +27,12 @@ import numpy as np
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
-from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
+from atmodeller import (
+    GAS_CONSTANT,
+    GRAVITATIONAL_CONSTANT,
+    INITIAL_CONDITION_LOG10_MAX_CLIP,
+    INITIAL_CONDITION_LOG10_MIN_CLIP,
+)
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
 from atmodeller.initial_condition import InitialConditionConstant
@@ -777,6 +782,11 @@ class InteriorAtmosphereSystem:
                 # if the solver failed. Hence restore the initial_guess and randomly perturb it.
                 self._log_solution = initial_guess + log10_perturb * (
                     2 * np.random.rand(self.log_solution.size) - 1
+                )
+                self._log_solution = np.clip(
+                    self._log_solution,
+                    INITIAL_CONDITION_LOG10_MIN_CLIP,
+                    INITIAL_CONDITION_LOG10_MAX_CLIP,
                 )
                 self._conform_initial_solution_to_constraints()
 
