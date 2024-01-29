@@ -614,8 +614,8 @@ class InteriorAtmosphereSystem:
         extra_output: dict[str, float] | None = None,
         initial_solution: list[float] | np.ndarray | None = None,
         max_attempts: int = 50,
-        log10_perturb: float = 0.5,
-        errors: str = "raise",
+        log10_perturb: float = 2.0,
+        errors: str = "ignore",
         method: str = "hybr",
         tol: float | None = None,
         **options,
@@ -630,8 +630,8 @@ class InteriorAtmosphereSystem:
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails.
             log10_perturb: Maximum log10 perturbation (plus or minus) to apply to the initial
-                condition on failure. Defaults to 1.0.
-            errors: Either 'raise' solver errors or 'ignore'. Defaults to 'raise'.
+                condition on failure. Defaults to 2.0.
+            errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
         """
@@ -709,6 +709,11 @@ class InteriorAtmosphereSystem:
     ) -> OptimizeResult:
         """Solves the non-linear system of equations.
 
+        The default to try and perturb the initial condition if the solver fails is experimental,
+        and ultimately still relies on the original initial condition not being too far from the
+        basin of convergence. The log output will reveal how successful this approach is in
+        practice.
+
         Args:
             initial_solution: Initial guess for the solution
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
@@ -741,7 +746,7 @@ class InteriorAtmosphereSystem:
         for attempt in range(1, max_attempts):
             logger.info("Attempt %d/%d", attempt, max_attempts)
             initial_guess: np.ndarray = self._log_solution.copy()
-            logger.debug("initial_guess = %s", initial_guess)
+            logger.info("Initial guess solution = %s", initial_guess)
             sol = root(
                 self._objective_func,
                 self._log_solution,
@@ -754,7 +759,6 @@ class InteriorAtmosphereSystem:
             logger.debug("sol = %s", sol)
 
             if sol.success:
-                logger.debug("Initial guess solution = %s", initial_guess)
                 logger.debug("Actual solution = %s", sol.x)
                 error: np.ndarray = np.sqrt(mean_squared_error(sol.x, initial_guess))
                 logger.info(
@@ -765,10 +769,12 @@ class InteriorAtmosphereSystem:
                 return sol
 
             else:
-                logger.warning("The solver failed on attempt %d/%d", attempt, max_attempts)
                 # Perturb initial guess by log10_perturb either side of the previous guess.
+                logger.warning("The solver failed on attempt %d/%d", attempt, max_attempts)
                 logger.info("Perturbing initial guess solution")
-                self._log_solution += log10_perturb * (
+                # self._log_solution is updated during the solve, so the value will be meaningless
+                # if the solver failed. Hence restore the initial_guess and randomly perturb it.
+                self._log_solution = initial_guess + log10_perturb * (
                     2 * np.random.rand(self.log_solution.size) - 1
                 )
                 self._conform_initial_solution_to_constraints()
