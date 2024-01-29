@@ -18,6 +18,7 @@ see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
 
+import copy
 import logging
 import pickle
 from collections import UserDict
@@ -466,6 +467,48 @@ class Output(UserDict):
                 df.to_excel(writer, sheet_name=df_name, index=True)
 
         logger.info("Output written to %s", output_file)
+
+    def _check_keys_the_same(self, other: Output) -> None:
+        """Checks if the keys are the same in 'other' before combining output.
+
+        Args:
+            other: Other output to potentially combine (if keys are the same)
+        """
+        if not self.keys() == other.keys():
+            msg: str = "Keys for 'other' are not the same as 'self' so cannot combine them"
+            logger.error(msg)
+            raise KeyError(msg)
+
+    def __add__(self, other: Output) -> Output:
+        """Addition
+
+        Args:
+            other: Other output to combine with self
+
+        Returns:
+            Combined output
+        """
+        self._check_keys_the_same(other)
+        output: Output = copy.deepcopy(self)
+        for key in self.keys():
+            output[key].extend(other[key])
+
+        return output
+
+    def __iadd__(self, other: Output) -> Output:
+        """In-place addition
+
+        Args:
+            other: Other output to combine with self in-place
+
+        Returns:
+            self
+        """
+        self._check_keys_the_same(other)
+        for key in self.keys():
+            self[key].extend(other[key])
+
+        return self
 
     def __call__(
         self,
