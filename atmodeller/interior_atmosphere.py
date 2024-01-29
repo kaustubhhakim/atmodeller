@@ -742,6 +742,7 @@ class InteriorAtmosphereSystem:
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
+        first_guess: np.ndarray = self._log_solution.copy()
 
         for attempt in range(1, max_attempts):
             logger.info("Attempt %d/%d", attempt, max_attempts)
@@ -778,6 +779,10 @@ class InteriorAtmosphereSystem:
                     2 * np.random.rand(self.log_solution.size) - 1
                 )
                 self._conform_initial_solution_to_constraints()
+
+        # Restore the solution to something reasonable for the next solve, since the total pressure
+        # is used to evaluate constraints for the next solve.
+        self._log_solution = first_guess
 
         return OptimizeResult({"success": False})
 
