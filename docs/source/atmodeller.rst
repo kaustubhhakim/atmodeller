@@ -37,10 +37,10 @@ atmodeller.example\_google module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.initial\_condition module
-------------------------------------
+atmodeller.initial\_solution module
+-----------------------------------
 
-.. automodule:: atmodeller.initial_condition
+.. automodule:: atmodeller.initial_solution
    :members:
    :undoc-members:
    :show-inheritance:
