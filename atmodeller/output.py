@@ -289,7 +289,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
-            interior_atmosphere
+            interior_atmosphere.planet.surface_temperature, interior_atmosphere.total_pressure
         )
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)

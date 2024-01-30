@@ -41,11 +41,11 @@ OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 
 DATA_ROOT_PATH: Traversable = importlib.resources.files("%s.data" % __package__)
 
-# In particular when using an overfitted regressor, the returned log10 initial solution guesses
-# can be large, which causes a blow up when the pressure is computed. Hence specify clipping
-# criteria.
-INITIAL_CONDITION_LOG10_MIN_CLIP: int = -11
-INITIAL_CONDITION_LOG10_MAX_CLIP: int = 4
+# Minimum and maximum values of log10(pressure) to prevent the initial condition from giving rise
+# to an excessively large total pressure that can cause numerical overflow or underflow.
+# Minimum value is guided by typical values of the fO2 for IW atmospheres for Earth-sized planets
+INITIAL_CONDITION_MIN_LOG10: float = -12
+INITIAL_CONDITION_MAX_LOG10: float = 5
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config

@@ -19,7 +19,6 @@ see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
 import logging
-from dataclasses import KW_ONLY, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,12 +34,11 @@ from atmodeller.interfaces import InitialConditionABC
 from atmodeller.output import Output
 
 if TYPE_CHECKING:
-    from atmodeller.core import Species
+    from atmodeller.constraints import SystemConstraints
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass
 class InitialConditionConstant(InitialConditionABC):
     """A constant value for the initial condition
 
@@ -53,116 +51,92 @@ class InitialConditionConstant(InitialConditionABC):
 
     Args:
         value: A constant pressure for the initial condition in bar. Defaults to 10.
-
-    Attributes:
-        See Args.
+        **kwargs: Keyword arguments to pass through to base class
     """
 
-    value: float = 10
-
-    def get_value(self, *args, **kwargs) -> float:
-        del args
-        del kwargs
-        logger.debug("%s: value = %s", self.__class__.__name__, self.value)
-
-        return self.value
-
-
-@dataclass
-class InitialConditionDict(InitialConditionABC):
-    """A dictionary of values for the initial condition
-
-    Args:
-        values: A dictionary of initial values for one or several species
-        species: Species in the interior atmosphere model
-        fill_value: Initial value for species that are not specified in the 'values' dictionary.
-            Defaults to 1 bar.
-
-    Attributes:
-        see Args.
-    """
-
-    values: dict[str, float | int]
-    _: KW_ONLY
-    species: Species
-    fill_value: float | int = 1
-    _initial_condition: np.ndarray = field(init=False)
-
-    def __post_init__(self):
-        super().__post_init__()
-        self._set_initial_condition_values()
-
-    def _set_initial_condition_values(self) -> None:
-        """Sets the initial condition values"""
-        initial_condition: list[float] = []
-        for species in self.species.formulas:
-            try:
-                value: float = self.values[species]
-            except KeyError:
-                value = self.fill_value
-            initial_condition.append(value)
-
-        self._initial_condition = np.array(initial_condition)
+    def __init__(self, value: float = 10, **kwargs):
+        super().__init__(value, **kwargs)
 
     def get_value(self, *args, **kwargs) -> np.ndarray:
         del args
         del kwargs
-        logger.debug("%s: value = %s", self.__class__.__name__, self._initial_condition)
-        return self._initial_condition
+        logger.debug("%s: value = %s", self.__class__.__name__, self.value)
+
+        return self.value * np.ones(self.species.number)
 
 
-@dataclass
+class InitialConditionDict(InitialConditionABC):
+    """A dictionary of values for the initial condition
+
+    Args:
+        value: A dictionary of initial values for one or several species
+        fill_value: Initial value for species that are not specified in the 'value' dictionary.
+            Defaults to 1 bar.
+        **kwargs: Keyword arguments to pass through to base class
+    """
+
+    def __init__(self, value: dict[str, float | int], fill_value: float = 1, **kwargs):
+        super().__init__(value, **kwargs)
+        self._fill_missing_species(fill_value)
+        self._value: np.ndarray = np.array(list(self.value.values()))
+
+    def _fill_missing_species(self, fill_value: float) -> None:
+        """Fills missing species values"""
+        for species in self.species.formulas:
+            if species not in self.value:
+                self.value[species] = fill_value
+
+        # Must maintain order with species.
+        self.value = {key: self.value[key] for key in self.species.formulas}
+
+    def get_value(self, *args, **kwargs) -> np.ndarray:
+        del args
+        del kwargs
+        logger.debug("%s: value = %s", self.__class__.__name__, self._value)
+
+        return self._value
+
+
 class InitialConditionRegressor(InitialConditionABC):
     """A regressor to compute the initial condition.
 
     Args:
-        output: Output for building the first trained regressor
-        species: Species in the new interior atmosphere model. Defaults to None, meaning that the
-            species in the output are assumed to also be the species in the new model.
+        value: Output for building the first trained regressor
         species_fill: Dictionary of missing species and their initial values. Defaults to an empty
             dictionary.
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit = True.
-            Defaults to 50.
+            Defaults to 100.
         partial_fit: Partial fit the regressor during the model run. Defaults to True.
         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
-            regressor. Defaults to 50.
-
-    Attributes:
-        output: Output for building the first trained regressor
-        species: Species in the new interior atmosphere model
-        species_fill: Dictionary of missing species and their initial values
-        fit: Fit the regressor during the model run. This will replace the original regressor by a
-            regressor trained only on the data from the current model.
-        fit_batch_size: Number of solutions to calculate before fitting model data if fit = True.
-        partial_fit: Partial fit the regressor during the model run.
-        partial_fit_batch_size: Number of solutions before partial refit of the regressor
-        constraint_names: Names of the constraints (and their order) in the output
-        species_names: Names of the species (and their order) in the output
+            regressor. Defaults to 500.
+        **kwargs: Keyword arguments to pass through to base class
     """
 
-    output: Output
-    _: KW_ONLY
-    species: Species | None = None
-    species_fill: dict[str, float] = field(default_factory=dict)
-    fit: bool = True
-    fit_batch_size: int = 50
-    partial_fit: bool = True
-    partial_fit_batch_size: int = 50
-    constraint_names: list[str] = field(init=False)
-    species_names: list[str] = field(init=False)
-    _reg: MultiOutputRegressor = field(init=False)
-    _solution_scalar: StandardScaler = field(init=False)
-    _constraints_scalar: StandardScaler = field(init=False)
-
-    def __post_init__(self):
-        super().__post_init__()
+    def __init__(
+        self,
+        value: Output,
+        *,
+        species_fill: dict[str, float] | None = None,
+        fit: bool = True,
+        fit_batch_size: int = 100,
+        partial_fit: bool = True,
+        partial_fit_batch_size: int = 500,
+        **kwargs,
+    ):
+        super().__init__(value, **kwargs)
+        self.species_fill: dict[str, float] = species_fill if species_fill is not None else {}
+        self.fit: bool = fit
         # Ensure consistency of arguments and correct handling of fit versus partial refit.
-        if not self.fit:
-            self.fit_batch_size = 0
+        self.fit_batch_size: int = fit_batch_size if self.fit else 0
+        self.partial_fit: bool = partial_fit
+        self.partial_fit_batch_size: int = partial_fit_batch_size
+        self._reg: MultiOutputRegressor
+        self._solution_scalar: StandardScaler
+        self._constraints_scalar: StandardScaler
         self._conform_output_to_species()
-        self._fit(self.output)
+        self._fit(self.value)
 
     @classmethod
     def from_pickle(cls, pickle_file: Path | str, *args, **kwargs) -> InitialConditionRegressor:
@@ -189,12 +163,12 @@ class InitialConditionRegressor(InitialConditionABC):
         model. It fills in initial values for missing species with user-prescribed data and
         excludes species that are not in the new model.
         """
-        output_dataframes: dict[str, pd.DataFrame] = self.output.to_dataframes()
+        output_dataframes: dict[str, pd.DataFrame] = self.value.to_dataframes()
         solution_df: pd.DataFrame = output_dataframes["solution"]
-        conformed_solution_df = solution_df.copy()
+        conformed_solution_df: pd.DataFrame = solution_df.copy()
 
         if self.species is None:
-            species_formulas: list[str] = self.output.species
+            species_formulas: list[str] = self.value.species
         else:
             species_formulas = self.species.formulas
 
@@ -215,7 +189,7 @@ class InitialConditionRegressor(InitialConditionABC):
             assert species_formulas == list(conformed_solution_df.columns)
 
         # Set the conformed solution to the output so it is used to construct the initial regressor
-        self.output["solution"] = conformed_solution_df.to_dict(orient="records")
+        self.value["solution"] = conformed_solution_df.to_dict(orient="records")
 
     def _fit(
         self,
@@ -253,10 +227,10 @@ class InitialConditionRegressor(InitialConditionABC):
             solution_log10_values
         )
 
-        self.constraint_names = list(constraints.columns)
-        logger.info("%s: Found constraints = %s", self.__class__.__name__, self.constraint_names)
-        self.species_names = list(solution.columns)
-        logger.info("%s: Found species = %s", self.__class__.__name__, self.species_names)
+        constraint_names = list(constraints.columns)
+        logger.info("%s: Found constraints = %s", self.__class__.__name__, constraint_names)
+        species_names = list(solution.columns)
+        logger.info("%s: Found species = %s", self.__class__.__name__, species_names)
 
         base_regressor: SGDRegressor = SGDRegressor()
         multi_output_regressor: MultiOutputRegressor = MultiOutputRegressor(base_regressor)
@@ -296,17 +270,27 @@ class InitialConditionRegressor(InitialConditionABC):
 
         self._reg.partial_fit(constraints_scaled, solution_scaled)
 
-    def get_value(self, evaluated_log10_constraints: np.ndarray) -> np.ndarray:
+    def get_value(
+        self, constraints: SystemConstraints, temperature: float, pressure: float
+    ) -> np.ndarray:
         """Computes the value.
 
         Args:
-            evaluated_log10_constraints: Log10 of the constraints evaluated at current conditions
+            constraints: Constraints for the system of equations
+            temperature: Temperature in K to evaluate the constraints
+            pressure: Pressure in bar to evaluate the constraints
 
         Returns:
             A guess for the initial solution
         """
-        constraints: np.ndarray = evaluated_log10_constraints.reshape(1, -1)
-        constraints_scaled: np.ndarray | spmatrix = self._constraints_scalar.transform(constraints)
+        evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
+            temperature=temperature, pressure=pressure
+        )
+        values_constraints_log10: np.ndarray = np.array(list(evaluated_constraints_log10.values()))
+        values_constraints_log10 = values_constraints_log10.reshape(1, -1)
+        constraints_scaled: np.ndarray | spmatrix = self._constraints_scalar.transform(
+            values_constraints_log10
+        )
         solution_scaled: np.ndarray | spmatrix = self._reg.predict(constraints_scaled)
         solution_original: np.ndarray | spmatrix = self._solution_scalar.inverse_transform(
             solution_scaled
@@ -370,26 +354,44 @@ class InitialConditionSwitchRegressor(InitialConditionABC):
     """An initial condition that uses some initial value(s) before switching to a regressor.
 
     Args:
-        initial_regressor: Initial regressor to use. Defaults to a constant value regressor.
-        *args: Arbitrary positional arguments to pass to InitialConditionRegressor constructor
+        value: Initial regressor to use
         **kwargs: Arbitrary keyword arguments to pass to InitialConditionRegressor constructor
     """
 
-    def __init__(self, initial_regressor: InitialConditionABC | None = None, *args, **kwargs):
-        if initial_regressor is None:
-            self._ic: InitialConditionABC = InitialConditionConstant()
-        else:
-            self._ic = initial_regressor
+    # _kwargs: dict[str, Any] = field(init=False)
+    # _switch: int = field(init=False)
+
+    def __init__(self, value: InitialConditionABC, **kwargs):
+        super().__init__(value, **kwargs)
         # Store to instantiate regressor once the switch occurs.
-        self._ic_regressor_args: tuple[Any, ...] = args
-        self._ic_regressor_kwargs: dict[str, Any] = kwargs
+        self._kwargs: dict[str, Any] = kwargs
         # fit_batch_size argument of InitialConditionRegressor controls how much data must be
         # present before switching to the regressor
         self._switch: int = kwargs["fit_batch_size"]
 
-    def get_value(self, *args, **kwargs) -> ndarray | float:
+    # def __init__(
+    #    self,
+    #    value: InitialConditionABC,
+    #    *,
+    #    species: Species | None = None,
+    #    min_log10: float = INITIAL_CONDITION_MIN_LOG10,
+    #    max_log10: float = INITIAL_CONDITION_MAX_LOG10,
+    #    **kwargs,
+    # ):
+    #    super().__init__(
+    #        value=value, species=value.species, min_log10=min_log10, max_log10=max_log10
+    #    )
+    #    self.value: InitialConditionABC = value
+    #    self.species: Species = self.value.species
+    # Store to instantiate regressor once the switch occurs.
+    #    self._kwargs = kwargs
+    # fit_batch_size argument of InitialConditionRegressor controls how much data must be
+    # present before switching to the regressor
+    #    self._switch = kwargs["fit_batch_size"]
+
+    def get_value(self, *args, **kwargs) -> ndarray:
         """See base class."""
-        return self._ic.get_value(*args, **kwargs)
+        return self.value.get_value(*args, **kwargs)
 
     def update(self, output: Output, *args, **kwargs) -> None:
         """See base class.
@@ -402,8 +404,6 @@ class InitialConditionSwitchRegressor(InitialConditionABC):
         if output.size == self._switch:
             # All data is fit when the regressor is instantiated (this is effectively the 'update')
             # so we do not need to call the update method (hence the if-else block).
-            self._ic = InitialConditionRegressor(
-                output, *self._ic_regressor_args, **self._ic_regressor_kwargs
-            )
+            self.value = InitialConditionRegressor(output, **self._kwargs)
         else:
-            self._ic.update(output, *args, **kwargs)
+            self.value.update(output, *args, **kwargs)

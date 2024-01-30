@@ -25,7 +25,6 @@ import logging
 from abc import abstractmethod
 from collections import UserList
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -35,9 +34,6 @@ from atmodeller.interfaces import ConstraintABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -150,35 +146,38 @@ class SystemConstraints(UserList):
         """Number of constraints related to the reaction network"""
         return len(self.reaction_network_constraints)
 
-    def evaluate(self, interior_atmosphere: InteriorAtmosphereSystem) -> dict[str, float]:
+    def evaluate(self, temperature: float, pressure: float) -> dict[str, float]:
         """Evaluates all constraints.
 
         Args:
-            interior_atmosphere: Model that defines the conditions to evaluate at.
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            A dictionary of the evaluated constraints in the same order as the underlying list.
+            A dictionary of the evaluated constraints (same order as the constraints list)
         """
-        evaluate_dict: dict[str, float] = {}
+        evaluated_constraints: dict[str, float] = {}
         for constraint in self.data:
-            evaluate_dict[constraint.full_name] = constraint.get_value(
-                temperature=interior_atmosphere.planet.surface_temperature,
-                pressure=interior_atmosphere.total_pressure,
+            evaluated_constraints[constraint.full_name] = constraint.get_value(
+                temperature=temperature,
+                pressure=pressure,
             )
 
-        return evaluate_dict
+        return evaluated_constraints
 
-    def evaluate_log10_values(self, interior_atmosphere: InteriorAtmosphereSystem) -> np.ndarray:
-        """Gets the log10 values of all constraints evaluated at current conditions.
+    def evaluate_log10(self, temperature: float, pressure: float) -> dict[str, float]:
+        """Evaluates all constraints and returns the log10 values.
 
         Args:
-            interior_atmosphere: Model that defines the conditions to evaluate at.
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            The log10 evaluated constraints in the same order as the underlying list.
+            A dictionary of the log10 evaluated constraints (same order as the constraints list)
         """
-
-        return np.log10(np.array(list(self.evaluate(interior_atmosphere).values())))
+        return {
+            key: np.log10(value) for key, value in self.evaluate(temperature, pressure).items()
+        }
 
     def _filter_by_name(self, name: str) -> list[ConstraintABC]:
         """Filters the constraints by a given name.

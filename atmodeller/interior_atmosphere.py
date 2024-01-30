@@ -27,12 +27,7 @@ import numpy as np
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
-from atmodeller import (
-    GAS_CONSTANT,
-    GRAVITATIONAL_CONSTANT,
-    INITIAL_CONDITION_LOG10_MAX_CLIP,
-    INITIAL_CONDITION_LOG10_MIN_CLIP,
-)
+from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
 from atmodeller.initial_condition import InitialConditionConstant
@@ -465,7 +460,7 @@ class InteriorAtmosphereSystem:
 
     species: Species
     planet: Planet = field(default_factory=Planet)
-    initial_condition: InitialConditionABC = field(default_factory=InitialConditionConstant)
+    initial_condition: InitialConditionABC | None = None
     output: Output = field(init=False, default_factory=Output)
     _reaction_network: ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
@@ -478,6 +473,8 @@ class InteriorAtmosphereSystem:
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_planet_composition(self.planet)
+        if self.initial_condition is None:
+            self.initial_condition = InitialConditionConstant(species=self.species)
         self._reaction_network = ReactionNetwork(species=self.species)
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
 
@@ -616,8 +613,8 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
+        initial_condition: InitialConditionABC | None = None,
         extra_output: dict[str, float] | None = None,
-        initial_solution: list[float] | np.ndarray | None = None,
         max_attempts: int = 50,
         log10_perturb: float = 2.0,
         errors: str = "ignore",
@@ -629,8 +626,9 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations
+            initial_condition: Initial condition for this solve only. Defaults to 'None', meaning
+                that the default (self.initial_condition) is used.
             extra_output: Extra data to write to the output
-            initial_solution: Initial guess for the solution. Defaults to None.
             method: Type of solver. Defaults to 'hybr'.
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails.
@@ -643,8 +641,12 @@ class InteriorAtmosphereSystem:
         logger.info("Solving system number %d", self.number_of_solves)
         self.set_constraints(constraints)
 
+        if initial_condition is None:
+            initial_condition = self.initial_condition
+        assert initial_condition is not None
+
         result: OptimizeResult = self._solve(
-            initial_solution=initial_solution,
+            initial_condition=initial_condition,
             max_attempts=max_attempts,
             log10_perturb=log10_perturb,
             method=method,
@@ -656,7 +658,7 @@ class InteriorAtmosphereSystem:
             self._log_solution = result.x
             self._residual = result.fun
             self.output.add(self, extra_output)
-            self.initial_condition.update(self.output)
+            initial_condition.update(self.output)
             logger.info(pprint.pformat(self.solution_dict))
 
         else:
@@ -683,29 +685,10 @@ class InteriorAtmosphereSystem:
             self._constraints.append(condensed_species.activity)
         logger.debug("Constraints: %s", pprint.pformat(self._constraints))
 
-    def _conform_initial_solution_to_constraints(self) -> None:
-        """Conforms the initial solution (estimate) to activity, pressure and fugacity constraints.
-
-        Pressure and fugacity constraints can be imposed directly on the initial solution
-        estimate. For simplicity impose both as pressure constraints and ignore the total pressure.
-        Assuming a pressure of 1 bar is adequate for a reasonable first guess and avoids the
-        potential blow-up of the constraint if the initial solution gives rise to a large total
-        pressure.
-        """
-        for constraint in self.constraints.reaction_network_constraints:
-            index: int = self.species.indices[constraint.species]
-            logger.debug("Setting %s %d", constraint.species, index)
-            self._log_solution[index] = np.log10(
-                constraint.get_value(temperature=self.planet.surface_temperature, pressure=1)
-            )
-
-        logger.debug("total_pressure = %s", self.total_pressure)
-        logger.info("Conforming initial solution to constraints = %s", self._log_solution)
-
     def _solve(
         self,
         *,
-        initial_solution: list[float] | np.ndarray | None = None,
+        initial_condition: InitialConditionABC,
         max_attempts: int,
         log10_perturb: float,
         method: str,
@@ -720,7 +703,7 @@ class InteriorAtmosphereSystem:
         practice.
 
         Args:
-            initial_solution: Initial guess for the solution
+            initial_condition: Initial condition for this solve
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails.
             log10_perturb: Maximum log10 perturbation (plus or minus) to apply to the initial
@@ -732,17 +715,11 @@ class InteriorAtmosphereSystem:
         Returns:
             The result
         """
-        # Manual override trumps self.initial_condition
-        if initial_solution is not None:
-            self._log_solution = np.log10(np.array(initial_solution))
-        else:
-            constraints_eval: np.ndarray = self.constraints.evaluate_log10_values(self)
-            log10_value: float | np.ndarray = self.initial_condition.get_log10_value(
-                constraints_eval
-            )
-            self._log_solution = log10_value * np.ones(self.species.number)
-
-        self._conform_initial_solution_to_constraints()
+        # The only constraints that require pressure are the fugacity constraints, so for the
+        # purpose of determining the initial condition we evaluate them (if present) at 1 bar.
+        self._log_solution = initial_condition.get_log10_value(
+            self.constraints, temperature=self.planet.surface_temperature, pressure=1
+        )
 
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
@@ -780,15 +757,18 @@ class InteriorAtmosphereSystem:
                 logger.info("Perturbing initial guess solution")
                 # self._log_solution is updated during the solve, so the value will be meaningless
                 # if the solver failed. Hence restore the initial_guess and randomly perturb it.
-                self._log_solution = initial_guess + log10_perturb * (
-                    2 * np.random.rand(self.log_solution.size) - 1
-                )
-                self._log_solution = np.clip(
-                    self._log_solution,
-                    INITIAL_CONDITION_LOG10_MIN_CLIP,
-                    INITIAL_CONDITION_LOG10_MAX_CLIP,
-                )
-                self._conform_initial_solution_to_constraints()
+                # TODO: Attach this to the initial condition object as a method to perturb the
+                # value
+                # TODO: Add perturb to the base class
+                # self._log_solution = initial_guess + log10_perturb * (
+                #    2 * np.random.rand(self.log_solution.size) - 1
+                # )
+                # self._log_solution = np.clip(
+                #    self._log_solution,
+                #    INITIAL_CONDITION_LOG10_MIN_CLIP,
+                #    INITIAL_CONDITION_LOG10_MAX_CLIP,
+                # )
+                # self._conform_initial_solution_to_constraints()
 
         # Restore the solution to something reasonable for the next solve, since the total pressure
         # is used to evaluate constraints for the next solve.
