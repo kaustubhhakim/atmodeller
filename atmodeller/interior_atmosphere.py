@@ -30,8 +30,8 @@ from sklearn.metrics import mean_squared_error
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
-from atmodeller.initial_condition import InitialConditionConstant
-from atmodeller.interfaces import ConstraintABC, InitialConditionABC
+from atmodeller.initial_solution import InitialSolutionABC, InitialSolutionConstant
+from atmodeller.interfaces import ConstraintABC
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion, dataclass_to_logger
 
@@ -449,18 +449,18 @@ class InteriorAtmosphereSystem:
     Args:
         species: A list of species
         planet: A planet. Defaults to a molten Earth
-        initial_condition: Initial condition. Defaults to a constant for all species.
+        initial_solution: Initial solution. Defaults to a constant for all species.
 
     Attributes:
         species: A list of species
         planet: A planet
-        initial_condition: Initial condition. Defaults to a constant for all species.
+        initial_solution: Initial solution. Defaults to a constant for all species.
         output: All output data for this system. Access the dictionary by (calling) output().
     """
 
     species: Species
     planet: Planet = field(default_factory=Planet)
-    initial_condition: InitialConditionABC | None = None
+    initial_solution: InitialSolutionABC | None = None
     output: Output = field(init=False, default_factory=Output)
     _reaction_network: ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
@@ -473,8 +473,8 @@ class InteriorAtmosphereSystem:
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_planet_composition(self.planet)
-        if self.initial_condition is None:
-            self.initial_condition = InitialConditionConstant(species=self.species)
+        if self.initial_solution is None:
+            self.initial_solution = InitialSolutionConstant(species=self.species)
         self._reaction_network = ReactionNetwork(species=self.species)
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
 
@@ -613,7 +613,7 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
-        initial_condition: InitialConditionABC | None = None,
+        initial_solution: InitialSolutionABC | None = None,
         extra_output: dict[str, float] | None = None,
         max_attempts: int = 50,
         log10_perturb: float = 2.0,
@@ -626,8 +626,8 @@ class InteriorAtmosphereSystem:
 
         Args:
             constraints: Constraints for the system of equations
-            initial_condition: Initial condition for this solve only. Defaults to 'None', meaning
-                that the default (self.initial_condition) is used.
+            initial_solution: Initial condition for this solve only. Defaults to 'None', meaning
+                that the default (self.initial_solution) is used.
             extra_output: Extra data to write to the output
             method: Type of solver. Defaults to 'hybr'.
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
@@ -641,12 +641,12 @@ class InteriorAtmosphereSystem:
         logger.info("Solving system number %d", self.number_of_solves)
         self.set_constraints(constraints)
 
-        if initial_condition is None:
-            initial_condition = self.initial_condition
-        assert initial_condition is not None
+        if initial_solution is None:
+            initial_solution = self.initial_solution
+        assert initial_solution is not None
 
         result: OptimizeResult = self._solve(
-            initial_condition=initial_condition,
+            initial_solution=initial_solution,
             max_attempts=max_attempts,
             log10_perturb=log10_perturb,
             method=method,
@@ -658,7 +658,7 @@ class InteriorAtmosphereSystem:
             self._log_solution = result.x
             self._residual = result.fun
             self.output.add(self, extra_output)
-            initial_condition.update(self.output)
+            initial_solution.update(self.output)
             logger.info(pprint.pformat(self.solution_dict))
 
         else:
@@ -688,7 +688,7 @@ class InteriorAtmosphereSystem:
     def _solve(
         self,
         *,
-        initial_condition: InitialConditionABC,
+        initial_solution: InitialSolutionABC,
         max_attempts: int,
         log10_perturb: float,
         method: str,
@@ -697,17 +697,17 @@ class InteriorAtmosphereSystem:
     ) -> OptimizeResult:
         """Solves the non-linear system of equations.
 
-        The default to try and perturb the initial condition if the solver fails is experimental,
-        and ultimately still relies on the original initial condition not being too far from the
+        The default to try and perturb the initial solution if the solver fails is experimental,
+        and ultimately still relies on the original initial solution not being too far from the
         basin of convergence. The log output will reveal how successful this approach is in
         practice.
 
         Args:
-            initial_condition: Initial condition for this solve
-            max_attempts: Maximum number of attempts to randomise the initial condition to find a
+            initial_solution: Initial solution for this solve
+            max_attempts: Maximum number of attempts to randomise the initial solution to find a
                 solution if the initial guess fails.
             log10_perturb: Maximum log10 perturbation (plus or minus) to apply to the initial
-                condition on failure.
+                solution on failure.
             method: Type of solver
             tol: Tolerance for termination
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -716,8 +716,8 @@ class InteriorAtmosphereSystem:
             The result
         """
         # The only constraints that require pressure are the fugacity constraints, so for the
-        # purpose of determining the initial condition we evaluate them (if present) at 1 bar.
-        self._log_solution = initial_condition.get_log10_value(
+        # purpose of determining the initial solution we evaluate them (if present) at 1 bar.
+        self._log_solution = initial_solution.get_log10_value(
             self.constraints, temperature=self.planet.surface_temperature, pressure=1
         )
 
@@ -729,7 +729,7 @@ class InteriorAtmosphereSystem:
         for attempt in range(1, max_attempts):
             logger.info("Attempt %d/%d", attempt, max_attempts)
             initial_guess: np.ndarray = self._log_solution.copy()
-            logger.info("Initial guess solution = %s", initial_guess)
+            logger.info("Initial solution = %s", initial_guess)
             sol = root(
                 self._objective_func,
                 self._log_solution,
@@ -746,7 +746,7 @@ class InteriorAtmosphereSystem:
                 error: np.ndarray = np.sqrt(mean_squared_error(sol.x, initial_guess))
                 logger.info(
                     "%s: RMSE (actual vs initial) = %s",
-                    self.initial_condition.__class__.__name__,
+                    self.initial_solution.__class__.__name__,
                     error,
                 )
                 return sol

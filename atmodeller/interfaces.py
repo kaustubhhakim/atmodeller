@@ -26,12 +26,7 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol
 
 import numpy as np
 
-from atmodeller import (
-    GAS_CONSTANT,
-    GAS_CONSTANT_BAR,
-    INITIAL_CONDITION_MAX_LOG10,
-    INITIAL_CONDITION_MIN_LOG10,
-)
+from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
@@ -380,119 +375,6 @@ class SolubilityABC(GetValueABC):
         #     solubility,
         # )
         return solubility
-
-
-class InitialConditionABC(ABC):
-    """Initial condition base class
-
-    Args:
-        value: The value
-        species: Species in the interior atmosphere model
-        min_log10: Minimuim log10 value of the initial condition. Defaults to
-            INITIAL_CONDITION_MIN_LOG10
-        max_log10: Maximum log10 value of the initial condition. Defaults to
-            INITIAL_CONDITION_MAX_LOG10
-        **kwargs: Catches unused keyword arguments from a child constructors
-    """
-
-    def __init__(
-        self,
-        value: Any,
-        *,
-        species: Species,
-        min_log10: float = INITIAL_CONDITION_MIN_LOG10,
-        max_log10: float = INITIAL_CONDITION_MAX_LOG10,
-        **kwargs,
-    ):
-        del kwargs
-        logger.info("Creating %s", self.__class__.__name__)
-        self.value: Any = value
-        self.species: Species = species
-        self.min_log10: float = min_log10
-        self.max_log10: float = max_log10
-
-    @abstractmethod
-    def get_value(
-        self, constraints: SystemConstraints, temperature: float, pressure: float
-    ) -> np.ndarray:
-        """Computes the value.
-
-        Args:
-            constraints: Constraints for the system of equations
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            The guess for the initial solution
-        """
-        ...
-
-    def get_log10_value(
-        self, constraints: SystemConstraints, temperature: float, pressure: float
-    ) -> np.ndarray:
-        """Computes the log10 value with additional processing.
-
-        Args:
-            constraints: Constraints for the system of equations
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns
-            The guess for the log10 initial solution
-        """
-        value: np.ndarray = self.get_value(constraints, temperature, pressure)
-        log10_value: np.ndarray = np.log10(value)
-
-        if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
-            msg: str = "Initial condition has values outside the min and max thresholds"
-            logger.warning(msg)
-            msg = "Clipping the initial condition between %f and %f" % (
-                self.min_log10,
-                self.max_log10,
-            )
-            logger.warning(msg)
-            log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
-
-        self._conform_to_constraints(log10_value, constraints, temperature, pressure)
-
-        return log10_value
-
-    def update(self, output: Output, *args, **kwargs) -> None:
-        """Updates the initial condition.
-
-        Args;
-            output: output
-            *args: Arbitrary positional arguments
-            **kwargs: Arbitrary keyword arguments
-        """
-        ...
-
-    def _conform_to_constraints(
-        self,
-        initial_solution: np.ndarray,
-        constraints: SystemConstraints,
-        temperature: float,
-        pressure: float,
-    ) -> None:
-        """Conforms the initial solution (estimate) to activity, pressure and fugacity constraints.
-
-        Pressure and fugacity constraints can be imposed directly on the initial solution estimate.
-        For simplicity impose both as pressure constraints.
-
-        Args:
-            initial_solution: Initial solution array to conform to the constraints (in-place).
-            constraints: Constraints for the system of equations
-            temperature: Temperature in K to evaluate the constraints
-            pressure: Pressure in bar to evaluate the constraints
-        """
-        for constraint in constraints.reaction_network_constraints:
-            index: int = self.species.indices[constraint.species]
-            logger.debug("Setting %s %d", constraint.species, index)
-            initial_solution[index] = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
-            )
-
-        logger.info("Conform initial solution to constraints = %s", initial_solution)
 
 
 @dataclass(frozen=True)

@@ -115,7 +115,7 @@ def test_AllS_Sulfide_IW() -> None:
         "O2": 1.0269757432683765e-06,
     }
 
-    system.solve(constraints, factor=1)
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -185,7 +185,7 @@ def test_AllS_TotalSolubility_IW() -> None:
         "O2": 1.0269757432682946e-06,
     }
 
-    system.solve(constraints, factor=1)
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -297,7 +297,7 @@ def test_HOS_Species_IW() -> None:
         "O2S": 0.004839395737226402,
     }
 
-    system.solve(constraints, factor=1)
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -349,7 +349,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
         "S2": 0.004999999999999999,
     }
 
-    system.solve(constraints, factor=1)
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -438,5 +438,5 @@ def test_CHOS_Species_IW() -> None:
         "S2": 0.003765263450757495,
     }
 
-    system.solve(constraints, factor=1)
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)

@@ -18,8 +18,6 @@ see <https://www.gnu.org/licenses/>.
 
 import logging
 
-import numpy as np
-
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
@@ -327,10 +325,5 @@ def test_non_ideal() -> None:
         "O2": 9.864116211201776e-08,
     }
 
-    # Initial solution (i.e. estimates) must correspond by position to the order in the species
-    # You don't actually need to specify initial estimates for this test to find a solution, but
-    # it is here to show the user how to implement them if desired.
-    initial_solution: np.ndarray = np.array([1000, 1000, 1e-7, 100, 10, 1])
-
-    system.solve(constraints, factor=1, initial_solution=initial_solution)
+    system.solve(constraints, factor=1)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
