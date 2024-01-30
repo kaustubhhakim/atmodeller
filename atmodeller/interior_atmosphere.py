@@ -616,7 +616,7 @@ class InteriorAtmosphereSystem:
         initial_solution: InitialSolutionABC | None = None,
         extra_output: dict[str, float] | None = None,
         max_attempts: int = 50,
-        log10_perturb: float = 2.0,
+        perturb_log10: float = 2.0,
         errors: str = "ignore",
         method: str = "hybr",
         tol: float | None = None,
@@ -632,8 +632,8 @@ class InteriorAtmosphereSystem:
             method: Type of solver. Defaults to 'hybr'.
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails.
-            log10_perturb: Maximum log10 perturbation (plus or minus) to apply to the initial
-                condition on failure. Defaults to 2.0.
+            perturb_log10: Maximum log10 perturbation to apply to the initial condition on failure.
+                Defaults to 2.0.
             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -648,7 +648,7 @@ class InteriorAtmosphereSystem:
         result: OptimizeResult = self._solve(
             initial_solution=initial_solution,
             max_attempts=max_attempts,
-            log10_perturb=log10_perturb,
+            perturb_log10=perturb_log10,
             method=method,
             tol=tol,
             **options,
@@ -690,7 +690,7 @@ class InteriorAtmosphereSystem:
         *,
         initial_solution: InitialSolutionABC,
         max_attempts: int,
-        log10_perturb: float,
+        perturb_log10: float,
         method: str,
         tol: float | None,
         **options,
@@ -706,8 +706,7 @@ class InteriorAtmosphereSystem:
             initial_solution: Initial solution for this solve
             max_attempts: Maximum number of attempts to randomise the initial solution to find a
                 solution if the initial guess fails.
-            log10_perturb: Maximum log10 perturbation (plus or minus) to apply to the initial
-                solution on failure.
+            perturb_log10: Maximum log10 perturbation to apply to the initial solution on failure.
             method: Type of solver
             tol: Tolerance for termination
             **options: Keyword arguments for solver options. Available keywords depend on method.
@@ -715,24 +714,22 @@ class InteriorAtmosphereSystem:
         Returns:
             The result
         """
-        # The only constraints that require pressure are the fugacity constraints, so for the
-        # purpose of determining the initial solution we evaluate them (if present) at 1 bar.
-        self._log_solution = initial_solution.get_log10_value(
-            self.constraints, temperature=self.planet.surface_temperature, pressure=1
-        )
-
         coefficient_matrix: np.ndarray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
-        first_guess: np.ndarray = self._log_solution.copy()
+        # The only constraints that require pressure are the fugacity constraints, so for the
+        # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
+        # ensure the initial solution is bounded.
+        log_solution = initial_solution.get_log10_value(
+            self.constraints, temperature=self.planet.surface_temperature, pressure=1
+        )
 
         for attempt in range(1, max_attempts):
             logger.info("Attempt %d/%d", attempt, max_attempts)
-            initial_guess: np.ndarray = self._log_solution.copy()
-            logger.info("Initial solution = %s", initial_guess)
+            logger.info("Initial solution = %s", log_solution)
             sol = root(
                 self._objective_func,
-                self._log_solution,
+                log_solution,
                 args=(coefficient_matrix,),
                 method=method,
                 tol=tol,
@@ -743,7 +740,7 @@ class InteriorAtmosphereSystem:
 
             if sol.success:
                 logger.debug("Actual solution = %s", sol.x)
-                error: np.ndarray = np.sqrt(mean_squared_error(sol.x, initial_guess))
+                error: np.ndarray = np.sqrt(mean_squared_error(sol.x, log_solution))
                 logger.info(
                     "%s: RMSE (actual vs initial) = %s",
                     self.initial_solution.__class__.__name__,
@@ -752,27 +749,14 @@ class InteriorAtmosphereSystem:
                 return sol
 
             else:
-                # Perturb initial guess by log10_perturb either side of the previous guess.
-                logger.warning("The solver failed on attempt %d/%d", attempt, max_attempts)
-                logger.info("Perturbing initial guess solution")
-                # self._log_solution is updated during the solve, so the value will be meaningless
-                # if the solver failed. Hence restore the initial_guess and randomly perturb it.
-                # TODO: Attach this to the initial condition object as a method to perturb the
-                # value
-                # TODO: Add perturb to the base class
-                # self._log_solution = initial_guess + log10_perturb * (
-                #    2 * np.random.rand(self.log_solution.size) - 1
-                # )
-                # self._log_solution = np.clip(
-                #    self._log_solution,
-                #    INITIAL_CONDITION_LOG10_MIN_CLIP,
-                #    INITIAL_CONDITION_LOG10_MAX_CLIP,
-                # )
-                # self._conform_initial_solution_to_constraints()
-
-        # Restore the solution to something reasonable for the next solve, since the total pressure
-        # is used to evaluate constraints for the next solve.
-        self._log_solution = first_guess
+                logger.warning("The solver failed.")
+                log_solution = initial_solution.get_log10_value(
+                    self.constraints,
+                    temperature=self.planet.surface_temperature,
+                    pressure=1,
+                    perturb=True,
+                    perturb_log10=perturb_log10,
+                )
 
         return OptimizeResult({"success": False})
 
@@ -790,7 +774,6 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
         """
-        logger.debug("log_solution = %s", log_solution)
         self._log_solution = log_solution
 
         # Compute residual for the reaction network.

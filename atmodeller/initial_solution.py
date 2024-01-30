@@ -46,7 +46,7 @@ class InitialSolutionABC(ABC):
     """Initial solution base class
 
     Note:
-        Activity constraints are imposed directly by
+        Activity constraints are imposed directly by a private method
         :meth:`InitialSolutionABC._conform_to_constraints` since their exact solution is known a
         priori.
 
@@ -100,7 +100,13 @@ class InitialSolutionABC(ABC):
         ...
 
     def get_log10_value(
-        self, constraints: SystemConstraints, temperature: float, pressure: float
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        perturb: bool = False,
+        perturb_log10: float = 2,
     ) -> np.ndarray:
         """Computes the log10 value of the initial solution with additional processing.
 
@@ -108,12 +114,23 @@ class InitialSolutionABC(ABC):
             constraints: Constraints on the interior-atmosphere system
             temperature: Temperature in K
             pressure: Pressure in bar
+            perturb: Randomaly perturb the log10 value by `perturb_log10`. Defaults to False
+            perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
+                to 2.
 
         Returns
             The log10 initial solution adhering to bounds and the system constraints
         """
         value: np.ndarray = self.get_value(constraints, temperature, pressure)
         log10_value: np.ndarray = np.log10(value)
+
+        if perturb:
+            msg: str = (
+                "Randomly perturbing the initial solution by a maximum of %f log10 units"
+                % perturb_log10
+            )
+            logger.info(msg)
+            log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
 
         if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
             msg: str = "Initial solution has values outside the min and max thresholds"
@@ -163,7 +180,7 @@ class InitialSolutionABC(ABC):
                 temperature=temperature, pressure=pressure
             )
 
-        logger.info("Conform initial solution to constraints = %s", initial_solution)
+        logger.debug("Conform initial solution to constraints = %s", initial_solution)
 
 
 class InitialSolutionConstant(InitialSolutionABC):
