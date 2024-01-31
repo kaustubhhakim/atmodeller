@@ -21,18 +21,186 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from cmcrameri import cm
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.colors import Colormap
+from scipy.constants import kilo
 
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+class Category:
+    """Defines a category based on a series in a dataframe in :class:`output.Output`.
+
+    Args:
+        dataframe_name: Name of the dataframe
+        column_name: Name of the column in the dataframe
+        categories: Categories and their maximum values
+        column_rename: New name of the column
+    """
+
+    def __init__(
+        self,
+        *,
+        dataframe_name: str,
+        column_name: str,
+        categories: dict[str, float],
+        column_rename: str | None = None,
+    ):
+        self.categories: dict[str, float] = categories
+        self._dataframe_name: str = dataframe_name
+        self._column_name: str = column_name
+        self._column_rename: str = column_rename if column_rename is not None else column_name
+        self._palette: dict = self.get_custom_palette()
+
+    @property
+    def name(self) -> str:
+        return self._column_rename
+
+    @property
+    def hue_order(self) -> list[str]:
+        return list(self._palette.keys())
+
+    @property
+    def palette(self) -> dict:
+        return self._palette
+
+    def _get_category_name_for_value(self, value: float) -> str:
+        """Gets the category name for a value
+
+        Args:
+            value: Value to get the category
+
+        Returns:
+            The category
+        """
+        for category_name, category_max_value in self.categories.items():
+            if value < category_max_value:
+                return category_name
+        msg: str = "value = %f exceeds the maximum value of the category list"
+        logger.warning(msg)
+        logger.warning("categories = %s", self.categories)
+        raise ValueError(msg)
+
+    def get_category(self, output: Output) -> pd.Series:
+        """Gets the category.
+
+        Args:
+            output: Output
+
+        Returns:
+            A series of the category
+        """
+        raw_data: pd.Series = output.to_dataframes()[self._dataframe_name][self._column_name]
+        categorised_data: pd.Series = raw_data.apply(self._get_category_name_for_value)
+        categorised_data.name = self._column_rename
+
+        return categorised_data
+
+    def get_custom_palette(self) -> dict:
+        """Gets a custom palette
+
+        Returns:
+            A custom palette
+        """
+        colormap: Colormap = cm.batlowS  # type: ignore
+        colormap_values: list[tuple[float, ...]] = [colormap(4), colormap(2), colormap(3)]
+        custom_palette: dict[str, tuple[float, ...]] = {
+            name: value for name, value in zip(self.categories.keys(), colormap_values)
+        }
+
+        return custom_palette
+
+
+# Define categories for grouping and colouring data
+
+oxygen_fugacity_categories: dict[str, float] = {"Reduced": -1, "IW": 1, "Oxidised": 5}
+oxygen_fugacity: Category = Category(
+    dataframe_name="extra",
+    column_name="fO2_shift",
+    categories=oxygen_fugacity_categories,
+    column_rename="Oxygen fugacity",
+)
+
+C_H_ratio_categories: dict[str, float] = {"Low C/H": 1, "Medium C/H": 5, "High C/H": 10}
+C_H_ratio: Category = Category(
+    dataframe_name="extra", column_name="C/H ratio", categories=C_H_ratio_categories
+)
+
+H_oceans_categories: dict[str, float] = {"Low H": 3, "Medium H": 5, "Large H": 10}
+H_oceans: Category = Category(
+    dataframe_name="extra",
+    column_name="Number of ocean moles",
+    categories=H_oceans_categories,
+    column_rename="H budget",
+)
+
+categories: dict[str, Category] = {
+    "Oxygen fugacity": oxygen_fugacity,
+    "C/H ratio": C_H_ratio,
+    "H budget": H_oceans,
+}
+
+# Standard kws for pairplot
+pairplot_kws: dict[str, Any] = {
+    "fill": True,
+    "alpha": 0.7,
+    # "thresh": 0.1,
+    # "levels": 4,
+    "levels": [0.1, 0.25, 0.5, 0.75, 1],
+    "common_norm": False,
+}
+
+
+def get_axis(
+    grid: sns.PairGrid,
+    *,
+    data: pd.DataFrame | None = None,
+    column_name: str | None = None,
+    column_index: int | None = None,
+) -> Axes:
+    """Gets an axis from a grid.
+
+    The order of the axes in the list is top left to bottom right for the bivariate plots,
+    with an empty axes for the univariate plots. The univariate axes are then appended to
+    the end of list, also ordered from top left to bottom right.
+
+    Args:
+        grid: Grid to get the axes
+        data: The data. Defaults to None.
+        column_name: Name of the column. Defaults to None.
+        column_index: Index of the column in the plot. Defaults to None.
+
+    Returns:
+        The axes
+    """
+    axes: list[Axes] = grid.figure.axes
+    if column_name is not None:
+        assert data is not None
+        logger.info("Getting column index for %s", column_name)
+        # Recall that the first column is the category hence minus 1
+        column_index = data.columns.get_loc(column_name) - 1
+        logger.info("column_index = %s", column_index)
+
+    try:
+        assert column_index is not None
+    except AssertionError as e:
+        msg: str = "Both column_name and column_index cannot be None"
+        logger.error(msg)
+        raise ValueError(msg) from e
+
+    axis_index: int = sum(range(column_index + 1)) + column_index
+
+    return axes[axis_index]
 
 
 @dataclass
@@ -76,11 +244,11 @@ class Plotter:
         Args:
             element1: Element in the numerator
             element2: Element in the denominator
-            reservoir: Can be 'atmosphere', 'solid', 'melt', or 'total'. Defaults to 'total'
-            mass_or_moles: Can be 'mass' or 'moles'. Defaults to 'mass'
+            reservoir: Can be atmosphere, solid, melt, or total. Defaults to total.
+            mass_or_moles: Can be mass or moles. Defaults to mass.
 
         Returns:
-            A series of the ratio
+            The ratio of the two elements
         """
         column_name: str = f"{reservoir}_{mass_or_moles}"
 
@@ -95,136 +263,28 @@ class Plotter:
 
         return mass_ratio
 
-    @staticmethod
-    def _get_fO2_category(fo2_shift: float) -> str:
-        """Gets the atmosphere category based on fO2.
-
-        The bounds are somewhat arbitrary, but centered around IW.
-
-        Args:
-            fO2_shift: fO2_shift relative to the IW buffer
-
-        Returns:
-            Category of the atmosphere
-        """
-        if fo2_shift < -1:
-            return "Reduced"
-        elif fo2_shift < 1:
-            return "IW"
-        else:
-            return "Oxidised"
-
-    def fO2_categorise(self) -> tuple[pd.Series, tuple[str, ...]]:
-        """Gets a series of the atmosphere category based on fO2.
-
-        Returns:
-            Category of the atmosphere as a series and the order of the categories
-        """
-        fO2_shift: pd.Series = self.dataframes["extra"]["fO2_shift"]
-        fO2_categorise = fO2_shift.apply(self._get_fO2_category)
-        fO2_categorise.name = "Oxygen fugacity"
-        category_order: tuple[str, ...] = ("Reduced", "IW", "Oxidised")
-
-        return fO2_categorise, category_order
-
-    @staticmethod
-    def _get_CH_category(CH_ratio: float) -> str:
-        """Gets the atmosphere category based on C/H.
-
-        The bounds are somewhat arbitrary.
-
-        Args:
-            CH_ratio: C/H ratio
-
-        Returns:
-            Category of the atmosphere
-        """
-        if CH_ratio < 1:
-            return "Low C/H"
-        elif CH_ratio < 5:
-            return "Medium C/H"
-        else:
-            return "High C/H"
-
-    def CH_categorise(self) -> tuple[pd.Series, tuple[str, ...]]:
-        """Gets a series of the atmosphere category based on C/H.
-
-        Returns:
-            Category of the atmosphere as a series and the order of the categories
-        """
-        CH_ratio: pd.Series = self.dataframes["extra"]["C/H ratio"]
-        CH_categorise = CH_ratio.apply(self._get_CH_category)
-        CH_categorise.name = "C/H ratio"
-        category_order: tuple[str, ...] = ("Low C/H", "Medium C/H", "High C/H")
-
-        return CH_categorise, category_order
-
-    @staticmethod
-    def _get_H_category(H: float) -> str:
-        """Gets the atmosphere category based on H.
-
-        The bounds are somewhat arbitrary.
-
-        Args:
-            H: Ocean moles of H
-
-        Returns:
-            Category of the atmosphere
-        """
-        if H < 3:
-            return "Low oceans"
-        elif H < 5:
-            return "Medium oceans"
-        else:
-            return "High oceans"
-
-    def H_oceans(self) -> tuple[pd.Series, tuple[str, ...]]:
-        """Gets a series of the atmosphere category based on total H
-
-        Returns:
-            Category of the atmosphere as a series and the order of the categories
-        """
-        H_oceans: pd.Series = self.dataframes["extra"]["Number of ocean moles"]
-        H_oceans = H_oceans.apply(self._get_H_category)
-        H_oceans.name = "Oceans"
-        category_order: tuple[str, ...] = ("Low oceans", "Medium oceans", "High oceans")
-
-        return H_oceans, category_order
-
     def species_pairplot(
         self,
-        species: tuple[str, ...] = ("C", "H", "O", "N"),
         *,
-        mass_or_moles: str = "mass",
-        category: str = "fO2",
+        species: tuple[str, ...] = ("C", "H", "O", "N"),
+        mass_or_moles: str = "moles",
+        category: str = "Oxygen fugacity",
+        plot_atmosphere: bool = True,
+        minor_species: bool = False,
     ) -> sns.PairGrid:
-        """Pair plot of species
+        """Plots a pair plot of species and/or atmospheric properties.
 
         Args:
-            species: A tuple of species to plot. Defaults to (C, H, O, N).
-            mass_or_moles: Can be 'mass' or 'moles'. Defaults to 'mass'.
-            category: Can be 'fO2', 'CH', or 'H'. Defaults to 'fO2'.
+            species: A tuple of species or elements to plot, which can be empty. Defaults to
+                (C, H, O, N).
+            mass_or_moles: Plot the species by mass or moles. Defaults to moles.
+            category: Category to group and colour the data by. Defaults to oxygen fugacity.
+            plot_atmosphere: Plots atmosphere quantities. Defaults to True.
+            minor_species: Do not set axes parameters.
+
+        Returns:
+            The grid
         """
-        # Threshold to determine whether to plot melt ppmw, since if all values are basically
-        # zero then no solubility was applied and we don't need to plot these data.
-        # threshold: float = 1e-5
-
-        output: list[pd.Series] = []
-
-        if category == "fO2":
-            colour_category, category_order = self.fO2_categorise()
-        elif category == "CH":
-            colour_category, category_order = self.CH_categorise()
-        elif category == "H":
-            colour_category, category_order = self.H_oceans()
-        else:
-            msg: str = "{category} is unknown"
-            logger.error(msg)
-            raise ValueError(msg)
-        output.append(colour_category)
-
-        to_percent: float = UnitConversion.ppm_to_percent()
-
         if mass_or_moles == "mass":
             suffix: str = "ppmw"
             units: str = "wt.%"
@@ -232,9 +292,18 @@ class Plotter:
             suffix = "ppm"
             units = "mol.%"
         else:
-            msg: str = "{mass_or_moles} is unknown (expecting 'mass' or 'moles')"
+            msg: str = "%s is unknown" % mass_or_moles
             logger.error(msg)
             raise ValueError(msg)
+
+        try:
+            colour_category: Category = categories[category]
+        except KeyError:
+            msg: str = "%s not in %s" % (category, categories)
+            logger.error(msg)
+            raise KeyError(msg)
+
+        output: list[pd.Series] = [colour_category.get_category(self.output)]
 
         for entry in species:
             # Try to find species totals (i.e. assume species is an elemental total)
@@ -243,45 +312,83 @@ class Plotter:
             # Otherwise, get the species directly
             except KeyError:
                 totals = self.dataframes[entry]
-            atmos: pd.Series = totals[f"atmosphere_{suffix}"] * to_percent
+            atmos: pd.Series = UnitConversion.ppm_to_percent(totals[f"atmosphere_{suffix}"])
             atmos.name = f"{entry} atmos ({units})"
             output.append(atmos)
-            # Plotting the melt as well is overwhelming for one figure.
-            # melt: pd.Series = totals["melt_ppmw"]
-            # all_close_to_zero = np.all(np.isclose(melt, 0, atol=threshold))
-            # if not all_close_to_zero:
-            #     melt.name = f"{entry} melt (ppmw)"
-            #     output.append(melt)
+
+        if plot_atmosphere:
+            atmosphere: pd.DataFrame = self.dataframes["atmosphere"]
+            pressure: pd.Series = atmosphere["pressure"] / kilo  # to kbar
+            pressure.name = "Pressure (kbar)"
+            mean_molar_mass: pd.Series = atmosphere["mean_molar_mass"] * kilo  # to g/mol
+            mean_molar_mass.name = "Molar mass (g/mol)"
+            atmosphere_series: list[pd.Series] = [pressure, mean_molar_mass]
+            output.extend(atmosphere_series)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
 
-        colormap = cm.batlowS  # type: ignore
-        colormap_values: list = [colormap(4), colormap(2), colormap(3)]
-        custom_palette = {name: value for name, value in zip(category_order, colormap_values)}
-        plot_kws: dict = {
-            "fill": True,
-            "alpha": 0.7,
-            "thresh": 0.1,
-            "levels": 4,
-            "clip": (0, 100),
-            "common_norm": False,
-        }
-        ax: sns.PairGrid = sns.pairplot(
+        sns.set_theme(font_scale=1.3)
+
+        grid: sns.PairGrid = sns.pairplot(
             data,
-            hue=str(colour_category.name),
+            hue=colour_category.name,
             corner=True,
-            plot_kws=plot_kws,
-            palette=custom_palette,
+            plot_kws=pairplot_kws,
+            palette=colour_category.palette,
             kind="kde",
-            hue_order=custom_palette.keys(),
+            hue_order=colour_category.hue_order,
         )
 
-        sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
-        ticks: Iterable[float] = range(0, 101, 25)
-        ax.set(xlim=(-5, 100), ylim=(-5, 105), xticks=ticks, yticks=ticks)
         plt.subplots_adjust(hspace=0.15, wspace=0.15)
+        sns.move_legend(grid, "center left", bbox_to_anchor=(0.6, 0.6))
 
-        return ax
+        for nn, species_name in enumerate(species):
+            logger.info("Setting axis properties for %s", species_name)
+            axis: Axes = get_axis(grid, column_index=nn)
+
+            # N is an exception because its abundance is so low.
+            if species_name == "N":
+                N_min: float = -0.01
+                N_max: float = 0.31
+                N_start: float = 0
+                N_step: float = 0.1
+                ticksa: np.ndarray = np.arange(N_start, N_max, N_step)
+                axis.set_xlim(N_min, N_max)
+                axis.set_ylim(N_min, N_max)
+                axis.set_xticks(ticksa)
+                axis.set_yticks(ticksa)
+
+            # Let S and Cl plot as they wish for the moment.
+            elif species_name == "S" or species_name == "Cl":
+                continue
+
+            else:
+                if not minor_species:
+                    ticks: range = range(0, 101, 25)
+                    axis.set_xlim(-5, 105)
+                    axis.set_ylim(-5, 105)
+                    axis.set_xticks(ticks)
+                    axis.set_yticks(ticks)
+
+        if plot_atmosphere:
+            column_name: str = "Pressure (kbar)"
+            logger.info("Setting axis properties for %s" % column_name)
+            axis: Axes = get_axis(grid, data=data, column_name=column_name)
+            ticks = range(0, 16, 5)
+            axis.set_xlim(-1, 15)
+            axis.set_ylim(-1, 15)
+            axis.set_xticks(ticks)
+            axis.set_yticks(ticks)
+            column_name = "Molar mass (g/mol)"
+            logger.info("Setting axis properties for %s", column_name)
+            axis: Axes = get_axis(grid, data=data, column_name=column_name)
+            ticks = range(0, 41, 10)
+            axis.set_xlim(-1, 45)
+            axis.set_ylim(-1, 45)
+            axis.set_xticks(ticks)
+            axis.set_yticks(ticks)
+
+        return grid
 
     def ratios_pairplot(
         self,
@@ -329,3 +436,17 @@ class Plotter:
         sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
 
         return ax
+
+
+# Temporary store for potentially useful plotting code
+
+# Threshold to determine whether to plot melt ppmw, since if all values are basically
+# zero then no solubility was applied and we don't need to plot these data.
+# threshold: float = 1e-5
+
+# Plotting the melt as well is overwhelming for one figure.
+# melt: pd.Series = totals["melt_ppmw"]
+# all_close_to_zero = np.all(np.isclose(melt, 0, atol=threshold))
+# if not all_close_to_zero:
+#     melt.name = f"{entry} melt (ppmw)"
+#     output.append(melt)

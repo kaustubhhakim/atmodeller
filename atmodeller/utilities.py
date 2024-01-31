@@ -25,14 +25,16 @@ from collections.abc import MutableMapping
 from dataclasses import asdict
 from typing import Any, Callable, Type, TypeVar
 
-from molmass import Formula
+import numpy as np
+import pandas as pd
 from scipy.constants import kilo, mega
 
-from atmodeller import OCEAN_MASS_H2, OCEAN_MOLES
+from atmodeller import OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+T_multiply = TypeVar("T_multiply", float, np.ndarray, pd.Series, pd.DataFrame)
 
 
 def debug_decorator(logger: logging.Logger) -> Callable:
@@ -81,57 +83,57 @@ class UnitConversion:
     """Unit conversions."""
 
     @staticmethod
-    def bar_to_Pa(value_bar: float = 1) -> float:
+    def bar_to_Pa(value_bar: T_multiply = 1) -> T_multiply:
         """bar to Pa."""
         return value_bar * 1e5
 
     @classmethod
-    def bar_to_GPa(cls, value_bar: float = 1) -> float:
+    def bar_to_GPa(cls, value_bar: T_multiply = 1) -> T_multiply:
         """Bar to GPa."""
         return cls.bar_to_Pa(value_bar) * 1.0e-9
 
     @staticmethod
-    def fraction_to_ppm(value_fraction: float = 1) -> float:
+    def fraction_to_ppm(value_fraction: T_multiply = 1) -> T_multiply:
         """Mole or mass fraction to parts-per-million by mole or mass, respectively."""
         return value_fraction * mega
 
     @staticmethod
-    def g_to_kg(value_grams: float = 1) -> float:
+    def g_to_kg(value_grams: T_multiply = 1) -> T_multiply:
         """Grams to kilograms."""
         return value_grams / kilo
 
     @classmethod
-    def ppm_to_fraction(cls, value_ppm: float = 1) -> float:
+    def ppm_to_fraction(cls, value_ppm: T_multiply = 1) -> T_multiply:
         """Parts-per-million by mole or mass to mole or mass fraction, respectively."""
         return value_ppm / cls.fraction_to_ppm()
 
     @classmethod
-    def ppm_to_percent(cls, value_ppm: float = 1) -> float:
+    def ppm_to_percent(cls, value_ppm: T_multiply = 1) -> T_multiply:
         """Parts-per-million by percent"""
         return cls.ppm_to_fraction(value_ppm) * 100
 
     @classmethod
-    def cm3_to_m3(cls, cm_cubed: float = 1) -> float:
+    def cm3_to_m3(cls, cm_cubed: T_multiply = 1) -> T_multiply:
         """cm^3 to m^3"""
         return cm_cubed * 1.0e-6
 
     @classmethod
-    def m3_bar_to_J(cls, m3_bar: float = 1) -> float:
+    def m3_bar_to_J(cls, m3_bar: T_multiply = 1) -> T_multiply:
         """m^3 bar to J"""
         return m3_bar * 1e5
 
     @classmethod
-    def J_to_m3_bar(cls, joules: float = 1) -> float:
+    def J_to_m3_bar(cls, joules: T_multiply = 1) -> T_multiply:
         """J to m^3 bar"""
         return joules / cls.m3_bar_to_J()
 
     @classmethod
-    def litre_to_m3(cls, litre: float = 1) -> float:
+    def litre_to_m3(cls, litre: T_multiply = 1) -> T_multiply:
         """litre to m^3"""
         return litre * 1e-3
 
     @staticmethod
-    def weight_percent_to_ppmw(value_weight_percent: float = 1) -> float:
+    def weight_percent_to_ppmw(value_weight_percent: T_multiply = 1) -> T_multiply:
         """Weight percent to parts-per-million by weight"""
         return value_weight_percent * 1.0e4
 
