@@ -38,6 +38,12 @@ from atmodeller.utilities import UnitConversion
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class AxesSpec:
+    xylim: tuple[float, float]
+    ticks: list[float]
+
+
 class Category:
     """Defines a category based on a series in a dataframe in :class:`output.Output`.
 
@@ -158,12 +164,13 @@ pairplot_kws: dict[str, Any] = {
     # "levels": 4,
     "levels": [0.1, 0.25, 0.5, 0.75, 1],
     "common_norm": False,
+    # "cut": 0,
 }
 
 # Standard kws for univariate pairplot
 # Other parameters seem to be consistently carry across from pairplot_kws, which operates on the
 # bivariate plots, but the common_norm apparently needs to be applied again.
-diag_kws: dict[str, Any] = {"common_norm": False}
+diag_kws: dict[str, Any] = {"common_norm": False}  # "cut": 0
 
 
 def get_axis(
@@ -271,21 +278,18 @@ class Plotter:
     def species_pairplot(
         self,
         *,
-        species: tuple[str, ...] = ("C", "H", "O", "N"),
+        species: dict[str, AxesSpec | None],
         mass_or_moles: str = "moles",
         category: str = "Oxygen fugacity",
         plot_atmosphere: bool = True,
-        minor_species: bool = False,
     ) -> sns.PairGrid:
         """Plots a pair plot of species and/or atmospheric properties.
 
         Args:
-            species: A tuple of species or elements to plot, which can be empty. Defaults to
-                (C, H, O, N).
+            species: A dict of species or elements to plot, which can be empty.
             mass_or_moles: Plot the species by mass or moles. Defaults to moles.
             category: Category to group and colour the data by. Defaults to oxygen fugacity.
             plot_atmosphere: Plots atmosphere quantities. Defaults to True.
-            minor_species: Do not set axes parameters.
 
         Returns:
             The grid
@@ -348,49 +352,32 @@ class Plotter:
         plt.subplots_adjust(hspace=0.15, wspace=0.15)
         sns.move_legend(grid, "center left", bbox_to_anchor=(0.6, 0.6))
 
-        for nn, species_name in enumerate(species):
-            logger.info("Setting axis properties for %s", species_name)
-            axis: Axes = get_axis(grid, column_index=nn)
-
-            # N is an exception because its abundance is so low.
-            if species_name == "N":
-                N_min: float = -0.01
-                N_max: float = 0.31
-                N_start: float = 0
-                N_step: float = 0.1
-                ticksa: np.ndarray = np.arange(N_start, N_max, N_step)
-                axis.set_xlim(N_min, N_max)
-                axis.set_ylim(N_min, N_max)
-                axis.set_xticks(ticksa)
-                axis.set_yticks(ticksa)
-
-            # Let S and Cl plot as they wish for the moment.
-            elif species_name == "S" or species_name == "Cl":
-                continue
-
+        for nn, (species_name, species_axes_spec) in enumerate(species.items()):
+            if species_axes_spec is not None:
+                logger.info("Setting axis properties for %s", species_name)
+                axis: Axes = get_axis(grid, column_index=nn)
+                axis.set_xlim(*species_axes_spec.xylim)
+                axis.set_ylim(*species_axes_spec.xylim)
+                axis.set_xticks(species_axes_spec.ticks)
+                axis.set_yticks(species_axes_spec.ticks)
             else:
-                if not minor_species:
-                    ticks: range = range(0, 101, 25)
-                    axis.set_xlim(-5, 105)
-                    axis.set_ylim(-5, 105)
-                    axis.set_xticks(ticks)
-                    axis.set_yticks(ticks)
+                logger.info("Using default axis properties for %s", species_name)
 
         if plot_atmosphere:
             column_name: str = "Pressure (kbar)"
             logger.info("Setting axis properties for %s" % column_name)
             axis: Axes = get_axis(grid, data=data, column_name=column_name)
             ticks = range(0, 16, 5)
-            axis.set_xlim(-1, 15)
-            axis.set_ylim(-1, 15)
+            axis.set_xlim(0, 15)
+            axis.set_ylim(0, 15)
             axis.set_xticks(ticks)
             axis.set_yticks(ticks)
             column_name = "Molar mass (g/mol)"
             logger.info("Setting axis properties for %s", column_name)
             axis: Axes = get_axis(grid, data=data, column_name=column_name)
             ticks = range(0, 41, 10)
-            axis.set_xlim(-1, 45)
-            axis.set_ylim(-1, 45)
+            axis.set_xlim(0, 45)
+            axis.set_ylim(0, 45)
             axis.set_xticks(ticks)
             axis.set_yticks(ticks)
 
