@@ -150,7 +150,7 @@ categories: dict[str, Category] = {
     "H budget": H_oceans,
 }
 
-# Standard kws for pairplot
+# Standard kws for bivariate pairplot
 pairplot_kws: dict[str, Any] = {
     "fill": True,
     "alpha": 0.7,
@@ -159,6 +159,11 @@ pairplot_kws: dict[str, Any] = {
     "levels": [0.1, 0.25, 0.5, 0.75, 1],
     "common_norm": False,
 }
+
+# Standard kws for univariate pairplot
+# Other parameters seem to be consistently carry across from pairplot_kws, which operates on the
+# bivariate plots, but the common_norm apparently needs to be applied again.
+diag_kws: dict[str, Any] = {"common_norm": False}
 
 
 def get_axis(
@@ -334,6 +339,7 @@ class Plotter:
             hue=colour_category.name,
             corner=True,
             plot_kws=pairplot_kws,
+            diag_kws=diag_kws,
             palette=colour_category.palette,
             kind="kde",
             hue_order=colour_category.hue_order,
