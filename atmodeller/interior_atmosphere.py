@@ -30,7 +30,7 @@ from sklearn.metrics import mean_squared_error
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
-from atmodeller.initial_solution import InitialSolutionABC, InitialSolutionConstant
+from atmodeller.initial_solution import InitialSolution, InitialSolutionConstant
 from atmodeller.interfaces import ConstraintABC
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion, dataclass_to_logger
@@ -460,7 +460,7 @@ class InteriorAtmosphereSystem:
 
     species: Species
     planet: Planet = field(default_factory=Planet)
-    initial_solution: InitialSolutionABC | None = None
+    initial_solution: InitialSolution | None = None
     output: Output = field(init=False, default_factory=Output)
     _reaction_network: ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
@@ -613,7 +613,7 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
-        initial_solution: InitialSolutionABC | None = None,
+        initial_solution: InitialSolution | None = None,
         extra_output: dict[str, float] | None = None,
         max_attempts: int = 50,
         perturb_log10: float = 2.0,
@@ -688,7 +688,7 @@ class InteriorAtmosphereSystem:
     def _solve(
         self,
         *,
-        initial_solution: InitialSolutionABC,
+        initial_solution: InitialSolution,
         max_attempts: int,
         perturb_log10: float,
         method: str,

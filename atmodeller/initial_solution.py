@@ -42,12 +42,12 @@ if TYPE_CHECKING:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class InitialSolutionABC(ABC):
-    """Initial solution base class
+class InitialSolution(ABC):
+    """Initial solution
 
     Note:
         Activity constraints are imposed directly by a private method
-        :meth:`InitialSolutionABC._conform_to_constraints` since their exact solution is known a
+        :meth:`InitialSolution._conform_to_constraints` since their exact solution is known a
         priori.
 
     Args:
@@ -183,7 +183,7 @@ class InitialSolutionABC(ABC):
         logger.debug("Conform initial solution to constraints = %s", initial_solution)
 
 
-class InitialSolutionConstant(InitialSolutionABC):
+class InitialSolutionConstant(InitialSolution):
     """A constant value for the initial solution
 
     The default value, which is applied to each gas species individually, is chosen to be within
@@ -209,7 +209,7 @@ class InitialSolutionConstant(InitialSolutionABC):
         return self.value * np.ones(self.species.number)
 
 
-class InitialSolutionDict(InitialSolutionABC):
+class InitialSolutionDict(InitialSolution):
     """A dictionary of species and their values for the initial solution
 
     Args:
@@ -248,7 +248,7 @@ class InitialSolutionDict(InitialSolutionABC):
         return self._value
 
 
-class InitialSolutionRegressor(InitialSolutionABC):
+class InitialSolutionRegressor(InitialSolution):
     """A regressor to compute the initial solution
 
     Args:
@@ -501,7 +501,7 @@ class InitialSolutionRegressor(InitialSolutionABC):
             )
 
 
-class InitialSolutionSwitchRegressor(InitialSolutionABC):
+class InitialSolutionSwitchRegressor(InitialSolution):
     """An initial solution that uses constant initial value(s) before switching to a regressor.
 
     Args:
@@ -515,8 +515,8 @@ class InitialSolutionSwitchRegressor(InitialSolutionABC):
         fit_batch_size: Number of simulations to generate before fitting the regressor.
     """
 
-    def __init__(self, value: InitialSolutionABC, fit_batch_size: int = 100, **kwargs):
-        self.value: InitialSolutionABC  # For typing
+    def __init__(self, value: InitialSolution, fit_batch_size: int = 100, **kwargs):
+        self.value: InitialSolution  # For typing
         super().__init__(value, **kwargs)
         self.fit_batch_size: int = fit_batch_size
         # Store to instantiate regressor once the switch occurs.
