@@ -23,7 +23,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
-import numpy as np
 import pandas as pd
 import seaborn as sns
 from cmcrameri import cm
@@ -40,18 +39,29 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AxesSpec:
+    """Parameters for configuring the axes.
+
+    Args:
+        xylim: Tuple to set_xlim and set_ylim of axes
+        ticks: Tick marks
+
+    Attributes:
+        xylim: Tuple to set_xlim and set_ylim of axes
+        ticks: Tick marks
+    """
+
     xylim: tuple[float, float]
     ticks: list[float]
 
 
 class Category:
-    """Defines a category based on a series in a dataframe in :class:`output.Output`.
+    """Defines a category based on a column in a dataframe in :class:`atmodeller.output.Output`.
 
     Args:
         dataframe_name: Name of the dataframe
         column_name: Name of the column in the dataframe
         categories: Categories and their maximum values
-        column_rename: New name of the column
+        category_name: Name of the category. Defaults to `column_name`.
     """
 
     def __init__(
@@ -60,17 +70,17 @@ class Category:
         dataframe_name: str,
         column_name: str,
         categories: dict[str, float],
-        column_rename: str | None = None,
+        category_name: str | None = None,
     ):
         self.categories: dict[str, float] = categories
         self._dataframe_name: str = dataframe_name
         self._column_name: str = column_name
-        self._column_rename: str = column_rename if column_rename is not None else column_name
+        self._category_name: str = category_name if category_name is not None else column_name
         self._palette: dict = self.get_custom_palette()
 
     @property
     def name(self) -> str:
-        return self._column_rename
+        return self._category_name
 
     @property
     def hue_order(self) -> list[str]:
@@ -84,7 +94,7 @@ class Category:
         """Gets the category name for a value
 
         Args:
-            value: Value to get the category
+            value: Value to get the category from
 
         Returns:
             The category
@@ -92,6 +102,7 @@ class Category:
         for category_name, category_max_value in self.categories.items():
             if value < category_max_value:
                 return category_name
+
         msg: str = "value = %f exceeds the maximum value of the category list"
         logger.warning(msg)
         logger.warning("categories = %s", self.categories)
@@ -104,16 +115,18 @@ class Category:
             output: Output
 
         Returns:
-            A series of the category
+            The category data
         """
         raw_data: pd.Series = output.to_dataframes()[self._dataframe_name][self._column_name]
         categorised_data: pd.Series = raw_data.apply(self._get_category_name_for_value)
-        categorised_data.name = self._column_rename
+        categorised_data.name = self._category_name
 
         return categorised_data
 
     def get_custom_palette(self) -> dict:
         """Gets a custom palette
+
+        https://www.fabiocrameri.ch/colourmaps/
 
         Returns:
             A custom palette
@@ -129,25 +142,28 @@ class Category:
 
 # Define categories for grouping and colouring data
 
+# Oxygen fugacity
 oxygen_fugacity_categories: dict[str, float] = {"Reduced": -1, "IW": 1, "Oxidised": 5}
 oxygen_fugacity: Category = Category(
     dataframe_name="extra",
     column_name="fO2_shift",
     categories=oxygen_fugacity_categories,
-    column_rename="Oxygen fugacity",
+    category_name="Oxygen fugacity",
 )
 
+# C/H ratio
 C_H_ratio_categories: dict[str, float] = {"Low C/H": 1, "Medium C/H": 5, "High C/H": 10}
 C_H_ratio: Category = Category(
     dataframe_name="extra", column_name="C/H ratio", categories=C_H_ratio_categories
 )
 
+# H budget
 H_oceans_categories: dict[str, float] = {"Low H": 3, "Medium H": 5, "Large H": 10}
 H_oceans: Category = Category(
     dataframe_name="extra",
     column_name="Number of ocean moles",
     categories=H_oceans_categories,
-    column_rename="H budget",
+    category_name="H budget",
 )
 
 categories: dict[str, Category] = {
@@ -162,6 +178,7 @@ pairplot_kws: dict[str, Any] = {
     "alpha": 0.7,
     # "thresh": 0.1,
     # "levels": 4,
+    # Ideally keep the levels the same between plots to allow direct comparison.
     "levels": [0.1, 0.25, 0.5, 0.75, 1],
     "common_norm": False,
     # "cut": 0,
@@ -173,18 +190,18 @@ pairplot_kws: dict[str, Any] = {
 diag_kws: dict[str, Any] = {"common_norm": False}  # "cut": 0
 
 
-def get_axis(
+def get_axes(
     grid: sns.PairGrid,
     *,
     data: pd.DataFrame | None = None,
     column_name: str | None = None,
     column_index: int | None = None,
 ) -> Axes:
-    """Gets an axis from a grid.
+    """Gets axes from a grid.
 
     The order of the axes in the list is top left to bottom right for the bivariate plots,
-    with an empty axes for the univariate plots. The univariate axes are then appended to
-    the end of list, also ordered from top left to bottom right.
+    with empty axes for the univariate plots. The univariate axes are then appended to the end of
+    the list, also ordered from top left to bottom right.
 
     Args:
         grid: Grid to get the axes
@@ -196,10 +213,11 @@ def get_axis(
         The axes
     """
     axes: list[Axes] = grid.figure.axes
+
     if column_name is not None:
         assert data is not None
         logger.info("Getting column index for %s", column_name)
-        # Recall that the first column is the category hence minus 1
+        # Recall that the first column is the category, hence must minus one
         column_index = data.columns.get_loc(column_name) - 1
         logger.info("column_index = %s", column_index)
 
@@ -235,7 +253,7 @@ class Plotter:
         """Reads output data from a pickle file and creates a Plotter instance.
 
         Args:
-            pickle_file: Pickle file of the output from a model run.
+            pickle_file: Pickle file of the output.
 
         Returns:
             Plotter
@@ -355,7 +373,7 @@ class Plotter:
         for nn, (species_name, species_axes_spec) in enumerate(species.items()):
             if species_axes_spec is not None:
                 logger.info("Setting axis properties for %s", species_name)
-                axis: Axes = get_axis(grid, column_index=nn)
+                axis: Axes = get_axes(grid, column_index=nn)
                 axis.set_xlim(*species_axes_spec.xylim)
                 axis.set_ylim(*species_axes_spec.xylim)
                 axis.set_xticks(species_axes_spec.ticks)
@@ -364,9 +382,10 @@ class Plotter:
                 logger.info("Using default axis properties for %s", species_name)
 
         if plot_atmosphere:
+            # Axes for atmosphere quantites are currently set once here.
             column_name: str = "Pressure (kbar)"
             logger.info("Setting axis properties for %s" % column_name)
-            axis: Axes = get_axis(grid, data=data, column_name=column_name)
+            axis: Axes = get_axes(grid, data=data, column_name=column_name)
             ticks = range(0, 16, 5)
             axis.set_xlim(0, 15)
             axis.set_ylim(0, 15)
@@ -374,7 +393,7 @@ class Plotter:
             axis.set_yticks(ticks)
             column_name = "Molar mass (g/mol)"
             logger.info("Setting axis properties for %s", column_name)
-            axis: Axes = get_axis(grid, data=data, column_name=column_name)
+            axis: Axes = get_axes(grid, data=data, column_name=column_name)
             ticks = range(0, 41, 10)
             axis.set_xlim(0, 45)
             axis.set_ylim(0, 45)
