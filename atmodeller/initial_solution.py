@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -33,11 +33,9 @@ from sklearn.preprocessing import StandardScaler
 from typing_extensions import override
 
 from atmodeller import INITIAL_SOLUTION_MAX_LOG10, INITIAL_SOLUTION_MIN_LOG10
+from atmodeller.constraints import SystemConstraints
+from atmodeller.core import Species
 from atmodeller.output import Output
-
-if TYPE_CHECKING:
-    from atmodeller.constraints import SystemConstraints
-    from atmodeller.core import Species
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -54,15 +52,15 @@ class InitialSolution(ABC):
         value: Some value (object) used to compute the initial solution
         species: Species in the interior-atmosphere system
         min_log10: Minimuim log10 value of the initial solution. Defaults to
-            `INITIAL_SOLUTION_MIN_LOG10`
+            ``INITIAL_SOLUTION_MIN_LOG10``
         max_log10: Maximum log10 value of the initial solution. Defaults to
-            `INITIAL_SOLUTION_MAX_LOG10`
+            ``INITIAL_SOLUTION_MAX_LOG10``
         **kwargs: Catches unused keyword arguments from a child constructors
 
     Attributes:
         value: Some value (object) used to compute the initial solution
         species: Species in the interior-atmosphere system
-        min_log10: Minimuim log10 value of the initial solution
+        min_log10: Minimum log10 value of the initial solution
         max_log10: Maximum log10 value of the initial solution
         **kwargs: Catches unused keyword arguments from a child constructors
     """
@@ -202,6 +200,7 @@ class InitialSolutionConstant(InitialSolution):
 
     @override
     def get_value(self, *args, **kwargs) -> np.ndarray:
+        """See base class."""
         del args
         del kwargs
         logger.debug("%s: value = %s", self.__class__.__name__, self.value)
@@ -241,6 +240,7 @@ class InitialSolutionDict(InitialSolution):
 
     @override
     def get_value(self, *args, **kwargs) -> np.ndarray:
+        """See base class."""
         del args
         del kwargs
         logger.debug("%s: value = %s", self.__class__.__name__, self._value)
@@ -432,6 +432,7 @@ class InitialSolutionRegressor(InitialSolution):
     def get_value(
         self, constraints: SystemConstraints, temperature: float, pressure: float
     ) -> np.ndarray:
+        """See base class."""
         evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
             temperature=temperature, pressure=pressure
         )
@@ -458,7 +459,7 @@ class InitialSolutionRegressor(InitialSolution):
             output: Output
 
         Returns:
-            A tuple: (start_index, end_index) or None if nothing to do
+            A tuple: (start_index, end_index) or None
         """
         trigger_fit: bool = self.fit_batch_size == output.size
 
@@ -472,7 +473,7 @@ class InitialSolutionRegressor(InitialSolution):
             output: Output
 
         Returns:
-            A tuple: (start_index, end_index) or None if nothing to do
+            A tuple: (start_index, end_index) or None
         """
         trigger_partial_fit: bool = (
             not (output.size - self.fit_batch_size) % self.partial_fit_batch_size
@@ -489,6 +490,7 @@ class InitialSolutionRegressor(InitialSolution):
 
     @override
     def update(self, output: Output) -> None:
+        """See base class."""
         action_fit: tuple[int, int] | None = self.action_fit(output)
         action_partial_fit: tuple[int, int] | None = self.action_partial_fit(output)
 
@@ -524,14 +526,16 @@ class InitialSolutionSwitchRegressor(InitialSolution):
 
     @override
     def get_value(self, *args, **kwargs) -> ndarray:
+        """See base class."""
         return self.value.get_value(*args, **kwargs)
 
     @override
     def update(self, output: Output, *args, **kwargs) -> None:
+        """See base class."""
         if output.size == self.fit_batch_size:
-            # The `fit` keyword argument of InitialSolutionRegressor is effectively ignored
+            # The fit keyword argument of InitialSolutionRegressor is effectively ignored
             # because the fit is done once when InitialSolutionRegressor is instantiated and
-            # `action_fit` cannot be triggered regardless of the value of `fit`.
+            # action_fit cannot be triggered regardless of the value of fit.
             self.value = InitialSolutionRegressor(output, **self._kwargs)
         else:
             self.value.update(output, *args, **kwargs)
