@@ -211,6 +211,24 @@ class Plotter:
 
         return kws
 
+    def get_units(self, mass_or_moles: str = "moles") -> tuple[str, str]:
+        """Gets the units.
+
+        Args:
+            mass_or_moles: mass or moles
+
+        Returns:
+            A tuple with the name and the units
+        """
+        if mass_or_moles == "moles":
+            return ("ppm", "mol.%")
+        elif mass_or_moles == "mass":
+            return ("ppmw", "wt.%")
+        else:
+            msg: str = "%s is unknown" % mass_or_moles
+            logger.error(msg)
+            raise ValueError(msg)
+
     @classmethod
     def read_pickle(cls, pickle_file: Path | str) -> Plotter:
         """Reads output data from a pickle file and creates a Plotter instance.
@@ -252,7 +270,7 @@ class Plotter:
         element1_mass: pd.Series = self.dataframes[f"{element1}_totals"][column_name]
         element2_mass: pd.Series = self.dataframes[f"{element2}_totals"][column_name]
         mass_ratio: pd.Series = element1_mass / element2_mass
-        mass_ratio.name = f"{element1}/{element2} (by {mass_or_moles}) {reservoir}"
+        mass_ratio.name = f"{element1}/{element2} {reservoir[:5]} ({mass_or_moles}) "
 
         return mass_ratio
 
@@ -318,16 +336,7 @@ class Plotter:
         Returns:
             The grid
         """
-        if mass_or_moles == "mass":
-            suffix: str = "ppmw"
-            units: str = "wt.%"
-        elif mass_or_moles == "moles":
-            suffix = "ppm"
-            units = "mol.%"
-        else:
-            msg: str = "%s is unknown" % mass_or_moles
-            logger.error(msg)
-            raise ValueError(msg)
+        suffix, units = self.get_units(mass_or_moles)
 
         try:
             colour_category: Category = categories[category]
@@ -411,18 +420,26 @@ class Plotter:
     def ratios_pairplot(
         self,
         reservoirs: Iterable[str] = ("atmosphere", "melt", "total"),
-        mass_or_moles: str = "mass",
+        mass_or_moles: str = "moles",
+        category: str = "Oxygen fugacity",
     ) -> sns.PairGrid:
         """Pair plots of C/H and C/O ratios in the reservoirs
 
         Args:
             reservoirs: Reservoirs to plot. Defaults to all reservoirs.
-            mass_or_moles: Compute ratios by mass or moles. Defaults to mass.
+            mass_or_moles: Compute ratios by mass or moles. Defaults to moles.
+            category: Category to group and colour the data by. Defaults to oxygen fugacity.
         """
-        colour_category, category_order = self.fO2_categorise()
-        output: list[pd.Series] = [colour_category]
+        try:
+            colour_category: Category = categories[category]
+        except KeyError:
+            msg: str = "%s not in %s" % (category, categories)
+            logger.error(msg)
+            raise KeyError(msg)
 
-        for element in ("H", "O"):
+        output: list[pd.Series] = [colour_category.get_category(self.output)]
+
+        for element in ("H", "O", "S"):
             for reservoir in reservoirs:
                 series_data: pd.Series = self.get_element_ratio_in_reservoir(
                     "C", element, reservoir=reservoir, mass_or_moles=mass_or_moles
@@ -431,40 +448,20 @@ class Plotter:
 
         data: pd.DataFrame = pd.concat(output, axis=1)
 
-        colormap = cm.batlowS  # type: ignore
-        colormap_values: list = [colormap(4), colormap(2), colormap(3)]
-        custom_palette = {name: value for name, value in zip(category_order, colormap_values)}
-        plot_kws: dict = {
-            "fill": True,
-            "alpha": 0.7,
-            "thresh": 0.1,
-            "levels": 4,
-            "common_norm": False,
-        }
-        ax: sns.PairGrid = sns.pairplot(
+        sns.set_theme(font_scale=1.3)
+
+        grid: sns.PairGrid = sns.pairplot(
             data,
-            hue=str(colour_category.name),
+            hue=colour_category.name,
             corner=True,
-            plot_kws=plot_kws,
-            palette=custom_palette,
+            plot_kws=self.plot_kws,
+            diag_kws=self.diag_kws,
+            palette=colour_category.palette,
             kind="kde",
-            hue_order=custom_palette.keys(),
+            hue_order=colour_category.hue_order,
         )
 
-        sns.move_legend(ax, "center left", bbox_to_anchor=(0.6, 0.6))
+        plt.subplots_adjust(hspace=0.15, wspace=0.15)
+        sns.move_legend(grid, "center left", bbox_to_anchor=(0.6, 0.6))
 
-        return ax
-
-
-# Temporary store for potentially useful plotting code
-
-# Threshold to determine whether to plot melt ppmw, since if all values are basically
-# zero then no solubility was applied and we don't need to plot these data.
-# threshold: float = 1e-5
-
-# Plotting the melt as well is overwhelming for one figure.
-# melt: pd.Series = totals["melt_ppmw"]
-# all_close_to_zero = np.all(np.isclose(melt, 0, atol=threshold))
-# if not all_close_to_zero:
-#     melt.name = f"{entry} melt (ppmw)"
-#     output.append(melt)
+        return grid
