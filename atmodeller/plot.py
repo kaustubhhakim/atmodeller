@@ -172,66 +172,6 @@ categories: dict[str, Category] = {
     "H budget": H_oceans,
 }
 
-# Standard kws for bivariate pairplot
-pairplot_kws: dict[str, Any] = {
-    "fill": True,
-    "alpha": 0.7,
-    # "thresh": 0.1,
-    # "levels": 4,
-    # Ideally keep the levels the same between plots to allow direct comparison.
-    "levels": [0.1, 0.25, 0.5, 0.75, 1],
-    "common_norm": False,
-    # "cut": 0,
-}
-
-# Standard kws for univariate pairplot
-# Other parameters seem to be consistently carry across from pairplot_kws, which operates on the
-# bivariate plots, but the common_norm apparently needs to be applied again.
-diag_kws: dict[str, Any] = {"common_norm": False}  # "cut": 0
-
-
-def get_axes(
-    grid: sns.PairGrid,
-    *,
-    data: pd.DataFrame | None = None,
-    column_name: str | None = None,
-    column_index: int | None = None,
-) -> Axes:
-    """Gets axes from a grid.
-
-    The order of the axes in the list is top left to bottom right for the bivariate plots,
-    with empty axes for the univariate plots. The univariate axes are then appended to the end of
-    the list, also ordered from top left to bottom right.
-
-    Args:
-        grid: Grid to get the axes
-        data: The data. Defaults to None.
-        column_name: Name of the column. Defaults to None.
-        column_index: Index of the column in the plot. Defaults to None.
-
-    Returns:
-        The axes
-    """
-    axes: list[Axes] = grid.figure.axes
-
-    if column_name is not None:
-        assert data is not None
-        logger.info("Getting column index for %s", column_name)
-        # Recall that the first column is the category, hence must minus one
-        column_index = data.columns.get_loc(column_name) - 1
-        logger.info("column_index = %s", column_index)
-
-    try:
-        assert column_index is not None
-    except AssertionError as e:
-        msg: str = "Both column_name and column_index cannot be None"
-        logger.error(msg)
-        raise ValueError(msg) from e
-
-    axis_index: int = sum(range(column_index + 1)) + column_index
-
-    return axes[axis_index]
-
 
 @dataclass
 class Plotter:
@@ -247,6 +187,29 @@ class Plotter:
     def __post_init__(self):
         self.dataframes = self.output.to_dataframes()
         logger.info("Found data for %s", self.dataframes.keys())
+
+    @property
+    def plot_kws(self) -> dict[str, Any]:
+        """Keyword arguments for the bivariate plotting function"""
+        kws: dict[str, Any] = {
+            "fill": True,
+            "alpha": 0.7,
+            # "thresh": 0.1,
+            # "levels": 4,
+            # Ideally keep the levels the same between plots to allow direct comparison.
+            "levels": [0.1, 0.25, 0.5, 0.75, 1],
+            "common_norm": False,
+            # "cut": 0,
+        }
+
+        return kws
+
+    @property
+    def diag_kws(self) -> dict[str, Any]:
+        """Keyword arguments for the univariate plotting function"""
+        kws: dict[str, Any] = {"common_norm": False}  # "cut": 0
+
+        return kws
 
     @classmethod
     def read_pickle(cls, pickle_file: Path | str) -> Plotter:
@@ -292,6 +255,49 @@ class Plotter:
         mass_ratio.name = f"{element1}/{element2} (by {mass_or_moles}) {reservoir}"
 
         return mass_ratio
+
+    def get_axes(
+        self,
+        grid: sns.PairGrid,
+        *,
+        plot_data: pd.DataFrame | None = None,
+        column_name: str | None = None,
+        column_index: int | None = None,
+    ) -> Axes:
+        """Gets axes from a grid.
+
+        The order of the axes in the list is top left to bottom right for the bivariate plots,
+        with empty axes for the univariate plots. The univariate axes are then appended to the end
+        of the list, also ordered from top left to bottom right.
+
+        Args:
+            grid: Grid to get the axes from
+            plot_data: The data used by the plot. Defaults to None.
+            column_name: Name of the column. Defaults to None.
+            column_index: Index of the column in the plot. Defaults to None.
+
+        Returns:
+            The axes
+        """
+        axes: list[Axes] = grid.figure.axes
+
+        if column_name is not None:
+            assert plot_data is not None
+            logger.info("Getting column index for %s", column_name)
+            # Recall that the first column is the category, hence must minus one
+            column_index = plot_data.columns.get_loc(column_name) - 1
+            logger.info("column_index = %s", column_index)
+
+        try:
+            assert column_index is not None
+        except AssertionError as e:
+            msg: str = "Both column_name and column_index cannot be None"
+            logger.error(msg)
+            raise ValueError(msg) from e
+
+        axis_index: int = sum(range(column_index + 1)) + column_index
+
+        return axes[axis_index]
 
     def species_pairplot(
         self,
@@ -360,8 +366,8 @@ class Plotter:
             data,
             hue=colour_category.name,
             corner=True,
-            plot_kws=pairplot_kws,
-            diag_kws=diag_kws,
+            plot_kws=self.plot_kws,
+            diag_kws=self.diag_kws,
             palette=colour_category.palette,
             kind="kde",
             hue_order=colour_category.hue_order,
@@ -373,7 +379,7 @@ class Plotter:
         for nn, (species_name, species_axes_spec) in enumerate(species.items()):
             if species_axes_spec is not None:
                 logger.info("Setting axis properties for %s", species_name)
-                axis: Axes = get_axes(grid, column_index=nn)
+                axis: Axes = self.get_axes(grid, column_index=nn)
                 axis.set_xlim(*species_axes_spec.xylim)
                 axis.set_ylim(*species_axes_spec.xylim)
                 axis.set_xticks(species_axes_spec.ticks)
@@ -385,7 +391,7 @@ class Plotter:
             # Axes for atmosphere quantites are currently set once here.
             column_name: str = "Pressure (kbar)"
             logger.info("Setting axis properties for %s" % column_name)
-            axis: Axes = get_axes(grid, data=data, column_name=column_name)
+            axis: Axes = self.get_axes(grid, plot_data=data, column_name=column_name)
             ticks = range(0, 16, 5)
             axis.set_xlim(0, 15)
             axis.set_ylim(0, 15)
@@ -393,7 +399,7 @@ class Plotter:
             axis.set_yticks(ticks)
             column_name = "Molar mass (g/mol)"
             logger.info("Setting axis properties for %s", column_name)
-            axis: Axes = get_axes(grid, data=data, column_name=column_name)
+            axis: Axes = self.get_axes(grid, plot_data=data, column_name=column_name)
             ticks = range(0, 41, 10)
             axis.set_xlim(0, 45)
             axis.set_ylim(0, 45)
