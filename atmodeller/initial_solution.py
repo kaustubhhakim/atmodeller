@@ -19,9 +19,15 @@ see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
 import logging
+import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 import numpy as np
 import pandas as pd
@@ -30,7 +36,6 @@ from scipy.sparse import spmatrix
 from sklearn.linear_model import SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
-from typing_extensions import override
 
 from atmodeller import INITIAL_SOLUTION_MAX_LOG10, INITIAL_SOLUTION_MIN_LOG10
 from atmodeller.constraints import SystemConstraints
