@@ -2,12 +2,10 @@ Atmodeller documentation
 ========================
 
 | Author: Dan J. Bower
-| ETHZ
-| ETHZ, Switzerland
-
+| Institute of Geochemistry and Petrology
+| ETH Zurich, Switzerland
 
 Atmodeller is available at https://github.com/ExPlanetology/atmodeller
-
 
 License
 -------
@@ -15,18 +13,11 @@ License
 Atmodeller is free to use, but when results from Atmodeller are published, then the following papers have to be referenced
 :cite:p:`BHS21`, :cite:p:`BKW19`.
 
-
-Tutorial
---------
-
 .. toctree::
    :maxdepth: 2
    :caption: Tutorial:
 
    Tutorial.rst
-
-Links
------
 
 .. toctree::
    :maxdepth: 2
@@ -34,32 +25,17 @@ Links
 
    Links.rst
 
-Bibliography
-------------
-
 .. toctree::
    :maxdepth: 2
    :caption: Bibliography:
 
-   Bibliography.rst
-
-AtmodellerData
---------------
+   bibliography.rst
 
 .. toctree::
    :maxdepth: 2
-   :caption: AtmodellerData:
+   :caption: Developers Guide:
 
-   source/atmodeller.data.rst
-
-AtmodellerRST
---------------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: AtmodellerRST:
-
-   source/atmodeller.rst
+   source/modules.rst
 
 Indices and tables
 ------------------
