@@ -25,7 +25,7 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, IdealGas, NoSolubility, ThermodynamicDataset
+from atmodeller.core import GasSpecies, IdealGas, ThermodynamicDataset
 from atmodeller.eos.holland import (
     CH4_CORK_HP91,
     CO2_CORK_HP91,
@@ -38,7 +38,7 @@ from atmodeller.eos.holland import (
 )
 from atmodeller.interfaces import RealGasABC, ThermodynamicDatasetABC
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import BasaltDixonCO2, BasaltH2, PeridotiteH2O
+from atmodeller.solubilities import BasaltCO2, BasaltH2, NoSolubility, PeridotiteH2O
 from atmodeller.utilities import UnitConversion, earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
@@ -287,7 +287,7 @@ def test_non_ideal() -> None:
             ),
             GasSpecies(
                 formula="CO2",
-                solubility=BasaltDixonCO2(),
+                solubility=BasaltCO2(),
                 thermodynamic_dataset=thermodynamic_dataset,
                 eos=eos_models["CO2"],
             ),

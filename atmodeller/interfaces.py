@@ -21,21 +21,16 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
-from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
     from atmodeller.core import ChemicalComponent
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-# Solubility limiter is applied universally
-MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight
 
 
 class GetValueABC(ABC):
@@ -281,98 +276,6 @@ class RealGasABC(GetValueABC):
             Volume integral in J mol^(-1)
         """
         ...
-
-
-def limit_solubility(bound: float = MAXIMUM_PPMW) -> Callable:
-    """A decorator to limit the solubility in ppmw.
-
-    Args:
-        bound: The maximum limit of the solubility in ppmw. Defaults to MAXIMUM_PPMW.
-
-    Returns:
-        The decorator.
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(self: SolubilityABC, *args, **kwargs):
-            result: float = func(self, *args, **kwargs)
-            if result > bound:
-                msg: str = "%s solubility (%d ppmw) will be limited to %d ppmw" % (
-                    self.__class__.__name__,
-                    result,
-                    bound,
-                )
-                logger.warning(msg)
-
-            return np.clip(result, 0, bound)  # Limit the result between 0 and 'bound'
-
-        return wrapper
-
-    return decorator
-
-
-class SolubilityABC(GetValueABC):
-    """A solubility law for a species."""
-
-    def power_law(self, fugacity: float, constant: float, exponent: float) -> float:
-        """Computes solubility from a power law.
-
-        Args:
-            fugacity: Fugacity of the species in bar
-            constant: Constant for the power law
-            exponent: Exponent for the power law
-
-        Returns:
-            Dissolved volatile concentration in the melt in ppmw.
-        """
-        return constant * fugacity**exponent
-
-    @abstractmethod
-    def _solubility(
-        self,
-        fugacity: float,
-        temperature: float,
-        log10_fugacities_dict: dict[str, float],
-        pressure: float,
-    ) -> float:
-        """Dissolved volatile concentration in the melt in ppmw.
-
-        Args:
-            fugacity: Fugacity of the species in bar
-            temperature: Temperature in kelvin
-            log10_fugacities_dict: Log10 fugacities of all species in the system
-            pressure: Total pressure
-
-        Returns:
-            Dissolved volatile concentration in the melt in ppmw.
-        """
-        raise NotImplementedError
-
-    @limit_solubility()  # Note this limiter is always applied.
-    def get_value(
-        self,
-        *,
-        fugacity: float,
-        temperature: float,
-        log10_fugacities_dict: dict[str, float],
-        pressure: float,
-    ) -> float:
-        """Dissolved volatile concentration in the melt in ppmw.
-
-        See self._solubility.
-        """
-        solubility: float = self._solubility(
-            fugacity, temperature, log10_fugacities_dict, pressure
-        )
-        # logger.debug(
-        #     "%s, f = %f, T = %f, ppmw = %f",
-        #     self.__class__.__name__,
-        #     fugacity,
-        #     temperature,
-        #     solubility,
-        # )
-        return solubility
 
 
 @dataclass(frozen=True)

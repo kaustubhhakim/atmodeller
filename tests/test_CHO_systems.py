@@ -38,7 +38,7 @@ from atmodeller.core import (
 )
 from atmodeller.interfaces import ThermodynamicDatasetABC
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import BasaltDixonCO2, PeridotiteH2O
+from atmodeller.solubilities import BasaltCO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -268,7 +268,7 @@ def test_H_and_C() -> None:
             GasSpecies(formula="H2", solubility=NoSolubility()),
             GasSpecies(formula="O2", solubility=NoSolubility()),
             GasSpecies(formula="CO", solubility=NoSolubility()),
-            GasSpecies(formula="CO2", solubility=BasaltDixonCO2()),
+            GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
 
@@ -309,7 +309,7 @@ def test_H_and_C_total_pressure() -> None:
             GasSpecies(formula="H2", solubility=NoSolubility()),
             GasSpecies(formula="O2", solubility=NoSolubility()),
             GasSpecies(formula="CO", solubility=NoSolubility()),
-            GasSpecies(formula="CO2", solubility=BasaltDixonCO2()),
+            GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
 

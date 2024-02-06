@@ -34,12 +34,11 @@ from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT_BAR, NOBLE_GASES
 from atmodeller.interfaces import (
     ConstraintABC,
     RealGasABC,
-    SolubilityABC,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
 )
-from atmodeller.solubilities import composition_solubilities
-from atmodeller.utilities import UnitConversion, dataclass_to_logger, filter_by_type
+from atmodeller.solubilities import NoSolubility, Solubility, composition_solubilities
+from atmodeller.utilities import UnitConversion, filter_by_type
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -120,16 +119,6 @@ class ActivityConstant(ConstantConstraint):
 
     name: str = field(init=False, default="activity")
     value: float = 1.0
-
-
-class NoSolubility(SolubilityABC):
-    """No solubility."""
-
-    def _solubility(self, *args, **kwargs) -> float:
-        """See base class."""
-        del args
-        del kwargs
-        return 0.0
 
 
 class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
@@ -440,10 +429,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
             volume_T: float = V * np.exp(
                 alpha0 * (temperature - self.enthalpy_reference_temperature)
-                - 2
-                * 10.0
-                * alpha0
-                * (temperature**0.5 - self.enthalpy_reference_temperature**0.5)
+                - 2 * 10.0 * alpha0 * (temperature**0.5 - self.enthalpy_reference_temperature**0.5)
             )
             return volume_T
 
@@ -677,7 +663,7 @@ class GasSpecies(ChemicalComponent):
     """
 
     _: KW_ONLY
-    solubility: SolubilityABC = field(default_factory=NoSolubility)
+    solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
     eos: RealGasABC = field(default_factory=IdealGas)
 
@@ -712,7 +698,7 @@ class GasSpecies(ChemicalComponent):
         )
 
         # Melt
-        ppmw_in_melt: float = self.solubility.get_value(
+        ppmw_in_melt: float = self.solubility.concentration(
             fugacity=fugacity,
             temperature=planet.surface_temperature,
             log10_fugacities_dict=system.log10_fugacities_dict,
@@ -843,7 +829,7 @@ class Species(UserList):
             )
             logger.info(msg)
             try:
-                solubilities: dict[str, SolubilityABC] = composition_solubilities[
+                solubilities: dict[str, Solubility] = composition_solubilities[
                     planet.melt_composition.casefold()
                 ]
             except KeyError:

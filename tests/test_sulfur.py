@@ -31,10 +31,10 @@ from atmodeller.constraints import (
 from atmodeller.core import GasSpecies, NoSolubility
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import (
-    BasaltDixonCO2,
-    BasaltDixonH2O,
+    BasaltCO2,
     BasaltH2,
-    BasaltLibourelN2,
+    BasaltH2O,
+    BasaltN2_Libourel,
     BasaltS2,
     BasaltS2_Sulfate,
     BasaltS2_Sulfide,
@@ -264,7 +264,7 @@ def test_HOS_Species_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=BasaltDixonH2O()),
+            GasSpecies(formula="H2O", solubility=BasaltH2O()),
             GasSpecies(formula="H2", solubility=BasaltH2()),
             GasSpecies(formula="OS", solubility=NoSolubility()),
             GasSpecies(formula="S2", solubility=BasaltS2()),
@@ -307,15 +307,15 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=BasaltDixonH2O()),
+            GasSpecies(formula="H2O", solubility=BasaltH2O()),
             GasSpecies(formula="H2", solubility=BasaltH2()),
             GasSpecies(formula="OS", solubility=NoSolubility()),
             GasSpecies(formula="S2", solubility=BasaltS2()),
             GasSpecies(formula="O2", solubility=NoSolubility()),
             GasSpecies(formula="O2S", solubility=NoSolubility()),
             GasSpecies(formula="CO", solubility=NoSolubility()),
-            GasSpecies(formula="CO2", solubility=BasaltDixonCO2()),
-            GasSpecies(formula="N2", solubility=BasaltLibourelN2()),
+            GasSpecies(formula="CO2", solubility=BasaltCO2()),
+            GasSpecies(formula="N2", solubility=BasaltN2_Libourel()),
         ]
     )
 
@@ -363,7 +363,7 @@ def test_COS_Species_IW() -> None:
             GasSpecies(formula="O2", solubility=NoSolubility()),
             GasSpecies(formula="O2S", solubility=NoSolubility()),
             GasSpecies(formula="CO", solubility=NoSolubility()),
-            GasSpecies(formula="CO2", solubility=BasaltDixonCO2()),
+            GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
 
@@ -399,14 +399,14 @@ def test_CHOS_Species_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=BasaltDixonH2O()),
+            GasSpecies(formula="H2O", solubility=BasaltH2O()),
             GasSpecies(formula="H2", solubility=BasaltH2()),
             GasSpecies(formula="OS", solubility=NoSolubility()),
             GasSpecies(formula="S2", solubility=BasaltS2()),
             GasSpecies(formula="O2", solubility=NoSolubility()),
             GasSpecies(formula="O2S", solubility=NoSolubility()),
             GasSpecies(formula="CO", solubility=NoSolubility()),
-            GasSpecies(formula="CO2", solubility=BasaltDixonCO2()),
+            GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
 
