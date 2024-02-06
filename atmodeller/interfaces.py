@@ -30,9 +30,7 @@ from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
-    from atmodeller.constraints import SystemConstraints
-    from atmodeller.core import ChemicalComponent, Species
-    from atmodeller.output import Output
+    from atmodeller.core import ChemicalComponent
 
 logger: logging.Logger = logging.getLogger(__name__)
 
