@@ -21,9 +21,9 @@ Atmodeller is free to use, but when results from Atmodeller are published, then 
 
 .. toctree::
    :maxdepth: 2
-   :caption: Links:
+   :caption: Troubleshooting:
 
-   Links.rst
+   troubleshooting.rst
 
 .. toctree::
    :maxdepth: 2
@@ -33,7 +33,7 @@ Atmodeller is free to use, but when results from Atmodeller are published, then 
 
 .. toctree::
    :maxdepth: 2
-   :caption: Developers Guide:
+   :caption: API:
 
    source/modules.rst
 
