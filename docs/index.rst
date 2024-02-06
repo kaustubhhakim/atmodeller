@@ -5,19 +5,35 @@ Atmodeller documentation
 | Institute of Geochemistry and Petrology
 | ETH Zurich, Switzerland
 
-Atmodeller is available at https://github.com/ExPlanetology/atmodeller
+*Atmodeller* is available at https://github.com/ExPlanetology/atmodeller
+
+About
+-----
+*Atmodeller* is a Python package that computes the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under `The GNU General Public License v3.0 or later <https://www.gnu.org/licenses/gpl-3.0.en.html>`_.
+
+Authors:
+
+* Dan J. Bower (main developer)
+* Maggie A. Thompson
+* Meng Tian
+* Paolo Sossi
 
 License
 -------
 
-Atmodeller is free to use, but when results from Atmodeller are published, then the following papers have to be referenced
-:cite:p:`BHS21`, :cite:p:`BKW19`.
+If you use Atmodeller please cite :cite:t:`BTT24`.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Setup:
+
+   setup.rst
 
 .. toctree::
    :maxdepth: 2
    :caption: Tutorial:
 
-   Tutorial.rst
+   tutorial.rst
 
 .. toctree::
    :maxdepth: 2

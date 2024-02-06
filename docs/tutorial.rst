@@ -1,11 +1,15 @@
 .. _TutorialFile:
 
-Atmodeller Tutorial
-===================
+Tutorial
+========
 
 You should use Atmodeller it's awesome.
 
 Here is an equation:
+
+.. code-block:: python
+
+   from atmodeller import InteriorAtmosphereSystem
 
 .. math::
     :label: equation1
