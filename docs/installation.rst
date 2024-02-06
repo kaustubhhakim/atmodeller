@@ -1,8 +1,5 @@
-Setup
-=====
-
 Installation
-------------
+============
 
 *Atmodeller* is a Python package that can be installed on a variety of platforms (e.g. Mac, Windows, Linux).
 
@@ -16,7 +13,7 @@ Navigate to a location on your computer and obtain the *Atmodeller* source code:
     git clone git@github.com:ExPlanetology/atmodeller.git
     cd atmodeller
 
-The basic procedure is to install *Atmodeller* into an environment. For example, if you are using a Conda distribution to create Python environments (`Anaconda <https://www.anaconda.com/download>`_ is recommended), create a new environment to install *Atmodeller*. *Atmodeller* requires Python >= 3.10::
+The basic procedure is to install *Atmodeller* into an environment. For example, if you are using a Conda distribution to create Python environments (e.g. `Anaconda <https://www.anaconda.com/download>`_), create a new environment to install *Atmodeller*. *Atmodeller* requires Python >= 3.10::
 
     conda create -n atmodeller python
     conda activate atmodeller

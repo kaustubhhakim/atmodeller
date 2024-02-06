@@ -21,19 +21,25 @@ Authors:
 License
 -------
 
-If you use Atmodeller please cite :cite:t:`BTT24`.
+If you use *Atmodeller* please cite :cite:t:`BTT24`. Furthermore, see the *Atmodeller* source code to find the citations for solubility laws and real gas equations of state. Thermodynamic data is provided by :cite:t:`Cha98`, or Holland and Powell :cite:p:`HP98,HP11`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Setup:
+   :caption: Installation:
 
-   setup.rst
+   installation.rst
 
 .. toctree::
    :maxdepth: 2
    :caption: Tutorial:
 
    tutorial.rst
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Output format:
+
+   output.rst
 
 .. toctree::
    :maxdepth: 2
