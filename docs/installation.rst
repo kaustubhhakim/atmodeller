@@ -31,7 +31,7 @@ You may need to *trust* the notebook before it will run.
 Developer install
 -----------------
 
-See `this setup guide <https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3>`_ to set up your system to develop *Atmodeller* using `VS Code <https://code.visualstudio.com>`_ and `Poetry <https://python-poetry.org>`_.
+See this `developer setup guide <https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3>`_ to set up your system to develop *Atmodeller* using `VS Code <https://code.visualstudio.com>`_ and `Poetry <https://python-poetry.org>`_.
 
 Tutorial
 --------
