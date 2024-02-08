@@ -39,7 +39,7 @@ NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
 OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 
-DATA_ROOT_PATH: Traversable = importlib.resources.files("%s.data" % __package__)
+DATA_ROOT_PATH: Traversable = importlib.resources.files(f"{__package__}.data")
 
 # Minimum and maximum values of log10(pressure) to prevent the initial solution from giving rise
 # to an excessively large total pressure that can cause numerical overflow or underflow.
@@ -99,7 +99,7 @@ def debug_file_logger() -> logging.Logger:
     console_handler.setLevel(logging.INFO)
     logger.addHandler(console_handler)
     # File logger
-    file_handler: logging.Handler = logging.FileHandler("%s.log" % __package__)
+    file_handler: logging.Handler = logging.FileHandler(f"{__package__}.log")
     file_formatter: logging.Formatter = complex_formatter()
     file_handler.setFormatter(file_formatter)
     file_handler.setLevel(logging.DEBUG)

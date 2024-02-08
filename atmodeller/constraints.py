@@ -74,7 +74,6 @@ class Constraint(ABC):
         Returns:
             An evaluation based on the provided arguments
         """
-        ...
 
     def get_log10_value(self, *args, **kwargs) -> float:
         """Computes the log10 value for given input arguments.
@@ -449,16 +448,16 @@ class IronWustiteBufferConstraintFischer(OxygenFugacityBuffer):
         """See base class."""
 
         del kwargs
-        pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
-        a_P: float = 6.44059 + 0.00463099 * pressure_GPa
-        b_P: float = (
+        pressure_gpa: float = UnitConversion.bar_to_GPa(pressure)
+        a_coeff: float = 6.44059 + 0.00463099 * pressure_gpa
+        b_coeff: float = (
             -28.1808
-            + 0.556272 * pressure_GPa
-            - 0.00143757 * pressure_GPa**2
-            + 4.0256e-6 * pressure_GPa**3
-            - 5.4861e-9 * pressure_GPa**4  # Note typo in Table S2. Must be pressure**4.
+            + 0.556272 * pressure_gpa
+            - 0.00143757 * pressure_gpa**2
+            + 4.0256e-6 * pressure_gpa**3
+            - 5.4861e-9 * pressure_gpa**4  # Note typo in Table S2. Must be pressure**4.
         )
-        b_P *= 1000 / temperature
-        fugacity: float = a_P + b_P
+        b_coeff *= 1000 / temperature
+        fugacity: float = a_coeff + b_coeff
 
         return fugacity

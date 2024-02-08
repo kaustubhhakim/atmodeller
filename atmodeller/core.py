@@ -19,11 +19,12 @@ see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from collections import UserList
 from dataclasses import KW_ONLY, dataclass, field
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
 
 import numpy as np
 import pandas as pd
@@ -33,10 +34,6 @@ from thermochem import janaf
 from atmodeller import DATA_ROOT_PATH, NOBLE_GASES
 from atmodeller.constraints import ActivityConstant, Constraint
 from atmodeller.eos.interfaces import IdealGas, RealGas
-from atmodeller.interfaces import (
-    ThermodynamicDataForSpeciesProtocol,
-    ThermodynamicDatasetABC,
-)
 from atmodeller.solubilities import NoSolubility, Solubility, composition_solubilities
 from atmodeller.utilities import UnitConversion, filter_by_type
 
@@ -44,6 +41,73 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+
+
+@dataclass(frozen=True)
+class ThermodynamicDataForSpeciesProtocol(Protocol):
+    """Protocol for a class with a method that returns the Gibbs energy of formation for a species.
+
+    Args:
+        species: Species
+        data_source: Source of the thermodynamic data
+        data: Data used to compute the Gibbs energy of formation
+
+    Attributes:
+        species: Species
+        data_source: Source of the thermodynamic data
+        data: Data used to compute the Gibbs energy of formation
+    """
+
+    species: ChemicalComponent
+    data_source: str
+    data: Any
+
+    def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
+        """Gets the standard Gibbs free energy of formation in J/mol.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Total pressure in bar
+
+        Returns:
+            The standard Gibbs free energy of formation in J/mol
+        """
+        ...
+
+
+class ThermodynamicDatasetABC(ABC):
+    """Thermodynamic dataset base class"""
+
+    _DATA_SOURCE: str
+    # JANAF standards below. May be overwritten by child classes.
+    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
+    _STANDARD_STATE_PRESSURE: float = 1  # bar
+
+    @abstractmethod
+    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
+        """Gets the thermodynamic data for a species, otherwise None if not available
+
+        Args:
+            species: Species
+
+        Returns:
+            Thermodynamic data for the species, otherwise None is not available
+        """
+
+    @property
+    def DATA_SOURCE(self) -> str:
+        """Identifies the source of the data."""
+        return self._DATA_SOURCE
+
+    @property
+    def ENTHALPY_REFERENCE_TEMPERATURE(self) -> float:
+        """Enthalpy reference temperature in kelvin"""
+        return self._ENTHALPY_REFERENCE_TEMPERATURE
+
+    @property
+    def STANDARD_STATE_PRESSURE(self) -> float:
+        """Standard state pressure in bar"""
+        return self._STANDARD_STATE_PRESSURE
 
 
 class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):

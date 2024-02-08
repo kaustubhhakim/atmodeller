@@ -25,7 +25,7 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, ThermodynamicDataset
+from atmodeller.core import GasSpecies, ThermodynamicDataset, ThermodynamicDatasetABC
 from atmodeller.eos.holland import (
     CH4_CORK_HP91,
     CO2_CORK_HP91,
@@ -37,7 +37,6 @@ from atmodeller.eos.holland import (
     get_holland_eos_models,
 )
 from atmodeller.eos.interfaces import IdealGas, RealGas
-from atmodeller.interfaces import ThermodynamicDatasetABC
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltCO2, BasaltH2, NoSolubility, PeridotiteH2O
 from atmodeller.utilities import UnitConversion, earth_oceans_to_kg

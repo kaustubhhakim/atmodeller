@@ -391,14 +391,11 @@ class ReactionNetwork:
             )
             if fugacity_coefficient == np.inf:
                 name: str = gas_species.formula
-                msg: str = "Fugacity coefficient for %s has blown up (inf)" % name
-                logger.warning(msg)
-                msg = "Conditions at blow-up: temperature = %f, pressure = %f" % (
-                    temperature,
-                    pressure,
+                logger.warning("Fugacity coefficient for %s has blown up (inf)", name)
+                logger.warning(
+                    "Conditions at blow-up: temperature = %f, pressure = %f", temperature, pressure
                 )
-                logger.warning(msg)
-                logger.warning("Setting fugacity coefficient for %s to unity (ideal gas)" % name)
+                logger.warning("Setting fugacity coefficient for %s to unity (ideal gas)", name)
                 fugacity_coefficient = 1
 
             fugacity_coefficients[index] = fugacity_coefficient
@@ -803,7 +800,7 @@ class InteriorAtmosphereSystem:
         residual_total_pressure: np.ndarray = np.zeros(
             len(self.constraints.total_pressure_constraint), dtype=np.float_
         )
-        if len(self.constraints.total_pressure_constraint):
+        if len(self.constraints.total_pressure_constraint) > 0:
             constraint: Constraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += (
                 np.log10(self.total_pressure) - constraint.get_log10_value()

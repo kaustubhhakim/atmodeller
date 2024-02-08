@@ -24,11 +24,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
-
 import numpy as np
 import pandas as pd
 from numpy import ndarray
@@ -41,6 +36,11 @@ from atmodeller import INITIAL_SOLUTION_MAX_LOG10, INITIAL_SOLUTION_MIN_LOG10
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
 from atmodeller.output import Output
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -100,7 +100,6 @@ class InitialSolution(ABC):
         Returns:
             The initial solution
         """
-        ...
 
     def get_log10_value(
         self,
@@ -128,21 +127,17 @@ class InitialSolution(ABC):
         log10_value: np.ndarray = np.log10(value)
 
         if perturb:
-            msg: str = (
-                "Randomly perturbing the initial solution by a maximum of %f log10 units"
-                % perturb_log10
+            logger.info(
+                "Randomly perturbing the initial solution by a maximum of %f log10 units",
+                perturb_log10,
             )
-            logger.info(msg)
             log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
 
         if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
-            msg: str = "Initial solution has values outside the min and max thresholds"
-            logger.warning(msg)
-            msg = "Clipping the initial solution between %f and %f" % (
-                self.min_log10,
-                self.max_log10,
+            logger.warning("Initial solution has values outside the min and max thresholds")
+            logger.warning(
+                "Clipping the initial solution between %f and %f", self.min_log10, self.max_log10
             )
-            logger.warning(msg)
             log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
 
         self._conform_to_constraints(log10_value, constraints, temperature, pressure)
