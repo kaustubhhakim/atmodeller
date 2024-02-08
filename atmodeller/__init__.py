@@ -55,9 +55,8 @@ logger.addHandler(logging.NullHandler())
 
 def complex_formatter() -> logging.Formatter:
     """Complex formatter."""
-    fmt: str = (
-        "[%(asctime)s - %(name)-30s - %(lineno)03d - %(levelname)-9s - %(funcName)s()] - %(message)s"
-    )
+    fmt: str = "[%(asctime)s - %(name)-30s - %(lineno)03d - %(levelname)-9s - %(funcName)s()]"
+    fmt += " - %(message)s"
     datefmt: str = "%Y-%m-%d %H:%M:%S"
     formatter: logging.Formatter = logging.Formatter(fmt, datefmt=datefmt)
 
@@ -76,33 +75,33 @@ def simple_formatter() -> logging.Formatter:
 def debug_logger() -> logging.Logger:
     """Setup the logging for debugging: DEBUG to the console."""
     # Console logger
-    logger: logging.Logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    logger.handlers = []
+    package_logger: logging.Logger = logging.getLogger(__name__)
+    package_logger.setLevel(logging.DEBUG)
+    package_logger.handlers = []
     console_handler: logging.Handler = logging.StreamHandler()
     console_formatter: logging.Formatter = simple_formatter()
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
-    return logger
+    return package_logger
 
 
 def debug_file_logger() -> logging.Logger:
     """Setup the logging to a file (DEBUG) and to the console (INFO)."""
     # Console logger
-    logger: logging.Logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    logger.handlers = []
+    package_logger: logging.Logger = logging.getLogger(__name__)
+    package_logger.setLevel(logging.DEBUG)
+    package_logger.handlers = []
     console_handler: logging.Handler = logging.StreamHandler()
     console_formatter: logging.Formatter = simple_formatter()
     console_handler.setFormatter(console_formatter)
     console_handler.setLevel(logging.INFO)
-    logger.addHandler(console_handler)
+    package_logger.addHandler(console_handler)
     # File logger
     file_handler: logging.Handler = logging.FileHandler(f"{__package__}.log")
     file_formatter: logging.Formatter = complex_formatter()
     file_handler.setFormatter(file_formatter)
     file_handler.setLevel(logging.DEBUG)
-    logger.addHandler(file_handler)
+    package_logger.addHandler(file_handler)
 
-    return logger
+    return package_logger

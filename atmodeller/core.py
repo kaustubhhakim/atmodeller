@@ -95,17 +95,17 @@ class ThermodynamicDatasetABC(ABC):
         """
 
     @property
-    def DATA_SOURCE(self) -> str:
-        """Identifies the source of the data."""
+    def data_source(self) -> str:
+        """The source of the data."""
         return self._DATA_SOURCE
 
     @property
-    def ENTHALPY_REFERENCE_TEMPERATURE(self) -> float:
+    def enthalpy_reference_temperature(self) -> float:
         """Enthalpy reference temperature in kelvin"""
         return self._ENTHALPY_REFERENCE_TEMPERATURE
 
     @property
-    def STANDARD_STATE_PRESSURE(self) -> float:
+    def standard_state_pressure(self) -> float:
         """Standard state pressure in bar"""
         return self._STANDARD_STATE_PRESSURE
 
@@ -207,25 +207,25 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             raise ValueError(msg)
 
         if phase_data is None:
-            msg = "Thermodynamic data for %s is not available in %s (%s name = %s)" % (
+            logger.warning(
+                "Thermodynamic data for %s is not available in %s (%s name = %s)",
                 species.formula,
-                self.DATA_SOURCE,
-                self.DATA_SOURCE,
+                self.data_source,
+                self.data_source,
                 species.name_in_dataset,
             )
-            logger.warning(msg)
 
             return None
         else:
-            msg = "Thermodynamic data for %s found in %s (%s name = %s)" % (
+            logger.debug(
+                "Thermodynamic data for %s found in %s (%s name = %s)",
                 species.formula,
-                self.DATA_SOURCE,
-                self.DATA_SOURCE,
+                self.data_source,
+                self.data_source,
                 species.name_in_dataset,
             )
-            logger.debug(msg)
 
-            return self.ThermodynamicDataForSpecies(species, self.DATA_SOURCE, phase_data)
+            return self.ThermodynamicDataForSpecies(species, self.data_source, phase_data)
 
     @dataclass(frozen=True)
     class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesProtocol):
@@ -275,27 +275,27 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
     def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
         try:
             phase_data: pd.Series | None = self.data.loc[species.name_in_dataset]
-            msg = "Thermodynamic data for %s found in %s (%s name = %s)" % (
+            logger.debug(
+                "Thermodynamic data for %s found in %s (%s name = %s)",
                 species.formula,
-                self.DATA_SOURCE,
-                self.DATA_SOURCE,
+                self.data_source,
+                self.data_source,
                 species.name_in_dataset,
             )
-            logger.debug(msg)
 
             return self.ThermodynamicDataForSpecies(
-                species, self.DATA_SOURCE, phase_data, self._ENTHALPY_REFERENCE_TEMPERATURE
+                species, self.data_source, phase_data, self.enthalpy_reference_temperature
             )
 
         except KeyError:
             phase_data = None
-            msg = "Thermodynamic data for %s is not available in %s (%s name = %s)" % (
+            logger.warning(
+                "Thermodynamic data for %s is not available in %s (%s name = %s)",
                 species.formula,
-                self.DATA_SOURCE,
-                self.DATA_SOURCE,
+                self.data_source,
+                self.data_source,
                 species.name_in_dataset,
             )
-            logger.warning(msg)
 
             return None
 
@@ -490,7 +490,7 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
         """
         if len(self.datasets) >= 1:
             logger.warning("Combining different thermodynamic data may result in inconsistencies")
-        logger.info("Adding thermodynamic data: %s", dataset.DATA_SOURCE)
+        logger.info("Adding thermodynamic data: %s", dataset.data_source)
         self.datasets.append(dataset)
 
     def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
