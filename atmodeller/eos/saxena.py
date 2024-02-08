@@ -321,7 +321,7 @@ class SaxenaEightCoefficients(SaxenaABC):
 _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
     critical_temperature=critical_data_dictionary["H2"].temperature,
     critical_pressure=critical_data_dictionary["H2"].pressure,
-    a_coefficients=(1, 0, 0, 0, 0, 0),
+    a_coefficients=(1, 0, 0, 0, 0),
     b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
     c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
@@ -472,11 +472,11 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
     low_pressure: RealGas = SaxenaFiveCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
-        a_coefficients=(1, 0, 0, 0, 0, 0),
+        a_coefficients=(1, 0, 0, 0, 0),
         b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
         # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
         c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
-        d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+        d_coefficients=(0, 0, 0, 0, 0),
     )
 
     # Table 1(a), 1000-5000 bar
