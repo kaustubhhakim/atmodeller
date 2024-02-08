@@ -23,71 +23,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
-import numpy as np
-
 if TYPE_CHECKING:
     from atmodeller.core import ChemicalComponent
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-class GetValueABC(ABC):
-    """An object with a get_value method."""
-
-    @abstractmethod
-    def get_value(self, *args, **kwargs) -> float:
-        """Computes the value for given input arguments.
-
-        Args:
-            *args: Positional arguments
-            **kwargs: Keyword arguments
-
-        Returns:
-            An evaluation based on the provided arguments
-        """
-        ...
-
-    def get_log10_value(self, *args, **kwargs) -> float:
-        """Computes the log10 value for given input arguments.
-
-        Args:
-            *args: Positional arguments only
-            **kwargs: Keyword arguments only
-
-        Returns:
-            An evaluation of the log10 value based on the provided arguments
-        """
-        return np.log10(self.get_value(*args, **kwargs))
-
-
-@dataclass(kw_only=True, frozen=True)
-class ConstraintABC(GetValueABC):
-    """A constraint to apply to an interior-atmosphere system.
-
-    Args:
-        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
-            'pressure', or 'mass'.
-        species: The species to constrain, typically representing a species for 'pressure' or
-            'fugacity' constraints or an element for 'mass' constraints.
-
-    Attributes:
-        name: The name of the constraint
-        species: The species to constrain
-    """
-
-    name: str
-    species: str
-
-    @property
-    def full_name(self) -> str:
-        """Combines the species name and constraint name to give a unique descriptive name."""
-        if self.species:
-            full_name: str = f"{self.species}_"
-        else:
-            full_name = ""
-        full_name += self.name
-
-        return full_name
 
 
 @dataclass(frozen=True)

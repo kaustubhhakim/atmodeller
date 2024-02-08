@@ -22,18 +22,114 @@ This module defines constraints that can be applied to an interior-atmosphere sy
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import UserList
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.core import ConstantConstraint
-from atmodeller.interfaces import ConstraintABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass(kw_only=True, frozen=True)
+class Constraint(ABC):
+    """A constraint to apply to an interior-atmosphere system.
+
+    Args:
+        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
+            'pressure', or 'mass'.
+        species: The species to constrain, typically representing a species for 'pressure' or
+            'fugacity' constraints or an element for 'mass' constraints.
+
+    Attributes:
+        name: The name of the constraint
+        species: The species to constrain
+    """
+
+    name: str
+    species: str
+
+    @property
+    def full_name(self) -> str:
+        """Combines the species name and constraint name to give a unique descriptive name."""
+        if self.species:
+            full_name: str = f"{self.species}_"
+        else:
+            full_name = ""
+        full_name += self.name
+
+        return full_name
+
+    @abstractmethod
+    def get_value(self, *args, **kwargs) -> float:
+        """Computes the value for given input arguments.
+
+        Args:
+            *args: Positional arguments
+            **kwargs: Keyword arguments
+
+        Returns:
+            An evaluation based on the provided arguments
+        """
+        ...
+
+    def get_log10_value(self, *args, **kwargs) -> float:
+        """Computes the log10 value for given input arguments.
+
+        Args:
+            *args: Positional arguments only
+            **kwargs: Keyword arguments only
+
+        Returns:
+            An evaluation of the log10 value based on the provided arguments
+        """
+        return np.log10(self.get_value(*args, **kwargs))
+
+
+@dataclass(kw_only=True, frozen=True)
+class ConstantConstraint(Constraint):
+    """A constraint of a constant value
+
+    Args:
+        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
+            'pressure', or 'mass'.
+        species: The species to constrain, typically representing a species for 'pressure' or
+            'fugacity' constraints or an element for 'mass' constraints.
+        value: The constant value, which is usually in kg for masses and bar for pressures or
+            fugacities.
+
+    Attributes:
+        name: The name of the constraint
+        species: The species to constrain
+        value: The constant value
+    """
+
+    value: float
+
+    def get_value(self, **kwargs) -> float:
+        """Returns the constant value. See base class."""
+        del kwargs
+        return self.value
+
+
+@dataclass(kw_only=True, frozen=True)
+class ActivityConstant(ConstantConstraint):
+    """A constant activity
+
+    Args:
+        species: The species to constrain
+        value: The constant value. Defaults to unity for ideal behaviour.
+
+    Attributes:
+        species: The species to constrain
+        value: The constant value
+    """
+
+    name: str = field(init=False, default="activity")
+    value: float = 1.0
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -94,7 +190,7 @@ class SystemConstraints(UserList):
     """
 
     def __init__(self, initlist=None):
-        self.data: list[ConstraintABC]
+        self.data: list[Constraint]
         super().__init__(initlist)
 
     @property
@@ -102,29 +198,29 @@ class SystemConstraints(UserList):
         return [constraint.full_name for constraint in self.data]
 
     @property
-    def activity_constraints(self) -> list[ConstraintABC]:
+    def activity_constraints(self) -> list[Constraint]:
         """Constraints related to activity"""
         return self._filter_by_name("activity")
 
     @property
-    def fugacity_constraints(self) -> list[ConstraintABC]:
+    def fugacity_constraints(self) -> list[Constraint]:
         """Constraints related to fugacity"""
         return self._filter_by_name("fugacity")
 
     @property
-    def mass_constraints(self) -> list[ConstraintABC]:
+    def mass_constraints(self) -> list[Constraint]:
         """Constraints related to mass conservation"""
         return self._filter_by_name("mass")
 
     @property
-    def pressure_constraints(self) -> list[ConstraintABC]:
+    def pressure_constraints(self) -> list[Constraint]:
         """Constraints related to pressure"""
         return self._filter_by_name("pressure")
 
     @property
-    def total_pressure_constraint(self) -> list[ConstraintABC]:
+    def total_pressure_constraint(self) -> list[Constraint]:
         """Total pressure constraint"""
-        total_pressure: list[ConstraintABC] = self._filter_by_name("total_pressure")
+        total_pressure: list[Constraint] = self._filter_by_name("total_pressure")
         if len(total_pressure) > 1:
             msg: str = "You can only specify zero or one total pressure constraints"
             logger.error(msg)
@@ -133,9 +229,9 @@ class SystemConstraints(UserList):
         return total_pressure
 
     @property
-    def reaction_network_constraints(self) -> list[ConstraintABC]:
+    def reaction_network_constraints(self) -> list[Constraint]:
         """Constraints related to the reaction network"""
-        filtered_entries: list[ConstraintABC] = self.fugacity_constraints
+        filtered_entries: list[Constraint] = self.fugacity_constraints
         filtered_entries.extend(self.pressure_constraints)
         filtered_entries.extend(self.activity_constraints)
 
@@ -179,7 +275,7 @@ class SystemConstraints(UserList):
             key: np.log10(value) for key, value in self.evaluate(temperature, pressure).items()
         }
 
-    def _filter_by_name(self, name: str) -> list[ConstraintABC]:
+    def _filter_by_name(self, name: str) -> list[Constraint]:
         """Filters the constraints by a given name.
 
         Args:
@@ -197,7 +293,7 @@ class SystemConstraints(UserList):
 
 
 @dataclass(kw_only=True, frozen=True)
-class RedoxBuffer(ConstraintABC):
+class RedoxBuffer(Constraint):
     """A mineral redox buffer that constrains a fugacity as a function of temperature
 
     Args:

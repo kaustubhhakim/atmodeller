@@ -31,9 +31,9 @@ from molmass import Composition, Formula
 from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH, NOBLE_GASES
+from atmodeller.constraints import ActivityConstant, Constraint
 from atmodeller.eos.interfaces import IdealGas, RealGas
 from atmodeller.interfaces import (
-    ConstraintABC,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
 )
@@ -44,49 +44,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
-
-
-@dataclass(kw_only=True, frozen=True)
-class ConstantConstraint(ConstraintABC):
-    """A constraint of a constant value
-
-    Args:
-        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
-            'pressure', or 'mass'.
-        species: The species to constrain, typically representing a species for 'pressure' or
-            'fugacity' constraints or an element for 'mass' constraints.
-        value: The constant value, which is usually in kg for masses and bar for pressures or
-            fugacities.
-
-    Attributes:
-        name: The name of the constraint
-        species: The species to constrain
-        value: The constant value
-    """
-
-    value: float
-
-    def get_value(self, **kwargs) -> float:
-        """Returns the constant value. See base class."""
-        del kwargs
-        return self.value
-
-
-@dataclass(kw_only=True, frozen=True)
-class ActivityConstant(ConstantConstraint):
-    """A constant activity
-
-    Args:
-        species: The species to constrain
-        value: The constant value. Defaults to unity for ideal behaviour.
-
-    Attributes:
-        species: The species to constrain
-        value: The constant value
-    """
-
-    name: str = field(init=False, default="activity")
-    value: float = 1.0
 
 
 class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
@@ -714,7 +671,7 @@ class CondensedSpecies(ChemicalComponent):
     """
 
     _: KW_ONLY
-    activity: ConstraintABC = field(init=False)
+    activity: Constraint = field(init=False)
 
     def __post_init__(self):
         super().__post_init__()

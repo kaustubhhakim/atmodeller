@@ -28,10 +28,9 @@ from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
-from atmodeller.constraints import SystemConstraints
+from atmodeller.constraints import Constraint, SystemConstraints
 from atmodeller.core import Species
 from atmodeller.initial_solution import InitialSolution, InitialSolutionConstant
-from atmodeller.interfaces import ConstraintABC
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion, dataclass_to_logger
 
@@ -805,7 +804,7 @@ class InteriorAtmosphereSystem:
             len(self.constraints.total_pressure_constraint), dtype=np.float_
         )
         if len(self.constraints.total_pressure_constraint):
-            constraint: ConstraintABC = self.constraints.total_pressure_constraint[0]
+            constraint: Constraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += (
                 np.log10(self.total_pressure) - constraint.get_log10_value()
             )
