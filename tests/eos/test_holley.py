@@ -20,11 +20,11 @@ import logging
 
 from atmodeller import ATMOSPHERE, __version__, debug_logger
 from atmodeller.eos.holley import get_holley_eos_models
-from atmodeller.interfaces import RealGasABC
+from atmodeller.eos.interfaces import RealGas
 
 logger: logging.Logger = debug_logger()
 
-eos_models: dict[str, RealGasABC] = get_holley_eos_models()
+eos_models: dict[str, RealGas] = get_holley_eos_models()
 
 # Probably due to rounding of the model parameters in the paper, some compressibilities in the
 # table in the paper don't quite match exactly with what we compute. Hence relax the tolerance.

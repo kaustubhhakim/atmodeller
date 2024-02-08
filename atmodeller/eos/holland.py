@@ -90,9 +90,9 @@ from atmodeller.eos.interfaces import (
     MRKCriticalBehaviour,
     MRKExplicitABC,
     MRKImplicitABC,
+    RealGas,
     critical_data_dictionary,
 )
-from atmodeller.interfaces import RealGasABC
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class MRKCorrespondingStatesHP91(MRKExplicitABC):
     b0: float = field(init=False, default=9.18301e-6)
 
     @classmethod
-    def get_species(cls, species: str) -> RealGasABC:
+    def get_species(cls, species: str) -> RealGas:
         """Instantiates a MRK corresponding states model for a given species.
 
         Args:
@@ -165,7 +165,7 @@ class CORKCorrespondingStatesHP91(CORK):
     c_virial: tuple[float, float] = field(init=False, default=(0, 0))
 
     @classmethod
-    def get_species(cls, species: str) -> RealGasABC:
+    def get_species(cls, species: str) -> RealGas:
         """Instantiates a CORK corresponding states model for a given species
 
         Args:
@@ -174,7 +174,7 @@ class CORKCorrespondingStatesHP91(CORK):
         Returns:
             A corresponding states model for the species
         """
-        mrk: RealGasABC = MRKCorrespondingStatesHP91.get_species(species)
+        mrk: RealGas = MRKCorrespondingStatesHP91.get_species(species)
 
         return cls(
             mrk=mrk,
@@ -184,22 +184,22 @@ class CORKCorrespondingStatesHP91(CORK):
 
 
 # MRK concrete classes
-CO2_MRK_simple_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO2")
-CH4_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CH4")
-H2_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2_Holland")
-CO_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("CO")
-N2_MRK_HP91: RealGasABC = MRKCorrespondingStatesHP91.get_species("N2")
-S2_MRK_HP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("S2")
-H2S_MRK_HP11: RealGasABC = MRKCorrespondingStatesHP91.get_species("H2S")
+CO2_MRK_simple_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2")
+CH4_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4")
+H2_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("H2_Holland")
+CO_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CO")
+N2_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("N2")
+S2_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("S2")
+H2S_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S")
 
 # CORK concrete classes
-CO2_CORK_simple_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO2")
-CH4_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CH4")
-H2_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2_Holland")
-CO_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("CO")
-N2_CORK_HP91: RealGasABC = CORKCorrespondingStatesHP91.get_species("N2")
-S2_CORK_HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("S2")
-H2S_CORK_HP11: RealGasABC = CORKCorrespondingStatesHP91.get_species("H2S")
+CO2_CORK_simple_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO2")
+CH4_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CH4")
+H2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("H2_Holland")
+CO_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO")
+N2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("N2")
+S2_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("S2")
+H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S")
 
 # endregion
 
@@ -357,10 +357,10 @@ class MRKCO2HP91(MRKImplicitABC):
         return np.max(volume_roots)
 
 
-CO2_MRK_HP91: RealGasABC = MRKCO2HP91()
+CO2_MRK_HP91: RealGas = MRKCO2HP91()
 
 # For completeness, the MRK model for CO2 in 1998 is the same as the 1991 paper.
-CO2_MRK_HP98: RealGasABC = MRKCO2HP91()
+CO2_MRK_HP98: RealGas = MRKCO2HP91()
 
 
 @dataclass(kw_only=True)
@@ -391,10 +391,10 @@ class MRKH2OHP91(MRKCriticalBehaviour):
         return Psat
 
 
-H2O_MRK_HP91: RealGasABC = MRKH2OHP91()
+H2O_MRK_HP91: RealGas = MRKH2OHP91()
 
 # For completeness, the MRK model for H2O in 1998 is the same as the 1991 paper.
-H2O_MRK_HP98: RealGasABC = MRKH2OHP91()
+H2O_MRK_HP98: RealGas = MRKH2OHP91()
 
 # For the Full CORK models below, the virial coefficients in the Holland and Powell papers need
 # converting to SI units and pressure in bar as follows, where k = kilo = 1000:
@@ -412,28 +412,28 @@ c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple
     map(lambda y: y * 1e-5 / kilo**0.25, x)
 )
 
-CO2_CORK_HP91: RealGasABC = CORK(
+CO2_CORK_HP91: RealGas = CORK(
     P0=5000,
     mrk=CO2_MRK_HP91,
     a_virial=a_conversion((1.33790e-2, -1.01740e-5)),
     b_virial=b_conversion((-2.26924e-1, 7.73793e-5)),
 )
 
-CO2_CORK_HP98: RealGasABC = CORK(
+CO2_CORK_HP98: RealGas = CORK(
     P0=5000,
     mrk=CO2_MRK_HP98,
     a_virial=a_conversion((5.40776e-3, -1.59046e-6)),
     b_virial=b_conversion((-1.78198e-1, 2.45317e-5)),
 )
 
-H2O_CORK_HP91: RealGasABC = CORK(
+H2O_CORK_HP91: RealGas = CORK(
     P0=2000,
     mrk=MRKH2OHP91(),
     a_virial=a_conversion((-3.2297554e-3, 2.2215221e-6)),
     b_virial=b_conversion((-3.025650e-2, -5.343144e-6)),
 )
 
-H2O_CORK_HP98: RealGasABC = CORK(
+H2O_CORK_HP98: RealGas = CORK(
     P0=2000,
     mrk=H2O_MRK_HP98,
     a_virial=a_conversion((1.9853e-3, 0)),
@@ -444,13 +444,13 @@ H2O_CORK_HP98: RealGasABC = CORK(
 # endregion
 
 
-def get_holland_eos_models() -> dict[str, RealGasABC]:
+def get_holland_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of the preferred EOS models to use for each species.
 
     Returns:
         Dictionary of preferred EOS models for each species
     """
-    models: dict[str, RealGasABC] = {}
+    models: dict[str, RealGas] = {}
     models["CH4"] = CH4_CORK_HP91
     models["CO"] = CO_CORK_HP91
     models["CO2"] = CO2_CORK_HP98

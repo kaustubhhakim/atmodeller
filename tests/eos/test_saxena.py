@@ -19,13 +19,13 @@ see <https://www.gnu.org/licenses/>.
 import logging
 
 from atmodeller import __version__, debug_logger
+from atmodeller.eos.interfaces import RealGas
 from atmodeller.eos.saxena import H2_SF87, get_saxena_eos_models
-from atmodeller.interfaces import RealGasABC
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = debug_logger()
 
-eos_models: dict[str, RealGasABC] = get_saxena_eos_models()
+eos_models: dict[str, RealGas] = get_saxena_eos_models()
 
 RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8

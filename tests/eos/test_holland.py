@@ -25,7 +25,7 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, IdealGas, ThermodynamicDataset
+from atmodeller.core import GasSpecies, ThermodynamicDataset
 from atmodeller.eos.holland import (
     CH4_CORK_HP91,
     CO2_CORK_HP91,
@@ -36,7 +36,8 @@ from atmodeller.eos.holland import (
     CO2_MRK_simple_HP91,
     get_holland_eos_models,
 )
-from atmodeller.interfaces import RealGasABC, ThermodynamicDatasetABC
+from atmodeller.eos.interfaces import IdealGas, RealGas
+from atmodeller.interfaces import ThermodynamicDatasetABC
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltCO2, BasaltH2, NoSolubility, PeridotiteH2O
 from atmodeller.utilities import UnitConversion, earth_oceans_to_kg
@@ -45,7 +46,7 @@ logger: logging.Logger = debug_logger()
 
 thermodynamic_dataset: ThermodynamicDatasetABC = ThermodynamicDataset()
 
-eos_models: dict[str, RealGasABC] = get_holland_eos_models()
+eos_models: dict[str, RealGas] = get_holland_eos_models()
 
 RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8

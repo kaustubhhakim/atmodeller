@@ -62,14 +62,14 @@ import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
-from atmodeller.interfaces import RealGasABC
+from atmodeller.eos.interfaces import RealGas
 from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class BeattieBridgeman(RealGasABC):
+class BeattieBridgeman(RealGas):
     """Beattie-Bridgeman equation
 
     Compressibility factors and fugacity coefficients calculated from the Beattie-Bridgeman
@@ -182,11 +182,7 @@ class BeattieBridgeman(RealGasABC):
             * temperature
             * (
                 np.log(GAS_CONSTANT_BAR * temperature / vol)
-                + (
-                    self.B0
-                    - self.c / temperature**3
-                    - self.A0 / (GAS_CONSTANT_BAR * temperature)
-                )
+                + (self.B0 - self.c / temperature**3 - self.A0 / (GAS_CONSTANT_BAR * temperature))
                 * 2
                 / vol
                 - (
@@ -213,49 +209,49 @@ volume_conversion: Callable = UnitConversion.litre_to_m3
 # Converts PV**2 coefficient to be in terms of m^3 and bar
 A0_conversion: Callable = lambda x: x * ATMOSPHERE * UnitConversion.litre_to_m3() ** 2
 
-H2_Beattie_holley: RealGasABC = BeattieBridgeman(
+H2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(0.1975),
     a=volume_conversion(-0.00506),
     B0=volume_conversion(0.02096),
     b=volume_conversion(-0.04359),
     c=volume_conversion(0.0504e4),
 )
-N2_Beattie_holley: RealGasABC = BeattieBridgeman(
+N2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(1.3445),
     a=volume_conversion(0.02617),
     B0=volume_conversion(0.05046),
     b=volume_conversion(-0.00691),
     c=volume_conversion(4.2e4),
 )
-O2_Beattie_holley: RealGasABC = BeattieBridgeman(
+O2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(1.4911),
     a=volume_conversion(0.02562),
     B0=volume_conversion(0.04624),
     b=volume_conversion(0.004208),
     c=volume_conversion(4.8e4),
 )
-CO2_Beattie_holley: RealGasABC = BeattieBridgeman(
+CO2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(5.0065),
     a=volume_conversion(0.07132),
     B0=volume_conversion(0.10476),
     b=volume_conversion(0.07235),
     c=volume_conversion(66e4),
 )
-NH3_Beattie_holley: RealGasABC = BeattieBridgeman(
+NH3_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(2.3930),
     a=volume_conversion(0.17031),
     B0=volume_conversion(0.03415),
     b=volume_conversion(0.19112),
     c=volume_conversion(476.87e4),
 )
-CH4_Beattie_holley: RealGasABC = BeattieBridgeman(
+CH4_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(2.2769),
     a=volume_conversion(0.01855),
     B0=volume_conversion(0.05587),
     b=volume_conversion(-0.01587),
     c=volume_conversion(12.83e4),
 )
-He_Beattie_holley: RealGasABC = BeattieBridgeman(
+He_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(0.0216),
     a=volume_conversion(0.05984),
     B0=volume_conversion(0.01400),
@@ -264,13 +260,13 @@ He_Beattie_holley: RealGasABC = BeattieBridgeman(
 )
 
 
-def get_holley_eos_models() -> dict[str, RealGasABC]:
+def get_holley_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of the preferred EOS models to use for each species.
 
     Returns:
         Dictionary of prefered EOS models for each species
     """
-    models: dict[str, RealGasABC] = {}
+    models: dict[str, RealGas] = {}
     models["CH4"] = CH4_Beattie_holley
     models["CO2"] = CO2_Beattie_holley
     models["H2"] = H2_Beattie_holley

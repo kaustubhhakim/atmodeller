@@ -387,7 +387,7 @@ class ReactionNetwork:
         temperature: float = system.planet.surface_temperature
         pressure: float = system.total_pressure
         for index, gas_species in self.species.gas_species.items():
-            fugacity_coefficient = gas_species.eos.get_value(
+            fugacity_coefficient = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
             if fugacity_coefficient == np.inf:
@@ -539,8 +539,10 @@ class InteriorAtmosphereSystem:
     def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients (relevant for gas species only) in a dictionary."""
         output: dict[str, float] = {
-            species.formula: species.eos.get_log10_value(
-                temperature=self.planet.surface_temperature, pressure=self.total_pressure
+            species.formula: np.log10(
+                species.eos.fugacity_coefficient(
+                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
+                )
             )
             for species in self.species.gas_species.values()
         }

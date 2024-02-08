@@ -30,10 +30,10 @@ import pandas as pd
 from molmass import Composition, Formula
 from thermochem import janaf
 
-from atmodeller import DATA_ROOT_PATH, GAS_CONSTANT_BAR, NOBLE_GASES
+from atmodeller import DATA_ROOT_PATH, NOBLE_GASES
+from atmodeller.eos.interfaces import IdealGas, RealGas
 from atmodeller.interfaces import (
     ConstraintABC,
-    RealGasABC,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
 )
@@ -44,38 +44,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
-
-
-@dataclass(kw_only=True)
-class IdealGas(RealGasABC):
-    """An ideal gas, PV=RT"""
-
-    def volume(self, temperature: float, pressure: float) -> float:
-        """Volume
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Volume in m^3 mol^(-1)
-        """
-        return self.ideal_volume(temperature, pressure)
-
-    def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Volume integral in J mol^(-1)
-        """
-        volume_integral: float = GAS_CONSTANT_BAR * temperature * np.log(pressure)
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
-
-        return volume_integral
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -665,7 +633,7 @@ class GasSpecies(ChemicalComponent):
     _: KW_ONLY
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
-    eos: RealGasABC = field(default_factory=IdealGas)
+    eos: RealGas = field(default_factory=IdealGas)
 
     @_mass_decorator
     def mass(

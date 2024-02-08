@@ -19,21 +19,224 @@ see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import GAS_CONSTANT_BAR
-from atmodeller.interfaces import RealGasABC
+from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class ModifiedRedlichKwongABC(RealGasABC):
+class RealGas(ABC):
+    """A real gas equation of state (EOS)
+
+    This base class requires a specification for the volume and volume integral. Then the
+    fugacity and related quantities can be computed using the standard relation:
+
+    RTlnf = integral(VdP)
+
+    If critical_temperature and critical_pressure are set to their default value of unity, then
+    these quantities are effectively not used, and the model coefficients should be in terms of
+    the real temperature and pressure. But for corresponding state models, which are formulated in
+    terms of a reduced temperature and a reduced pressure, the critical_temperature and
+    critical_pressure must be set to appropriate values for the species under consideration.
+
+    Args:
+        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
+        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
+
+    Attributes:
+        critical_temperature: Critical temperature in kelvin
+        critical_pressure: Critical pressure in bar
+        standard_state_pressure: Standard state pressure
+    """
+
+    critical_temperature: float = 1  # Default of one is equivalent to not used
+    critical_pressure: float = 1  # Default of one is equivalent to not used
+    standard_state_pressure: float = field(init=False, default=1)  # 1 bar
+
+    def scaled_pressure(self, pressure: float) -> float:
+        """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity
+
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            The scaled (reduced) pressure, which is dimensionless
+        """
+        scaled_pressure: float = pressure / self.critical_pressure
+
+        return scaled_pressure
+
+    def scaled_temperature(self, temperature: float) -> float:
+        """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity
+
+        Args:
+            temperature: Temperature in kelvin
+
+        Returns:
+            The scaled (reduced) temperature, which is dimensionless
+        """
+        scaled_temperature: float = temperature / self.critical_temperature
+
+        return scaled_temperature
+
+    def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
+        """Compressibility parameter at temperature and pressure.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+            **kwargs: Catches unused keyword arguments. Used for overrides in subclasses.
+
+        Returns:
+            The compressibility parameter, Z, which is dimensionless
+        """
+        del kwargs
+        volume: float = self.volume(temperature, pressure)
+        volume_ideal: float = self.ideal_volume(temperature, pressure)
+        Z: float = volume / volume_ideal
+
+        return Z
+
+    def ln_fugacity(self, temperature: float, pressure: float) -> float:
+        """Natural log of the fugacity
+
+        The fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and f0 is the
+        pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Natural log of the fugacity
+        """
+        ln_fugacity: float = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT * temperature
+        )
+
+        return ln_fugacity
+
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Fugacity
+
+        The fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and f0 is the
+        pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity in bar
+        """
+        fugacity: float = np.exp(self.ln_fugacity(temperature, pressure))
+
+        return fugacity
+
+    def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
+        """Fugacity coefficient
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            fugacity coefficient, which is non-dimensional
+        """
+        fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
+
+        return fugacity_coefficient
+
+    def ideal_volume(self, temperature: float, pressure: float) -> float:
+        """Ideal volume
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            ideal volume in m^3 mol^(-1)
+        """
+        volume_ideal: float = GAS_CONSTANT_BAR * temperature / pressure
+
+        return volume_ideal
+
+    @abstractmethod
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume in m^3 mol^(-1)
+        """
+        ...
+
+    @abstractmethod
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral (VdP)
+
+        Be careful with units. If this function uses the same constants (and GAS_CONSTANT_BAR) as
+        volume() then the units will be m^3 mol^(-1) bar. But this method requires that the units
+        returned are J mol^(-1). Hence the following conversion is often necessary:
+
+            1 J = 10^(-5) m^(3) bar
+
+        There are functions to do this conversion in utilities.py.
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral in J mol^(-1)
+        """
+        ...
+
+
+@dataclass(kw_only=True)
+class IdealGas(RealGas):
+    """An ideal gas, PV=RT"""
+
+    def volume(self, temperature: float, pressure: float) -> float:
+        """Volume
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume in m^3 mol^(-1)
+        """
+        return self.ideal_volume(temperature, pressure)
+
+    def volume_integral(self, temperature: float, pressure: float) -> float:
+        """Volume integral
+
+        Args:
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral in J mol^(-1)
+        """
+        volume_integral: float = GAS_CONSTANT_BAR * temperature * np.log(pressure)
+        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+
+        return volume_integral
+
+
+@dataclass(kw_only=True)
+class ModifiedRedlichKwongABC(RealGas):
     """A Modified Redlich Kwong (MRK) EOS
 
     For example, Equation 3, Holland and Powell (1991):
@@ -307,7 +510,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
 
 @dataclass(kw_only=True)
-class MRKCriticalBehaviour(RealGasABC):
+class MRKCriticalBehaviour(RealGas):
     """A MRK model that accommodates critical behaviour
 
     Args:
@@ -427,7 +630,7 @@ class MRKCriticalBehaviour(RealGasABC):
 
 
 @dataclass(kw_only=True)
-class VirialCompensation(RealGasABC):
+class VirialCompensation(RealGas):
     """A compensation term for the increasing deviation of the MRK volumes with pressure
 
     General form of the equation from Holland and Powell (1998), and also see Holland and Powell
@@ -571,7 +774,7 @@ class VirialCompensation(RealGasABC):
 
 
 @dataclass(kw_only=True)
-class CORK(RealGasABC):
+class CORK(RealGas):
     """A Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991)
 
     Args:
@@ -598,7 +801,7 @@ class CORK(RealGasABC):
     """
 
     P0: float
-    mrk: RealGasABC
+    mrk: RealGas
     a_virial: tuple[float, ...] = (0, 0)
     b_virial: tuple[float, ...] = (0, 0)
     c_virial: tuple[float, ...] = (0, 0)
@@ -650,7 +853,7 @@ class CORK(RealGasABC):
 
 
 @dataclass(kw_only=True)
-class CombinedEOSModel(RealGasABC):
+class CombinedEOSModel(RealGas):
     """Combines multiple EOS models for different pressure ranges into a single model.
 
     Args:
@@ -662,7 +865,7 @@ class CombinedEOSModel(RealGasABC):
         upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
     """
 
-    models: tuple[RealGasABC, ...]
+    models: tuple[RealGas, ...]
     upper_pressure_bounds: tuple[float, ...]
 
     def _get_index(self, pressure: float) -> int:
