@@ -34,10 +34,10 @@ from atmodeller import OCEAN_MASS_H2
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-T_multiply = TypeVar("T_multiply", float, np.ndarray, pd.Series, pd.DataFrame)
+MultiplyT = TypeVar("MultiplyT", float, np.ndarray, pd.Series, pd.DataFrame)
 
 
-def debug_decorator(logger: logging.Logger) -> Callable:
+def debug_decorator(logger_in: logging.Logger) -> Callable:
     """A decorator to print the result of a function to a debug logger."""
 
     def decorator(func: Callable) -> Callable:
@@ -45,7 +45,7 @@ def debug_decorator(logger: logging.Logger) -> Callable:
         def wrapper(*args, **kwargs) -> Any:
             # logger.info(f"Executing {func.__name__}")
             result: Any = func(*args, **kwargs)
-            logger.debug("%s = %s", func.__name__, result)
+            logger_in.debug("%s = %s", func.__name__, result)
             # logger.info(f"Finished executing {func.__name__}")
             return result
 
@@ -83,57 +83,65 @@ class UnitConversion:
     """Unit conversions."""
 
     @staticmethod
-    def bar_to_Pa(value_bar: T_multiply = 1) -> T_multiply:
+    def bar_to_Pa(  # Symbol name, so pylint: disable=invalid-name
+        value_bar: MultiplyT = 1,
+    ) -> MultiplyT:
         """bar to Pa."""
         return value_bar * 1e5
 
     @classmethod
-    def bar_to_GPa(cls, value_bar: T_multiply = 1) -> T_multiply:
+    def bar_to_GPa(  # Symbol name, so pylint: disable=invalid-name
+        cls, value_bar: MultiplyT = 1
+    ) -> MultiplyT:
         """Bar to GPa."""
         return cls.bar_to_Pa(value_bar) * 1.0e-9
 
     @staticmethod
-    def fraction_to_ppm(value_fraction: T_multiply = 1) -> T_multiply:
+    def fraction_to_ppm(value_fraction: MultiplyT = 1) -> MultiplyT:
         """Mole or mass fraction to parts-per-million by mole or mass, respectively."""
         return value_fraction * mega
 
     @staticmethod
-    def g_to_kg(value_grams: T_multiply = 1) -> T_multiply:
+    def g_to_kg(value_grams: MultiplyT = 1) -> MultiplyT:
         """Grams to kilograms."""
         return value_grams / kilo
 
     @classmethod
-    def ppm_to_fraction(cls, value_ppm: T_multiply = 1) -> T_multiply:
+    def ppm_to_fraction(cls, value_ppm: MultiplyT = 1) -> MultiplyT:
         """Parts-per-million by mole or mass to mole or mass fraction, respectively."""
         return value_ppm / cls.fraction_to_ppm()
 
     @classmethod
-    def ppm_to_percent(cls, value_ppm: T_multiply = 1) -> T_multiply:
+    def ppm_to_percent(cls, value_ppm: MultiplyT = 1) -> MultiplyT:
         """Parts-per-million by percent"""
         return cls.ppm_to_fraction(value_ppm) * 100
 
     @classmethod
-    def cm3_to_m3(cls, cm_cubed: T_multiply = 1) -> T_multiply:
+    def cm3_to_m3(cls, cm_cubed: MultiplyT = 1) -> MultiplyT:
         """cm^3 to m^3"""
         return cm_cubed * 1.0e-6
 
     @classmethod
-    def m3_bar_to_J(cls, m3_bar: T_multiply = 1) -> T_multiply:
+    def m3_bar_to_J(  # Symbol name, so pylint: disable=invalid-name
+        cls, m3_bar: MultiplyT = 1
+    ) -> MultiplyT:
         """m^3 bar to J"""
         return m3_bar * 1e5
 
     @classmethod
-    def J_to_m3_bar(cls, joules: T_multiply = 1) -> T_multiply:
+    def J_to_m3_bar(  # Symbol name, so pylint: disable=invalid-name
+        cls, joules: MultiplyT = 1
+    ) -> MultiplyT:
         """J to m^3 bar"""
         return joules / cls.m3_bar_to_J()
 
     @classmethod
-    def litre_to_m3(cls, litre: T_multiply = 1) -> T_multiply:
+    def litre_to_m3(cls, litre: MultiplyT = 1) -> MultiplyT:
         """litre to m^3"""
         return litre * 1e-3
 
     @staticmethod
-    def weight_percent_to_ppmw(value_weight_percent: T_multiply = 1) -> T_multiply:
+    def weight_percent_to_ppmw(value_weight_percent: MultiplyT = 1) -> MultiplyT:
         """Weight percent to parts-per-million by weight"""
         return value_weight_percent * 1.0e4
 
@@ -164,7 +172,7 @@ def flatten(
     return dict(items)
 
 
-def dataclass_to_logger(data_instance, logger: logging.Logger, log_level=logging.INFO) -> None:
+def dataclass_to_logger(data_instance, logger_in: logging.Logger, log_level=logging.INFO) -> None:
     """Logs the attributes of a dataclass.
 
     Args:
@@ -175,7 +183,7 @@ def dataclass_to_logger(data_instance, logger: logging.Logger, log_level=logging
     data: dict[Any, Any] = flatten(asdict(data_instance))
 
     for key, value in data.items():
-        logger.log(log_level, "%s = %s", key, value)
+        logger_in.log(log_level, "%s = %s", key, value)
 
 
 def delete_entries_with_suffix(input_dict: dict[Any, Any], suffix: str) -> dict[Any, Any]:
