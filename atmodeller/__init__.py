@@ -27,25 +27,34 @@ from importlib.abc import Traversable
 from molmass import Formula
 from scipy import constants
 
-# Module constants
-GAS_CONSTANT: float = constants.gas_constant  # J/K/mol
-GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5  # m^3 bar/K/mol
-GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant  # m^3/kg/s^2
-ATMOSPHERE: float = constants.atmosphere / constants.bar  # bar
-
+GAS_CONSTANT: float = constants.gas_constant
+"""Gas constant in units of J/K/mol"""
+GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5
+"""Gas constant in units of m^3 bar/K/mol"""
+GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant
+"""Gravitational constant in units of m^3/kg/s^2"""
+ATMOSPHERE: float = constants.atmosphere / constants.bar
+"""Atmospheres in one bar"""
 # Used to determine the JANAF reference state
 NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
-
-OCEAN_MOLES: float = 7.68894973907177e22  # Moles of H2 (or H2O) in one present-day Earth ocean.
+"""Noble gases"""
+OCEAN_MOLES: float = 7.68894973907177e22
+"""Moles of H2 (or H2O) in one present-day Earth ocean"""
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
+"""Mass of H2 in one present-day Earth ocean"""
 
 DATA_ROOT_PATH: Traversable = importlib.resources.files(f"{__package__}.data")
 
 # Minimum and maximum values of log10(pressure) to prevent the initial solution from giving rise
 # to an excessively large total pressure that can cause numerical overflow or underflow.
-# Minimum value is guided by typical values of the fO2 for IW atmospheres for Earth-sized planets
 INITIAL_SOLUTION_MIN_LOG10: float = -12
+"""Minimum value of log10(pressure) as determined by the initial solution.
+
+This value is motivated by typical values of the fO2 for atmospheres at the iron-wustite buffer
+for Earth-sized planets.
+"""
 INITIAL_SOLUTION_MAX_LOG10: float = 5
+"""Maximum value of log10(pressure) as determined by the initial solution."""
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config
@@ -73,7 +82,7 @@ def simple_formatter() -> logging.Formatter:
 
 
 def debug_logger() -> logging.Logger:
-    """Setup the logging for debugging: DEBUG to the console."""
+    """Set up the logging for debugging: debug to the console."""
     # Console logger
     package_logger: logging.Logger = logging.getLogger(__name__)
     package_logger.setLevel(logging.DEBUG)
@@ -87,7 +96,7 @@ def debug_logger() -> logging.Logger:
 
 
 def debug_file_logger() -> logging.Logger:
-    """Setup the logging to a file (DEBUG) and to the console (INFO)."""
+    """Set up the logging to a file (debug) and to the console (info)."""
     # Console logger
     package_logger: logging.Logger = logging.getLogger(__name__)
     package_logger.setLevel(logging.DEBUG)
