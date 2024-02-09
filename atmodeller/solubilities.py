@@ -1,20 +1,20 @@
-"""Solubility laws
-
-Copyright 2024 Dan J. Bower
-
-This file is part of Atmodeller.
-
-Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU 
-General Public License as published by the Free Software Foundation, either version 3 of the 
-License, or (at your option) any later version.
-
-Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without 
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with Atmodeller. If not, 
-see <https://www.gnu.org/licenses/>.
-"""
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Solubility laws"""
 
 from __future__ import annotations
 
@@ -24,15 +24,15 @@ from abc import abstractmethod
 from functools import wraps
 from typing import Callable
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
-
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.utilities import UnitConversion
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -58,12 +58,12 @@ def limit_concentration(bound: float = MAXIMUM_PPMW) -> Callable:
         def wrapper(self: Solubility, *args, **kwargs):
             result: float = func(self, *args, **kwargs)
             if result > bound:
-                msg: str = "%s concentration (%d ppmw) will be limited to %d ppmw" % (
+                logger.warning(
+                    "%s concentration (%d ppmw) will be limited to %d ppmw",
                     self.__class__.__name__,
                     result,
                     bound,
                 )
-                logger.warning(msg)
 
             return np.clip(result, 0, bound)
 
@@ -80,9 +80,9 @@ class Solubility:
         self,
         fugacity: float,
         *,
-        temperature: float,
-        pressure: float,
-        log10_fugacities_dict: dict[str, float],
+        temperature: float | None = None,
+        pressure: float | None = None,
+        log10_fugacities_dict: dict[str, float] | None = None,
     ) -> float:
         """Dissolved volatile concentration in the melt in ppmw
 

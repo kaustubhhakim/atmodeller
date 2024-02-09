@@ -1,20 +1,20 @@
-"""Plotting
-
-Copyright 2024 Dan J. Bower
-
-This file is part of Atmodeller.
-
-Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU 
-General Public License as published by the Free Software Foundation, either version 3 of the 
-License, or (at your option) any later version.
-
-Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without 
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with Atmodeller. If not, 
-see <https://www.gnu.org/licenses/>.
-"""
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Plotting"""
 
 from __future__ import annotations
 
@@ -439,12 +439,18 @@ class Plotter:
 
         output: list[pd.Series] = [colour_category.get_category(self.output)]
 
-        for element in ("H", "O", "S"):
+        for element in ("H", "O"):
             for reservoir in reservoirs:
                 series_data: pd.Series = self.get_element_ratio_in_reservoir(
                     "C", element, reservoir=reservoir, mass_or_moles=mass_or_moles
                 )
                 output.append(series_data)
+
+        for element in ("C", "H", "O"):
+            element_data: pd.DataFrame = self.dataframes[f"{element}_totals"]
+            interior: pd.Series = element_data["melt_mass"] * 100 / element_data["total_mass"]
+            interior.name = f"{element} melt (wt.%)"
+            output.append(interior)
 
         data: pd.DataFrame = pd.concat(output, axis=1)
 
@@ -460,6 +466,56 @@ class Plotter:
             kind="kde",
             hue_order=colour_category.hue_order,
         )
+
+        # These axes are all tuned for ratios in moles and interior storage in wt.%
+        axes = self.get_axes(grid, column_index=0)
+        specs: AxesSpec = AxesSpec(xylim=(0, 1500), ticks=[0, 500, 1000, 1500])
+        axes.set_xlim(specs.xylim)
+        axes.set_ylim(specs.xylim)
+        axes.set_xticks(specs.ticks)
+        axes.set_yticks(specs.ticks)
+
+        axes = self.get_axes(grid, column_index=1)
+        specs: AxesSpec = AxesSpec(xylim=(0, 1), ticks=[0, 0.5, 1])
+        axes.set_xlim(specs.xylim)
+        axes.set_ylim(specs.xylim)
+        axes.set_xticks(specs.ticks)
+        axes.set_yticks(specs.ticks)
+
+        axes = self.get_axes(grid, column_index=2)
+        specs: AxesSpec = AxesSpec(xylim=(0, 2), ticks=[0, 0.5, 1, 1.5, 2])
+        axes.set_xlim(specs.xylim)
+        axes.set_ylim(specs.xylim)
+        axes.set_xticks(specs.ticks)
+        axes.set_yticks(specs.ticks)
+
+        axes = self.get_axes(grid, column_index=3)
+        specs: AxesSpec = AxesSpec(xylim=(0, 1.5), ticks=[0, 0.5, 1, 1.5])
+        axes.set_xlim(specs.xylim)
+        axes.set_ylim(specs.xylim)
+        axes.set_xticks(specs.ticks)
+        axes.set_yticks(specs.ticks)
+
+        axes = self.get_axes(grid, column_index=4)
+        specs: AxesSpec = AxesSpec(xylim=(0, 25), ticks=[0, 5, 10, 15, 20, 25])
+        axes.set_xlim(specs.xylim)
+        axes.set_ylim(specs.xylim)
+        axes.set_xticks(specs.ticks)
+        axes.set_yticks(specs.ticks)
+
+        axes = self.get_axes(grid, column_index=5)
+        specs: AxesSpec = AxesSpec(xylim=(25, 100), ticks=[25, 50, 75, 100])
+        axes.set_xlim(specs.xylim)
+        axes.set_ylim(specs.xylim)
+        axes.set_xticks(specs.ticks)
+        axes.set_yticks(specs.ticks)
+
+        axes = self.get_axes(grid, column_index=6)
+        specs: AxesSpec = AxesSpec(xylim=(0, 100), ticks=[0, 25, 50, 75, 100])
+        axes.set_xlim(specs.xylim)
+        axes.set_ylim(specs.xylim)
+        axes.set_xticks(specs.ticks)
+        axes.set_yticks(specs.ticks)
 
         plt.subplots_adjust(hspace=0.15, wspace=0.15)
         sns.move_legend(grid, "center left", bbox_to_anchor=(0.6, 0.6))
