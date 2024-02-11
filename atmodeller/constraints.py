@@ -49,8 +49,8 @@ class Constraint(ABC):
         species: The species to constrain
     """
 
-    name: str
-    species: str
+    name: str = ""
+    species: str = ""
 
     @property
     def full_name(self) -> str:
