@@ -160,7 +160,7 @@ class AndesiteS2Sulfate(Solubility):
     @override
     @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
-        """fugacity is S2"""
+        # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (31586.2393 / temperature)
         logs_wtp: float = logcs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fO2))
@@ -174,7 +174,7 @@ class AndesiteS2Sulfide(Solubility):
     """Sulfur as sulfide (S^2-) in andesite :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
-    for Andesite from Table 1. Experiments conducted at 1 atm, 1473-1773 K in a controlled
+    for andesite from Table 1. Experiments conducted at 1 atm, 1473-1773 K in a controlled
     CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit below FMQ.
     """
 
@@ -217,7 +217,7 @@ class AndesiteS2(Solubility):
 
 
 class AnorthiteDiopsideH2O(SolubilityPowerLaw):
-    """H2O in lunar basalt and anorthite-diopside-eutectic compositions :cite:p:`NBB17`
+    """H2O in anorthite-diopside-eutectic compositions :cite:p:`NBB17`
 
     Power law from Figure 5(A) for anorthite-diopside glass. Experiments conducted at 1 atm and
     1350 C. Melts equilibrated in 1 atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3
@@ -300,12 +300,16 @@ class BasaltN2Dasgupta(Solubility):
     """N2 in silicate melts :cite:p:`DFP22`
 
     Using Equation 10, composition parameters from :cite:t:`LMH03{Table 3}` (CM-1), and
-    Iron-wustite buffer (logIW_fugacity) from O'Neill and Pownceby (1993) and Hirschmann et al.
-    (2008).
+    Iron-wustite buffer (logIW_fugacity) from :cite:t:`OP93,HGD08`.
 
     Performed experiments on 80:20 synthetic basalt-Si3N4 mixture at 1.5-3.0 GPa and 1300-1600 C
     fO2 from ~IW-3 to IW-4. Combined this high pressure data with lower pressure studies to derive
     their N solubility law.
+
+    Args:
+        xsio2: Mole fraction of SiO2 # TODO: Maggie to confirm - mole or mass fraction?
+        xal2o3: Mole fraction of Al2O3
+        xtio2: Mole fraction of TiO2
     """
 
     def __init__(self, xsio2: float = 0.582, xal2o3: float = 0.157, xtio2: float = 0.018):
@@ -338,9 +342,7 @@ class BasaltN2Dasgupta(Solubility):
 
 
 class BasaltN2Bernadou(Solubility):
-    """Bernadou et al. 2021.Solubility of Nitrogen in basaltic silicate melt
-
-    https://ui.adsabs.harvard.edu/abs/2021ChGeo.57320192B/abstract
+    """N2 in basaltic silicate melt :cite:p:`BGF21`
 
     Equation 18 and using Equations 19-20 and the values for the thermodynamic constants from Table
     6. Experiments on basaltic samples at fluid saturation in C-H-O-N system, pressure range:
@@ -367,20 +369,18 @@ class BasaltN2Bernadou(Solubility):
 
 
 class BasaltS2Sulfate(Solubility):
-    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
-
-    https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
+    """Sulfur in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract and the corrected expression for sulfate capacity
-    (C_S6+) in corrigendum (https://ui.adsabs.harvard.edu/abs/2023GeCoA.343..420B/abstract).
-    Composition for Basalt from Table 1. Experiments conducted at 1 atm pressure, temperatures from
-    1473-1773 K for silicate melts equilibrated with Air/SO2 mixtures.
+    (C_S6+) in :cite:t:`BW23corr`. Composition for Basalt from Table 1. Experiments conducted at 1
+    atm pressure, temperatures from 1473-1773 K for silicate melts equilibrated with Air/SO2
+    mixtures.
     """
 
     @override
     @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
-        """Fugacity is fS2."""
+        # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (32333.5635 / temperature)
         logso4_wtp: float = logcs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fO2))
@@ -392,20 +392,17 @@ class BasaltS2Sulfate(Solubility):
 
 
 class BasaltS2Sulfide(Solubility):
-    """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
+    """Sulfur in basalt as sulfide (S^2-) :cite:p:`BW23`
 
-    https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
-
-    Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition
-    for Basalt from Table 1. Experiments conducted at 1 atm pressure and temperatures from
-    1473-1773 K in a controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit
-    below FMQ.
+    Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for
+    basalt from Table 1. Experiments conducted at 1 atm pressure and temperatures from 1473-1773 K
+    in a controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit below FMQ.
     """
 
     @override
     @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
-        """Fugacity is fS2."""
+        # Fugacity is fS2
         del kwargs
         logcs: float = 0.225 - (8045.7465 / temperature)
         logs_wtp: float = logcs - (0.5 * (np.log10(fO2) - np.log10(fugacity)))
@@ -416,9 +413,8 @@ class BasaltS2Sulfide(Solubility):
 
 
 class BasaltS2(Solubility):
-    """Total S solubility accounting for both sulfide and sulfate dissolution.
-
-    Adding sulfate solubility (Boulliung & Wood 2022) and sulfide solubility (Boulliun & Wood 2023)
+    """Total sulfur in basalt due to both sulfide and sulfate dissolution
+    :cite:p:`BW22,BW23corr,BW23`
     """
 
     def __init__(self):
@@ -447,13 +443,10 @@ class BasaltS2(Solubility):
 
 
 class BasaltH2OWilson(SolubilityPowerLaw):
-    """Wilson and Head (1981) and Hamilton et al. (1964)
-
-    https://ui.adsabs.harvard.edu/abs/1981JGR....86.2971W/abstract
-    https://doi.org/10.1093/petrology/5.1.21
+    """H2O in basalt :cite:p:`WH81,HBO64`
 
     Equation 30, and converting from weight % to ppmw. Not clear what all experimental data is used
-    to derive this fit, but it fits data at 1100 C and 1000-6000 bars H2O from Hamilton et al. 1964
+    to derive this fit, but it fits data at 1100 C and 1000-6000 bars H2O from :cite:t:`HBO64`
     decently well (their Table 3).
     """
 
@@ -463,15 +456,12 @@ class BasaltH2OWilson(SolubilityPowerLaw):
 
 
 class TBasaltS2Sulfate(Solubility):
-    """Boulliung & Wood 2022. Solubility of sulfur as sulfate, SO4^2-/S^6+
+    """Sulfur as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`
 
-    https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..150B/abstract
-
-    Using the first equation in the abstract and the corrected expression for sulfate capacity
-    (C_S6+) in corrigendum (https://ui.adsabs.harvard.edu/abs/2023GeCoA.343..420B/abstract).
-    Composition for Basalt from Table 1. Experiments conducted at 1 atm pressure, temperatures from
-    1473-1773 K for silicate melts equilibrated with Air/SO2 mixtures. Composition for
-    Trachy-Basalt from Table 1.
+    Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
+    sulfate capacity (C_S6+) in :cite:t:`BW23corr`. Composition for trachybasalt from Table 1.
+    Experiments conducted at 1 atm, 1473-1773 K for silicate melts equilibrated with Air/SO2
+    mixtures.
     """
 
     @override
@@ -484,7 +474,7 @@ class TBasaltS2Sulfate(Solubility):
         fO2: float,
         **kwargs,
     ) -> float:
-        """Fugacity is fS2."""
+        # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (32446.366 / temperature)
         logs_wtp: float = logcs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(fO2))
@@ -495,14 +485,11 @@ class TBasaltS2Sulfate(Solubility):
 
 
 class TBasaltS2Sulfide(Solubility):
-    """Boulliung & Wood 2023. Solubility of sulfur as sulfide (S^2-)
+    """Sulfur as sulfide (S^2-) in trachybasalt :cite:p:`BW23`
 
-    https://ui.adsabs.harvard.edu/abs/2023CoMP..178...56B/abstract
-
-    Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for
-    Basalt from Table 1. Experiments conducted at 1 atm pressure and temperatures from 1473-1773 K
-    in a controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit below FMQ.
-    Composition for Trachy-basalt from Table 1.
+    Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
+    for trachybasalt from Table 1. Experiments conducted at 1 atm, 1473-1773 K in a controlled
+    CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit below FMQ.
     """
 
     @override
@@ -515,7 +502,7 @@ class TBasaltS2Sulfide(Solubility):
         fO2: float,
         **kwargs,
     ) -> float:
-        """Fugacity is fS2."""
+        # Fugacity is fS2
         del kwargs
         logcs: float = 0.225 - (7842.5 / temperature)
         logs_wtp: float = logcs - (0.5 * (np.log10(fO2) - np.log10(fugacity)))
@@ -526,10 +513,7 @@ class TBasaltS2Sulfide(Solubility):
 
 
 class LunarGlassH2O(SolubilityPowerLaw):
-    """Newcombe et al. (2017). Water solubility in lunar basalt and Anorthite-Diopside-Eutectic
-    compositions.
-
-    https://ui.adsabs.harvard.edu/abs/2017GeCoA.200..330N/abstract
+    """H2O in lunar basalt :cite:p:`NBB17`
 
     Power law from Figure 5(A) for Lunar glass. Experiments conducted at 1 atm and 1350 C. Melts
     equilibrated in 1-atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3 to IW+4.8.
@@ -743,7 +727,7 @@ class AnorthiteDiopsideForsteriteCl2(Solubility):
         return ppmw
 
 
-# Dictionaries of self-consistent solubility laws for a given composition
+# Dictionaries of solubility laws for a given composition
 andesite_solubilities: dict[str, Solubility] = {
     "H2": AndesiteH2(),
     "S2": AndesiteS2(),
@@ -766,8 +750,8 @@ rhyolite_solubilities: dict[str, Solubility] = {
 peridotite_solubilities: dict[str, Solubility] = {"H2O": PeridotiteH2O()}
 reducedmagma_solubilities: dict[str, Solubility] = {"H2S": MercuryMagmaS()}
 
-# Dictionary of all the composition solubilities. All of the dictionaries with self-consistent
-# solubility laws for a given composition (above) should be included in this dictionary.
+# Dictionary of all the composition solubilities. All of the dictionaries with solubility laws for
+# a given composition (above) should be included in this dictionary.
 composition_solubilities: dict[str, dict[str, Solubility]] = {
     "basalt": basalt_solubilities,
     "andesite": andesite_solubilities,

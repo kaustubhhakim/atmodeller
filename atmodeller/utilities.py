@@ -86,14 +86,14 @@ class UnitConversion:
     def bar_to_Pa(  # Symbol name, so pylint: disable=C0103
         value_bar: MultiplyT = 1,
     ) -> MultiplyT:
-        """bar to Pa."""
+        """bar to Pa"""
         return value_bar * 1e5
 
     @classmethod
     def bar_to_GPa(  # Symbol name, so pylint: disable=C0103
         cls, value_bar: MultiplyT = 1
     ) -> MultiplyT:
-        """Bar to GPa."""
+        """Bar to GPa"""
         return cls.bar_to_Pa(value_bar) * 1.0e-9
 
     @staticmethod
@@ -103,7 +103,7 @@ class UnitConversion:
 
     @staticmethod
     def g_to_kg(value_grams: MultiplyT = 1) -> MultiplyT:
-        """Grams to kilograms."""
+        """Grams to kilograms"""
         return value_grams / kilo
 
     @classmethod
@@ -118,26 +118,26 @@ class UnitConversion:
 
     @classmethod
     def cm3_to_m3(cls, cm_cubed: MultiplyT = 1) -> MultiplyT:
-        """cm^3 to m^3"""
+        """cm\ :sup:`3` to m\ :sup:`3`"""  # type: ignore reStructuredText so pylint: disable=W1401
         return cm_cubed * 1.0e-6
 
     @classmethod
     def m3_bar_to_J(  # Symbol name, so pylint: disable=C0103
         cls, m3_bar: MultiplyT = 1
     ) -> MultiplyT:
-        """m^3 bar to J"""
+        """m\ :sup:`3` bar to J"""  # type: ignore reStructuredText so pylint: disable=W1401
         return m3_bar * 1e5
 
     @classmethod
     def J_to_m3_bar(  # Symbol name, so pylint: disable=C0103
         cls, joules: MultiplyT = 1
     ) -> MultiplyT:
-        """J to m^3 bar"""
+        """J to m\ :sup:`3` bar"""  # type: ignore reStructuredText so pylint: disable=W1401
         return joules / cls.m3_bar_to_J()
 
     @classmethod
     def litre_to_m3(cls, litre: MultiplyT = 1) -> MultiplyT:
-        """litre to m^3"""
+        """litre to m\ :sup:`3`"""  # type: ignore reStructuredText so pylint: disable=W1401
         return litre * 1e-3
 
     @staticmethod
