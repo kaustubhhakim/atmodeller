@@ -560,6 +560,10 @@ class ChemicalComponent:
         return self._formula.composition()
 
     @property
+    def elements(self) -> list[str]:
+        return list(self.composition().keys())
+
+    @property
     def hill_formula(self) -> str:
         """Hill formula"""
         return self._formula.formula
@@ -678,7 +682,7 @@ class GasSpecies(ChemicalComponent):
 
         planet: Planet = system.planet
         pressure: float = system.solution_dict[self.formula]
-        fugacity: float = system.fugacities_dict[self.formula]
+        fugacity: float = system.fugacities_dict[f"f{self.formula}"]
 
         # Atmosphere
         mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
@@ -687,11 +691,12 @@ class GasSpecies(ChemicalComponent):
         )
 
         # Melt
-        ppmw_in_melt: float = self.solubility.concentration(
+        # TODO: Might not need to clip the concentration.
+        ppmw_in_melt: float = self.solubility.clipped_concentration(
             fugacity=fugacity,
             temperature=planet.surface_temperature,
-            log10_fugacities_dict=system.log10_fugacities_dict,
             pressure=system.total_pressure,
+            **system.fugacities_dict,
         )
         mass_in_melt: float = (
             system.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
@@ -753,10 +758,7 @@ class LiquidSpecies(CondensedSpecies):
 
 
 class Species(UserList):
-    """Collections of species for an interior-atmosphere system
-
-    A collection of species. It provides methods to filter species based on their phases (gas,
-    condensed).
+    """A list of species
 
     Args:
         initlist: Initial list of species. Defaults to None.
@@ -766,8 +768,17 @@ class Species(UserList):
     """
 
     def __init__(self, initlist: list[ChemicalComponent] | None = None):
-        self.data: list[ChemicalComponent]  # For typing.
+        self.data: list[ChemicalComponent]  # For typing
         super().__init__(initlist)
+
+    @property
+    def elements(self) -> list[str]:
+        elements: list[str] = []
+        for species in self.data:
+            elements.extend(species.elements)
+        unique_elements: list[str] = list(set(elements))
+
+        return unique_elements
 
     @property
     def number(self) -> int:
@@ -775,9 +786,19 @@ class Species(UserList):
         return len(self.data)
 
     @property
+    def number_elements(self) -> int:
+        """Number of elements"""
+        return len(self.elements)
+
+    @property
     def gas_species(self) -> dict[int, GasSpecies]:
         """Gas species"""
         return filter_by_type(self, GasSpecies)
+
+    @property
+    def gas_species_by_formula(self) -> dict[str, GasSpecies]:
+        """Gas species by name"""
+        return {value.formula: value for value in self.gas_species.values()}
 
     @property
     def number_gas_species(self) -> int:
@@ -804,26 +825,23 @@ class Species(UserList):
         """Chemical formulas of the species"""
         return [species.formula for species in self.data]
 
-    def conform_solubilities_to_planet_composition(self, planet: Planet) -> None:
-        """Ensure that the solubilities of the species are consistent with the planet composition.
+    def conform_solubilities_to_composition(self, melt_composition: str | None = None) -> None:
+        """Conforms the solubilities of the species to the planet composition.
 
         Args:
-            planet: A planet.
+            melt_composition: Composition of the melt. Defaults to None.
         """
-        if planet.melt_composition is not None:
-            msg: str = (
-                # pylint: disable=consider-using-f-string
-                "Setting solubilities to be consistent with the melt composition (%s)"
-                % planet.melt_composition
+        if melt_composition is not None:
+            logger.info(
+                "Setting solubilities to be consistent with the melt composition (%s)",
+                melt_composition,
             )
-            logger.info(msg)
             try:
                 solubilities: dict[str, Solubility] = composition_solubilities[
-                    planet.melt_composition.casefold()
+                    melt_composition.casefold()
                 ]
-            except KeyError:
-                logger.error("Cannot find solubilities for %s", planet.melt_composition)
-                raise
+            except KeyError as exc:
+                raise ValueError(f"Cannot find solubilities for {melt_composition}") from exc
 
             for species in self.gas_species.values():
                 try:
@@ -837,15 +855,22 @@ class Species(UserList):
                     logger.info("No solubility law for %s", species.formula)
                     species.solubility = NoSolubility()
 
-    def _species_sorter(self, species: ChemicalComponent) -> tuple[int, str]:
-        """Sorter for the species
-
-        Sorts first by species complexity and second by species name.
-
-        Args:
-            species: Species
+    def composition_matrix(self) -> np.ndarray:
+        """Creates a matrix where species (rows) are split into their element counts (columns).
 
         Returns:
-            A tuple to sort first by number of elements and second by species name.
+            For example, self.species = ['CO2', 'H2O'] would return:
+                [[0, 1, 2],
+                 [2, 0, 1]]
+            if the columns represent the elements H, C, and O, respectively.
         """
-        return (species.atoms, species.formula)
+        matrix: np.ndarray = np.zeros((self.number, self.number_elements), dtype=int)
+        for species_index, species in enumerate(self.data):
+            for element_index, element in enumerate(self.elements):
+                try:
+                    count: int = species.composition()[element].count
+                except KeyError:
+                    count = 0
+                matrix[species_index, element_index] = count
+
+        return matrix

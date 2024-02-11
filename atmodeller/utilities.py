@@ -83,14 +83,14 @@ class UnitConversion:
     """Unit conversions."""
 
     @staticmethod
-    def bar_to_Pa(  # Symbol name, so pylint: disable=invalid-name
+    def bar_to_Pa(  # Symbol name, so pylint: disable=C0103
         value_bar: MultiplyT = 1,
     ) -> MultiplyT:
         """bar to Pa."""
         return value_bar * 1e5
 
     @classmethod
-    def bar_to_GPa(  # Symbol name, so pylint: disable=invalid-name
+    def bar_to_GPa(  # Symbol name, so pylint: disable=C0103
         cls, value_bar: MultiplyT = 1
     ) -> MultiplyT:
         """Bar to GPa."""
@@ -122,14 +122,14 @@ class UnitConversion:
         return cm_cubed * 1.0e-6
 
     @classmethod
-    def m3_bar_to_J(  # Symbol name, so pylint: disable=invalid-name
+    def m3_bar_to_J(  # Symbol name, so pylint: disable=C0103
         cls, m3_bar: MultiplyT = 1
     ) -> MultiplyT:
         """m^3 bar to J"""
         return m3_bar * 1e5
 
     @classmethod
-    def J_to_m3_bar(  # Symbol name, so pylint: disable=invalid-name
+    def J_to_m3_bar(  # Symbol name, so pylint: disable=C0103
         cls, joules: MultiplyT = 1
     ) -> MultiplyT:
         """J to m^3 bar"""

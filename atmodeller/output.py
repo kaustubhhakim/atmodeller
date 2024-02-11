@@ -183,14 +183,6 @@ class Output(UserDict):
     which uses Output to source data to plot.
     """
 
-    def __init__(self, dict=None, /, **kwargs):
-        """Init definition from the base class provided for clarity."""
-        self.data = {}
-        if dict is not None:
-            self.update(dict)
-        if kwargs:
-            self.update(kwargs)
-
     @property
     def species(self) -> list[str]:
         """Species in the output"""
@@ -306,7 +298,7 @@ class Output(UserDict):
         # Sum all the elements across the species.
         mass: dict[str, Any] = {}
 
-        for element in interior_atmosphere._reaction_network.unique_elements:
+        for element in interior_atmosphere.species.elements:
             mass[element] = {"atmosphere": 0, "melt": 0, "solid": 0}
             for species in interior_atmosphere.species.gas_species.values():
                 species_masses: dict[str, float] = species.mass(
@@ -378,7 +370,7 @@ class Output(UserDict):
 
         for species in interior_atmosphere.species.gas_species.values():
             pressure: float = interior_atmosphere.solution_dict[species.formula]
-            fugacity: float = interior_atmosphere.fugacities_dict[species.formula]
+            fugacity: float = interior_atmosphere.fugacities_dict[f"f{species.formula}"]
             fugacity_coefficient: float = (
                 10 ** interior_atmosphere.log10_fugacity_coefficients_dict[species.formula]
             )
@@ -462,7 +454,7 @@ class Output(UserDict):
         out: dict[str, pd.DataFrame] = self.to_dataframes()
         output_file: Path = Path(f"{file_prefix}.xlsx")
 
-        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:  # pylint: disable=E0110
             for df_name, df in out.items():
                 df.to_excel(writer, sheet_name=df_name, index=True)
 
@@ -505,7 +497,7 @@ class Output(UserDict):
             self
         """
         self._check_keys_the_same(other)
-        for key in self.keys():
+        for key in self:
             self[key].extend(other[key])
 
         return self

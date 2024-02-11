@@ -21,7 +21,6 @@ from __future__ import annotations
 import logging
 import pprint
 from dataclasses import dataclass, field
-from functools import cached_property
 
 import numpy as np
 from scipy.optimize import OptimizeResult, root
@@ -89,9 +88,8 @@ class Planet:
         dataclass_to_logger(self, logger)
 
 
-@dataclass(kw_only=True)
-class ReactionNetwork:
-    """Determines the necessary reactions to solve a chemical network.
+class _ReactionNetwork:
+    """Determines the reactions to solve a chemical network.
 
     Args:
         species: Species
@@ -102,53 +100,18 @@ class ReactionNetwork:
         reaction_matrix: The reaction stoichiometry matrix
     """
 
-    species: Species
-
-    def __post_init__(self):
+    def __init__(self, species: Species):
+        self.species: Species = species
         logger.info("Creating a reaction network")
         logger.info("Species = %s", self.species.formulas)
-        self.species_matrix: np.ndarray = self.find_matrix()
-        self.reaction_matrix: np.ndarray = self.partial_gaussian_elimination()
+        self.reaction_matrix: np.ndarray = self._partial_gaussian_elimination()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
 
-    @cached_property
+    @property
     def number_reactions(self) -> int:
-        return self.species.number - self.number_unique_elements
+        return self.species.number - self.species.number_elements
 
-    @cached_property
-    def number_unique_elements(self) -> int:
-        return len(self.unique_elements)
-
-    @cached_property
-    def unique_elements(self) -> list[str]:
-        elements: list[str] = []
-        for species in self.species.data:
-            elements.extend(list(species.composition().keys()))
-        unique_elements: list[str] = list(set(elements))
-        return unique_elements
-
-    def find_matrix(self) -> np.ndarray:
-        """Creates a matrix where species (rows) are split into their element counts (columns).
-
-        Returns:
-            For example, self.species = ['CO2', 'H2O'] would return:
-                [[0, 1, 2],
-                 [2, 0, 1]]
-            if the columns represent the elements H, C, and O, respectively.
-        """
-        matrix: np.ndarray = np.zeros(
-            (self.species.number, self.number_unique_elements), dtype=int
-        )
-        for species_index, species in enumerate(self.species.data):
-            for element_index, element in enumerate(self.unique_elements):
-                try:
-                    count: int = species.composition()[element].count
-                except KeyError:
-                    count = 0
-                matrix[species_index, element_index] = count
-        return matrix
-
-    def partial_gaussian_elimination(self) -> np.ndarray:
+    def _partial_gaussian_elimination(self) -> np.ndarray:
         """Performs a partial gaussian elimination to determine the required reactions.
 
         A copy of `self.species_matrix` is first (partially) reduced to row echelon form by
@@ -160,13 +123,13 @@ class ReactionNetwork:
         Returns:
             A matrix of the reaction stoichiometry.
         """
-        matrix1: np.ndarray = self.species_matrix
+        matrix1: np.ndarray = self.species.composition_matrix()
         matrix2: np.ndarray = np.eye(self.species.number)
         augmented_matrix: np.ndarray = np.hstack((matrix1, matrix2))
         logger.debug("augmented_matrix = \n%s", augmented_matrix)
 
-        # Forward elimination.
-        for i in range(self.number_unique_elements):  # Note only over the number of elements.
+        # Forward elimination
+        for i in range(self.species.number_elements):  # Note only over the number of elements.
             # Check if the pivot element is zero.
             if augmented_matrix[i, i] == 0:
                 # Swap rows to get a non-zero pivot element.
@@ -178,8 +141,8 @@ class ReactionNetwork:
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
         logger.debug("Augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
-        # Backward substitution.
-        for i in range(self.number_unique_elements - 1, -1, -1):
+        # Backward substitution
+        for i in range(self.species.number_elements - 1, -1, -1):
             # Normalize the pivot row.
             augmented_matrix[i] /= augmented_matrix[i, i]
             # Eliminate values above the pivot.
@@ -191,14 +154,13 @@ class ReactionNetwork:
 
         reduced_matrix1: np.ndarray = augmented_matrix[:, : matrix1.shape[1]]
         reaction_matrix: np.ndarray = augmented_matrix[
-            self.number_unique_elements :, matrix1.shape[1] :
+            self.species.number_elements :, matrix1.shape[1] :
         ]
         logger.debug("Reduced_matrix1 = \n%s", reduced_matrix1)
         logger.debug("Reaction_matrix = \n%s", reaction_matrix)
 
         return reaction_matrix
 
-    @cached_property
     def reactions(self) -> dict[int, str]:
         """The reactions as a dictionary"""
         reactions: dict[int, str] = {}
@@ -213,14 +175,14 @@ class ReactionNetwork:
                     else:
                         products += f"{coeff} {species.formula} + "
 
-            reactants = reactants.rstrip(" + ")  # Removes the extra + at the end.
-            products = products.rstrip(" + ")  # Removes the extra + at the end.
+            reactants = reactants.rstrip(" + ")
+            products = products.rstrip(" + ")
             reaction: str = f"{reactants} = {products}"
             reactions[reaction_index] = reaction
 
         return reactions
 
-    def get_reaction_log10_equilibrium_constant(
+    def _get_reaction_log10_equilibrium_constant(
         self, *, reaction_index: int, temperature: float, pressure: float
     ) -> float:
         """Gets the log10 of the reaction equilibrium constant.
@@ -236,14 +198,14 @@ class ReactionNetwork:
         Returns:
             log10 of the reaction equilibrium constant
         """
-        gibbs_energy: float = self.get_reaction_gibbs_energy_of_formation(
+        gibbs_energy: float = self._get_reaction_gibbs_energy_of_formation(
             reaction_index=reaction_index, temperature=temperature, pressure=pressure
         )
         equilibrium_constant: float = -gibbs_energy / (np.log(10) * GAS_CONSTANT * temperature)
 
         return equilibrium_constant
 
-    def get_reaction_gibbs_energy_of_formation(
+    def _get_reaction_gibbs_energy_of_formation(
         self, *, reaction_index: int, temperature: float, pressure: float
     ) -> float:
         """Gets the Gibb's free energy of formation for a reaction.
@@ -264,25 +226,8 @@ class ReactionNetwork:
             ] * species._thermodynamic_data.get_formation_gibbs(
                 temperature=temperature, pressure=pressure
             )
+
         return gibbs_energy
-
-    def get_reaction_equilibrium_constant(
-        self, *, reaction_index: int, temperature: float, pressure: float
-    ) -> float:
-        """Gets the equilibrium constant of a reaction Kf
-
-        Args:
-            reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`
-            temperature: Temperature
-            pressure: Pressure
-
-        Returns:
-            The equilibrium constant of the reaction
-        """
-        equilibrium_constant: float = 10 ** self.get_reaction_log10_equilibrium_constant(
-            reaction_index=reaction_index, temperature=temperature, pressure=pressure
-        )
-        return equilibrium_constant
 
     def get_coefficient_matrix(self, *, constraints: SystemConstraints) -> np.ndarray:
         """Builds the coefficient matrix.
@@ -322,13 +267,18 @@ class ReactionNetwork:
 
         return coeff
 
-    def assemble_right_hand_side_values(
-        self, *, system: InteriorAtmosphereSystem, constraints: SystemConstraints
+    def _assemble_right_hand_side_values(
+        self,
+        *,
+        temperature: float,
+        pressure: float,
+        constraints: SystemConstraints,
     ) -> np.ndarray:
         """Assembles the right-hand side vector of values for the system of equations.
 
         Args:
-            system: Interior atmosphere system
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
             constraints: Constraints for the system of equations
 
         Returns:
@@ -343,35 +293,41 @@ class ReactionNetwork:
                 "Row %02d: Reaction %d: %s",
                 reaction_index,
                 reaction_index,
-                self.reactions[reaction_index],
+                self.reactions()[reaction_index],
             )
-            rhs[reaction_index] = self.get_reaction_log10_equilibrium_constant(
+            rhs[reaction_index] = self._get_reaction_log10_equilibrium_constant(
                 reaction_index=reaction_index,
-                temperature=system.planet.surface_temperature,
-                pressure=system.total_pressure,
+                temperature=temperature,
+                pressure=pressure,
             )
 
         # Constraints
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
             logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
-            rhs[row_index] = constraint.get_log10_value(
-                temperature=system.planet.surface_temperature, pressure=system.total_pressure
-            )
+            rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
             if constraint.name == "pressure":
-                rhs[row_index] += system.log10_fugacity_coefficients_dict[constraint.species]
+                rhs[row_index] += np.log10(
+                    self.species.gas_species_by_formula[
+                        constraint.species
+                    ].eos.fugacity_coefficient(temperature=temperature, pressure=pressure)
+                )
 
         logger.debug("RHS vector = %s", rhs)
 
         return rhs
 
-    def assemble_log_fugacity_coefficients(
-        self, *, system: InteriorAtmosphereSystem
+    def _assemble_log_fugacity_coefficients(
+        self,
+        *,
+        temperature: float,
+        pressure: float,
     ) -> np.ndarray:
         """Assembles the fugacity coefficient vector on the left-hand side of the equations.
 
         Args:
-            system: Interior atmosphere system
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
 
         Returns:
             The log10(fugacity coefficient) vector
@@ -383,8 +339,6 @@ class ReactionNetwork:
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
-        temperature: float = system.planet.surface_temperature
-        pressure: float = system.total_pressure
         for index, gas_species in self.species.gas_species.items():
             fugacity_coefficient = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
@@ -408,29 +362,33 @@ class ReactionNetwork:
     def get_residual(
         self,
         *,
-        system: InteriorAtmosphereSystem,
+        temperature: float,
+        pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: np.ndarray,
+        log_solution: np.ndarray,
     ) -> np.ndarray:
         """Returns the residual vector of the reaction network.
 
         Args:
-            system: Interior atmosphere system
+            temperature: Temperature in kelvin
+            pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix
+            log_solution: Estimated log10 solution to compute the residual for
 
         Returns:
             The residual vector of the reaction network
         """
-        rhs: np.ndarray = self.assemble_right_hand_side_values(
-            system=system, constraints=constraints
+        rhs: np.ndarray = self._assemble_right_hand_side_values(
+            temperature=temperature, pressure=pressure, constraints=constraints
         )
-        log_fugacity_coefficients: np.ndarray = self.assemble_log_fugacity_coefficients(
-            system=system
+        log_fugacity_coefficients: np.ndarray = self._assemble_log_fugacity_coefficients(
+            temperature=temperature, pressure=pressure
         )
         residual_reaction: np.ndarray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(system.log_solution)
+            + coefficient_matrix.dot(log_solution)
             - rhs
         )
         logger.debug("Residual_reaction = %s", residual_reaction)
@@ -458,7 +416,7 @@ class InteriorAtmosphereSystem:
     planet: Planet = field(default_factory=Planet)
     initial_solution: InitialSolution | None = None
     output: Output = field(init=False, default_factory=Output)
-    _reaction_network: ReactionNetwork = field(init=False)
+    _reaction_network: _ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
     # The solution is log10 of the partial pressure for gas phases and log10 of the activity for
@@ -468,10 +426,10 @@ class InteriorAtmosphereSystem:
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
-        self.species.conform_solubilities_to_planet_composition(self.planet)
+        self.species.conform_solubilities_to_composition(self.planet.melt_composition)
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionConstant(species=self.species)
-        self._reaction_network = ReactionNetwork(species=self.species)
+        self._reaction_network = _ReactionNetwork(species=self.species)
         self._log_solution = np.zeros_like(self.species, dtype=np.float_)
 
     @property
@@ -501,7 +459,7 @@ class InteriorAtmosphereSystem:
         The order of the constraints must align with the order in which they are assembled.
         """
         output: dict[str, float] = {}
-        for index, reaction in enumerate(self._reaction_network.reactions.values()):
+        for index, reaction in enumerate(self._reaction_network.reactions().values()):
             output[reaction] = self._residual[index]
         for index, constraint in enumerate(self.constraints.reaction_network_constraints):
             row_index: int = self._reaction_network.number_reactions + index
@@ -547,17 +505,10 @@ class InteriorAtmosphereSystem:
     @property
     def fugacities_dict(self) -> dict[str, float]:
         """Fugacities of all species in a dictionary."""
-        output: dict[str, float] = {
-            key: 10**value for key, value in self.log10_fugacities_dict.items()
-        }
-        return output
-
-    @property
-    def log10_fugacities_dict(self) -> dict[str, float]:
-        """Log10 fugacities of all species in a dictionary."""
         output: dict[str, float] = {}
         for key, value in self.log10_fugacity_coefficients_dict.items():
-            output[key] = np.log10(self.solution_dict[key]) + value
+            output[f"f{key}"] = 10 ** (np.log10(self.solution_dict[key]) + value)
+
         return output
 
     @property
@@ -776,7 +727,11 @@ class InteriorAtmosphereSystem:
 
         # Compute residual for the reaction network.
         residual_reaction: np.ndarray = self._reaction_network.get_residual(
-            system=self, constraints=self.constraints, coefficient_matrix=coefficient_matrix
+            temperature=self.planet.surface_temperature,
+            pressure=self.total_pressure,
+            constraints=self.constraints,
+            coefficient_matrix=coefficient_matrix,
+            log_solution=self._log_solution,
         )
 
         # Compute residual for the mass balance (if relevant).
