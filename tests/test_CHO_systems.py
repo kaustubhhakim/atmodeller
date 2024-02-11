@@ -27,6 +27,7 @@ from atmodeller.constraints import (
     IronWustiteBufferConstraintBallhaus,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
+    PressureConstraint,
     SystemConstraints,
     TotalPressureConstraint,
 )
@@ -37,6 +38,8 @@ from atmodeller.core import (
     ThermodynamicDatasetABC,
     ThermodynamicDatasetJANAF,
 )
+from atmodeller.eos.holland import get_holland_eos_models
+from atmodeller.eos.interfaces import RealGas
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltCO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
@@ -380,6 +383,40 @@ def test_graphite() -> None:
         "H2": 44.493349981766045,
         "H2O": 14.708340036418534,
         "O2": 1.4458158511932372e-25,
+    }
+
+    system.solve(constraints)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+
+
+def test_H_fO2_nonideal() -> None:
+    """Tests H2-H2O at the IW buffer for a non-ideal gas."""
+
+    eos: dict[str, RealGas] = get_holland_eos_models()
+
+    species: Species = Species(
+        [
+            GasSpecies(formula="H2O", solubility=PeridotiteH2O(), eos=eos["H2O"]),
+            GasSpecies(formula="H2", solubility=NoSolubility(), eos=eos["H2"]),
+            GasSpecies(formula="O2", solubility=NoSolubility()),
+        ]
+    )
+
+    planet: Planet = Planet()
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            PressureConstraint(species="H2", value=1000),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target_pressures: dict[str, float] = {
+        "H2": 1000.0,
+        "H2O": 1441.892430083237,
+        "O2": 1.0154197223693444e-07,
     }
 
     system.solve(constraints)

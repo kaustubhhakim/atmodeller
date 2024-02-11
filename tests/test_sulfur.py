@@ -34,10 +34,10 @@ from atmodeller.solubilities import (
     BasaltCO2,
     BasaltH2,
     BasaltH2O,
-    BasaltN2_Libourel,
+    BasaltN2Libourel,
     BasaltS2,
-    BasaltS2_Sulfate,
-    BasaltS2_Sulfide,
+    BasaltS2Sulfate,
+    BasaltS2Sulfide,
 )
 
 logger: logging.Logger = debug_logger()
@@ -58,7 +58,7 @@ def test_S2_SO_Sulfide_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS", solubility=NoSolubility()),
-            GasSpecies(formula="S2", solubility=BasaltS2_Sulfide()),
+            GasSpecies(formula="S2", solubility=BasaltS2Sulfide()),
             GasSpecies(formula="O2", solubility=NoSolubility()),
         ]
     )
@@ -90,7 +90,7 @@ def test_AllS_Sulfide_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS", solubility=NoSolubility()),
-            GasSpecies(formula="S2", solubility=BasaltS2_Sulfide()),
+            GasSpecies(formula="S2", solubility=BasaltS2Sulfide()),
             GasSpecies(formula="O2S", solubility=NoSolubility()),
             GasSpecies(formula="O2", solubility=NoSolubility()),
         ]
@@ -125,7 +125,7 @@ def test_AllS_Sulfate_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS", solubility=NoSolubility()),
-            GasSpecies(formula="S2", solubility=BasaltS2_Sulfate()),
+            GasSpecies(formula="S2", solubility=BasaltS2Sulfate()),
             GasSpecies(formula="O2S", solubility=NoSolubility()),
             GasSpecies(formula="O2", solubility=NoSolubility()),
         ]
@@ -315,7 +315,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
             GasSpecies(formula="O2S", solubility=NoSolubility()),
             GasSpecies(formula="CO", solubility=NoSolubility()),
             GasSpecies(formula="CO2", solubility=BasaltCO2()),
-            GasSpecies(formula="N2", solubility=BasaltN2_Libourel()),
+            GasSpecies(formula="N2", solubility=BasaltN2Libourel()),
         ]
     )
 
