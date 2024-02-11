@@ -134,7 +134,7 @@ class NoSolubility(Solubility):
 
 
 class AndesiteH2(Solubility):
-    """H2 in silicate melts :cite:p:`HWA12`
+    """H2 in synthetic andesite :cite:p:`HWA12`
 
     Log-scale linear fit to fH2 vs H2 concentration for andesite in Table 2. Experiments conducted
     from 0.7-3 GPa at 1400 C.
@@ -149,10 +149,10 @@ class AndesiteH2(Solubility):
 
 
 class AndesiteS2Sulfate(Solubility):
-    """Sulfur as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`
+    """Sulfur as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
-    sulfate capacity (C_S6+) in :cite:t:`BW23corr`. Composition for Andesite from Table 1.
+    sulfate capacity (C_S6+) in :cite:t:`BW23corr`. Composition for andesite from Table 1.
     Experiments conducted at 1 atm, 1473-1773 K for silicate melts equilibrated with Air/SO2
     mixtures.
     """
@@ -171,7 +171,7 @@ class AndesiteS2Sulfate(Solubility):
 
 
 class AndesiteS2Sulfide(Solubility):
-    """Sulfur as sulfide (S^2-) :cite:p:`BW23`
+    """Sulfur as sulfide (S^2-) in andesite :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
     for Andesite from Table 1. Experiments conducted at 1 atm, 1473-1773 K in a controlled
@@ -181,7 +181,6 @@ class AndesiteS2Sulfide(Solubility):
     @override
     @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
-        """fugacity is S2"""
         del kwargs
         logcs: float = 0.225 - (8921.0927 / temperature)
         logs_wtp: float = logcs - (0.5 * (np.log10(fO2) - np.log10(fugacity)))
@@ -192,7 +191,7 @@ class AndesiteS2Sulfide(Solubility):
 
 
 class AndesiteS2(Solubility):
-    """S2 accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
+    """S2 in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
     def __init__(self):
         self.sulfide: Solubility = AndesiteS2Sulfide()
@@ -220,7 +219,7 @@ class AndesiteS2(Solubility):
 class AnorthiteDiopsideH2O(SolubilityPowerLaw):
     """H2O in lunar basalt and anorthite-diopside-eutectic compositions :cite:p:`NBB17`
 
-    Power law from Figure 5(A) for Anorthite-Diopside glass. Experiments conducted at 1 atm and
+    Power law from Figure 5(A) for anorthite-diopside glass. Experiments conducted at 1 atm and
     1350 C. Melts equilibrated in 1 atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3
     to IW+4.8 and pH2/pH2O from 0.003-24.
     """
@@ -231,7 +230,7 @@ class AnorthiteDiopsideH2O(SolubilityPowerLaw):
 
 
 class BasaltCO2(Solubility):
-    """H2O and CO2 solubilities in MORB liquids :cite:p:`DSH95`
+    """CO2 solubilities in MORB liquids :cite:p:`DSH95`
 
     Equation 6 for mole fraction of dissolved carbonate (CO3^2-) and then converting to ppmw for
     CO2 experiments conducted at 1200 C, 210-980 bars with mixed H2O-CO2 vapor phase (CO2 vapor
@@ -250,12 +249,10 @@ class BasaltCO2(Solubility):
 
 
 class BasaltH2O(SolubilityPowerLaw):
-    """Dixon et al. (1995). H2O and CO2 solubilities in MORB liquids
+    """H2O solubilities in MORB liquids :cite:p:`DSH95`
 
-    https://academic.oup.com/petrology/article/36/6/1607/1493308?login=true
-
-    Refit data to a power law by Paolo Sossi (fitting Figure 4, TODO: CHECK). Experiments conducted
-    at 1200 C, 200-717 bars with pure H2O.
+    Refitted data to a power law by Paolo Sossi (fitting Figure 4, TODO: CHECK). Experiments
+    conducted at 1200 C, 200-717 bars with pure H2O.
     """
 
     @override
@@ -264,9 +261,7 @@ class BasaltH2O(SolubilityPowerLaw):
 
 
 class BasaltH2(Solubility):
-    """Hirschmann et al. 2012, H2 solubility in silicate melts
-
-    https://ui.adsabs.harvard.edu/abs/2012E%26PSL.345...38H/abstract
+    """H2 in synthetic basalt :cite:p:`HWA12`
 
     Log-scale linear fit to fH2 vs. H2 concentration for basalt in Table 2. Experiments conducted
     from 0.7-3 GPa, 1400 C.
@@ -281,9 +276,7 @@ class BasaltH2(Solubility):
 
 
 class BasaltN2Libourel(Solubility):
-    """Libourel et al. (2003), basalt (tholeiitic) magmas.
-
-    https://ui.adsabs.harvard.edu/abs/2003GeCoA..67.4123L/abstract
+    """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
     Equation 23, includes dependencies on fN2 and fO2. Experiments conducted at 1 atm and 1425 C
     (two experiments at 1400 C), fO2 from IW-8.3 to IW+8.7 using mixtures of CO, CO2 and N2 gases.
@@ -304,11 +297,9 @@ class BasaltN2Libourel(Solubility):
 
 
 class BasaltN2Dasgupta(Solubility):
-    """Dasgupta et al. 2022. Solubility of N in silicate melts.
+    """N2 in silicate melts :cite:p:`DFP22`
 
-    https://ui.adsabs.harvard.edu/abs/2022GeCoA.336..291D/abstract
-
-    Using Equation 10, composition parameters from Table 3 of Libourel et a. 2003 (CM-1), and
+    Using Equation 10, composition parameters from :cite:t:`LMH03{Table 3}` (CM-1), and
     Iron-wustite buffer (logIW_fugacity) from O'Neill and Pownceby (1993) and Hirschmann et al.
     (2008).
 
