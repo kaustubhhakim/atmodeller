@@ -692,7 +692,7 @@ class GasSpecies(ChemicalComponent):
 
         # Melt
         # TODO: Might not need to clip the concentration.
-        ppmw_in_melt: float = self.solubility.clipped_concentration(
+        ppmw_in_melt: float = self.solubility.concentration(
             fugacity=fugacity,
             temperature=planet.surface_temperature,
             pressure=system.total_pressure,
