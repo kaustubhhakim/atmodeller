@@ -121,7 +121,7 @@ def test_CORK_H2_volume_1800bar(check_values) -> None:
     check_values.volume(773, 1800, H2_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
-def test_CORK_2_volume_10kb(check_values) -> None:
+def test_CORK_H2_volume_10kb(check_values) -> None:
     expected: float = 20.67497630046999
     expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(773, 10000, H2_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
