@@ -158,7 +158,7 @@ class AndesiteS2Sulfate(Solubility):
     """
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         # Fugacity is fS2
         del kwargs
@@ -179,7 +179,7 @@ class AndesiteS2Sulfide(Solubility):
     """
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         del kwargs
         logcs: float = 0.225 - (8921.0927 / temperature)
@@ -198,7 +198,7 @@ class AndesiteS2(Solubility):
         self.sulfate: Solubility = AndesiteS2Sulfate()
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -378,7 +378,7 @@ class BasaltS2Sulfate(Solubility):
     """
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         # Fugacity is fS2
         del kwargs
@@ -400,7 +400,7 @@ class BasaltS2Sulfide(Solubility):
     """
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         # Fugacity is fS2
         del kwargs
@@ -422,7 +422,7 @@ class BasaltS2(Solubility):
         self.sulfate_solubility: Solubility = BasaltS2Sulfate()
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -465,7 +465,7 @@ class TBasaltS2Sulfate(Solubility):
     """
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -493,7 +493,7 @@ class TBasaltS2Sulfide(Solubility):
     """
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -540,7 +540,7 @@ class MercuryMagmaS(Solubility):
         self.coefficients: tuple[float, ...] = (7.25, -2.54e4, 0.04, -0.551)
 
     @override
-    @limit_concentration(SULFUR_MAXIMUM_PPMW)
+    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
