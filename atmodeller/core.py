@@ -745,6 +745,31 @@ class CondensedSpecies(ChemicalComponent):
         super().__post_init__()
         self.activity = ActivityConstant(species=self.formula)
 
+    @_mass_decorator
+    def mass(
+        self,
+        system: InteriorAtmosphereSystem,
+        *,
+        element: Optional[str] = None,
+    ) -> float:
+        """Calculates the total mass of the species or element
+
+        # TODO: Probably the condensed mass fraction actually
+
+        Args:
+            system: Interior atmosphere system
+            element: Returns the mass for an element. Defaults to None to return the species mass.
+               This argument is used by the @_mass_decorator.
+
+        Returns:
+            Total reservoir mass of the species (element=None) or element (element=element)
+        """
+        # Only used by the decorator.
+        del element
+
+        output: float = 1.0
+        return output
+
 
 @dataclass(kw_only=True)
 class SolidSpecies(CondensedSpecies):

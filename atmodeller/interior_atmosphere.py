@@ -105,7 +105,7 @@ class _ReactionNetwork:
         logger.info("Creating a reaction network")
         logger.info("Species = %s", self.species.formulas)
         self.reaction_matrix: np.ndarray = self._partial_gaussian_elimination()
-        logger.info("Reactions = \n%s", pprint.pformat(self.reactions))
+        logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
     @property
     def number_reactions(self) -> int:
@@ -340,7 +340,7 @@ class _ReactionNetwork:
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
         for index, gas_species in self.species.gas_species.items():
-            fugacity_coefficient = gas_species.eos.fugacity_coefficient(
+            fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
             if fugacity_coefficient == np.inf:
@@ -484,6 +484,7 @@ class InteriorAtmosphereSystem:
         `self.output()` to return a dictionary of all the data.
         """
         output: dict[str, float] = {}
+        # TODO: This will need to take account of the degree of condensation
         for chemical_formula, solution in zip(self.species.formulas, self.solution):
             output[chemical_formula] = solution
 
@@ -673,6 +674,16 @@ class InteriorAtmosphereSystem:
             self.constraints, temperature=self.planet.surface_temperature, pressure=1
         )
 
+        # HACK for condensates
+        # 0.5 is some initial guess of mass fraction of condensates
+        # Just for one condensed phase
+        # TODO: Add a degree of condensation for each element that is present in a condensed
+        # phase. Here is one for the simple C test case.
+        # Would need to get all the elements present in a condensed phase, one f for each element
+        # then append here. Initial guess depends whether it's mass fraction or a more convenient
+        # function with better numerical properties / stability. Maybe 1+ln(k) transform?
+        log_solution = np.append(log_solution, 0.1)
+
         for attempt in range(1, max_attempts):
             logger.info("Attempt %d/%d", attempt, max_attempts)
             logger.info("Initial solution = %s", log_solution)
@@ -723,7 +734,9 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
         """
-        self._log_solution = log_solution
+        # TODO: This just sets the relevant parts for the reaction network, which excludes the
+        # condensate fraction for each element
+        self._log_solution = log_solution[:-1]  # Because only one condensate currently considered
 
         # Compute residual for the reaction network.
         residual_reaction: np.ndarray = self._reaction_network.get_residual(
@@ -746,7 +759,17 @@ class InteriorAtmosphereSystem:
                         element=constraint.species,
                     ).values()
                 )
+            # TODO: New to include condensed phase mass
+            for species in self.species.condensed_species.values():
+                # Here f is the mass fraction of condensates (M_condensates/M_total)
+                # With two imposed constraints (plus activity), and a defined f, this solves
+                f: float = log_solution[-1]
+                residual_mass[constraint_index] *= f
+
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
+
+            # Could maybe log here instead to deal with condensates?
+
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_log10_value()
         logger.debug("Residual_mass = %s", residual_mass)
