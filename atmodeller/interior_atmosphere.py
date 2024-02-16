@@ -506,8 +506,8 @@ class InteriorAtmosphereSystem:
         for degree_of_condensation, solution in zip(
             self.degree_of_condensation, self.solution[self.species.number :]
         ):
-            key: str = f"gas_multiplier_{degree_of_condensation}"
-            output[key] = solution
+            key: str = f"degree_of_condensation_{degree_of_condensation}"
+            output[key] = solution / (1 + solution)
 
         return output
 
@@ -781,10 +781,12 @@ class InteriorAtmosphereSystem:
 
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
-            # # Condensed species
+            # Condensed species
             for nn, condensed_element in enumerate(self.degree_of_condensation):
                 if condensed_element == constraint.species:
-                    residual_mass[constraint_index] += log_solution[self.species.number + nn]
+                    residual_mass[constraint_index] += np.log10(
+                        10 ** self.log_solution[self.species.number + nn] + 1
+                    )
 
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_log10_value()
