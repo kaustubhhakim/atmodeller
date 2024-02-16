@@ -260,6 +260,20 @@ class BasaltH2O(SolubilityPowerLaw):
         super().__init__(constant, exponent)
 
 
+class BasaltH2OMitchell(SolubilityPowerLaw):
+    """H2O solubility in basaltic melt :cite:p:`MGO17`
+
+    Refitted the H2O wt. % vs. fH2O fitted line from their Figure 8 to a power-law. Experiments
+    conducted at 1200 C and 1000 MPa total pressure. Mitchell's Figure 8 fit includes data from their
+    experiments and prior studies on H2O solubility in basaltic melt at 1200 C and P at or below
+    600 MPa.
+    """
+
+    @override
+    def __init__(self, constant: float = 1209.387, exponent: float = 0.669):
+        super().__init__(constant, exponent)
+
+
 class BasaltH2(Solubility):
     """H2 in synthetic basalt :cite:p:`HWA12`
 
@@ -734,7 +748,7 @@ andesite_solubilities: dict[str, Solubility] = {
 }
 anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
 basalt_solubilities: dict[str, Solubility] = {
-    "H2O": BasaltH2O(),
+    "H2O": BasaltH2OMitchell(),
     "CO2": BasaltCO2(),
     "H2": BasaltH2(),
     "N2": BasaltN2Libourel(),
