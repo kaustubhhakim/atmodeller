@@ -748,7 +748,7 @@ andesite_solubilities: dict[str, Solubility] = {
 }
 anorthdiop_solubilities: dict[str, Solubility] = {"H2O": AnorthiteDiopsideH2O()}
 basalt_solubilities: dict[str, Solubility] = {
-    "H2O": BasaltH2OMitchell(),
+    "H2O": BasaltH2O(),
     "CO2": BasaltCO2(),
     "H2": BasaltH2(),
     "N2": BasaltN2Libourel(),

@@ -448,6 +448,20 @@ class InteriorAtmosphereSystem:
         return self._log_solution
 
     @property
+    def degree_of_condensation(self) -> list:
+        """Degree of condensation for elements
+
+        The number of elements for which we calculate the degree of condensation depends on which
+        elements are in condensed phases and which mass constraints are applied.
+        """
+        condensation: list[str] = []
+        for constraint in self.constraints.mass_constraints:
+            if constraint.species in self.species.condensed_elements:
+                condensation.append(constraint.species)
+
+        return condensation
+
+    @property
     def solution(self) -> np.ndarray:
         """Solution."""
         return 10**self.log_solution
@@ -484,9 +498,16 @@ class InteriorAtmosphereSystem:
         `self.output()` to return a dictionary of all the data.
         """
         output: dict[str, float] = {}
-        # TODO: This will need to take account of the degree of condensation
-        for chemical_formula, solution in zip(self.species.formulas, self.solution):
+        for chemical_formula, solution in zip(
+            self.species.formulas, self.solution[: self.species.number]
+        ):
             output[chemical_formula] = solution
+
+        for degree_of_condensation, solution in zip(
+            self.degree_of_condensation, self.solution[self.species.number :]
+        ):
+            key: str = f"gas_multiplier_{degree_of_condensation}"
+            output[key] = solution
 
         return output
 
@@ -670,19 +691,12 @@ class InteriorAtmosphereSystem:
         # The only constraints that require pressure are the fugacity constraints, so for the
         # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
         # ensure the initial solution is bounded.
-        log_solution = initial_solution.get_log10_value(
+        log_solution: np.ndarray = initial_solution.get_log10_value(
             self.constraints, temperature=self.planet.surface_temperature, pressure=1
         )
 
-        # HACK for condensates
-        # 0.5 is some initial guess of mass fraction of condensates
-        # Just for one condensed phase
-        # TODO: Add a degree of condensation for each element that is present in a condensed
-        # phase. Here is one for the simple C test case.
-        # Would need to get all the elements present in a condensed phase, one f for each element
-        # then append here. Initial guess depends whether it's mass fraction or a more convenient
-        # function with better numerical properties / stability. Maybe 1+ln(k) transform?
-        log_solution = np.append(log_solution, 0.1)
+        log_degree_of_condensation: np.ndarray = np.zeros(len(self.degree_of_condensation))
+        log_solution = np.append(log_solution, log_degree_of_condensation)
 
         for attempt in range(1, max_attempts):
             logger.info("Attempt %d/%d", attempt, max_attempts)
@@ -734,9 +748,12 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
         """
-        # TODO: This just sets the relevant parts for the reaction network, which excludes the
-        # condensate fraction for each element
-        self._log_solution = log_solution[:-1]  # Because only one condensate currently considered
+
+        # This must be set here
+        self._log_solution = log_solution
+
+        # Exclude the degree of condensation for the reaction network
+        log_solution_reaction: np.ndarray = log_solution[: self.species.number]
 
         # Compute residual for the reaction network.
         residual_reaction: np.ndarray = self._reaction_network.get_residual(
@@ -744,14 +761,16 @@ class InteriorAtmosphereSystem:
             pressure=self.total_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
-            log_solution=self._log_solution,
+            log_solution=log_solution_reaction,
         )
 
         # Compute residual for the mass balance (if relevant).
         residual_mass: np.ndarray = np.zeros(
             len(self.constraints.mass_constraints), dtype=np.float_
         )
+
         for constraint_index, constraint in enumerate(self.constraints.mass_constraints):
+            # Gas species
             for species in self.species.gas_species.values():
                 residual_mass[constraint_index] += sum(
                     species.mass(
@@ -759,19 +778,17 @@ class InteriorAtmosphereSystem:
                         element=constraint.species,
                     ).values()
                 )
-            # TODO: New to include condensed phase mass
-            for species in self.species.condensed_species.values():
-                # Here f is the mass fraction of condensates (M_condensates/M_total)
-                # With two imposed constraints (plus activity), and a defined f, this solves
-                f: float = log_solution[-1]
-                residual_mass[constraint_index] *= f
 
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
-            # Could maybe log here instead to deal with condensates?
+            # # Condensed species
+            for nn, condensed_element in enumerate(self.degree_of_condensation):
+                if condensed_element == constraint.species:
+                    residual_mass[constraint_index] += log_solution[self.species.number + nn]
 
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= constraint.get_log10_value()
+
         logger.debug("Residual_mass = %s", residual_mass)
 
         # Compute residual for the total pressure (if relevant).
@@ -784,7 +801,7 @@ class InteriorAtmosphereSystem:
                 np.log10(self.total_pressure) - constraint.get_log10_value()
             )
 
-        # Combined residual.
+        # Combined residual
         residual: np.ndarray = np.concatenate(
             (residual_reaction, residual_mass, residual_total_pressure)
         )

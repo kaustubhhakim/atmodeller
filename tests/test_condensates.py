@@ -120,7 +120,7 @@ def test_graphite_mass() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintBallhaus(),
-            FugacityConstraint(species="H2", value=16),
+            FugacityConstraint(species="H2", value=6),
             MassConstraint(species="C", value=c_kg),
         ]
     )
@@ -138,5 +138,7 @@ def test_graphite_mass() -> None:
     system.solve(constraints)
 
     print(system.solution)
+
+    system.output("test", to_excel=True)
 
     # assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
