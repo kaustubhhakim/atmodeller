@@ -120,8 +120,11 @@ def test_graphite_mass() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintBallhaus(),
+            # Gives doc close to 0.5 (0.5136921235780504)
+            # FugacityConstraint(species="H2", value=5.8),
+            # Gives doc close to zero (0.006696462037687005)
             FugacityConstraint(species="H2", value=8.55),
-            # MassConstraint(species="C", value=c_kg),
+            MassConstraint(species="C", value=c_kg),
         ]
     )
 

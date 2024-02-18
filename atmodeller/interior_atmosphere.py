@@ -782,10 +782,12 @@ class InteriorAtmosphereSystem:
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
             # Condensed species
+            # TODO: Keyword argument to specify whether the mass constraint should include the
+            # condensed phase or just the gas phase?
             for nn, condensed_element in enumerate(self.degree_of_condensation):
                 if condensed_element == constraint.species:
                     residual_mass[constraint_index] += np.log10(
-                        10 ** self.log_solution[self.species.number + nn] + 1
+                        self.solution[self.species.number + nn] + 1
                     )
 
             # Mass values are constant so no need to pass any arguments to get_value().
