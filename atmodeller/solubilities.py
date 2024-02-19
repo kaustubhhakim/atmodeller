@@ -270,7 +270,7 @@ class BasaltH2OMitchell(SolubilityPowerLaw):
     """
 
     @override
-    def __init__(self, constant: float = 1209.387, exponent: float = 0.669):
+    def __init__(self, constant: float = 258.946, exponent: float = 0.669):
         super().__init__(constant, exponent)
 
 
