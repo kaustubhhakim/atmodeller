@@ -313,7 +313,7 @@ class BasaltN2Libourel(Solubility):
 class BasaltN2Dasgupta(Solubility):
     """N2 in silicate melts :cite:p:`DFP22`
 
-    Using Equation 10, composition parameters from :cite:t:`LMH03{Table 3}` (CM-1), and
+    Using Equation 10, composition parameters from :cite:t:`DFP22{Figure 8}`, and
     Iron-wustite buffer (logIW_fugacity) from :cite:t:`OP93,HGD08`.
 
     Performed experiments on 80:20 synthetic basalt-Si3N4 mixture at 1.5-3.0 GPa and 1300-1600 C
@@ -321,12 +321,12 @@ class BasaltN2Dasgupta(Solubility):
     their N solubility law.
 
     Args:
-        xsio2: Mole fraction of SiO2 # TODO: Maggie to confirm - mole or mass fraction?
+        xsio2: Mole fraction of SiO2
         xal2o3: Mole fraction of Al2O3
         xtio2: Mole fraction of TiO2
     """
 
-    def __init__(self, xsio2: float = 0.582, xal2o3: float = 0.157, xtio2: float = 0.018):
+    def __init__(self, xsio2: float = 0.56, xal2o3: float = 0.11, xtio2: float = 0.01):
         self.xsio2: float = xsio2
         self.xal2o3: float = xal2o3
         self.xtio2: float = xtio2
