@@ -21,8 +21,6 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
-from functools import wraps
-from typing import Callable
 
 import numpy as np
 
@@ -35,41 +33,6 @@ else:
     from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-# Solubility limiters
-# Applied universally
-MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(10)  # 10% by weight
-# Applied to sulfur
-SULFUR_MAXIMUM_PPMW: float = UnitConversion.weight_percent_to_ppmw(1)  # 1% by weight
-
-
-def limit_concentration(bound: float = MAXIMUM_PPMW) -> Callable:
-    """A decorator to limit the concentration in ppmw
-
-    Args:
-        bound: The maximum limit of the concentration in ppmw. Defaults to ``MAXIMUM_PPMW``.
-
-    Returns:
-        The decorator
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(self: Solubility, *args, **kwargs):
-            result: float = func(self, *args, **kwargs)
-            if result > bound:
-                logger.warning(
-                    "%s concentration (%d ppmw) will be limited to %d ppmw",
-                    self.__class__.__name__,
-                    result,
-                    bound,
-                )
-
-            return np.clip(result, 0, bound)
-
-        return wrapper
-
-    return decorator
 
 
 class Solubility(ABC):
@@ -97,11 +60,6 @@ class Solubility(ABC):
             Dissolved volatile concentration in the melt in ppmw
         """
         raise NotImplementedError
-
-    @limit_concentration()
-    def clipped_concentration(self, *args, **kwargs) -> float:
-        """Dissolved volatile concentration in the melt in ppmw limited below a maximum bound"""
-        return self.concentration(*args, **kwargs)
 
 
 class SolubilityPowerLaw(Solubility):
@@ -158,7 +116,6 @@ class AndesiteS2Sulfate(Solubility):
     """
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         # Fugacity is fS2
         del kwargs
@@ -179,7 +136,6 @@ class AndesiteS2Sulfide(Solubility):
     """
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         del kwargs
         logcs: float = 0.225 - (8921.0927 / temperature)
@@ -198,7 +154,6 @@ class AndesiteS2(Solubility):
         self.sulfate: Solubility = AndesiteS2Sulfate()
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -392,7 +347,6 @@ class BasaltS2Sulfate(Solubility):
     """
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         # Fugacity is fS2
         del kwargs
@@ -414,7 +368,6 @@ class BasaltS2Sulfide(Solubility):
     """
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(self, fugacity: float, *, temperature: float, fO2: float, **kwargs) -> float:
         # Fugacity is fS2
         del kwargs
@@ -436,7 +389,6 @@ class BasaltS2(Solubility):
         self.sulfate_solubility: Solubility = BasaltS2Sulfate()
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -479,7 +431,6 @@ class TBasaltS2Sulfate(Solubility):
     """
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -507,7 +458,6 @@ class TBasaltS2Sulfide(Solubility):
     """
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
@@ -554,7 +504,6 @@ class MercuryMagmaS(Solubility):
         self.coefficients: tuple[float, ...] = (7.25, -2.54e4, 0.04, -0.551)
 
     @override
-    # @limit_concentration(SULFUR_MAXIMUM_PPMW)
     def concentration(
         self,
         fugacity: float,
