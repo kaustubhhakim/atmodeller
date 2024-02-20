@@ -271,7 +271,7 @@ class Output(UserDict):
                 pressure=interior_atmosphere.total_pressure,
             )
             output = CondensedSpeciesOutput(activity=activity)
-            data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
+            data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output.asdict())
 
     def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
@@ -369,7 +369,7 @@ class Output(UserDict):
             atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
 
         for species in interior_atmosphere.species.gas_species.values():
-            pressure: float = interior_atmosphere.solution_dict()[species.formula]
+            pressure: float = interior_atmosphere.solution_dict()[species.name]
             fugacity: float = interior_atmosphere.fugacities_dict[f"f{species.formula}"]
             fugacity_coefficient: float = (
                 10 ** interior_atmosphere.log10_fugacity_coefficients_dict[species.formula]
@@ -398,7 +398,7 @@ class Output(UserDict):
                 mass=species_masses["solid"],
             )
             output = SpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
-            data_list: list[dict[str, float]] = self.data.setdefault(species.formula, [])
+            data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output.asdict())
 
         return atmosphere_total_species_moles

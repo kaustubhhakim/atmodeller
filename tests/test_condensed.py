@@ -35,7 +35,7 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+# logger.setLevel(logging.INFO)
 
 
 def get_graphite_system(temperature: float = 873) -> InteriorAtmosphereSystem:
@@ -65,29 +65,25 @@ def get_graphite_system(temperature: float = 873) -> InteriorAtmosphereSystem:
     return interior_atmosphere_system
 
 
-def get_graphite_water_system(temperature: float = 873) -> InteriorAtmosphereSystem:
-    """Gets an interior-atmosphere system with graphite and water as condensed species.
+def get_water_system(temperature: float = 300) -> InteriorAtmosphereSystem:
+    """Gets an interior-atmosphere system with water as a condensed species.
 
     Args:
         temperature: Temperature in kelvin
     """
 
-    species_with_graphite_water: Species = Species(
+    species_with_water: Species = Species(
         [
-            GasSpecies(formula="H2"),
             GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO"),
             GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
             GasSpecies(formula="O2"),
-            SolidSpecies(formula="C"),
             LiquidSpecies(formula="H2O"),
         ]
     )
     planet: Planet = Planet()
     planet.surface_temperature = temperature
     interior_atmosphere_system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species_with_graphite_water, planet=planet
+        species=species_with_water, planet=planet
     )
 
     return interior_atmosphere_system
@@ -213,49 +209,49 @@ def test_graphite_no_condensed() -> None:
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="Dan working with this test to get two condensed phases working")
-def test_graphite_water_half_condensed() -> None:
+def test_water_half_condensed() -> None:
     """Tests including graphite with around 50% condensed C mass fraction."""
 
-    system: InteriorAtmosphereSystem = get_graphite_water_system(temperature=300)
+    system: InteriorAtmosphereSystem = get_water_system(temperature=500)
 
-    h_kg: float = earth_oceans_to_kg(1)
-    c_kg: float = 1 * h_kg
+    h_kg: float = earth_oceans_to_kg(0.125)
+    c_kg = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintBallhaus(),
-            FugacityConstraint(species="H2", value=5.8),
-            # MassConstraint(species="C", value=c_kg),
+            MassConstraint(species="H", value=h_kg),
+            MassConstraint(species="C", value=c_kg),
         ]
     )
 
+    # TODO: Update below when recomputed
     # Calculated by Paolo 19/02/2024
-    factsage_comparison: dict[str, float] = {
-        "H2": 5.766,
-        "H2O": 1.790,
-        "CO": 0.072,
-        "CO2": 0.060,
-        "CH4": 15.33,
-        "O2": 1.268e-25,
-        "C": 1.0,
-        # "degree_of_condensation_C": 0.513,
-    }
+    # factsage_comparison: dict[str, float] = {
+    #     "H2": 5.766,
+    #     "H2O": 1.790,
+    #     "CO": 0.072,
+    #     "CO2": 0.060,
+    #     "CH4": 15.33,
+    #     "O2": 1.268e-25,
+    #     "degree_of_condensation_H": 0.513,
+    # }
 
     target: dict[str, float] = {
-        "H2": 5.799999999999998,
-        "H2O": 1.7900177926108025,
-        "CO": 0.07227659435955698,
-        "CO2": 0.05975037656249113,
-        "CH4": 15.300198167373871,
-        "O2": 1.2601857916706088e-25,
-        "C": 1.0,
-        # "degree_of_condensation_C": 0.5136921235780504,
+        "H2O_g": 23.077726277860233,
+        "CO2_g": 7.593719286176847,
+        "O2_g": 9.987214527646175e-50,
+        "H2O_l": 1.0,
+        "degree_of_condensation_H": 0.489925255786694,
     }
 
     system.solve(constraints)
 
-    msg: str = "Compatible with FactSage result"
-    system.isclose_tolerance(factsage_comparison, msg)
+    # TODO: Update
+    # msg: str = "Compatible with FactSage result"
+    # system.isclose_tolerance(factsage_comparison, msg)
+
+    # Uncomment below to dump the output to an Excel
+    # system.output(file_prefix="H_50%_condensates", to_excel=True)
 
     assert system.isclose(target, rtol=RTOL, atol=ATOL)

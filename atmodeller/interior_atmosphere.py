@@ -103,7 +103,7 @@ class _ReactionNetwork:
     def __init__(self, species: Species):
         self.species: Species = species
         logger.info("Creating a reaction network")
-        logger.info("Species = %s", self.species.formulas)
+        logger.info("Species = %s", self.species.names)
         self.reaction_matrix: np.ndarray = self._partial_gaussian_elimination()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
@@ -171,9 +171,9 @@ class _ReactionNetwork:
                 coeff: float = self.reaction_matrix[reaction_index, species_index]
                 if coeff != 0:
                     if coeff < 0:
-                        reactants += f"{abs(coeff)} {species.formula} + "
+                        reactants += f"{abs(coeff)} {species.name} + "
                     else:
-                        products += f"{coeff} {species.formula} + "
+                        products += f"{coeff} {species.name} + "
 
             reactants = reactants.rstrip(" + ")
             products = products.rstrip(" + ")
@@ -247,10 +247,9 @@ class _ReactionNetwork:
             logger.debug(msg)
         else:
             num: int = self.species.number - nrows
-            # Logger convention is to avoid f-string. pylint: disable=consider-using-f-string
-            msg = "%d additional (mass) constraint(s) are necessary " % num
-            msg += "to solve the system"
-            logger.debug(msg)
+            logger.debug(
+                "%d additional (mass) constraint(s) are necessary to solve the system", num
+            )
 
         coeff: np.ndarray = np.zeros((nrows, self.species.number))
         coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
@@ -507,10 +506,8 @@ class InteriorAtmosphereSystem:
         """
         output: dict[str, float] = {}
         # Gas species partial pressures
-        for chemical_formula, solution in zip(
-            self.species.formulas, self.solution[: self.species.number]
-        ):
-            output[chemical_formula] = solution
+        for name, solution in zip(self.species.names, self.solution[: self.species.number]):
+            output[name] = solution
         # Degree of condensation for elements in condensed species
         for degree_of_condensation, solution in zip(
             self.degree_of_condensation_elements, self.solution[self.species.number :]
@@ -538,7 +535,8 @@ class InteriorAtmosphereSystem:
         """Fugacities of all species in a dictionary."""
         output: dict[str, float] = {}
         for key, value in self.log10_fugacity_coefficients_dict.items():
-            output[f"f{key}"] = 10 ** (np.log10(self.solution_dict()[key]) + value)
+            # TODO: Not clean to append _g suffix to denote gas phase.
+            output[f"f{key}"] = 10 ** (np.log10(self.solution_dict()[f"{key}_g"]) + value)
 
         return output
 
@@ -604,9 +602,7 @@ class InteriorAtmosphereSystem:
                 logger.info("%s (tol = %f)", message, tol)
                 return tol
 
-        logger.info("%s (no tolerance < 0.1 satisfied)")
-
-        return None
+        logger.info("%s (no tolerance < 0.1 satisfied)", message)
 
     def solve(
         self,

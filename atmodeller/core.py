@@ -510,12 +510,14 @@ class ChemicalComponent:
 
     Args:
         formula: Chemical formula (e.g., CO2, C, CH4, etc.)
+        phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively.
         thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
         name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset. Defaults to an
             empty string which means the `formula` should be used.
 
     Attributes:
         formula: Chemical formula
+        phase: Phase (cr, g, or l)
         thermodynamic_dataset: The thermodynamic dataset
         name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
         atoms: Number of atoms
@@ -527,6 +529,7 @@ class ChemicalComponent:
     """
 
     formula: str
+    _phase: str
     _: KW_ONLY
     thermodynamic_dataset: ThermodynamicDatasetABC = field(
         default_factory=ThermodynamicDatasetJANAF
@@ -589,6 +592,16 @@ class ChemicalComponent:
     def molar_mass(self) -> float:
         """Molar mass in kg/mol"""
         return UnitConversion.g_to_kg(self._formula.mass)
+
+    @property
+    def name(self) -> str:
+        """Unique name, combining formula and phase"""
+        return f"{self.formula}_{self.phase}"
+
+    @property
+    def phase(self) -> str:
+        """Phase"""
+        return self._phase
 
 
 def _mass_decorator(func) -> Callable:
@@ -655,6 +668,7 @@ class GasSpecies(ChemicalComponent):
         eos: A gas equation of state
     """
 
+    _phase: str = field(init=False, default="g")
     _: KW_ONLY
     solubility: Solubility = field(default_factory=NoSolubility)
     solid_melt_distribution_coefficient: float = 0
@@ -681,7 +695,7 @@ class GasSpecies(ChemicalComponent):
         del element
 
         planet: Planet = system.planet
-        pressure: float = system.solution_dict()[self.formula]
+        pressure: float = system.solution_dict()[self.name]
         fugacity: float = system.fugacities_dict[f"f{self.formula}"]
 
         # Atmosphere
@@ -746,14 +760,18 @@ class CondensedSpecies(ChemicalComponent):
         self.activity = ActivityConstant(species=self.formula)
 
 
-@dataclass(kw_only=True)
+@dataclass
 class SolidSpecies(CondensedSpecies):
     """Solid species"""
 
+    _phase: str = field(init=False, default="cr")
 
-@dataclass(kw_only=True)
+
+@dataclass
 class LiquidSpecies(CondensedSpecies):
     """Liquid species"""
+
+    _phase: str = field(init=False, default="l")
 
 
 class Species(UserList):
@@ -833,6 +851,11 @@ class Species(UserList):
     def formulas(self) -> list[str]:
         """Chemical formulas of the species"""
         return [species.formula for species in self.data]
+
+    @property
+    def names(self) -> list[str]:
+        """Unique names of the species"""
+        return [species.name for species in self.data]
 
     def conform_solubilities_to_composition(self, melt_composition: str | None = None) -> None:
         """Conforms the solubilities of the species to the planet composition.
