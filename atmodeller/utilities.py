@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 from scipy.constants import kilo, mega
 
-from atmodeller import OCEAN_MASS_H2
+from atmodeller import ATMOSPHERE, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -80,7 +80,12 @@ def earth_oceans_to_kg(number_of_earth_oceans: float = 1) -> float:
 
 
 class UnitConversion:
-    """Unit conversions."""
+    """Unit conversions"""
+
+    @staticmethod
+    def atmosphere_to_bar(value_atmosphere: MultiplyT = 1) -> MultiplyT:
+        """atmosphere to bar"""
+        return value_atmosphere * ATMOSPHERE
 
     @staticmethod
     def bar_to_Pa(  # Symbol name, so pylint: disable=C0103

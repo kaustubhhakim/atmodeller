@@ -1,45 +1,33 @@
-"""Tests for simple C-H-O interior-atmosphere systems
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Tests for ideal C-H-O interior-atmosphere systems"""
 
-Copyright 2024 Dan J. Bower
-
-This file is part of Atmodeller.
-
-Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU 
-General Public License as published by the Free Software Foundation, either version 3 of the 
-License, or (at your option) any later version.
-
-Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without 
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with Atmodeller. If not, 
-see <https://www.gnu.org/licenses/>.
-
-
-Tests using the JANAF data for simple C-H-O interior-atmosphere systems.
-"""
+from __future__ import annotations
 
 import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    FugacityConstraint,
-    IronWustiteBufferConstraintBallhaus,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
-    PressureConstraint,
     SystemConstraints,
     TotalPressureConstraint,
 )
-from atmodeller.core import (
-    GasSpecies,
-    NoSolubility,
-    SolidSpecies,
-    ThermodynamicDatasetABC,
-    ThermodynamicDatasetJANAF,
-)
-from atmodeller.eos.holland import get_holland_eos_models
-from atmodeller.eos.interfaces import RealGas
+from atmodeller.core import GasSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import BasaltCO2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
@@ -48,7 +36,6 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
 
 
 def test_version():
@@ -62,8 +49,8 @@ def test_H_fO2() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -80,14 +67,14 @@ def test_H_fO2() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "H2": 0.25161113771286514,
+    target: dict[str, float] = {
         "H2O": 0.25706483161845733,
+        "H2": 0.25161113771286514,
         "O2": 8.699765393460875e-08,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_basalt_melt() -> None:
@@ -95,9 +82,9 @@ def test_H_basalt_melt() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=NoSolubility()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="H2O"),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -114,14 +101,14 @@ def test_H_basalt_melt() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "H2": 0.09234539760208682,
+    target: dict[str, float] = {
         "H2O": 0.09434603056360964,
+        "H2": 0.09234539760208682,
         "O2": 8.699588020866791e-08,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_plus() -> None:
@@ -130,8 +117,8 @@ def test_H_fO2_plus() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -148,14 +135,14 @@ def test_H_fO2_plus() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "H2": 0.025274900256252293,
+    target: dict[str, float] = {
         "H2O": 0.25822551891794376,
+        "H2": 0.025274900256252293,
         "O2": 8.699641354691526e-06,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_minus() -> None:
@@ -164,8 +151,8 @@ def test_H_fO2_minus() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -182,14 +169,14 @@ def test_H_fO2_minus() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "H2": 2.292084107842916,
+    target: dict[str, float] = {
         "H2O": 0.234191482856985,
+        "H2": 2.292084107842916,
         "O2": 8.700876916925329e-10,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_five_oceans() -> None:
@@ -198,8 +185,8 @@ def test_H_five_oceans() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -216,14 +203,14 @@ def test_H_five_oceans() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "H2": 6.123002998015027,
+    target: dict[str, float] = {
         "H2O": 6.258071518665579,
+        "H2": 6.123002998015027,
         "O2": 8.706308103092035e-08,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_1500K() -> None:
@@ -232,8 +219,8 @@ def test_H_1500K() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -252,14 +239,14 @@ def test_H_1500K() -> None:
 
     planet.surface_temperature = 1500.0  # K
 
-    target_pressures: dict[str, float] = {
-        "H2": 0.3065119897656826,
+    target: dict[str, float] = {
         "H2O": 0.25671119963042033,
+        "H2": 0.3065119897656826,
         "O2": 2.5006714903237476e-12,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C() -> None:
@@ -268,9 +255,9 @@ def test_H_and_C() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
-            GasSpecies(formula="CO", solubility=NoSolubility()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
+            GasSpecies(formula="CO"),
             GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
@@ -291,16 +278,16 @@ def test_H_and_C() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
+    target: dict[str, float] = {
+        "H2O": 0.25824358142493425,
+        "H2": 0.2521806525810137,
+        "O2": 8.740121617121534e-08,
         "CO": 59.6819921102523,
         "CO2": 13.404792068284909,
-        "H2": 0.2521806525810137,
-        "H2O": 0.25824358142493425,
-        "O2": 8.740121617121534e-08,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C_total_pressure() -> None:
@@ -309,9 +296,9 @@ def test_H_and_C_total_pressure() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
-            GasSpecies(formula="H2", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
-            GasSpecies(formula="CO", solubility=NoSolubility()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
+            GasSpecies(formula="CO"),
             GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
@@ -330,94 +317,13 @@ def test_H_and_C_total_pressure() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
+    target: dict[str, float] = {
+        "H2O": 0.25824457265720585,
+        "H2": 0.2519709032598433,
+        "O2": 8.754746041831307e-08,
         "CO": 81.22997882092373,
         "CO2": 18.259805583019286,
-        "H2": 0.2519709032598433,
-        "H2O": 0.25824457265720585,
-        "O2": 8.754746041831307e-08,
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
-
-
-def test_graphite() -> None:
-    """Tests including graphite."""
-
-    thermodynamic_data: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF()
-
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", thermodynamic_dataset=thermodynamic_data),
-            GasSpecies(formula="H2O", thermodynamic_dataset=thermodynamic_data),
-            GasSpecies(formula="CO", thermodynamic_dataset=thermodynamic_data),
-            GasSpecies(formula="CO2", thermodynamic_dataset=thermodynamic_data),
-            GasSpecies(formula="CH4", thermodynamic_dataset=thermodynamic_data),
-            GasSpecies(formula="O2", thermodynamic_dataset=thermodynamic_data),
-            SolidSpecies(
-                formula="C",
-                thermodynamic_dataset=thermodynamic_data,
-                name_in_dataset="graphite",
-            ),
-        ]
-    )
-
-    planet: Planet = Planet()
-    planet.surface_temperature = 600 + 273  # K
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            IronWustiteBufferConstraintBallhaus(),
-            FugacityConstraint(species="H2", value=44.49334998176607),
-        ]
-    )
-
-    target_pressures: dict[str, float] = {
-        "C": 1.0,
-        "CH4": 900.3912797397132,
-        "CO": 0.07741709702165529,
-        "CO2": 0.0685518295157825,
-        "H2": 44.493349981766045,
-        "H2O": 14.708340036418534,
-        "O2": 1.4458158511932372e-25,
-    }
-
-    system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
-
-
-def test_H_fO2_nonideal() -> None:
-    """Tests H2-H2O at the IW buffer for a non-ideal gas."""
-
-    eos: dict[str, RealGas] = get_holland_eos_models()
-
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O(), eos=eos["H2O"]),
-            GasSpecies(formula="H2", solubility=NoSolubility(), eos=eos["H2"]),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
-        ]
-    )
-
-    planet: Planet = Planet()
-
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            PressureConstraint(species="H2", value=1000),
-            IronWustiteBufferConstraintHirschmann(),
-        ]
-    )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-
-    target_pressures: dict[str, float] = {
-        "H2": 1000.0,
-        "H2O": 1441.892430083237,
-        "O2": 1.0154197223693444e-07,
-    }
-
-    system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)

@@ -1,23 +1,22 @@
-"""Tests with sulfur
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Tests with sulfur"""
 
-Copyright 2024 Dan J. Bower
-
-This file is part of Atmodeller.
-
-Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU 
-General Public License as published by the Free Software Foundation, either version 3 of the 
-License, or (at your option) any later version.
-
-Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without 
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with Atmodeller. If not, 
-see <https://www.gnu.org/licenses/>.
-
-
-Tests using the JANAF data for simple interior-atmosphere systems that include sulfur.
-"""
+from __future__ import annotations
 
 import logging
 
@@ -28,7 +27,7 @@ from atmodeller.constraints import (
     MassConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, NoSolubility
+from atmodeller.core import GasSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubilities import (
     BasaltCO2,
@@ -40,11 +39,10 @@ from atmodeller.solubilities import (
     BasaltS2Sulfide,
 )
 
-logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
-
 RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
+
+logger: logging.Logger = debug_logger()
 
 
 def test_version():
@@ -57,9 +55,9 @@ def test_S2_SO_Sulfide_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2Sulfide()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -74,14 +72,14 @@ def test_S2_SO_Sulfide_IW() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "S2": 1e-05,
+    target: dict[str, float] = {
         "OS": 6.018454943818516e-05,
+        "S2": 1e-05,
         "O2": 8.699485217915599e-08,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_Sulfide_IW() -> None:
@@ -89,10 +87,10 @@ def test_AllS_Sulfide_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2Sulfide()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -108,15 +106,15 @@ def test_AllS_Sulfide_IW() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "S2": 0.003704873878513222,
+    target: dict[str, float] = {
         "OS": 0.002991983415707734,
+        "S2": 0.003704873878513222,
         "O2S": 0.004839725408460836,
         "O2": 1.0269757432683765e-06,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_Sulfate_IW() -> None:
@@ -124,10 +122,10 @@ def test_AllS_Sulfate_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2Sulfate()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -143,15 +141,15 @@ def test_AllS_Sulfate_IW() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
+    target: dict[str, float] = {
         "OS": 0.6267850732546694,
         "S2": 161.05514086015452,
-        "O2": 1.0367593216540548e-06,
         "O2S": 1.0186830187658191,
+        "O2": 1.0367593216540548e-06,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IW() -> None:
@@ -159,10 +157,10 @@ def test_AllS_TotalSolubility_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -178,15 +176,15 @@ def test_AllS_TotalSolubility_IW() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "S2": 0.0037048732091408782,
+    target: dict[str, float] = {
         "OS": 0.00299198314542162,
+        "S2": 0.0037048732091408782,
         "O2S": 0.0048397249712554885,
         "O2": 1.0269757432682946e-06,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IWp3() -> None:
@@ -194,10 +192,10 @@ def test_AllS_TotalSolubility_IWp3() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -213,15 +211,15 @@ def test_AllS_TotalSolubility_IWp3() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "S2": 1.466040005579648,
+    target: dict[str, float] = {
         "OS": 1.8876140158988506,
+        "S2": 1.466040005579648,
         "O2S": 96.83727235805357,
         "O2": 0.0010329892821750164,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IWm3() -> None:
@@ -229,10 +227,10 @@ def test_AllS_TotalSolubility_IWm3() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="O2"),
         ]
     )
 
@@ -248,15 +246,15 @@ def test_AllS_TotalSolubility_IWm3() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "S2": 3.7052440315568952e-06,
+    target: dict[str, float] = {
         "OS": 2.9921318707665795e-06,
+        "S2": 3.7052440315568952e-06,
         "O2S": 1.5305309773280557e-07,
         "O2": 1.0269750531288816e-09,
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_HOS_Species_IW() -> None:
@@ -266,10 +264,10 @@ def test_HOS_Species_IW() -> None:
         [
             GasSpecies(formula="H2O", solubility=BasaltH2O()),
             GasSpecies(formula="H2", solubility=BasaltH2()),
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
+            GasSpecies(formula="O2"),
+            GasSpecies(formula="O2S"),
         ]
     )
 
@@ -288,7 +286,7 @@ def test_HOS_Species_IW() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
+    target: dict[str, float] = {
         "H2O": 0.9880831835505409,
         "H2": 0.9394385103704318,
         "OS": 0.002991611571529395,
@@ -298,7 +296,7 @@ def test_HOS_Species_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_CHONS_Species_IW_MixConstraints() -> None:
@@ -309,11 +307,11 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
         [
             GasSpecies(formula="H2O", solubility=BasaltH2O()),
             GasSpecies(formula="H2", solubility=BasaltH2()),
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="CO", solubility=NoSolubility()),
+            GasSpecies(formula="O2"),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="CO"),
             GasSpecies(formula="CO2", solubility=BasaltCO2()),
             GasSpecies(formula="N2", solubility=BasaltN2Libourel()),
         ]
@@ -337,20 +335,20 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "CO": 229.78209561323393,
-        "CO2": 47.25770263332629,
-        "H2": 0.9372769308635419,
+    target: dict[str, float] = {
         "H2O": 0.993868468772402,
-        "N2": 2.3492111506716515,
-        "O2": 1.0439522732151121e-06,
-        "O2S": 0.005715305744187322,
+        "H2": 0.9372769308635419,
         "OS": 0.003504432498947422,
         "S2": 0.004999999999999999,
+        "O2": 1.0439522732151121e-06,
+        "O2S": 0.005715305744187322,
+        "CO": 229.78209561323393,
+        "CO2": 47.25770263332629,
+        "N2": 2.3492111506716515,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_COS_Species_IW() -> None:
@@ -358,11 +356,11 @@ def test_COS_Species_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="CO", solubility=NoSolubility()),
+            GasSpecies(formula="O2"),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="CO"),
             GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
@@ -381,17 +379,17 @@ def test_COS_Species_IW() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "CO": 230.95725097056018,
-        "CO2": 47.49541654239574,
-        "O2": 1.043777676357166e-06,
-        "O2S": 0.0049587343906308,
+    target: dict[str, float] = {
         "OS": 0.003040782781419073,
         "S2": 0.0037651132245168973,
+        "O2": 1.043777676357166e-06,
+        "O2S": 0.0049587343906308,
+        "CO": 230.95725097056018,
+        "CO2": 47.49541654239574,
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_CHOS_Species_IW() -> None:
@@ -401,11 +399,11 @@ def test_CHOS_Species_IW() -> None:
         [
             GasSpecies(formula="H2O", solubility=BasaltH2O()),
             GasSpecies(formula="H2", solubility=BasaltH2()),
-            GasSpecies(formula="OS", solubility=NoSolubility()),
+            GasSpecies(formula="OS"),
             GasSpecies(formula="S2", solubility=BasaltS2()),
-            GasSpecies(formula="O2", solubility=NoSolubility()),
-            GasSpecies(formula="O2S", solubility=NoSolubility()),
-            GasSpecies(formula="CO", solubility=NoSolubility()),
+            GasSpecies(formula="O2"),
+            GasSpecies(formula="O2S"),
+            GasSpecies(formula="CO"),
             GasSpecies(formula="CO2", solubility=BasaltCO2()),
         ]
     )
@@ -427,16 +425,16 @@ def test_CHOS_Species_IW() -> None:
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    target_pressures: dict[str, float] = {
-        "CO": 229.93580441594614,
-        "CO2": 47.286325666730285,
-        "H2": 0.9373315297419959,
+    target: dict[str, float] = {
         "H2O": 0.9938635373137384,
-        "O2": 1.0438202991344499e-06,
-        "O2S": 0.004959035809733831,
+        "H2": 0.9373315297419959,
         "OS": 0.003040905529668846,
         "S2": 0.003765263450757495,
+        "O2": 1.0438202991344499e-06,
+        "O2S": 0.004959035809733831,
+        "CO": 229.93580441594614,
+        "CO2": 47.286325666730285,
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)

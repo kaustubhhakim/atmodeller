@@ -681,7 +681,7 @@ class GasSpecies(ChemicalComponent):
         del element
 
         planet: Planet = system.planet
-        pressure: float = system.solution_dict[self.formula]
+        pressure: float = system.solution_dict()[self.formula]
         fugacity: float = system.fugacities_dict[f"f{self.formula}"]
 
         # Atmosphere
@@ -763,7 +763,7 @@ class Species(UserList):
         initlist: Initial list of species. Defaults to None.
 
     Attributes:
-        data: List of species contained in the system.
+        data: List of species contained in the system
     """
 
     def __init__(self, initlist: list[ChemicalComponent] | None = None):
@@ -806,8 +806,18 @@ class Species(UserList):
 
     @property
     def condensed_species(self) -> dict[int, CondensedSpecies]:
-        """Condensed species."""
+        """Condensed species"""
         return filter_by_type(self, CondensedSpecies)
+
+    @property
+    def condensed_elements(self) -> list[str]:
+        """Elements in condensed species"""
+        elements: list[str] = []
+        for species in self.condensed_species.values():
+            elements.extend(species.elements)
+        unique_elements: list[str] = list(set(elements))
+
+        return unique_elements
 
     @property
     def number_condensed_species(self) -> int:
