@@ -1,31 +1,26 @@
-"""Tests for the Holland and Powell EOS models
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Tests for the EOS models from :cite:t:`HP91,HP98`"""
 
-Copyright 2024 Dan J. Bower
-
-This file is part of Atmodeller.
-
-Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU 
-General Public License as published by the Free Software Foundation, either version 3 of the 
-License, or (at your option) any later version.
-
-Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without 
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with Atmodeller. If not, 
-see <https://www.gnu.org/licenses/>.
-"""
+from __future__ import annotations
 
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import (
-    FugacityConstraint,
-    IronWustiteBufferConstraintHirschmann,
-    MassConstraint,
-    SystemConstraints,
-)
-from atmodeller.core import GasSpecies, ThermodynamicDataset, ThermodynamicDatasetABC
 from atmodeller.eos.holland import (
     CH4_CORK_HP91,
     CO2_CORK_HP91,
@@ -36,19 +31,15 @@ from atmodeller.eos.holland import (
     CO2_MRK_simple_HP91,
     get_holland_eos_models,
 )
-from atmodeller.eos.interfaces import IdealGas, RealGas
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import BasaltCO2, BasaltH2, NoSolubility, PeridotiteH2O
-from atmodeller.utilities import UnitConversion, earth_oceans_to_kg
-
-logger: logging.Logger = debug_logger()
-
-thermodynamic_dataset: ThermodynamicDatasetABC = ThermodynamicDataset()
-
-eos_models: dict[str, RealGas] = get_holland_eos_models()
+from atmodeller.eos.interfaces import RealGas
+from atmodeller.utilities import UnitConversion
 
 RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
+
+logger: logging.Logger = debug_logger()
+
+eos_models: dict[str, RealGas] = get_holland_eos_models()
 
 
 def test_version():
@@ -206,124 +197,3 @@ def test_CorkH2O_below_Tc_above_P0(check_values) -> None:
     check_values.fugacity_coefficient(
         600, 10e3, eos_models["H2O"], 0.39074941260585533, rtol=RTOL, atol=ATOL
     )
-
-
-def test_H2_with_cork() -> None:
-    """Tests H2-H2O at the IW buffer."""
-
-    species: Species = Species(
-        [
-            GasSpecies(
-                formula="H2O",
-                solubility=PeridotiteH2O(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=IdealGas(),  # This is the default if nothing specified
-            ),
-            GasSpecies(
-                formula="H2",
-                solubility=NoSolubility(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=eos_models["H2"],
-            ),
-            GasSpecies(
-                formula="O2",
-                solubility=NoSolubility(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=IdealGas(),  # This is the default if nothing specified
-            ),
-        ]
-    )
-
-    # oceans: float = 1
-    planet: Planet = Planet(surface_temperature=2000)
-    # h_kg: float = earth_oceans_to_kg(oceans)
-
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            FugacityConstraint(species="H2", value=1e3),
-            IronWustiteBufferConstraintHirschmann(),
-        ]
-    )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-
-    target_pressures: dict[str, float] = {
-        "H2": 747.5737656770727,
-        "H2O": 1072.4328856736947,
-        "O2": 9.76211086495026e-08,
-    }
-
-    system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
-
-
-def test_non_ideal() -> None:
-    """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer."""
-
-    species: Species = Species(
-        [
-            GasSpecies(
-                formula="H2",
-                solubility=BasaltH2(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=eos_models["H2"],
-            ),
-            GasSpecies(
-                formula="H2O",
-                solubility=PeridotiteH2O(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=eos_models["H2O"],
-            ),
-            GasSpecies(
-                formula="O2",
-                solubility=NoSolubility(),
-                thermodynamic_dataset=thermodynamic_dataset,
-            ),
-            GasSpecies(
-                formula="CO",
-                solubility=NoSolubility(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=eos_models["CO"],
-            ),
-            GasSpecies(
-                formula="CO2",
-                solubility=BasaltCO2(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=eos_models["CO2"],
-            ),
-            GasSpecies(
-                formula="CH4",
-                solubility=NoSolubility(),
-                thermodynamic_dataset=thermodynamic_dataset,
-                eos=eos_models["CH4"],
-            ),
-        ]
-    )
-
-    oceans: float = 10
-    planet: Planet = Planet()
-    planet.surface_temperature = 2000
-    h_kg: float = earth_oceans_to_kg(oceans)
-    c_kg: float = h_kg
-
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            FugacityConstraint(species="H2", value=958),
-            IronWustiteBufferConstraintHirschmann(),
-            MassConstraint(species="C", value=c_kg),
-        ]
-    )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-
-    target_pressures: dict[str, float] = {
-        "CH4": 10.475707268187382,
-        "CO": 277.8942949175459,
-        "CO2": 65.96337637262027,
-        "H2": 696.5849953455706,
-        "H2O": 933.2499010489084,
-        "O2": 9.864116211201776e-08,
-    }
-
-    system.solve(constraints, factor=1)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)

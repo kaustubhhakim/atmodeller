@@ -1,22 +1,7 @@
-#
-# Copyright 2024 Dan J. Bower
-#
-# This file is part of Atmodeller.
-#
-# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
-# General Public License as published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
-# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
-# see <https://www.gnu.org/licenses/>.
-#
-"""Tests for non-ideal systems with silicon"""
+"""Tests for nonideal gas behaviour
 
-from __future__ import annotations
+See the LICENSE file for licensing information.
+"""
 
 import logging
 
@@ -37,12 +22,15 @@ from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Spe
 from atmodeller.solubilities import BasaltH2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
-RTOL: float = 1.0e-8
-ATOL: float = 1.0e-8
+rtol: float = 1.0e-8
+atol: float = 1.0e-8
 
 logger: logging.Logger = debug_logger()
 
 eos_models: dict[str, RealGas] = get_saxena_eos_models()
+
+RTOL: float = 1.0e-8
+ATOL: float = 1.0e-8
 
 
 def test_version():
@@ -90,7 +78,7 @@ def test_SiHO_massSiH_nosolubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target, rtol=rtol, atol=atol)
 
 
 @pytest.mark.skip(reason="with condensed species mass balance another constraint is now required")
@@ -133,7 +121,7 @@ def test_SiHO_massSiH_solubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
 def test_SiHO_massH_logfO2_nosolubility() -> None:
@@ -173,7 +161,7 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
 def test_SiHO_massH_logfO2_solubility() -> None:
@@ -213,7 +201,7 @@ def test_SiHO_massH_logfO2_solubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
 def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
@@ -252,7 +240,7 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
 def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
@@ -290,7 +278,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
 
 
 if __name__ == "__main__":

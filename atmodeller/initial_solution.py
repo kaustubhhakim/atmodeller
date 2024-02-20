@@ -107,6 +107,7 @@ class InitialSolution(ABC):
         *,
         temperature: float,
         pressure: float,
+        degree_of_condensation_number: int,
         perturb: bool = False,
         perturb_log10: float = 2,
     ) -> np.ndarray:
@@ -116,6 +117,8 @@ class InitialSolution(ABC):
             constraints: Constraints on the interior-atmosphere system
             temperature: Temperature in K
             pressure: Pressure in bar
+            degree_of_condensation_number: Number of elements to solve for the degree of
+                condensation
             perturb: Randomaly perturb the log10 value by `perturb_log10`. Defaults to False
             perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
                 to 2.
@@ -141,6 +144,13 @@ class InitialSolution(ABC):
             log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
 
         self._conform_to_constraints(log10_value, constraints, temperature, pressure)
+
+        # When condensates and mass constraints are present, we assume an initial degree of
+        # condensation of 0.5 for each element. Recall that the (log10) solution quantity is:
+        # beta = log10(mu) = log10(d/(1-d)), where beta is the log10 mass of the condensed element,
+        # and d is the degree of condensation. Hence d = 0.5 gives mu = 1 gives beta = 0
+        log_degree_of_condensation: np.ndarray = np.zeros(degree_of_condensation_number)
+        log10_value = np.append(log10_value, log_degree_of_condensation)
 
         return log10_value
 

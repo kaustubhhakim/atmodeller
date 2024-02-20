@@ -681,7 +681,7 @@ class GasSpecies(ChemicalComponent):
         del element
 
         planet: Planet = system.planet
-        pressure: float = system.solution_dict[self.formula]
+        pressure: float = system.solution_dict()[self.formula]
         fugacity: float = system.fugacities_dict[f"f{self.formula}"]
 
         # Atmosphere
@@ -763,7 +763,7 @@ class Species(UserList):
         initlist: Initial list of species. Defaults to None.
 
     Attributes:
-        data: List of species contained in the system.
+        data: List of species contained in the system
     """
 
     def __init__(self, initlist: list[ChemicalComponent] | None = None):

@@ -369,7 +369,7 @@ class Output(UserDict):
             atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
 
         for species in interior_atmosphere.species.gas_species.values():
-            pressure: float = interior_atmosphere.solution_dict[species.formula]
+            pressure: float = interior_atmosphere.solution_dict()[species.formula]
             fugacity: float = interior_atmosphere.fugacities_dict[f"f{species.formula}"]
             fugacity_coefficient: float = (
                 10 ** interior_atmosphere.log10_fugacity_coefficients_dict[species.formula]
@@ -419,7 +419,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         data_list: list[dict[str, float]] = self.data.setdefault("solution", [])
-        data_list.append(interior_atmosphere.solution_dict)
+        data_list.append(interior_atmosphere.solution_dict())
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Output as a dictionary of dataframes

@@ -1,20 +1,22 @@
-"""Tests for the Saxena EOS models
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Tests for the Saxena EOS models"""
 
-Copyright 2024 Dan J. Bower
-
-This file is part of Atmodeller.
-
-Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU 
-General Public License as published by the Free Software Foundation, either version 3 of the 
-License, or (at your option) any later version.
-
-Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without 
-even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with Atmodeller. If not, 
-see <https://www.gnu.org/licenses/>.
-"""
+from __future__ import annotations
 
 import logging
 
@@ -23,12 +25,12 @@ from atmodeller.eos.interfaces import RealGas
 from atmodeller.eos.saxena import H2_SF87, get_saxena_eos_models
 from atmodeller.utilities import UnitConversion
 
+RTOL: float = 1.0e-8
+ATOL: float = 1.0e-8
+
 logger: logging.Logger = debug_logger()
 
 eos_models: dict[str, RealGas] = get_saxena_eos_models()
-
-RTOL: float = 1.0e-8
-ATOL: float = 1.0e-8
 
 
 def test_version():
