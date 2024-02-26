@@ -220,10 +220,10 @@ class _ReactionNetwork:
         """
         gibbs_energy: float = 0
         for species_index, species in enumerate(self.species.data):
-            assert species._thermodynamic_data is not None
+            assert species.thermodynamic_data is not None
             gibbs_energy += self.reaction_matrix[
                 reaction_index, species_index
-            ] * species._thermodynamic_data.get_formation_gibbs(
+            ] * species.thermodynamic_data.get_formation_gibbs(
                 temperature=temperature, pressure=pressure
             )
 

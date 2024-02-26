@@ -19,12 +19,13 @@
 from __future__ import annotations
 
 import logging
+import sys
 from abc import ABC, abstractmethod
 from collections import UserList
-from dataclasses import KW_ONLY, dataclass, field
+from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -37,20 +38,26 @@ from atmodeller.eos.interfaces import IdealGas, RealGas
 from atmodeller.solubilities import NoSolubility, Solubility, composition_solubilities
 from atmodeller.utilities import UnitConversion, filter_by_type
 
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 
-@dataclass(frozen=True)
-class ThermodynamicDataForSpeciesProtocol(Protocol):
-    """Protocol for a class with a method that returns the Gibbs energy of formation for a species.
+class ThermodynamicDataForSpeciesABC(ABC):
+    """Thermodynamic data for a species to compute the Gibbs energy of formation.
 
     Args:
         species: Species
         data_source: Source of the thermodynamic data
         data: Data used to compute the Gibbs energy of formation
+        *args: Arbitrary positional arguments may be used by child classes
+        **kwargs: Arbitrary keyword arguments may be used by child classes
 
     Attributes:
         species: Species
@@ -58,10 +65,12 @@ class ThermodynamicDataForSpeciesProtocol(Protocol):
         data: Data used to compute the Gibbs energy of formation
     """
 
-    species: ChemicalComponent
-    data_source: str
-    data: Any
+    def __init__(self, species: ChemicalComponent, data_source: str, data: Any):
+        self.species: ChemicalComponent = species
+        self.data_source: str = data_source
+        self.data: Any = data
 
+    @abstractmethod
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
         """Gets the standard Gibbs free energy of formation in J/mol.
 
@@ -72,7 +81,6 @@ class ThermodynamicDataForSpeciesProtocol(Protocol):
         Returns:
             The standard Gibbs free energy of formation in J/mol
         """
-        ...
 
 
 class ThermodynamicDatasetABC(ABC):
@@ -84,14 +92,17 @@ class ThermodynamicDatasetABC(ABC):
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
     @abstractmethod
-    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
-        """Gets the thermodynamic data for a species, otherwise None if not available
+    def get_species_data(
+        self, species: ChemicalComponent, **kwargs
+    ) -> ThermodynamicDataForSpeciesABC | None:
+        """Gets the thermodynamic data for a species or None if not available
 
         Args:
             species: Species
+            **kwargs: Arbitrary keyword arguments
 
         Returns:
-            Thermodynamic data for the species, otherwise None is not available
+            Thermodynamic data for the species or None if not available
         """
 
     @property
@@ -154,13 +165,22 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
 
         return formula_string
 
-    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
-        """See base class"""
+    @override
+    def get_species_data(
+        self,
+        species: ChemicalComponent,
+        *,
+        name: str | None = None,
+        filename: str | None = None,
+        **kwargs,
+    ) -> ThermodynamicDataForSpeciesABC | None:
+        """See base class."""
+        del kwargs
 
         db: janaf.Janafdb = janaf.Janafdb()
 
-        # Regardless of the user input for name_in_dataset, this is defined by JANAF convention.
-        species.name_in_dataset = self.get_modified_hill_formula(species)
+        # Defined by JANAF convention
+        janaf_formula: str = self.get_modified_hill_formula(species)
 
         def get_phase_data(phases: list[str]) -> janaf.JanafPhase | None:
             """Gets the phase data for a list of phases in order of priority.
@@ -173,7 +193,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             """
             try:
                 phase_data: janaf.JanafPhase | None = db.getphasedata(
-                    formula=species.name_in_dataset, phase=phases[0]
+                    formula=janaf_formula, name=name, phase=phases[0], filename=filename
                 )
             except ValueError:
                 # Cannot find the phase, so keep iterating through the list of options
@@ -197,52 +217,41 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             phase_data = get_phase_data(["l"])
 
         else:
-            msg: str = "Thermodynamic data is unknown for %s" % species.__class__.__name__
-            logger.error(msg)
-            msg = "%s does not support %s because it has no phase information" % (
-                self.__class__.__name__,
-                species.__class__.__name__,
-            )
-            logger.error(msg)
+            logger.error("Thermodynamic data is unknown for %s", species.__class__.__name__)
+            msg: str = f"{self.__class__.__name__} does not support {species.__class__.__name__} "
+            msg += " because it has no phase information"
             raise ValueError(msg)
 
         if phase_data is None:
             logger.warning(
-                "Thermodynamic data for %s is not available in %s (%s name = %s)",
+                "Thermodynamic data for %s (%s) not found in %s",
                 species.formula,
+                janaf_formula,
                 self.data_source,
-                self.data_source,
-                species.name_in_dataset,
             )
 
             return None
         else:
             logger.debug(
-                "Thermodynamic data for %s found in %s (%s name = %s)",
+                "Thermodynamic data for %s (%s) found in %s",
                 species.formula,
+                janaf_formula,
                 self.data_source,
-                self.data_source,
-                species.name_in_dataset,
             )
 
             return self.ThermodynamicDataForSpecies(species, self.data_source, phase_data)
 
-    @dataclass(frozen=True)
-    class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesProtocol):
-        """JANAF thermodynamic data for a species
+    class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesABC):
+        """JANAF thermodynamic data for a species"""
 
-        See base class.
-        """
+        @override
+        def __init__(self, species: ChemicalComponent, data_source: str, data: janaf.JanafPhase):
+            """See base class."""
+            super().__init__(species, data_source, data)
 
-        species: ChemicalComponent
-        data_source: str
-        data: janaf.JanafPhase
-
+        @override
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-            """Gets the standard Gibbs free energy of formation in J/mol.
-
-            See base class.
-            """
+            """See base class."""
             del pressure
             gibbs: float = self.data.DeltaG(temperature)
 
@@ -272,15 +281,20 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
         self.data = self.data.loc[:, :"Vmax"]
         self.data = self.data.astype(float)
 
-    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
+    @override
+    def get_species_data(
+        self, species: ChemicalComponent, name: str | None = None, **kwargs
+    ) -> ThermodynamicDataForSpeciesABC | None:
+        """See base class."""
+        del kwargs
+
         try:
-            phase_data: pd.Series | None = self.data.loc[species.name_in_dataset]
+            phase_data: pd.Series | None = self.data.loc[name]
             logger.debug(
-                "Thermodynamic data for %s found in %s (%s name = %s)",
+                "Thermodynamic data for %s (%s) found in %s",
                 species.formula,
+                name,
                 self.data_source,
-                self.data_source,
-                species.name_in_dataset,
             )
 
             return self.ThermodynamicDataForSpecies(
@@ -290,17 +304,15 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
         except KeyError:
             phase_data = None
             logger.warning(
-                "Thermodynamic data for %s is not available in %s (%s name = %s)",
+                "Thermodynamic data for %s (%s) not found in %s",
                 species.formula,
+                name,
                 self.data_source,
-                self.data_source,
-                species.name_in_dataset,
             )
 
             return None
 
-    @dataclass(frozen=True)
-    class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesProtocol):
+    class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesABC):
         """Holland and Powell thermodynamic data for a species
 
         Args:
@@ -314,17 +326,24 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             data_source: Source of the thermodynamic data
             data: Data used to compute the Gibbs energy of formation
             enthalpy_reference_temperature: Enthalpy reference temperature
-            dKdP: Derivative of bulk modulus (K) with respect to pressure. Set to 4.
-            dKdT_factor: Factor for computing the temperature-dependence of K. Set to 1.5e-4.
+            dkdp: Derivative of bulk modulus (K) with respect to pressure. Set to 4.
+            dkdt_factor: Factor for computing the temperature-dependence of K. Set to 1.5e-4.
         """
 
-        species: ChemicalComponent
-        data_source: str
-        data: pd.Series
-        enthalpy_reference_temperature: float
-        dKdP: float = field(init=False, default=4.0)
-        dKdT_factor: float = field(init=False, default=-1.5e-4)
+        @override
+        def __init__(
+            self,
+            species: ChemicalComponent,
+            data_source: str,
+            data: pd.Series,
+            enthalpy_reference_temperature: float,
+        ):
+            super().__init__(species, data_source, data)
+            self.enthalpy_reference_temperature: float = enthalpy_reference_temperature
+            self.dkdp: float = 4.0
+            self.dkdt_factor: float = -1.5e-4
 
+        @override
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
             """Gets the standard Gibbs free energy of formation in units of J/mol.
 
@@ -344,7 +363,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
             logger.debug(
                 "Species = %s, standard Gibbs energy of formation = %f",
-                self.species.name_in_dataset,
+                self.species.formula,
                 gibbs,
             )
 
@@ -359,21 +378,21 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             Returns:
                 Enthalpy in J
             """
-            H = self.data["Hf"]  # J
+            enthalpy0 = self.data["Hf"]  # J
             # Coefficients for calculating the heat capacity
             a = self.data["a"]  # J/K
             b = self.data["b"]  # J/K^2
             c = self.data["c"]  # J K
             d = self.data["d"]  # J K^(-1/2)
 
-            integral_H: float = (
-                H
+            enthalpy_integral: float = (
+                enthalpy0
                 + a * (temperature - self.enthalpy_reference_temperature)
                 + b / 2 * (temperature**2 - self.enthalpy_reference_temperature**2)
                 - c * (1 / temperature - 1 / self.enthalpy_reference_temperature)
                 + 2 * d * (temperature**0.5 - self.enthalpy_reference_temperature**0.5)
             )
-            return integral_H
+            return enthalpy_integral
 
         def _get_entropy(self, temperature: float) -> float:
             """Calculates the entropy at temperature.
@@ -384,21 +403,21 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             Returns:
                 Entropy in J/K
             """
-            S = self.data["S"]  # J/K
+            entropy0 = self.data["S"]  # J/K
             # Coefficients for calculating the heat capacity
             a = self.data["a"]  # J/K
             b = self.data["b"]  # J/K^2
             c = self.data["c"]  # J K
             d = self.data["d"]  # J K^(-1/2)
 
-            integral_S: float = (
-                S
+            entropy_integral: float = (
+                entropy0
                 + a * np.log(temperature / self.enthalpy_reference_temperature)
                 + b * (temperature - self.enthalpy_reference_temperature)
                 - c / 2 * (1 / temperature**2 - 1 / self.enthalpy_reference_temperature**2)
                 - 2 * d * (1 / temperature**0.5 - 1 / self.enthalpy_reference_temperature**0.5)
             )
-            return integral_S
+            return entropy_integral
 
         def _get_volume_at_temperature(self, temperature: float) -> float:
             """Calculates the volume at temperature.
@@ -413,14 +432,14 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             Returns:
                 Volume in J/bar
             """
-            V = self.data["V"]  # J/bar
+            volume0 = self.data["V"]  # J/bar
             alpha0 = self.data["a0"]  # K^(-1), thermal expansivity
 
-            volume_T: float = V * np.exp(
+            volume: float = volume0 * np.exp(
                 alpha0 * (temperature - self.enthalpy_reference_temperature)
                 - 2 * 10.0 * alpha0 * (temperature**0.5 - self.enthalpy_reference_temperature**0.5)
             )
-            return volume_T
+            return volume
 
         def _get_bulk_modulus_at_temperature(self, temperature: float) -> float:
             """Calculates the bulk modulus at temperature.
@@ -433,11 +452,11 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             Returns:
                 Bulk modulus in bar
             """
-            K = self.data["K"]  # Bulk modulus in bar
-            bulk_modulus_T: float = K * (
-                1 + self.dKdT_factor * (temperature - self.enthalpy_reference_temperature)
+            bulk_modulus0 = self.data["K"]  # Bulk modulus in bar
+            bulk_modulus: float = bulk_modulus0 * (
+                1 + self.dkdt_factor * (temperature - self.enthalpy_reference_temperature)
             )
-            return bulk_modulus_T
+            return bulk_modulus
 
         def _get_volume_pressure_integral(self, temperature: float, pressure: float) -> float:
             """Computes the volume-pressure integral.
@@ -451,15 +470,18 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             Returns:
                 The volume-pressure integral
             """
-            V_T: float = self._get_volume_at_temperature(temperature)
-            K_T: float = self._get_bulk_modulus_at_temperature(temperature)
-            integral_VP: float = (
-                V_T
-                * K_T
-                / (self.dKdP - 1)
-                * ((1 + self.dKdP * (pressure - 1.0) / K_T) ** (1.0 - 1.0 / self.dKdP) - 1)
+            volume: float = self._get_volume_at_temperature(temperature)
+            bulk_modulus: float = self._get_bulk_modulus_at_temperature(temperature)
+            integral_vp: float = (
+                volume
+                * bulk_modulus
+                / (self.dkdp - 1)
+                * (
+                    (1 + self.dkdp * (pressure - 1.0) / bulk_modulus) ** (1.0 - 1.0 / self.dkdp)
+                    - 1
+                )
             )  # J, use P-1.0 instead of P.
-            return integral_VP
+            return integral_vp
 
 
 class ThermodynamicDataset(ThermodynamicDatasetABC):
@@ -493,33 +515,33 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
         logger.info("Adding thermodynamic data: %s", dataset.data_source)
         self.datasets.append(dataset)
 
-    def get_data(self, species: ChemicalComponent) -> ThermodynamicDataForSpeciesProtocol | None:
+    @override
+    def get_species_data(
+        self, species: ChemicalComponent, **kwargs
+    ) -> ThermodynamicDataForSpeciesABC | None:
         """See base class."""
+        del kwargs
         for dataset in self.datasets:
             if dataset is not None:
-                return dataset.get_data(species)
+                return dataset.get_species_data(species)
 
-        msg: str = "Thermodynamic data for %s is not available in any dataset" % (species.formula)
-        logger.error(msg)
-        raise KeyError(msg)
+        raise KeyError(f"Thermodynamic data for {species.formula} is not available in any dataset")
 
 
-@dataclass
 class ChemicalComponent:
     """A chemical component and its properties
 
     Args:
         formula: Chemical formula (e.g., CO2, C, CH4, etc.)
-        phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively.
-        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
-        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset. Defaults to an
-            empty string which means the `formula` should be used.
+        phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively
+        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF.
+        name: Name in the thermodynamic dataset. Defaults to None.
+        filename: Filename in the thermodynamic dataset. Defaults to None.
 
     Attributes:
         formula: Chemical formula
         phase: Phase (cr, g, or l)
-        thermodynamic_dataset: The thermodynamic dataset
-        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        thermodynamic_data: The thermodynamic data for the species
         atoms: Number of atoms
         composition: Composition
         hill_formula: Hill formula
@@ -528,29 +550,30 @@ class ChemicalComponent:
         molar_mass: Molar mass
     """
 
-    formula: str
-    _phase: str
-    _: KW_ONLY
-    thermodynamic_dataset: ThermodynamicDatasetABC = field(
-        default_factory=ThermodynamicDatasetJANAF
-    )
-    name_in_dataset: str = ""  # Empty string to maintain type for type checking
-    _formula: Formula = field(init=False)
-    _thermodynamic_data: ThermodynamicDataForSpeciesProtocol | None = field(init=False)
-
-    def __post_init__(self):
-        if not self.name_in_dataset:  # Empty string
-            self.name_in_dataset = self.formula
-        self._formula = Formula(self.formula)
-        self._thermodynamic_data = self.thermodynamic_dataset.get_data(self)
-        assert self._thermodynamic_data is not None
+    def __init__(
+        self,
+        formula: str,
+        phase: str,
+        *,
+        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
+        name: str | None = None,
+        filename: str | None = None,
+    ):
+        self._formula: Formula = Formula(formula)
+        self.phase: str = phase
+        if thermodynamic_dataset is None:
+            thermodynamic_dataset_ = ThermodynamicDatasetJANAF()
+        else:
+            thermodynamic_dataset_: ThermodynamicDatasetABC = thermodynamic_dataset
+        self.thermodynamic_data: ThermodynamicDataForSpeciesABC | None = (
+            thermodynamic_dataset_.get_species_data(self, name=name, filename=filename)
+        )
+        assert self.thermodynamic_data is not None
         logger.info(
-            "Creating %s %s using thermodynamic data in %s (%s name = %s)",
+            "Creating %s %s using thermodynamic data in %s",
             self.__class__.__name__,
             self.formula,
-            self._thermodynamic_data.data_source,
-            self._thermodynamic_data.data_source,
-            self.name_in_dataset,
+            thermodynamic_dataset_.data_source,
         )
 
     @property
@@ -565,6 +588,10 @@ class ChemicalComponent:
     @property
     def elements(self) -> list[str]:
         return list(self.composition().keys())
+
+    @property
+    def formula(self) -> str:
+        return str(self._formula)
 
     @property
     def hill_formula(self) -> str:
@@ -597,11 +624,6 @@ class ChemicalComponent:
     def name(self) -> str:
         """Unique name, combining formula and phase"""
         return f"{self.formula}_{self.phase}"
-
-    @property
-    def phase(self) -> str:
-        """Phase"""
-        return self._phase
 
 
 def _mass_decorator(func) -> Callable:
@@ -639,24 +661,24 @@ def _mass_decorator(func) -> Callable:
     return mass_wrapper
 
 
-@dataclass
 class GasSpecies(ChemicalComponent):
     """A gas species
 
     Args:
         formula: Chemical formula (e.g. CO2, C, CH4, etc.)
+        phase: Phase. Defaults to g for gas.
         thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
-        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset. Defaults to an
-            empty string which means the `formula` should be used.
-        solubility: Solubility model. Defaults to no solubility
+        name: Name in the thermodynamic dataset. Defaults to None.
+        filename: Filename in the thermodynamic dataset. Defaults to None.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
-            Defaults to 0
+            Defaults to 0.
+        solubility: Solubility model. Defaults to no solubility
         eos: A gas equation of state. Defaults to an ideal gas.
 
     Attributes:
         formula: Chemical formula
-        thermodynamic_dataset: The thermodynamic dataset
-        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        phase: g for gas
+        thermodynamic_data: The thermodynamic data for the species
         atoms: Number of atoms
         composition: Composition
         hill_formula: Hill formula
@@ -668,11 +690,28 @@ class GasSpecies(ChemicalComponent):
         eos: A gas equation of state
     """
 
-    _phase: str = field(init=False, default="g")
-    _: KW_ONLY
-    solubility: Solubility = field(default_factory=NoSolubility)
-    solid_melt_distribution_coefficient: float = 0
-    eos: RealGas = field(default_factory=IdealGas)
+    def __init__(
+        self,
+        formula: str,
+        phase="g",
+        *,
+        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
+        name: str | None = None,
+        filename: str | None = None,
+        solid_melt_distribution_coefficient: float = 0,
+        solubility: Solubility | None = None,
+        eos: RealGas | None = None,
+    ):
+        super().__init__(
+            formula,
+            phase,
+            thermodynamic_dataset=thermodynamic_dataset,
+            name=name,
+            filename=filename,
+        )
+        self.solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
+        self.solubility: Solubility = NoSolubility() if solubility is None else solubility
+        self.eos: RealGas = IdealGas() if eos is None else eos
 
     @_mass_decorator
     def mass(
@@ -730,19 +769,20 @@ class GasSpecies(ChemicalComponent):
         return output
 
 
-@dataclass
 class CondensedSpecies(ChemicalComponent):
     """A condensed species
 
     Args:
         formula: Chemical formula (e.g., C, SiO2, etc.)
+        phase: Phase
         thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
-        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        name: Name in the thermodynamic dataset. Defaults to None.
+        filename: Filename in the thermodynamic dataset. Defaults to None.
 
     Attributes:
         formula: Chemical formula
-        thermodynamic_dataset: The thermodynamic dataset
-        name_in_dataset: Name for locating Gibbs data in the thermodynamic dataset
+        phase: Phase
+        thermodynamic_data: The thermodynamic data for the species
         atoms: Number of atoms
         composition: Composition
         hill_formula: Hill formula
@@ -752,26 +792,67 @@ class CondensedSpecies(ChemicalComponent):
         activity: Activity, which is always ideal
     """
 
-    _: KW_ONLY
-    activity: Constraint = field(init=False)
+    def __init__(
+        self,
+        formula: str,
+        phase: str,
+        *,
+        thermodynamic_dataset: ThermodynamicDatasetABC | None,
+        name: str | None,
+        filename: str | None,
+    ):
+        super().__init__(
+            formula,
+            phase,
+            thermodynamic_dataset=thermodynamic_dataset,
+            name=name,
+            filename=filename,
+        )
+        self.activity: Constraint = ActivityConstant(species=str(self.formula))
 
-    def __post_init__(self):
-        super().__post_init__()
-        self.activity = ActivityConstant(species=self.formula)
 
-
-@dataclass
 class SolidSpecies(CondensedSpecies):
     """Solid species"""
 
-    _phase: str = field(init=False, default="cr")
+    @override
+    def __init__(
+        self,
+        formula: str,
+        phase: str = "cr",
+        *,
+        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
+        name: str | None = None,
+        filename: str | None = None,
+    ):
+        super().__init__(
+            formula,
+            phase,
+            thermodynamic_dataset=thermodynamic_dataset,
+            name=name,
+            filename=filename,
+        )
 
 
 @dataclass
 class LiquidSpecies(CondensedSpecies):
     """Liquid species"""
 
-    _phase: str = field(init=False, default="l")
+    def __init__(
+        self,
+        formula: str,
+        phase: str = "l",
+        *,
+        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
+        name: str | None = None,
+        filename: str | None = None,
+    ):
+        super().__init__(
+            formula,
+            phase,
+            thermodynamic_dataset=thermodynamic_dataset,
+            name=name,
+            filename=filename,
+        )
 
 
 class Species(UserList):

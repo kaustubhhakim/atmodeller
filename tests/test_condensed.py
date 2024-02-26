@@ -26,6 +26,7 @@ from atmodeller.constraints import (
     IronWustiteBufferConstraintBallhaus,
     MassConstraint,
     SystemConstraints,
+    TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
@@ -72,10 +73,19 @@ def get_water_system(temperature: float = 300) -> InteriorAtmosphereSystem:
         temperature: Temperature in kelvin
     """
 
+    # Below to use 1 bar data for water
+    # phase_data = db.getphasedata(filename="H-065")
+    # Below to use 10 bar data for water
+    # phase_data = db.getphasedata(filename="H-066")
+    # Below to use 100 bar for water
+    # phase_data = db.getphasedata(filename="H-067")
+
     species_with_water: Species = Species(
         [
             GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO2"),
+            GasSpecies(formula="H2"),
+            # GasSpecies(formula="CO2"),
+            # GasSpecies(formula="CO"),
             GasSpecies(formula="O2"),
             LiquidSpecies(formula="H2O"),
         ]
@@ -212,16 +222,19 @@ def test_graphite_no_condensed() -> None:
 def test_water_half_condensed() -> None:
     """Tests including graphite with around 50% condensed C mass fraction."""
 
-    system: InteriorAtmosphereSystem = get_water_system(temperature=500)
+    system: InteriorAtmosphereSystem = get_water_system(temperature=450)
 
-    h_kg: float = earth_oceans_to_kg(0.125)
-    c_kg = 1 * h_kg
+    h_kg: float = earth_oceans_to_kg(1)
+    # c_kg = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBufferConstraintBallhaus(),
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            # IronWustiteBufferConstraintBallhaus(),
+            # TotalPressureConstraint(value=100),
+            FugacityConstraint(species="H2", value=91.55),
+            # FugacityConstraint(species="H2O", value=8.448),
+            # MassConstraint(species="H", value=h_kg),
+            # MassConstraint(species="C", value=c_kg),
         ]
     )
 
@@ -253,5 +266,8 @@ def test_water_half_condensed() -> None:
 
     # Uncomment below to dump the output to an Excel
     # system.output(file_prefix="H_50%_condensates", to_excel=True)
+
+    # Total pressure 10 bar (little CO2)
+    # Temperature 450 K
 
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
