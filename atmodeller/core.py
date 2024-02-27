@@ -22,7 +22,6 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from collections import UserList
-from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
@@ -56,8 +55,8 @@ class ThermodynamicDataForSpeciesABC(ABC):
         species: Species
         data_source: Source of the thermodynamic data
         data: Data used to compute the Gibbs energy of formation
-        *args: Arbitrary positional arguments may be used by child classes
-        **kwargs: Arbitrary keyword arguments may be used by child classes
+        *args: Arbitrary positional arguments used by child classes
+        **kwargs: Arbitrary keyword arguments used by child classes
 
     Attributes:
         species: Species
@@ -65,7 +64,9 @@ class ThermodynamicDataForSpeciesABC(ABC):
         data: Data used to compute the Gibbs energy of formation
     """
 
-    def __init__(self, species: ChemicalComponent, data_source: str, data: Any):
+    def __init__(self, species: ChemicalComponent, data_source: str, data: Any, *args, **kwargs):
+        del args
+        del kwargs
         self.species: ChemicalComponent = species
         self.data_source: str = data_source
         self.data: Any = data
@@ -259,9 +260,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
 
 
 class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
-    """Holland and Powell thermodynamic dataset
-
-    https://ui.adsabs.harvard.edu/abs/1998JMetG..16..309H
+    """Thermodynamic dataset from :cite:t:`HP91,HP98`.
 
     The book 'Equilibrium thermodynamics in petrology: an introduction' by R. Powell also has
     a useful appendix A with equations.
@@ -313,7 +312,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             return None
 
     class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesABC):
-        """Holland and Powell thermodynamic data for a species
+        """Thermodynamic data for a species
 
         Args:
             species: Species
@@ -345,15 +344,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
         @override
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-            """Gets the standard Gibbs free energy of formation in units of J/mol.
-
-            Args:
-                temperature: Temperature in kelvin
-                pressure: Pressure (total) in bar
-
-            Returns:
-                The standard Gibbs free energy of formation in J/mol
-            """
+            """See base class"""
             gibbs: float = self._get_enthalpy(temperature) - temperature * self._get_entropy(
                 temperature
             )
@@ -520,10 +511,9 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
         self, species: ChemicalComponent, **kwargs
     ) -> ThermodynamicDataForSpeciesABC | None:
         """See base class."""
-        del kwargs
         for dataset in self.datasets:
             if dataset is not None:
-                return dataset.get_species_data(species)
+                return dataset.get_species_data(species, **kwargs)
 
         raise KeyError(f"Thermodynamic data for {species.formula} is not available in any dataset")
 
@@ -833,7 +823,6 @@ class SolidSpecies(CondensedSpecies):
         )
 
 
-@dataclass
 class LiquidSpecies(CondensedSpecies):
     """Liquid species"""
 
