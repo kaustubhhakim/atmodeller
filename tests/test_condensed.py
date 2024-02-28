@@ -87,7 +87,7 @@ def get_water_system(temperature: float = 300) -> InteriorAtmosphereSystem:
             # GasSpecies(formula="CO2"),
             # GasSpecies(formula="CO"),
             GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O"),
+            LiquidSpecies(formula="H2O", name="Water, 100 Bar"),  # filename="H-067"),
         ]
     )
     planet: Planet = Planet()
