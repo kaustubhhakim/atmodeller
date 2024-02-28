@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 import numpy as np
 import pandas as pd
 from molmass import Composition, Formula
+from scipy.constants import kilo
 from thermochem import janaf
 
 from atmodeller import DATA_ROOT_PATH, NOBLE_GASES
@@ -256,7 +257,9 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
             """See base class."""
             del pressure
-            gibbs: float = self.data.DeltaG(temperature)
+            # thermochem v0.8.2 returns J not kJ. Main branch now returns kJ hence kilo conversion.
+            # https://github.com/adelq/thermochem/pull/25
+            gibbs: float = self.data.DeltaG(temperature) * kilo
 
             return gibbs
 
