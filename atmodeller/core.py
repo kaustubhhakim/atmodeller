@@ -197,7 +197,6 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
                 phase_data: janaf.JanafPhase | None = db.getphasedata(filename=filename)
             else:
                 try:
-                    print(janaf_formula, name, phases[0], filename)
                     phase_data = db.getphasedata(formula=janaf_formula, name=name, phase=phases[0])
                 except ValueError:
                     # Cannot find the phase, so keep iterating through the list of options
@@ -218,7 +217,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
             phase_data = get_phase_data(["cr", "ref"])  # ref included for C (graphite)
 
         elif isinstance(species, LiquidSpecies):
-            phase_data = get_phase_data(["l", "l,g"])
+            phase_data = get_phase_data(["l", "l,g"])  # l,g included for Water at 1, 10, 100 bar
 
         else:
             logger.error("Thermodynamic data is unknown for %s", species.__class__.__name__)
