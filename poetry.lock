@@ -3005,15 +3005,19 @@ version = "0.8.2"
 description = "Python utilities for thermodynamics and thermochemistry"
 optional = false
 python-versions = "*"
-files = [
-    {file = "thermochem-0.8.2-py2.py3-none-any.whl", hash = "sha256:f574b0844ac566c26c66f868231f64a9b90e4cc6256b6d383918cf9852e49b38"},
-    {file = "thermochem-0.8.2.tar.gz", hash = "sha256:28bc164a7c32c3f4adf6dd5daf548c48d8d0fb702c2d8f5cdfbd27258764b461"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 numpy = ">=1.2.1"
 pandas = ">=0.17.0"
 scipy = ">=0.6.0"
+
+[package.source]
+type = "git"
+url = "https://github.com/ExPlanetology/thermochem.git"
+reference = "HEAD"
+resolved_reference = "c43a817df8d58b6f7e1d9ba044c769e92f0678f2"
 
 [[package]]
 name = "threadpoolctl"
@@ -3210,4 +3214,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "e46d3540ed6003f4ceba47e2bc4ce8a1c6e2d77606711c1b04fd5ba1f1c6f064"
+content-hash = "eff4e4c9b4583db5a0570cc12eb72067bfe7643915792a4a4d52d5d3e16286c8"
