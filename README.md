@@ -1,7 +1,7 @@
 You have been granted advanced preview access of Atmodeller and therefore the development team requests the following:
 
 1. Do not distribute or share any parts of the code. Ask the development team directly if you would like other group members or colleagues to have access to the code.
-2. You are requested to inform the development team when you are using atmodeller to prepare results for a manuscript. The development team may request that one or several members of the development team are included as authors on your manuscript.
+2. If you are planning to use atmodeller to prepare results for a manuscript, you are requested to discuss this with the development team prior to commencing. This is to avoid any potential overlaps with ongoing projects within the development team. The development team may request that one or several members of the development team are included as authors on your manuscript.
 3. Involving members of the development team from the outset of your atmodeller projects is always encouraged, since we can help you to get the best performance from the code for your particular applications.
 4. Please provide feedback to the development team. We want to improve the code with your assistance!
 
