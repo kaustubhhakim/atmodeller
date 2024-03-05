@@ -44,42 +44,42 @@ class Planet:
     values suitable for modelling a fully molten Earth-like planet.
 
     Args:
-        mantle_mass: Mass of the planetary mantle in kg. Defaults to Earth.
+        planet_mass: Mass of the planet in kg. Defaults to Earth.
+        core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
+            to Earth.
         mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
-        core_mass_fraction: Mass fraction of the core relative to the planetary mass. Defaults to
-            Earth.
         surface_radius: Radius of the planetary surface in m. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
         melt_composition: Melt composition of the planet. Default is None.
 
     Attributes:
-        mantle_mass: Mass of the planetary mantle in kg
-        mantle_melt_fraction: Mass fraction of the mantle that is molten
+        planet_mass: Mass of the planet in kg
         core_mass_fraction: Mass fraction of the core relative to the planetary mass (kg/kg)
+        mantle_melt_fraction: Mass fraction of the mantle that is molten
         surface_radius: Radius of the planetary surface in m
         surface_temperature: Temperature of the planetary surface in kelvin
         melt_composition: Melt composition of the planet
-        planet_mass: Mass of the planet
-        mass_melt_mass: Mass of the mantle that is molten
-        mass_solid_mass: Mass of the mantle that is solid
+        mantle_mass: Mass of the mantle
+        mantle_melt_mass: Mass of the mantle that is molten
+        mantle_solid_mass: Mass of the mantle that is solid
         surface_area: Surface area of the planet
         surface_gravity: Surface gravity of the planet
     """
 
-    mantle_mass: float = 4.208261222595111e24
-    mantle_melt_fraction: float = 1.0
+    planet_mass: float = 5.972e24
     core_mass_fraction: float = 0.295334691460966
+    mantle_melt_fraction: float = 1.0
     surface_radius: float = 6371000.0
     surface_temperature: float = 2000.0
     melt_composition: str | None = None
-    planet_mass: float = field(init=False)
+    mantle_mass: float = field(init=False)
     mantle_melt_mass: float = field(init=False)
     mantle_solid_mass: float = field(init=False)
     surface_area: float = field(init=False)
     surface_gravity: float = field(init=False)
 
     def __post_init__(self):
-        self.planet_mass = self.mantle_mass / (1 - self.core_mass_fraction)
+        self.mantle_mass = self.planet_mass * (1 - self.core_mass_fraction)
         self.mantle_melt_mass = self.mantle_mass * self.mantle_melt_fraction
         self.mantle_solid_mass = self.mantle_mass * (1 - self.mantle_melt_fraction)
         self.surface_area = 4.0 * np.pi * self.surface_radius**2
