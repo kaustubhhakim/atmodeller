@@ -29,7 +29,7 @@ If you use *Atmodeller* please cite (prior to manuscript submission, check back 
 
 ## Quick install
 
-If you want a mostly GUI way of installing *Atmodeller* (and particularly if you are a Windows or Spyder user), see [here](https://gist.github.com/djbower/c82b4a70a3c3c74ad26dc572edefdd34). Otherwise, the instructions below are given in terms of terminal commands for a Mac, but equivalents exist for other operating systems.
+If you want a GUI way of installing *Atmodeller*, particularly if you are a Windows or Spyder user, see [here](https://gist.github.com/djbower/c82b4a70a3c3c74ad26dc572edefdd34). Otherwise, the instructions below should work to install *Atmodeller* using the terminal on a Mac or Linux system.
 
 Navigate to a location on your computer and obtain the *Atmodeller* source code:
 
@@ -41,7 +41,7 @@ The basic procedure is to install *Atmodeller* into an environment. For example,
     conda create -n atmodeller python
     conda activate atmodeller
 
-Install Atmodeller into the environment. The preference is to use [Poetry](https://python-poetry.org) because it allows greater flexibility and control over dependency management, and this is actually required if you want to install the dependencies for testing and documentation that are unfortunately not yet supported by `pip`. However, you can install the main *Atmodeller* package using pip as follows, where you can include the `-e` option if you want an [editable install ](https://setuptools.pypa.io/en/latest/userguide/development_mode.html).
+Install *Atmodeller* into the environment. The preference is to use [Poetry](https://python-poetry.org) because it allows greater flexibility and control over dependency management, and this is actually required if you want to install the dependencies for testing and documentation that are unfortunately not yet supported by `pip`. However, you can install the main *Atmodeller* package using pip as follows, where you can include the `-e` option if you want an [editable install ](https://setuptools.pypa.io/en/latest/userguide/development_mode.html).
 
 
     pip install .
