@@ -1,4 +1,4 @@
-# Advanced preview access
+# Advanced preview access (beta testing)
 
 You have been granted advanced preview access of *Atmodeller* and therefore the development team requests the following:
 
