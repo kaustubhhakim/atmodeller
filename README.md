@@ -29,7 +29,7 @@ If you use *Atmodeller* please cite (prior to manuscript submission, check back 
 
 ## Quick install
 
-The instructions are given in terms of terminal commands for a Mac, but equivalents exist for other systems.
+The instructions are given in terms of terminal commands for a Mac, but equivalents exist for other operating systems.
 
 Navigate to a location on your computer and obtain the *Atmodeller* source code:
 
@@ -41,7 +41,7 @@ The basic procedure is to install *Atmodeller* into an environment. For example,
     conda create -n atmodeller python
     conda activate atmodeller
 
-Install Atmodeller into the environment, where you can include the `-e` option if you want an [editable install ](https://setuptools.pypa.io/en/latest/userguide/development_mode.html).
+Install Atmodeller into the environment. The preference is to use [Poetry](https://python-poetry.org) because it allows greater flexibility and control over dependency management, and this is actually required if you want to install the dependencies for testing and documentation that are unfortunately not yet supported by `pip`. However, you can install the main *Atmodeller* package using pip as follows, where you can include the `-e` option if you want an [editable install ](https://setuptools.pypa.io/en/latest/userguide/development_mode.html).
 
 
     pip install .
@@ -58,6 +58,10 @@ You may need to *trust* the notebook before it will run.
 ## Developer install
 
 See this [developer setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3) to set up your system to develop *Atmodeller* using [VS Code](https://code.visualstudio.com) and [Poetry](https://python-poetry.org).
+
+## Documentation
+
+Documentation will eventually be available on readthedocs, but for the time being you can compile (and contribute if you wish) to the documentation in the `docs/` directory. To compile the documentation you will need to use Poetry and the option `--with docs` when you run `poetry install`. See [here](https://python-poetry.org/docs/managing-dependencies/) for further information.
 
 ## Tutorial
 
