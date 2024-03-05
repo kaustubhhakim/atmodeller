@@ -73,6 +73,27 @@ def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> dict
     return ordered_dict
 
 
+def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
+    """Bulk silicate Earth element masses in kg.
+
+    Hydrogen, carbon, and nitrogen from :cite:t:`SKG21`
+    Sulfur from :cite:t:`H16`
+    Chlorine from :cite:t:`KHK17`
+    """
+    earth_bse: dict[str, dict[str, float]] = {
+        "H": {"min": 1.852e20, "max": 1.894e21},
+        "C": {"min": 1.767e20, "max": 3.072e21},
+        "S": {"min": 8.416e20, "max": 1.052e21},
+        "N": {"min": 3.493e18, "max": 1.052e19},
+        "Cl": {"min": 7.574e19, "max": 1.431e20},
+    }
+
+    for _, values in earth_bse.items():
+        values["mean"] = np.mean((values["min"], values["max"]))  # type: ignore
+
+    return earth_bse
+
+
 def earth_oceans_to_kg(number_of_earth_oceans: float = 1) -> float:
     h_grams: float = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: float = UnitConversion().g_to_kg(h_grams)
