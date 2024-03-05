@@ -29,7 +29,7 @@ If you use *Atmodeller* please cite (prior to manuscript submission, check back 
 
 ## Quick install
 
-The instructions are given in terms of terminal commands for a Mac, but equivalents exist for other operating systems.
+If you want a mostly GUI way of installing *Atmodeller* (and particularly if you are a Windows or Spyder user), see [here](https://gist.github.com/djbower/c82b4a70a3c3c74ad26dc572edefdd34). Otherwise, the instructions below are given in terms of terminal commands for a Mac, but equivalents exist for other operating systems.
 
 Navigate to a location on your computer and obtain the *Atmodeller* source code:
 
