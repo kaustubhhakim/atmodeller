@@ -84,10 +84,8 @@ def get_water_system(temperature: float = 300) -> InteriorAtmosphereSystem:
         [
             GasSpecies(formula="H2O"),
             GasSpecies(formula="H2"),
-            # GasSpecies(formula="CO2"),
-            # GasSpecies(formula="CO"),
             GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", name="Water, 100 Bar"),  # filename="H-067"),
+            LiquidSpecies(formula="H2O", name="Water, 10 Bar"),
         ]
     )
     planet: Planet = Planet()
@@ -219,22 +217,29 @@ def test_graphite_no_condensed() -> None:
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
-def test_water_half_condensed() -> None:
-    """Tests including graphite with around 50% condensed C mass fraction."""
+def test_water_condensed_10bar() -> None:
+    """Tests including condensed water."""
 
-    system: InteriorAtmosphereSystem = get_water_system(temperature=450)
+    species_with_water: Species = Species(
+        [
+            GasSpecies(formula="H2O"),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
+            LiquidSpecies(formula="H2O", name="Water, 10 Bar"),
+        ]
+    )
+    planet: Planet = Planet()
+    planet.surface_temperature = 450
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species_with_water, planet=planet
+    )
 
     h_kg: float = earth_oceans_to_kg(1)
-    # c_kg = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            # IronWustiteBufferConstraintBallhaus(),
-            # TotalPressureConstraint(value=100),
-            FugacityConstraint(species="H2", value=91.55),
-            # FugacityConstraint(species="H2O", value=8.448),
-            # MassConstraint(species="H", value=h_kg),
-            # MassConstraint(species="C", value=c_kg),
+            FugacityConstraint(species="H2", value=4.821455660106787),
+            MassConstraint(species="H", value=h_kg),
         ]
     )
 
@@ -243,19 +248,16 @@ def test_water_half_condensed() -> None:
     # factsage_comparison: dict[str, float] = {
     #     "H2": 5.766,
     #     "H2O": 1.790,
-    #     "CO": 0.072,
-    #     "CO2": 0.060,
-    #     "CH4": 15.33,
     #     "O2": 1.268e-25,
     #     "degree_of_condensation_H": 0.513,
     # }
 
     target: dict[str, float] = {
-        "H2O_g": 23.077726277860233,
-        "CO2_g": 7.593719286176847,
-        "O2_g": 9.987214527646175e-50,
+        "H2O_g": 5.178544339893213,
+        "H2_g": 4.821455660106786,
+        "O2_g": 4.431323828352432e-52,
         "H2O_l": 1.0,
-        "degree_of_condensation_H": 0.489925255786694,
+        "degree_of_condensation_H": 0.9344220206230801,
     }
 
     system.solve(constraints)
@@ -264,10 +266,56 @@ def test_water_half_condensed() -> None:
     # msg: str = "Compatible with FactSage result"
     # system.isclose_tolerance(factsage_comparison, msg)
 
-    # Uncomment below to dump the output to an Excel
-    # system.output(file_prefix="H_50%_condensates", to_excel=True)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
-    # Total pressure 10 bar (little CO2)
-    # Temperature 450 K
+
+def test_water_condensed_100bar() -> None:
+    """Tests including condensed water."""
+
+    species_with_water: Species = Species(
+        [
+            GasSpecies(formula="H2O"),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
+            LiquidSpecies(formula="H2O", name="Water, 100 Bar"),
+        ]
+    )
+    planet: Planet = Planet()
+    planet.surface_temperature = 550
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species_with_water, planet=planet
+    )
+
+    h_kg: float = earth_oceans_to_kg(2)
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(species="H2", value=53.71953115689841),
+            MassConstraint(species="H", value=h_kg),
+        ]
+    )
+
+    # TODO: Update below when recomputed
+    # Calculated by Paolo 19/02/2024
+    # factsage_comparison: dict[str, float] = {
+    #     "H2": 5.766,
+    #     "H2O": 1.790,
+    #     "O2": 1.268e-25,
+    #     "degree_of_condensation_H": 0.513,
+    # }
+
+    target: dict[str, float] = {
+        "H2O_g": 46.280468843101616,
+        "H2_g": 53.71953115689844,
+        "O2_g": 5.5324593476958213e-42,
+        "H2O_l": 1.0,
+        "degree_of_condensation_H": 0.6414542027845724,
+    }
+
+    system.solve(constraints)
+
+    # TODO: Update
+    # msg: str = "Compatible with FactSage result"
+    # system.isclose_tolerance(factsage_comparison, msg)
 
     assert system.isclose(target, rtol=RTOL, atol=ATOL)

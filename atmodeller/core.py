@@ -235,12 +235,13 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
 
             return None
         else:
-            logger.debug(
+            logger.info(
                 "Thermodynamic data for %s (%s) found in %s",
                 species.formula,
                 janaf_formula,
                 self.data_source,
             )
+            logger.info("Phase data = %s", phase_data)
 
             return self.ThermodynamicDataForSpecies(species, self.data_source, phase_data)
 
