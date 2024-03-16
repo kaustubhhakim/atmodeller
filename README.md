@@ -29,31 +29,39 @@ If you use *Atmodeller* please cite (prior to manuscript submission, check back 
 
 ## Quick install
 
-If you want a GUI way of installing *Atmodeller*, particularly if you are a Windows or Spyder user, see [here](https://gist.github.com/djbower/c82b4a70a3c3c74ad26dc572edefdd34). Otherwise, the instructions below should work to install *Atmodeller* using the terminal on a Mac or Linux system.
+If you want to use a GUI to install the code, particularly if you are a Windows or Spyder user, see [here](https://gist.github.com/djbower/c82b4a70a3c3c74ad26dc572edefdd34). Otherwise, follow the instructions below to install the code using the terminal on a Mac or Linux system.
 
-Navigate to a location on your computer and obtain the *Atmodeller* source code:
+### 1. Obtain the source code
+
+Navigate to a location on your computer and obtain the source code:
 
     git clone git@github.com:ExPlanetology/atmodeller.git
     cd atmodeller
 
-The basic procedure is to install *Atmodeller* into an environment. For example, if you are using a Conda distribution to create Python environments (e.g. [Anaconda](https://www.anaconda.com/download)), create a new environment to install *Atmodeller*. *Atmodeller* requires Python >= 3.10:
+### 2. Create a Python environment
+
+The basic procedure is to install *Atmodeller* into a Python environment. For example, if you are using a Conda distribution to create Python environments (e.g. [Anaconda](https://www.anaconda.com/download)), create a new environment to install *Atmodeller*. *Atmodeller* requires Python >= 3.10:
 
     conda create -n atmodeller python
     conda activate atmodeller
 
-Install *Atmodeller* into the environment. The preference is to use [Poetry](https://python-poetry.org) because it allows greater flexibility and control over dependency management, and this is actually required if you want to install the dependencies for testing and documentation that are unfortunately not yet supported by `pip`. However, you can install the main *Atmodeller* package using pip as follows, where you can include the `-e` option if you want an [editable install ](https://setuptools.pypa.io/en/latest/userguide/development_mode.html).
+### 3. Install into the environment
 
+Install *Atmodeller* into the environment using either (a) [Poetry](https://python-poetry.org) or (b) [pip](https://pip.pypa.io/en/stable/getting-started/).
+
+#### 3a. Option 1: Poetry
+
+This requires that you have you have [Poetry](https://python-poetry.org) installed:
+
+    poetry install
+
+#### 3b. Option 2: pip
+
+Alternatively, use `pip`, where you can include the `-e` option if you want an [editable install ](https://setuptools.pypa.io/en/latest/userguide/development_mode.html).
 
     pip install .
 
-
-You can load the tutorials by specifying the path to the Jupyter notebook. For example, the first tutorial can be loaded with:
-
-
-    jupyter notebook notebooks/1_basics.ipynb
-
-
-You may need to *trust* the notebook before it will run.
+If desired, you will need to manually install the dependencies for testing and documentation (these are automatically installed by Poetry but not when using `pip`). See the additional dependencies to install in `pyproject.toml`.
 
 ## Developer install
 
