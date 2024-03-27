@@ -47,7 +47,7 @@ The basic procedure is to install *Atmodeller* into a Python environment. For ex
 
 ### 3. Install into the environment
 
-Install *Atmodeller* into the environment using either (a) [Poetry](https://python-poetry.org) or (b) [pip](https://pip.pypa.io/en/stable/getting-started/).
+Install *Atmodeller* into the environment using either (a) [Poetry](https://python-poetry.org) or (b) [pip](https://pip.pypa.io/en/stable/getting-started/). If you are a developer you will probably prefer to use Poetry and if you are an end-user you will probably prefer to use pip. This [Gist](https://gist.github.com/djbower/e9538e7eb5ed3deaf3c4de9dea41ebcd) provides further information.
 
 #### 3a. Option 1: Poetry
 
