@@ -161,6 +161,8 @@ cython_debug/
 
 .DS_Store
 
+poetry.lock
+
 # Atmodeller output file formats
 *.pdf
 *.pkl
