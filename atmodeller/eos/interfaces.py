@@ -44,13 +44,13 @@ class RealGasProtocol(Protocol):
 
 @dataclass(kw_only=True)
 class RealGas(ABC):
-    r"""A real gas equation of state (EOS)
+    r"""Real gas equation of state (EOS)
 
     Fugacity is computed using the standard relation:
 
     .. math::
 
-        R T \ln(f) = \int V dP
+        R T \ln f = \int V dP
 
     where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
     is volume, and :math:`P` is pressure.
@@ -269,7 +269,7 @@ class ModifiedRedlichKwongABC(RealGas):
             temperature: Temperature in K
 
         Returns:
-            MRK `a` parameter in units of
+            MRK `a` parameter in
             :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
         """
         raise NotImplementedError
@@ -277,7 +277,7 @@ class ModifiedRedlichKwongABC(RealGas):
     @property
     @abstractmethod
     def b(self) -> float:
-        r"""MRK `b` parameter computed from :attr:`b0`.
+        r"""MRK `b` parameter computed from :attr:`b0`
 
         Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
         """
@@ -286,19 +286,18 @@ class ModifiedRedlichKwongABC(RealGas):
 
 @dataclass(kw_only=True)
 class MRKExplicitABC(ModifiedRedlichKwongABC):
-    """A Modified Redlich Kwong (MRK) EOS with explicit equations for the volume and its integral.
+    """A Modified Redlich Kwong (MRK) EOS in explicit form"""
 
-    See base class.
-    """
-
+    @override
     def a(self, temperature: float) -> float:
-        """Parameter a in Equation 9, Holland and Powell (1991)
+        r"""MRK `a` parameter from :attr:`a_coefficients` :cite:p:`HP91{Equation 9}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
-            Parameter a in (m^3/mol)^2 K^(1/2) bar
+            MRK `a` parameter in units of
+            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
         """
         a: float = (
             self.a_coefficients[0] * self.critical_temperature ** (5.0 / 2)
@@ -311,30 +310,34 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
     @property
     def b(self) -> float:
-        """Parameter b in Equation 9, Holland and Powell (1991)
+        r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`
 
-        Returns:
-            Parameter b in m^3/mol
+        Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
         """
         b: float = self.b0 * self.critical_temperature / self.critical_pressure
 
         return b
 
-    @debug_decorator(logger)
+    @override
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume-explicit equation. Equation 7, Holland and Powell (1991).
+        r"""Volume-explicit equation :cite:p:`HP91{Equation 7}`
 
         Without complications of critical phenomena the MRK equation can be simplified using the
         approximation:
 
-            V ~ RT/P + b
+        .. math::
+
+            V \sim \frac{RT}{P} + b
+
+        where :math:`V` is volume, :math:`R` is the gas constant, :math:`T` is temperature,
+        :math:`P` is pressure, and :math:`b` is :attr:`b`.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            MRK volume in m^3/mol
+            MRK volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
         """
         volume: float = (
             GAS_CONSTANT_BAR * temperature / pressure
@@ -348,16 +351,16 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
         return volume
 
-    @debug_decorator(logger)
+    @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume-explicit integral (VdP). Equation 8, Holland and Powell (1991).
+        r"""Volume-explicit integral :cite:p:`HP91{Equation 8}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in J mol^(-1)
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
         volume_integral: float = (
             GAS_CONSTANT_BAR * temperature * np.log(pressure)
