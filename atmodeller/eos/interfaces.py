@@ -14,11 +14,12 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Interfaces for real gas equations of state"""
+"""Real gas equations of state"""
 
 from __future__ import annotations
 
 import logging
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -29,6 +30,11 @@ from numpy.polynomial.polynomial import Polynomial
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.utilities import UnitConversion, debug_decorator
 
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -38,32 +44,31 @@ class RealGasProtocol(Protocol):
 
 @dataclass(kw_only=True)
 class RealGas(ABC):
-    """A real gas equation of state (EOS)
+    r"""A real gas equation of state (EOS)
 
-    This base class requires a specification for the volume and volume integral. Then the
-    fugacity and related quantities can be computed using the standard relation:
+    Fugacity is computed using the standard relation:
 
-    RTlnf = integral(VdP)
+    .. math::
 
-    If critical_temperature and critical_pressure are set to their default value of unity, then
-    these quantities are effectively not used, and the model coefficients should be in terms of
-    the real temperature and pressure. But for corresponding state models, which are formulated in
-    terms of a reduced temperature and a reduced pressure, the critical_temperature and
-    critical_pressure must be set to appropriate values for the species under consideration.
+        R T \ln(f) = \int V dP
+
+    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
+    is volume, and :math:`P` is pressure.
+
+    ``critical_temperature`` and ``critical_pressure`` can be non-unity to allow for a
+    corresponding states model.
 
     Args:
-        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
-        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
-
-    Attributes:
-        critical_temperature: Critical temperature in kelvin
-        critical_pressure: Critical pressure in bar
-        standard_state_pressure: Standard state pressure
+        critical_temperature: Critical temperature in K. Defaults to unity, meaning not used.
+        critical_pressure: Critical pressure in bar. Defaults to unity, meaning not used.
     """
 
-    critical_temperature: float = 1  # Default of one is equivalent to not used
-    critical_pressure: float = 1  # Default of one is equivalent to not used
-    standard_state_pressure: float = field(init=False, default=1)  # 1 bar
+    critical_temperature: float = 1
+    """Critical temperature in K"""
+    critical_pressure: float = 1
+    """Critical pressure in bar"""
+    standard_state_pressure: float = field(init=False, default=1)
+    """Standard state pressure in bar"""
 
     def scaled_pressure(self, pressure: float) -> float:
         """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity
@@ -82,7 +87,7 @@ class RealGas(ABC):
         """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
             The scaled (reduced) temperature, which is dimensionless
@@ -91,32 +96,27 @@ class RealGas(ABC):
 
         return scaled_temperature
 
-    def compressibility_parameter(self, temperature: float, pressure: float, **kwargs) -> float:
-        """Compressibility parameter at temperature and pressure.
+    def compressibility_parameter(self, temperature: float, pressure: float) -> float:
+        """Compressibility parameter
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
-            **kwargs: Catches unused keyword arguments. Used for overrides in subclasses.
 
         Returns:
-            The compressibility parameter, Z, which is dimensionless
+            The compressibility parameter, which is dimensionless
         """
-        del kwargs
         volume: float = self.volume(temperature, pressure)
         volume_ideal: float = self.ideal_volume(temperature, pressure)
-        Z: float = volume / volume_ideal
+        compressibility_parameter: float = volume / volume_ideal
 
-        return Z
+        return compressibility_parameter
 
     def ln_fugacity(self, temperature: float, pressure: float) -> float:
         """Natural log of the fugacity
 
-        The fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and f0 is the
-        pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
-
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
@@ -131,11 +131,8 @@ class RealGas(ABC):
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Fugacity
 
-        The fugacity term in the exponential is non-dimensional (f'), where f'=f/f0 and f0 is the
-        pure gas fugacity at reference pressure of 1 bar under which f0 = P0 = 1 bar.
-
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
@@ -149,7 +146,7 @@ class RealGas(ABC):
         """Fugacity coefficient
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
@@ -160,14 +157,14 @@ class RealGas(ABC):
         return fugacity_coefficient
 
     def ideal_volume(self, temperature: float, pressure: float) -> float:
-        """Ideal volume
+        r"""Ideal volume
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            ideal volume in m^3 mol^(-1)
+            Ideal volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         volume_ideal: float = GAS_CONSTANT_BAR * temperature / pressure
 
@@ -175,65 +172,60 @@ class RealGas(ABC):
 
     @abstractmethod
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume
+        r"""Volume
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume in m^3 mol^(-1)
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        ...
 
     @abstractmethod
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP)
+        r"""Volume integral
 
-        Be careful with units. If this function uses the same constants (and GAS_CONSTANT_BAR) as
-        volume() then the units will be m^3 mol^(-1) bar. But this method requires that the units
-        returned are J mol^(-1). Hence the following conversion is often necessary:
+        .. math::
 
-            1 J = 10^(-5) m^(3) bar
+            \int V dP
 
-        There are functions to do this conversion in utilities.py.
+        This method requires that the units returned are :math:`\mathrm{J}\mathrm{mol}^{-1}`. Hence
+        the following conversion is often necessary:
+
+        .. math::
+
+            1\ \mathrm{J} = 10^{-5}\ \mathrm{m}^3\mathrm{bar}
+
+        There are functions to do this conversion in :class:`atmodeller.utilities.UnitConversion`.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in J mol^(-1)
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        ...
 
 
 @dataclass(kw_only=True)
 class IdealGas(RealGas):
-    """An ideal gas, PV=RT"""
+    r"""An ideal gas equation of state:
 
+    .. math::
+
+        R T = P V
+
+    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`P` is pressure, and
+    :math:`V` is volume.
+    """
+
+    @override
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Volume in m^3 mol^(-1)
-        """
         return self.ideal_volume(temperature, pressure)
 
+    @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Volume integral in J mol^(-1)
-        """
         volume_integral: float = GAS_CONSTANT_BAR * temperature * np.log(pressure)
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
@@ -242,54 +234,52 @@ class IdealGas(RealGas):
 
 @dataclass(kw_only=True)
 class ModifiedRedlichKwongABC(RealGas):
-    """A Modified Redlich Kwong (MRK) EOS
+    r"""A Modified Redlich Kwong (MRK) equation of state :cite:p:`{e.g.}HP91{Equation 3}`:
 
-    For example, Equation 3, Holland and Powell (1991):
-        P = RT/(V-b) - a/(V(V+b)T**0.5)
+    .. math::
 
-    where:
-        P is pressure
-        T is temperature
-        V is the molar volume
-        R is the gas constant
-        a is the Redlich-Kwong function, which is a function of T
-        b is the Redlich-Kwong constant b
+        P = \frac{RT}{V-b} - \frac{a(T)}{V(V+b)\sqrt{T}}
+
+    where :math:`P` is pressure, :math:`T` is temperature, :math:`V` is the molar volume, :math:`R`
+    the gas constant, :math:`a(T)` is the Redlich-Kwong function of :math:`T`, and  :math:`b` is
+    the Redlich-Kwong constant.
 
     Args:
-        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
-        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
-        a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter
-        b0: Coefficient to compute the Redlich-Kwong constant b
+        critical_temperature: Critical temperature in K. Defaults to unity, meaning not used.
+        critical_pressure: Critical pressure in bar. Defaults to unity, meaning not used.
+        a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) `a` parameter
+        b0: The Redlich-Kwong constant `b`
 
     Attributes:
-        critical_temperature: Critical temperature in kelvin
+        critical_temperature: Critical temperature in K
         critical_pressure: Critical pressure in bar
-        standard_state_pressure: Standard state pressure
-        a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) a parameter
-        b0: Coefficient to compute the Redlich-Kwong constant b
+        standard_state_pressure: Standard state pressure in bar
     """
 
     a_coefficients: tuple[float, ...]
+    """Coefficients for the Modified Redlich Kwong (MRK) `a` parameter"""
     b0: float
+    """The Redlich-Kwong constant `b`"""
 
     @abstractmethod
     def a(self, temperature: float) -> float:
-        """MRK a parameter computed from self.a_coefficients.
+        r"""MRK `a` parameter computed from :attr:`a_coefficients`.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
-            MRK a parameter in units of (m^3/mol)^2 K^(1/2) bar
+            MRK `a` parameter in units of
+            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
         """
         raise NotImplementedError
 
     @property
     @abstractmethod
     def b(self) -> float:
-        """MRK b parameter computed from self.b0.
+        r"""MRK `b` parameter computed from :attr:`b0`.
 
-        Independent of temperature. Units are volume (m^3/mol).
+        Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
         """
         raise NotImplementedError
 
@@ -416,7 +406,6 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
     @abstractmethod
     def delta_temperature_for_a(self, temperature: float) -> float:
         """Temperature difference for the calculation of the a parameter"""
-        ...
 
     @property
     def b(self) -> float:
@@ -549,7 +538,6 @@ class MRKCriticalBehaviour(RealGas):
         Returns:
             Saturation curve pressure in bar
         """
-        ...
 
     def volume(self, temperature: float, pressure: float) -> float:
         """Volume

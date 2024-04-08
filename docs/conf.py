@@ -65,6 +65,8 @@ bibtex_reference_style = "author_year"
 
 pygments_style = "sphinx"
 
+autodoc_member_order = "bysource"
+
 # Napoleon settings
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False
