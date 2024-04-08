@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Protocol
 
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
@@ -29,6 +30,10 @@ from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.utilities import UnitConversion, debug_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+class RealGasProtocol(Protocol):
+    def fugacity_coefficient(self, temperature: float, pressure: float) -> float: ...
 
 
 @dataclass(kw_only=True)

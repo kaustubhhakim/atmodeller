@@ -36,7 +36,7 @@ from thermochem import janaf
 
 from atmodeller import DATA_DIRECTORY, NOBLE_GASES
 from atmodeller.constraints import ActivityConstant, Constraint
-from atmodeller.eos.interfaces import IdealGas, RealGas
+from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.solubilities import NoSolubility, Solubility, composition_solubilities
 from atmodeller.utilities import UnitConversion, filter_by_type
 
@@ -700,7 +700,7 @@ class GasSpecies(ChemicalComponent):
         filename: str | None = None,
         solid_melt_distribution_coefficient: float = 0,
         solubility: Solubility | None = None,
-        eos: RealGas | None = None,
+        eos: RealGasProtocol | None = None,
     ):
         super().__init__(
             formula,
@@ -711,7 +711,7 @@ class GasSpecies(ChemicalComponent):
         )
         self.solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
         self.solubility: Solubility = NoSolubility() if solubility is None else solubility
-        self.eos: RealGas = IdealGas() if eos is None else eos
+        self.eos: RealGasProtocol = IdealGas() if eos is None else eos
 
     @_mass_decorator
     def mass(
