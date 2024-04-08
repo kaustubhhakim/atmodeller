@@ -43,7 +43,7 @@ OCEAN_MOLES: float = 7.68894973907177e22
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 """Mass of H2 in one present-day Earth ocean"""
 
-DATA_ROOT_PATH: Traversable = importlib.resources.files(f"{__package__}.data")
+DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 
 # Minimum and maximum values of log10(pressure) to prevent the initial solution from giving rise
 # to an excessively large total pressure that can cause numerical overflow or underflow.
@@ -63,7 +63,7 @@ logger.addHandler(logging.NullHandler())
 
 
 def complex_formatter() -> logging.Formatter:
-    """Complex formatter."""
+    """Complex formatter"""
     fmt: str = "[%(asctime)s - %(name)-30s - %(lineno)03d - %(levelname)-9s - %(funcName)s()]"
     fmt += " - %(message)s"
     datefmt: str = "%Y-%m-%d %H:%M:%S"
@@ -73,7 +73,11 @@ def complex_formatter() -> logging.Formatter:
 
 
 def simple_formatter() -> logging.Formatter:
-    """Simple formatter."""
+    """Simple formatter for logging
+
+    Returns:
+        Formatter for logging
+    """
     fmt: str = "[%(asctime)s - %(name)-30s - %(levelname)-9s] - %(message)s"
     datefmt: str = "%H:%M:%S"
     formatter: logging.Formatter = logging.Formatter(fmt, datefmt=datefmt)
@@ -82,8 +86,11 @@ def simple_formatter() -> logging.Formatter:
 
 
 def debug_logger() -> logging.Logger:
-    """Set up the logging for debugging: debug to the console."""
-    # Console logger
+    """Sets up debug logging to the console.
+
+    Returns:
+        A logger
+    """
     package_logger: logging.Logger = logging.getLogger(__name__)
     package_logger.setLevel(logging.DEBUG)
     package_logger.handlers = []
@@ -96,7 +103,11 @@ def debug_logger() -> logging.Logger:
 
 
 def debug_file_logger() -> logging.Logger:
-    """Set up the logging to a file (debug) and to the console (info)."""
+    """Sets up info logging to the console and debug logging to a file.
+
+    Returns:
+        A logger
+    """
     # Console logger
     package_logger: logging.Logger = logging.getLogger(__name__)
     package_logger.setLevel(logging.DEBUG)

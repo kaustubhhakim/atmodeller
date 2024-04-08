@@ -229,7 +229,7 @@ def test_water_condensed_10bar() -> None:
         ]
     )
     planet: Planet = Planet()
-    planet.surface_temperature = 450
+    planet.surface_temperature = 399  # 450
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species_with_water, planet=planet
     )

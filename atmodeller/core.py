@@ -18,10 +18,12 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import logging
 import sys
 from abc import ABC, abstractmethod
 from collections import UserList
+from contextlib import AbstractContextManager
 from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
@@ -32,7 +34,7 @@ from molmass import Composition, Formula
 from scipy.constants import kilo
 from thermochem import janaf
 
-from atmodeller import DATA_ROOT_PATH, NOBLE_GASES
+from atmodeller import DATA_DIRECTORY, NOBLE_GASES
 from atmodeller.constraints import ActivityConstant, Constraint
 from atmodeller.eos.interfaces import IdealGas, RealGas
 from atmodeller.solubilities import NoSolubility, Solubility, composition_solubilities
@@ -276,8 +278,11 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
     def __init__(self):
-        data_path: Path = DATA_ROOT_PATH / Path("Mindata161127.csv")  # type: ignore
-        self.data: pd.DataFrame = pd.read_csv(data_path, comment="#")
+        data: AbstractContextManager[Path] = importlib.resources.as_file(
+            DATA_DIRECTORY.joinpath("Mindata161127.csv")
+        )
+        with data as data_path:
+            self.data: pd.DataFrame = pd.read_csv(data_path, comment="#")
         self.data["name of phase component"] = self.data["name of phase component"].str.strip()
         self.data.rename(columns={"Unnamed: 1": "Abbreviation"}, inplace=True)
         self.data.drop(columns="Abbreviation", inplace=True)
