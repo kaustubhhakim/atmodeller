@@ -16,6 +16,8 @@
 #
 """Real gas equations of state"""
 
+# Use symbols from the relevant papers for consistency so pylint: disable=C0103
+
 from __future__ import annotations
 
 import logging
@@ -44,7 +46,7 @@ class RealGasProtocol(Protocol):
 
 @dataclass(kw_only=True)
 class RealGas(ABC):
-    r"""Real gas equation of state (EOS)
+    r"""A real gas equation of state (EOS)
 
     Fugacity is computed using the standard relation:
 
@@ -296,7 +298,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
             temperature: Temperature in K
 
         Returns:
-            MRK `a` parameter in units of
+            MRK `a` parameter in
             :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
         """
         a: float = (
@@ -310,7 +312,7 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
     @property
     def b(self) -> float:
-        r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`
+        r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`.
 
         Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
         """
@@ -380,23 +382,28 @@ class MRKExplicitABC(ModifiedRedlichKwongABC):
 
 @dataclass(kw_only=True)
 class MRKImplicitABC(ModifiedRedlichKwongABC):
-    """A Modified Redlich Kwong (MRK) EOS in an implicit form
+    r"""A Modified Redlich Kwong (MRK) EOS in implicit form
 
-    See base class.
+    Args:
+        Ta: Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting :cite:p:`HP91`.
+            Defaults to 0.
     """
 
+    # TODO: Is this required here? Is the default value of 0 necessary or risks bugs? Use None?
     Ta: float = 0
+    r"""Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting"""
 
+    @override
     def a(self, temperature: float) -> float:
-        """MRK a parameter for Equation 6, Holland and Powell (1991)
+        r"""MRK `a` parameter from :attr:`a_coefficients` :cite:p:`HP91{Equation 6}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
-            MRK a parameter in units of (m^3/mol)^2 K^(1/2) bar
+            MRK `a` parameter in
+            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
         """
-
         a: float = (
             self.a_coefficients[0]
             + self.a_coefficients[1] * self.delta_temperature_for_a(temperature)
@@ -408,62 +415,73 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
     @abstractmethod
     def delta_temperature_for_a(self, temperature: float) -> float:
-        """Temperature difference for the calculation of the a parameter"""
+        """Temperature difference for the calculation of the `a` parameter
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            A temperature difference
+        """
 
     @property
     def b(self) -> float:
-        """This class is not used for corresponding states which means b0 is the b coefficient."""
+        """MRK `b` parameter computed from :attr:`b0`.
+
+        :class:`~MRKImplicitABC` is not used for corresponding states models so :attr:`b0` is the
+        `b` coefficient.
+        """
         return self.b0
 
     def A_factor(self, temperature: float, pressure: float) -> float:
-        """A factor in Appendix A of Holland and Powell (1991)
+        """`A` factor :cite:p:`HP91{Appendix A}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            A factor, which is non-dimensional
+            `A` factor, which is non-dimensional
         """
         del pressure
-        A: float = self.a(temperature) / (self.b * GAS_CONSTANT_BAR * temperature**1.5)
+        A_factor: float = self.a(temperature) / (self.b * GAS_CONSTANT_BAR * temperature**1.5)
 
-        return A
+        return A_factor
 
     def B_factor(self, temperature: float, pressure: float) -> float:
-        """B factor in Appendix A of Holland and Powell (1991)
+        """`B` factor :cite:p:`HP91{Appendix A}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            B factor, which is non-dimensional
+            `B` factor, which is non-dimensional
         """
-        B: float = self.b * pressure / (GAS_CONSTANT_BAR * temperature)
+        B_factor: float = self.b * pressure / (GAS_CONSTANT_BAR * temperature)
 
-        return B
+        return B_factor
 
-    @debug_decorator(logger)
+    @override
     def volume_integral(
         self,
         temperature: float,
         pressure: float,
     ) -> float:
-        """Volume integral. Equation A.2., Holland and Powell (1991)
+        r"""Volume integral :cite:p:`HP91{Equation A.2}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in J mol^(-1)
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
         z: float = self.compressibility_parameter(temperature, pressure)
         A: float = self.A_factor(temperature, pressure)
         B: float = self.B_factor(temperature, pressure)
-        # The base class requires a specification of the volume_integral, but the equations in
-        # Holland and Powell (1991) are in terms of the fugacity coefficient.
+        # The base class requires a specification of the volume_integral, but the equations are in
+        # terms of the fugacity coefficient.
         ln_fugacity_coefficient: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
         ln_fugacity: float = np.log(pressure) + ln_fugacity_coefficient
         volume_integral: float = GAS_CONSTANT_BAR * temperature * ln_fugacity
@@ -472,14 +490,14 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         return volume_integral
 
     def volume_roots(self, temperature: float, pressure: float) -> np.ndarray:
-        """Real and (potentially) physically meaningful volume solutions of the MRK equation
+        r"""Real and (potentially) physically meaningful volume solutions of the MRK equation
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume solutions of the MRK equation in m^3 mol^(-1)
+            Volume solutions of the MRK equation in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         coefficients: list[float] = []
         coefficients.append(-self.a(temperature) * self.b / np.sqrt(temperature))
@@ -911,7 +929,7 @@ class CombinedEOSModel(RealGas):
 
 
 @dataclass(frozen=True)
-class critical_data:
+class CriticalData:
     """Critical temperature and pressure of a gas species.
 
     Args:
@@ -935,15 +953,15 @@ class critical_data:
 # insignificant differences in most cases, but their values are give in comments for completeness.
 # However, for H2 their critical values are significantly different and are therefore retained as
 # a separate entry.
-critical_data_dictionary: dict[str, critical_data] = {
-    "H2O": critical_data(647.25, 221.1925),
-    "CO2": critical_data(304.15, 73.8659),  # 304.2, 73.8 from Holland and Powell (1991)
-    "CH4": critical_data(191.05, 46.4069),  # 190.6, 46 from Holland and Powell (1991)
-    "CO": critical_data(133.15, 34.9571),  # 132.9, 35 from Holland and Powell (1991)
-    "O2": critical_data(154.75, 50.7638),
-    "H2": critical_data(33.25, 12.9696),
+critical_data_dictionary: dict[str, CriticalData] = {
+    "H2O": CriticalData(647.25, 221.1925),
+    "CO2": CriticalData(304.15, 73.8659),  # 304.2, 73.8 from Holland and Powell (1991)
+    "CH4": CriticalData(191.05, 46.4069),  # 190.6, 46 from Holland and Powell (1991)
+    "CO": CriticalData(133.15, 34.9571),  # 132.9, 35 from Holland and Powell (1991)
+    "O2": CriticalData(154.75, 50.7638),
+    "H2": CriticalData(33.25, 12.9696),
     # Holland and Powell (1991) require different critical parameters
-    "H2_Holland": critical_data(41.2, 21.1),
+    "H2_Holland": CriticalData(41.2, 21.1),
     # Holland and Powell (2011) state that the critical constants for S2 are taken from:
     # Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.
     # McGraw-Hill, New York.
@@ -952,13 +970,13 @@ critical_data_dictionary: dict[str, critical_data] = {
     # Shi and Saxena, Thermodynamic modeling of the C-H-O-S fluid system, American Mineralogist,
     # Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid phases.
     # http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
-    "S2": critical_data(208.15, 72.954),
-    "SO2": critical_data(430.95, 78.7295),
-    "COS": critical_data(377.55, 65.8612),
+    "S2": CriticalData(208.15, 72.954),
+    "SO2": CriticalData(430.95, 78.7295),
+    "COS": CriticalData(377.55, 65.8612),
     # Appendix A.19 in:
     # Poling, Prausnitz, and O'Connell, 2001. The Properties of Gases and Liquids, 5th edition.
     # McGraw-Hill, New York. DOI: 10.1036/0070116822.
-    "H2S": critical_data(373.55, 90.0779),  # 373.4, 0.08963
-    "N2": critical_data(126.2, 33.9),  # Saxena and Fei (1987)
-    "Ar": critical_data(151, 48.6),  # Saxena and Fei (1987)
+    "H2S": CriticalData(373.55, 90.0779),  # 373.4, 0.08963
+    "N2": CriticalData(126.2, 33.9),  # Saxena and Fei (1987)
+    "Ar": CriticalData(151, 48.6),  # Saxena and Fei (1987)
 }
