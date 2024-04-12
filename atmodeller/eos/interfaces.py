@@ -512,13 +512,13 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="V")
         logger.debug("MRK equation = %s", polynomial)
         volume_roots: np.ndarray = polynomial.roots()
-        # Numerical solution could result in a small imaginery component, even though the real
-        # root is purely real.
+        # Numerical solution could result in a small imaginery component, even though the root is
+        # real.
         real_roots: np.ndarray = np.real(volume_roots[np.isclose(volume_roots.imag, 0)])
         # Physically meaningful volumes must be positive.
         positive_roots: np.ndarray = real_roots[real_roots > 0]
         # In general, several roots could be returned, and subclasses will need to determine which
-        # is the correct volume to use.
+        # is the correct volume to use depending on the phase (liquid, gas, etc.)
         logger.debug("V = %s", positive_roots)
 
         return positive_roots
@@ -933,11 +933,11 @@ class CriticalData:
     """Critical temperature and pressure of a gas species.
 
     Args:
-        Tc: Critical temperature in kelvin
+        Tc: Critical temperature in K
         Pc: Critical pressure in bar
 
     Attributes:
-        Tc: Critical temperature in kelvin
+        Tc: Critical temperature in K
         Pc: Critical pressure in bar
     """
 

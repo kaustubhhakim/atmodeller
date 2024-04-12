@@ -43,6 +43,34 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
+def test_H2O() -> None:
+    """Tests H2O (a single species)"""
+
+    species: Species = Species([GasSpecies(formula="H2O", solubility=PeridotiteH2O())])
+
+    oceans: float = 2
+    planet: Planet = Planet()
+    h_kg: float = earth_oceans_to_kg(oceans)
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target: dict[str, float] = {
+        "H2O": 1.0312913336898137,
+    }
+
+    system.solve(constraints)
+
+    system.output(to_excel=True)
+
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+
+
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 

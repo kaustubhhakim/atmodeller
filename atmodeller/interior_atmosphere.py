@@ -104,14 +104,18 @@ class _ReactionNetwork:
         self.species: Species = species
         logger.info("Creating a reaction network")
         logger.info("Species = %s", self.species.names)
-        self.reaction_matrix: np.ndarray = self._partial_gaussian_elimination()
+        self.reaction_matrix: np.ndarray | None = self._partial_gaussian_elimination()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
     @property
     def number_reactions(self) -> int:
-        return self.species.number - self.species.number_elements
+        if self.species.number == 1:
+            return 0
+        else:
+            assert self.reaction_matrix is not None
+            return self.reaction_matrix.shape[0]
 
-    def _partial_gaussian_elimination(self) -> np.ndarray:
+    def _partial_gaussian_elimination(self) -> np.ndarray | None:
         """Performs a partial gaussian elimination to determine the required reactions.
 
         A copy of `self.species_matrix` is first (partially) reduced to row echelon form by
@@ -123,6 +127,10 @@ class _ReactionNetwork:
         Returns:
             A matrix of the reaction stoichiometry.
         """
+        if self.species.number == 1:
+            logger.debug("Only one species therefore no reactions")
+            return None
+
         matrix1: np.ndarray = self.species.composition_matrix()
         matrix2: np.ndarray = np.eye(self.species.number)
         augmented_matrix: np.ndarray = np.hstack((matrix1, matrix2))
@@ -164,21 +172,22 @@ class _ReactionNetwork:
     def reactions(self) -> dict[int, str]:
         """The reactions as a dictionary"""
         reactions: dict[int, str] = {}
-        for reaction_index in range(self.number_reactions):
-            reactants: str = ""
-            products: str = ""
-            for species_index, species in enumerate(self.species.data):
-                coeff: float = self.reaction_matrix[reaction_index, species_index]
-                if coeff != 0:
-                    if coeff < 0:
-                        reactants += f"{abs(coeff)} {species.name} + "
-                    else:
-                        products += f"{coeff} {species.name} + "
+        if self.reaction_matrix is not None:
+            for reaction_index in range(self.number_reactions):
+                reactants: str = ""
+                products: str = ""
+                for species_index, species in enumerate(self.species.data):
+                    coeff: float = self.reaction_matrix[reaction_index, species_index]
+                    if coeff != 0:
+                        if coeff < 0:
+                            reactants += f"{abs(coeff)} {species.name} + "
+                        else:
+                            products += f"{coeff} {species.name} + "
 
-            reactants = reactants.rstrip(" + ")
-            products = products.rstrip(" + ")
-            reaction: str = f"{reactants} = {products}"
-            reactions[reaction_index] = reaction
+                reactants = reactants.rstrip(" + ")
+                products = products.rstrip(" + ")
+                reaction: str = f"{reactants} = {products}"
+                reactions[reaction_index] = reaction
 
         return reactions
 
@@ -219,6 +228,7 @@ class _ReactionNetwork:
             The Gibb's free energy of the reaction
         """
         gibbs_energy: float = 0
+        assert self.reaction_matrix is not None
         for species_index, species in enumerate(self.species.data):
             assert species.thermodynamic_data is not None
             gibbs_energy += self.reaction_matrix[
@@ -252,7 +262,8 @@ class _ReactionNetwork:
             )
 
         coeff: np.ndarray = np.zeros((nrows, self.species.number))
-        coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
+        if self.reaction_matrix is not None:
+            coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
