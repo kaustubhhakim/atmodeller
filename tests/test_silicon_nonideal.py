@@ -1,7 +1,22 @@
-"""Tests for nonideal gas behaviour
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Tests for non-ideal systems with silicon"""
 
-See the LICENSE file for licensing information.
-"""
+from __future__ import annotations
 
 import logging
 
@@ -22,15 +37,12 @@ from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Spe
 from atmodeller.solubilities import BasaltH2, PeridotiteH2O
 from atmodeller.utilities import earth_oceans_to_kg
 
-rtol: float = 1.0e-8
-atol: float = 1.0e-8
+RTOL: float = 1.0e-8
+ATOL: float = 1.0e-8
 
 logger: logging.Logger = debug_logger()
 
 eos_models: dict[str, RealGas] = get_saxena_eos_models()
-
-RTOL: float = 1.0e-8
-ATOL: float = 1.0e-8
 
 
 def test_version():
@@ -78,7 +90,7 @@ def test_SiHO_massSiH_nosolubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target, rtol=rtol, atol=atol)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 @pytest.mark.skip(reason="with condensed species mass balance another constraint is now required")
@@ -121,7 +133,7 @@ def test_SiHO_massSiH_solubility() -> None:
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_massH_logfO2_nosolubility() -> None:
@@ -152,16 +164,16 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2": 3552.669457706052,
-        "H2O": 4767.286871920151,
-        "O2": 0.03382190282100078,
-        "OSi": 14.517388181293816,
-        "H4Si": 0.008762061109896661,
-        "SiO2": 1.0,
+        "H2_g": 3552.669457706052,
+        "H2O_G": 4767.286871920151,
+        "O2_G": 0.03382190282100078,
+        "OSi_G": 14.517388181293816,
+        "H4Si_g": 0.008762061109896661,
+        "SiO2_l": 1.0,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_massH_logfO2_solubility() -> None:
@@ -192,16 +204,16 @@ def test_SiHO_massH_logfO2_solubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2": 337.17023763048417,
-        "H2O": 378.88646918406965,
-        "O2": 0.025481748164747447,
-        "OSi": 16.72526080495589,
-        "H4Si": 9.750334904890755e-05,
-        "SiO2": 1.0,
+        "H2_g": 337.17023763048417,
+        "H2O_g": 378.88646918406965,
+        "O2_g": 0.025481748164747447,
+        "OSi_g": 16.72526080495589,
+        "H4Si_g": 9.750334904890755e-05,
+        "SiO2_l": 1.0,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
@@ -231,16 +243,16 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2": 1868.1256657071128,
-        "H2O": 2116.1052597622975,
-        "O2": 0.02877934211561468,
-        "OSi": 15.737910722708122,
-        "H4Si": 0.002384364181797566,
-        "SiO2": 1.0,
+        "H2_g": 1868.1256657071128,
+        "H2O_G": 2116.1052597622975,
+        "O2_g": 0.02877934211561468,
+        "OSi_g": 15.737910722708122,
+        "H4Si_g": 0.002384364181797566,
+        "SiO2_l": 1.0,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
@@ -269,16 +281,16 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2": 3668.5524293467392,
-        "H2O": 4999.9999999999945,
-        "O2": 0.03426380501584421,
-        "OSi": 14.42346859651946,
-        "H4Si": 0.00939136258814609,
-        "SiO2": 1.0,
+        "H2_g": 3668.5524293467392,
+        "H2O_g": 4999.9999999999945,
+        "O2_g": 0.03426380501584421,
+        "OSi_g": 14.42346859651946,
+        "H4Si_G": 0.00939136258814609,
+        "SiO2_l": 1.0,
     }
 
     system.solve(SystemConstraints(constraints))
-    assert system.isclose(target_pressures, rtol=rtol, atol=atol)
+    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 if __name__ == "__main__":

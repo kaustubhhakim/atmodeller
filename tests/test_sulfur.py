@@ -73,9 +73,9 @@ def test_S2_SO_Sulfide_IW() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OS": 6.018454943818516e-05,
-        "S2": 1e-05,
-        "O2": 8.699485217915599e-08,
+        "OS_g": 6.018454943818516e-05,
+        "S2_g": 1e-05,
+        "O2_g": 8.699485217915599e-08,
     }
 
     system.solve(constraints)
@@ -107,10 +107,10 @@ def test_AllS_Sulfide_IW() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OS": 0.002991983415707734,
-        "S2": 0.003704873878513222,
-        "O2S": 0.004839725408460836,
-        "O2": 1.0269757432683765e-06,
+        "OS_g": 0.002991983415707734,
+        "S2_g": 0.003704873878513222,
+        "O2S_g": 0.004839725408460836,
+        "O2_g": 1.0269757432683765e-06,
     }
 
     system.solve(constraints)
@@ -142,10 +142,10 @@ def test_AllS_Sulfate_IW() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OS": 0.6267850732546694,
-        "S2": 161.05514086015452,
-        "O2S": 1.0186830187658191,
-        "O2": 1.0367593216540548e-06,
+        "OS_g": 0.6267850732546694,
+        "S2_g": 161.05514086015452,
+        "O2S_g": 1.0186830187658191,
+        "O2_g": 1.0367593216540548e-06,
     }
 
     system.solve(constraints)
@@ -177,10 +177,10 @@ def test_AllS_TotalSolubility_IW() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OS": 0.00299198314542162,
-        "S2": 0.0037048732091408782,
-        "O2S": 0.0048397249712554885,
-        "O2": 1.0269757432682946e-06,
+        "OS_g": 0.00299198314542162,
+        "S2_g": 0.0037048732091408782,
+        "O2S_g": 0.0048397249712554885,
+        "O2_g": 1.0269757432682946e-06,
     }
 
     system.solve(constraints)
@@ -212,10 +212,10 @@ def test_AllS_TotalSolubility_IWp3() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OS": 1.8876140158988506,
-        "S2": 1.466040005579648,
-        "O2S": 96.83727235805357,
-        "O2": 0.0010329892821750164,
+        "OS_g": 1.8876140158988506,
+        "S2_g": 1.466040005579648,
+        "O2S_g": 96.83727235805357,
+        "O2_g": 0.0010329892821750164,
     }
 
     system.solve(constraints)
@@ -247,10 +247,10 @@ def test_AllS_TotalSolubility_IWm3() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OS": 2.9921318707665795e-06,
-        "S2": 3.7052440315568952e-06,
-        "O2S": 1.5305309773280557e-07,
-        "O2": 1.0269750531288816e-09,
+        "OS_g": 2.9921318707665795e-06,
+        "S2_g": 3.7052440315568952e-06,
+        "O2S_g": 1.5305309773280557e-07,
+        "O2_g": 1.0269750531288816e-09,
     }
 
     system.solve(constraints, factor=1)
@@ -287,12 +287,12 @@ def test_HOS_Species_IW() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O": 0.9880831835505409,
-        "H2": 0.9394385103704318,
-        "OS": 0.002991611571529395,
-        "S2": 0.0037035369886239495,
-        "O2": 1.0270911157002842e-06,
-        "O2S": 0.004839395737226402,
+        "H2O_g": 0.9880831835505409,
+        "H2_g": 0.9394385103704318,
+        "OS_g": 0.002991611571529395,
+        "S2_g": 0.0037035369886239495,
+        "O2_g": 1.0270911157002842e-06,
+        "O2S_g": 0.004839395737226402,
     }
 
     system.solve(constraints)
@@ -336,15 +336,15 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O": 0.993868468772402,
-        "H2": 0.9372769308635419,
-        "OS": 0.003504432498947422,
-        "S2": 0.004999999999999999,
-        "O2": 1.0439522732151121e-06,
-        "O2S": 0.005715305744187322,
-        "CO": 229.78209561323393,
-        "CO2": 47.25770263332629,
-        "N2": 2.3492111506716515,
+        "H2O_g": 0.993868468772402,
+        "H2_g": 0.9372769308635419,
+        "OS_g": 0.003504432498947422,
+        "S2_g": 0.004999999999999999,
+        "O2_g": 1.0439522732151121e-06,
+        "O2S_g": 0.005715305744187322,
+        "CO_g": 229.78209561323393,
+        "CO2_g": 47.25770263332629,
+        "N2_g": 2.3492111506716515,
     }
 
     system.solve(constraints)
@@ -380,12 +380,12 @@ def test_COS_Species_IW() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OS": 0.003040782781419073,
-        "S2": 0.0037651132245168973,
-        "O2": 1.043777676357166e-06,
-        "O2S": 0.0049587343906308,
-        "CO": 230.95725097056018,
-        "CO2": 47.49541654239574,
+        "OS_g": 0.003040782781419073,
+        "S2_g": 0.0037651132245168973,
+        "O2_g": 1.043777676357166e-06,
+        "O2S_g": 0.0049587343906308,
+        "CO_g": 230.95725097056018,
+        "CO2_g": 47.49541654239574,
     }
 
     system.solve(constraints, factor=1)
@@ -426,14 +426,14 @@ def test_CHOS_Species_IW() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O": 0.9938635373137384,
-        "H2": 0.9373315297419959,
-        "OS": 0.003040905529668846,
-        "S2": 0.003765263450757495,
-        "O2": 1.0438202991344499e-06,
-        "O2S": 0.004959035809733831,
-        "CO": 229.93580441594614,
-        "CO2": 47.286325666730285,
+        "H2O_g": 0.9938635373137384,
+        "H2_g": 0.9373315297419959,
+        "OS_g": 0.003040905529668846,
+        "S2_g": 0.003765263450757495,
+        "O2_g": 1.0438202991344499e-06,
+        "O2S_g": 0.004959035809733831,
+        "CO_g": 229.93580441594614,
+        "CO2_g": 47.286325666730285,
     }
 
     system.solve(constraints)

@@ -591,13 +591,13 @@ class InteriorAtmosphereSystem:
         if len((self.solution_dict())) != len(target_dict):
             return np.bool_(False)
 
-        target_values: list = list(target_dict.values())
-        solution_values: list = list(self.solution_dict().values())
+        target_values: list = list(dict(sorted(target_dict.items())).values())
+        solution_values: list = list(dict(sorted(self.solution_dict().items())).values())
         isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
 
         return isclose
 
-    def isclose_tolerance(self, target_dict: dict[str, float], message: str) -> float | None:
+    def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
         """Writes a log message with the tightest tolerance that is satisfied.
 
         Args:
@@ -610,10 +610,10 @@ class InteriorAtmosphereSystem:
         for log_tolerance in (-6, -5, -4, -3, -2, -1):
             tol: float = 10**log_tolerance
             if self.isclose(target_dict, rtol=tol, atol=tol):
-                logger.info("%s (tol = %f)", message, tol)
+                logger.info("%s (tol = %f)".lstrip(), message, tol)
                 return tol
 
-        logger.info("%s (no tolerance < 0.1 satisfied)", message)
+        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
 
     def solve(
         self,

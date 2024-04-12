@@ -74,9 +74,9 @@ def test_pH2_fO2_holland() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O": 1441.892430083237,
-        "H2": 1000.0,
-        "O2": 1.0154197223693444e-07,
+        "H2O_g": 1441.892430083237,
+        "H2_g": 1000.0,
+        "O2_g": 1.0154197223693444e-07,
     }
 
     system.solve(constraints)
@@ -109,9 +109,9 @@ def test_fH2_fO2_holland() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O": 989.1708427772087,
-        "H2": 756.9484278838194,
-        "O2": 9.71654424299468e-08,
+        "H2O_g": 989.1708427772087,
+        "H2_g": 756.9484278838194,
+        "O2_g": 9.71654424299468e-08,
     }
 
     system.solve(constraints)
@@ -149,12 +149,12 @@ def test_H_and_C_holland() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2": 695.640114660725,
-        "H2O": 941.5985234431984,
-        "O2": 9.86913046974216e-08,
-        "CO": 277.80794508391784,
-        "CO2": 66.71386181033674,
-        "CH4": 10.433657059802755,
+        "H2_g": 695.640114660725,
+        "H2O_g": 941.5985234431984,
+        "O2_g": 9.86913046974216e-08,
+        "CO_g": 277.80794508391784,
+        "CO2_g": 66.71386181033674,
+        "CH4_g": 10.433657059802755,
     }
 
     system.solve(constraints)
