@@ -219,9 +219,9 @@ class BasaltH2OMitchell(SolubilityPowerLaw):
     """H2O solubility in basaltic melt :cite:p:`MGO17`
 
     Refitted the H2O wt. % vs. fH2O fitted line from their Figure 8 to a power-law. Experiments
-    conducted at 1200 C and 1000 MPa total pressure. Mitchell's Figure 8 fit includes data from their
-    experiments and prior studies on H2O solubility in basaltic melt at 1200 C and P at or below
-    600 MPa.
+    conducted at 1200 C and 1000 MPa total pressure. Mitchell's Figure 8 fit includes data from
+    their experiments and prior studies on H2O solubility in basaltic melt at 1200 C and P at or
+    below 600 MPa.
     """
 
     @override

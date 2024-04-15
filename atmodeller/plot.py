@@ -18,18 +18,22 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, cast
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from cmcrameri import cm
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap
+from matplotlib.figure import Figure
 from scipy.constants import kilo
+from scipy.ndimage import gaussian_filter1d
 
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion
@@ -315,6 +319,125 @@ class Plotter:
         axis_index: int = sum(range(column_index + 1)) + column_index
 
         return axes[axis_index]
+
+    def _sort(self, sort_sheet_name: str, sort_column_name: str) -> dict[str, pd.DataFrame]:
+        """Sorts the dataframes in ascending order according to a column.
+
+        Args:
+            sort_sheet_name: Name of the sheet containing the column to sort by.
+            sort_column_name: Name of the column to sort by.
+
+        Returns:
+            The sorted dataframes
+        """
+        output: dict[str, pd.DataFrame] = copy.deepcopy(self.dataframes)
+        for sheet_name in self.dataframes:
+            output[sheet_name][sort_column_name] = output[sort_sheet_name][sort_column_name]
+            output[sheet_name].sort_values(by=[sort_column_name], inplace=True)
+
+        return output
+
+    def bin_data(
+        self, sort_sheet_name: str, sort_column_name: str, bin_size: int
+    ) -> dict[str, pd.DataFrame]:
+        """Bins the data.
+
+        Args:
+            sort_sheet_name: Name of the sheet containing the column to sort by.
+            sort_column_name: Name of the column to sort by.
+            bin_size: Size of the bin.
+
+        Returns:
+            Binned data
+        """
+        data_size: int = self.dataframes["solution"].shape[0]
+        try:
+            assert not data_size % bin_size
+        except AssertionError as exc:
+            raise ValueError(
+                f"Data size = {data_size} and bin_size = {bin_size} must be exactly divisible"
+            ) from exc
+
+        sorted_data: dict[str, pd.DataFrame] = self._sort(sort_sheet_name, sort_column_name)
+
+        output: dict[str, pd.DataFrame] = {}
+        for sheet_name in sorted_data:
+            out: pd.DataFrame = pd.DataFrame()
+            for column in sorted_data[sheet_name].columns:
+                data_reshape: np.ndarray = np.array(sorted_data[sheet_name][column]).reshape(
+                    -1, bin_size
+                )
+                try:
+                    data_average: np.ndarray = np.average(data_reshape, axis=1)
+                    data_std: np.ndarray = cast(np.ndarray, np.std(data_average))
+                    out[f"{column}"] = data_average
+                    out[f"{column}_std"] = data_std
+                except TypeError:
+                    logger.warning(
+                        "Cannot compute an average for column = %s due to invalid type", column
+                    )
+            output[sheet_name] = out
+
+        return output
+
+    def plot_binned_data_by_fO2(
+        self,
+        bin_size: int,
+        y_axis: str,
+        species_set: list[str],
+        colors_set: list[str],
+        *,
+        sigma: float = 2,
+        smooth: int | None = None,
+        xmin: float | None = None,
+        xmax: float | None = None,
+        xlabel: str | None = None,
+        ymin: float | None = None,
+        ymax: float | None = None,
+        ylabel: str | None = None,
+        yscale: str = "linear",
+        fill_between: bool = True,
+    ) -> Figure:
+        """Plots binned data by fO2"""
+        fig, ax = plt.subplots()
+        x_axis: str = "fO2_shift"
+        binned_data: dict[str, pd.DataFrame] = self.bin_data("extra", x_axis, bin_size)
+
+        for species, color in zip(species_set, colors_set):
+            label: str = species.rstrip("_g")
+            x_data: np.ndarray | pd.Series = binned_data[species][x_axis]
+            y_data: np.ndarray | pd.Series = binned_data[species][y_axis]
+            if smooth is not None:
+                y_data = gaussian_filter1d(y_data, sigma=sigma)
+
+            if fill_between:
+                plot_label = None
+            else:
+                plot_label = label
+            ax.plot(x_data, y_data, color=color, label=plot_label)
+
+            if fill_between:
+                ax.fill_between(
+                    binned_data[species][x_axis],
+                    y_data - binned_data[species][f"{y_axis}_std"],
+                    y_data + binned_data[species][f"{y_axis}_std"],
+                    color=color,
+                    alpha=0.2,
+                    label=label,
+                )
+
+        if xlabel is None:
+            xlabel = x_axis
+        if ylabel is None:
+            ylabel = y_axis
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_yscale(yscale)
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymin, ymax)
+        ax.legend()
+
+        return fig
 
     def species_pairplot(
         self,
