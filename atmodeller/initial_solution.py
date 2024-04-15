@@ -241,12 +241,12 @@ class InitialSolutionDict(InitialSolution):
         Args:
             fill_value: Fill value to use for missing species
         """
-        for species in self.species.formulas:
-            if species not in self.value:
-                self.value[species] = fill_value
+        for species_name in self.species.names:
+            if species_name not in self.value:
+                self.value[species_name] = fill_value
 
         # Must maintain order with species.
-        self.value = {key: self.value[key] for key in self.species.formulas}
+        self.value = {key: self.value[key] for key in self.species.names}
 
     @override
     def get_value(self, *args, **kwargs) -> np.ndarray:
@@ -294,6 +294,7 @@ class InitialSolutionRegressor(InitialSolution):
         partial_fit_batch_size: int = 500,
         **kwargs,
     ):
+        self.value: Output  # For typing
         super().__init__(value, **kwargs)
         self.species_fill: dict[str, float] = species_fill if species_fill is not None else {}
         self.fit: bool = fit
@@ -336,9 +337,10 @@ class InitialSolutionRegressor(InitialSolution):
         conformed_solution_df: pd.DataFrame = solution_df.copy()
 
         if self.species is None:
-            species_formulas: list[str] = self.value.species
+            species_names: list[str] = self.value.species
         else:
-            species_formulas = self.species.formulas
+            species_names = self.species.names
+        logger.debug("species_names = %s", species_names)
 
         if self.species_fill:
             fill_df: pd.DataFrame = pd.DataFrame(
@@ -348,13 +350,20 @@ class InitialSolutionRegressor(InitialSolution):
 
             # Add columns that don't exist and replace those that do.
             for column in fill_df.columns:
+                if column in conformed_solution_df:
+                    logger.info("Replacing data in %s with %f", column, self.species_fill[column])
+                else:
+                    logger.info("Adding data in %s with %f", column, self.species_fill[column])
+
                 conformed_solution_df[column] = fill_df[column]
 
             # Reorder the columns based on the order of the species for the new model
-            conformed_solution_df = conformed_solution_df[species_formulas]
+            logger.info("Columns before reordering = %s", list(conformed_solution_df.columns))
+            conformed_solution_df = conformed_solution_df[species_names]
+            logger.info("Column after reordering = %s", list(conformed_solution_df.columns))
             logger.debug("conformed_solution_df = %s", conformed_solution_df)
 
-            assert species_formulas == list(conformed_solution_df.columns)
+            assert species_names == list(conformed_solution_df.columns)
 
         # Set the conformed solution to the output so it is used to construct the initial regressor
         self.value["solution"] = conformed_solution_df.to_dict(orient="records")

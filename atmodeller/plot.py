@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 import pandas as pd
 import seaborn as sns
@@ -61,7 +61,7 @@ class Category:
         dataframe_name: Name of the dataframe
         column_name: Name of the column in the dataframe
         categories: Categories and their maximum values
-        category_name: Name of the category. Defaults to `column_name`.
+        category_name: Name of the category. Defaults to ``column_name``.
     """
 
     def __init__(
@@ -69,10 +69,10 @@ class Category:
         *,
         dataframe_name: str,
         column_name: str,
-        categories: dict[str, float],
+        categories_dict: dict[str, float],
         category_name: str | None = None,
     ):
-        self.categories: dict[str, float] = categories
+        self.categories_dict: dict[str, float] = categories_dict
         self._dataframe_name: str = dataframe_name
         self._column_name: str = column_name
         self._category_name: str = category_name if category_name is not None else column_name
@@ -99,13 +99,13 @@ class Category:
         Returns:
             The category
         """
-        for category_name, category_max_value in self.categories.items():
+        for category_name, category_max_value in self.categories_dict.items():
             if value < category_max_value:
                 return category_name
 
         msg: str = "value = %f exceeds the maximum value of the category list"
         logger.warning(msg)
-        logger.warning("categories = %s", self.categories)
+        logger.warning("categories_dict = %s", self.categories_dict)
         raise ValueError(msg)
 
     def get_category(self, output: Output) -> pd.Series:
@@ -134,7 +134,7 @@ class Category:
         colormap: Colormap = cm.batlowS  # type: ignore
         colormap_values: list[tuple[float, ...]] = [colormap(4), colormap(2), colormap(3)]
         custom_palette: dict[str, tuple[float, ...]] = {
-            name: value for name, value in zip(self.categories.keys(), colormap_values)
+            name: value for name, value in zip(self.categories_dict.keys(), colormap_values)
         }
 
         return custom_palette
@@ -147,14 +147,14 @@ oxygen_fugacity_categories: dict[str, float] = {"Reduced": -1, "IW": 1, "Oxidise
 oxygen_fugacity: Category = Category(
     dataframe_name="extra",
     column_name="fO2_shift",
-    categories=oxygen_fugacity_categories,
+    categories_dict=oxygen_fugacity_categories,
     category_name="Oxygen fugacity",
 )
 
 # C/H ratio
 C_H_ratio_categories: dict[str, float] = {"Low C/H": 1, "Medium C/H": 5, "High C/H": 10}
 C_H_ratio: Category = Category(
-    dataframe_name="extra", column_name="C/H ratio", categories=C_H_ratio_categories
+    dataframe_name="extra", column_name="C/H ratio", categories_dict=C_H_ratio_categories
 )
 
 # H budget
@@ -162,7 +162,7 @@ H_oceans_categories: dict[str, float] = {"Low H": 3, "Medium H": 5, "Large H": 1
 H_oceans: Category = Category(
     dataframe_name="extra",
     column_name="Number of ocean moles",
-    categories=H_oceans_categories,
+    categories_dict=H_oceans_categories,
     category_name="H budget",
 )
 
@@ -225,9 +225,7 @@ class Plotter:
         elif mass_or_moles == "mass":
             return ("ppmw", "wt.%")
         else:
-            msg: str = "%s is unknown" % mass_or_moles
-            logger.error(msg)
-            raise ValueError(msg)
+            raise ValueError(f"{mass_or_moles} is unknown")
 
     @classmethod
     def read_pickle(cls, pickle_file: Path | str) -> Plotter:
@@ -303,7 +301,8 @@ class Plotter:
             assert plot_data is not None
             logger.info("Getting column index for %s", column_name)
             # Recall that the first column is the category, hence must minus one
-            column_index = plot_data.columns.get_loc(column_name) - 1
+            column_index = cast(int, plot_data.columns.get_loc(column_name))
+            column_index -= 1
             logger.info("column_index = %s", column_index)
 
         try:
@@ -340,10 +339,8 @@ class Plotter:
 
         try:
             colour_category: Category = categories[category]
-        except KeyError:
-            msg: str = "%s not in %s" % (category, categories)
-            logger.error(msg)
-            raise KeyError(msg)
+        except KeyError as exc:
+            raise KeyError(f"{category} is not in {categories}") from exc
 
         output: list[pd.Series] = [colour_category.get_category(self.output)]
 
@@ -399,7 +396,7 @@ class Plotter:
         if plot_atmosphere:
             # Axes for atmosphere quantites are currently set once here.
             column_name: str = "Pressure (kbar)"
-            logger.info("Setting axis properties for %s" % column_name)
+            logger.info("Setting axis properties for %s", column_name)
             axis: Axes = self.get_axes(grid, plot_data=data, column_name=column_name)
             ticks = range(0, 16, 5)
             axis.set_xlim(0, 15)
@@ -432,21 +429,19 @@ class Plotter:
         """
         try:
             colour_category: Category = categories[category]
-        except KeyError:
-            msg: str = "%s not in %s" % (category, categories)
-            logger.error(msg)
-            raise KeyError(msg)
+        except KeyError as exc:
+            raise KeyError(f"{category} is not in {categories}") from exc
 
         output: list[pd.Series] = [colour_category.get_category(self.output)]
 
-        for element in ("H", "O"):
+        for element in "H":  # , "O"):
             for reservoir in reservoirs:
                 series_data: pd.Series = self.get_element_ratio_in_reservoir(
                     "C", element, reservoir=reservoir, mass_or_moles=mass_or_moles
                 )
                 output.append(series_data)
 
-        for element in ("C", "H", "O"):
+        for element in ("C", "H"):  # , "O"):
             element_data: pd.DataFrame = self.dataframes[f"{element}_totals"]
             interior: pd.Series = element_data["melt_mass"] * 100 / element_data["total_mass"]
             interior.name = f"{element} melt (wt.%)"
@@ -483,35 +478,14 @@ class Plotter:
         axes.set_yticks(specs.ticks)
 
         axes = self.get_axes(grid, column_index=2)
-        specs: AxesSpec = AxesSpec(xylim=(0, 2), ticks=[0, 0.5, 1, 1.5, 2])
-        axes.set_xlim(specs.xylim)
-        axes.set_ylim(specs.xylim)
-        axes.set_xticks(specs.ticks)
-        axes.set_yticks(specs.ticks)
-
-        axes = self.get_axes(grid, column_index=3)
-        specs: AxesSpec = AxesSpec(xylim=(0, 1.5), ticks=[0, 0.5, 1, 1.5])
-        axes.set_xlim(specs.xylim)
-        axes.set_ylim(specs.xylim)
-        axes.set_xticks(specs.ticks)
-        axes.set_yticks(specs.ticks)
-
-        axes = self.get_axes(grid, column_index=4)
         specs: AxesSpec = AxesSpec(xylim=(0, 25), ticks=[0, 5, 10, 15, 20, 25])
         axes.set_xlim(specs.xylim)
         axes.set_ylim(specs.xylim)
         axes.set_xticks(specs.ticks)
         axes.set_yticks(specs.ticks)
 
-        axes = self.get_axes(grid, column_index=5)
+        axes = self.get_axes(grid, column_index=3)
         specs: AxesSpec = AxesSpec(xylim=(25, 100), ticks=[25, 50, 75, 100])
-        axes.set_xlim(specs.xylim)
-        axes.set_ylim(specs.xylim)
-        axes.set_xticks(specs.ticks)
-        axes.set_yticks(specs.ticks)
-
-        axes = self.get_axes(grid, column_index=6)
-        specs: AxesSpec = AxesSpec(xylim=(0, 100), ticks=[0, 25, 50, 75, 100])
         axes.set_xlim(specs.xylim)
         axes.set_ylim(specs.xylim)
         axes.set_xticks(specs.ticks)
