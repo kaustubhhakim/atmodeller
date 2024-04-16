@@ -23,7 +23,8 @@ import pprint
 from dataclasses import dataclass, field
 
 import numpy as np
-from scipy.optimize import root
+from scipy.linalg import LinAlgError
+from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
@@ -431,6 +432,7 @@ class InteriorAtmosphereSystem:
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
     _log_solution: np.ndarray = field(init=False)
     _residual: np.ndarray = field(init=False)
+    _failed_solves: int = 0
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
@@ -478,6 +480,19 @@ class InteriorAtmosphereSystem:
     def degree_of_condensation_number(self) -> int:
         """Number of elements to solve for the degree of condensation"""
         return len(self.degree_of_condensation_elements)
+
+    @property
+    def failed_solves(self) -> int:
+        """Number of failed solves"""
+        fraction: float = self._failed_solves / self.number_of_solves
+        logger.info(
+            "%d failed solves from a total of %d (%f %%)",
+            self._failed_solves,
+            self.number_of_solves,
+            fraction,
+        )
+
+        return self._failed_solves
 
     @property
     def solution(self) -> np.ndarray:
@@ -672,16 +687,24 @@ class InteriorAtmosphereSystem:
         for attempt in range(max_attempts):
             logger.info("Attempt %d/%d", attempt + 1, max_attempts)
             logger.info("Initial solution = %s", log_solution)
-            sol = root(
-                self._objective_func,
-                log_solution,
-                args=(coefficient_matrix,),
-                method=method,
-                tol=tol,
-                options=options,
-            )
-            logger.info(sol["message"])
-            logger.debug("sol = %s", sol)
+            try:
+                sol = root(
+                    self._objective_func,
+                    log_solution,
+                    args=(coefficient_matrix,),
+                    method=method,
+                    tol=tol,
+                    options=options,
+                )
+                logger.info(sol["message"])
+                logger.debug("sol = %s", sol)
+            except LinAlgError:
+                if errors == "raise":
+                    raise
+                else:
+                    logger.warning("Linear algebra error")
+                    sol = OptimizeResult()
+                    sol.success = False
 
             if sol.success:
                 logger.debug("Actual solution = %s", sol.x)
@@ -711,6 +734,7 @@ class InteriorAtmosphereSystem:
 
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
+            self._failed_solves += 1
             if self.degree_of_condensation_number > 0:
                 logger.info("Probably no solution for condensed species and imposed constraints")
                 logger.info("Remove some condensed species and try again")
