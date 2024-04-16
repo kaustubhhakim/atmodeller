@@ -387,8 +387,9 @@ class Plotter:
         species_set: list[str],
         colors_set: list[str],
         *,
+        scale_factor: float = 1,
         sigma: float = 2,
-        smooth: int | None = None,
+        smooth: bool = True,
         xmin: float | None = None,
         xmax: float | None = None,
         xlabel: str | None = None,
@@ -398,7 +399,25 @@ class Plotter:
         yscale: str = "linear",
         fill_between: bool = True,
     ) -> Figure:
-        """Plots binned data by fO2"""
+        """Plots binned data by fO2
+
+        Args:
+            bin_size: Size of the bin
+            y_axis: Field to plot for the y axis for each species in ``species_set``
+            species_set: Species
+            colors_set: Colors
+            scale_factor: Factor to scale the y data
+            sigma: Sigma for the Gaussian filter. Defaults to 2.
+            smooth: Apply the Gaussian filter to smooth the data. Defaults to True.
+            xmin: Minimum for x axis. Defaults to None.
+            xmax: Maximum for x axis. Defaults to None.
+            xlabel: Label for x axis. Defaults to None.
+            ymin: Minimum for y axis. Defaults to None.
+            ymax: Maximum for y axis. Defaults to None.
+            ylabel: Label for y axis. Defaults to None.
+            yscale: Scale for y axis. Defaults to linear.
+            fill_between: True to plot one std either side of the mean. Defaults to True.
+        """
         fig, ax = plt.subplots()
         x_axis: str = "fO2_shift"
         binned_data: dict[str, pd.DataFrame] = self.bin_data("extra", x_axis, bin_size)
@@ -406,24 +425,19 @@ class Plotter:
         for species, color in zip(species_set, colors_set):
             label: str = species.rstrip("_g")
             x_data: np.ndarray | pd.Series = binned_data[species][x_axis]
-            y_data: np.ndarray | pd.Series = binned_data[species][y_axis]
+            y_data: np.ndarray | pd.Series = binned_data[species][y_axis] / scale_factor
             if smooth is not None:
                 y_data = gaussian_filter1d(y_data, sigma=sigma)
-
-            if fill_between:
-                plot_label = None
-            else:
-                plot_label = label
-            ax.plot(x_data, y_data, color=color, label=plot_label)
+            ax.plot(x_data, y_data, color=color, label=label)
 
             if fill_between:
                 ax.fill_between(
                     binned_data[species][x_axis],
-                    y_data - binned_data[species][f"{y_axis}_std"],
-                    y_data + binned_data[species][f"{y_axis}_std"],
+                    y_data - binned_data[species][f"{y_axis}_std"] / scale_factor,
+                    y_data + binned_data[species][f"{y_axis}_std"] / scale_factor,
                     color=color,
                     alpha=0.2,
-                    label=label,
+                    # label=label,
                 )
 
         if xlabel is None:
@@ -438,6 +452,58 @@ class Plotter:
         ax.legend()
 
         return fig
+
+    def plot_volume_mixing_ratio(
+        self,
+        bin_size: int,
+        species_set: list[str],
+        colors_set: list[str],
+        *,
+        sigma: float = 2,
+        smooth: bool = True,
+        xmin: float | None = None,
+        xmax: float | None = None,
+        xlabel: str | None = None,
+        ymin: float | None = 0,
+        ymax: float | None = 1,
+        ylabel: str | None = "Volume mixing ratio",
+        yscale: str = "linear",
+        fill_between: bool = True,
+    ) -> Figure:
+        """Plots volume mixiing ratios by fO2
+
+        Args:
+            bin_size: Size of the bin
+            species_set: Species
+            colors_set: Colors
+            sigma: Sigma for the Gaussian filter. Defaults to 2.
+            smooth: Apply the Gaussian filter to smooth the data. Defaults to True.
+            xmin: Minimum for x axis. Defaults to None.
+            xmax: Maximum for x axis. Defaults to None.
+            xlabel: Label for x axis. Defaults to None.
+            ymin: Minimum for y axis. Defaults to 0.
+            ymax: Maximum for y axis. Defaults to 1.
+            ylabel: Label for y axis. Defaults to `Volume mixing ratio`.
+            yscale: Scale for y axis. Defaults to linear.
+            fill_between: True to plot one std either side of the mean. Defaults to True.
+        """
+        return self.plot_binned_data_by_fO2(
+            bin_size,
+            "atmosphere_ppm",
+            species_set,
+            colors_set,
+            scale_factor=1e6,
+            sigma=sigma,
+            smooth=smooth,
+            xmin=xmin,
+            xmax=xmax,
+            xlabel=xlabel,
+            ymin=ymin,
+            ymax=ymax,
+            ylabel=ylabel,
+            yscale=yscale,
+            fill_between=fill_between,
+        )
 
     def species_pairplot(
         self,
