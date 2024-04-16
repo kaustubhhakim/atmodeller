@@ -59,7 +59,7 @@ class AxesSpec:
 
 
 class Category:
-    """Defines a category based on a column in a dataframe in :class:`atmodeller.output.Output`.
+    """A category based on a column in a dataframe in :class:`atmodeller.output.Output`.
 
     Args:
         dataframe_name: Name of the dataframe
@@ -380,6 +380,7 @@ class Plotter:
 
         return output
 
+    # Convenient to use fO2 so pylint: disable=C0103
     def plot_binned_data_by_fO2(
         self,
         bin_size: int,
@@ -470,7 +471,7 @@ class Plotter:
         yscale: str = "linear",
         fill_between: bool = True,
     ) -> Figure:
-        """Plots volume mixiing ratios by fO2
+        """Plots volume mixing ratios by fO2
 
         Args:
             bin_size: Size of the bin
