@@ -354,26 +354,6 @@ class _ReactionNetwork:
             fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
-            if fugacity_coefficient == np.inf:
-                name: str = gas_species.formula
-                logger.warning("Fugacity coefficient for %s has blown up (inf)", name)
-                logger.warning(
-                    "Evaluation at temperature = %f, pressure = %f", temperature, pressure
-                )
-                logger.warning("Setting fugacity coefficient for %s to unity (ideal gas)", name)
-                fugacity_coefficient = 1
-
-            elif fugacity_coefficient <= 0:
-                name: str = gas_species.formula
-                logger.warning(
-                    "Fugacity coefficient for %s is zero or negative (unphysical)", name
-                )
-                logger.warning(
-                    "Evaluation at temperature = %f, pressure = %f", temperature, pressure
-                )
-                logger.warning("Setting fugacity coefficient for %s to unity (ideal gas)", name)
-                fugacity_coefficient = 1
-
             fugacity_coefficients[index] = fugacity_coefficient
 
         log_fugacity_coefficients: np.ndarray = np.log10(fugacity_coefficients)
@@ -588,6 +568,7 @@ class InteriorAtmosphereSystem:
     def total_pressure(self) -> float:
         """Total pressure."""
         indices: list[int] = list(self.species.gas_species.keys())
+
         return sum(float(self.solution[index]) for index in indices)
 
     @property
@@ -709,6 +690,7 @@ class InteriorAtmosphereSystem:
                 )
                 logger.info(sol["message"])
                 logger.debug("sol = %s", sol)
+
             except LinAlgError:
                 if errors == "raise":
                     raise
