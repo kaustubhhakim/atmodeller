@@ -358,7 +358,18 @@ class _ReactionNetwork:
                 name: str = gas_species.formula
                 logger.warning("Fugacity coefficient for %s has blown up (inf)", name)
                 logger.warning(
-                    "Conditions at blow-up: temperature = %f, pressure = %f", temperature, pressure
+                    "Evaluation at temperature = %f, pressure = %f", temperature, pressure
+                )
+                logger.warning("Setting fugacity coefficient for %s to unity (ideal gas)", name)
+                fugacity_coefficient = 1
+
+            elif fugacity_coefficient <= 0:
+                name: str = gas_species.formula
+                logger.warning(
+                    "Fugacity coefficient for %s is zero or negative (unphysical)", name
+                )
+                logger.warning(
+                    "Evaluation at temperature = %f, pressure = %f", temperature, pressure
                 )
                 logger.warning("Setting fugacity coefficient for %s to unity (ideal gas)", name)
                 fugacity_coefficient = 1

@@ -22,7 +22,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
@@ -230,7 +230,7 @@ class InitialSolutionDict(InitialSolution):
         value: A dictionary of species and values for all the gas species
     """
 
-    def __init__(self, value: dict[str, float | int], fill_value: float = 1, **kwargs):
+    def __init__(self, value: Mapping[str, float | int], fill_value: float = 1, **kwargs):
         super().__init__(value, **kwargs)
         self._fill_missing_species(fill_value)
         self._value: np.ndarray = np.array(list(self.value.values()))
