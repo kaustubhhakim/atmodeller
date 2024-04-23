@@ -57,12 +57,14 @@ class RealGas(ABC):
     where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
     is volume, and :math:`P` is pressure.
 
-    ``critical_temperature`` and ``critical_pressure`` can be non-unity to allow for a
+    :attr:`critical_temperature` and :attr:`critical_pressure` can be non-unity to allow for a
     corresponding states model.
 
     Args:
-        critical_temperature: Critical temperature in K. Defaults to unity, meaning not used.
-        critical_pressure: Critical pressure in bar. Defaults to unity, meaning not used.
+        critical_temperature: Critical temperature in K. Defaults to unity, meaning a corresponding
+            states model is not used.
+        critical_pressure: Critical pressure in bar. Defaults to unity, meaning a corresponding
+            states model is not used.
     """
 
     critical_temperature: float = 1
@@ -73,7 +75,9 @@ class RealGas(ABC):
     """Standard state pressure in bar"""
 
     def scaled_pressure(self, pressure: float) -> float:
-        """Scaled pressure, i.e. a reduced pressure when critical pressure is not unity
+        """Scaled pressure
+
+        This is a reduced pressure when :attr:`critical_pressure` is not unity.
 
         Args:
             pressure: Pressure in bar
@@ -86,7 +90,9 @@ class RealGas(ABC):
         return scaled_pressure
 
     def scaled_temperature(self, temperature: float) -> float:
-        """Scaled temperature, i.e. a reduced temperature when critical temperature is not unity
+        """Scaled temperature
+
+        This is a reduced temperature when :attr:`critical_temperature` is not unity.
 
         Args:
             temperature: Temperature in K
@@ -265,8 +271,10 @@ class ModifiedRedlichKwongABC(RealGas):
     the Redlich-Kwong constant.
 
     Args:
-        critical_temperature: Critical temperature in K. Defaults to unity, meaning not used.
-        critical_pressure: Critical pressure in bar. Defaults to unity, meaning not used.
+        critical_temperature: Critical temperature in K. Defaults to unity, meaning a corresponding
+            states model is not used.
+        critical_pressure: Critical pressure in bar. Defaults to unity, meaning a corresponding
+            states model is not used.
         a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) `a` parameter
         b0: The Redlich-Kwong constant `b`
 
@@ -544,50 +552,40 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
 @dataclass(kw_only=True)
 class MRKCriticalBehaviour(RealGas):
-    """A MRK model that accommodates critical behaviour
+    """A MRK equation of state that accommodates critical behaviour :cite:p:`HP91{Appendix A}`
 
     Args:
-        mrk_fluid: The MRK for the supercritical fluid
-        mrk_gas: The MRK for the subcritical gas
-        mrk_liquid: The MRK for the subcritical liquid
-        Ta: Temperature at which a_gas = a in the MRK formulation
-        Tc: Critical temperature
-
-    Attributes:
-        mrk_fluid: The MRK for the supercritical fluid
-        mrk_gas: The MRK for the subcritical gas
-        mrk_liquid: The MRK for the subcritical liquid
+        mrk_fluid: The MRK EOS for the supercritical fluid
+        mrk_gas: The MRK EOS for the subcritical gas
+        mrk_liquid: The MRK EOS for the subcritical liquid
         Ta: Temperature at which a_gas = a in the MRK formulation
         Tc: Critical temperature
     """
 
     mrk_fluid: MRKImplicitABC
+    """The MRK EOS for the supercritical fluid"""
     mrk_gas: MRKImplicitABC
+    """The MRK EOS for the subcritical gas"""
     mrk_liquid: MRKImplicitABC
+    """The MRK EOS for the subcritical liquid"""
     Ta: float
+    r"""Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting"""
     Tc: float
+    """Critical temperature"""
 
     @abstractmethod
     def Psat(self, temperature: float) -> float:
-        """Saturation curve. Equation 5, Holland and Powell (1991)
+        """Saturation curve :cite:p:`{e.g.}HP91{Equation 5}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
             Saturation curve pressure in bar
         """
 
+    @override
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Volume in m^3 mol^(-1)
-        """
         Psat: float = self.Psat(temperature)
 
         if temperature <= self.Ta and pressure <= Psat:
@@ -618,16 +616,8 @@ class MRKCriticalBehaviour(RealGas):
 
         return volume
 
+    @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral. Appendix A, Holland and Powell (1991)
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            volume integral in J mol^(-1)
-        """
         Psat: float = self.Psat(temperature)
 
         if temperature <= self.Ta and pressure <= Psat:
@@ -663,20 +653,21 @@ class MRKCriticalBehaviour(RealGas):
 
 @dataclass(kw_only=True)
 class VirialCompensation(RealGas):
-    """A compensation term for the increasing deviation of the MRK volumes with pressure
+    r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
 
-    General form of the equation from Holland and Powell (1998), and also see Holland and Powell
-    (1991) Equations 4 and 9:
+    General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
 
-        V_virial = a(P-P0) + b(P-P0)**0.5 + c(P-P0)**0.25
+    .. math::
 
-    This form also works for the virial compensation term from Holland and Powell (1991), in which
-    case c=0. critical_pressure and critical_temperature are required for gases which are known to
-    obey approximately the principle of corresponding states.
+        V_\mathrm{virial} = a(P-P0) + b(P-P0)^\frac{1}{2} + c(P-P0)^\frac{1}{4}
 
-    Although this looks similar to an EOS, it's important to remember that for Holland and Powell
-    it only calculates an additional perturbation to the volume and the volume integral of an MRK
-    EOS, and hence it does not return a meaningful volume or volume integral by itself.
+    This form also works for the virial compensation term from :cite:t:`HP91`, in which
+    case :math:`c=0`. :attr:`critical_pressure` and :attr:`critical_temperature` are required for
+    gases which are known to obey approximately the principle of corresponding states.
+
+    Although this looks similar to an EOS, it only calculates an additional perturbation to the
+    volume and the volume integral of an MRK EOS, and hence it does not return a meaningful volume
+    or volume integral by itself.
 
     Args:
         a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
