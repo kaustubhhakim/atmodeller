@@ -70,11 +70,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from atmodeller import GAS_CONSTANT_BAR
-from atmodeller.eos.interfaces import (
-    CombinedEOSModel,
-    RealGas,
-    critical_data_dictionary,
-)
+from atmodeller.eos.interfaces import CombinedEOSModel, RealGas, critical_parameters
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -319,8 +315,8 @@ class SaxenaEightCoefficients(SaxenaABC):
 # The coefficients are the same as for the corresponding states model in Table 1(a) because they
 # originate from Saxena and Fei (1987a). Table 1(b), <1000 bar
 _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].temperature,
-    critical_pressure=critical_data_dictionary["H2"].pressure,
+    critical_temperature=critical_parameters["H2"].temperature,
+    critical_pressure=critical_parameters["H2"].pressure,
     a_coefficients=(1, 0, 0, 0, 0),
     b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
@@ -345,8 +341,8 @@ _H2_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
 # (as in Table 1b at pressures > 1 kbar) and a least squares regression. The refitting is performed
 # using reduced temperature and pressure.
 _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2"].temperature,
-    critical_pressure=critical_data_dictionary["H2"].pressure,
+    critical_temperature=critical_parameters["H2"].temperature,
+    critical_pressure=critical_parameters["H2"].pressure,
     a_coefficients=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
     b_coefficients=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
     c_coefficients=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
@@ -364,8 +360,8 @@ H2_SS92: RealGas = CombinedEOSModel(models=models, upper_pressure_bounds=upper_p
 # temperature and pressure are the actual values or reduced values. Since this model cannot be
 # trusted it is commented out.
 # H2_high_pressure_SF88: RealGas = SaxenaEightCoefficients(
-#     critical_temperature=critical_data_dictionary["H2"].temperature,
-#     critical_pressure=critical_data_dictionary["H2"].pressure,
+#     critical_temperature=critical_parameters["H2"].temperature,
+#     critical_pressure=critical_parameters["H2"].pressure,
 #     a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
 #     b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
 #     c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
@@ -374,8 +370,8 @@ H2_SS92: RealGas = CombinedEOSModel(models=models, upper_pressure_bounds=upper_p
 
 # Fugacity model for SO2 from Shi and Saxena (1992). Table 1(c)
 SO2_SS92: RealGas = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["SO2"].temperature,
-    critical_pressure=critical_data_dictionary["SO2"].pressure,
+    critical_temperature=critical_parameters["SO2"].temperature,
+    critical_pressure=critical_parameters["SO2"].pressure,
     a_coefficients=(0.92854, 0.43269e-1, -0.24671, 0, 0.24999, 0, -0.53182, -0.16461e-1),
     b_coefficients=(
         0.84866e-3,
@@ -403,8 +399,8 @@ SO2_SS92: RealGas = SaxenaEightCoefficients(
 # Fugacity model for H2S from Shi and Saxena (1992)
 # Table 1(d), 1-500 bar
 _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2S"].temperature,
-    critical_pressure=critical_data_dictionary["H2S"].pressure,
+    critical_temperature=critical_parameters["H2S"].temperature,
+    critical_pressure=critical_parameters["H2S"].pressure,
     a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
     b_coefficients=(0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515),
     c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
@@ -414,8 +410,8 @@ _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
 # Fugacity model for H2S from Shi and Saxena (1992).
 # Table 1(d), 500-10000 bar
 _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
-    critical_temperature=critical_data_dictionary["H2S"].temperature,
-    critical_pressure=critical_data_dictionary["H2S"].pressure,
+    critical_temperature=critical_parameters["H2S"].temperature,
+    critical_pressure=critical_parameters["H2S"].pressure,
     a_coefficients=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
     b_coefficients=(
         0.22545e-1,
@@ -459,14 +455,14 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
     Table 1(a)
 
     Args:
-        species: Species name. Must corresponding to an entry (key) in critical_data_dictionary
+        species: Species name. Must corresponding to an entry (key) in critical_parameters
 
     Returns:
         Corresponding states fugacity model
     """
 
-    critical_temperature: float = critical_data_dictionary[species].temperature
-    critical_pressure: float = critical_data_dictionary[species].pressure
+    critical_temperature: float = critical_parameters[species].temperature
+    critical_pressure: float = critical_parameters[species].pressure
 
     # Table 1(a), <1000 bar
     low_pressure: RealGas = SaxenaFiveCoefficients(

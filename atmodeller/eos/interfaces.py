@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas equations of state"""
+"""Interfaces for real gas equations of state"""
 
 # Use symbols from the relevant papers for consistency so pylint: disable=C0103
 
@@ -30,7 +30,7 @@ import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
-from atmodeller.utilities import UnitConversion, debug_decorator
+from atmodeller.utilities import UnitConversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -44,7 +44,6 @@ class RealGasProtocol(Protocol):
     def fugacity_coefficient(self, temperature: float, pressure: float) -> float: ...
 
 
-@dataclass(kw_only=True)
 class RealGas(ABC):
     r"""A real gas equation of state (EOS)
 
@@ -56,53 +55,7 @@ class RealGas(ABC):
 
     where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
     is volume, and :math:`P` is pressure.
-
-    :attr:`critical_temperature` and :attr:`critical_pressure` can be non-unity to allow for a
-    corresponding states model.
-
-    Args:
-        critical_temperature: Critical temperature in K. Defaults to unity, meaning a corresponding
-            states model is not used.
-        critical_pressure: Critical pressure in bar. Defaults to unity, meaning a corresponding
-            states model is not used.
     """
-
-    critical_temperature: float = 1
-    """Critical temperature in K"""
-    critical_pressure: float = 1
-    """Critical pressure in bar"""
-    standard_state_pressure: float = field(init=False, default=1)
-    """Standard state pressure in bar"""
-
-    def scaled_pressure(self, pressure: float) -> float:
-        """Scaled pressure
-
-        This is a reduced pressure when :attr:`critical_pressure` is not unity.
-
-        Args:
-            pressure: Pressure in bar
-
-        Returns:
-            The scaled (reduced) pressure, which is dimensionless
-        """
-        scaled_pressure: float = pressure / self.critical_pressure
-
-        return scaled_pressure
-
-    def scaled_temperature(self, temperature: float) -> float:
-        """Scaled temperature
-
-        This is a reduced temperature when :attr:`critical_temperature` is not unity.
-
-        Args:
-            temperature: Temperature in K
-
-        Returns:
-            The scaled (reduced) temperature, which is dimensionless
-        """
-        scaled_temperature: float = temperature / self.critical_temperature
-
-        return scaled_temperature
 
     def compressibility_parameter(self, temperature: float, pressure: float) -> float:
         """Compressibility parameter
@@ -235,6 +188,46 @@ class RealGas(ABC):
 
 
 @dataclass(kw_only=True)
+class CorrespondingStates(ABC):
+    """A corresponding states model"""
+
+    critical_temperature: float = 1
+    """Critical temperature in K"""
+    critical_pressure: float = 1
+    """Critical pressure in bar"""
+
+    def scaled_pressure(self, pressure: float) -> float:
+        """Scaled pressure
+
+        This is a reduced pressure when :attr:`critical_pressure` is not unity.
+
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            The scaled (reduced) pressure, which is dimensionless
+        """
+        scaled_pressure: float = pressure / self.critical_pressure
+
+        return scaled_pressure
+
+    def scaled_temperature(self, temperature: float) -> float:
+        """Scaled temperature
+
+        This is a reduced temperature when :attr:`critical_temperature` is not unity.
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            The scaled (reduced) temperature, which is dimensionless
+        """
+        scaled_temperature: float = temperature / self.critical_temperature
+
+        return scaled_temperature
+
+
+@dataclass(kw_only=True)
 class IdealGas(RealGas):
     r"""An ideal gas equation of state:
 
@@ -267,21 +260,12 @@ class ModifiedRedlichKwongABC(RealGas):
         P = \frac{RT}{V-b} - \frac{a(T)}{V(V+b)\sqrt{T}}
 
     where :math:`P` is pressure, :math:`T` is temperature, :math:`V` is the molar volume, :math:`R`
-    the gas constant, :math:`a(T)` is the Redlich-Kwong function of :math:`T`, and  :math:`b` is
-    the Redlich-Kwong constant.
+    the gas constant, :math:`a(T)` is the Redlich-Kwong function of :math:`T`, and :math:`b` is the
+    Redlich-Kwong constant.
 
     Args:
-        critical_temperature: Critical temperature in K. Defaults to unity, meaning a corresponding
-            states model is not used.
-        critical_pressure: Critical pressure in bar. Defaults to unity, meaning a corresponding
-            states model is not used.
         a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) `a` parameter
         b0: The Redlich-Kwong constant `b`
-
-    Attributes:
-        critical_temperature: Critical temperature in K
-        critical_pressure: Critical pressure in bar
-        standard_state_pressure: Standard state pressure in bar
     """
 
     a_coefficients: tuple[float, ...]
@@ -313,7 +297,7 @@ class ModifiedRedlichKwongABC(RealGas):
 
 
 @dataclass(kw_only=True)
-class MRKExplicitABC(ModifiedRedlichKwongABC):
+class MRKExplicitABC(CorrespondingStates, ModifiedRedlichKwongABC):
     """A Modified Redlich Kwong (MRK) EOS in explicit form"""
 
     @override
@@ -414,10 +398,6 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         Ta: Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting :cite:p:`HP91`.
             Defaults to 0.
     """
-
-    # TODO: Is this required here? Is the default value of 0 necessary or risks bugs? Use None?
-    Ta: float = 0
-    r"""Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting"""
 
     @override
     def a(self, temperature: float) -> float:
@@ -555,23 +535,20 @@ class MRKCriticalBehaviour(RealGas):
     """A MRK equation of state that accommodates critical behaviour :cite:p:`HP91{Appendix A}`
 
     Args:
-        mrk_fluid: The MRK EOS for the supercritical fluid
-        mrk_gas: The MRK EOS for the subcritical gas
-        mrk_liquid: The MRK EOS for the subcritical liquid
+        mrk_fluid: MRK EOS for the supercritical fluid
+        mrk_gas: MRK EOS for the subcritical gas
+        mrk_liquid: MRK EOS for the subcritical liquid
         Ta: Temperature at which a_gas = a in the MRK formulation
-        Tc: Critical temperature
     """
 
     mrk_fluid: MRKImplicitABC
-    """The MRK EOS for the supercritical fluid"""
+    """MRK EOS for the supercritical fluid"""
     mrk_gas: MRKImplicitABC
-    """The MRK EOS for the subcritical gas"""
+    """MRK EOS for the subcritical gas"""
     mrk_liquid: MRKImplicitABC
-    """The MRK EOS for the subcritical liquid"""
+    """MRK EOS for the subcritical liquid"""
     Ta: float
     r"""Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting"""
-    Tc: float
-    """Critical temperature"""
 
     @abstractmethod
     def Psat(self, temperature: float) -> float:
@@ -652,7 +629,7 @@ class MRKCriticalBehaviour(RealGas):
 
 
 @dataclass(kw_only=True)
-class VirialCompensation(RealGas):
+class VirialCompensation(CorrespondingStates, RealGas):
     r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
 
     General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
@@ -670,45 +647,40 @@ class VirialCompensation(RealGas):
     or volume integral by itself.
 
     Args:
-        a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
-            may be scaled (internally) by critical parameters for corresponding states.
+        a_coefficients: Coefficients for a polynomial of the form a = a0+a1*T, where a0 and a1 may
+            be scaled (internally) by critical parameters for corresponding states.
         b_coefficients: As above for the b coefficients
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly, and may be determined from experimental data. Defaults to zero, which is
-            appropriate for the corresponding states case.
-        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
-        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
-
-    Attributes:
-        a_coefficients: Coefficients for a polynomial of the form a = a0 * a1 * T, where a0 and a1
-            may be additionally (internally) scaled by Tc and Pc in the case of corresponding
-            states.
-        b_coefficients: As above for the b coefficients
-        c_coefficients: As above for the c coefficients
-        P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly, and may be determined from experimental data
-        critical_temperature: Critical temperature in kelvin
-        critical_pressure: Critical pressure in bar
-        standard_state_pressure: Standard state pressure
+            significantly and may be determined from experimental data. Defaults to zero.
+        critical_temperature: Critical temperature in K. Defaults to unity meaning not a
+            corresponding states model.
+        critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
+            states model.
     """
 
     a_coefficients: tuple[float, ...]
+    r"""Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where :math:`a_0` and
+    :math:`a_1` may be additionally (internally) scaled by critical parameters
+    (:attr:`critical_temperature` and :attr:`critical_pressure`) for corresponding states."""
     b_coefficients: tuple[float, ...]
+    """Coefficients for the `b` parameter. See :attr:`a_coefficients` documentation."""
     c_coefficients: tuple[float, ...]
+    """Coefficients for the `c` parameter. See :attr:`a_coefficients` documentation."""
     P0: float
+    """Pressure at which the MRK equation begins to overestimate the molar volume significantly 
+    and may be determined from experimental data."""
 
-    @debug_decorator(logger)
     def a(self, temperature: float) -> float:
-        """a parameter in Holland and Powell (1998)
+        r"""`a` parameter :cite:p:`HP98`
 
-        This is the d parameter in Holland and Powell (1991).
+        This is also the `d` parameter in :cite:t:`HP91`.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
-            a parameter in m^3 mol^(-1) bar^(-1)
+            `a` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^{-1}`
         """
         a: float = (
             self.a_coefficients[0] * self.critical_temperature
@@ -718,17 +690,16 @@ class VirialCompensation(RealGas):
 
         return a
 
-    @debug_decorator(logger)
     def b(self, temperature: float) -> float:
-        """b parameter in Holland and Powell (1998)
+        r"""`b` parameter :cite:p:`HP98`
 
-        This is the c parameter in Holland and Powell (1991).
+        This is also the `c` parameter in :cite:t:`HP91`.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
-            b parameter in m^3 mol^(-1) bar^(-1/2)
+            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{2}`
         """
         b: float = (
             self.b_coefficients[0] * self.critical_temperature
@@ -738,15 +709,14 @@ class VirialCompensation(RealGas):
 
         return b
 
-    @debug_decorator(logger)
     def c(self, temperature: float) -> float:
-        """c parameter in Holland and Powell (1998)
+        r"""`c` parameter :cite:p:`HP98`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
-            c parameter in m^3 mol^(-1) bar^(-1/4)
+            `c` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{4}`
         """
         c: float = (
             self.c_coefficients[0] * self.critical_temperature
@@ -756,16 +726,15 @@ class VirialCompensation(RealGas):
 
         return c
 
-    @debug_decorator(logger)
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume contribution
+        r"""Volume contribution
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume contribution in m^3 mol^(-1)
+            Volume contribution in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         volume: float = (
             self.a(temperature) * (pressure - self.P0)
@@ -775,16 +744,15 @@ class VirialCompensation(RealGas):
 
         return volume
 
-    @debug_decorator(logger)
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP) contribution
+        r"""Volume integral :math:`V dP` contribution
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume integral contribution in J mol^(-1)
+            Volume integral contribution in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
         volume_integral: float = (
             self.a(temperature) / 2.0 * (pressure - self.P0) ** 2
@@ -797,38 +765,35 @@ class VirialCompensation(RealGas):
 
 
 @dataclass(kw_only=True)
-class CORK(RealGas):
-    """A Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991)
+class CORK(CorrespondingStates, RealGas):
+    """A Compensated-Redlich-Kwong (CORK) EOS :cite:p:`HP91`
 
     Args:
-        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
-        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
-        P0: Pressure in bar at which the MRK equation begins to overestimate the molar volume
-            significantly, and may be determined from experimental data
-        mrk: MRK model for computing the MRK contribution
-        a_virial: a coefficients for the virial compensation. Defaults to zero coefficients
-        b_virial: b coefficients for the virial compensation. Defaults to zero coefficients
-        c_virial: c coefficients for the virial compensation. Defaults to zero coefficients
-
-    Attributes:
-        critical_temperature: Critical temperature in kelvin
-        critical_pressure: Critical pressure in bar
-        standard_state_pressure: Standard state pressure
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly, and may be determined from experimental data
+            significantly and may be determined from experimental data. Defaults to zero.
         mrk: MRK model for computing the MRK contribution
-        a_virial: a coefficients for the virial compensation
-        b_virial: b coefficients for the virial compensation
-        c_virial: c coefficients for the virial compensation
-        virial: A VirialCompensation instance
+        a_virial: `a` coefficients for the virial compensation. Defaults to zero.
+        b_virial: `b` coefficients for the virial compensation. Defaults to zero.
+        c_virial: `c` coefficients for the virial compensation. Defaults to zero.
+        critical_temperature: Critical temperature in K. Defaults to unity meaning not a
+            corresponding states model.
+        critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
+            states model.
     """
 
     P0: float
+    """Pressure at which the MRK equation begins to overestimate the molar volume significantly 
+    and may be determined from experimental data."""
     mrk: RealGas
+    """MRK model for computing the MRK contribution"""
     a_virial: tuple[float, ...] = (0, 0)
+    """`a` coefficients for the virial compensation"""
     b_virial: tuple[float, ...] = (0, 0)
+    """`b` coefficients for the virial compensation"""
     c_virial: tuple[float, ...] = (0, 0)
+    """`c` coefficients for the virial compensation"""
     virial: VirialCompensation = field(init=False)
+    """The virial compensation model"""
 
     def __post_init__(self):
         self.virial = VirialCompensation(
@@ -840,15 +805,16 @@ class CORK(RealGas):
             critical_pressure=self.critical_pressure,
         )
 
+    @override
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume including virial compensation. Equation 7a, Holland and Powell (1991)
+        r"""Volume :cite:p:`HP91{Equation 7a}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume including the virial compensation in m^3 mol^(-1)
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         volume: float = self.mrk.volume(temperature, pressure)
 
@@ -857,15 +823,16 @@ class CORK(RealGas):
 
         return volume
 
+    @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral including virial compensation. Equation 8, Holland and Powell (1991)
+        r"""Volume integral :cite:p:`HP91{Equation 8}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume integral including the virial compensation in J mol^(-1)
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
         volume_integral: float = self.mrk.volume_integral(temperature, pressure)
 
@@ -877,19 +844,17 @@ class CORK(RealGas):
 
 @dataclass(kw_only=True)
 class CombinedEOSModel(RealGas):
-    """Combines multiple EOS models for different pressure ranges into a single model.
+    """Combines multiple EOS models for different pressure ranges into a single EOS model.
 
     Args:
-        models: EOS models ordered by increasing pressure from lowest to highest
-        upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
-
-    Attributes:
         models: EOS models ordered by increasing pressure from lowest to highest
         upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
     """
 
     models: tuple[RealGas, ...]
+    """EOS models ordered by increasing pressure from lowest to highest"""
     upper_pressure_bounds: tuple[float, ...]
+    """Upper pressure bound in bar relevant to the EOS by position"""
 
     def _get_index(self, pressure: float) -> int:
         """Gets the index of the appropriate EOS model using the pressure
@@ -906,31 +871,15 @@ class CombinedEOSModel(RealGas):
         # If the pressure is higher than all specified pressure ranges, use the last model.
         return len(self.models) - 1
 
+    @override
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Volume in m^3 mol^(-1)
-        """
         index: int = self._get_index(pressure)
         volume: float = self.models[index].volume(temperature, pressure)
 
         return volume
 
+    @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP)
-
-        Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
-
-        Returns:
-            Volume integral in J mol^(-1)
-        """
         index: int = self._get_index(pressure)
         volume: float = self.models[index].volume_integral(temperature, pressure)
 
@@ -942,50 +891,77 @@ class CriticalData:
     """Critical temperature and pressure of a gas species.
 
     Args:
-        Tc: Critical temperature in K
-        Pc: Critical pressure in bar
-
-    Attributes:
-        Tc: Critical temperature in K
-        Pc: Critical pressure in bar
+        temperature: Critical temperature in K
+        pressure: Critical pressure in bar
     """
 
     temperature: float
+    """Critical temperature in K"""
     pressure: float
+    """Critical pressure in bar"""
 
 
-# Critical temperature and pressure data for a corresponding states model, based on Table 2 in
-# Shi and Saxena (1992) with some additions. For simplicity, we just compile one set of critical
-# data, even though they vary a little between studies which could result in subtle differences.
+critical_parameters_H2O: CriticalData = CriticalData(647.25, 221.1925)
+"""Critical parameters for H2O :cite:p:`SS92{Table 2}`"""
+critical_parameters_CO2: CriticalData = CriticalData(304.15, 73.8659)
+"""Critical parameters for CO2 :cite:p:`SS92{Table 2}`
 
-# Holland and Powell use slightly different critical data in their 1991 paper, which makes
-# insignificant differences in most cases, but their values are give in comments for completeness.
-# However, for H2 their critical values are significantly different and are therefore retained as
-# a separate entry.
-critical_data_dictionary: dict[str, CriticalData] = {
-    "H2O": CriticalData(647.25, 221.1925),
-    "CO2": CriticalData(304.15, 73.8659),  # 304.2, 73.8 from Holland and Powell (1991)
-    "CH4": CriticalData(191.05, 46.4069),  # 190.6, 46 from Holland and Powell (1991)
-    "CO": CriticalData(133.15, 34.9571),  # 132.9, 35 from Holland and Powell (1991)
-    "O2": CriticalData(154.75, 50.7638),
-    "H2": CriticalData(33.25, 12.9696),
-    # Holland and Powell (1991) require different critical parameters
-    "H2_Holland": CriticalData(41.2, 21.1),
-    # Holland and Powell (2011) state that the critical constants for S2 are taken from:
-    # Reid, R.C., Prausnitz, J.M. & Sherwood, T.K., 1977. The Properties of Gases and Liquids.
-    # McGraw-Hill, New York.
-    # In the fifth edition of this book S2 is not given (only S is), so instead the critical
-    # constants for S2 are taken from:
-    # Shi and Saxena, Thermodynamic modeling of the C-H-O-S fluid system, American Mineralogist,
-    # Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid phases.
-    # http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
-    "S2": CriticalData(208.15, 72.954),
-    "SO2": CriticalData(430.95, 78.7295),
-    "COS": CriticalData(377.55, 65.8612),
-    # Appendix A.19 in:
-    # Poling, Prausnitz, and O'Connell, 2001. The Properties of Gases and Liquids, 5th edition.
-    # McGraw-Hill, New York. DOI: 10.1036/0070116822.
-    "H2S": CriticalData(373.55, 90.0779),  # 373.4, 0.08963
-    "N2": CriticalData(126.2, 33.9),  # Saxena and Fei (1987)
-    "Ar": CriticalData(151, 48.6),  # Saxena and Fei (1987)
+Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar
+"""
+critical_parameters_CH4: CriticalData = CriticalData(191.05, 46.4069)
+"""Critical parameters for CH4 :cite:p:`SS92{Table 2}`
+
+Alternative values from :cite:t:`HP91` are 190.6 K and 46 bar
+"""
+critical_parameters_CO: CriticalData = CriticalData(133.15, 34.9571)
+"""Critical parameters for CO :cite:p:`SS92{Table 2}`
+
+Alternative values from :cite:t:`HP91` are 132.9 K and 35 bar
+"""
+critical_parameters_O2: CriticalData = CriticalData(154.75, 50.7638)
+"""Critical parameters for O2 :cite:p:`SS92{Table 2}`"""
+critical_parameters_H2: CriticalData = CriticalData(33.25, 12.9696)
+"""Critical parameters for H2 :cite:p:`SS92{Table 2}`"""
+critical_parameters_H2_holland: CriticalData = CriticalData(41.2, 21.1)
+"""Critical parameters for H2 :cite:p:`HP91`"""
+critical_parameters_S2: CriticalData = CriticalData(208.15, 72.954)
+"""Critical parameters for S2 :cite:p:`SS92{Table 2}`
+
+http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
+
+:cite:p:`HP11` state that the critical parameters are from :cite:t:`RPS77`. However, in the fifth
+edition of this book (:cite:t:`PPO00`) S2 is not given (only S is).
+"""
+critical_parameters_SO2: CriticalData = CriticalData(430.95, 78.7295)
+"""Critical parameters for SO2 :cite:p:`SS92{Table 2}`"""
+critical_parameters_COS: CriticalData = CriticalData(377.55, 65.8612)
+"""Critical parameters for COS :cite:p:`SS92{Table 2}`"""
+critical_parameters_H2S: CriticalData = CriticalData(373.55, 90.0779)
+"""Critical parameters for H2S :cite:p:`SS92{Table 2}`
+
+Alternative values from :cite:t:`HP91` are 373.4 K and 0.08963 bar
+"""
+critical_parameters_N2: CriticalData = CriticalData(126.2, 33.9)
+"""Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
+critical_parameters_Ar: CriticalData = CriticalData(151, 48.6)
+"""Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
+
+critical_parameters: dict[str, CriticalData] = {
+    "Ar": critical_parameters_Ar,
+    "CH4": critical_parameters_CH4,
+    "CO": critical_parameters_CO,
+    "CO2": critical_parameters_CO2,
+    "COS": critical_parameters_COS,
+    "H2": critical_parameters_H2,
+    "H2_Holland": critical_parameters_H2_holland,
+    "H2O": critical_parameters_H2O,
+    "H2S": critical_parameters_H2S,
+    "N2": critical_parameters_N2,
+    "O2": critical_parameters_O2,
+    "S2": critical_parameters_S2,
+    "SO2": critical_parameters_SO2,
 }
+"""Critical parameters for gases
+
+These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
+"""

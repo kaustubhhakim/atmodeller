@@ -14,68 +14,33 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOSs from Holland and Powell (1991, 1998, 2011)
+"""Real gas EOS from :cite:t:`HP91,HP98,HP11`
 
 You will usually want to use the CORK models, since these are the most complete. The MRK models are
 nevertheless useful for comparison and understanding the influence of the virial compensation term 
 that is encapsulated within the CORK model.
 
-Functions:
-    get_holland_eos_models: Gets the preferred EOS models to use for each species.
-
-Real gas EOSs (class instances) in this module that can be imported:
-    CO2_CORK_HP91: Full CORK for CO2 in Holland and Powell (1991)
-    CO2_CORK_HP98: Full CORK for CO2 in Holland and Powell (1998)
-    CO2_CORK_simple_HP91: Simple CORK model for CO2 in Holland and Powell (1991)
-    H2O_CORK_HP91: Full CORK for H2O in Holland and Powell (1991)
-    H2O_CORK_HP98: Full CORK for H2O in Holland and Powell (1998)
-    CH4_CORK_HP91: CORK corresponding states for CH4 in Holland and Powell (1991)
-    H2_CORK_HP91: CORK corresponding states for H2 in Holland and Powell (1991)
-    CO_CORK_HP91: CORK corresponding states for CO in Holland and Powell (1991)
-    N2_CORK_HP91: CORK corresponding states for N2 in Holland and Powell (1991)
-    S2_CORK_HP11: CORK corresponding states for S2 in Holland and Powell (2011)
-    H2S_CORK_HP11: CORK corresponding states for H2S in Holland and Powell (2011)
-    CO2_MRK_HP91: Full MRK for CO2 in Holland and Powell (1991)
-    CO2_MRK_HP98: Full MRK for CO2 in Holland and Powell (1998)
-    CO2_MRK_simple_HP91: Simple MRK for CO2 in Holland and Powell (1991)
-    H2O_MRK_HP91: MRK for H2O with critical behaviour in Holland and Powell (1991)
-    H2O_MRK_HP98: MRK for H2O with critical behaviour in Holland and Powell (1998)
-    CH4_MRK_HP91: MRK corresponding states for CH4 in Holland and Powell (1991)
-    H2_MRK_HP91: MRK corresponding states for H2 in Holland and Powell (1991)
-    CO_MRK_HP91: MRK corresponding states for CO in Holland and Powell (1991)
-    N2_MRK_HP91: MRK corresponding states for N2 in Holland and Powell (1991)
-    S2_MRK_HP11: MRK corresponding states for S2 in Holland and Powell (2011)
-    H2S_MRK_HP11: MRK corresponding states for H2S in Holland and Powell (2011)
-
 Examples:
-    Get the fugacity coefficient for the H2O CORK model from Holland and Powell (1998). Note that
-    the input pressure should always be in bar:
+    Evaluate the fugacity coefficient for the H2O CORK model from :cite:t:`HP98` at 2000 K and
+    1000 bar::
 
-    ```python
-    >>> from atmodeller.eos.holland import H2O_CORK_HP98
-    >>> model = H2O_CORK_HP98
-    >>> fugacity_coefficient = model.fugacity_coefficient(temperature=2000, pressure=1000)
-    >>> print(fugacity_coefficient)
-    1.0482786160583228
-    ```
+        from atmodeller.eos.holland import H2O_CORK_HP98
+        model = H2O_CORK_HP98
+        fugacity_coefficient = model.fugacity_coefficient(temperature=2000, pressure=1000)
+        print(fugacity_coefficient)
 
-    Get the preferred EOS models for various species from the Holland and Powell models. Note that
-    the input pressure should always be in bar:
+    Get the preferred EOS models for various species from the Holland and Powell models::
     
-    ```python
-    >>> from atmodeller.eos.holland import get_holland_eos_models
-    >>> models = get_holland_eos_models()
-    >>> # list the available species
-    >>> models.keys()
-    >>> # Get the EOS model for CO
-    >>> co_model = models['CO']
-    >>> # Determine the fugacity coefficient at 2000 K and 1000 bar
-    >>> fugacity_coefficient = co_model.get_value(temperature=2000, pressure=1000)
-    >>> print(fugacity_coefficient)
-    1.2672752381755616
-    ```
+        from atmodeller.eos.holland import get_holland_eos_models
+        models = get_holland_eos_models()
+        # List the available species
+        models.keys()
+        # Get the EOS model for CO
+        co_model = models['CO']
+        # Determine the fugacity coefficient at 2000 K and 1000 bar
+        fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
+        print(fugacity_coefficient)
 """
-
 from __future__ import annotations
 
 import logging
@@ -91,24 +56,22 @@ from atmodeller.eos.interfaces import (
     MRKExplicitABC,
     MRKImplicitABC,
     RealGas,
-    critical_data_dictionary,
+    critical_parameters,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-# region MRK Corresponding States
-
-
 @dataclass(kw_only=True)
 class MRKCorrespondingStatesHP91(MRKExplicitABC):
-    """A MRK simplified model used for corresponding states from Holland and Powell (1991)
+    """An MRK simplified model used for corresponding states :cite:p:`HP91`
 
-    Universal constants from Table 2, Holland and Powell (1991).
+    Universal constants from :cite:t:`HP91{Table 2}`
 
-    Note the unit conversion to SI and pressure in bar. Compared to the original constants:
-        a coefficients have been multiplied by 1e-4
-        b0 has been multiplied by 1e-2
+    Note the unit conversion to SI and pressure in bar using the values in Table 2:
+
+        * `a` coefficients have been multiplied by 1e-4
+        * `b0` has been multiplied by 1e-2
     """
 
     a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e-9, -8.63920e-10, 0))
@@ -116,47 +79,39 @@ class MRKCorrespondingStatesHP91(MRKExplicitABC):
 
     @classmethod
     def get_species(cls, species: str) -> RealGas:
-        """Instantiates a MRK corresponding states model for a given species.
+        """Gets an MRK corresponding states model for a given species.
 
         Args:
-            species: A species which is a key in the critical_data_dictionary
+            species: A species, which must be a key in
+                :obj:`atmodeller.eos.interfaces.critical_parameters`
 
         Returns:
             A corresponding states model for the species
         """
         return cls(
-            critical_temperature=critical_data_dictionary[species].temperature,
-            critical_pressure=critical_data_dictionary[species].pressure,
+            critical_temperature=critical_parameters[species].temperature,
+            critical_pressure=critical_parameters[species].pressure,
         )
 
 
 @dataclass(kw_only=True)
 class CORKCorrespondingStatesHP91(CORK):
-    """A Simplified Compensated-Redlich-Kwong (CORK) equation from Holland and Powell (1991).
+    """A Simplified Compensated-Redlich-Kwong (CORK) equation :cite:p:`HP91`.
 
     Although originally fit to CO2 data, this predicts the volumes and fugacities for several other
     gases which are known to obey approximately the principle of corresponding states. The
-    corresponding states parameters are from Table 2 in Holland and Powell (1991). Note also in
-    this case it appears P0 is always zero, even though for the full CORK equations it determines
+    corresponding states parameters are from :cite:t:`HP91{Table 2}`. Note also in this case it
+    appears :attr:`P0` is always zero, even though for the full CORK equations it determines
     whether or not the virial contribution is added. It assumes there are no complications of
     critical behaviour in the P-T range considered.
 
     The unit conversions to SI and pressure in bar mean that every virial coefficient has been
-    multiplied by 1e-2 compared to the values in Table 2 in Holland and Powell (1991).
+    multiplied by 1e-2 compared to the values in :cite:t:`HP91{Table 2}`.
 
     Args:
-        critical_temperature: Critical temperature in kelvin
+        critical_temperature: Critical temperature in K
         critical_pressure: Critical pressure in bar
         mrk: Fugacity model for computing the MRK contribution
-
-    Attributes:
-        critical_temperature: Critical temperature in kelvin
-        critical_pressure: Critical pressure in bar
-        P0: Pressure at which the MRK equation begins to overestimate the molar volume. Set to 0
-        a_virial: Constants for the virial contribution (d0 and d1 in Table 2)
-        b_virial: Constants for the virial contribution (c0 and c1 in Table 2)
-        c_virial: Constants for the virial contribution (unused)
-        virial: Virial contribution object
     """
 
     P0: float = field(init=False, default=0)
@@ -166,10 +121,11 @@ class CORKCorrespondingStatesHP91(CORK):
 
     @classmethod
     def get_species(cls, species: str) -> RealGas:
-        """Instantiates a CORK corresponding states model for a given species
+        """Gets a CORK corresponding states model for a given species
 
         Args:
-            species: A species which is a key in the critical_data_dictionary
+            species: A species, which must be a key in
+                :obj:`atmodeller.eos.interfaces.critical_parameters`
 
         Returns:
             A corresponding states model for the species
@@ -178,32 +134,40 @@ class CORKCorrespondingStatesHP91(CORK):
 
         return cls(
             mrk=mrk,
-            critical_temperature=critical_data_dictionary[species].temperature,
-            critical_pressure=critical_data_dictionary[species].pressure,
+            critical_temperature=critical_parameters[species].temperature,
+            critical_pressure=critical_parameters[species].pressure,
         )
 
 
-# MRK concrete classes
 CO2_MRK_simple_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2")
+"""CO2 MRK corresponding states :cite:p:`HP91`"""
 CH4_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4")
+"""CH4 MRK corresponding states :cite:p:`HP91`"""
 H2_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("H2_Holland")
+"""H2 MRK corresponding states :cite:p:`HP91`"""
 CO_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CO")
+"""CO MRK corresponding states :cite:p:`HP91`"""
 N2_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("N2")
+"""N2 MRK corresponding states :cite:p:`HP91`"""
 S2_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("S2")
+"""S2 MRK corresponding states :cite:p:`HP91`"""
 H2S_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S")
+"""H2S MRK corresponding states :cite:p:`HP91`"""
 
-# CORK concrete classes
 CO2_CORK_simple_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO2")
+"""CO2 CORK corresponding states :cite:p:`HP91`"""
 CH4_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CH4")
+"""CH4 CORK corresponding states :cite:p:`HP91`"""
 H2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("H2_Holland")
+"""H2 CORK corresponding states :cite:p:`HP91`"""
 CO_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO")
+"""CO CORK corresponding states :cite:p:`HP91`"""
 N2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("N2")
+"""N2 CORK corresponding states :cite:p:`HP91`"""
 S2_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("S2")
+"""S2 CORK corresponding states :cite:p:`HP11`"""
 H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S")
-
-# endregion
-
-# region Full CORK models
+"""H2S CORK corresponding states :cite:p:`HP11`"""
 
 # For any subclass of MRKImplicitABC, note the unit conversion to SI and pressure in bar compared
 # to the values that Holland and Powell present in Table 1. These are different by 1000 compared to
@@ -335,6 +299,7 @@ class MRKCO2HP91(MRKImplicitABC):
         default=(741.2e-7, -0.10891e-7, -3.4203e-11, 0),
     )
     b0: float = field(init=False, default=3.057e-5)
+    Ta: float = field(init=False, default=0)
 
     def delta_temperature_for_a(self, temperature: float) -> float:
         return temperature - self.Ta
@@ -440,8 +405,6 @@ H2O_CORK_HP98: RealGas = CORK(
     b_virial=b_conversion((-8.9090e-2, 0)),
     c_virial=c_conversion((8.0331e-2, 0)),
 )
-
-# endregion
 
 
 def get_holland_eos_models() -> dict[str, RealGas]:
