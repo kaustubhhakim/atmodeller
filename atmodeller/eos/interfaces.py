@@ -163,21 +163,21 @@ class RealGas(ABC):
         fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
 
         if fugacity_coefficient == np.inf:
-            logger.warning("Fugacity coefficient has blown up (unphysical)")
-            logger.warning("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-            logger.warning("Setting fugacity coefficient to unity (ideal gas)")
+            logger.debug("Fugacity coefficient has blown up (unphysical)")
+            logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
+            logger.debug("Setting fugacity coefficient to unity (ideal gas)")
             fugacity_coefficient = 1
 
         elif fugacity_coefficient == 0:
-            logger.warning("Fugacity coefficient is zero (unphysical)")
-            logger.warning("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-            logger.warning("Setting fugacity coefficient to unity (ideal gas)")
+            logger.debug("Fugacity coefficient is zero (unphysical)")
+            logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
+            logger.debug("Setting fugacity coefficient to unity (ideal gas)")
             fugacity_coefficient = 1
 
         elif fugacity_coefficient < 0:
-            logger.warning("Fugacity coefficient is negative (unphysical)")
-            logger.warning("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-            logger.warning("Setting fugacity coefficient to unity (ideal gas)")
+            logger.debug("Fugacity coefficient is negative (unphysical)")
+            logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
+            logger.debug("Setting fugacity coefficient to unity (ideal gas)")
             fugacity_coefficient = 1
 
         return fugacity_coefficient
