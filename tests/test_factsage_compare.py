@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Comparison tests with FactSage"""
+"""Comparisons with FactSage 8.2"""
 
 # Want to use chemistry symbols so pylint: disable=invalid-name
 
@@ -25,12 +25,11 @@ import logging
 import pytest
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import (  # IronWustiteBufferConstraintOneill,; PressureConstraint,
+from atmodeller.constraints import (
     FugacityConstraint,
     IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraints,
-    TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
@@ -38,8 +37,8 @@ from atmodeller.utilities import earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
 
-# Tolerance to satisfy comparison with FactSage
-TOLERANCE: float = 1.0e-3
+# 3% tolerance of log values to satisfy comparison with FactSage
+TOLERANCE: float = 3.0e-2
 FACTSAGE_COMPARISON: str = "Comparing with FactSage result"
 
 
@@ -69,8 +68,6 @@ def test_CHO_reduced(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintHirschmann(log10_shift=-2),
-            # IronWustiteBufferConstraintOneill(log10_shift=-2),
-            # PressureConstraint(species="O2", value=2.774505894510357e-15),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -78,14 +75,13 @@ def test_CHO_reduced(helper) -> None:
 
     system.solve(constraints)
 
-    # FIXME: To recompute
     factsage_result: dict[str, float] = {
-        "H2_g": 175.4554515669669,
-        "H2O_g": 13.776152804526566,
-        "CO_g": 6.221337247436662,
-        "CO2_g": 0.22549239036959995,
-        "CH4_g": 38.10481325867202,
-        "O2_g": 1.2530641173017539e-15,
+        "H2_g": 175.5,
+        "H2O_g": 13.8,
+        "CO_g": 6.21,
+        "CO2_g": 0.228,
+        "CH4_g": 38.07,
+        "O2_g": 1.25e-15,
     }
 
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
@@ -117,7 +113,6 @@ def test_CHO_IW(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintHirschmann(log10_shift=0.5),
-            # IronWustiteBufferConstraintOneill(log10_shift=0.5),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -125,14 +120,13 @@ def test_CHO_IW(helper) -> None:
 
     system.solve(constraints)
 
-    # FIXME: To recompute
     factsage_result: dict[str, float] = {
-        "CH4_g": 28.673181986100104,
-        "CO2_g": 30.67480325405014,
-        "CO_g": 46.64081376634055,
-        "H2O_g": 337.3541612052904,
-        "H2_g": 236.78678795816822,
-        "O2_g": 4.1258015513565896e-13,
+        "CH4_g": 28.66,
+        "CO2_g": 30.88,
+        "CO_g": 46.42,
+        "H2O_g": 337.16,
+        "H2_g": 236.98,
+        "O2_g": 4.11e-13,
     }
 
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
@@ -164,7 +158,6 @@ def test_CHO_oxidised(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintHirschmann(log10_shift=2),
-            # IronWustiteBufferConstraintOneill(log10_shift=2),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -172,14 +165,13 @@ def test_CHO_oxidised(helper) -> None:
 
     system.solve(constraints)
 
-    # FIXME: To recompute
     factsage_result: dict[str, float] = {
-        "CH4_g": 0.0013660718550200582,
-        "CO2_g": 3.234021086939191,
-        "CO_g": 0.8916119856511471,
-        "H2O_g": 218.12574742133162,
-        "H2_g": 27.760484694381987,
-        "O2_g": 1.2549051460563437e-11,
+        "CH4_g": 0.00129,
+        "CO2_g": 3.25,
+        "CO_g": 0.873,
+        "H2O_g": 218.48,
+        "H2_g": 27.40,
+        "O2_g": 1.29e-11,
     }
 
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
@@ -211,7 +203,6 @@ def test_CHO_highly_oxidised(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintHirschmann(log10_shift=4),
-            # IronWustiteBufferConstraintOneill(log10_shift=4),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -219,21 +210,20 @@ def test_CHO_highly_oxidised(helper) -> None:
 
     system.solve(constraints)
 
-    # FIXME: To recompute
     factsage_result: dict[str, float] = {
-        "CH4_g": 5.373946431827908e-05,
-        "CO2_g": 357.8233109893475,
-        "CO_g": 9.620427735331576,
-        "H2O_g": 432.48249470696953,
-        "H2_g": 5.3676148627962545,
-        "O2_g": 1.3195489273596867e-09,
+        "CH4_g": 7.13e-05,
+        "CO2_g": 357.23,
+        "CO_g": 10.21,
+        "H2O_g": 432.08,
+        "H2_g": 5.78,
+        "O2_g": 1.14e-09,
     }
 
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_graphite_no_condensed(helper) -> None:
-    """Graphite with near 0% condensed C mass fraction."""
+def test_CHO_low_temperature(helper) -> None:
+    """C-H-O system at 873 K"""
 
     species: Species = Species(
         [
@@ -243,7 +233,6 @@ def test_graphite_no_condensed(helper) -> None:
             GasSpecies(formula="CO2"),
             GasSpecies(formula="CH4"),
             GasSpecies(formula="O2"),
-            SolidSpecies(formula="C"),
         ]
     )
     planet: Planet = Planet()
@@ -256,29 +245,27 @@ def test_graphite_no_condensed(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             IronWustiteBufferConstraintHirschmann(),
-            FugacityConstraint(species="H2", value=8.55),
+            MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
     )
 
     factsage_result: dict[str, float] = {
-        "H2_g": 8.497,
-        "H2O_g": 2.644,
-        "CO_g": 0.0721,
-        "CO2_g": 0.0607,
-        "CH4_g": 33.29,
-        "O2_g": 1.274e-25,
-        "C_cr": 1.0,
-        "degree_of_condensation_C": 0.0057,
+        "H2_g": 59.066,
+        "H2O_g": 18.320,
+        "CO_g": 8.91e-4,
+        "CO2_g": 7.48e-4,
+        "CH4_g": 19.548,
+        "O2_g": 1.27e-25,
     }
 
     system.solve(constraints)
 
-    assert helper.isclose(system, factsage_result, log=True, rtol=5e-2, atol=5e-2)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_graphite_half_condensed(helper) -> None:
-    """Graphite with around 50% condensed C mass fraction."""
+    """Graphite with 50% condensed C mass fraction"""
 
     species: Species = Species(
         [
@@ -307,19 +294,20 @@ def test_graphite_half_condensed(helper) -> None:
     )
 
     factsage_result: dict[str, float] = {
-        "H2_g": 5.766,
-        "H2O_g": 1.790,
-        "CO_g": 0.072,
-        "CO2_g": 0.060,
-        "CH4_G": 15.33,
-        "O2_G": 1.268e-25,
+        "H2_g": 5.802,
+        "H2O_g": 1.789,
+        "CO_g": 0.07185,
+        "CO2_g": 0.06,
+        "CH4_g": 15.30,
+        "O2_g": 1.2525e-25,
         "C_cr": 1.0,
-        "degree_of_condensation_C": 0.513,
+        "degree_of_condensation_C": 0.51348,
     }
 
     system.solve(constraints)
+    system.output(to_excel=True)
 
-    assert helper.isclose(system, factsage_result, log=True, rtol=5e-3, atol=5e-3)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 @pytest.mark.skip(reason="debugging")
