@@ -41,9 +41,13 @@ Examples:
         fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
         print(fugacity_coefficient)
 """
+
+# Use symbols from the relevant papers for consistency so pylint: disable=C0103
+
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -58,6 +62,11 @@ from atmodeller.eos.interfaces import (
     RealGas,
     critical_parameters,
 )
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -170,23 +179,23 @@ H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S")
 """H2S CORK corresponding states :cite:p:`HP11`"""
 
 # For any subclass of MRKImplicitABC, note the unit conversion to SI and pressure in bar compared
-# to the values that Holland and Powell present in Table 1. These are different by 1000 compared to
-# the corresponding states scaling, because in the corresponding states formulation the
-# coefficients contain a (kilo) pressure scaling as well.
-#   a coefficients have been multiplied by 1e-7
-#   b0 coefficient has been multiplied by 1e-5
+# to the values in Holland and Powell (1991), Table 1. These are different by 1000 compared to the
+# corresponding states scaling because in the corresponding states formulation the coefficients
+# contain a (kilo) pressure scaling as well.
+#     - a coefficients have been multiplied by 1e-7
+#     - b0 coefficient has been multiplied by 1e-5
 
-# The critical temperature for the CORK H2O model
-Tc_H2O: float = 695  # K
-# The temperature at which a_gas = a; hence the critical point is handled by a single a parameter
+Tc_H2O: float = 695
+"""Critical temperature in K for the CORK H2O model"""
 Ta_H2O: float = 673  # K
-# b parameter value is the same across all phases (i.e. gas, fluid, liquid)
+"""Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting"""
 b0_H2O: float = 1.465e-5
+"""b parameter value is the same across all phases (i.e. gas, fluid, liquid)"""
 
 
 @dataclass(kw_only=True)
 class _MRKH2OLiquidHP91(MRKImplicitABC):
-    """MRK for liquid H2O. Equation 6, Holland and Powell (1991)"""
+    """MRK for liquid H2O :cite:p`HP91{Equation 6}`"""
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -195,19 +204,30 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
     b0: float = field(init=False, default=b0_H2O)
     Ta: float = field(init=False, default=Ta_H2O)
 
+    @override
     def delta_temperature_for_a(self, temperature: float) -> float:
-        """Temperature difference for the calculation of the a parameter"""
-        return self.Ta - temperature
-
-    def volume(self, *args, **kwargs) -> float:
-        """Volume
+        """Temperature difference for the calculation of the `a` parameter
 
         Args:
-            *args: Positional arguments to pass to self.volume_roots
-            **kwargs: Keyword arguments to pass to self.volume_roots
+            temperature: Temperature
 
         Returns:
-            Volume in m^3/mol
+            Temperature difference
+        """
+        return self.Ta - temperature
+
+    @override
+    def volume(self, *args, **kwargs) -> float:
+        r"""Volume
+
+        Args:
+            *args: Positional arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
+            **kwargs: Keyword arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
+
+        Returns:
+            Volume in :math:`\rmmath{m}^3\rmmath{mol}^{-1}
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
@@ -216,7 +236,7 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
 
 @dataclass(kw_only=True)
 class _MRKH2OGasHP91(MRKImplicitABC):
-    """MRK for gaseous H2O. Equation 6a, Holland and Powell (1991)"""
+    """MRK for gaseous H2O :cite:p:`HP91{Equation 6a}`"""
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -230,19 +250,22 @@ class _MRKH2OGasHP91(MRKImplicitABC):
     b0: float = field(init=False, default=b0_H2O)
     Ta: float = field(init=False, default=Ta_H2O)
 
+    @override
     def delta_temperature_for_a(self, temperature: float) -> float:
-        """Temperature difference for the calculation of the a parameter"""
         return self.Ta - temperature
 
+    @override
     def volume(self, *args, **kwargs) -> float:
-        """Volume
+        r"""Volume
 
         Args:
-            *args: Positional arguments to pass to self.volume_roots
-            **kwargs: Keyword arguments to pass to self.volume_roots
+            *args: Positional arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
+            **kwargs: Keyword arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
 
         Returns:
-            Volume in m^3/mol
+            Volume in :math:`\rmmath{m}^3\rmmath{mol}^{-1}
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
@@ -251,7 +274,7 @@ class _MRKH2OGasHP91(MRKImplicitABC):
 
 @dataclass(kw_only=True)
 class _MRKH2OFluidHP91(MRKImplicitABC):
-    """MRK a parameter for supercritical H2O. Equation 6, Holland and Powell (1991)"""
+    """MRK for supercritical H2O :cite:p:`HP91{Equation 6}`"""
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -266,19 +289,22 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
     Ta: float = field(init=False, default=Ta_H2O)
     Tc: float = field(init=False, default=Tc_H2O)
 
+    @override
     def delta_temperature_for_a(self, temperature: float) -> float:
-        """Temperature difference for the calculation of the a parameter"""
         return temperature - self.Ta
 
+    @override
     def volume(self, *args, **kwargs) -> float:
-        """Volume
+        r"""Volume
 
         Args:
-            *args: Positional arguments to pass to self.volume_roots
-            **kwargs: Keyword arguments to pass to self.volume_roots
+            *args: Positional arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
+            **kwargs: Keyword arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
 
         Returns:
-            Volume in m^3/mol
+            Volume in :math:`\rmmath{m}^3\rmmath{mol}^{-1}
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
@@ -292,7 +318,7 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
 
 @dataclass(kw_only=True)
 class MRKCO2HP91(MRKImplicitABC):
-    """MRK for CO2. Holland and Powell (1991)"""
+    """MRK for CO2 :cite:p:`HP91`"""
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -301,36 +327,44 @@ class MRKCO2HP91(MRKImplicitABC):
     b0: float = field(init=False, default=3.057e-5)
     Ta: float = field(init=False, default=0)
 
+    @override
     def delta_temperature_for_a(self, temperature: float) -> float:
         return temperature - self.Ta
 
+    @override
     def volume(self, *args, **kwargs) -> float:
-        """Volume
+        r"""Volume
 
         Args:
-            *args: Positional arguments to pass to self.volume_roots
-            **kwargs: Keyword arguments to pass to self.volume_roots
+            *args: Positional arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
+            **kwargs: Keyword arguments to pass through to
+                :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
 
         Returns:
-            Volume in m^3/mol
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
         # In some cases there are more than a single root, in which case the maximum value
         # maintains continuity/monotonicity with the single root cases. Furthermore, the max value
         # passed the tests that were previously configured when Newton's method was used instead.
+
         return np.max(volume_roots)
 
 
 CO2_MRK_HP91: RealGas = MRKCO2HP91()
-
-# For completeness, the MRK model for CO2 in 1998 is the same as the 1991 paper.
+"""CO2 MRK :cite:p:`HP91`"""
 CO2_MRK_HP98: RealGas = MRKCO2HP91()
+"""CO2 MRK :cite:p:`HP98`
+
+This is the same as the CO2 MRK model in :cite:t:`HP91`.
+"""
 
 
 @dataclass(kw_only=True)
 class MRKH2OHP91(MRKCriticalBehaviour):
-    """MRK for H2O that spans the range across the critical behaviour"""
+    """MRK for H2O that includes critical behaviour"""
 
     mrk_fluid: MRKImplicitABC = field(init=False, default_factory=_MRKH2OFluidHP91)
     mrk_gas: MRKImplicitABC = field(init=False, default_factory=_MRKH2OGasHP91)
@@ -338,11 +372,12 @@ class MRKH2OHP91(MRKCriticalBehaviour):
     Ta: float = field(init=False, default=Ta_H2O)
     Tc: float = field(init=False, default=Tc_H2O)
 
+    @override
     def Psat(self, temperature: float) -> float:
-        """Saturation curve. Equation 5, Holland and Powell (1991)
+        """Saturation curve :cite:p:`HP91{Equation 5}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
 
         Returns:
             Saturation curve pressure in bar
@@ -357,58 +392,68 @@ class MRKH2OHP91(MRKCriticalBehaviour):
 
 
 H2O_MRK_HP91: RealGas = MRKH2OHP91()
-
-# For completeness, the MRK model for H2O in 1998 is the same as the 1991 paper.
+"""H2O MRK :cite:p:`HP91`"""
 H2O_MRK_HP98: RealGas = MRKH2OHP91()
+"""H2O MRK :cite:p:`HP98`
 
-# For the Full CORK models below, the virial coefficients in the Holland and Powell papers need
+This is the same as the H2O MRK model in :cite:t:`HP91`.
+"""
+
+# For the Full CORK models, the virial coefficients in the Holland and Powell papers need
 # converting to SI units and pressure in bar as follows, where k = kilo = 1000:
-#    a_virial = a_virial (Holland and Powell) * 10**(-5) / k
-#    b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
-#    c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
+#     - a_virial = a_virial (Holland and Powell) * 10**(-5) / k
+#     - b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
+#     - c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
 
-a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
+_a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
     map(lambda y: y * 1e-5 / kilo, x)
 )
-b_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
+_b_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
     map(lambda y: y * 1e-5 / kilo**0.5, x)
 )
-c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
+_c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
     map(lambda y: y * 1e-5 / kilo**0.25, x)
 )
 
 CO2_CORK_HP91: RealGas = CORK(
     P0=5000,
     mrk=CO2_MRK_HP91,
-    a_virial=a_conversion((1.33790e-2, -1.01740e-5)),
-    b_virial=b_conversion((-2.26924e-1, 7.73793e-5)),
+    a_virial=_a_conversion((1.33790e-2, -1.01740e-5)),
+    b_virial=_b_conversion((-2.26924e-1, 7.73793e-5)),
 )
+"""CO2 CORK :cite:p:`HP91`"""
 
 CO2_CORK_HP98: RealGas = CORK(
     P0=5000,
     mrk=CO2_MRK_HP98,
-    a_virial=a_conversion((5.40776e-3, -1.59046e-6)),
-    b_virial=b_conversion((-1.78198e-1, 2.45317e-5)),
+    a_virial=_a_conversion((5.40776e-3, -1.59046e-6)),
+    b_virial=_b_conversion((-1.78198e-1, 2.45317e-5)),
 )
+"""CO2 CORK :cite:p:`HP98`"""
 
 H2O_CORK_HP91: RealGas = CORK(
     P0=2000,
     mrk=MRKH2OHP91(),
-    a_virial=a_conversion((-3.2297554e-3, 2.2215221e-6)),
-    b_virial=b_conversion((-3.025650e-2, -5.343144e-6)),
+    a_virial=_a_conversion((-3.2297554e-3, 2.2215221e-6)),
+    b_virial=_b_conversion((-3.025650e-2, -5.343144e-6)),
 )
+"""H2O CORK :cite:p:`HP91`"""
 
 H2O_CORK_HP98: RealGas = CORK(
     P0=2000,
     mrk=H2O_MRK_HP98,
-    a_virial=a_conversion((1.9853e-3, 0)),
-    b_virial=b_conversion((-8.9090e-2, 0)),
-    c_virial=c_conversion((8.0331e-2, 0)),
+    a_virial=_a_conversion((1.9853e-3, 0)),
+    b_virial=_b_conversion((-8.9090e-2, 0)),
+    c_virial=_c_conversion((8.0331e-2, 0)),
 )
+"""H2O CORK :cite:p:`HP98`"""
 
 
 def get_holland_eos_models() -> dict[str, RealGas]:
-    """Gets a dictionary of the preferred EOS models to use for each species.
+    """Gets a dictionary of the preferred Holland and Powell EOS models for each species
+
+    The latest and/or most sophisticated EOS model is chosen for each species. Corresponding
+    states models are used when a bespoke fit to just that species is not available.
 
     Returns:
         Dictionary of preferred EOS models for each species

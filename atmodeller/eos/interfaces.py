@@ -392,12 +392,7 @@ class MRKExplicitABC(CorrespondingStates, ModifiedRedlichKwongABC):
 
 @dataclass(kw_only=True)
 class MRKImplicitABC(ModifiedRedlichKwongABC):
-    r"""A Modified Redlich Kwong (MRK) EOS in implicit form
-
-    Args:
-        Ta: Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting :cite:p:`HP91`.
-            Defaults to 0.
-    """
+    """A Modified Redlich Kwong (MRK) EOS in implicit form"""
 
     @override
     def a(self, temperature: float) -> float:
@@ -532,13 +527,13 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
 @dataclass(kw_only=True)
 class MRKCriticalBehaviour(RealGas):
-    """A MRK equation of state that accommodates critical behaviour :cite:p:`HP91{Appendix A}`
+    r"""A MRK equation of state that accommodates critical behaviour :cite:p:`HP91{Appendix A}`
 
     Args:
         mrk_fluid: MRK EOS for the supercritical fluid
         mrk_gas: MRK EOS for the subcritical gas
         mrk_liquid: MRK EOS for the subcritical liquid
-        Ta: Temperature at which a_gas = a in the MRK formulation
+        Ta: Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting :cite:p:`HP91`.
     """
 
     mrk_fluid: MRKImplicitABC
@@ -647,8 +642,9 @@ class VirialCompensation(CorrespondingStates, RealGas):
     or volume integral by itself.
 
     Args:
-        a_coefficients: Coefficients for a polynomial of the form a = a0+a1*T, where a0 and a1 may
-            be scaled (internally) by critical parameters for corresponding states.
+        a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where
+            :math:`a_0` and :math:`a_1` may be scaled (internally) by critical parameters for
+            corresponding states.
         b_coefficients: As above for the b coefficients
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
