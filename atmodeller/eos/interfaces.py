@@ -188,8 +188,16 @@ class RealGas(ABC):
 
 
 @dataclass(kw_only=True)
-class CorrespondingStates(ABC):
-    """A corresponding states model"""
+class CorrespondingStatesMixin(ABC):
+    """A corresponding states model
+
+    Args:
+        critical_temperature: Critical temperature in K. Defaults to 1, effectively meaning that
+            the scaled temperature is numerically the same as the actual temperature, albeit
+            without units.
+        critical_pressure: Critical pressure in bar. Defaults to 1, effectively meaning that the
+            scale pressure is numerically the same as the actual pressure, albeit without units.
+    """
 
     critical_temperature: float = 1
     """Critical temperature in K"""
@@ -297,7 +305,7 @@ class ModifiedRedlichKwongABC(RealGas):
 
 
 @dataclass(kw_only=True)
-class MRKExplicitABC(CorrespondingStates, ModifiedRedlichKwongABC):
+class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
     """A Modified Redlich Kwong (MRK) EOS in explicit form"""
 
     @override
@@ -624,7 +632,7 @@ class MRKCriticalBehaviour(RealGas):
 
 
 @dataclass(kw_only=True)
-class VirialCompensation(CorrespondingStates, RealGas):
+class VirialCompensation(CorrespondingStatesMixin, RealGas):
     r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
 
     General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
@@ -761,7 +769,7 @@ class VirialCompensation(CorrespondingStates, RealGas):
 
 
 @dataclass(kw_only=True)
-class CORK(CorrespondingStates, RealGas):
+class CORK(CorrespondingStatesMixin, RealGas):
     """A Compensated-Redlich-Kwong (CORK) EOS :cite:p:`HP91`
 
     Args:

@@ -14,123 +14,102 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOSs from Shi and Saxena (1992), Saxena and Fei (1988), and Saxena and Fei (1987a,b)
-
-Functions:
-    get_saxena_eos_models: Gets the preferred EOS models to use for each species
-
-Real gas EOSs (class instances) in this module that can be imported:
-    Ar_SF87: Corresponding states for Ar from Saxena and Fei (1987)
-    CH4_SS92: Corresponding states for CH4 from Shi and Saxena (1992)
-    COS_S92: Corresponding states for CO from Shi and Saxena (1992)
-    CO2_SS92: Corresponding states for CO2 from Shi and Saxena (1992)
-    COS_SS92: Correponding states for COS from Shi and Saxena (1992)
-    H2S_F87: Corresponding states for H2 from Saxena and Fei (1987)
-    H2_SS92: H2 from Shi and Saxena with refitted high pressure data (1992)
-    H2S_SS92: H2S from Shi and Saxena (1992)
-    N2_SF87: Corresponding states for N2 from Saxena and Fei (1987)
-    O2_SS92: Corresponding states for O2 from Shi and Saxena (1992)
-    S2_SS92: Corresponding states for S2 from Shi and Saxena (1992)
-    SO2_SS92: SO2 from Shi and Saxena (1992)
+"""Real gas EOSs from :cite:t:`SF87,SF87a,SF88,SS92`.
 
 Examples:
-    Get the fugacity coefficient for the CO2 corresponding states model from Shi and Saxena (1992)
-    Note that the input pressure should always be in bar:
+    Evaluate the fugacity coefficient for the CO2 corresponding states model from :cite:t:`SS92` at
+    2000 K and 1000 bar::
 
-    ```python
-    >>> from atmodeller.eos.saxena import CO2_SS92
-    >>> fugacity_coefficient = CO2SS92.fugacity_coefficient(temperature=2000, pressure=1000)
-    >>> print(fugacity_coefficient)
-    1.0973520647000174
-    ```
+        from atmodeller.eos.saxena import CO2_SS92
+        model = CO2_SS92
+        fugacity_coefficient = model.fugacity_coefficient(temperature=2000, pressure=1000)
+        print(fugacity_coefficient)
 
-    Get the preferred EOS models for various species from the Saxena models. Note that the input 
-    pressure should always be in bar:
-    
-    ```python
-    >>> from atmodeller.eos.saxena import get_saxena_eos_models
-    >>> models = get_saxena_eos_models()
-    >>> # list the available species
-    >>> models.keys()
-    >>> # Get the EOS model for CO
-    >>> co_model = models['CO']
-    >>> # Determine the fugacity coefficient at 2000 K and 1000 bar
-    >>> fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
-    >>> print(fugacity_coefficient)
-    1.1648016694290084
-    ```
+    Get the preferred EOS models for various species from the Saxena and colleagues models::
+
+        from atmodeller.eos.saxena import get_saxena_eos_models
+        models = get_saxena_eos_models()
+        # List the available species
+        models.keys()
+        # Get the EOS model for CO
+        co_model = models['CO']
+        # Determine the fugacity coefficient at 2000 K and 1000 bar
+        fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
+        print(fugacity_coefficient)
 """
+# Use symbols from the relevant papers for consistency so pylint: disable=C0103
 
 from __future__ import annotations
 
 import logging
+import sys
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from atmodeller import GAS_CONSTANT_BAR
-from atmodeller.eos.interfaces import CombinedEOSModel, RealGas, critical_parameters
+from atmodeller.eos.interfaces import (
+    CombinedEOSModel,
+    CorrespondingStatesMixin,
+    RealGas,
+    critical_parameters,
+)
 from atmodeller.utilities import UnitConversion
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
-class SaxenaABC(RealGas):
-    """Shi and Saxena (1992) fugacity model
+class SaxenaABC(CorrespondingStatesMixin, RealGas):
+    """A real gas EOS from :cite:t:`SS92`
 
-    The model presented in Shi and Saxena (1992) is a general form that can be adapted to the
-    previous work of Saxena and Fei (1988) and Saxena and Fei (1987).
-
-    Shi and Saxena (1992), Thermodynamic modeling of the C-H-O-S fluid system, American
-    Mineralogist, Volume 77, pages 1038-1049, 1992. See table 2, critical data of C-H-O-S fluid
-    phases.
-
-    http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
+    This form of the EOS can also be used for the models in :cite:t:`SF87a,SF87,SF88`.
 
     Args:
-        critical_temperature: Critical temperature in kelvin. Defaults to unity (not used)
-        critical_pressure: Critical pressure in bar. Defaults to unity (not used)
-        a_coefficients: a coefficients (see paper). Defaults to empty
-        b_coefficients: b coefficients (see paper). Defaults to empty
-        c_coefficients: c coefficients (see paper). Defaults to empty
-        d_coefficients: d coefficients (see paper). Defaults to empty
-
-    Attributes:
-        critical_temperature: Critical temperature in kelvin
-        critical_pressure: Critical pressure in bar
-        a_coefficients: a coefficients
-        b_coefficients: b coefficients
-        c_coefficients: c coefficients
-        d_coefficients: d coefficients
-        standard_state_pressure: Scaled standard state pressure with the appropriate units
+        a_coefficients: `a` coefficients. Defaults to empty.
+        b_coefficients: `b` coefficients. Defaults to empty.
+        c_coefficients: `c` coefficients. Defaults to empty.
+        d_coefficients: `d` coefficients. Defaults to empty.
+        critical_temperature: Critical temperature in K. Defaults to unity meaning not a
+            corresponding states model.
+        critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
+            states model.
     """
 
     a_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    """`a` coefficients"""
     b_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    """`b` coefficients"""
     c_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    """`c` coefficients"""
     d_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    """`d` coefficients"""
+    standard_state_pressure: float = field(init=False, default=1)
+    """Standard state pressure with the appropriate units"""
 
     @abstractmethod
     def _get_compressibility_coefficient(
         self, scaled_temperature: float, coefficients: tuple[float, ...]
     ) -> float:
         """General form of the coefficients for the compressibility calculation
-
-        Shi and Saxena (1992), Equation 1
+        :cite:p:`SS92{Equation 1}`
 
         Args:
             temperature: Scaled temperature
-            coefficients: Tuple of the coefficients a, b, c, or d
+            coefficients: Tuple of the coefficients `a`, `b`, `c`, or `d`.
 
         Returns
             The relevant coefficient
         """
-        ...
 
     def _a(self, scaled_temperature: float) -> float:
-        """a parameter
+        """`a` parameter
 
         Args:
             scaled_temperature: Scaled temperature
@@ -143,7 +122,7 @@ class SaxenaABC(RealGas):
         return a
 
     def _b(self, scaled_temperature: float) -> float:
-        """b parameter
+        """`b` parameter
 
         Args:
             scaled_temperature: Scaled temperature
@@ -156,7 +135,7 @@ class SaxenaABC(RealGas):
         return b
 
     def _c(self, scaled_temperature: float) -> float:
-        """c parameter
+        """`c` parameter
 
         Args:
             scaled_temperature: Scaled temperature
@@ -169,7 +148,7 @@ class SaxenaABC(RealGas):
         return c
 
     def _d(self, scaled_temperature: float) -> float:
-        """d parameter
+        """`d` parameter
 
         Args:
             scaled_temperature: Scaled temperature
@@ -181,21 +160,20 @@ class SaxenaABC(RealGas):
 
         return d
 
+    @override
     def compressibility_parameter(self, temperature: float, pressure: float) -> float:
-        """Compressibility parameter at temperature and pressure
+        """Compressibility parameter :cite:p:`SS92{Equation 2}`
 
         This overrides the base class because the compressibility factor is used to determine the
         volume, whereas in the base class the volume is used to determine the compressibility
         factor.
 
-        Shi and Saxena (1992), Equation 2
-
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            The compressibility parameter, Z
+            The compressibility parameter, which is dimensionless
         """
         Tr: float = self.scaled_temperature(temperature)
         Pr: float = self.scaled_pressure(pressure)
@@ -203,34 +181,32 @@ class SaxenaABC(RealGas):
 
         return Z
 
+    @override
     def volume(self, temperature: float, pressure: float) -> float:
-        """Volume
-
-        Shi and Saxena (1992), Equation 1.
+        r"""Volume :cite:p:`SS92{Equation 1}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume in m^3 mol^(-1)
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         Z: float = self.compressibility_parameter(temperature, pressure)
         volume: float = Z * self.ideal_volume(temperature, pressure)
 
         return volume
 
+    @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral (VdP)
-
-        Shi and Saxena (1992), Equation 11.
+        r"""Volume integral :cite:p:`SS92{Equation 11}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in J mol^(-1)
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
         Tr: float = self.scaled_temperature(temperature)
         Pr: float = self.scaled_pressure(pressure)
@@ -252,18 +228,18 @@ class SaxenaABC(RealGas):
 
 @dataclass(kw_only=True)
 class SaxenaFiveCoefficients(SaxenaABC):
-    """Fugacity model with five coefficients, which is generally used for low pressures"""
+    """Real gas EOS with five coefficients, which is generally used for low pressures"""
 
+    @override
     def _get_compressibility_coefficient(
         self, scaled_temperature: float, coefficients: tuple[float, ...]
     ) -> float:
         """General form of the coefficients for the compressibility calculation
-
-        Shi and Saxena (1992), Equation 3b
+        :cite:p:`SS92{Equation 3b}`
 
         Args:
-            scaled_temperature: Temperature
-            coefficients: Tuple of the coefficients a, b, c, or d
+            temperature: Scaled temperature
+            coefficients: Tuple of the coefficients `a`, `b`, `c`, or `d`.
 
         Returns
             The relevant coefficient
@@ -281,18 +257,18 @@ class SaxenaFiveCoefficients(SaxenaABC):
 
 @dataclass(kw_only=True)
 class SaxenaEightCoefficients(SaxenaABC):
-    """Fugacity model with eight coefficients, which is generally used for high pressures"""
+    """Real gas EOS with eight coefficients, which is generally used for high pressures"""
 
+    @override
     def _get_compressibility_coefficient(
         self, scaled_temperature: float, coefficients: tuple[float, ...]
     ) -> float:
         """General form of the coefficients for the compressibility calculation
-
-        Shi and Saxena (1992), Equation 3a
+        :cite:p:`SS92{Equation 3a}`
 
         Args:
-            scaled_temperature: Temperature
-            coefficients: Tuple of the coefficients a, b, c, or d
+            temperature: Scaled temperature
+            coefficients: Tuple of the coefficients `a`, `b`, `c`, or `d`.
 
         Returns
             The relevant coefficient
@@ -311,9 +287,6 @@ class SaxenaEightCoefficients(SaxenaABC):
         return coefficient
 
 
-# Low pressure model for H2 from Shi and Saxena (1992)
-# The coefficients are the same as for the corresponding states model in Table 1(a) because they
-# originate from Saxena and Fei (1987a). Table 1(b), <1000 bar
 _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
     critical_temperature=critical_parameters["H2"].temperature,
     critical_pressure=critical_parameters["H2"].pressure,
@@ -323,23 +296,26 @@ _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
     c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
     d_coefficients=(0, 0, 0, 0, 0),
 )
+"""H2 low pressure (<1000 bar) :cite:p:`SS92{Table 1b}`
 
-# High pressure model for H2 from Shi and Saxena (1992)
-# This model is currently not used because it has been superseded by the refitted model
-# Coefficients require the actual temperature and pressure. Table 1(b), >1 kbar
+The coefficients are the same as for the corresponding states model in :cite:t:`SS92{Table 1a}`
+because they originate from :cite:t:`SF87a{Equation 23}`.
+
+In :cite:t:`SF87a{Equation 23}` the final `c` coefficient is 0.1472e-1, not 0.1427e-1 as given in
+:cite:t:`SS92{Table 1b}`. The earlier work is assumed to be correct.
+"""
 _H2_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
     a_coefficients=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1),
     b_coefficients=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5),
     c_coefficients=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10),
     d_coefficients=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0),
 )
+"""H2 high pressure (>1000 bar) :cite:p:`SS92{Table 1b}`
 
-# High pressure model for H2 from Shi and Saxena (1992) refitted using the experimental volume,
-# pressure, and temperature data from Presnall (1969) and Ross, Ree and Young (1983).
-# For this fit, we assume the same functional form as Shi and Saxena for pressures above 1 kbar
-# (Equation 2 and Equation 3a), including which coefficients are set to zero
-# (as in Table 1b at pressures > 1 kbar) and a least squares regression. The refitting is performed
-# using reduced temperature and pressure.
+This model is not a corresponding states model and requires the actual temperature and pressure.
+It has been superseded by a refitted model. 
+"""
+
 _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["H2"].temperature,
     critical_pressure=critical_parameters["H2"].pressure,
@@ -348,27 +324,36 @@ _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
     c_coefficients=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
     d_coefficients=(2.28281107e-11, 0, -1.07138603e-08, 0, 3.67720815e-07, 0, 0, 0),
 )
+"""H2 high pressure (>1000 bar)
 
-# H2 fugacity model from Shi and Saxena (1992)
-# Combines the low pressure and high pressure models into a single model. Table 1(b)
-models: tuple[RealGas, ...] = (_H2_low_pressure_SS92, _H2_high_pressure_SS92_refit)
-upper_pressure_bounds: tuple[float, ...] = (1000,)
-H2_SS92: RealGas = CombinedEOSModel(models=models, upper_pressure_bounds=upper_pressure_bounds)
+This model has been refitted using a least square regression using the experimental volume, 
+pressure, and temperature data from :cite:t:`P69,RRY83` assuming the same functional form for 
+pressures above 1 kbar as given by :cite:t:`SS92{Equation 2 and 3a}`, including which coefficients 
+are set to zero :cite:p:`SS92{Table 1b}`. The refitting is performed using reduced temperature and
+pressure.
+"""
 
-# High pressure model for H2 from Saxena and Fei (1988). Table on p1196
-# This model does not at all agree with Shi and Saxena or data, regardless of whether the
-# temperature and pressure are the actual values or reduced values. Since this model cannot be
-# trusted it is commented out.
-# H2_high_pressure_SF88: RealGas = SaxenaEightCoefficients(
-#     critical_temperature=critical_parameters["H2"].temperature,
-#     critical_pressure=critical_parameters["H2"].pressure,
-#     a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
-#     b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
-#     c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
-#     d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
-# )
+H2_SS92: RealGas = CombinedEOSModel(
+    models=(_H2_low_pressure_SS92, _H2_high_pressure_SS92_refit), upper_pressure_bounds=(1000,)
+)
+"""H2 EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1b}`"""
 
-# Fugacity model for SO2 from Shi and Saxena (1992). Table 1(c)
+_H2_high_pressure_SF88: RealGas = SaxenaEightCoefficients(
+    critical_temperature=critical_parameters["H2"].temperature,
+    critical_pressure=critical_parameters["H2"].pressure,
+    a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
+    b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
+    c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
+    d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
+)
+"""H2 high pressure :cite:p:`SF88{Table on page 1196}`
+
+This model does not at all agree with :cite:t:`SS92` or data, regardless of whether the temperature
+and pressure inputs are the actual or reduced values.
+
+Further investigations are warranted before this model should be used.
+"""
+
 SO2_SS92: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["SO2"].temperature,
     critical_pressure=critical_parameters["SO2"].pressure,
@@ -395,9 +380,8 @@ SO2_SS92: RealGas = SaxenaEightCoefficients(
     ),
     d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
 )
+"""SO2 EOS :cite:p:`SS92{Table 1c}`"""
 
-# Fugacity model for H2S from Shi and Saxena (1992)
-# Table 1(d), 1-500 bar
 _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["H2S"].temperature,
     critical_pressure=critical_parameters["H2S"].pressure,
@@ -406,9 +390,8 @@ _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
     c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
     d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
 )
+"""H2S low pressure (1-500 bar) :cite:p:`SS92{Table 1d}`"""
 
-# Fugacity model for H2S from Shi and Saxena (1992).
-# Table 1(d), 500-10000 bar
 _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["H2S"].temperature,
     critical_pressure=critical_parameters["H2S"].pressure,
@@ -435,60 +418,58 @@ _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
     ),
     d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
 )
+"""H2S high pressure (500-10000 bar) :cite:p:`SS92{Table 1d}`"""
 
-# H2S fugacity model from Shi and Saxena (1992).
-# Combines the low pressure and high pressure models into a single model. See Table 1(d)
-models: tuple[RealGas, ...] = (_H2S_low_pressure_SS92, _H2S_high_pressure_SS92)
-upper_pressure_bounds: tuple[float, ...] = (500,)
-H2S_SS92: RealGas = CombinedEOSModel(models=models, upper_pressure_bounds=upper_pressure_bounds)
+H2S_SS92: RealGas = CombinedEOSModel(
+    models=(_H2S_low_pressure_SS92, _H2S_high_pressure_SS92), upper_pressure_bounds=(500,)
+)
+"""H2S EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1d}`"""
 
 
 def get_corresponding_states_SS92(species: str) -> RealGas:
-    """Corresponding states from Shi and Saxena (1992)
+    """Corresponding states :cite:p:`SS92{Table 1a}`
 
-    The coefficients for the low and medium pressure regime are actually lifted from Saxena and
-    Fei (1987a), although some values disagree in either value or sign with Table 1(a) in the 1992
-    paper. We need to decide which one is right, probably by computing the RMSE and taking the
-    best-fitting combination. I'd assume the 1987 study is correct and the error is copying the
-    data into the 1992 paper?  To be investigated.
-
-    Table 1(a)
+    Coefficients for the low and medium pressure regimes are from
+    :cite:t:`SF87a{Equation 23 and 21}`, respectively, although some values disagree either in
+    value or sign with :cite:t:`SS92{Table 1a}`. Eventually it should be determined which is right,
+    but for the time being it is assumed that the earlier work is correct. Coefficients for the
+    high pressure regime are from :cite:t:`SF87{Equation 11}`.
 
     Args:
-        species: Species name. Must corresponding to an entry (key) in critical_parameters
+        species: A species, which must be a key in
+            :obj:`atmodeller.eos.interfaces.critical_parameters`
 
     Returns:
-        Corresponding states fugacity model
+        A corresponding states model for the species
     """
 
     critical_temperature: float = critical_parameters[species].temperature
     critical_pressure: float = critical_parameters[species].pressure
 
-    # Table 1(a), <1000 bar
+    # Table 1a, <1000 bar
     low_pressure: RealGas = SaxenaFiveCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
         a_coefficients=(1, 0, 0, 0, 0),
         b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
-        # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
+        # Saxena and Fei (1987) CMP, Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
         c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
         d_coefficients=(0, 0, 0, 0, 0),
     )
 
-    # Table 1(a), 1000-5000 bar
+    # Table 1a, 1000-5000 bar
     medium_pressure: RealGas = SaxenaEightCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
         a_coefficients=(1, 0, 0, 0, -5.917e-1, 0, 0, 0),
         b_coefficients=(0, 0, 9.122e-2, 0, 0, 0, 0, 0),
-        # Saxena and Fei (1987a), Eq. 21, C first coefficient = 1.4164e-4 (not negative)
+        # Saxena and Fei (1987) CMP, Eq. 21, C first coefficient = 1.4164e-4 (not negative)
         c_coefficients=(0, 0, 0, 0, 1.4164e-4, 0, 0, -2.8349e-6),
         d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
     )
 
-    # Table 1(a), >5000 bar
-    # Higher precision coefficients taken from Saxena and Fei (1987b), but agrees with Table 1(a)
-    # in the 1992 paper.
+    # Table 1a, >5000 bar
+    # High precision coefficients taken from Saxena and Fei (1987), GCA, and agree with Table 1(a)
     high_pressure: RealGas = SaxenaEightCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
@@ -498,35 +479,50 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
         d_coefficients=(0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0),
     )
 
-    models: tuple[RealGas, ...] = (low_pressure, medium_pressure, high_pressure)
-    upper_pressure_bounds: tuple[float, ...] = (1000, 5000)
-
     combined_model: RealGas = CombinedEOSModel(
-        models=models, upper_pressure_bounds=upper_pressure_bounds
+        models=(low_pressure, medium_pressure, high_pressure), upper_pressure_bounds=(1000, 5000)
     )
 
     return combined_model
 
 
-# Corresponding states fugacity models from Shi and Saxena (1992)
 CH4_SS92: RealGas = get_corresponding_states_SS92("CH4")
+"""CH4 corresponding states :cite:p:`SS92`"""
 CO_SS92: RealGas = get_corresponding_states_SS92("CO")
+"""CO corresponding states :cite:p:`SS92`"""
 CO2_SS92: RealGas = get_corresponding_states_SS92("CO2")
+"""CO2 corresponding states :cite:p:`SS92`"""
 COS_SS92: RealGas = get_corresponding_states_SS92("COS")
+"""COS corresponding states :cite:p:`SS92`"""
 O2_SS92: RealGas = get_corresponding_states_SS92("O2")
+"""O2 corresponding states :cite:p:`SS92`"""
 S2_SS92: RealGas = get_corresponding_states_SS92("S2")
-
-# N2, H2, Ar are presented in Saxena and Fei for the high pressure fit only, but here we adopt the
-# same low pressure extension as in Shi and Saxena (1992), Table 1(a).
+"""S2 corresponding states :cite:p:`SS92`"""
 Ar_SF87: RealGas = get_corresponding_states_SS92("Ar")
+"""Ar corresponding states :cite:p:`SF87{Equation 11}`
+
+The low pressure extension given by the corresponding states model of :cite:t:`SS92{Table 1a}` is
+also adopted.
+"""
 H2_SF87: RealGas = get_corresponding_states_SS92("H2")
+"""H2 corresponding states :cite:p:`SF87{Equation 11}`
+
+The low pressure extension given by the corresponding states model of :cite:t:`SS92{Table 1a}` is
+also adopted.
+"""
 N2_SF87: RealGas = get_corresponding_states_SS92("N2")
+"""N2 corresponding states :cite:p:`SF87{Equation 11}`
+
+The low pressure extension given by the corresponding states model of :cite:t:`SS92{Table 1a}` is
+also adopted.
+"""
 
 
 def get_saxena_eos_models() -> dict[str, RealGas]:
-    """Gets a dictionary of the preferred EOS models to use for each species.
+    """Gets a dictionary of the preferred Saxena and colleagues EOS models for each species.
 
-    The keys are the species and the values are class instances.
+    The latest and/or most sophisticated EOS model is chosen for each species. Corresponding
+    states models are used when a bespoke fit to just that species is not available.
 
     Returns:
         Dictionary of preferred EOS models for each species

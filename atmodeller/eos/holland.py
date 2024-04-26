@@ -41,7 +41,6 @@ Examples:
         fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
         print(fugacity_coefficient)
 """
-
 # Use symbols from the relevant papers for consistency so pylint: disable=C0103
 
 from __future__ import annotations
@@ -188,7 +187,7 @@ H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S")
 Tc_H2O: float = 695
 """Critical temperature in K for the CORK H2O model"""
 Ta_H2O: float = 673  # K
-"""Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting"""
+r"""Temperature at which :math:`a_{\mathrm gas} = a` by constrained fitting"""
 b0_H2O: float = 1.465e-5
 """b parameter value is the same across all phases (i.e. gas, fluid, liquid)"""
 
