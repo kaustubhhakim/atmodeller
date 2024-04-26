@@ -14,47 +14,28 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOSs from Holley et al. (1958)
-
-Compressibility factors and fugacity coefficients calculated from the Beattie-Bridgeman equation
-of state for hydrogen, nitrogen, oxygen, carbon dioxide, ammonia, methane, and helium.
-C. E. Holley, Jr., W. J. Worlton, and R. K. Zeigler (1958), doi: 10.2172/4289497
-
-https://www.osti.gov/biblio/4289497
-
-Functions:
-    get_holley_eos_models: Gets the preferred EOS models to use for each species.
-
-Real gas EOSs (class instances) in this module that can be imported:
-    H2_Beattie_holley: Beattie-Bridgeman for H2
-    N2_Beattie_holley: Beattie-Bridgeman for N2
-    O2_Beattie_holley: Beattie-Bridgeman for O2
-    CO2_Beattie_holley: Beattie-Bridgeman for CO2
-    NH3_Beattie_holley: Beattie-Bridgeman for NH3
-    CH4_Beattie_holley: Beattie-Bridgeman for CH4
-    He_Beattie_holley: Beattie-Bridgeman for He
+"""Real gas EOSs from :cite:t:`HWZ58`
 
 Examples:
-    Get the preferred EOS models for various species. Note that the input pressure should always be
-    in bar:
+    Get the preferred EOS models for various species from the Holley models::
     
-    ```python
-    >>> from atmodeller.eos.holley import get_holley_eos_models
-    >>> models = get_holley_eos_models()
-    >>> # list the available species
-    >>> models.keys()
-    >>> # Get the EOS model for He
-    >>> he_model = models['He']
-    >>> # Determine the fugacity coefficient at 1000 K and 100 bar
-    >>> fugacity_coefficient = he_model.get_value(temperature=1000, pressure=100)
-    >>> print(fugacity_coefficient)
-    1.0165341564229526
-    ```
+        from atmodeller.eos.holley import get_holley_eos_models
+        models = get_holley_eos_models()
+        # List the available species
+        models.keys()
+        # Get the EOS model for He
+        he_model = models['He']
+        # Determine the fugacity coefficient at 1000 K and 100 bar
+        fugacity_coefficient = he_model.fugacity_coefficient(temperature=1000, pressure=100)
+        print(fugacity_coefficient)
 """
+
+# Use symbols from the paper for consistency so pylint: disable=C0103
 
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from typing import Callable
 
@@ -63,7 +44,12 @@ from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import RealGas
-from atmodeller.utilities import UnitConversion, debug_decorator
+from atmodeller.utilities import UnitConversion
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -72,20 +58,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 class BeattieBridgeman(RealGas):
     """Beattie-Bridgeman equation
 
-    Compressibility factors and fugacity coefficients calculated from the Beattie-Bridgeman
-    equation of state for hydrogen, nitrogen, oxygen, carbon dioxide, ammonia, methane, and helium.
-    C. E. Holley, Jr., W. J. Worlton, and R. K. Zeigler (1958), doi: 10.2172/4289497
-
-    https://www.osti.gov/biblio/4289497
-
     Args:
-        A0: A0 constant
-        a: a constant
-        B0: B0 constant
-        b: b constant
-        c: c constant
-
-    Attributes:
         A0: A0 constant
         a: a constant
         B0: B0 constant
@@ -94,23 +67,25 @@ class BeattieBridgeman(RealGas):
     """
 
     A0: float
+    """A0 constant"""
     a: float
+    """a constant"""
     B0: float
+    """B0 constant"""
     b: float
+    """b constant"""
     c: float
+    """c constant"""
 
-    @debug_decorator(logger)
     def volume_roots(self, temperature: float, pressure: float) -> np.ndarray:
-        """Real and (potentially) physically meaningful volume solutions
-
-        E.g. Equation 2, Holley et al. (1958), https://www.osti.gov/biblio/4289497
+        r"""Real and potentially physically meaningful volume solutions :cite:p:`HWZ58{equation 2}`
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume solutions of the Beattie-Bridgeman equation in m^3 mol^(-1)
+            Volume solutions in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         coefficients: list[float] = []
         coefficients.append(-GAS_CONSTANT_BAR * self.c * self.b * self.B0 / temperature**2)
@@ -142,40 +117,39 @@ class BeattieBridgeman(RealGas):
 
         return positive_roots
 
-    @debug_decorator(logger)
+    @override
     def volume(self, *args, **kwargs) -> float:
-        """Volume
+        r"""Volume
 
-        The paper doesn't say which root to take, but one root is very small and the maximum root
-        gives a volume that agrees with the tabulated compressibility factor for all species.
+        :cite:t:`HWZ58` doesn't say which root to take, but one root is very small and the maximum
+        root gives a volume that agrees with the tabulated compressibility factor for all species.
 
         Args:
-            *args: Positional arguments to pass to self.volume_roots
-            **kwargs: Keyword arguments to pass to self.volume_roots
+            *args: Positional arguments to pass to :func:`volume_roots`
+            **kwargs: Keyword arguments to pass to :func:`volume_roots`
 
         Returns:
-            Volume in m^3 mol^(-1)
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
         return np.max(volume_roots)
 
-    @debug_decorator(logger)
+    @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        """Volume integral.
+        r"""Volume integral :cite:p:`HWZ58{Equation 11}`.
 
-        Equation 11 (Holley et al., 1958) because it includes the limits of integration.  It's
-        necessary to multiply ln f by RT to get the volume integral. In practice though, due to the
-        choice of integration limits, I don't think this formulation differs from Equation 8.
+        It is necessary to multiply :math:`\ln f` by :math:`RT` to obtain the volume integral.
+        Due to the choice of integration limits I do not think this formulation differs from
+        :cite:p:`HWZ58{Equation 8}`.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in J mol^(-1)
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        # Volume evaluated at T and P conditions
         vol: float = self.volume(temperature, pressure)
         volume_integral: float = (
             GAS_CONSTANT_BAR
@@ -202,9 +176,8 @@ class BeattieBridgeman(RealGas):
 
 # Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure
 # in bar). Using the original table values below allows easy visual comparison and ensures that
-# the base class does not have to figure out how to correctly convert units.
+# the base class does not have to deal with unit conversions.
 
-# Converts volumes from litres to m^3
 volume_conversion: Callable = UnitConversion.litre_to_m3
 # Converts PV**2 coefficient to be in terms of m^3 and bar
 A0_conversion: Callable = lambda x: x * ATMOSPHERE * UnitConversion.litre_to_m3() ** 2
@@ -216,6 +189,7 @@ H2_Beattie_holley: RealGas = BeattieBridgeman(
     b=volume_conversion(-0.04359),
     c=volume_conversion(0.0504e4),
 )
+"""H2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 N2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(1.3445),
     a=volume_conversion(0.02617),
@@ -223,6 +197,7 @@ N2_Beattie_holley: RealGas = BeattieBridgeman(
     b=volume_conversion(-0.00691),
     c=volume_conversion(4.2e4),
 )
+"""N2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 O2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(1.4911),
     a=volume_conversion(0.02562),
@@ -230,6 +205,7 @@ O2_Beattie_holley: RealGas = BeattieBridgeman(
     b=volume_conversion(0.004208),
     c=volume_conversion(4.8e4),
 )
+"""O2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 CO2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(5.0065),
     a=volume_conversion(0.07132),
@@ -237,6 +213,7 @@ CO2_Beattie_holley: RealGas = BeattieBridgeman(
     b=volume_conversion(0.07235),
     c=volume_conversion(66e4),
 )
+"""CO2 Beattie-Bridgeman :cite:p:`HWZ58`"""
 NH3_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(2.3930),
     a=volume_conversion(0.17031),
@@ -244,6 +221,7 @@ NH3_Beattie_holley: RealGas = BeattieBridgeman(
     b=volume_conversion(0.19112),
     c=volume_conversion(476.87e4),
 )
+"""NH3 Beattie-Bridgeman :cite:p:`HWZ58`"""
 CH4_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(2.2769),
     a=volume_conversion(0.01855),
@@ -251,6 +229,7 @@ CH4_Beattie_holley: RealGas = BeattieBridgeman(
     b=volume_conversion(-0.01587),
     c=volume_conversion(12.83e4),
 )
+"""CH4 Beattie-Bridgeman :cite:p:`HWZ58`"""
 He_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(0.0216),
     a=volume_conversion(0.05984),
@@ -258,10 +237,11 @@ He_Beattie_holley: RealGas = BeattieBridgeman(
     b=0,
     c=volume_conversion(0.004e4),
 )
+"""He Beattie-Bridgeman :cite:p:`HWZ58`"""
 
 
 def get_holley_eos_models() -> dict[str, RealGas]:
-    """Gets a dictionary of the preferred EOS models to use for each species.
+    """Gets a dictionary of the preferred Holley EOS models for each species.
 
     Returns:
         Dictionary of prefered EOS models for each species

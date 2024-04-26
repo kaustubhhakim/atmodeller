@@ -648,7 +648,7 @@ class VirialCompensation(CorrespondingStates, RealGas):
         b_coefficients: As above for the b coefficients
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly and may be determined from experimental data. Defaults to zero.
+            significantly and may be determined from experimental data.
         critical_temperature: Critical temperature in K. Defaults to unity meaning not a
             corresponding states model.
         critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
@@ -766,7 +766,7 @@ class CORK(CorrespondingStates, RealGas):
 
     Args:
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly and may be determined from experimental data. Defaults to zero.
+            significantly and may be determined from experimental data.
         mrk: MRK model for computing the MRK contribution
         a_virial: `a` coefficients for the virial compensation. Defaults to zero.
         b_virial: `b` coefficients for the virial compensation. Defaults to zero.

@@ -29,14 +29,6 @@ atmodeller.core module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.example\_google module
----------------------------------
-
-.. automodule:: atmodeller.example_google
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 atmodeller.initial\_solution module
 -----------------------------------
 

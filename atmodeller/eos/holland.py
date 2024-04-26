@@ -182,8 +182,8 @@ H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S")
 # to the values in Holland and Powell (1991), Table 1. These are different by 1000 compared to the
 # corresponding states scaling because in the corresponding states formulation the coefficients
 # contain a (kilo) pressure scaling as well.
-#     - a coefficients have been multiplied by 1e-7
-#     - b0 coefficient has been multiplied by 1e-5
+#   a coefficients have been multiplied by 1e-7
+#   b0 coefficient has been multiplied by 1e-5
 
 Tc_H2O: float = 695
 """Critical temperature in K for the CORK H2O model"""
@@ -227,7 +227,7 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
                 :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
 
         Returns:
-            Volume in :math:`\rmmath{m}^3\rmmath{mol}^{-1}
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
@@ -265,7 +265,7 @@ class _MRKH2OGasHP91(MRKImplicitABC):
                 :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
 
         Returns:
-            Volume in :math:`\rmmath{m}^3\rmmath{mol}^{-1}
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
@@ -304,7 +304,7 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
                 :meth:`~atmodeller.eos.interfaces.MRKImplicitABC.volume_roots`
 
         Returns:
-            Volume in :math:`\rmmath{m}^3\rmmath{mol}^{-1}
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}
         """
         volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
 
@@ -401,9 +401,9 @@ This is the same as the H2O MRK model in :cite:t:`HP91`.
 
 # For the Full CORK models, the virial coefficients in the Holland and Powell papers need
 # converting to SI units and pressure in bar as follows, where k = kilo = 1000:
-#     - a_virial = a_virial (Holland and Powell) * 10**(-5) / k
-#     - b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
-#     - c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
+#   a_virial = a_virial (Holland and Powell) * 10**(-5) / k
+#   b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
+#   c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
 
 _a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
     map(lambda y: y * 1e-5 / kilo, x)
