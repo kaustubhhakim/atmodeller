@@ -16,6 +16,8 @@
 #
 """Tests for non-ideal C-H-O interior-atmosphere systems"""
 
+# Convenient to use naming convention so pylint: disable=C0103
+
 from __future__ import annotations
 
 import logging
@@ -32,7 +34,11 @@ from atmodeller.core import GasSpecies
 from atmodeller.eos.holland import get_holland_eos_models
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import BasaltCO2, BasaltH2, PeridotiteH2O
+from atmodeller.solubility.carbon_species import CO2_basalt_dixon
+from atmodeller.solubility.hydrogen_species import (
+    H2_basalt_hirschmann,
+    H2O_peridotite_sossi,
+)
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -56,7 +62,7 @@ def test_pH2_fO2_holland() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O(), eos=eos_holland["H2O"]),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]),
             GasSpecies(formula="H2", eos=eos_holland["H2"]),
             GasSpecies(formula="O2"),
         ]
@@ -91,7 +97,7 @@ def test_fH2_fO2_holland() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O(), eos=eos_holland["H2O"]),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]),
             GasSpecies(formula="H2", eos=eos_holland["H2"]),
             GasSpecies(formula="O2"),
         ]
@@ -123,11 +129,11 @@ def test_H_and_C_holland() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2", solubility=BasaltH2(), eos=eos_holland["H2"]),
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O(), eos=eos_holland["H2O"]),
+            GasSpecies(formula="H2", solubility=H2_basalt_hirschmann(), eos=eos_holland["H2"]),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]),
             GasSpecies(formula="O2"),
             GasSpecies(formula="CO", eos=eos_holland["CO"]),
-            GasSpecies(formula="CO2", solubility=BasaltCO2(), eos=eos_holland["CO2"]),
+            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon(), eos=eos_holland["CO2"]),
             GasSpecies(formula="CH4", eos=eos_holland["CH4"]),
         ]
     )

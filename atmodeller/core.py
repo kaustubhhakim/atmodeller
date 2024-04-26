@@ -26,7 +26,7 @@ from collections import UserList
 from contextlib import AbstractContextManager
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
 import numpy as np
 import pandas as pd
@@ -37,7 +37,8 @@ from thermochem import janaf
 from atmodeller import DATA_DIRECTORY, NOBLE_GASES
 from atmodeller.constraints import ActivityConstant, Constraint
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
-from atmodeller.solubilities import NoSolubility, Solubility, composition_solubilities
+from atmodeller.solubility.compositions import composition_solubilities
+from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.utilities import UnitConversion, filter_by_type
 
 if sys.version_info < (3, 12):
@@ -699,7 +700,7 @@ class GasSpecies(ChemicalComponent):
         name: str | None = None,
         filename: str | None = None,
         solid_melt_distribution_coefficient: float = 0,
-        solubility: Solubility | None = None,
+        solubility: SolubilityProtocol | None = None,
         eos: RealGasProtocol | None = None,
     ):
         super().__init__(
@@ -710,7 +711,7 @@ class GasSpecies(ChemicalComponent):
             filename=filename,
         )
         self.solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
-        self.solubility: Solubility = NoSolubility() if solubility is None else solubility
+        self.solubility: SolubilityProtocol = NoSolubility() if solubility is None else solubility
         self.eos: RealGasProtocol = IdealGas() if eos is None else eos
 
     @_mass_decorator
@@ -949,7 +950,7 @@ class Species(UserList):
                 melt_composition,
             )
             try:
-                solubilities: dict[str, Solubility] = composition_solubilities[
+                solubilities: Mapping[str, SolubilityProtocol] = composition_solubilities[
                     melt_composition.casefold()
                 ]
             except KeyError as exc:

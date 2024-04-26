@@ -16,6 +16,8 @@
 #
 """Tests with sulfur"""
 
+# Convenient to use naming convention so pylint: disable=C0103
+
 from __future__ import annotations
 
 import logging
@@ -29,14 +31,16 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import (
-    BasaltCO2,
-    BasaltH2,
-    BasaltH2O,
-    BasaltN2Libourel,
-    BasaltS2,
-    BasaltS2Sulfate,
-    BasaltS2Sulfide,
+from atmodeller.solubility.carbon_species import CO2_basalt_dixon
+from atmodeller.solubility.hydrogen_species import (
+    H2_basalt_hirschmann,
+    H2O_basalt_dixon,
+)
+from atmodeller.solubility.other_species import N2_basalt_libourel
+from atmodeller.solubility.sulfur_species import (
+    S2_basalt_boulliung,
+    S2_sulfate_basalt_boulliung,
+    S2_sulfide_basalt_boulliung,
 )
 
 RTOL: float = 1.0e-8
@@ -56,7 +60,7 @@ def test_S2_SO_Sulfide_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2Sulfide()),
+            GasSpecies(formula="S2", solubility=S2_sulfide_basalt_boulliung()),
             GasSpecies(formula="O2"),
         ]
     )
@@ -88,7 +92,7 @@ def test_AllS_Sulfide_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2Sulfide()),
+            GasSpecies(formula="S2", solubility=S2_sulfide_basalt_boulliung()),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="O2"),
         ]
@@ -123,7 +127,7 @@ def test_AllS_Sulfate_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2Sulfate()),
+            GasSpecies(formula="S2", solubility=S2_sulfate_basalt_boulliung()),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="O2"),
         ]
@@ -158,7 +162,7 @@ def test_AllS_TotalSolubility_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2()),
+            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="O2"),
         ]
@@ -193,7 +197,7 @@ def test_AllS_TotalSolubility_IWp3() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2()),
+            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="O2"),
         ]
@@ -228,7 +232,7 @@ def test_AllS_TotalSolubility_IWm3() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2()),
+            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="O2"),
         ]
@@ -262,10 +266,10 @@ def test_HOS_Species_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=BasaltH2O()),
-            GasSpecies(formula="H2", solubility=BasaltH2()),
+            GasSpecies(formula="H2O", solubility=H2O_basalt_dixon()),
+            GasSpecies(formula="H2", solubility=H2_basalt_hirschmann()),
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2()),
+            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
             GasSpecies(formula="O2"),
             GasSpecies(formula="O2S"),
         ]
@@ -305,15 +309,15 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=BasaltH2O()),
-            GasSpecies(formula="H2", solubility=BasaltH2()),
+            GasSpecies(formula="H2O", solubility=H2O_basalt_dixon()),
+            GasSpecies(formula="H2", solubility=H2_basalt_hirschmann()),
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2()),
+            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
             GasSpecies(formula="O2"),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2", solubility=BasaltCO2()),
-            GasSpecies(formula="N2", solubility=BasaltN2Libourel()),
+            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon()),
+            GasSpecies(formula="N2", solubility=N2_basalt_libourel()),
         ]
     )
 
@@ -357,11 +361,11 @@ def test_COS_Species_IW() -> None:
     species: Species = Species(
         [
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2()),
+            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
             GasSpecies(formula="O2"),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2", solubility=BasaltCO2()),
+            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon()),
         ]
     )
 
@@ -397,14 +401,14 @@ def test_CHOS_Species_IW() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=BasaltH2O()),
-            GasSpecies(formula="H2", solubility=BasaltH2()),
+            GasSpecies(formula="H2O", solubility=H2O_basalt_dixon()),
+            GasSpecies(formula="H2", solubility=H2_basalt_hirschmann()),
             GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=BasaltS2()),
+            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
             GasSpecies(formula="O2"),
             GasSpecies(formula="O2S"),
             GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2", solubility=BasaltCO2()),
+            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon()),
         ]
     )
 

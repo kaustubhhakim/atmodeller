@@ -16,6 +16,8 @@
 #
 """Tests for ideal C-H-O interior-atmosphere systems"""
 
+# Convenient to use naming convention so pylint: disable=C0103
+
 from __future__ import annotations
 
 import logging
@@ -29,7 +31,8 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import BasaltCO2, PeridotiteH2O
+from atmodeller.solubility.carbon_species import CO2_basalt_dixon
+from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -46,7 +49,7 @@ def test_version():
 def test_H2O() -> None:
     """Tests H2O (a single species)"""
 
-    species: Species = Species([GasSpecies(formula="H2O", solubility=PeridotiteH2O())])
+    species: Species = Species([GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi())])
 
     oceans: float = 2
     planet: Planet = Planet()
@@ -76,7 +79,7 @@ def test_H_fO2() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
         ]
@@ -144,7 +147,7 @@ def test_H_fO2_plus() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
         ]
@@ -178,7 +181,7 @@ def test_H_fO2_minus() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
         ]
@@ -212,7 +215,7 @@ def test_H_five_oceans() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
         ]
@@ -246,7 +249,7 @@ def test_H_1500K() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
         ]
@@ -282,11 +285,11 @@ def test_H_and_C() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
             GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2", solubility=BasaltCO2()),
+            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon()),
         ]
     )
 
@@ -323,11 +326,11 @@ def test_H_and_C_total_pressure() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
             GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2", solubility=BasaltCO2()),
+            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon()),
         ]
     )
 

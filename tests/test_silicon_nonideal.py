@@ -16,6 +16,8 @@
 #
 """Tests for non-ideal systems with silicon"""
 
+# Convenient to use naming convention so pylint: disable=C0103
+
 from __future__ import annotations
 
 import logging
@@ -34,7 +36,10 @@ from atmodeller.core import GasSpecies, LiquidSpecies
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.eos.saxena import get_saxena_eos_models
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
-from atmodeller.solubilities import BasaltH2, PeridotiteH2O
+from atmodeller.solubility.hydrogen_species import (
+    H2_basalt_hirschmann,
+    H2O_peridotite_sossi,
+)
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -99,8 +104,8 @@ def test_SiHO_massSiH_solubility() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2", eos=eos_models["H2"], solubility=BasaltH2()),
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2", eos=eos_models["H2"], solubility=H2_basalt_hirschmann()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="O2"),
             GasSpecies(formula="OSi"),
             GasSpecies(formula="H4Si"),
@@ -181,8 +186,8 @@ def test_SiHO_massH_logfO2_solubility() -> None:
 
     species: Species = Species(
         [
-            GasSpecies(formula="H2", eos=eos_models["H2"], solubility=BasaltH2()),
-            GasSpecies(formula="H2O", solubility=PeridotiteH2O()),
+            GasSpecies(formula="H2", eos=eos_models["H2"], solubility=H2_basalt_hirschmann()),
+            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
             GasSpecies(formula="O2"),
             GasSpecies(formula="OSi"),
             GasSpecies(formula="H4Si"),
