@@ -32,10 +32,12 @@ from atmodeller.constraints import ActivityConstant, Constraint
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
+from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.interfaces import (
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
 )
+from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.utilities import UnitConversion, filter_by_type
 
 if sys.version_info < (3, 12):

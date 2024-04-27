@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core"""
+"""Thermodynamic data from Holland and Powell"""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ import logging
 import sys
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import pandas as pd
@@ -77,8 +77,10 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
         """See base class."""
         del kwargs
 
+        name_: str = name if name is not None else species.formula
+
         try:
-            phase_data: pd.Series | None = self.data.loc[name]
+            phase_data: pd.Series = cast(pd.Series, self.data.loc[name_])
             logger.debug(
                 "Thermodynamic data for %s (%s) found in %s",
                 species.formula,
@@ -91,7 +93,6 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
             )
 
         except KeyError:
-            phase_data = None
             logger.warning(
                 "Thermodynamic data for %s (%s) not found in %s",
                 species.formula,
@@ -139,7 +140,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
                 temperature
             )
 
-            if isinstance(self.species, CondensedSpecies):
+            if self.species.phase != "g":
                 gibbs += self._get_volume_pressure_integral(temperature, pressure)
 
             logger.debug(

@@ -32,6 +32,44 @@ class ThermodynamicDataForSpeciesProtocol(Protocol):
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float: ...
 
 
+class ThermodynamicDatasetABC(ABC):
+    """Thermodynamic dataset"""
+
+    _DATA_SOURCE: str
+    # JANAF standards below. May be overwritten by child classes.
+    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
+    _STANDARD_STATE_PRESSURE: float = 1  # bar
+
+    @abstractmethod
+    def get_species_data(
+        self, species: ChemicalComponent, **kwargs
+    ) -> ThermodynamicDataForSpeciesABC | None:
+        """Gets the thermodynamic data for a species
+
+        Args:
+            species: Species
+            **kwargs: Arbitrary keyword arguments
+
+        Returns:
+            Thermodynamic data for the species or None if not available
+        """
+
+    @property
+    def data_source(self) -> str:
+        """The source of the data."""
+        return self._DATA_SOURCE
+
+    @property
+    def enthalpy_reference_temperature(self) -> float:
+        """Enthalpy reference temperature in kelvin"""
+        return self._ENTHALPY_REFERENCE_TEMPERATURE
+
+    @property
+    def standard_state_pressure(self) -> float:
+        """Standard state pressure in bar"""
+        return self._STANDARD_STATE_PRESSURE
+
+
 class ThermodynamicDataForSpeciesABC(ABC):
     """Thermodynamic data for a species to compute the Gibbs energy of formation.
 
@@ -66,41 +104,3 @@ class ThermodynamicDataForSpeciesABC(ABC):
         Returns:
             The standard Gibbs free energy of formation in J/mol
         """
-
-
-class ThermodynamicDatasetABC(ABC):
-    """Thermodynamic dataset"""
-
-    _DATA_SOURCE: str
-    # JANAF standards below. May be overwritten by child classes.
-    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
-    _STANDARD_STATE_PRESSURE: float = 1  # bar
-
-    @abstractmethod
-    def get_species_data(
-        self, species: ChemicalComponent, **kwargs
-    ) -> ThermodynamicDataForSpeciesABC | None:
-        """Gets the thermodynamic data for a species or None if not available
-
-        Args:
-            species: Species
-            **kwargs: Arbitrary keyword arguments
-
-        Returns:
-            Thermodynamic data for the species or None if not available
-        """
-
-    @property
-    def data_source(self) -> str:
-        """The source of the data."""
-        return self._DATA_SOURCE
-
-    @property
-    def enthalpy_reference_temperature(self) -> float:
-        """Enthalpy reference temperature in kelvin"""
-        return self._ENTHALPY_REFERENCE_TEMPERATURE
-
-    @property
-    def standard_state_pressure(self) -> float:
-        """Standard state pressure in bar"""
-        return self._STANDARD_STATE_PRESSURE

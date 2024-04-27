@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core"""
+"""Thermodynamic data from JANAF"""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ from thermochem import janaf
 
 from atmodeller.thermodata.interfaces import (
     ThermodynamicDataForSpeciesABC,
+    ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
 )
 
@@ -38,13 +39,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from atmodeller.core import (
-        ChemicalComponent,
-        GasSpecies,
-        LiquidSpecies,
-        SolidSpecies,
-    )
-    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+    from atmodeller.core import ChemicalComponent
 
 
 class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
@@ -99,8 +94,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
         name: str | None = None,
         filename: str | None = None,
         **kwargs,
-    ) -> ThermodynamicDataForSpeciesABC | None:
-        """See base class."""
+    ) -> ThermodynamicDataForSpeciesProtocol | None:
         del kwargs
 
         db: janaf.Janafdb = janaf.Janafdb()
@@ -131,16 +125,16 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
 
             return phase_data
 
-        if isinstance(species, GasSpecies):
+        if species.phase == "g":
             if species.is_homonuclear_diatomic or species.is_noble:
                 phase_data = get_phase_data(["ref", "g"])
             else:
                 phase_data = get_phase_data(["g"])
 
-        elif isinstance(species, SolidSpecies):
+        elif species.phase == "cr":
             phase_data = get_phase_data(["cr", "ref"])  # ref included for C (graphite)
 
-        elif isinstance(species, LiquidSpecies):
+        elif species.phase == "l":
             phase_data = get_phase_data(["l", "l,g"])  # l,g included for Water at 1, 10, 100 bar
 
         else:
@@ -174,12 +168,10 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
 
         @override
         def __init__(self, species: ChemicalComponent, data_source: str, data: janaf.JanafPhase):
-            """See base class."""
             super().__init__(species, data_source, data)
 
         @override
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-            """See base class."""
             del pressure
             # thermochem v0.8.2 returns J not kJ. Main branch now returns kJ hence kilo conversion.
             # https://github.com/adelq/thermochem/pull/25

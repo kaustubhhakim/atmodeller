@@ -33,6 +33,7 @@ from atmodeller.core import GasSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
+from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -102,6 +103,50 @@ def test_H_fO2() -> None:
         "H2O_g": 0.25706483161845733,
         "H2_g": 0.25161113771286514,
         "O2_g": 8.699765393460875e-08,
+    }
+
+    system.solve(constraints)
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+
+
+def test_H_fO2_holland() -> None:
+    """Tests H2-H2O at the IW buffer using thermodynamic data from Holland and Powell"""
+
+    species: Species = Species(
+        [
+            GasSpecies(
+                formula="H2O",
+                solubility=H2O_peridotite_sossi(),
+                thermodynamic_dataset=ThermodynamicDatasetHollandAndPowell(),
+            ),
+            GasSpecies(
+                formula="H2",
+                thermodynamic_dataset=ThermodynamicDatasetHollandAndPowell(),
+            ),
+            GasSpecies(
+                formula="O2",
+                thermodynamic_dataset=ThermodynamicDatasetHollandAndPowell(),
+            ),
+        ]
+    )
+
+    oceans: float = 1
+    planet: Planet = Planet()
+    h_kg: float = earth_oceans_to_kg(oceans)
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target: dict[str, float] = {
+        "H2O_g": 0.25705058811429515,
+        "H2_g": 0.2539022472323053,
+        "O2_g": 8.699766647737794e-08,
     }
 
     system.solve(constraints)
