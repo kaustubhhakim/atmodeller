@@ -52,32 +52,30 @@ class Planet:
         surface_radius: Radius of the planetary surface in m. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
         melt_composition: Melt composition of the planet. Default is None.
-
-    Attributes:
-        planet_mass: Mass of the planet in kg
-        core_mass_fraction: Mass fraction of the core relative to the planetary mass (kg/kg)
-        mantle_melt_fraction: Mass fraction of the mantle that is molten
-        surface_radius: Radius of the planetary surface in m
-        surface_temperature: Temperature of the planetary surface in kelvin
-        melt_composition: Melt composition of the planet
-        mantle_mass: Mass of the mantle
-        mantle_melt_mass: Mass of the mantle that is molten
-        mantle_solid_mass: Mass of the mantle that is solid
-        surface_area: Surface area of the planet
-        surface_gravity: Surface gravity of the planet
     """
 
     planet_mass: float = 5.972e24
+    """Mass of the planet in kg"""
     core_mass_fraction: float = 0.295334691460966
+    """Mass fraction of the core relative to the planetary mass (kg/kg)"""
     mantle_melt_fraction: float = 1.0
+    """Mass fraction of the mantle that is molten"""
     surface_radius: float = 6371000.0
+    """Radius of the surface in m"""
     surface_temperature: float = 2000.0
+    """Temperature of the surface in K"""
     melt_composition: str | None = None
+    """Melt composition"""
     mantle_mass: float = field(init=False)
+    """Mass of the mantle"""
     mantle_melt_mass: float = field(init=False)
+    """Mass of the mantle that is molten"""
     mantle_solid_mass: float = field(init=False)
+    """Mass of the mantle that is solid"""
     surface_area: float = field(init=False)
+    """Surface area"""
     surface_gravity: float = field(init=False)
+    """Surface gravity"""
 
     def __post_init__(self):
         self.mantle_mass = self.planet_mass * (1 - self.core_mass_fraction)
@@ -404,18 +402,16 @@ class InteriorAtmosphereSystem:
         species: A list of species
         planet: A planet. Defaults to a molten Earth
         initial_solution: Initial solution. Defaults to a constant for all species.
-
-    Attributes:
-        species: A list of species
-        planet: A planet
-        initial_solution: Initial solution. Defaults to a constant for all species.
-        output: All output data for this system. Access the dictionary by (calling) output().
     """
 
     species: Species
+    """A list of species"""
     planet: Planet = field(default_factory=Planet)
+    """A planet"""
     initial_solution: InitialSolution | None = None
+    """Initial solution"""
     output: Output = field(init=False, default_factory=Output)
+    """Output data"""
     _reaction_network: _ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)

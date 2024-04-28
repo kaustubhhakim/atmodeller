@@ -21,8 +21,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections import UserList
-from functools import wraps
-from typing import TYPE_CHECKING, Callable, Mapping, Optional
+from typing import TYPE_CHECKING, Mapping, Optional
 
 import numpy as np
 from molmass import Composition, Formula
@@ -61,15 +60,8 @@ class ChemicalSpecies:
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
 
     Attributes:
-        formula: Chemical formula
-        phase: Phase (cr, g, or l)
+        phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively
         thermodata: The thermodynamic data for the species
-        atoms: Number of atoms
-        composition: Composition
-        hill_formula: Hill formula
-        is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
-        is_noble: True if a noble gas, otherwise False
-        molar_mass: Molar mass
     """
 
     def __init__(
@@ -108,10 +100,12 @@ class ChemicalSpecies:
 
     @property
     def elements(self) -> list[str]:
+        """Elements in species"""
         return list(self.composition().keys())
 
     @property
     def formula(self) -> str:
+        """Formula"""
         return str(self._formula)
 
     @property
@@ -143,7 +137,7 @@ class ChemicalSpecies:
 
     @property
     def name(self) -> str:
-        """Unique name, combining formula and phase"""
+        """Unique name by combining formula and phase"""
         return f"{self.formula}_{self.phase}"
 
 
@@ -214,7 +208,7 @@ class GasSpecies(ChemicalSpecies):
             element: Returns the mass for an element. Defaults to None to return the species mass.
 
         Returns:
-            Total reservoir masses of the species (element=None) or element (element=element)
+            Total reservoir masses of the species or element
         """
         planet: Planet = system.planet
         pressure: float = system.solution_dict()[self.name]
@@ -305,6 +299,18 @@ class CondensedSpecies(ChemicalSpecies):
         # TODO: Want to allow an activity model to be specified as input, just like a real gas
         # EOS is specified for a gas species.
         self.activity: Constraint = ActivityConstant(species=str(self.formula))
+
+    # def mass(self, system: InteriorAtmosphereSystem, *, element: Optional[str] = None) -> float:
+    #     """Calculates the total mass of the species or element
+
+    #     Args:
+    #         system: Interior atmosphere system
+    #         element: Returns the mass for an element. Defaults to None to return the species mass
+
+    #     Returns:
+    #         Total mass of the species or element
+    #     """
+    #     planet: Planet = system.planet
 
 
 class SolidSpecies(CondensedSpecies):
@@ -468,10 +474,7 @@ class Species(UserList):
         """Creates a matrix where species (rows) are split into their element counts (columns).
 
         Returns:
-            For example, self.species = ['CO2', 'H2O'] would return:
-                [[0, 1, 2],
-                 [2, 0, 1]]
-            if the columns represent the elements H, C, and O, respectively.
+            A matrix of element counts
         """
         matrix: np.ndarray = np.zeros((self.number, self.number_elements), dtype=int)
         for species_index, species in enumerate(self.data):

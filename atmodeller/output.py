@@ -39,28 +39,26 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True)
 class ReservoirOutput:
-    """Mass and moles of a species (or element) in a reservoir
+    r"""Mass and moles of a species (or element) in a reservoir
 
     Args:
         mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in kg/mol
+        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
         reservoir_mass: Mass of the reservoir in kg. For the atmosphere reservoir this is the total
             mass of the atmosphere. For a mantle reservoir this is the total mass of the silicate
             component only (i.e. not including the volatile mass).
-
-    Attributes:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in kg/mol
-        reservoir_mass: Mass of the mantle reservoir in kg
-        moles: Number of moles
-        ppmw: Parts-per-million by weight (of the species relative to the reservoir)
     """
 
     mass: float
+    """Mass of the species in the reservoir in kg"""
     molar_mass: float
+    r"""Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`"""
     reservoir_mass: float
+    """Mass of the mantle reservoir in kg"""
     moles: float = field(init=False)
+    """Number of moles"""
     ppmw: float = field(init=False, default=0)
+    """Parts-per-million by weight of the species relative to the reservoir"""
 
     def __post_init__(self):
         self.moles = self.mass / self.molar_mass
@@ -70,26 +68,26 @@ class ReservoirOutput:
 
 @dataclass(kw_only=True)
 class ReservoirOutputMoleFraction(ReservoirOutput):
-    """Additionally computes the ppm by moles
+    r"""Additionally computes the ppm by moles
 
     Args:
         mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in kg/mol
+        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
         reservoir_mass: Mass of the reservoir in kg
         reservoir_moles: Total moles of the reservoir
 
     Attributes:
         mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in kg/mol
+        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
         reservoir_mass: Mass of the mantle reservoir in kg
-        reservoir_moles: Total moles of the reservoir
         moles: Number of moles
-        ppmw: Parts-per-million by weight (of the species relative to the reservoir)
-        ppm: Parts-per-million by moles (of the species relative to the reservoir)
+        ppmw: Parts-per-million by weight of the species relative to the reservoir
     """
 
     reservoir_moles: float
+    """Total moles of the reservoir"""
     ppm: float = field(init=False, default=0)
+    """Parts-per-million by moles of the species relative to the reservoir"""
 
     def __post_init__(self):
         super().__post_init__()
@@ -99,11 +97,11 @@ class ReservoirOutputMoleFraction(ReservoirOutput):
 
 @dataclass(kw_only=True)
 class AtmosphereReservoirOutput(ReservoirOutputMoleFraction):
-    """A species in the atmosphere
+    r"""A species in the atmosphere
 
     Args:
         mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species
+        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
         reservoir_mass: Total mass of the atmosphere
         reservoir_moles: Total moles of the reservoir
         fugacity: Fugacity in bar
@@ -113,18 +111,22 @@ class AtmosphereReservoirOutput(ReservoirOutputMoleFraction):
 
     Attributes:
         mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in kg/mol
-        reservoir_mass: Total mass of the atmosphere
-        reservoir_moles: Total moles of the reservoir
+        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
+        reservoir_mass: Mass of the mantle reservoir in kg
         moles: Number of moles
-        ppmw: Parts-per-million by weight (of the species relative to the reservoir)
-        ppm: Parts-per-million by moles (of the species relative to the reservoir)
+        ppmw: Parts-per-million by weight of the species relative to the reservoir
+        reservoir_moles: Total moles of the reservoir
+        ppm: Parts-per-million by moles of the species relative to the reservoir
     """
 
     fugacity: float
+    """Fugacity"""
     fugacity_coefficient: float
+    """Fugacity coefficient"""
     pressure: float
+    """Pressure"""
     volume_mixing_ratio: float
+    """Volume mixing ratio"""
 
 
 @dataclass(kw_only=True)

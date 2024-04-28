@@ -65,7 +65,7 @@ class InitialSolution(ABC):
         species: Species in the interior-atmosphere system
         min_log10: Minimum log10 value of the initial solution
         max_log10: Maximum log10 value of the initial solution
-        **kwargs: Catches unused keyword arguments from a child constructors
+        **kwargs: Catches unused keyword arguments from child constructors
     """
 
     def __init__(

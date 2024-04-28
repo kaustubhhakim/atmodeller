@@ -43,14 +43,12 @@ class Constraint(ABC):
             'pressure', or 'mass'.
         species: The species to constrain, typically representing a species for 'pressure' or
             'fugacity' constraints or an element for 'mass' constraints.
-
-    Attributes:
-        name: The name of the constraint
-        species: The species to constrain
     """
 
     name: str = ""
+    """Name of the constraint"""
     species: str = ""
+    """Species to constrain"""
 
     @property
     def full_name(self) -> str:
@@ -99,14 +97,10 @@ class ConstantConstraint(Constraint):
             'fugacity' constraints or an element for 'mass' constraints.
         value: The constant value, which is usually in kg for masses and bar for pressures or
             fugacities.
-
-    Attributes:
-        name: The name of the constraint
-        species: The species to constrain
-        value: The constant value
     """
 
     value: float
+    """Constant value of the constraint"""
 
     def get_value(self, **kwargs) -> float:
         """Returns the constant value. See base class."""
@@ -121,10 +115,6 @@ class ActivityConstant(ConstantConstraint):
     Args:
         species: The species to constrain
         value: The constant value. Defaults to unity for ideal behaviour.
-
-    Attributes:
-        species: The species to constrain
-        value: The constant value
     """
 
     name: str = field(init=False, default="activity")
@@ -179,13 +169,6 @@ class SystemConstraints(UserList):
     Attributes:
         data: A list of constraints for the interior-atmosphere system
         names: A list of unique names of the constraints
-        activity_constraints: Activity constraints
-        fugacity_constraints: Fugacity constraints
-        mass_constraints: Mass constraints
-        pressure_constraints: Pressure constraints
-        total_pressure_constraint: Total pressure constraint
-        reaction_network_constraints: Constraints for a reaction network
-        number_reaction_network_constraints: Number of reaction network constraints
     """
 
     def __init__(self, initlist=None):
