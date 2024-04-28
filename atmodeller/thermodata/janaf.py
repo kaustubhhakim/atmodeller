@@ -49,43 +49,6 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
     _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
     _STANDARD_STATE_PRESSURE: float = 1  # bar
 
-    @staticmethod
-    def get_modified_hill_formula(species: ChemicalComponent) -> str:
-        """Gets the modified Hill formula.
-
-        JANAF uses the modified Hill formula to index its data tables. In short, H, if present,
-        should appear after C (if C is present), otherwise it must be the first element.
-
-        Args:
-            species: Species
-
-        Returns:
-            The species represented in the JANAF format
-        """
-        elements: dict[str, int] = {
-            element: properties.count for element, properties in species.composition().items()
-        }
-
-        if "C" in elements:
-            ordered_elements: list[str] = ["C"]
-        else:
-            ordered_elements = []
-
-        if "H" in elements:
-            ordered_elements.append("H")
-
-        ordered_elements.extend(sorted(elements.keys() - {"C", "H"}))
-
-        formula_string: str = "".join(
-            [
-                element + (str(elements[element]) if elements[element] > 1 else "")
-                for element in ordered_elements
-            ]
-        )
-        logger.debug("Modified Hill formula = %s", formula_string)
-
-        return formula_string
-
     @override
     def get_species_data(
         self,
@@ -100,7 +63,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
         db: janaf.Janafdb = janaf.Janafdb()
 
         # Defined by JANAF convention
-        janaf_formula: str = self.get_modified_hill_formula(species)
+        janaf_formula: str = species.hill_formula  # modified_hill_formula()
 
         def get_phase_data(phases: list[str]) -> janaf.JanafPhase | None:
             """Gets the phase data for a list of phases in order of priority.

@@ -155,6 +155,7 @@ class ChemicalComponent:
     def elements(self) -> list[str]:
         return list(self.composition().keys())
 
+    # TODO: Return just the hill formula for consistency from the start?
     @property
     def formula(self) -> str:
         return str(self._formula)
@@ -176,10 +177,47 @@ class ChemicalComponent:
     @property
     def is_noble(self) -> bool:
         """True if a noble gas, otherwise False."""
-        if self.formula in NOBLE_GASES:
+        if self.hill_formula in NOBLE_GASES:
             return True
         else:
             return False
+
+    # TODO: Possibly not required anymore
+    # def modified_hill_formula(self) -> str:
+    #     """Gets the modified Hill formula.
+
+    #     JANAF uses the modified Hill formula to index its data tables. In short, H, if present,
+    #     should appear after C (if C is present), otherwise it must be the first element.
+
+    #     Args:
+    #         species: Species
+
+    #     Returns:
+    #         The species represented in the JANAF format
+    #     """
+    #     elements: dict[str, int] = {
+    #         element: properties.count for element, properties in self.composition().items()
+    #     }
+
+    #     if "C" in elements:
+    #         ordered_elements: list[str] = ["C"]
+    #     else:
+    #         ordered_elements = []
+
+    #     if "H" in elements:
+    #         ordered_elements.append("H")
+
+    #     ordered_elements.extend(sorted(elements.keys() - {"C", "H"}))
+
+    #     formula_string: str = "".join(
+    #         [
+    #             element + (str(elements[element]) if elements[element] > 1 else "")
+    #             for element in ordered_elements
+    #         ]
+    #     )
+    #     logger.debug("Modified Hill formula = %s", formula_string)
+
+    #     return formula_string
 
     @property
     def molar_mass(self) -> float:

@@ -42,8 +42,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from atmodeller.core import ChemicalComponent, CondensedSpecies
-    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+    from atmodeller.core import ChemicalComponent
 
 
 class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
@@ -74,7 +73,6 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
     def get_species_data(
         self, species: ChemicalComponent, name: str | None = None, **kwargs
     ) -> ThermodynamicDataForSpeciesABC | None:
-        """See base class."""
         del kwargs
 
         name_: str = name if name is not None else species.formula
@@ -135,7 +133,6 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
 
         @override
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-            """See base class"""
             gibbs: float = self._get_enthalpy(temperature) - temperature * self._get_entropy(
                 temperature
             )

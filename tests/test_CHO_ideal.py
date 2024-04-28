@@ -366,6 +366,47 @@ def test_H_and_C() -> None:
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
+def test_H_and_C_hill_formula() -> None:
+    """Tests H2-H2O and CO-CO2."""
+
+    species: Species = Species(
+        [
+            GasSpecies(formula="OH2", solubility=H2O_peridotite_sossi()),
+            GasSpecies(formula="H2"),
+            GasSpecies(formula="O2"),
+            GasSpecies(formula="OC"),
+            GasSpecies(formula="O2C", solubility=CO2_basalt_dixon()),
+        ]
+    )
+
+    oceans: float = 1
+    ch_ratio: float = 1
+    planet: Planet = Planet()
+    h_kg: float = earth_oceans_to_kg(oceans)
+    c_kg: float = ch_ratio * h_kg
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            MassConstraint(species="H", value=h_kg),
+            MassConstraint(species="C", value=c_kg),
+            IronWustiteBufferConstraintHirschmann(),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target: dict[str, float] = {
+        "OH2_g": 0.25824358142493425,
+        "H2_g": 0.2521806525810137,
+        "O2_g": 8.740121617121534e-08,
+        "OC_g": 59.6819921102523,
+        "O2C_g": 13.404792068284909,
+    }
+
+    system.solve(SystemConstraints(constraints))
+    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+
+
 def test_H_and_C_total_pressure() -> None:
     """Tests H2-H2O and CO-CO2 with a total pressure constraint."""
 
