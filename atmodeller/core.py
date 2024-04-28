@@ -32,7 +32,6 @@ from atmodeller.constraints import ActivityConstant, Constraint
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.interfaces import (
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
@@ -49,49 +48,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
-
-
-class ThermodynamicDataset(ThermodynamicDatasetABC):
-    """Combines thermodynamic data from multiple datasets.
-
-    Args:
-        datasets: A list of thermodynamic data to use. Defaults to Holland and Powell, and JANAF.
-    """
-
-    _DATA_SOURCE: str = "Combined"
-
-    def __init__(
-        self,
-        datasets: list[ThermodynamicDatasetABC] | None = None,
-    ):
-        if datasets is None:
-            self.datasets: list[ThermodynamicDatasetABC] = []
-            self.add_dataset(ThermodynamicDatasetHollandAndPowell())
-            self.add_dataset(ThermodynamicDatasetJANAF())
-        else:
-            self.datasets = datasets
-
-    def add_dataset(self, dataset: ThermodynamicDatasetABC) -> None:
-        """Adds a thermodynamic dataset
-
-        Args:
-            dataset: A thermodynamic dataset
-        """
-        if len(self.datasets) >= 1:
-            logger.warning("Combining different thermodynamic data may result in inconsistencies")
-        logger.info("Adding thermodynamic data: %s", dataset.data_source)
-        self.datasets.append(dataset)
-
-    @override
-    def get_species_data(
-        self, species: ChemicalSpecies, **kwargs
-    ) -> ThermodynamicDataForSpeciesProtocol | None:
-        """See base class."""
-        for dataset in self.datasets:
-            if dataset is not None:
-                return dataset.get_species_data(species, **kwargs)
-
-        raise KeyError(f"Thermodynamic data for {species.formula} is not available in any dataset")
 
 
 class ChemicalSpecies:
