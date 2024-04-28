@@ -73,8 +73,6 @@ def test_CHO_reduced(helper) -> None:
         ]
     )
 
-    system.solve(constraints)
-
     factsage_result: dict[str, float] = {
         "H2_g": 175.5,
         "H2O_g": 13.8,
@@ -84,6 +82,7 @@ def test_CHO_reduced(helper) -> None:
         "O2_g": 1.25e-15,
     }
 
+    system.solve(constraints)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -118,8 +117,6 @@ def test_CHO_IW(helper) -> None:
         ]
     )
 
-    system.solve(constraints)
-
     factsage_result: dict[str, float] = {
         "CH4_g": 28.66,
         "CO2_g": 30.88,
@@ -129,6 +126,7 @@ def test_CHO_IW(helper) -> None:
         "O2_g": 4.11e-13,
     }
 
+    system.solve(constraints)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -163,8 +161,6 @@ def test_CHO_oxidised(helper) -> None:
         ]
     )
 
-    system.solve(constraints)
-
     factsage_result: dict[str, float] = {
         "CH4_g": 0.00129,
         "CO2_g": 3.25,
@@ -174,6 +170,7 @@ def test_CHO_oxidised(helper) -> None:
         "O2_g": 1.29e-11,
     }
 
+    system.solve(constraints)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -208,8 +205,6 @@ def test_CHO_highly_oxidised(helper) -> None:
         ]
     )
 
-    system.solve(constraints)
-
     factsage_result: dict[str, float] = {
         "CH4_g": 7.13e-05,
         "CO2_g": 357.23,
@@ -219,6 +214,7 @@ def test_CHO_highly_oxidised(helper) -> None:
         "O2_g": 1.14e-09,
     }
 
+    system.solve(constraints)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -260,7 +256,6 @@ def test_CHO_low_temperature(helper) -> None:
     }
 
     system.solve(constraints)
-
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -305,8 +300,6 @@ def test_graphite_half_condensed(helper) -> None:
     }
 
     system.solve(constraints)
-    system.output(to_excel=True)
-
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -340,10 +333,6 @@ def test_water_condensed_10bar(helper) -> None:
         ]
     )
 
-    system.solve(constraints)
-
-    system.output(to_excel=True)
-
     # TODO: Update below when recomputed
     # Calculated by Paolo 19/02/2024
     # factsage_comparison: dict[str, float] = {
@@ -365,4 +354,5 @@ def test_water_condensed_10bar(helper) -> None:
     # msg: str = "Compatible with FactSage result"
     # system.isclose_tolerance(factsage_comparison, msg)
 
+    system.solve(constraints)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
