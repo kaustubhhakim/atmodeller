@@ -32,7 +32,6 @@ from sklearn.linear_model import SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
-from atmodeller import INITIAL_SOLUTION_MAX_LOG10, INITIAL_SOLUTION_MIN_LOG10
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
 from atmodeller.output import Output
@@ -56,10 +55,9 @@ class InitialSolution(ABC):
     Args:
         value: Some value (object) used to compute the initial solution
         species: Species in the interior-atmosphere system
-        min_log10: Minimuim log10 value of the initial solution. Defaults to
-            ``INITIAL_SOLUTION_MIN_LOG10``
-        max_log10: Maximum log10 value of the initial solution. Defaults to
-            ``INITIAL_SOLUTION_MAX_LOG10``
+        min_log10: Minimuim log10 value of the initial solution. Defaults to -12, which is
+            motivated by typical values of oxygen fugacity at the iron-wustite buffer.
+        max_log10: Maximum log10 value of the initial solution. Defaults to 5.
         **kwargs: Catches unused keyword arguments from a child constructors
 
     Attributes:
@@ -75,8 +73,8 @@ class InitialSolution(ABC):
         value: Any,
         *,
         species: Species,
-        min_log10: float = INITIAL_SOLUTION_MIN_LOG10,
-        max_log10: float = INITIAL_SOLUTION_MAX_LOG10,
+        min_log10: float = -12,
+        max_log10: float = 5,
         **kwargs,
     ):
         del kwargs

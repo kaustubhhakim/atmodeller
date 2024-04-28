@@ -41,17 +41,6 @@ OCEAN_MOLES: float = 7.68894973907177e22
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 """Mass of H2 in one present-day Earth ocean"""
 
-# Minimum and maximum values of log10(pressure) to prevent the initial solution from giving rise
-# to an excessively large total pressure that can cause numerical overflow or underflow.
-INITIAL_SOLUTION_MIN_LOG10: float = -12
-"""Minimum value of log10(pressure) as determined by the initial solution.
-
-This value is motivated by typical values of the fO2 for atmospheres at the iron-wustite buffer
-for Earth-sized planets.
-"""
-INITIAL_SOLUTION_MAX_LOG10: float = 5
-"""Maximum value of log10(pressure) as determined by the initial solution."""
-
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config
 logger: logging.Logger = logging.getLogger(__name__)

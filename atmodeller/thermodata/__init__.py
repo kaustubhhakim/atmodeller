@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Package level variables"""
+"""Thermodata package level variables"""
 
 import importlib.resources
 from importlib.abc import Traversable
