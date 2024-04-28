@@ -50,7 +50,7 @@ def get_water_system(temperature: float = 300) -> InteriorAtmosphereSystem:
             GasSpecies(formula="H2O"),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", name="Water, 10 Bar"),
+            LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar"),
         ]
     )
     planet: Planet = Planet()
@@ -70,7 +70,7 @@ def test_water_condensed_100bar() -> None:
             GasSpecies(formula="H2O"),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", name="Water, 100 Bar"),
+            LiquidSpecies(formula="H2O", thermodata_name="Water, 100 Bar"),
         ]
     )
     planet: Planet = Planet()

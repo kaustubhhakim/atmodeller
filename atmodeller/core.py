@@ -84,7 +84,7 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
 
     @override
     def get_species_data(
-        self, species: ChemicalComponent, **kwargs
+        self, species: ChemicalSpecies, **kwargs
     ) -> ThermodynamicDataForSpeciesProtocol | None:
         """See base class."""
         for dataset in self.datasets:
@@ -94,20 +94,20 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
         raise KeyError(f"Thermodynamic data for {species.formula} is not available in any dataset")
 
 
-class ChemicalComponent:
-    """A chemical component and its properties
+class ChemicalSpecies:
+    """A chemical species and its properties
 
     Args:
         formula: Chemical formula (e.g., CO2, C, CH4, etc.)
         phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively
-        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF.
-        name: Name in the thermodynamic dataset. Defaults to None.
-        filename: Filename in the thermodynamic dataset. Defaults to None.
+        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF.
+        thermodata_name: Name of the component in the thermodynamic dataset. Defaults to None.
+        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
 
     Attributes:
         formula: Chemical formula
         phase: Phase (cr, g, or l)
-        thermodynamic_data: The thermodynamic data for the species
+        thermodata: The thermodynamic data for the species
         atoms: Number of atoms
         composition: Composition
         hill_formula: Hill formula
@@ -121,25 +121,24 @@ class ChemicalComponent:
         formula: str,
         phase: str,
         *,
-        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
-        name: str | None = None,
-        filename: str | None = None,
+        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_name: str | None = None,
+        thermodata_filename: str | None = None,
     ):
         self._formula: Formula = Formula(formula)
         self.phase: str = phase
-        if thermodynamic_dataset is None:
-            thermodynamic_dataset_ = ThermodynamicDatasetJANAF()
-        else:
-            thermodynamic_dataset_: ThermodynamicDatasetABC = thermodynamic_dataset
-        self.thermodynamic_data: ThermodynamicDataForSpeciesProtocol | None = (
-            thermodynamic_dataset_.get_species_data(self, name=name, filename=filename)
+        self.thermodata: ThermodynamicDataForSpeciesProtocol | None = (
+            thermodata_dataset.get_species_data(
+                self, name=thermodata_name, filename=thermodata_filename
+            )
         )
-        assert self.thermodynamic_data is not None
+        assert self.thermodata is not None
         logger.info(
-            "Creating %s %s using thermodynamic data in %s",
+            "Creating %s %s (hill formula=%s) using thermodynamic data in %s",
             self.__class__.__name__,
             self.formula,
-            thermodynamic_dataset_.data_source,
+            self.hill_formula,
+            self.thermodata.data_source,
         )
 
     @property
@@ -155,7 +154,6 @@ class ChemicalComponent:
     def elements(self) -> list[str]:
         return list(self.composition().keys())
 
-    # TODO: Return just the hill formula for consistency from the start?
     @property
     def formula(self) -> str:
         return str(self._formula)
@@ -181,43 +179,6 @@ class ChemicalComponent:
             return True
         else:
             return False
-
-    # TODO: Possibly not required anymore
-    # def modified_hill_formula(self) -> str:
-    #     """Gets the modified Hill formula.
-
-    #     JANAF uses the modified Hill formula to index its data tables. In short, H, if present,
-    #     should appear after C (if C is present), otherwise it must be the first element.
-
-    #     Args:
-    #         species: Species
-
-    #     Returns:
-    #         The species represented in the JANAF format
-    #     """
-    #     elements: dict[str, int] = {
-    #         element: properties.count for element, properties in self.composition().items()
-    #     }
-
-    #     if "C" in elements:
-    #         ordered_elements: list[str] = ["C"]
-    #     else:
-    #         ordered_elements = []
-
-    #     if "H" in elements:
-    #         ordered_elements.append("H")
-
-    #     ordered_elements.extend(sorted(elements.keys() - {"C", "H"}))
-
-    #     formula_string: str = "".join(
-    #         [
-    #             element + (str(elements[element]) if elements[element] > 1 else "")
-    #             for element in ordered_elements
-    #         ]
-    #     )
-    #     logger.debug("Modified Hill formula = %s", formula_string)
-
-    #     return formula_string
 
     @property
     def molar_mass(self) -> float:
@@ -265,15 +226,15 @@ def _mass_decorator(func) -> Callable:
     return mass_wrapper
 
 
-class GasSpecies(ChemicalComponent):
+class GasSpecies(ChemicalSpecies):
     """A gas species
 
     Args:
         formula: Chemical formula (e.g. CO2, C, CH4, etc.)
         phase: Phase. Defaults to g for gas.
-        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
-        name: Name in the thermodynamic dataset. Defaults to None.
-        filename: Filename in the thermodynamic dataset. Defaults to None.
+        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
+        thermodata_name: Name in the thermodynamic dataset. Defaults to None.
+        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
         solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
             Defaults to 0.
         solubility: Solubility model. Defaults to no solubility
@@ -282,40 +243,42 @@ class GasSpecies(ChemicalComponent):
     Attributes:
         formula: Chemical formula
         phase: g for gas
-        thermodynamic_data: The thermodynamic data for the species
+        thermodata: The thermodynamic data for the species
         atoms: Number of atoms
         composition: Composition
         hill_formula: Hill formula
         is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
         is_noble: True if a noble gas, otherwise False
         molar_mass: Molar mass
-        solubility: Solubility model
-        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt
-        eos: A gas equation of state
+        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
+            Defaults to 0.
+        solubility: Solubility model. Defaults to no solubility
+        eos: A gas equation of state. Defaults to Ideal.
     """
 
+    @override
     def __init__(
         self,
         formula: str,
         phase="g",
         *,
-        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
-        name: str | None = None,
-        filename: str | None = None,
+        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_name: str | None = None,
+        thermodata_filename: str | None = None,
         solid_melt_distribution_coefficient: float = 0,
-        solubility: SolubilityProtocol | None = None,
-        eos: RealGasProtocol | None = None,
+        solubility: SolubilityProtocol = NoSolubility(),
+        eos: RealGasProtocol = IdealGas(),
     ):
         super().__init__(
             formula,
             phase,
-            thermodynamic_dataset=thermodynamic_dataset,
-            name=name,
-            filename=filename,
+            thermodata_dataset=thermodata_dataset,
+            thermodata_name=thermodata_name,
+            thermodata_filename=thermodata_filename,
         )
         self.solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
-        self.solubility: SolubilityProtocol = NoSolubility() if solubility is None else solubility
-        self.eos: RealGasProtocol = IdealGas() if eos is None else eos
+        self.solubility: SolubilityProtocol = solubility
+        self.eos: RealGasProtocol = eos
 
     @_mass_decorator
     def mass(
@@ -373,20 +336,20 @@ class GasSpecies(ChemicalComponent):
         return output
 
 
-class CondensedSpecies(ChemicalComponent):
+class CondensedSpecies(ChemicalSpecies):
     """A condensed species
 
     Args:
         formula: Chemical formula (e.g., C, SiO2, etc.)
         phase: Phase
-        thermodynamic_dataset: The thermodynamic dataset. Defaults to JANAF
-        name: Name in the thermodynamic dataset. Defaults to None.
-        filename: Filename in the thermodynamic dataset. Defaults to None.
+        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
+        thermodata_name: Name in the thermodynamic dataset. Defaults to None.
+        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
 
     Attributes:
         formula: Chemical formula
         phase: Phase
-        thermodynamic_data: The thermodynamic data for the species
+        thermodata: The thermodynamic data for the species
         atoms: Number of atoms
         composition: Composition
         hill_formula: Hill formula
@@ -396,22 +359,25 @@ class CondensedSpecies(ChemicalComponent):
         activity: Activity, which is always ideal
     """
 
+    @override
     def __init__(
         self,
         formula: str,
         phase: str,
         *,
-        thermodynamic_dataset: ThermodynamicDatasetABC | None,
-        name: str | None,
-        filename: str | None,
+        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_name: str | None = None,
+        thermodata_filename: str | None = None,
     ):
         super().__init__(
             formula,
             phase,
-            thermodynamic_dataset=thermodynamic_dataset,
-            name=name,
-            filename=filename,
+            thermodata_dataset=thermodata_dataset,
+            thermodata_name=thermodata_name,
+            thermodata_filename=thermodata_filename,
         )
+        # TODO: Want to allow an activity model to be specified as input, just like a real gas
+        # EOS is specified for a gas species.
         self.activity: Constraint = ActivityConstant(species=str(self.formula))
 
 
@@ -424,37 +390,38 @@ class SolidSpecies(CondensedSpecies):
         formula: str,
         phase: str = "cr",
         *,
-        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
-        name: str | None = None,
-        filename: str | None = None,
+        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_name: str | None = None,
+        thermodata_filename: str | None = None,
     ):
         super().__init__(
             formula,
             phase,
-            thermodynamic_dataset=thermodynamic_dataset,
-            name=name,
-            filename=filename,
+            thermodata_dataset=thermodata_dataset,
+            thermodata_name=thermodata_name,
+            thermodata_filename=thermodata_filename,
         )
 
 
 class LiquidSpecies(CondensedSpecies):
     """Liquid species"""
 
+    @override
     def __init__(
         self,
         formula: str,
         phase: str = "l",
         *,
-        thermodynamic_dataset: ThermodynamicDatasetABC | None = None,
-        name: str | None = None,
-        filename: str | None = None,
+        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_name: str | None = None,
+        thermodata_filename: str | None = None,
     ):
         super().__init__(
             formula,
             phase,
-            thermodynamic_dataset=thermodynamic_dataset,
-            name=name,
-            filename=filename,
+            thermodata_dataset=thermodata_dataset,
+            thermodata_name=thermodata_name,
+            thermodata_filename=thermodata_filename,
         )
 
 
@@ -468,8 +435,8 @@ class Species(UserList):
         data: List of species contained in the system
     """
 
-    def __init__(self, initlist: list[ChemicalComponent] | None = None):
-        self.data: list[ChemicalComponent]  # For typing
+    def __init__(self, initlist: list[ChemicalSpecies] | None = None):
+        self.data: list[ChemicalSpecies]  # For typing
         super().__init__(initlist)
 
     @property

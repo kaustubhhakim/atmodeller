@@ -117,15 +117,15 @@ def test_H_fO2_holland() -> None:
             GasSpecies(
                 formula="H2O",
                 solubility=H2O_peridotite_sossi(),
-                thermodynamic_dataset=ThermodynamicDatasetHollandAndPowell(),
+                thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
             ),
             GasSpecies(
                 formula="H2",
-                thermodynamic_dataset=ThermodynamicDatasetHollandAndPowell(),
+                thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
             ),
             GasSpecies(
                 formula="O2",
-                thermodynamic_dataset=ThermodynamicDatasetHollandAndPowell(),
+                thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
             ),
         ]
     )
@@ -367,7 +367,7 @@ def test_H_and_C() -> None:
 
 
 def test_H_and_C_hill_formula() -> None:
-    """Tests H2-H2O and CO-CO2."""
+    """Tests H2-H2O and CO-CO2 by changing the order of the chemical formulae for the species"""
 
     species: Species = Species(
         [

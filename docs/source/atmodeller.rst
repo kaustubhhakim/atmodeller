@@ -7,8 +7,9 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   atmodeller.data
    atmodeller.eos
+   atmodeller.solubility
+   atmodeller.thermodata
 
 Submodules
 ----------
@@ -57,14 +58,6 @@ atmodeller.plot module
 ----------------------
 
 .. automodule:: atmodeller.plot
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-atmodeller.solubilities module
-------------------------------
-
-.. automodule:: atmodeller.solubilities
    :members:
    :undoc-members:
    :show-inheritance:

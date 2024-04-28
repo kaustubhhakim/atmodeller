@@ -20,9 +20,7 @@ from __future__ import annotations
 
 __version__: str = "0.1.0"
 
-import importlib.resources
 import logging
-from importlib.abc import Traversable
 
 from molmass import Formula
 from scipy import constants
@@ -42,8 +40,6 @@ OCEAN_MOLES: float = 7.68894973907177e22
 """Moles of H2 (or H2O) in one present-day Earth ocean"""
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 """Mass of H2 in one present-day Earth ocean"""
-
-DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 
 # Minimum and maximum values of log10(pressure) to prevent the initial solution from giving rise
 # to an excessively large total pressure that can cause numerical overflow or underflow.

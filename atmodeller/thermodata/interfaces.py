@@ -14,40 +14,72 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Interfaces for thermodynamic data"""
+"""Interfaces for obtaining thermodynamic data"""
 
 from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from atmodeller.core import ChemicalComponent
+
+class ChemicalSpeciesProtocol(Protocol):
+    """Chemical species protocol for obtaining thermodynamic data"""
+
+    @property
+    def formula(self) -> str:
+        """Chemical formula"""
+        raise NotImplementedError
+
+    @property
+    def hill_formula(self) -> str:
+        """Hill formula"""
+        raise NotImplementedError
+
+    @property
+    def is_homonuclear_diatomic(self) -> bool:
+        """True if the species is homonuclear diatomic, otherwise False"""
+        raise NotImplementedError
+
+    @property
+    def is_noble(self) -> bool:
+        """True if the species is a noble gas, otherwise False"""
+        raise NotImplementedError
+
+    @property
+    def phase(self) -> str:
+        """Must be g, cr, or l, for a gas, solid, or liquid phase, respectively"""
+        raise NotImplementedError
 
 
 class ThermodynamicDataForSpeciesProtocol(Protocol):
+
+    @property
+    def data_source(self) -> str: ...
+
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float: ...
 
 
 class ThermodynamicDatasetABC(ABC):
-    """Thermodynamic dataset"""
+    """A thermodynamic dataset"""
 
     _DATA_SOURCE: str
-    # JANAF standards below. May be overwritten by child classes.
-    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
-    _STANDARD_STATE_PRESSURE: float = 1  # bar
+    """Thermodynamic data source"""
+    _ENTHALPY_REFERENCE_TEMPERATURE: float
+    """Enthalpy reference temperature in K"""
+    _STANDARD_STATE_PRESSURE: float
+    """Standard state pressure in bar"""
 
     @abstractmethod
     def get_species_data(
-        self, species: ChemicalComponent, **kwargs
-    ) -> ThermodynamicDataForSpeciesABC | None:
-        """Gets the thermodynamic data for a species
+        self, species: ChemicalSpeciesProtocol, **kwargs
+    ) -> ThermodynamicDataForSpeciesProtocol | None:
+        """Gets the thermodynamic data for a species.
 
         Args:
-            species: Species
+            species: A chemical species
             **kwargs: Arbitrary keyword arguments
 
         Returns:
@@ -56,12 +88,12 @@ class ThermodynamicDatasetABC(ABC):
 
     @property
     def data_source(self) -> str:
-        """The source of the data."""
+        """The source of the thermodynamic data."""
         return self._DATA_SOURCE
 
     @property
     def enthalpy_reference_temperature(self) -> float:
-        """Enthalpy reference temperature in kelvin"""
+        """Enthalpy reference temperature in K"""
         return self._ENTHALPY_REFERENCE_TEMPERATURE
 
     @property
@@ -71,36 +103,32 @@ class ThermodynamicDatasetABC(ABC):
 
 
 class ThermodynamicDataForSpeciesABC(ABC):
-    """Thermodynamic data for a species to compute the Gibbs energy of formation.
+    """Thermodynamic data for a species
 
     Args:
-        species: Species
+        species: A chemical species
         data_source: Source of the thermodynamic data
-        data: Data used to compute the Gibbs energy of formation
-        *args: Arbitrary positional arguments used by child classes
-        **kwargs: Arbitrary keyword arguments used by child classes
+        data: Data used for thermodynamic calculations
 
     Attributes:
-        species: Species
+        species: A chemical species
         data_source: Source of the thermodynamic data
-        data: Data used to compute the Gibbs energy of formation
+        data: Data used for thermodynamic calculations
     """
 
-    def __init__(self, species: ChemicalComponent, data_source: str, data: Any, *args, **kwargs):
-        del args
-        del kwargs
-        self.species: ChemicalComponent = species
+    def __init__(self, species: ChemicalSpeciesProtocol, data_source: str, data: Any):
+        self.species: ChemicalSpeciesProtocol = species
         self.data_source: str = data_source
         self.data: Any = data
 
     @abstractmethod
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-        """Gets the standard Gibbs free energy of formation in J/mol.
+        r"""Gets the standard Gibbs free energy of formation.
 
         Args:
-            temperature: Temperature in kelvin
-            pressure: Total pressure in bar
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            The standard Gibbs free energy of formation in J/mol
+            The standard Gibbs free energy of formation in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """

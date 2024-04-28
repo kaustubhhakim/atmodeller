@@ -1,6 +1,14 @@
 atmodeller.eos package
 ======================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   atmodeller.eos.data
+
 Submodules
 ----------
 
@@ -32,6 +40,14 @@ atmodeller.eos.saxena module
 ----------------------------
 
 .. automodule:: atmodeller.eos.saxena
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.eos.template module
+------------------------------
+
+.. automodule:: atmodeller.eos.template
    :members:
    :undoc-members:
    :show-inheritance:

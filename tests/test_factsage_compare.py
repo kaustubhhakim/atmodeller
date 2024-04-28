@@ -319,7 +319,7 @@ def test_water_condensed_10bar(helper) -> None:
             GasSpecies(formula="H2O"),
             GasSpecies(formula="H2"),
             GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", name="Water, 10 Bar"),
+            LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar"),
         ]
     )
     planet: Planet = Planet()

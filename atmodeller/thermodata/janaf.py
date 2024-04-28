@@ -14,18 +14,18 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Thermodynamic data from JANAF"""
+"""Thermodynamic data from JANAF :cite:p:`Cha98`"""
 
 from __future__ import annotations
 
 import logging
 import sys
-from typing import TYPE_CHECKING
 
 from scipy.constants import kilo
 from thermochem import janaf
 
 from atmodeller.thermodata.interfaces import (
+    ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesABC,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDatasetABC,
@@ -38,106 +38,148 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from atmodeller.core import ChemicalComponent
-
 
 class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
-    """JANAF thermodynamic dataset"""
+    """The JANAF thermodynamic dataset :cite:p:`Cha98`.
+
+    The modified Hill indexing system for chemical compounds is used to order the tables.
+
+    Attributes:
+        data: Thermodynamic data used for calculations
+        cache: Whether to cache the JANAF database. Setting this to False will download the JANAF
+            databse every time it is used. Set to True.
+    """
 
     _DATA_SOURCE: str = "JANAF"
-    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15  # K
-    _STANDARD_STATE_PRESSURE: float = 1  # bar
+    _ENTHALPY_REFERENCE_TEMPERATURE: float = 298.15
+    _STANDARD_STATE_PRESSURE: float = 1
+
+    def __init__(self):
+        self.data: janaf.Janafdb = janaf.Janafdb()
+        self.cache: bool = True
 
     @override
     def get_species_data(
         self,
-        species: ChemicalComponent,
+        species: ChemicalSpeciesProtocol,
         *,
         name: str | None = None,
         filename: str | None = None,
         **kwargs,
     ) -> ThermodynamicDataForSpeciesProtocol | None:
+        """Gets the thermodynamic data for a species.
+
+        Args:
+            species: A chemical species
+            name: Select records that match the chemical/mineral name. Defaults to None.
+            filename: Select only records that match the filename on the website, which is very
+                unique. Defaults to None.
+            kwargs: Catches unused keyword arguments.
+
+        Returns:
+            Thermodynamic data for the species or None if not available
+        """
         del kwargs
 
-        db: janaf.Janafdb = janaf.Janafdb()
-
-        # Defined by JANAF convention
-        janaf_formula: str = species.hill_formula  # modified_hill_formula()
-
         def get_phase_data(phases: list[str]) -> janaf.JanafPhase | None:
-            """Gets the phase data for a list of phases in order of priority.
+            """Gets the phase data from a list of phases in order of priority.
 
             Args:
-                phases: Phases to search for in the JANAF database.
+                phases: Phases to search for in the JANAF database in priority order.
 
             Returns:
-                Phase data if it exists in JANAF, otherwise None
+                Phase data if it exists in JANAF or None if not available
             """
-            if filename is not None:
-                phase_data: janaf.JanafPhase | None = db.getphasedata(filename=filename)
-            else:
-                try:
-                    phase_data = db.getphasedata(formula=janaf_formula, name=name, phase=phases[0])
-                except ValueError:
-                    # Cannot find the phase, so keep iterating through the list of options
-                    phase_data = get_phase_data(phases[1:])
-                except IndexError:
-                    # Reached the end of the phases to try meaning no phase data was found
-                    phase_data = None
+            try:
+                logger.info(
+                    "Searching for %s (formula=%s, name=%s, phase=%s) in %s",
+                    species.formula,
+                    species.hill_formula,
+                    name,
+                    phases[0],
+                    self.data_source,
+                )
+                phase_data = self.data.getphasedata(
+                    formula=species.hill_formula, name=name, phase=phases[0], cache=self.cache
+                )
+            except ValueError:
+                # Cannot find the phase, so keep iterating through the list of options.
+                phase_data = get_phase_data(phases[1:])
+            except IndexError:
+                # Reached the end of all options therefore no phase data was found.
+                phase_data = None
 
             return phase_data
 
-        if species.phase == "g":
+        # First, check exclusively for a filename match if a filename has been specified.
+        if filename is not None:
+            logger.info(
+                "Searching for %s (filename=%s) in %s",
+                species.formula,
+                filename,
+                self.data_source,
+            )
+            phase_data: janaf.JanafPhase | None = self.data.getphasedata(filename=filename)
+
+        # Otherwise, find the phase data based on the phase (solid, liquid, gas).
+        elif species.phase == "g":
             if species.is_homonuclear_diatomic or species.is_noble:
                 phase_data = get_phase_data(["ref", "g"])
             else:
                 phase_data = get_phase_data(["g"])
 
         elif species.phase == "cr":
-            phase_data = get_phase_data(["cr", "ref"])  # ref included for C (graphite)
+            # ref is included for C (graphite)
+            phase_data = get_phase_data(["cr", "ref"])
 
         elif species.phase == "l":
-            phase_data = get_phase_data(["l", "l,g"])  # l,g included for Water at 1, 10, 100 bar
+            # l,g is included for water at 1, 10, and 100 bar
+            phase_data = get_phase_data(["l", "l,g"])
 
         else:
-            logger.error("Thermodynamic data is unknown for %s", species.__class__.__name__)
             msg: str = f"{self.__class__.__name__} does not support {species.__class__.__name__} "
             msg += " because it has no phase information"
             raise ValueError(msg)
 
         if phase_data is None:
-            logger.warning(
-                "Thermodynamic data for %s (%s) not found in %s",
-                species.formula,
-                janaf_formula,
-                self.data_source,
-            )
-
+            logger.warning("Thermodynamic data not found")
             return None
         else:
-            logger.info(
-                "Thermodynamic data for %s (%s) found in %s",
-                species.formula,
-                janaf_formula,
-                self.data_source,
-            )
-            logger.info("Phase data = %s", phase_data)
-
+            logger.info("Thermodynamic data found = %s", phase_data)
             return self.ThermodynamicDataForSpecies(species, self.data_source, phase_data)
 
     class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesABC):
-        """JANAF thermodynamic data for a species"""
+        """Thermodynamic data for a species"""
 
         @override
-        def __init__(self, species: ChemicalComponent, data_source: str, data: janaf.JanafPhase):
+        def __init__(
+            self, species: ChemicalSpeciesProtocol, data_source: str, data: janaf.JanafPhase
+        ):
             super().__init__(species, data_source, data)
 
         @override
         def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
+            r"""Gets the standard Gibbs free energy of formation.
+
+            Note that thermochem v0.8.2 returns J not kJ. But the main branch, which atmodeller
+            uses, now returns kJ. This gives rise to the kilo conversion. See
+            https://github.com/adelq/thermochem/pull/25
+
+            Args:
+                temperature: Temperature in K
+                pressure: Pressure in bar
+
+            Returns:
+                The standard Gibbs free energy of formation in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+            """
+
             del pressure
-            # thermochem v0.8.2 returns J not kJ. Main branch now returns kJ hence kilo conversion.
-            # https://github.com/adelq/thermochem/pull/25
             gibbs: float = self.data.DeltaG(temperature) * kilo
+
+            logger.debug(
+                "Species = %s, standard Gibbs energy of formation=%f",
+                self.species.formula,
+                gibbs,
+            )
 
             return gibbs
