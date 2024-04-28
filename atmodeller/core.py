@@ -34,7 +34,7 @@ from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.thermodata.interfaces import (
     ThermodynamicDataForSpeciesProtocol,
-    ThermodynamicDatasetABC,
+    ThermodynamicDataset,
 )
 from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.utilities import UnitConversion, filter_by_type
@@ -77,7 +77,7 @@ class ChemicalSpecies:
         formula: str,
         phase: str,
         *,
-        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
         thermodata_name: str | None = None,
         thermodata_filename: str | None = None,
     ):
@@ -147,41 +147,6 @@ class ChemicalSpecies:
         return f"{self.formula}_{self.phase}"
 
 
-def _mass_decorator(func) -> Callable:
-    """Returns the reservoir masses of either the gas species or one of its elements."""
-
-    @wraps(func)
-    def mass_wrapper(
-        self: GasSpecies,
-        system: InteriorAtmosphereSystem,
-        *,
-        element: Optional[str] = None,
-    ) -> dict[str, float]:
-        """Wrapper to return the reservoir masses of either the gas species or one of its elements.
-
-        Args:
-            element: Returns the reservoir masses of this element. Defaults to None to return the
-                species masses.
-
-        Returns:
-            Reservoir masses of either the gas species or one of its elements.
-        """
-        mass: dict[str, float] = func(self, system)
-        if element is not None:
-            try:
-                mass_scale_factor: float = (
-                    UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
-                )
-            except KeyError:  # Element not in formula so mass is zero.
-                mass_scale_factor = 0
-            for key in mass:
-                mass[key] *= mass_scale_factor
-
-        return mass
-
-    return mass_wrapper
-
-
 class GasSpecies(ChemicalSpecies):
     """A gas species
 
@@ -218,7 +183,7 @@ class GasSpecies(ChemicalSpecies):
         formula: str,
         phase="g",
         *,
-        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
         thermodata_name: str | None = None,
         thermodata_filename: str | None = None,
         solid_melt_distribution_coefficient: float = 0,
@@ -236,7 +201,6 @@ class GasSpecies(ChemicalSpecies):
         self.solubility: SolubilityProtocol = solubility
         self.eos: RealGasProtocol = eos
 
-    @_mass_decorator
     def mass(
         self,
         system: InteriorAtmosphereSystem,
@@ -248,14 +212,10 @@ class GasSpecies(ChemicalSpecies):
         Args:
             system: Interior atmosphere system
             element: Returns the mass for an element. Defaults to None to return the species mass.
-               This argument is used by the @_mass_decorator.
 
         Returns:
             Total reservoir masses of the species (element=None) or element (element=element)
         """
-        # Only used by the decorator.
-        del element
-
         planet: Planet = system.planet
         pressure: float = system.solution_dict()[self.name]
         fugacity: float = system.fugacities_dict[f"f{self.formula}"]
@@ -289,6 +249,16 @@ class GasSpecies(ChemicalSpecies):
             "solid": mass_in_solid,
         }
 
+        if element is not None:
+            try:
+                mass_scale_factor: float = (
+                    UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
+                )
+            except KeyError:  # Element not in formula so mass is zero.
+                mass_scale_factor = 0
+            for key in output:
+                output[key] *= mass_scale_factor
+
         return output
 
 
@@ -321,7 +291,7 @@ class CondensedSpecies(ChemicalSpecies):
         formula: str,
         phase: str,
         *,
-        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
         thermodata_name: str | None = None,
         thermodata_filename: str | None = None,
     ):
@@ -346,7 +316,7 @@ class SolidSpecies(CondensedSpecies):
         formula: str,
         phase: str = "cr",
         *,
-        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
         thermodata_name: str | None = None,
         thermodata_filename: str | None = None,
     ):
@@ -368,7 +338,7 @@ class LiquidSpecies(CondensedSpecies):
         formula: str,
         phase: str = "l",
         *,
-        thermodata_dataset: ThermodynamicDatasetABC = ThermodynamicDatasetJANAF(),
+        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
         thermodata_name: str | None = None,
         thermodata_filename: str | None = None,
     ):

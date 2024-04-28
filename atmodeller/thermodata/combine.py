@@ -27,7 +27,7 @@ from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.interfaces import (
     ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesProtocol,
-    ThermodynamicDatasetABC,
+    ThermodynamicDataset,
 )
 
 if sys.version_info < (3, 12):
@@ -38,8 +38,8 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class ThermodynamicDataset(ThermodynamicDatasetABC):
-    """Combines thermodynamic data from multiple datasets.
+class ThermodynamicDatasetCombined(ThermodynamicDataset):
+    """Combined thermodynamic data from multiple datasets.
 
     Args:
         datasets: A list of thermodynamic data to use. Defaults to Holland and Powell and JANAF.
@@ -54,16 +54,16 @@ class ThermodynamicDataset(ThermodynamicDatasetABC):
 
     def __init__(
         self,
-        datasets: list[ThermodynamicDatasetABC] | None = None,
+        datasets: list[ThermodynamicDataset] | None = None,
     ):
         if datasets is None:
-            self.datasets: list[ThermodynamicDatasetABC] = []
+            self.datasets: list[ThermodynamicDataset] = []
             self.add_dataset(ThermodynamicDatasetHollandAndPowell())
             self.add_dataset(ThermodynamicDatasetJANAF())
         else:
             self.datasets = datasets
 
-    def add_dataset(self, dataset: ThermodynamicDatasetABC) -> None:
+    def add_dataset(self, dataset: ThermodynamicDataset) -> None:
         """Adds a thermodynamic dataset
 
         Args:

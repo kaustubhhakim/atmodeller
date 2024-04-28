@@ -62,7 +62,7 @@ class ThermodynamicDataForSpeciesProtocol(Protocol):
     def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float: ...
 
 
-class ThermodynamicDatasetABC(ABC):
+class ThermodynamicDataset(ABC):
     """A thermodynamic dataset"""
 
     _DATA_SOURCE: str

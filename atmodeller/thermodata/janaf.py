@@ -28,7 +28,7 @@ from atmodeller.thermodata.interfaces import (
     ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesABC,
     ThermodynamicDataForSpeciesProtocol,
-    ThermodynamicDatasetABC,
+    ThermodynamicDataset,
 )
 
 if sys.version_info < (3, 12):
@@ -39,7 +39,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class ThermodynamicDatasetJANAF(ThermodynamicDatasetABC):
+class ThermodynamicDatasetJANAF(ThermodynamicDataset):
     """The JANAF thermodynamic dataset :cite:p:`Cha98`.
 
     The modified Hill indexing system for chemical compounds is used to order the tables.

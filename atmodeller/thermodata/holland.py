@@ -35,7 +35,7 @@ from atmodeller.thermodata.interfaces import (
     ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesABC,
     ThermodynamicDataForSpeciesProtocol,
-    ThermodynamicDatasetABC,
+    ThermodynamicDataset,
 )
 
 if sys.version_info < (3, 12):
@@ -49,7 +49,7 @@ HOLLAND_FILENAME: str = "holland_Mindata161127.csv"
 """Filename of the thermodynamic data from :cite:t:`HP91,HP98`"""
 
 
-class ThermodynamicDatasetHollandAndPowell(ThermodynamicDatasetABC):
+class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
     """The thermodynamic dataset from :cite:t:`HP91,HP98`.
 
     See also the equations in :cite:t:`P78{Appendix A}`.
