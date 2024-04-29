@@ -137,12 +137,26 @@ class SpeciesOutput:
     atmosphere: ReservoirOutput
     melt: ReservoirOutput
     solid: ReservoirOutput
+    degree_of_condensation: float = 0
+    condensed_mass: float = field(init=False, default=0)
+    condensed_moles: float = field(init=False, default=0)
     total_mass: float = field(init=False)
     total_moles: float = field(init=False)
 
     def __post_init__(self):
-        self.total_mass = self.atmosphere.mass + self.melt.mass + self.solid.mass
-        self.total_moles = self.atmosphere.moles + self.melt.moles + self.solid.moles
+        doc_factor: float = self.degree_of_condensation / (1 - self.degree_of_condensation)
+        self.condensed_mass = doc_factor * (
+            self.atmosphere.mass + self.melt.mass + self.solid.mass
+        )
+        self.condensed_moles = doc_factor * (
+            self.atmosphere.moles + self.melt.moles + self.solid.moles
+        )
+        self.total_mass = (
+            self.atmosphere.mass + self.melt.mass + self.solid.mass + self.condensed_mass
+        )
+        self.total_moles = (
+            self.atmosphere.moles + self.melt.moles + self.solid.moles + self.condensed_moles
+        )
 
     def asdict(self) -> dict[str, float]:
         """Data as a dictionary
@@ -158,6 +172,10 @@ class SpeciesOutput:
         output_dict["molar_mass"] = molar_mass
         output_dict = delete_entries_with_suffix(output_dict, "reservoir_mass")
         output_dict = delete_entries_with_suffix(output_dict, "reservoir_moles")
+        if self.degree_of_condensation == 0:
+            del output_dict["degree_of_condensation"]
+            del output_dict["condensed_mass"]
+            del output_dict["condensed_moles"]
 
         return output_dict
 
@@ -321,7 +339,19 @@ class Output(UserDict):
                 mass=element_mass["solid"],
                 reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
             )
-            output = SpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
+            # Add contribution from condensation for the elements
+            if element in interior_atmosphere.degree_of_condensation_elements:
+                degree_of_condensation: float = interior_atmosphere.solution_dict()[
+                    f"degree_of_condensation_{element}"
+                ]
+            else:
+                degree_of_condensation = 0
+            output = SpeciesOutput(
+                atmosphere=atmosphere,
+                melt=melt,
+                solid=solid,
+                degree_of_condensation=degree_of_condensation,
+            )
             # Create a unique key name to avoid a potential name conflict with atomic species
             key_name: str = f"{element}_totals"
             data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])

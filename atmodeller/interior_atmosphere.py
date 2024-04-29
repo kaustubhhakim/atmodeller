@@ -783,6 +783,8 @@ class InteriorAtmosphereSystem:
             len(self.constraints.mass_constraints), dtype=np.float_
         )
 
+        # Recall that mass constraints are currently only ever specified in terms of elements.
+        # Hence constraint.species is an element.
         for constraint_index, constraint in enumerate(self.constraints.mass_constraints):
             # Gas species
             for species in self.species.gas_species.values():
