@@ -81,7 +81,7 @@ class ChemicalSpecies:
             "Creating %s %s (hill formula=%s) using thermodynamic data in %s",
             self.__class__.__name__,
             self.formula,
-            self.formula.formula,
+            self.hill_formula,
             self.thermodata.data_source,
         )
 
@@ -94,6 +94,10 @@ class ChemicalSpecies:
     def formula(self) -> Formula:
         """Formula object"""
         return self._formula
+
+    @property
+    def hill_formula(self) -> str:
+        return self.formula.formula
 
     @property
     def molar_mass(self) -> float:

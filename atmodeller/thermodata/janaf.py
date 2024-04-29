@@ -56,7 +56,7 @@ def is_homonuclear_diatomic(species: ChemicalSpecies) -> bool:
 
 def is_noble(species: ChemicalSpecies) -> bool:
     """True if a species is a noble gas, otherwise False"""
-    if species.formula.formula in NOBLE_GASES:
+    if species.hill_formula in NOBLE_GASES:
         return True
     else:
         return False
@@ -117,13 +117,13 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
                 logger.info(
                     "Searching for %s (formula=%s, name=%s, phase=%s) in %s",
                     species.formula,
-                    species.formula.formula,
+                    species.hill_formula,
                     name,
                     phases[0],
                     self.data_source,
                 )
                 phase_data = self.data.getphasedata(
-                    formula=species.formula.formula, name=name, phase=phases[0], cache=self.cache
+                    formula=species.hill_formula, name=name, phase=phases[0], cache=self.cache
                 )
             except ValueError:
                 # Cannot find the phase, so keep iterating through the list of options.
