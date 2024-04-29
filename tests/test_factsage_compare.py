@@ -296,10 +296,11 @@ def test_graphite_half_condensed(helper) -> None:
     }
 
     system.solve(constraints)
+    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-@pytest.mark.skip(reason="debugging")
+# @pytest.mark.skip(reason="debugging")
 def test_water_condensed_10bar(helper) -> None:
     """Condensed water at 10 bar"""
 
@@ -351,4 +352,5 @@ def test_water_condensed_10bar(helper) -> None:
     # system.isclose_tolerance(factsage_comparison, msg)
 
     system.solve(constraints)
+    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
