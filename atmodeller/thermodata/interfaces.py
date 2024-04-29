@@ -23,7 +23,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from atmodeller.core import ChemicalSpecies
+    from atmodeller.core import _ChemicalSpecies
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class ThermodynamicDataset(ABC):
 
     @abstractmethod
     def get_species_data(
-        self, species: ChemicalSpecies, **kwargs
+        self, species: _ChemicalSpecies, **kwargs
     ) -> ThermodynamicDataForSpeciesProtocol | None:
         """Gets the thermodynamic data for a species.
 
@@ -90,8 +90,8 @@ class ThermodynamicDataForSpeciesABC(ABC):
         data: Data used for thermodynamic calculations
     """
 
-    def __init__(self, species: ChemicalSpecies, data_source: str, data: Any):
-        self.species: ChemicalSpecies = species
+    def __init__(self, species: _ChemicalSpecies, data_source: str, data: Any):
+        self.species: _ChemicalSpecies = species
         self.data_source: str = data_source
         self.data: Any = data
 

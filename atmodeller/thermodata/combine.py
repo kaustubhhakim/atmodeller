@@ -35,7 +35,7 @@ else:
     from typing import override
 
 if TYPE_CHECKING:
-    from atmodeller.core import ChemicalSpecies
+    from atmodeller.core import _ChemicalSpecies
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class ThermodynamicDatasetCombined(ThermodynamicDataset):
 
     @override
     def get_species_data(
-        self, species: ChemicalSpecies, **kwargs
+        self, species: _ChemicalSpecies, **kwargs
     ) -> ThermodynamicDataForSpeciesProtocol | None:
         for dataset in self.datasets:
             if dataset is not None:

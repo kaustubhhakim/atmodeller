@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 
-class ChemicalSpecies:
+class _ChemicalSpecies:
     """A chemical species and its properties
 
     Args:
@@ -121,7 +121,7 @@ class ChemicalSpecies:
         return self._thermodata
 
 
-class GasSpecies(ChemicalSpecies):
+class GasSpecies(_ChemicalSpecies):
     """A gas species
 
     Args:
@@ -236,7 +236,7 @@ class GasSpecies(ChemicalSpecies):
         return output
 
 
-class CondensedSpecies(ChemicalSpecies):
+class _CondensedSpecies(_ChemicalSpecies):
     """A condensed species
 
     Args:
@@ -285,7 +285,7 @@ class CondensedSpecies(ChemicalSpecies):
     #     planet: Planet = system.planet
 
 
-class SolidSpecies(CondensedSpecies):
+class SolidSpecies(_CondensedSpecies):
     """A solid species
 
     Args:
@@ -315,7 +315,7 @@ class SolidSpecies(CondensedSpecies):
         )
 
 
-class LiquidSpecies(CondensedSpecies):
+class LiquidSpecies(_CondensedSpecies):
     """A liquid species
 
     Args:
@@ -355,8 +355,8 @@ class Species(UserList):
         data: List of species contained in the system
     """
 
-    def __init__(self, initlist: list[ChemicalSpecies] | None = None):
-        self.data: list[ChemicalSpecies]  # For typing
+    def __init__(self, initlist: list[_ChemicalSpecies] | None = None):
+        self.data: list[_ChemicalSpecies]  # For typing
         super().__init__(initlist)
 
     @property
@@ -394,9 +394,9 @@ class Species(UserList):
         return len(self.gas_species)
 
     @property
-    def condensed_species(self) -> dict[int, CondensedSpecies]:
+    def condensed_species(self) -> dict[int, _CondensedSpecies]:
         """Condensed species"""
-        return filter_by_type(self, CondensedSpecies)
+        return filter_by_type(self, _CondensedSpecies)
 
     @property
     def condensed_elements(self) -> list[str]:
