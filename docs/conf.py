@@ -67,7 +67,7 @@ pygments_style = "sphinx"
 
 autodoc_member_order = "bysource"
 
-# autodoc_default_options = {"inherited-members": True}
+autodoc_default_options = {"inherited-members": True}
 
 # Napoleon settings
 napoleon_google_docstring = True

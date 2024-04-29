@@ -25,14 +25,13 @@ import logging
 import sys
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import pandas as pd
 
 from atmodeller.thermodata import DATA_DIRECTORY
 from atmodeller.thermodata.interfaces import (
-    ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesABC,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDataset,
@@ -42,6 +41,10 @@ if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
+
+if TYPE_CHECKING:
+    from atmodeller.core import ChemicalSpecies
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -79,7 +82,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
     @override
     def get_species_data(
         self,
-        species: ChemicalSpeciesProtocol,
+        species: ChemicalSpecies,
         *,
         name: str | None = None,
         **kwargs,
@@ -97,7 +100,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
             Thermodynamic data for the species or None if not available
         """
         del kwargs
-        search_name: str = name if name is not None else species.formula
+        search_name: str = name if name is not None else str(species.formula)
 
         try:
             logger.info(
@@ -138,7 +141,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
         @override
         def __init__(
             self,
-            species: ChemicalSpeciesProtocol,
+            species: ChemicalSpecies,
             data_source: str,
             data: pd.Series,
             enthalpy_reference_temperature: float,

@@ -532,7 +532,7 @@ class InteriorAtmosphereSystem:
     def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients (relevant for gas species only) in a dictionary."""
         output: dict[str, float] = {
-            species.formula: np.log10(
+            str(species.formula): np.log10(
                 species.eos.fugacity_coefficient(
                     temperature=self.planet.surface_temperature, pressure=self.total_pressure
                 )

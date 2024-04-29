@@ -20,10 +20,10 @@ from __future__ import annotations
 
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.interfaces import (
-    ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDataset,
 )
@@ -33,6 +33,10 @@ if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
+
+if TYPE_CHECKING:
+    from atmodeller.core import ChemicalSpecies
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -75,7 +79,7 @@ class ThermodynamicDatasetCombined(ThermodynamicDataset):
 
     @override
     def get_species_data(
-        self, species: ChemicalSpeciesProtocol, **kwargs
+        self, species: ChemicalSpecies, **kwargs
     ) -> ThermodynamicDataForSpeciesProtocol | None:
         for dataset in self.datasets:
             if dataset is not None:

@@ -24,9 +24,8 @@ from collections import UserList
 from typing import TYPE_CHECKING, Mapping, Optional
 
 import numpy as np
-from molmass import Composition, Formula
+from molmass import Formula
 
-from atmodeller import NOBLE_GASES
 from atmodeller.constraints import ActivityConstant, Constraint
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.solubility.compositions import composition_solubilities
@@ -58,10 +57,6 @@ class ChemicalSpecies:
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF.
         thermodata_name: Name of the component in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-
-    Attributes:
-        phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively
-        thermodata: The thermodynamic data for the species
     """
 
     def __init__(
@@ -74,71 +69,51 @@ class ChemicalSpecies:
         thermodata_filename: str | None = None,
     ):
         self._formula: Formula = Formula(formula)
-        self.phase: str = phase
-        self.thermodata: ThermodynamicDataForSpeciesProtocol | None = (
+        self._phase: str = phase
+        thermodata: ThermodynamicDataForSpeciesProtocol | None = (
             thermodata_dataset.get_species_data(
                 self, name=thermodata_name, filename=thermodata_filename
             )
         )
-        assert self.thermodata is not None
+        assert thermodata is not None
+        self._thermodata: ThermodynamicDataForSpeciesProtocol = thermodata
         logger.info(
             "Creating %s %s (hill formula=%s) using thermodynamic data in %s",
             self.__class__.__name__,
             self.formula,
-            self.hill_formula,
+            self.formula.formula,
             self.thermodata.data_source,
         )
 
     @property
-    def atoms(self) -> int:
-        """Number of atoms"""
-        return self._formula.atoms
-
-    def composition(self) -> Composition:
-        """Composition"""
-        return self._formula.composition()
-
-    @property
     def elements(self) -> list[str]:
         """Elements in species"""
-        return list(self.composition().keys())
+        return list(self.formula.composition().keys())
 
     @property
-    def formula(self) -> str:
-        """Formula"""
-        return str(self._formula)
-
-    @property
-    def hill_formula(self) -> str:
-        """Hill formula"""
-        return self._formula.formula
-
-    @property
-    def is_homonuclear_diatomic(self) -> bool:
-        """True if homonuclear diatomic, otherwise False."""
-        composition = self.composition()
-        if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
-            return True
-        else:
-            return False
-
-    @property
-    def is_noble(self) -> bool:
-        """True if a noble gas, otherwise False."""
-        if self.hill_formula in NOBLE_GASES:
-            return True
-        else:
-            return False
+    def formula(self) -> Formula:
+        """Formula object"""
+        return self._formula
 
     @property
     def molar_mass(self) -> float:
         """Molar mass in kg/mol"""
-        return UnitConversion.g_to_kg(self._formula.mass)
+        return UnitConversion.g_to_kg(self.formula.mass)
 
     @property
     def name(self) -> str:
         """Unique name by combining formula and phase"""
         return f"{self.formula}_{self.phase}"
+
+    @property
+    def phase(self) -> str:
+        """Phase"""
+        return self._phase
+
+    @property
+    def thermodata(self) -> ThermodynamicDataForSpeciesProtocol:
+        """Thermodynamic data for the species"""
+        return self._thermodata
 
 
 class GasSpecies(ChemicalSpecies):
@@ -156,19 +131,7 @@ class GasSpecies(ChemicalSpecies):
         eos: A gas equation of state. Defaults to an ideal gas.
 
     Attributes:
-        formula: Chemical formula
-        phase: g for gas
-        thermodata: The thermodynamic data for the species
-        atoms: Number of atoms
-        composition: Composition
-        hill_formula: Hill formula
-        is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
-        is_noble: True if a noble gas, otherwise False
-        molar_mass: Molar mass
-        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
-            Defaults to 0.
-        solubility: Solubility model. Defaults to no solubility
-        eos: A gas equation of state. Defaults to Ideal.
+        solubility: Solubility model
     """
 
     @override
@@ -191,9 +154,19 @@ class GasSpecies(ChemicalSpecies):
             thermodata_name=thermodata_name,
             thermodata_filename=thermodata_filename,
         )
-        self.solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
+        self._solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
         self.solubility: SolubilityProtocol = solubility
-        self.eos: RealGasProtocol = eos
+        self._eos: RealGasProtocol = eos
+
+    @property
+    def eos(self) -> RealGasProtocol:
+        """A gas equation of state"""
+        return self._eos
+
+    @property
+    def solid_melt_distribution_coefficient(self) -> float:
+        """Distribution coefficient between solid and melt"""
+        return self._solid_melt_distribution_coefficient
 
     def mass(
         self,
@@ -212,6 +185,7 @@ class GasSpecies(ChemicalSpecies):
         """
         planet: Planet = system.planet
         pressure: float = system.solution_dict()[self.name]
+        # TODO: Use Hill for convention
         fugacity: float = system.fugacities_dict[f"f{self.formula}"]
 
         # Atmosphere
@@ -246,7 +220,8 @@ class GasSpecies(ChemicalSpecies):
         if element is not None:
             try:
                 mass_scale_factor: float = (
-                    UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
+                    UnitConversion.g_to_kg(self.formula.composition()[element].mass)
+                    / self.molar_mass
                 )
             except KeyError:  # Element not in formula so mass is zero.
                 mass_scale_factor = 0
@@ -265,18 +240,6 @@ class CondensedSpecies(ChemicalSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-
-    Attributes:
-        formula: Chemical formula
-        phase: Phase
-        thermodata: The thermodynamic data for the species
-        atoms: Number of atoms
-        composition: Composition
-        hill_formula: Hill formula
-        is_homonuclear_diatomic: True if homonuclear diatomic, otherwise False
-        is_noble: True if a noble gas, otherwise False
-        molar_mass: Molar mass
-        activity: Activity, which is always ideal
     """
 
     @override
@@ -298,7 +261,11 @@ class CondensedSpecies(ChemicalSpecies):
         )
         # TODO: Want to allow an activity model to be specified as input, just like a real gas
         # EOS is specified for a gas species.
-        self.activity: Constraint = ActivityConstant(species=str(self.formula))
+        self._activity: Constraint = ActivityConstant(species=str(self.formula))
+
+    @property
+    def activity(self) -> Constraint:
+        return self._activity
 
     # def mass(self, system: InteriorAtmosphereSystem, *, element: Optional[str] = None) -> float:
     #     """Calculates the total mass of the species or element
@@ -314,7 +281,15 @@ class CondensedSpecies(ChemicalSpecies):
 
 
 class SolidSpecies(CondensedSpecies):
-    """Solid species"""
+    """A solid species
+
+    Args:
+        formula: Chemical formula (e.g., C, SiO2, etc.)
+        phase: Phase. Defaults to cr for solid.
+        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
+        thermodata_name: Name in the thermodynamic dataset. Defaults to None.
+        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
+    """
 
     @override
     def __init__(
@@ -336,7 +311,15 @@ class SolidSpecies(CondensedSpecies):
 
 
 class LiquidSpecies(CondensedSpecies):
-    """Liquid species"""
+    """A liquid species
+
+    Args:
+        formula: Chemical formula (e.g., C, SiO2, etc.)
+        phase: Phase. Defaults to l for liquid.
+        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
+        thermodata_name: Name in the thermodynamic dataset. Defaults to None.
+        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
+    """
 
     @override
     def __init__(
@@ -398,7 +381,7 @@ class Species(UserList):
     @property
     def gas_species_by_formula(self) -> dict[str, GasSpecies]:
         """Gas species by name"""
-        return {value.formula: value for value in self.gas_species.values()}
+        return {str(value.formula): value for value in self.gas_species.values()}
 
     @property
     def number_gas_species(self) -> int:
@@ -433,7 +416,7 @@ class Species(UserList):
     @property
     def formulas(self) -> list[str]:
         """Chemical formulas of the species"""
-        return [species.formula for species in self.data]
+        return [str(species.formula) for species in self.data]
 
     @property
     def names(self) -> list[str]:
@@ -460,7 +443,7 @@ class Species(UserList):
 
             for species in self.gas_species.values():
                 try:
-                    species.solubility = solubilities[species.formula]
+                    species.solubility = solubilities[str(species.formula)]
                     logger.info(
                         "Found solubility law for %s: %s",
                         species.formula,
@@ -480,7 +463,7 @@ class Species(UserList):
         for species_index, species in enumerate(self.data):
             for element_index, element in enumerate(self.elements):
                 try:
-                    count: int = species.composition()[element].count
+                    count: int = species.formula.composition()[element].count
                 except KeyError:
                     count = 0
                 matrix[species_index, element_index] = count

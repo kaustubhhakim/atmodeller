@@ -20,38 +20,12 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from atmodeller.core import ChemicalSpecies
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-class ChemicalSpeciesProtocol(Protocol):
-    """Chemical species protocol for obtaining thermodynamic data"""
-
-    @property
-    def formula(self) -> str:
-        """Chemical formula"""
-        raise NotImplementedError
-
-    @property
-    def hill_formula(self) -> str:
-        """Hill formula"""
-        raise NotImplementedError
-
-    @property
-    def is_homonuclear_diatomic(self) -> bool:
-        """True if the species is homonuclear diatomic, otherwise False"""
-        raise NotImplementedError
-
-    @property
-    def is_noble(self) -> bool:
-        """True if the species is a noble gas, otherwise False"""
-        raise NotImplementedError
-
-    @property
-    def phase(self) -> str:
-        """Must be g, cr, or l, for a gas, solid, or liquid phase, respectively"""
-        raise NotImplementedError
 
 
 class ThermodynamicDataForSpeciesProtocol(Protocol):
@@ -74,7 +48,7 @@ class ThermodynamicDataset(ABC):
 
     @abstractmethod
     def get_species_data(
-        self, species: ChemicalSpeciesProtocol, **kwargs
+        self, species: ChemicalSpecies, **kwargs
     ) -> ThermodynamicDataForSpeciesProtocol | None:
         """Gets the thermodynamic data for a species.
 
@@ -116,8 +90,8 @@ class ThermodynamicDataForSpeciesABC(ABC):
         data: Data used for thermodynamic calculations
     """
 
-    def __init__(self, species: ChemicalSpeciesProtocol, data_source: str, data: Any):
-        self.species: ChemicalSpeciesProtocol = species
+    def __init__(self, species: ChemicalSpecies, data_source: str, data: Any):
+        self.species: ChemicalSpecies = species
         self.data_source: str = data_source
         self.data: Any = data
 

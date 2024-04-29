@@ -20,12 +20,14 @@ from __future__ import annotations
 
 import logging
 import sys
+from typing import TYPE_CHECKING
 
+from molmass import Composition
 from scipy.constants import kilo
 from thermochem import janaf
 
+from atmodeller import NOBLE_GASES
 from atmodeller.thermodata.interfaces import (
-    ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesABC,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDataset,
@@ -36,7 +38,28 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
+if TYPE_CHECKING:
+    from atmodeller.core import ChemicalSpecies
+
+
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+def is_homonuclear_diatomic(species: ChemicalSpecies) -> bool:
+    """True if species is homonuclear diatomic, otherwise False."""
+    composition: Composition = species.formula.composition()
+    if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
+        return True
+    else:
+        return False
+
+
+def is_noble(species: ChemicalSpecies) -> bool:
+    """True if a species is a noble gas, otherwise False"""
+    if species.formula.formula in NOBLE_GASES:
+        return True
+    else:
+        return False
 
 
 class ThermodynamicDatasetJANAF(ThermodynamicDataset):
@@ -61,7 +84,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
     @override
     def get_species_data(
         self,
-        species: ChemicalSpeciesProtocol,
+        species: ChemicalSpecies,
         *,
         name: str | None = None,
         filename: str | None = None,
@@ -94,13 +117,13 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
                 logger.info(
                     "Searching for %s (formula=%s, name=%s, phase=%s) in %s",
                     species.formula,
-                    species.hill_formula,
+                    species.formula.formula,
                     name,
                     phases[0],
                     self.data_source,
                 )
                 phase_data = self.data.getphasedata(
-                    formula=species.hill_formula, name=name, phase=phases[0], cache=self.cache
+                    formula=species.formula.formula, name=name, phase=phases[0], cache=self.cache
                 )
             except ValueError:
                 # Cannot find the phase, so keep iterating through the list of options.
@@ -123,7 +146,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
 
         # Otherwise, find the phase data based on the phase (solid, liquid, gas).
         elif species.phase == "g":
-            if species.is_homonuclear_diatomic or species.is_noble:
+            if is_homonuclear_diatomic(species) or is_noble(species):
                 phase_data = get_phase_data(["ref", "g"])
             else:
                 phase_data = get_phase_data(["g"])
@@ -152,9 +175,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
         """Thermodynamic data for a species"""
 
         @override
-        def __init__(
-            self, species: ChemicalSpeciesProtocol, data_source: str, data: janaf.JanafPhase
-        ):
+        def __init__(self, species: ChemicalSpecies, data_source: str, data: janaf.JanafPhase):
             super().__init__(species, data_source, data)
 
         @override
