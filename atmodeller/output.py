@@ -75,13 +75,6 @@ class ReservoirOutputMoleFraction(ReservoirOutput):
         molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
         reservoir_mass: Mass of the reservoir in kg
         reservoir_moles: Total moles of the reservoir
-
-    Attributes:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
-        reservoir_mass: Mass of the mantle reservoir in kg
-        moles: Number of moles
-        ppmw: Parts-per-million by weight of the species relative to the reservoir
     """
 
     reservoir_moles: float
@@ -108,15 +101,6 @@ class AtmosphereReservoirOutput(ReservoirOutputMoleFraction):
         fugacity_coefficient: Fugacity coefficient
         pressure: Pressure in bar
         volume_mixing_ratio: Volume mixing ratio
-
-    Attributes:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
-        reservoir_mass: Mass of the mantle reservoir in kg
-        moles: Number of moles
-        ppmw: Parts-per-million by weight of the species relative to the reservoir
-        reservoir_moles: Total moles of the reservoir
-        ppm: Parts-per-million by moles of the species relative to the reservoir
     """
 
     fugacity: float

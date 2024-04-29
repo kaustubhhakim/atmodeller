@@ -48,14 +48,12 @@ class AxesSpec:
     Args:
         xylim: Tuple to set_xlim and set_ylim of axes
         ticks: Tick marks
-
-    Attributes:
-        xylim: Tuple to set_xlim and set_ylim of axes
-        ticks: Tick marks
     """
 
     xylim: tuple[float, float]
+    """Tuple to `set_xlim` and `set_ylim` of axes"""
     ticks: list[float]
+    """Tick marks"""
 
 
 class Category:
