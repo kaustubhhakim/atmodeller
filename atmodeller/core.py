@@ -97,6 +97,7 @@ class ChemicalSpecies:
 
     @property
     def hill_formula(self) -> str:
+        """Hill formula"""
         return self.formula.formula
 
     @property
