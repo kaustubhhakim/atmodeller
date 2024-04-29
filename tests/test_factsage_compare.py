@@ -25,14 +25,10 @@ import logging
 import pytest
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import (
-    FugacityConstraint,
-    IronWustiteBufferConstraintHirschmann,
-    MassConstraint,
-    SystemConstraints,
-)
+from atmodeller.constraints import FugacityConstraint, MassConstraint, SystemConstraints
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
@@ -67,7 +63,7 @@ def test_CHO_reduced(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBufferConstraintHirschmann(log10_shift=-2),
+            IronWustiteBuffer(log10_shift=-2),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -111,7 +107,7 @@ def test_CHO_IW(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBufferConstraintHirschmann(log10_shift=0.5),
+            IronWustiteBuffer(log10_shift=0.5),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -155,7 +151,7 @@ def test_CHO_oxidised(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBufferConstraintHirschmann(log10_shift=2),
+            IronWustiteBuffer(log10_shift=2),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -199,7 +195,7 @@ def test_CHO_highly_oxidised(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBufferConstraintHirschmann(log10_shift=4),
+            IronWustiteBuffer(log10_shift=4),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -240,7 +236,7 @@ def test_CHO_low_temperature(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
         ]
@@ -282,7 +278,7 @@ def test_graphite_half_condensed(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
             FugacityConstraint(species="H2", value=5.8),
             MassConstraint(species="C", value=c_kg),
         ]

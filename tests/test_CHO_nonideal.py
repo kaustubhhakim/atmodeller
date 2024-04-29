@@ -25,7 +25,6 @@ import logging
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
-    IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     PressureConstraint,
     SystemConstraints,
@@ -39,6 +38,7 @@ from atmodeller.solubility.hydrogen_species import (
     H2_basalt_hirschmann,
     H2O_peridotite_sossi,
 )
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -73,7 +73,7 @@ def test_pH2_fO2_holland() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             PressureConstraint(species="H2", value=1000),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -108,7 +108,7 @@ def test_fH2_fO2_holland() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(species="H2", value=1000),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -147,7 +147,7 @@ def test_H_and_C_holland() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(species="H2", value=958),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
             MassConstraint(species="C", value=c_kg),
         ]
     )

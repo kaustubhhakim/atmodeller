@@ -27,7 +27,6 @@ import pytest
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     FugacityConstraint,
-    IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraints,
     TotalPressureConstraint,
@@ -40,6 +39,7 @@ from atmodeller.solubility.hydrogen_species import (
     H2_basalt_hirschmann,
     H2O_peridotite_sossi,
 )
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -162,7 +162,7 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 
@@ -202,7 +202,7 @@ def test_SiHO_massH_logfO2_solubility() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 
@@ -241,7 +241,7 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             TotalPressureConstraint(value=4000),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 
@@ -279,7 +279,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(species="H2O", value=5000),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 

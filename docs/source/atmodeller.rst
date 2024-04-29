@@ -38,6 +38,14 @@ atmodeller.initial\_solution module
    :undoc-members:
    :show-inheritance:
 
+atmodeller.interfaces module
+----------------------------
+
+.. automodule:: atmodeller.interfaces
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.interior\_atmosphere module
 --------------------------------------
 

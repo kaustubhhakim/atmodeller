@@ -24,7 +24,6 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    IronWustiteBufferConstraintHirschmann,
     MassConstraint,
     SystemConstraints,
     TotalPressureConstraint,
@@ -34,6 +33,7 @@ from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Spe
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
@@ -69,9 +69,6 @@ def test_H2O() -> None:
     }
 
     system.solve(constraints)
-
-    system.output(to_excel=True)
-
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -93,7 +90,7 @@ def test_H_fO2() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -137,7 +134,7 @@ def test_H_fO2_holland() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -171,7 +168,7 @@ def test_H_basalt_melt() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -205,7 +202,7 @@ def test_H_fO2_plus() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(log10_shift=2),
+            IronWustiteBuffer(log10_shift=2),
         ]
     )
 
@@ -239,7 +236,7 @@ def test_H_fO2_minus() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(log10_shift=-2),
+            IronWustiteBuffer(log10_shift=-2),
         ]
     )
 
@@ -273,7 +270,7 @@ def test_H_five_oceans() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -307,7 +304,7 @@ def test_H_1500K() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -348,7 +345,7 @@ def test_H_and_C() -> None:
         [
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -389,7 +386,7 @@ def test_H_and_C_hill_formula() -> None:
         [
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -427,7 +424,7 @@ def test_H_and_C_total_pressure() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="H", value=h_kg),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
             TotalPressureConstraint(value=100),
         ]
     )

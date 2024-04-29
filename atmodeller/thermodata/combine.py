@@ -21,14 +21,13 @@ from __future__ import annotations
 import logging
 import sys
 
-from thermodata.janaf import ThermodynamicDatasetJANAF
-
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.interfaces import (
     ChemicalSpeciesProtocol,
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDataset,
 )
+from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -39,7 +38,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ThermodynamicDatasetCombined(ThermodynamicDataset):
-    """Combined thermodynamic data from multiple datasets.
+    """Combines thermodynamic data from multiple datasets.
 
     Args:
         datasets: A list of thermodynamic data to use. Defaults to Holland and Powell and JANAF.

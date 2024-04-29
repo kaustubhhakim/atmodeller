@@ -23,12 +23,7 @@ from __future__ import annotations
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import (
-    FugacityConstraint,
-    IronWustiteBufferConstraintHirschmann,
-    MassConstraint,
-    SystemConstraints,
-)
+from atmodeller.constraints import FugacityConstraint, MassConstraint, SystemConstraints
 from atmodeller.core import GasSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
@@ -42,6 +37,7 @@ from atmodeller.solubility.sulfur_species import (
     S2_sulfate_basalt_boulliung,
     S2_sulfide_basalt_boulliung,
 )
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
@@ -70,7 +66,7 @@ def test_S2_SO_Sulfide_IW() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(species="S2", value=S2_fugacity),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -104,7 +100,7 @@ def test_AllS_Sulfide_IW() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -139,7 +135,7 @@ def test_AllS_Sulfate_IW() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -174,7 +170,7 @@ def test_AllS_TotalSolubility_IW() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
-            IronWustiteBufferConstraintHirschmann(),
+            IronWustiteBuffer(),
         ]
     )
 
@@ -209,7 +205,7 @@ def test_AllS_TotalSolubility_IWp3() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
-            IronWustiteBufferConstraintHirschmann(log10_shift=3),
+            IronWustiteBuffer(log10_shift=3),
         ]
     )
 
@@ -244,7 +240,7 @@ def test_AllS_TotalSolubility_IWm3() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             MassConstraint(species="S", value=mass_S),
-            IronWustiteBufferConstraintHirschmann(log10_shift=-3),
+            IronWustiteBuffer(log10_shift=-3),
         ]
     )
 
@@ -284,7 +280,7 @@ def test_HOS_Species_IW() -> None:
         [
             MassConstraint(species="S", value=mass_S),
             MassConstraint(species="H", value=mass_H),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 
@@ -333,7 +329,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
             MassConstraint(species="H", value=mass_H),
             MassConstraint(species="C", value=mass_C),
             MassConstraint(species="N", value=mass_N),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 
@@ -377,7 +373,7 @@ def test_COS_Species_IW() -> None:
         [
             MassConstraint(species="S", value=mass_S),
             MassConstraint(species="C", value=mass_C),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 
@@ -423,7 +419,7 @@ def test_CHOS_Species_IW() -> None:
             MassConstraint(species="S", value=mass_S),
             MassConstraint(species="H", value=mass_H),
             MassConstraint(species="C", value=mass_C),
-            IronWustiteBufferConstraintHirschmann(log10_shift=0),
+            IronWustiteBuffer(log10_shift=0),
         ]
     )
 
