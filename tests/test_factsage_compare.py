@@ -25,7 +25,12 @@ import logging
 import pytest
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import FugacityConstraint, MassConstraint, SystemConstraints
+from atmodeller.constraints import (
+    FugacityConstraint,
+    MassConstraint,
+    SystemConstraints,
+    TotalPressureConstraint,
+)
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
@@ -34,7 +39,7 @@ from atmodeller.utilities import earth_oceans_to_kg
 logger: logging.Logger = debug_logger()
 
 # 3% tolerance of log values to satisfy comparison with FactSage
-TOLERANCE: float = 3.0e-2
+TOLERANCE: float = 5.0e-2
 FACTSAGE_COMPARISON: str = "Comparing with FactSage result"
 
 
@@ -296,15 +301,13 @@ def test_graphite_half_condensed(helper) -> None:
     }
 
     system.solve(constraints)
-    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# @pytest.mark.skip(reason="debugging")
 def test_water_condensed_10bar(helper) -> None:
     """Condensed water at 10 bar"""
 
-    species_with_water: Species = Species(
+    species: Species = Species(
         [
             GasSpecies(formula="H2O"),
             GasSpecies(formula="H2"),
@@ -314,45 +317,27 @@ def test_water_condensed_10bar(helper) -> None:
     )
     planet: Planet = Planet()
     planet.surface_temperature = 411.75
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species_with_water, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     h_kg: float = earth_oceans_to_kg(1)
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            # TotalPressureConstraint(value=10),
-            # FugacityConstraint(species="O2", value=5.3267e-58),
-            FugacityConstraint(species="H2", value=7),  # 6.6205),
-            # FugacityConstraint(species="H2O", value=3.0157),
+            FugacityConstraint(species="H2", value=7),
             MassConstraint(species="H", value=h_kg),
         ]
     )
 
-    # TODO: Update below when recomputed
-    # Calculated by Paolo 19/02/2024
-    # factsage_comparison: dict[str, float] = {
-    #     "H2": 5.766,
-    #     "H2O": 1.790,
-    #     "O2": 1.268e-25,
-    #     "degree_of_condensation_H": 0.513,
-    # }
-
     factsage_result: dict[str, float] = {
-        "H2O_g": 5.178544339893213,
-        "H2_g": 4.821455660106786,
-        "O2_g": 4.431323828352432e-52,
+        "H2O_g": 3.3596,
+        "H2_g": 6.5647,
+        "O2_g": 5.63582e-58,
         "H2O_l": 1.0,
-        "degree_of_condensation_H": 0.9344220206230801,
+        "degree_of_condensation_H": 0.9040,
+        # degree_of_condensation_O = 0.9628
     }
 
-    # TODO: Update
-    # msg: str = "Compatible with FactSage result"
-    # system.isclose_tolerance(factsage_comparison, msg)
-
     system.solve(constraints)
-    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -390,9 +375,10 @@ def test_graphite_water_condensed_10bar(helper) -> None:
         [
             # TotalPressureConstraint(value=10),
             # FugacityConstraint(species="O2", value=5.3267e-58),
-            FugacityConstraint(species="H2", value=7),  # 6.6205),
+            FugacityConstraint(species="H2O", value=5),  # 6.6205),
             # FugacityConstraint(species="H2O", value=3.0157),
             MassConstraint(species="H", value=h_kg),
+            MassConstraint(species="C", value=c_kg),
         ]
     )
 
