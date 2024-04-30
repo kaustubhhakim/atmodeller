@@ -324,7 +324,6 @@ def test_water_condensed_10bar(helper) -> None:
         [
             # TotalPressureConstraint(value=10),
             # FugacityConstraint(species="O2", value=5.3267e-58),
-            FugacityConstraint(species="H2", value=6.6205),
             FugacityConstraint(species="H2", value=7),  # 6.6205),
             # FugacityConstraint(species="H2O", value=3.0157),
             MassConstraint(species="H", value=h_kg),
