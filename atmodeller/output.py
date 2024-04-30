@@ -321,7 +321,7 @@ class Output(UserDict):
 
         # Create and add the output.
         for element, element_mass in mass.items():
-            logger.warning(element)
+            logger.info("Adding %s to output", element)
             formula: Formula = Formula(element)
             molar_mass: float = UnitConversion.g_to_kg(formula.mass)
             atmosphere: ReservoirOutput = ReservoirOutputMoleFraction(
@@ -349,12 +349,13 @@ class Output(UserDict):
             # TODO: Clean up this clunky exception logic for oxygen
             elif (
                 element == "O"
-                # add condition to check for H2O and only H2O with O?
+                # TODO: Add condition to check for H2O and only H2O with O?
                 and "O" not in interior_atmosphere.degree_of_condensation_elements
                 and "H" in interior_atmosphere.degree_of_condensation_elements
                 # Below assume only C and H2O can exist as condensed. Ugly.
                 and interior_atmosphere.species.number_condensed_species <= 2
             ):
+                logger.warning("Back-computing oxygen in condensed phase (H2O)")
                 degree_of_condensation_H: float = interior_atmosphere.solution_dict()[
                     "degree_of_condensation_H"
                 ]
@@ -362,9 +363,12 @@ class Output(UserDict):
                 doc_factor = degree_of_condensation_H / (1 - degree_of_condensation_H)
                 mass_H: float = mass["H"]["atmosphere"] + mass["H"]["melt"] + mass["H"]["solid"]
                 moles_H: float = doc_factor * mass_H / UnitConversion.g_to_kg(Formula("H").mass)
-                logger.warning("moles_H = %s", moles_H)
-                moles_O = moles_H / 2  # From stoichiometry of H2O
-                logger.warning("moles_O = %s", moles_O)
+                logger.warning("condensed_moles_H = %s", moles_H)
+                # From stoichiometry of H2O. This assumes that H2O is the only condensed phase
+                # involving H and O. Can then directly determine the number of moles of O that
+                # must also be present in the condensed phase (H2O).
+                moles_O = moles_H / 2
+                logger.warning("condensed_moles_O = %s", moles_O)
                 condensed_mass_O = moles_O * UnitConversion.g_to_kg(Formula("O").mass)
                 logger.warning("condensed_mass_O = %s", condensed_mass_O)
                 degree_of_condensation = condensed_mass_O

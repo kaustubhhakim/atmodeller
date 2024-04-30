@@ -401,13 +401,15 @@ def test_graphite_water_condensed_10bar(helper) -> None:
         "degree_of_condensation_H": 0.9099995423718071,
     }
 
-    # Start total pressure
+    # Start solution
     data_to_start = factsage_result_CH4
+    # Compare solution
     data_to_compare = factsage_result_CH4
 
     initial_solution = InitialSolutionDict(value=data_to_start, species=species)
 
     system.solve(constraints, initial_solution=initial_solution)
+    # system.output(to_excel=True)
     assert helper.isclose(system, data_to_compare, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
