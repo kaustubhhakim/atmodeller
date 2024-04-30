@@ -354,3 +354,65 @@ def test_water_condensed_10bar(helper) -> None:
     system.solve(constraints)
     system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+# @pytest.mark.skip(reason="debugging")
+def test_graphite_water_condensed_10bar(helper) -> None:
+    """Condensed water at 10 bar"""
+
+    species_with_water: Species = Species(
+        [
+            GasSpecies(formula="H2O"),
+            GasSpecies(formula="H2"),  # Very low abundance
+            GasSpecies(formula="O2"),
+            LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar"),
+            GasSpecies(formula="CO"),
+            GasSpecies(formula="CO2"),
+            GasSpecies(formula="CH4"),
+            SolidSpecies(formula="C"),
+        ]
+    )
+    planet: Planet = Planet()
+    planet.surface_temperature = 430
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species_with_water, planet=planet
+    )
+
+    # h_kg: float = earth_oceans_to_kg(1)
+
+    h_kg: float = 2e20 / 1000  # kg
+    c_kg: float = 1.1e21 / 1000  # kg
+    # Oxygen
+    o_kg: float = 1.144e21 / 1000  # kg
+
+    # Total pressure of 10 bar. FIXME: Need to manually tweak to get 10 bar
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            # TotalPressureConstraint(value=10),
+            # FugacityConstraint(species="O2", value=5.3267e-58),
+            FugacityConstraint(species="H2", value=7),  # 6.6205),
+            # FugacityConstraint(species="H2O", value=3.0157),
+            MassConstraint(species="H", value=h_kg),
+        ]
+    )
+
+    factsage_result: dict[str, float] = {
+        "H2O_g": 5.4383,
+        "H2_g": 0.00839,
+        "O2_g": 3.75e-49,
+        "H2O_l": 1.0,
+        "C_cr": 1.0,
+        "CH4_g": 4.21,
+        "CO2_g": 0.34,
+        "CO_g": 7.82e-7,
+        "degree_of_condensation_H": 0.5,
+        "degree_of_condensation_C": 0.82,
+    }
+
+    # TODO: Update
+    # msg: str = "Compatible with FactSage result"
+    # system.isclose_tolerance(factsage_comparison, msg)
+
+    system.solve(constraints)
+    system.output(to_excel=True)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
