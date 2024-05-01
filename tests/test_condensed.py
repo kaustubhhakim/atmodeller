@@ -21,8 +21,8 @@ import logging
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     ActivityConstraint,
+    ElementMassConstraint,
     FugacityConstraint,
-    MassConstraint,
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies
@@ -36,61 +36,27 @@ logger: logging.Logger = debug_logger()
 # logger.setLevel(logging.INFO)
 
 
-def get_water_system(temperature: float = 300) -> InteriorAtmosphereSystem:
-    """Gets an interior-atmosphere system with water as a condensed species.
-
-    Args:
-        temperature: Temperature in kelvin
-    """
-
-    # Below to use 1 bar data for water
-    # phase_data = db.getphasedata(filename="H-065")
-    # Below to use 10 bar data for water
-    # phase_data = db.getphasedata(filename="H-066")
-    # Below to use 100 bar for water
-    # phase_data = db.getphasedata(filename="H-067")
-
-    species_with_water: Species = Species(
-        [
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar"),
-        ]
-    )
-    planet: Planet = Planet()
-    planet.surface_temperature = temperature
-    interior_atmosphere_system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species_with_water, planet=planet
-    )
-
-    return interior_atmosphere_system
-
-
 def test_water_condensed_100bar() -> None:
     """Tests including condensed water."""
 
-    species_with_water: Species = Species(
-        [
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", thermodata_name="Water, 100 Bar"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 100 Bar")
+
+    species: Species = Species([H2O_g, H2_g, O2_g, H2O_l])
+
     planet: Planet = Planet()
     planet.surface_temperature = 550
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species_with_water, planet=planet
-    )
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     h_kg: float = earth_oceans_to_kg(2)
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(species="H2", value=53.71953115689841),
-            MassConstraint(species="H", value=h_kg),
-            ActivityConstraint(species="H2O", value=1),
+            FugacityConstraint(H2_g, value=53.71953115689841),
+            ElementMassConstraint("H", h_kg),
+            ActivityConstraint(H2O_l, 1),
         ]
     )
 
