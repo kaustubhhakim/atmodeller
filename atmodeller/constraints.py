@@ -154,9 +154,6 @@ class SystemConstraints(UserList):
     methods to filter constraints based on their types, such as activity, fugacity, mass
     conservation, pressure, and reaction network constraints.
 
-    Note that condensed species activity constraints are inherent to the species and are appended
-    to this list of user-prescribed constraints before the interior-atmosphere system is solved.
-
     Args:
         initlist: Initial list of constraints. Defaults to None.
 

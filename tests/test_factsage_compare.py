@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import logging
 
-import pytest
-
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     ActivityConstraint,
@@ -393,6 +391,7 @@ def test_graphite_water_condensed_10bar(helper) -> None:
     }
 
     # This is the solution when instead, the total pressure is fixed at 10 bar
+    # pylint: disable=unused-variable
     factsage_result_total_pressure: dict[str, float] = {
         "CH4_g": 0.6241604132666166,
         "CO2_g": 3.494658483175357,
