@@ -20,11 +20,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from atmodeller.core import _ChemicalSpecies
 
 
+@runtime_checkable
 class ConstraintProtocol(Protocol):
 
     @property
@@ -44,7 +45,27 @@ class SpeciesConstraintProtocol(ConstraintProtocol, Protocol):
     def species(self) -> _ChemicalSpecies: ...
 
 
-class ElementMassConstraintProtocol(ConstraintProtocol, Protocol):
+class ElementConstraintProtocol(ConstraintProtocol, Protocol):
 
     @property
     def element(self) -> str: ...
+
+
+class ActivityConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+    def activity(self, *args, **kwargs) -> float: ...
+
+
+class MassConstraintProtocol(ConstraintProtocol, Protocol):
+    def mass(self, *args, **kwargs) -> float: ...
+
+
+class FugacityConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+    def fugacity(self, *args, **kwargs) -> float: ...
+
+
+class PressureConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+    def pressure(self, *args, **kwargs) -> float: ...
+
+
+class TotalPressureConstraintProtocol(ConstraintProtocol, Protocol):
+    def total_pressure(self, *args, **kwargs) -> float: ...

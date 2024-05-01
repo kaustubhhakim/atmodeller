@@ -126,7 +126,6 @@ class GasSpecies(_ChemicalSpecies):
 
     Args:
         formula: Chemical formula (e.g. CO2, C, CH4, etc.)
-        phase: Phase. Defaults to g for gas.
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
@@ -143,14 +142,13 @@ class GasSpecies(_ChemicalSpecies):
     def __init__(
         self,
         formula: str,
-        phase="g",
         *,
         solid_melt_distribution_coefficient: float = 0,
         solubility: SolubilityProtocol = NoSolubility(),
         eos: RealGasProtocol = IdealGas(),
         **kwargs,
     ):
-        super().__init__(formula, phase, **kwargs)
+        super().__init__(formula, "g", **kwargs)
         self._solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
         self.solubility: SolubilityProtocol = solubility
         self._eos: RealGasProtocol = eos
@@ -266,7 +264,6 @@ class SolidSpecies(_CondensedSpecies):
 
     Args:
         formula: Chemical formula (e.g., C, SiO2, etc.)
-        phase: Phase. Defaults to cr for solid.
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
@@ -277,8 +274,8 @@ class SolidSpecies(_CondensedSpecies):
     """
 
     @override
-    def __init__(self, formula: str, phase: str = "cr", **kwargs):
-        super().__init__(formula, phase, **kwargs)
+    def __init__(self, formula: str, **kwargs):
+        super().__init__(formula, "cr", **kwargs)
 
 
 class LiquidSpecies(_CondensedSpecies):
@@ -286,7 +283,6 @@ class LiquidSpecies(_CondensedSpecies):
 
     Args:
         formula: Chemical formula (e.g., C, SiO2, etc.)
-        phase: Phase. Defaults to l for liquid.
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
@@ -297,8 +293,8 @@ class LiquidSpecies(_CondensedSpecies):
     """
 
     @override
-    def __init__(self, formula: str, phase: str = "l", **kwargs):
-        super().__init__(formula, phase, **kwargs)
+    def __init__(self, formula: str, **kwargs):
+        super().__init__(formula, "l", **kwargs)
 
 
 class Species(UserList):

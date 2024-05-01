@@ -51,7 +51,7 @@ def test_version():
 def test_H2O() -> None:
     """Tests H2O (a single species)"""
 
-    H2O_g: GasSpecies = GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi())
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
 
     species: Species = Species([H2O_g])
 
@@ -61,7 +61,7 @@ def test_H2O() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
+            ElementMassConstraint("H", h_kg),
         ]
     )
 
@@ -78,9 +78,9 @@ def test_H2O() -> None:
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    H2O_g: GasSpecies = GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi())
-    H2_g: GasSpecies = GasSpecies(formula="H2")
-    O2_g: GasSpecies = GasSpecies(formula="O2")
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
 
     species: Species = Species([H2O_g, H2_g, O2_g])
 
@@ -90,8 +90,8 @@ def test_H_fO2() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            BufferedFugacityConstraint(species=O2_g, value=IronWustiteBuffer()),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -110,23 +110,21 @@ def test_H_fO2() -> None:
 def test_H_fO2_holland() -> None:
     """Tests H2-H2O at the IW buffer using thermodynamic data from Holland and Powell"""
 
-    species: Species = Species(
-        [
-            GasSpecies(
-                formula="H2O",
-                solubility=H2O_peridotite_sossi(),
-                thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
-            ),
-            GasSpecies(
-                formula="H2",
-                thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
-            ),
-            GasSpecies(
-                formula="O2",
-                thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
-            ),
-        ]
+    H2O_g: GasSpecies = GasSpecies(
+        "H2O",
+        solubility=H2O_peridotite_sossi(),
+        thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
     )
+    H2_g: GasSpecies = GasSpecies(
+        "H2",
+        thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
+    )
+    O2_g: GasSpecies = GasSpecies(
+        "O2",
+        thermodata_dataset=ThermodynamicDatasetHollandAndPowell(),
+    )
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -134,8 +132,8 @@ def test_H_fO2_holland() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            IronWustiteBuffer(),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -154,13 +152,11 @@ def test_H_fO2_holland() -> None:
 def test_H_basalt_melt() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
     planet: Planet = Planet(melt_composition="basalt")
@@ -168,8 +164,8 @@ def test_H_basalt_melt() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            IronWustiteBuffer(),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -188,13 +184,11 @@ def test_H_basalt_melt() -> None:
 def test_H_fO2_plus() -> None:
     """Tests H2-H2O at the IW buffer+2."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -202,8 +196,8 @@ def test_H_fO2_plus() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            IronWustiteBuffer(log10_shift=2),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=2)),
         ]
     )
 
@@ -222,13 +216,11 @@ def test_H_fO2_plus() -> None:
 def test_H_fO2_minus() -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -236,8 +228,8 @@ def test_H_fO2_minus() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            IronWustiteBuffer(log10_shift=-2),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=-2)),
         ]
     )
 
@@ -256,13 +248,11 @@ def test_H_fO2_minus() -> None:
 def test_H_five_oceans() -> None:
     """Tests H2-H2O for five H oceans."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 5
     planet: Planet = Planet()
@@ -270,8 +260,8 @@ def test_H_five_oceans() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            IronWustiteBuffer(),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -290,13 +280,11 @@ def test_H_five_oceans() -> None:
 def test_H_1500K() -> None:
     """Tests H2-H2O at a different temperature."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -304,8 +292,8 @@ def test_H_1500K() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            IronWustiteBuffer(),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -326,15 +314,13 @@ def test_H_1500K() -> None:
 def test_H_and_C() -> None:
     """Tests H2-H2O and CO-CO2."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon()),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2", solubility=CO2_basalt_dixon())
+
+    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
 
     oceans: float = 1
     ch_ratio: float = 1
@@ -344,9 +330,9 @@ def test_H_and_C() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint(element="H", value=h_kg),
-            ElementMassConstraint(element="C", value=c_kg),
-            IronWustiteBuffer(),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -367,15 +353,13 @@ def test_H_and_C() -> None:
 def test_H_and_C_hill_formula() -> None:
     """Tests H2-H2O and CO-CO2 by changing the order of the chemical formulae for the species"""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="OH2", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="OC"),
-            GasSpecies(formula="O2C", solubility=CO2_basalt_dixon()),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("OH2", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    CO_g: GasSpecies = GasSpecies("OC")
+    CO2_g: GasSpecies = GasSpecies("O2C", solubility=CO2_basalt_dixon())
+
+    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
 
     oceans: float = 1
     ch_ratio: float = 1
@@ -387,7 +371,7 @@ def test_H_and_C_hill_formula() -> None:
         [
             ElementMassConstraint(element="H", value=h_kg),
             ElementMassConstraint(element="C", value=c_kg),
-            IronWustiteBuffer(),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -408,15 +392,13 @@ def test_H_and_C_hill_formula() -> None:
 def test_H_and_C_total_pressure() -> None:
     """Tests H2-H2O and CO-CO2 with a total pressure constraint."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon()),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2", solubility=CO2_basalt_dixon())
+
+    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -425,7 +407,7 @@ def test_H_and_C_total_pressure() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             ElementMassConstraint(element="H", value=h_kg),
-            IronWustiteBuffer(),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
             TotalPressureConstraint(value=100),
         ]
     )

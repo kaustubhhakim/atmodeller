@@ -25,8 +25,9 @@ import logging
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     ActivityConstraint,
+    BufferedFugacityConstraint,
+    ElementMassConstraint,
     FugacityConstraint,
-    MassConstraint,
     SystemConstraints,
     TotalPressureConstraint,
 )
@@ -49,14 +50,15 @@ def test_CHO_reduced(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 1}`
     """
 
-    H2_g: GasSpecies = GasSpecies(formula="H2")
-    H2O_g: GasSpecies = GasSpecies(formula="H2O")
-    CO_g: GasSpecies = GasSpecies(formula="CO")
-    CO2_g: GasSpecies = GasSpecies(formula="CO2")
-    CH4_g: GasSpecies = GasSpecies(formula="CH4")
-    O2_g: GasSpecies = GasSpecies(formula="O2")
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    O2_g: GasSpecies = GasSpecies("O2")
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+
     planet: Planet = Planet()
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -66,9 +68,9 @@ def test_CHO_reduced(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBuffer(log10_shift=-2),
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=-2)),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
         ]
     )
 
@@ -91,16 +93,15 @@ def test_CHO_IW(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+
     planet: Planet = Planet()
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -110,9 +111,9 @@ def test_CHO_IW(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBuffer(log10_shift=0.5),
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=0.5)),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
         ]
     )
 
@@ -135,16 +136,15 @@ def test_CHO_oxidised(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 3}`
     """
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+
     planet: Planet = Planet()
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -154,9 +154,9 @@ def test_CHO_oxidised(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBuffer(log10_shift=2),
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=2)),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
         ]
     )
 
@@ -179,16 +179,15 @@ def test_CHO_highly_oxidised(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 4}`
     """
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+
     planet: Planet = Planet()
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -198,9 +197,9 @@ def test_CHO_highly_oxidised(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBuffer(log10_shift=4),
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=4)),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
         ]
     )
 
@@ -220,16 +219,15 @@ def test_CHO_highly_oxidised(helper) -> None:
 def test_CHO_low_temperature(helper) -> None:
     """C-H-O system at 873 K"""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+
     planet: Planet = Planet()
     planet.surface_temperature = 873
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -239,9 +237,9 @@ def test_CHO_low_temperature(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBuffer(),
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
         ]
     )
 
@@ -261,17 +259,16 @@ def test_CHO_low_temperature(helper) -> None:
 def test_graphite_half_condensed(helper) -> None:
     """Graphite with 50% condensed C mass fraction"""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
-            GasSpecies(formula="O2"),
-            SolidSpecies(formula="C"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    O2_g: GasSpecies = GasSpecies("O2")
+    C_cr: SolidSpecies = SolidSpecies("C")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g, C_cr])
+
     planet: Planet = Planet()
     planet.surface_temperature = 873
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -281,10 +278,10 @@ def test_graphite_half_condensed(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            IronWustiteBuffer(),
-            FugacityConstraint(species="H2", value=5.8),
-            MassConstraint(species="C", value=c_kg),
-            ActivityConstraint(species="C", value=1),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            FugacityConstraint(H2_g, 5.8),
+            ElementMassConstraint("C", c_kg),
+            ActivityConstraint(C_cr, 1),
         ]
     )
 
@@ -306,14 +303,13 @@ def test_graphite_half_condensed(helper) -> None:
 def test_water_condensed_10bar(helper) -> None:
     """Condensed water at 10 bar"""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, H2O_l])
+
     planet: Planet = Planet()
     planet.surface_temperature = 411.75
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -322,9 +318,9 @@ def test_water_condensed_10bar(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(species="H2", value=7),
-            MassConstraint(species="H", value=h_kg),
-            ActivityConstraint(species="H2O", value=1),
+            FugacityConstraint(H2_g, value=7),
+            ElementMassConstraint("H", h_kg),
+            ActivityConstraint(H2O_l, 1),
         ]
     )
 
@@ -344,18 +340,17 @@ def test_water_condensed_10bar(helper) -> None:
 def test_graphite_water_condensed_10bar(helper) -> None:
     """Graphite and condensed water at 10 bar"""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-            LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
-            SolidSpecies(formula="C"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies(formula="H2")
+    O2_g: GasSpecies = GasSpecies(formula="O2")
+    H2O_l: LiquidSpecies = LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar")
+    CO_g: GasSpecies = GasSpecies(formula="CO")
+    CO2_g: GasSpecies = GasSpecies(formula="CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    C_cr: SolidSpecies = SolidSpecies("C")
+
+    species: Species = Species([H2O_g, H2_g, O2_g, H2O_l, CO_g, CO2_g, CH4_g, C_cr])
+
     planet: Planet = Planet()
     planet.surface_temperature = 460
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
@@ -365,12 +360,12 @@ def test_graphite_water_condensed_10bar(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            # FugacityConstraint(species="CH4", value=3.428705),
-            TotalPressureConstraint(value=10),
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
-            ActivityConstraint(species="H2O", value=1),
-            ActivityConstraint(species="C", value=1),
+            # FugacityConstraint(CH4_g, 3.428705),
+            TotalPressureConstraint(10),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
+            ActivityConstraint(H2O_l, 1),
+            ActivityConstraint(C_cr, 1),
         ]
     )
 

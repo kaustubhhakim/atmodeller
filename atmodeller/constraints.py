@@ -28,9 +28,13 @@ import numpy as np
 
 from atmodeller.core import _ChemicalSpecies
 from atmodeller.interfaces import (
+    ActivityConstraintProtocol,
     ConstraintProtocol,
-    ElementMassConstraintProtocol,
+    ElementConstraintProtocol,
+    FugacityConstraintProtocol,
+    PressureConstraintProtocol,
     SpeciesConstraintProtocol,
+    TotalPressureConstraintProtocol,
 )
 from atmodeller.thermodata.redox_buffers import _RedoxBuffer
 
@@ -44,7 +48,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class ElementMassConstraint(ElementMassConstraintProtocol):
+class ElementMassConstraint(ElementConstraintProtocol):
     """An element mass constraint
 
     Args:
@@ -179,6 +183,9 @@ class ActivityConstraint(_SpeciesConstantConstraint):
     def __init__(self, species: _ChemicalSpecies, value: float = 1, constraint: str = "activity"):
         super().__init__(species, value, constraint)
 
+    def activity(self, *args, **kwargs) -> float:
+        return self.get_value(*args, **kwargs)
+
 
 class FugacityConstraint(_SpeciesConstantConstraint):
     """A constant fugacity constraint
@@ -190,6 +197,9 @@ class FugacityConstraint(_SpeciesConstantConstraint):
 
     def __init__(self, species: _ChemicalSpecies, value: float, constraint: str = "fugacity"):
         super().__init__(species, value, constraint)
+
+    def fugacity(self, *args, **kwargs) -> float:
+        return self.get_value(*args, **kwargs)
 
 
 class BufferedFugacityConstraint(_SpeciesConstraint):
@@ -210,6 +220,9 @@ class BufferedFugacityConstraint(_SpeciesConstraint):
     def get_value(self, *args, **kwargs) -> float:
         return self._value.get_value(*args, **kwargs)
 
+    def fugacity(self, *args, **kwargs) -> float:
+        return self.get_value(*args, **kwargs)
+
 
 class MassConstraint(_SpeciesConstantConstraint):
     """A constant mass constraint
@@ -222,6 +235,9 @@ class MassConstraint(_SpeciesConstantConstraint):
     def __init__(self, species: _ChemicalSpecies, value: float, constraint: str = "mass"):
         super().__init__(species, value, constraint)
 
+    def mass(self, *args, **kwargs) -> float:
+        return self.get_value(*args, **kwargs)
+
 
 class PressureConstraint(_SpeciesConstantConstraint):
     """A constant pressure constraint
@@ -233,6 +249,9 @@ class PressureConstraint(_SpeciesConstantConstraint):
 
     def __init__(self, species: _ChemicalSpecies, value: float, constraint: str = "pressure"):
         super().__init__(species, value, constraint)
+
+    def pressure(self, *args, **kwargs) -> float:
+        return self.get_value(*args, **kwargs)
 
 
 class TotalPressureConstraint(ConstraintProtocol):
@@ -264,6 +283,9 @@ class TotalPressureConstraint(ConstraintProtocol):
     def get_log10_value(self, *args, **kwargs) -> float:
         return np.log10(self.get_value(*args, **kwargs))
 
+    def total_pressure(self, *args, **kwargs) -> float:
+        return self.get_value(*args, **kwargs)
+
 
 class SystemConstraints(UserList):
     """A collection of constraints
@@ -283,16 +305,14 @@ class SystemConstraints(UserList):
         super().__init__(initlist)
 
     @property
-    def activity_constraints(self) -> list[ActivityConstraint]:
+    def activity_constraints(self) -> list[ActivityConstraintProtocol]:
         """Constraints related to activity"""
-        return self._filter_by_name(ActivityConstraint)
+        return self._filter_by_name(ActivityConstraintProtocol)
 
     @property
-    def fugacity_constraints(self) -> list[FugacityConstraint]:
+    def fugacity_constraints(self) -> list[FugacityConstraintProtocol]:
         """Constraints related to fugacity"""
-        out = self._filter_by_name(FugacityConstraint)
-        out.extend(self._filter_by_name(BufferedFugacityConstraint))
-        # out = self._filter_by_name(Fugacity)
+        out = self._filter_by_name(FugacityConstraintProtocol)
 
         return out
 
@@ -304,15 +324,15 @@ class SystemConstraints(UserList):
         return self._filter_by_name(ElementMassConstraint)
 
     @property
-    def pressure_constraints(self) -> list[PressureConstraint]:
+    def pressure_constraints(self) -> list[PressureConstraintProtocol]:
         """Constraints related to pressure"""
-        return self._filter_by_name(PressureConstraint)
+        return self._filter_by_name(PressureConstraintProtocol)
 
     @property
-    def total_pressure_constraint(self) -> list[TotalPressureConstraint]:
+    def total_pressure_constraint(self) -> list[TotalPressureConstraintProtocol]:
         """Total pressure constraint"""
-        total_pressure: list[TotalPressureConstraint] = self._filter_by_name(
-            TotalPressureConstraint
+        total_pressure: list[TotalPressureConstraintProtocol] = self._filter_by_name(
+            TotalPressureConstraintProtocol
         )
         if len(total_pressure) > 1:
             msg: str = "You can only specify a maximum of one total pressure constraint"

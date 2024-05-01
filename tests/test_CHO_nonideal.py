@@ -24,8 +24,9 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    BufferedFugacityConstraint,
+    ElementMassConstraint,
     FugacityConstraint,
-    MassConstraint,
     PressureConstraint,
     SystemConstraints,
 )
@@ -60,20 +61,20 @@ def test_pH2_fO2_holland() -> None:
     Applies a constraint to the partial pressure of H2.
     """
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]),
-            GasSpecies(formula="H2", eos=eos_holland["H2"]),
-            GasSpecies(formula="O2"),
-        ]
+    H2O_g: GasSpecies = GasSpecies(
+        "H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]
     )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_holland["H2"])
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     planet: Planet = Planet()
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            PressureConstraint(species="H2", value=1000),
-            IronWustiteBuffer(),
+            PressureConstraint(H2_g, value=1000),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -95,20 +96,20 @@ def test_fH2_fO2_holland() -> None:
     Applies a constraint to the fugacity of H2.
     """
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]),
-            GasSpecies(formula="H2", eos=eos_holland["H2"]),
-            GasSpecies(formula="O2"),
-        ]
+    H2O_g: GasSpecies = GasSpecies(
+        "H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]
     )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_holland["H2"])
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     planet: Planet = Planet()
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(species="H2", value=1000),
-            IronWustiteBuffer(),
+            FugacityConstraint(H2_g, value=1000),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -127,16 +128,18 @@ def test_fH2_fO2_holland() -> None:
 def test_H_and_C_holland() -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", solubility=H2_basalt_hirschmann(), eos=eos_holland["H2"]),
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="CO", eos=eos_holland["CO"]),
-            GasSpecies(formula="CO2", solubility=CO2_basalt_dixon(), eos=eos_holland["CO2"]),
-            GasSpecies(formula="CH4", eos=eos_holland["CH4"]),
-        ]
+    H2_g: GasSpecies = GasSpecies("H2", solubility=H2_basalt_hirschmann(), eos=eos_holland["H2"])
+    H2O_g: GasSpecies = GasSpecies(
+        "H2O", solubility=H2O_peridotite_sossi(), eos=eos_holland["H2O"]
     )
+    O2_g: GasSpecies = GasSpecies("O2")
+    CO_g: GasSpecies = GasSpecies(formula="CO", eos=eos_holland["CO"])
+    CO2_g: GasSpecies = GasSpecies(
+        formula="CO2", solubility=CO2_basalt_dixon(), eos=eos_holland["CO2"]
+    )
+    CH4_g: GasSpecies = GasSpecies(formula="CH4", eos=eos_holland["CH4"])
+
+    species: Species = Species([H2_g, H2O_g, O2_g, CO_g, CO2_g, CH4_g])
 
     oceans: float = 10
     planet: Planet = Planet()
@@ -146,9 +149,9 @@ def test_H_and_C_holland() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(species="H2", value=958),
-            IronWustiteBuffer(),
-            MassConstraint(species="C", value=c_kg),
+            FugacityConstraint(H2_g, value=958),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            ElementMassConstraint("C", value=c_kg),
         ]
     )
 
