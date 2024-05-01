@@ -646,7 +646,8 @@ class InteriorAtmosphereSystem:
             **options: Keyword arguments for solver options. Available keywords depend on method.
         """
         logger.info("Solving system number %d", self.number_of_solves)
-        self.set_constraints(constraints)
+
+        self._constraints = constraints
 
         if self.degree_of_condensation_number > 0:
             logger.info("Solving for condensed species and mass constraints")
@@ -734,19 +735,6 @@ class InteriorAtmosphereSystem:
                 logger.warning(msg)
                 logger.warning("constraints = %s", self.constraints)
                 logger.warning("Continuing with next solve")
-
-    def set_constraints(self, constraints: SystemConstraints) -> None:
-        """Combines user-prescribed constraints with activity constraints.
-
-        Args;
-            constraints: Constraints for the system of equations
-        """
-        logger.debug("Set constraints")
-        self._constraints = constraints
-
-        for condensed_species in self.species.condensed_species.values():
-            self._constraints.append(condensed_species.activity)
-        logger.debug("Constraints: %s", pprint.pformat(self._constraints))
 
     def _objective_func(
         self,

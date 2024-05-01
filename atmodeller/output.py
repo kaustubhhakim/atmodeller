@@ -270,7 +270,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         for species in interior_atmosphere.species.condensed_species.values():
-            activity: float = species.activity.get_value(
+            activity: float = species.activity.activity(
                 temperature=interior_atmosphere.planet.surface_temperature,
                 pressure=interior_atmosphere.total_pressure,
             )

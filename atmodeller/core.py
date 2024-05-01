@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Mapping, Optional
 import numpy as np
 from molmass import Formula
 
-from atmodeller.constraints import ActivityConstant, Constraint
+from atmodeller.activity.interfaces import ActivityProtocol, ConstantActivity
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
@@ -145,20 +145,12 @@ class GasSpecies(_ChemicalSpecies):
         formula: str,
         phase="g",
         *,
-        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
-        thermodata_name: str | None = None,
-        thermodata_filename: str | None = None,
         solid_melt_distribution_coefficient: float = 0,
         solubility: SolubilityProtocol = NoSolubility(),
         eos: RealGasProtocol = IdealGas(),
+        **kwargs,
     ):
-        super().__init__(
-            formula,
-            phase,
-            thermodata_dataset=thermodata_dataset,
-            thermodata_name=thermodata_name,
-            thermodata_filename=thermodata_filename,
-        )
+        super().__init__(formula, phase, **kwargs)
         self._solid_melt_distribution_coefficient: float = solid_melt_distribution_coefficient
         self.solubility: SolubilityProtocol = solubility
         self._eos: RealGasProtocol = eos
@@ -245,6 +237,10 @@ class _CondensedSpecies(_ChemicalSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
+        activity: Activity model. Defaults to unity for a pure component.
+
+    Attributes:
+        activity: Activity model
     """
 
     @override
@@ -253,36 +249,16 @@ class _CondensedSpecies(_ChemicalSpecies):
         formula: str,
         phase: str,
         *,
-        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
-        thermodata_name: str | None = None,
-        thermodata_filename: str | None = None,
+        activity: ActivityProtocol = ConstantActivity(),
+        **kwargs,
     ):
-        super().__init__(
-            formula,
-            phase,
-            thermodata_dataset=thermodata_dataset,
-            thermodata_name=thermodata_name,
-            thermodata_filename=thermodata_filename,
-        )
-        # TODO: Want to allow an activity model to be specified as input, just like a real gas
-        # EOS is specified for a gas species.
-        self._activity: Constraint = ActivityConstant(species=str(self.formula))
+        super().__init__(formula, phase, **kwargs)
+        self._activity: ActivityProtocol = activity
 
     @property
-    def activity(self) -> Constraint:
+    def activity(self) -> ActivityProtocol:
+        """An activity model"""
         return self._activity
-
-    # def mass(self, system: InteriorAtmosphereSystem, *, element: Optional[str] = None) -> float:
-    #     """Calculates the total mass of the species or element
-
-    #     Args:
-    #         system: Interior atmosphere system
-    #         element: Returns the mass for an element. Defaults to None to return the species mass
-
-    #     Returns:
-    #         Total mass of the species or element
-    #     """
-    #     planet: Planet = system.planet
 
 
 class SolidSpecies(_CondensedSpecies):
@@ -294,25 +270,15 @@ class SolidSpecies(_CondensedSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
+        activity: Activity model. Defaults to unity for a pure component.
+
+    Attributes:
+        activity: Activity model
     """
 
     @override
-    def __init__(
-        self,
-        formula: str,
-        phase: str = "cr",
-        *,
-        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
-        thermodata_name: str | None = None,
-        thermodata_filename: str | None = None,
-    ):
-        super().__init__(
-            formula,
-            phase,
-            thermodata_dataset=thermodata_dataset,
-            thermodata_name=thermodata_name,
-            thermodata_filename=thermodata_filename,
-        )
+    def __init__(self, formula: str, phase: str = "cr", **kwargs):
+        super().__init__(formula, phase, **kwargs)
 
 
 class LiquidSpecies(_CondensedSpecies):
@@ -324,25 +290,15 @@ class LiquidSpecies(_CondensedSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
+        activity: Activity model. Defaults to unity for a pure component.
+
+    Attributes:
+        activity: Activity model
     """
 
     @override
-    def __init__(
-        self,
-        formula: str,
-        phase: str = "l",
-        *,
-        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
-        thermodata_name: str | None = None,
-        thermodata_filename: str | None = None,
-    ):
-        super().__init__(
-            formula,
-            phase,
-            thermodata_dataset=thermodata_dataset,
-            thermodata_name=thermodata_name,
-            thermodata_filename=thermodata_filename,
-        )
+    def __init__(self, formula: str, phase: str = "l", **kwargs):
+        super().__init__(formula, phase, **kwargs)
 
 
 class Species(UserList):

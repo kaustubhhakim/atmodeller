@@ -26,6 +26,7 @@ import pytest
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    ActivityConstraint,
     FugacityConstraint,
     MassConstraint,
     SystemConstraints,
@@ -80,6 +81,7 @@ def test_SiHO_massSiH_nosolubility() -> None:
         [
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="Si", value=si_kg),
+            ActivityConstraint(species="SiO2", value=1),
         ]
     )
 
@@ -123,6 +125,7 @@ def test_SiHO_massSiH_solubility() -> None:
         [
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="Si", value=si_kg),
+            ActivityConstraint(species="SiO2", value=1),
         ]
     )
 
@@ -163,6 +166,7 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
         [
             MassConstraint(species="H", value=h_kg),
             IronWustiteBuffer(log10_shift=0),
+            ActivityConstraint(species="SiO2", value=1),
         ]
     )
 
@@ -203,6 +207,7 @@ def test_SiHO_massH_logfO2_solubility() -> None:
         [
             MassConstraint(species="H", value=h_kg),
             IronWustiteBuffer(log10_shift=0),
+            ActivityConstraint(species="SiO2", value=1),
         ]
     )
 
@@ -242,6 +247,7 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
         [
             TotalPressureConstraint(value=4000),
             IronWustiteBuffer(log10_shift=0),
+            ActivityConstraint(species="SiO2", value=1),
         ]
     )
 
@@ -280,6 +286,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
         [
             FugacityConstraint(species="H2O", value=5000),
             IronWustiteBuffer(log10_shift=0),
+            ActivityConstraint(species="SiO2", value=1),
         ]
     )
 
@@ -299,6 +306,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
 
 
 if __name__ == "__main__":
+
     test_SiHO_massSiH_nosolubility()
     test_SiHO_massSiH_solubility()
     test_SiHO_massH_logfO2_nosolubility()

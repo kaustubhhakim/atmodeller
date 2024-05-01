@@ -103,7 +103,7 @@ class ConstantConstraint(Constraint):
 
 
 @dataclass(kw_only=True, frozen=True)
-class ActivityConstant(ConstantConstraint):
+class ActivityConstraint(ConstantConstraint):
     """A constant activity
 
     Args:

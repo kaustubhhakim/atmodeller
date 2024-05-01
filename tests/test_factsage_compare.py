@@ -26,6 +26,7 @@ import pytest
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    ActivityConstraint,
     FugacityConstraint,
     MassConstraint,
     SystemConstraints,
@@ -287,6 +288,7 @@ def test_graphite_half_condensed(helper) -> None:
             IronWustiteBuffer(),
             FugacityConstraint(species="H2", value=5.8),
             MassConstraint(species="C", value=c_kg),
+            ActivityConstraint(species="C", value=1),
         ]
     )
 
@@ -326,6 +328,7 @@ def test_water_condensed_10bar(helper) -> None:
         [
             FugacityConstraint(species="H2", value=7),
             MassConstraint(species="H", value=h_kg),
+            ActivityConstraint(species="H2O", value=1),
         ]
     )
 
@@ -370,6 +373,8 @@ def test_graphite_water_condensed_10bar(helper) -> None:
             TotalPressureConstraint(value=10),
             MassConstraint(species="H", value=h_kg),
             MassConstraint(species="C", value=c_kg),
+            ActivityConstraint(species="H2O", value=1),
+            ActivityConstraint(species="C", value=1),
         ]
     )
 
@@ -467,7 +472,6 @@ def test_graphite_water_condensed_10bar(helper) -> None:
 #         "degree_of_condensation_C": 0.82,
 #     }
 
-#     # TODO: Update
 #     # msg: str = "Compatible with FactSage result"
 #     # system.isclose_tolerance(factsage_comparison, msg)
 

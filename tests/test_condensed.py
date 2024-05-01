@@ -19,7 +19,12 @@
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import FugacityConstraint, MassConstraint, SystemConstraints
+from atmodeller.constraints import (
+    ActivityConstraint,
+    FugacityConstraint,
+    MassConstraint,
+    SystemConstraints,
+)
 from atmodeller.core import GasSpecies, LiquidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.utilities import earth_oceans_to_kg
@@ -85,6 +90,7 @@ def test_water_condensed_100bar() -> None:
         [
             FugacityConstraint(species="H2", value=53.71953115689841),
             MassConstraint(species="H", value=h_kg),
+            ActivityConstraint(species="H2O", value=1),
         ]
     )
 
