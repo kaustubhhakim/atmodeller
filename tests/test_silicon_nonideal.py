@@ -27,8 +27,9 @@ import pytest
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     ActivityConstraint,
+    BufferedFugacityConstraint,
+    ElementMassConstraint,
     FugacityConstraint,
-    MassConstraint,
     SystemConstraints,
     TotalPressureConstraint,
 )
@@ -60,16 +61,14 @@ def test_version():
 def test_SiHO_massSiH_nosolubility() -> None:
     """Tests H2-H2O and SiO-SiH4."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", eos=eos_models["H2"]),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="OSi"),
-            GasSpecies(formula="H4Si"),
-            LiquidSpecies(formula="SiO2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_models["H2"])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    OSi_g: GasSpecies = GasSpecies("OSi")
+    H4Si_g: GasSpecies = GasSpecies("H4Si")
+    SiO2_l: LiquidSpecies = LiquidSpecies("SiO2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, OSi_g, H4Si_g, SiO2_l])
 
     oceans: float = 50
     sih_ratio: float = 1
@@ -79,21 +78,21 @@ def test_SiHO_massSiH_nosolubility() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="Si", value=si_kg),
-            ActivityConstraint(species="SiO2", value=1),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("Si", si_kg),
+            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2": 3955.5461365393257,
-        "H2O": 238.6969674984362,
-        "O2": 8.041858631374242e-05,
-        "OSi": 297.7208780281457,
-        "H4Si": 3.8854445389482284,
-        "SiO2": 1.0,
+        "H2_g": 3955.5461365393257,
+        "H2O_g": 238.6969674984362,
+        "O2_g": 8.041858631374242e-05,
+        "OSi_g": 297.7208780281457,
+        "H4Si_g": 3.8854445389482284,
+        "SiO2_l": 1.0,
     }
 
     system.solve(SystemConstraints(constraints))
@@ -104,16 +103,14 @@ def test_SiHO_massSiH_nosolubility() -> None:
 def test_SiHO_massSiH_solubility() -> None:
     """Tests H2-H2O and SiO-SiH4."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", eos=eos_models["H2"], solubility=H2_basalt_hirschmann()),
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="OSi"),
-            GasSpecies(formula="H4Si"),
-            LiquidSpecies(formula="SiO2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_models["H2"], solubility=H2_basalt_hirschmann())
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    O2_g: GasSpecies = GasSpecies("O2")
+    OSi_g: GasSpecies = GasSpecies("OSi")
+    H4Si_g: GasSpecies = GasSpecies("H4Si")
+    SiO2_l: LiquidSpecies = LiquidSpecies("SiO2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, OSi_g, H4Si_g, SiO2_l])
 
     oceans: float = 50
     sih_ratio: float = 1
@@ -123,21 +120,21 @@ def test_SiHO_massSiH_solubility() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="Si", value=si_kg),
-            ActivityConstraint(species="SiO2", value=1),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("Si", si_kg),
+            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2": 2225.387378761475,
-        "H2O": 68.65564430638824,
-        "O2": 2.2005226675444582e-05,
-        "OSi": 569.1471756022945,
-        "H4Si": 4.292996959380682,
-        "SiO2": 1.0,
+        "H2_g": 2225.387378761475,
+        "H2O_g": 68.65564430638824,
+        "O2_g": 2.2005226675444582e-05,
+        "OSi_g": 569.1471756022945,
+        "H4Si_g": 4.292996959380682,
+        "SiO2_l": 1.0,
     }
 
     system.solve(SystemConstraints(constraints))
@@ -147,16 +144,14 @@ def test_SiHO_massSiH_solubility() -> None:
 def test_SiHO_massH_logfO2_nosolubility() -> None:
     """Tests H2-H2O and SiO-SiH4."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", eos=eos_models["H2"]),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="OSi"),
-            GasSpecies(formula="H4Si"),
-            LiquidSpecies(formula="SiO2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_models["H2"])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    OSi_g: GasSpecies = GasSpecies("OSi")
+    H4Si_g: GasSpecies = GasSpecies("H4Si")
+    SiO2_l: LiquidSpecies = LiquidSpecies("SiO2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, OSi_g, H4Si_g, SiO2_l])
 
     oceans: float = 50
     planet: Planet = Planet(surface_temperature=3400)
@@ -164,9 +159,9 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
-            IronWustiteBuffer(log10_shift=0),
-            ActivityConstraint(species="SiO2", value=1),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
@@ -174,9 +169,9 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
 
     target_pressures: dict[str, float] = {
         "H2_g": 3552.669457706052,
-        "H2O_G": 4767.286871920151,
-        "O2_G": 0.03382190282100078,
-        "OSi_G": 14.517388181293816,
+        "H2O_g": 4767.286871920151,
+        "O2_g": 0.03382190282100078,
+        "OSi_g": 14.517388181293816,
         "H4Si_g": 0.008762061109896661,
         "SiO2_l": 1.0,
     }
@@ -188,16 +183,14 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
 def test_SiHO_massH_logfO2_solubility() -> None:
     """Tests H2-H2O and SiO-SiH4."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", eos=eos_models["H2"], solubility=H2_basalt_hirschmann()),
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="OSi"),
-            GasSpecies(formula="H4Si"),
-            LiquidSpecies(formula="SiO2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_models["H2"], solubility=H2_basalt_hirschmann())
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    O2_g: GasSpecies = GasSpecies("O2")
+    OSi_g: GasSpecies = GasSpecies("OSi")
+    H4Si_g: GasSpecies = GasSpecies("H4Si")
+    SiO2_l: LiquidSpecies = LiquidSpecies("SiO2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, OSi_g, H4Si_g, SiO2_l])
 
     oceans: float = 50
     planet: Planet = Planet(surface_temperature=3400)
@@ -205,9 +198,9 @@ def test_SiHO_massH_logfO2_solubility() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
-            IronWustiteBuffer(log10_shift=0),
-            ActivityConstraint(species="SiO2", value=1),
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
@@ -229,25 +222,22 @@ def test_SiHO_massH_logfO2_solubility() -> None:
 def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
     """Tests H2-H2O and SiO2-SiO-SiH4."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", eos=eos_models["H2"]),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="OSi"),
-            GasSpecies(
-                formula="H4Si",
-            ),
-            LiquidSpecies(formula="SiO2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_models["H2"])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    OSi_g: GasSpecies = GasSpecies("OSi")
+    H4Si_g: GasSpecies = GasSpecies("H4Si")
+    SiO2_l: LiquidSpecies = LiquidSpecies("SiO2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, OSi_g, H4Si_g, SiO2_l])
+
     planet: Planet = Planet(surface_temperature=3400)
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            TotalPressureConstraint(value=4000),
-            IronWustiteBuffer(log10_shift=0),
-            ActivityConstraint(species="SiO2", value=1),
+            TotalPressureConstraint(4000),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
@@ -255,7 +245,7 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
 
     target_pressures: dict[str, float] = {
         "H2_g": 1868.1256657071128,
-        "H2O_G": 2116.1052597622975,
+        "H2O_g": 2116.1052597622975,
         "O2_g": 0.02877934211561468,
         "OSi_g": 15.737910722708122,
         "H4Si_g": 0.002384364181797566,
@@ -269,24 +259,22 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
 def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
     """Tests H2-H2O and SiO-SiH4."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2", eos=eos_models["H2"]),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="O2"),
-            GasSpecies(formula="OSi"),
-            GasSpecies(formula="H4Si"),
-            LiquidSpecies(formula="SiO2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_models["H2"])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    OSi_g: GasSpecies = GasSpecies("OSi")
+    H4Si_g: GasSpecies = GasSpecies("H4Si")
+    SiO2_l: LiquidSpecies = LiquidSpecies("SiO2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, OSi_g, H4Si_g, SiO2_l])
 
     planet: Planet = Planet(surface_temperature=3400)
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(species="H2O", value=5000),
-            IronWustiteBuffer(log10_shift=0),
-            ActivityConstraint(species="SiO2", value=1),
+            FugacityConstraint(H2O_g, 5000),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
@@ -297,7 +285,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
         "H2O_g": 4999.9999999999945,
         "O2_g": 0.03426380501584421,
         "OSi_g": 14.42346859651946,
-        "H4Si_G": 0.00939136258814609,
+        "H4Si_g": 0.00939136258814609,
         "SiO2_l": 1.0,
     }
 
