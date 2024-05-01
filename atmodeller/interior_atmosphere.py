@@ -28,7 +28,7 @@ from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
-from atmodeller.constraints import Constraint, SystemConstraints
+from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
 from atmodeller.core import Species
 from atmodeller.initial_solution import InitialSolution, InitialSolutionConstant
 from atmodeller.output import Output
@@ -265,7 +265,7 @@ class _ReactionNetwork:
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
-            species_index: int = self.species.indices[constraint.species]
+            species_index: int = self.species.indices[str(constraint.species.formula)]
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
@@ -316,7 +316,7 @@ class _ReactionNetwork:
             if constraint.name == "pressure":
                 rhs[row_index] += np.log10(
                     self.species.gas_species_by_formula[
-                        constraint.species
+                        str(constraint.species.formula)
                     ].eos.fugacity_coefficient(temperature=temperature, pressure=pressure)
                 )
 
@@ -456,8 +456,8 @@ class InteriorAtmosphereSystem:
         """
         condensation: list[str] = []
         for constraint in self.constraints.mass_constraints:
-            if constraint.species in self.species.condensed_elements:
-                condensation.append(constraint.species)
+            if constraint.element in self.species.condensed_elements:
+                condensation.append(constraint.element)
 
         return condensation
 
@@ -495,16 +495,16 @@ class InteriorAtmosphereSystem:
             output[reaction] = self._residual[index]
         for index, constraint in enumerate(self.constraints.reaction_network_constraints):
             row_index: int = self._reaction_network.number_reactions + index
-            output[constraint.full_name] = self._residual[row_index]
+            output[constraint.name] = self._residual[row_index]
         for index, constraint in enumerate(self.constraints.mass_constraints):
             row_index = (
                 self._reaction_network.number_reactions
                 + self.constraints.number_reaction_network_constraints
                 + index
             )
-            output[constraint.full_name] = self._residual[row_index]
+            output[constraint.name] = self._residual[row_index]
         for index, constraint in enumerate(self.constraints.total_pressure_constraint):
-            output[constraint.full_name] = self._residual[-1]  # Always last index if applied
+            output[constraint.name] = self._residual[-1]  # Always last index if applied
 
         return output
 
@@ -773,13 +773,13 @@ class InteriorAtmosphereSystem:
 
         # Recall that mass constraints are currently only ever specified in terms of elements.
         # Hence constraint.species is an element.
-        for constraint_index, constraint in enumerate(self.constraints.mass_constraints):
+        for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
             # Gas species
             for species in self.species.gas_species.values():
                 residual_mass[constraint_index] += sum(
                     species.mass(
                         system=self,
-                        element=constraint.species,
+                        element=mass_constraint.element,
                     ).values()
                 )
 
@@ -787,13 +787,13 @@ class InteriorAtmosphereSystem:
 
             # Condensed species
             for nn, condensed_element in enumerate(self.degree_of_condensation_elements):
-                if condensed_element == constraint.species:
+                if condensed_element == mass_constraint.element:
                     residual_mass[constraint_index] += np.log10(
                         self.solution[self.species.number + nn] + 1
                     )
 
             # Mass values are constant so no need to pass any arguments to get_value().
-            residual_mass[constraint_index] -= constraint.get_log10_value()
+            residual_mass[constraint_index] -= mass_constraint.get_log10_value()
 
         logger.debug("Residual_mass = %s", residual_mass)
 
@@ -802,7 +802,7 @@ class InteriorAtmosphereSystem:
             len(self.constraints.total_pressure_constraint), dtype=np.float_
         )
         if len(self.constraints.total_pressure_constraint) > 0:
-            constraint: Constraint = self.constraints.total_pressure_constraint[0]
+            constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += (
                 np.log10(self.total_pressure) - constraint.get_log10_value()
             )

@@ -24,7 +24,8 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    MassConstraint,
+    BufferedFugacityConstraint,
+    ElementMassConstraint,
     SystemConstraints,
     TotalPressureConstraint,
 )
@@ -50,7 +51,9 @@ def test_version():
 def test_H2O() -> None:
     """Tests H2O (a single species)"""
 
-    species: Species = Species([GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi())])
+    H2O_g: GasSpecies = GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi())
+
+    species: Species = Species([H2O_g])
 
     oceans: float = 2
     planet: Planet = Planet()
@@ -58,7 +61,7 @@ def test_H2O() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
         ]
     )
 
@@ -75,13 +78,11 @@ def test_H2O() -> None:
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi()),
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2O_g: GasSpecies = GasSpecies(formula="H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies(formula="H2")
+    O2_g: GasSpecies = GasSpecies(formula="O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
     planet: Planet = Planet()
@@ -89,8 +90,8 @@ def test_H_fO2() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
-            IronWustiteBuffer(),
+            ElementMassConstraint(element="H", value=h_kg),
+            BufferedFugacityConstraint(species=O2_g, value=IronWustiteBuffer()),
         ]
     )
 
@@ -133,7 +134,7 @@ def test_H_fO2_holland() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
             IronWustiteBuffer(),
         ]
     )
@@ -167,7 +168,7 @@ def test_H_basalt_melt() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
             IronWustiteBuffer(),
         ]
     )
@@ -201,7 +202,7 @@ def test_H_fO2_plus() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
             IronWustiteBuffer(log10_shift=2),
         ]
     )
@@ -235,7 +236,7 @@ def test_H_fO2_minus() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
             IronWustiteBuffer(log10_shift=-2),
         ]
     )
@@ -269,7 +270,7 @@ def test_H_five_oceans() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
             IronWustiteBuffer(),
         ]
     )
@@ -303,7 +304,7 @@ def test_H_1500K() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
             IronWustiteBuffer(),
         ]
     )
@@ -343,8 +344,8 @@ def test_H_and_C() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            ElementMassConstraint(element="H", value=h_kg),
+            ElementMassConstraint(element="C", value=c_kg),
             IronWustiteBuffer(),
         ]
     )
@@ -384,8 +385,8 @@ def test_H_and_C_hill_formula() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
-            MassConstraint(species="C", value=c_kg),
+            ElementMassConstraint(element="H", value=h_kg),
+            ElementMassConstraint(element="C", value=c_kg),
             IronWustiteBuffer(),
         ]
     )
@@ -423,7 +424,7 @@ def test_H_and_C_total_pressure() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="H", value=h_kg),
+            ElementMassConstraint(element="H", value=h_kg),
             IronWustiteBuffer(),
             TotalPressureConstraint(value=100),
         ]

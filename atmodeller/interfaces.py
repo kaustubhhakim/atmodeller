@@ -16,28 +16,35 @@
 #
 """Interfaces"""
 
+# Protocol so pylint: disable=C0115
+
 from __future__ import annotations
 
 from typing import Protocol
 
+from atmodeller.core import _ChemicalSpecies
 
-# Protocol so pylint: disable=C0115
+
 class ConstraintProtocol(Protocol):
 
     @property
-    def name(self) -> str:
-        raise NotImplementedError
+    def constraint(self) -> str: ...
 
     @property
-    def species(self) -> str:
-        raise NotImplementedError
+    def name(self) -> str: ...
+
+    def get_value(self, *args, **kwargs) -> float: ...
+
+    def get_log10_value(self, *args, **kwargs) -> float: ...
+
+
+class SpeciesConstraintProtocol(ConstraintProtocol, Protocol):
 
     @property
-    def full_name(self) -> str:
-        raise NotImplementedError
+    def species(self) -> _ChemicalSpecies: ...
 
-    def get_log10_value(self, *args, **kwargs) -> float:
-        raise NotImplementedError
 
-    def get_value(self, *args, **kwargs) -> float:
-        raise NotImplementedError
+class ElementMassConstraintProtocol(ConstraintProtocol, Protocol):
+
+    @property
+    def element(self) -> str: ...

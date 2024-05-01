@@ -49,16 +49,14 @@ def test_CHO_reduced(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 1}`
     """
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="H2"),
-            GasSpecies(formula="H2O"),
-            GasSpecies(formula="CO"),
-            GasSpecies(formula="CO2"),
-            GasSpecies(formula="CH4"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    H2_g: GasSpecies = GasSpecies(formula="H2")
+    H2O_g: GasSpecies = GasSpecies(formula="H2O")
+    CO_g: GasSpecies = GasSpecies(formula="CO")
+    CO2_g: GasSpecies = GasSpecies(formula="CO2")
+    CH4_g: GasSpecies = GasSpecies(formula="CH4")
+    O2_g: GasSpecies = GasSpecies(formula="O2")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
     planet: Planet = Planet()
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)

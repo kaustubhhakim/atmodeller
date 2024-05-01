@@ -19,41 +19,107 @@
 from __future__ import annotations
 
 import logging
+import sys
 from abc import ABC, abstractmethod
 from collections import UserList
-from dataclasses import dataclass, field
+from typing import Type, TypeVar
 
 import numpy as np
 
+from atmodeller.core import _ChemicalSpecies
+from atmodeller.interfaces import (
+    ConstraintProtocol,
+    ElementMassConstraintProtocol,
+    SpeciesConstraintProtocol,
+)
+from atmodeller.thermodata.redox_buffers import _RedoxBuffer
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
+
 logger: logging.Logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
 
-@dataclass(kw_only=True, frozen=True)
-class Constraint(ABC):
-    """A constraint to apply to an interior-atmosphere system.
+
+class ElementMassConstraint(ElementMassConstraintProtocol):
+    """An element mass constraint
 
     Args:
-        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
-            'pressure', or 'mass'.
-        species: The species to constrain, typically representing a species for 'pressure' or
-            'fugacity' constraints or an element for 'mass' constraints.
+        element: The element to constrain
     """
 
-    name: str = ""
-    """Name of the constraint"""
-    species: str = ""
-    """Species to constrain"""
+    def __init__(self, element: str, value: float):
+        self._element: str = element
+        self._value: float = value
+        self._constraint: str = "mass"
 
     @property
-    def full_name(self) -> str:
-        """Combines the species name and constraint name to give a unique descriptive name."""
-        if self.species:
-            full_name: str = f"{self.species}_"
-        else:
-            full_name = ""
-        full_name += self.name
+    def constraint(self) -> str:
+        return self._constraint
 
-        return full_name
+    @property
+    def element(self) -> str:
+        return self._element
+
+    @property
+    def name(self) -> str:
+        return f"{self.element}_{self.constraint}"
+
+    def get_value(self, *args, **kwargs) -> float:
+        """Computes the value for given input arguments.
+
+        Args:
+            *args: Positional arguments
+            **kwargs: Keyword arguments
+
+        Returns:
+            An evaluation of the value
+        """
+        del args
+        del kwargs
+
+        return self._value
+
+    def get_log10_value(self, *args, **kwargs) -> float:
+        """Computes the log10 value for given input arguments.
+
+        Args:
+            *args: Positional arguments
+            **kwargs: Keyword arguments
+
+        Returns:
+            An evaluation of the log10 value
+        """
+        return np.log10(self.get_value(*args, **kwargs))
+
+
+class _SpeciesConstraint(ABC, SpeciesConstraintProtocol):
+    """A species constraint
+
+    Args:
+        species: The species to constrain
+        constraint: The type of constraint, which should be one of: activity, fugacity, pressure,
+            or mass, depending on the phase of the species.
+    """
+
+    def __init__(self, species: _ChemicalSpecies, constraint: str):
+        self._species: _ChemicalSpecies = species
+        self._constraint: str = constraint
+
+    @property
+    def constraint(self) -> str:
+        return self._constraint
+
+    @property
+    def name(self) -> str:
+        return f"{self.species.name}_{self.constraint}"
+
+    @property
+    def species(self) -> _ChemicalSpecies:
+        return self._species
 
     @abstractmethod
     def get_value(self, *args, **kwargs) -> float:
@@ -80,131 +146,186 @@ class Constraint(ABC):
         return np.log10(self.get_value(*args, **kwargs))
 
 
-@dataclass(kw_only=True, frozen=True)
-class ConstantConstraint(Constraint):
-    """A constraint of a constant value
+class _SpeciesConstantConstraint(_SpeciesConstraint):
+    """A species constraint of a constant value
 
     Args:
-        name: The name of the constraint, which should be one of: 'activity', 'fugacity',
-            'pressure', or 'mass'.
-        species: The species to constrain, typically representing a species for 'pressure' or
-            'fugacity' constraints or an element for 'mass' constraints.
-        value: The constant value, which is usually in kg for masses and bar for pressures or
-            fugacities.
+        species: The species to constrain
+        constraint: The type of constraint, which should be one of: activity, fugacity, pressure,
+            or mass, depending on the phase of the species.
+        value: The constant value
     """
 
-    value: float
-    """Constant value of the constraint"""
+    def __init__(self, species: _ChemicalSpecies, value: float, constraint: str):
+        super().__init__(species, constraint)
+        self._value: float = value
 
-    def get_value(self, **kwargs) -> float:
-        """Returns the constant value. See base class."""
+    @override
+    def get_value(self, *args, **kwargs) -> float:
+        del args
         del kwargs
-        return self.value
+
+        return self._value
 
 
-@dataclass(kw_only=True, frozen=True)
-class ActivityConstraint(ConstantConstraint):
+class ActivityConstraint(_SpeciesConstantConstraint):
     """A constant activity
 
     Args:
         species: The species to constrain
-        value: The constant value. Defaults to unity for ideal behaviour.
+        value: The activity. Defaults to unity for ideal behaviour.
     """
 
-    name: str = field(init=False, default="activity")
-    value: float = 1.0
+    def __init__(self, species: _ChemicalSpecies, value: float = 1, constraint: str = "activity"):
+        super().__init__(species, value, constraint)
 
 
-@dataclass(kw_only=True, frozen=True)
-class FugacityConstraint(ConstantConstraint):
-    """A constant fugacity constraint. See base class."""
+class FugacityConstraint(_SpeciesConstantConstraint):
+    """A constant fugacity constraint
 
-    name: str = field(init=False, default="fugacity")
-
-
-@dataclass(kw_only=True, frozen=True)
-class PressureConstraint(ConstantConstraint):
-    """A constant pressure constraint. See base class."""
-
-    name: str = field(init=False, default="pressure")
-
-
-@dataclass(kw_only=True, frozen=True)
-class TotalPressureConstraint(ConstantConstraint):
-    """Total pressure constraint. See base class.
-
-    'species' is not required so is set to an empty string
+    Args:
+        species: The species to constrain
+        value: The fugacity in bar
     """
 
-    species: str = field(init=False, default="")
-    name: str = field(init=False, default="total_pressure")
+    def __init__(self, species: _ChemicalSpecies, value: float, constraint: str = "fugacity"):
+        super().__init__(species, value, constraint)
 
 
-@dataclass(kw_only=True, frozen=True)
-class MassConstraint(ConstantConstraint):
-    """A constant mass constraint. See base class."""
+class BufferedFugacityConstraint(_SpeciesConstraint):
+    """A buffered fugacity constraint
 
-    name: str = field(init=False, default="mass")
+    Args:
+        species: The species to constrain
+        value: The redox buffer
+    """
+
+    def __init__(
+        self, species: _ChemicalSpecies, value: _RedoxBuffer, constraint: str = "fugacity"
+    ):
+        super().__init__(species, constraint)
+        self._value: _RedoxBuffer = value
+
+    @override
+    def get_value(self, *args, **kwargs) -> float:
+        return self._value.get_value(*args, **kwargs)
+
+
+class MassConstraint(_SpeciesConstantConstraint):
+    """A constant mass constraint
+
+    Args:
+        species: The species to constrain
+        value: The mass in kg
+    """
+
+    def __init__(self, species: _ChemicalSpecies, value: float, constraint: str = "mass"):
+        super().__init__(species, value, constraint)
+
+
+class PressureConstraint(_SpeciesConstantConstraint):
+    """A constant pressure constraint
+
+    Args:
+        species: The species to constrain
+        value: The pressure in bar
+    """
+
+    def __init__(self, species: _ChemicalSpecies, value: float, constraint: str = "pressure"):
+        super().__init__(species, value, constraint)
+
+
+class TotalPressureConstraint(ConstraintProtocol):
+    """A total pressure constraint
+
+    Args:
+        value: The total pressure in bar
+    """
+
+    def __init__(self, value: float):
+        self._value: float = value
+        self._constraint: str = "total_pressure"
+        self._name: str = "total_pressure"
+
+    @property
+    def constraint(self) -> str:
+        return self._constraint
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def get_value(self, *args, **kwargs) -> float:
+        del args
+        del kwargs
+
+        return self._value
+
+    def get_log10_value(self, *args, **kwargs) -> float:
+        return np.log10(self.get_value(*args, **kwargs))
 
 
 class SystemConstraints(UserList):
-    """A collection of constraints for an interior-atmosphere system.
+    """A collection of constraints
 
-    A collection of constraints that can be applied to an interior-atmosphere system. It provides
-    methods to filter constraints based on their types, such as activity, fugacity, mass
-    conservation, pressure, and reaction network constraints.
+    It provides methods to filter constraints based on their types, such as activity, fugacity,
+    mass, pressure, and reaction network constraints.
 
     Args:
         initlist: Initial list of constraints. Defaults to None.
 
     Attributes:
-        data: A list of constraints for the interior-atmosphere system
-        names: A list of unique names of the constraints
+        data: A list of constraints
     """
 
     def __init__(self, initlist=None):
-        self.data: list[Constraint]
+        self.data: list[ConstraintProtocol]
         super().__init__(initlist)
 
     @property
-    def full_names(self) -> list[str]:
-        return [constraint.full_name for constraint in self.data]
-
-    @property
-    def activity_constraints(self) -> list[Constraint]:
+    def activity_constraints(self) -> list[ActivityConstraint]:
         """Constraints related to activity"""
-        return self._filter_by_name("activity")
+        return self._filter_by_name(ActivityConstraint)
 
     @property
-    def fugacity_constraints(self) -> list[Constraint]:
+    def fugacity_constraints(self) -> list[FugacityConstraint]:
         """Constraints related to fugacity"""
-        return self._filter_by_name("fugacity")
+        out = self._filter_by_name(FugacityConstraint)
+        out.extend(self._filter_by_name(BufferedFugacityConstraint))
+        # out = self._filter_by_name(Fugacity)
 
+        return out
+
+    # TODO: Currently only for element mass constraints, but should be generalised to include
+    # species mass constraints
     @property
-    def mass_constraints(self) -> list[Constraint]:
+    def mass_constraints(self) -> list[ElementMassConstraint]:
         """Constraints related to mass conservation"""
-        return self._filter_by_name("mass")
+        return self._filter_by_name(ElementMassConstraint)
 
     @property
-    def pressure_constraints(self) -> list[Constraint]:
+    def pressure_constraints(self) -> list[PressureConstraint]:
         """Constraints related to pressure"""
-        return self._filter_by_name("pressure")
+        return self._filter_by_name(PressureConstraint)
 
     @property
-    def total_pressure_constraint(self) -> list[Constraint]:
+    def total_pressure_constraint(self) -> list[TotalPressureConstraint]:
         """Total pressure constraint"""
-        total_pressure: list[Constraint] = self._filter_by_name("total_pressure")
+        total_pressure: list[TotalPressureConstraint] = self._filter_by_name(
+            TotalPressureConstraint
+        )
         if len(total_pressure) > 1:
-            msg: str = "You can only specify zero or one total pressure constraints"
+            msg: str = "You can only specify a maximum of one total pressure constraint"
             logger.error(msg)
             raise ValueError(msg)
 
         return total_pressure
 
     @property
-    def reaction_network_constraints(self) -> list[Constraint]:
+    def reaction_network_constraints(self) -> list[SpeciesConstraintProtocol]:
         """Constraints related to the reaction network"""
-        filtered_entries: list[Constraint] = self.fugacity_constraints
+        filtered_entries: list[SpeciesConstraintProtocol] = []
+        filtered_entries.extend(self.fugacity_constraints)
         filtered_entries.extend(self.pressure_constraints)
         filtered_entries.extend(self.activity_constraints)
 
@@ -227,7 +348,7 @@ class SystemConstraints(UserList):
         """
         evaluated_constraints: dict[str, float] = {}
         for constraint in self.data:
-            evaluated_constraints[constraint.full_name] = constraint.get_value(
+            evaluated_constraints[constraint.name] = constraint.get_value(
                 temperature=temperature,
                 pressure=pressure,
             )
@@ -248,7 +369,8 @@ class SystemConstraints(UserList):
             key: np.log10(value) for key, value in self.evaluate(temperature, pressure).items()
         }
 
-    def _filter_by_name(self, name: str) -> list[Constraint]:
+    # TODO: return dict to retain index? Or maybe given index as unique species name?
+    def _filter_by_name(self, class_name: Type[T]) -> list[T]:
         """Filters the constraints by a given name.
 
         Args:
@@ -257,9 +379,8 @@ class SystemConstraints(UserList):
         Returns:
             A list of filtered constraints
         """
-        filtered: list = []
-        for entry in self.data:
-            if entry.name == name:
-                filtered.append(entry)
+        filtered: dict[int, T] = {
+            ii: value for ii, value in enumerate(self) if isinstance(value, class_name)
+        }
 
-        return filtered
+        return list(filtered.values())

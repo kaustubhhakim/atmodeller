@@ -180,7 +180,7 @@ class InitialSolution(ABC):
             pressure: Pressure in bar
         """
         for constraint in constraints.reaction_network_constraints:
-            index: int = self.species.indices[constraint.species]
+            index: int = self.species.indices[str(constraint.species.formula)]
             logger.debug("Setting %s %d", constraint.species, index)
             initial_solution[index] = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure

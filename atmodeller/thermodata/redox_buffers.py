@@ -26,7 +26,6 @@ from typing import Type
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import ConstraintProtocol
 from atmodeller.utilities import UnitConversion
 
 if sys.version_info < (3, 12):
@@ -41,37 +40,19 @@ class _RedoxBuffer(ABC):
     """A redox buffer
 
     Args:
-        species: Species
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
         evaluation_pressure: Optional constant pressure in bar to always evaluate the redox buffer.
             Defaults to None, meaning that the input pressure argument is used instead.
 
     Attributes:
-        species: Species
         log10_shift: Log10 shift relative to the buffer.
         evaluation_pressure: Optional constant pressure in bar to always use to evaluate the redox
             buffer. Defaults to None, meaning that the input pressure argument is used instead.
-        full_name: Combines the species and fugacity to give a unique constraint name.
     """
 
-    def __init__(
-        self, species: str, *, log10_shift: float = 0, evaluation_pressure: float | None = None
-    ):
-        self._species: str = species
+    def __init__(self, *, log10_shift: float = 0, evaluation_pressure: float | None = None):
         self.log10_shift: float = log10_shift
         self.evaluation_pressure: float | None = evaluation_pressure
-
-    @property
-    def full_name(self) -> str:
-        return f"{self.species}_{self.name}"
-
-    @property
-    def name(self) -> str:
-        return "fugacity"
-
-    @property
-    def species(self) -> str:
-        return self._species
 
     @abstractmethod
     def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
@@ -128,15 +109,7 @@ class _RedoxBuffer(ABC):
         return value
 
 
-class _OxygenFugacityBuffer(_RedoxBuffer):
-    """A redox buffer that constrains oxygen fugacity as a function of temperature."""
-
-    @override
-    def __init__(self, species: str = "O2", **kwargs):
-        super().__init__(species, **kwargs)
-
-
-class IronWustiteBufferHirschmann(_OxygenFugacityBuffer, ConstraintProtocol):
+class IronWustiteBufferHirschmann(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`"""
 
     @override
@@ -152,7 +125,7 @@ class IronWustiteBufferHirschmann(_OxygenFugacityBuffer, ConstraintProtocol):
         return fugacity
 
 
-class IronWustiteBufferONeill(_OxygenFugacityBuffer, ConstraintProtocol):
+class IronWustiteBufferONeill(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`OE02`
 
     Gibbs energy of reaction is at 1 bar :cite:p:`OE02{Table 6}`.
@@ -171,7 +144,7 @@ class IronWustiteBufferONeill(_OxygenFugacityBuffer, ConstraintProtocol):
         return fugacity
 
 
-class IronWustiteBufferBallhaus(_OxygenFugacityBuffer, ConstraintProtocol):
+class IronWustiteBufferBallhaus(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`BBG91`"""
 
     @override
@@ -188,7 +161,7 @@ class IronWustiteBufferBallhaus(_OxygenFugacityBuffer, ConstraintProtocol):
         return fugacity
 
 
-class IronWustiteBufferFischer(_OxygenFugacityBuffer, ConstraintProtocol):
+class IronWustiteBufferFischer(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`F11`
 
     See :cite:t:`F11{Table S2}` in supplementary materials.
@@ -212,4 +185,4 @@ class IronWustiteBufferFischer(_OxygenFugacityBuffer, ConstraintProtocol):
         return fugacity
 
 
-IronWustiteBuffer: Type[_OxygenFugacityBuffer] = IronWustiteBufferHirschmann
+IronWustiteBuffer: Type[_RedoxBuffer] = IronWustiteBufferHirschmann
