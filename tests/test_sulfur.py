@@ -23,7 +23,13 @@ from __future__ import annotations
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import FugacityConstraint, MassConstraint, SystemConstraints
+from atmodeller.constraints import (
+    BufferedFugacityConstraint,
+    ElementMassConstraint,
+    FugacityConstraint,
+    MassConstraint,
+    SystemConstraints,
+)
 from atmodeller.core import GasSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
@@ -53,20 +59,18 @@ def test_version():
 def test_S2_SO_Sulfide_IW() -> None:
     """Tests S2 and SO Sulfide Solubilities at the IW buffer, 2000 K."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=S2_sulfide_basalt_boulliung()),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    OS_g: GasSpecies = GasSpecies("OS")
+    S2_g: GasSpecies = GasSpecies("S2", solubility=S2_sulfide_basalt_boulliung())
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([OS_g, S2_g, O2_g])
 
     planet: Planet = Planet()
     S2_fugacity: float = 1e-5
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(species="S2", value=S2_fugacity),
-            IronWustiteBuffer(),
+            FugacityConstraint(S2_g, S2_fugacity),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -85,22 +89,20 @@ def test_S2_SO_Sulfide_IW() -> None:
 def test_AllS_Sulfide_IW() -> None:
     """Tests SO, S2, and SO2 Sulfide Solubility at the IW buffer, 2173 K."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=S2_sulfide_basalt_boulliung()),
-            GasSpecies(formula="O2S"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    OS_g: GasSpecies = GasSpecies("OS")
+    S2_g: GasSpecies = GasSpecies("S2", solubility=S2_sulfide_basalt_boulliung())
+    O2_g: GasSpecies = GasSpecies("O2")
+    O2S_g: GasSpecies = GasSpecies("O2S")
+
+    species: Species = Species([OS_g, S2_g, O2_g, O2S_g])
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="S", value=mass_S),
-            IronWustiteBuffer(),
+            ElementMassConstraint("S", mass_S),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -120,22 +122,20 @@ def test_AllS_Sulfide_IW() -> None:
 def test_AllS_Sulfate_IW() -> None:
     """Tests SO, S2, and SO2 Sulfate Solubility at the IW buffer, 2173 K."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=S2_sulfate_basalt_boulliung()),
-            GasSpecies(formula="O2S"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    OS_g: GasSpecies = GasSpecies("OS")
+    S2_g: GasSpecies = GasSpecies("S2", solubility=S2_sulfate_basalt_boulliung())
+    O2_g: GasSpecies = GasSpecies("O2")
+    O2S_g: GasSpecies = GasSpecies("O2S")
+
+    species: Species = Species([OS_g, S2_g, O2_g, O2S_g])
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 2e-4 * planet.mantle_mass
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="S", value=mass_S),
-            IronWustiteBuffer(),
+            ElementMassConstraint("S", mass_S),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -155,22 +155,20 @@ def test_AllS_Sulfate_IW() -> None:
 def test_AllS_TotalSolubility_IW() -> None:
     """Tests SO, S2, and SO2 Sulfide+Sulfate Solubility at the IW buffer, 2173 K."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
-            GasSpecies(formula="O2S"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    OS_g: GasSpecies = GasSpecies("OS")
+    S2_g: GasSpecies = GasSpecies("S2", solubility=S2_basalt_boulliung())
+    O2_g: GasSpecies = GasSpecies("O2")
+    O2S_g: GasSpecies = GasSpecies("O2S")
+
+    species: Species = Species([OS_g, S2_g, O2_g, O2S_g])
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="S", value=mass_S),
-            IronWustiteBuffer(),
+            ElementMassConstraint("S", mass_S),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
 
@@ -190,22 +188,20 @@ def test_AllS_TotalSolubility_IW() -> None:
 def test_AllS_TotalSolubility_IWp3() -> None:
     """Tests SO, S2, and SO2 Sulfide+Sulfate Solubility at IW+3, 2173 K."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
-            GasSpecies(formula="O2S"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    OS_g: GasSpecies = GasSpecies("OS")
+    S2_g: GasSpecies = GasSpecies("S2", solubility=S2_basalt_boulliung())
+    O2_g: GasSpecies = GasSpecies("O2")
+    O2S_g: GasSpecies = GasSpecies("O2S")
+
+    species: Species = Species([OS_g, S2_g, O2_g, O2S_g])
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="S", value=mass_S),
-            IronWustiteBuffer(log10_shift=3),
+            ElementMassConstraint("S", mass_S),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=3)),
         ]
     )
 
@@ -225,22 +221,20 @@ def test_AllS_TotalSolubility_IWp3() -> None:
 def test_AllS_TotalSolubility_IWm3() -> None:
     """Tests SO, S2, and SO2 Sulfide+Sulfate Solubility at IW-3, 2173 K."""
 
-    species: Species = Species(
-        [
-            GasSpecies(formula="OS"),
-            GasSpecies(formula="S2", solubility=S2_basalt_boulliung()),
-            GasSpecies(formula="O2S"),
-            GasSpecies(formula="O2"),
-        ]
-    )
+    OS_g: GasSpecies = GasSpecies("OS")
+    S2_g: GasSpecies = GasSpecies("S2", solubility=S2_basalt_boulliung())
+    O2_g: GasSpecies = GasSpecies("O2")
+    O2S_g: GasSpecies = GasSpecies("O2S")
+
+    species: Species = Species([OS_g, S2_g, O2_g, O2S_g])
 
     planet: Planet = Planet(surface_temperature=2173)
     mass_S: float = 0.0002 * planet.mantle_mass
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            MassConstraint(species="S", value=mass_S),
-            IronWustiteBuffer(log10_shift=-3),
+            ElementMassConstraint("S", mass_S),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=-3)),
         ]
     )
 

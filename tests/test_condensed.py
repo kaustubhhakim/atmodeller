@@ -16,6 +16,8 @@
 #
 """Tests for condensed species and condensates"""
 
+# Convenient to use naming convention so pylint: disable=C0103
+
 import logging
 
 from atmodeller import __version__, debug_logger
