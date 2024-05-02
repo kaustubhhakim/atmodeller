@@ -27,7 +27,6 @@ from atmodeller.constraints import (
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
-    MassConstraint,
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies

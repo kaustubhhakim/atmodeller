@@ -63,9 +63,5 @@ class FugacityConstraintProtocol(SpeciesConstraintProtocol, Protocol):
     def fugacity(self, *args, **kwargs) -> float: ...
 
 
-class PressureConstraintProtocol(SpeciesConstraintProtocol, Protocol):
-    def pressure(self, *args, **kwargs) -> float: ...
-
-
 class TotalPressureConstraintProtocol(ConstraintProtocol, Protocol):
     def total_pressure(self, *args, **kwargs) -> float: ...

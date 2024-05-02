@@ -314,12 +314,6 @@ class _ReactionNetwork:
             row_index: int = self.number_reactions + index
             logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
-            if constraint.constraint == "pressure":
-                rhs[row_index] += np.log10(
-                    self.species.gas_species_by_formula[
-                        str(constraint.species.formula)
-                    ].eos.fugacity_coefficient(temperature=temperature, pressure=pressure)
-                )
 
         logger.debug("RHS vector = %s", rhs)
 
