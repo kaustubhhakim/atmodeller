@@ -328,7 +328,7 @@ class _ReactionNetwork:
         """Assembles the fugacity coefficient vector on the left-hand side of the equations.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
@@ -364,7 +364,7 @@ class _ReactionNetwork:
         """Returns the residual vector of the reaction network.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix

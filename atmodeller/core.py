@@ -158,6 +158,21 @@ class GasSpecies(_ChemicalSpecies):
         """A gas equation of state"""
         return self._eos
 
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Fugacity in bar
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity in bar
+        """
+        fugacity: float = self.eos.fugacity_coefficient(temperature=temperature, pressure=pressure)
+        fugacity *= pressure
+
+        return fugacity
+
     @property
     def solid_melt_distribution_coefficient(self) -> float:
         """Distribution coefficient between solid and melt"""
@@ -330,11 +345,6 @@ class Species(UserList[_ChemicalSpecies]):
     def gas_species(self) -> dict[int, GasSpecies]:
         """Gas species"""
         return filter_by_type(self, GasSpecies)
-
-    @property
-    def gas_species_by_formula(self) -> dict[str, GasSpecies]:
-        """Gas species by name"""
-        return {str(value.formula): value for value in self.gas_species.values()}
 
     @property
     def number_gas_species(self) -> int:
