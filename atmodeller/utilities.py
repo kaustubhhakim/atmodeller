@@ -20,8 +20,7 @@ from __future__ import annotations
 
 import functools
 import logging
-from collections import OrderedDict, abc
-from collections.abc import MutableMapping
+from collections.abc import Collection, MutableMapping
 from dataclasses import asdict
 from typing import Any, Callable, Type, TypeVar
 
@@ -54,23 +53,21 @@ def debug_decorator(logger_in: logging.Logger) -> Callable:
     return decorator
 
 
-def filter_by_type(some_collection: abc.Collection, class_type: Type[T]) -> dict[int, T]:
-    """Filters entries by the given class type and maintains order.
+def filter_by_type(some_collection: Collection, class_type: Type[T]) -> dict[int, T]:
+    """Filters entries of a collection according to the class type
 
     Args:
-        some_collection: A collection (e.g. a list) to filter.
-        class_type: Class type to filter.
+        some_collection: A collection (e.g. a list) to filter
+        class_type: Class type to filter
 
     Returns:
-        An OrderedDict with indices in some_collection as keys and filtered entries as values.
+        A dictionary with indices in some_collection as keys and filtered entries as values
     """
+    filtered: dict[int, T] = {
+        ii: value for ii, value in enumerate(some_collection) if isinstance(value, class_type)
+    }
 
-    ordered_dict = OrderedDict()
-    for index, entry in enumerate(some_collection):
-        if isinstance(entry, class_type):
-            ordered_dict[index] = entry
-
-    return ordered_dict
+    return filtered
 
 
 def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:

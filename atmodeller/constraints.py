@@ -22,7 +22,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from collections import UserList
-from typing import Generic, Type, TypeVar
+from typing import Generic, TypeVar
 
 import numpy as np
 
@@ -36,6 +36,7 @@ from atmodeller.interfaces import (
     TotalPressureConstraintProtocol,
 )
 from atmodeller.thermodata.redox_buffers import _RedoxBuffer
+from atmodeller.utilities import filter_by_type
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -339,12 +340,12 @@ class SystemConstraints(UserList):
     @property
     def activity_constraints(self) -> list[ActivityConstraintProtocol]:
         """Constraints related to activity"""
-        return self._filter_by_name(ActivityConstraintProtocol)
+        return list(filter_by_type(self, ActivityConstraintProtocol).values())
 
     @property
     def fugacity_constraints(self) -> list[FugacityConstraintProtocol]:
         """Constraints related to fugacity"""
-        out = self._filter_by_name(FugacityConstraintProtocol)
+        out = list(filter_by_type(self, FugacityConstraintProtocol).values())
 
         return out
 
@@ -353,13 +354,13 @@ class SystemConstraints(UserList):
     @property
     def mass_constraints(self) -> list[ElementMassConstraint]:
         """Constraints related to mass conservation"""
-        return self._filter_by_name(ElementMassConstraint)
+        return list(filter_by_type(self, ElementMassConstraint).values())
 
     @property
     def total_pressure_constraint(self) -> list[TotalPressureConstraintProtocol]:
         """Total pressure constraint"""
-        total_pressure: list[TotalPressureConstraintProtocol] = self._filter_by_name(
-            TotalPressureConstraintProtocol
+        total_pressure: list[TotalPressureConstraintProtocol] = list(
+            filter_by_type(self, TotalPressureConstraintProtocol).values()
         )
         if len(total_pressure) > 1:
             msg: str = "You can only specify a maximum of one total pressure constraint"
@@ -414,19 +415,3 @@ class SystemConstraints(UserList):
         return {
             key: np.log10(value) for key, value in self.evaluate(temperature, pressure).items()
         }
-
-    # TODO: return dict to retain index? Or maybe given index as unique species name?
-    def _filter_by_name(self, class_name: Type[T]) -> list[T]:
-        """Filters the constraints by a given name.
-
-        Args:
-            name: The filter string (e.g., activity, fugacity, pressure, mass)
-
-        Returns:
-            A list of filtered constraints
-        """
-        filtered: dict[int, T] = {
-            ii: value for ii, value in enumerate(self) if isinstance(value, class_name)
-        }
-
-        return list(filtered.values())
