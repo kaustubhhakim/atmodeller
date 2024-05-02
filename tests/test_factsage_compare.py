@@ -68,7 +68,7 @@ def test_CHO_reduced(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=-2)),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
         ]
@@ -111,7 +111,7 @@ def test_CHO_IW(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=0.5)),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(0.5)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
         ]
@@ -154,7 +154,7 @@ def test_CHO_oxidised(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=2)),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(2)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
         ]
@@ -197,7 +197,7 @@ def test_CHO_highly_oxidised(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=4)),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(4)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
         ]

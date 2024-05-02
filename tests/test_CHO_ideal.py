@@ -197,7 +197,7 @@ def test_H_fO2_plus() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             ElementMassConstraint("H", h_kg),
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=2)),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(2)),
         ]
     )
 
@@ -229,7 +229,7 @@ def test_H_fO2_minus() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             ElementMassConstraint("H", h_kg),
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(log10_shift=-2)),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
         ]
     )
 

@@ -50,7 +50,7 @@ class _RedoxBuffer(ABC):
             buffer. Defaults to None, meaning that the input pressure argument is used instead.
     """
 
-    def __init__(self, *, log10_shift: float = 0, evaluation_pressure: float | None = None):
+    def __init__(self, log10_shift: float = 0, *, evaluation_pressure: float | None = None):
         self.log10_shift: float = log10_shift
         self.evaluation_pressure: float | None = evaluation_pressure
 
