@@ -42,10 +42,10 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
-logger: logging.Logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class _ChemicalSpecies:
@@ -297,7 +297,7 @@ class LiquidSpecies(_CondensedSpecies):
         super().__init__(formula, "l", **kwargs)
 
 
-class Species(UserList):
+class Species(UserList[_ChemicalSpecies]):
     """A list of species
 
     Args:
@@ -306,10 +306,6 @@ class Species(UserList):
     Attributes:
         data: List of species contained in the system
     """
-
-    def __init__(self, initlist: list[_ChemicalSpecies] | None = None):
-        self.data: list[_ChemicalSpecies]  # For typing
-        super().__init__(initlist)
 
     @property
     def elements(self) -> list[str]:

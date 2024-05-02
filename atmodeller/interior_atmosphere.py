@@ -476,12 +476,12 @@ class InteriorAtmosphereSystem:
 
     @property
     def solution(self) -> np.ndarray:
-        """Solution."""
+        """Solution"""
         return 10**self.log_solution
 
     @property
     def residual_dict(self) -> dict[str, float]:
-        """Residual of the objective function.
+        """Residual of the objective function
 
         The order of the constraints must align with the order in which they are assembled.
         """
@@ -504,7 +504,7 @@ class InteriorAtmosphereSystem:
         return output
 
     def solution_dict(self) -> dict[str, float]:
-        """Solution for all species in a dictionary.
+        """Solution for all species in a dictionary
 
         This is convenient for a quick check of the solution, but in general you will use
         self.output to return a dictionary of all the data or export the data to Excel or a
@@ -525,7 +525,7 @@ class InteriorAtmosphereSystem:
 
     @property
     def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
-        """Fugacity coefficients (relevant for gas species only) in a dictionary."""
+        """Fugacity coefficients (relevant for gas species only) in a dictionary"""
         output: dict[str, float] = {
             str(species.formula): np.log10(
                 species.eos.fugacity_coefficient(
