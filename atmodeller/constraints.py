@@ -28,11 +28,9 @@ import numpy as np
 
 from atmodeller.core import GasSpecies, _ChemicalSpecies, _CondensedSpecies
 from atmodeller.interfaces import (
-    ActivityConstraintProtocol,
     ConstraintProtocol,
     ElementConstraintProtocol,
-    FugacityConstraintProtocol,
-    SpeciesConstraintProtocol,
+    ReactionNetworkConstraintProtocol,
     TotalPressureConstraintProtocol,
 )
 from atmodeller.thermodata.redox_buffers import _RedoxBuffer
@@ -54,7 +52,7 @@ class ElementMassConstraint(ElementConstraintProtocol):
 
     Args:
         element: The element whose mass to constrain
-        value: The value of the mass
+        value: The mass in kg
     """
 
     def __init__(self, element: str, value: float):
@@ -73,6 +71,11 @@ class ElementMassConstraint(ElementConstraintProtocol):
         return self._element
 
     @property
+    def mass(self) -> float:
+        """Value of the mass constraint in kg"""
+        return self._value
+
+    @property
     def name(self) -> str:
         """Unique name of the constraint"""
         return f"{self.element}_{self.constraint}"
@@ -81,8 +84,8 @@ class ElementMassConstraint(ElementConstraintProtocol):
         """Computes the value for given input arguments.
 
         Args:
-            *args: Positional arguments
-            **kwargs: Keyword arguments
+            *args: Catches unused positional arguments
+            **kwargs: Catches unused keyword arguments
 
         Returns:
             The evaluated value
@@ -90,14 +93,14 @@ class ElementMassConstraint(ElementConstraintProtocol):
         del args
         del kwargs
 
-        return self._value
+        return self.mass
 
     def get_log10_value(self, *args, **kwargs) -> float:
         """Computes the log10 value for given input arguments.
 
         Args:
-            *args: Positional arguments
-            **kwargs: Keyword arguments
+            *args: Catches unused positional arguments
+            **kwargs: Catches unused keyword arguments
 
         Returns:
             The log10 evaluated value
@@ -133,28 +136,28 @@ class _SpeciesConstraint(ABC, Generic[U]):
         return self._species
 
     @abstractmethod
-    def get_value(self, *args, **kwargs) -> float:
+    def get_value(self, temperature: float, pressure: float) -> float:
         """Computes the value for given input arguments.
 
         Args:
-            *args: Positional arguments
-            **kwargs: Keyword arguments
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             The evaluated value
         """
 
-    def get_log10_value(self, *args, **kwargs) -> float:
+    @abstractmethod
+    def get_log10_value(self, temperature: float, pressure: float) -> float:
         """Computes the log10 value for given input arguments.
 
         Args:
-            *args: Positional arguments only
-            **kwargs: Keyword arguments only
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             The log10 evaluated value
         """
-        return np.log10(self.get_value(*args, **kwargs))
 
 
 class _SpeciesConstantConstraint(_SpeciesConstraint[U]):
@@ -173,11 +176,15 @@ class _SpeciesConstantConstraint(_SpeciesConstraint[U]):
         self._value: float = value
 
     @override
-    def get_value(self, *args, **kwargs) -> float:
-        del args
-        del kwargs
+    def get_value(self, temperature: float, pressure: float) -> float:
+        del temperature
+        del pressure
 
         return self._value
+
+    @override
+    def get_log10_value(self, temperature: float, pressure: float) -> float:
+        return np.log10(self.get_value(temperature, pressure))
 
 
 class ActivityConstraint(_SpeciesConstantConstraint[_CondensedSpecies]):
@@ -189,13 +196,39 @@ class ActivityConstraint(_SpeciesConstantConstraint[_CondensedSpecies]):
     """
 
     @override
-    def __init__(self, species: _CondensedSpecies, value: float = 1, constraint: str = "activity"):
-        super().__init__(species, value, constraint)
+    def __init__(
+        self,
+        species: _CondensedSpecies,
+        value: float = 1,
+    ):
+        super().__init__(species, value, "activity")
 
-    def activity(self, *args, **kwargs) -> float:
-        return self.get_value(*args, **kwargs)
+    def activity(self, temperature: float, pressure: float) -> float:
+        """Value of the activity constraint
 
-    # TODO: For the purposes of calculation can I call the activity the fugacity?
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Activity
+        """
+        return self.get_value(temperature, pressure)
+
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Alias for the value of the activity constraint, which is anyhow related to fugacity
+
+        This allows this constraint to satisfy
+        :class:`atmodeller.interfaces.FugacityConstraintProtocol`
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity (activity)
+        """
+        return self.activity(temperature, pressure)
 
 
 class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
@@ -207,15 +240,33 @@ class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
     """
 
     @override
-    def __init__(self, species: GasSpecies, value: float, constraint: str = "fugacity"):
-        super().__init__(species, value, constraint)
+    def __init__(self, species: GasSpecies, value: float):
+        super().__init__(species, value, "fugacity")
 
-    def fugacity(self, *args, **kwargs) -> float:
-        return self.get_value(*args, **kwargs)
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Value of the fugacity constraint in bar
 
-    def pressure(self, *args, **kwargs) -> float:
-        fugacity: float = self.fugacity(*args, **kwargs)
-        fugacity /= self.species.eos.fugacity_coefficient(*args, **kwargs)
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity in bar
+        """
+        return self.get_value(temperature, pressure)
+
+    def pressure(self, temperature: float, pressure: float) -> float:
+        """Value of the pressure constraint in bar
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Pressure in bar
+        """
+        fugacity: float = self.fugacity(temperature, pressure)
+        fugacity /= self.species.eos.fugacity_coefficient(temperature, pressure)
 
         return fugacity
 
@@ -229,16 +280,29 @@ class BufferedFugacityConstraint(_SpeciesConstraint[GasSpecies]):
     """
 
     @override
-    def __init__(self, species: GasSpecies, value: _RedoxBuffer, constraint: str = "fugacity"):
-        super().__init__(species, constraint)
+    def __init__(self, species: GasSpecies, value: _RedoxBuffer):
+        super().__init__(species, "fugacity")
         self._value: _RedoxBuffer = value
 
-    @override
-    def get_value(self, *args, **kwargs) -> float:
-        return self._value.get_value(*args, **kwargs)
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Value of the fugacity constraint in bar
 
-    def fugacity(self, *args, **kwargs) -> float:
-        return self.get_value(*args, **kwargs)
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity in bar
+        """
+        return self.get_value(temperature, pressure)
+
+    @override
+    def get_value(self, temperature: float, pressure: float) -> float:
+        return self._value.get_value(temperature, pressure)
+
+    @override
+    def get_log10_value(self, temperature: float, pressure: float) -> float:
+        return np.log10(self.get_value(temperature, pressure))
 
 
 class MassConstraint(_SpeciesConstantConstraint):
@@ -250,10 +314,11 @@ class MassConstraint(_SpeciesConstantConstraint):
     """
 
     @override
-    def __init__(self, species: _ChemicalSpecies, value: float, constraint: str = "mass"):
-        super().__init__(species, value, constraint)
+    def __init__(self, species: _ChemicalSpecies, value: float):
+        super().__init__(species, value, "mass")
 
     def mass(self, *args, **kwargs) -> float:
+        """Value of the mass constraint in kg"""
         return self.get_value(*args, **kwargs)
 
 
@@ -266,24 +331,42 @@ class PressureConstraint(_SpeciesConstantConstraint[GasSpecies]):
     """
 
     @override
-    def __init__(self, species: GasSpecies, value: float, constraint: str = "pressure"):
-        super().__init__(species, value, constraint)
+    def __init__(self, species: GasSpecies, value: float):
+        super().__init__(species, value, "pressure")
 
-    def fugacity(self, *args, **kwargs) -> float:
-        fugacity: float = self.pressure(*args, **kwargs)
-        fugacity *= self.species.eos.fugacity_coefficient(*args, **kwargs)
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        """Value of the fugacity constraint in bar
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Fugacity in bar
+        """
+        fugacity: float = self.pressure(temperature, pressure)
+        fugacity *= self.species.eos.fugacity_coefficient(temperature, pressure)
 
         return fugacity
 
     def pressure(self, *args, **kwargs) -> float:
+        """Value of the pressure constraint in bar
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Pressure in bar
+        """
         del args
         del kwargs
 
         return self._value
 
     @override
-    def get_value(self, *args, **kwargs) -> float:
-        return self.fugacity(*args, **kwargs)
+    def get_value(self, temperature: float, pressure: float) -> float:
+        return self.fugacity(temperature, pressure)
 
 
 class TotalPressureConstraint(ConstraintProtocol):
@@ -307,12 +390,14 @@ class TotalPressureConstraint(ConstraintProtocol):
     def name(self) -> str:
         return self._name
 
+    @override
     def get_value(self, *args, **kwargs) -> float:
         del args
         del kwargs
 
         return self._value
 
+    @override
     def get_log10_value(self, *args, **kwargs) -> float:
         return np.log10(self.get_value(*args, **kwargs))
 
@@ -337,18 +422,6 @@ class SystemConstraints(UserList):
         self.data: list[ConstraintProtocol]
         super().__init__(initlist)
 
-    @property
-    def activity_constraints(self) -> list[ActivityConstraintProtocol]:
-        """Constraints related to activity"""
-        return list(filter_by_type(self, ActivityConstraintProtocol).values())
-
-    @property
-    def fugacity_constraints(self) -> list[FugacityConstraintProtocol]:
-        """Constraints related to fugacity"""
-        out = list(filter_by_type(self, FugacityConstraintProtocol).values())
-
-        return out
-
     # TODO: Currently only for element mass constraints, but should be generalised to include
     # species mass constraints
     @property
@@ -370,13 +443,9 @@ class SystemConstraints(UserList):
         return total_pressure
 
     @property
-    def reaction_network_constraints(self) -> list[SpeciesConstraintProtocol]:
+    def reaction_network_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
         """Constraints related to the reaction network"""
-        filtered_entries: list[SpeciesConstraintProtocol] = []
-        filtered_entries.extend(self.fugacity_constraints)
-        filtered_entries.extend(self.activity_constraints)
-
-        return filtered_entries
+        return list(filter_by_type(self, ReactionNetworkConstraintProtocol).values())
 
     @property
     def number_reaction_network_constraints(self) -> int:
