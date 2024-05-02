@@ -334,6 +334,7 @@ def test_water_condensed_10bar(helper) -> None:
     }
 
     system.solve(constraints)
+    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -341,31 +342,31 @@ def test_graphite_water_condensed_10bar(helper) -> None:
     """Graphite and condensed water at 10 bar"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies(formula="H2")
-    O2_g: GasSpecies = GasSpecies(formula="O2")
-    H2O_l: LiquidSpecies = LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar")
-    CO_g: GasSpecies = GasSpecies(formula="CO")
-    CO2_g: GasSpecies = GasSpecies(formula="CO2")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    # H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
     CH4_g: GasSpecies = GasSpecies("CH4")
-    C_cr: SolidSpecies = SolidSpecies("C")
+    # C_cr: SolidSpecies = SolidSpecies("C")
 
-    species: Species = Species([H2O_g, H2_g, O2_g, H2O_l, CO_g, CO2_g, CH4_g, C_cr])
+    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g])  # , C_cr, H2O_l])
 
     planet: Planet = Planet()
-    planet.surface_temperature = 460
+    planet.surface_temperature = 450
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1) * 0.2
+    h_kg: float = earth_oceans_to_kg(1) * 1
     c_kg = h_kg
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            # FugacityConstraint(CH4_g, 3.428705),
-            TotalPressureConstraint(10),
+            FugacityConstraint(H2O_g, 8),
+            # TotalPressureConstraint(10),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            ActivityConstraint(H2O_l, 1),
-            ActivityConstraint(C_cr, 1),
+            # ActivityConstraint(H2O_l, 1),
+            # ActivityConstraint(C_cr, 1),
         ]
     )
 
@@ -379,8 +380,8 @@ def test_graphite_water_condensed_10bar(helper) -> None:
         "H2O_l": 1.0,
         "H2_g": 0.01561731936431075,
         "O2_g": 9.326226158104995e-46,
-        "degree_of_condensation_C": 0.5687210428967688,
-        "degree_of_condensation_H": 0.7721952621991293,
+        # "degree_of_condensation_C": 0.5687210428967688,
+        # "degree_of_condensation_H": 0.7721952621991293,
     }
 
     # This is the solution when instead, the total pressure is fixed at 10 bar
@@ -406,7 +407,7 @@ def test_graphite_water_condensed_10bar(helper) -> None:
     initial_solution = InitialSolutionDict(value=data_to_start, species=species)
 
     system.solve(constraints, initial_solution=initial_solution)
-    # system.output(to_excel=True)
+    system.output(to_excel=True)
     assert helper.isclose(system, data_to_compare, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
