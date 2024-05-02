@@ -51,6 +51,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 import numpy as np
+import numpy.typing as npt
 from scipy.constants import kilo
 
 from atmodeller.eos.interfaces import (
@@ -228,7 +229,7 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}
         """
-        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
+        volume_roots: npt.NDArray = self.volume_roots(*args, **kwargs)
 
         return np.min(volume_roots)
 
@@ -266,7 +267,7 @@ class _MRKH2OGasHP91(MRKImplicitABC):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}
         """
-        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
+        volume_roots: npt.NDArray = self.volume_roots(*args, **kwargs)
 
         return np.max(volume_roots)
 
@@ -305,7 +306,7 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}
         """
-        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
+        volume_roots: npt.NDArray = self.volume_roots(*args, **kwargs)
 
         # It appears that there is only ever a single root, even if Ta < temperature < Tc. Holland
         # and Powell state that a single root exists if temperature > Tc, but this appears to be
@@ -343,7 +344,7 @@ class MRKCO2HP91(MRKImplicitABC):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
+        volume_roots: npt.NDArray = self.volume_roots(*args, **kwargs)
 
         # In some cases there are more than a single root, in which case the maximum value
         # maintains continuity/monotonicity with the single root cases. Furthermore, the max value

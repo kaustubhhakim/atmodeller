@@ -25,6 +25,7 @@ from importlib.abc import Traversable
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 
 from atmodeller.eos.interfaces import RealGasProtocol
 
@@ -48,7 +49,7 @@ class SimpleRealGasEquationOfState(RealGasProtocol):
             eos_data_directory.joinpath("test.dat")
         )
         with data as data_path:
-            lookup_data: np.ndarray = np.loadtxt(data_path)
+            lookup_data: npt.NDArray = np.loadtxt(data_path)
 
         # Do stuff with lookup data
         logger.info("Lookup data = %s", lookup_data)

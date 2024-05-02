@@ -24,6 +24,7 @@ from collections import UserList
 from typing import TYPE_CHECKING, Mapping, Optional
 
 import numpy as np
+import numpy.typing as npt
 from molmass import Formula
 
 from atmodeller.activity.interfaces import ActivityProtocol, ConstantActivity
@@ -102,7 +103,7 @@ class _ChemicalSpecies:
 
     @property
     def molar_mass(self) -> float:
-        """Molar mass in kg/mol"""
+        r"""Molar mass in :math:\mathrm{kg}\mathrm{mol}^{-1}"""
         return UnitConversion.g_to_kg(self.formula.mass)
 
     @property
@@ -157,21 +158,6 @@ class GasSpecies(_ChemicalSpecies):
     def eos(self) -> RealGasProtocol:
         """A gas equation of state"""
         return self._eos
-
-    def fugacity(self, temperature: float, pressure: float) -> float:
-        """Fugacity in bar
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Fugacity in bar
-        """
-        fugacity: float = self.eos.fugacity_coefficient(temperature=temperature, pressure=pressure)
-        fugacity *= pressure
-
-        return fugacity
 
     @property
     def solid_melt_distribution_coefficient(self) -> float:
@@ -283,9 +269,6 @@ class SolidSpecies(_CondensedSpecies):
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
         activity: Activity model. Defaults to unity for a pure component.
-
-    Attributes:
-        activity: Activity model
     """
 
     @override
@@ -302,9 +285,6 @@ class LiquidSpecies(_CondensedSpecies):
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
         activity: Activity model. Defaults to unity for a pure component.
-
-    Attributes:
-        activity: Activity model
     """
 
     @override
@@ -371,15 +351,24 @@ class Species(UserList[_ChemicalSpecies]):
         """Number of condensed species"""
         return len(self.condensed_species)
 
-    @property
-    def indices(self) -> dict[str, int]:
-        """Indices of the species"""
-        return {formula: index for index, formula in enumerate(self.formulas)}
+    def find_species(self, find_species: _ChemicalSpecies) -> int:
+        """Finds a species and return its index.
 
-    @property
-    def formulas(self) -> list[str]:
-        """Chemical formulas of the species"""
-        return [str(species.formula) for species in self.data]
+        Args:
+            find_species: Species to find
+
+        Returns:
+            Index of the species
+
+        Raises:
+            ValueError: The species is not in the list
+        """
+        for index, species in enumerate(self.data):
+            # is checks for identity (not equality)
+            if species is find_species:
+                return index
+
+        raise ValueError("Species not found")
 
     @property
     def names(self) -> list[str]:
@@ -387,7 +376,7 @@ class Species(UserList[_ChemicalSpecies]):
         return [species.name for species in self.data]
 
     def conform_solubilities_to_composition(self, melt_composition: str | None = None) -> None:
-        """Conforms the solubilities of the species to the planet composition.
+        """Conforms the solubilities of the gas species to the planet composition.
 
         Args:
             melt_composition: Composition of the melt. Defaults to None.
@@ -406,23 +395,28 @@ class Species(UserList[_ChemicalSpecies]):
 
             for species in self.gas_species.values():
                 try:
-                    species.solubility = solubilities[str(species.formula)]
+                    species.solubility = solubilities[species.hill_formula]
                     logger.info(
-                        "Found solubility law for %s: %s",
+                        "Found solubility law for %s (hill formula=%s): %s",
                         species.formula,
+                        species.hill_formula,
                         species.solubility.__class__.__name__,
                     )
                 except KeyError:
-                    logger.info("No solubility law for %s", species.formula)
+                    logger.info(
+                        "No solubility law for %s (hill formula=%s)",
+                        species.formula,
+                        species.hill_formula,
+                    )
                     species.solubility = NoSolubility()
 
-    def composition_matrix(self) -> np.ndarray:
+    def composition_matrix(self) -> npt.NDArray:
         """Creates a matrix where species (rows) are split into their element counts (columns).
 
         Returns:
             A matrix of element counts
         """
-        matrix: np.ndarray = np.zeros((self.number, self.number_elements), dtype=int)
+        matrix: npt.NDArray[np.int_] = np.zeros((self.number, self.number_elements), dtype=np.int_)
         for species_index, species in enumerate(self.data):
             for element_index, element in enumerate(self.elements):
                 try:

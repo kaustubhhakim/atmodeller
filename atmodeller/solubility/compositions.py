@@ -14,7 +14,10 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Collections of solubility laws for compositions"""
+"""Collections of solubility laws for compositions
+
+Keys (species) of the dictionaries must use the hill notation.
+"""
 
 from __future__ import annotations
 

@@ -19,6 +19,7 @@
 import logging
 
 import numpy as np
+import numpy.typing as npt
 import pytest
 
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
@@ -42,15 +43,15 @@ class Helper:
         if len((system.solution_dict())) != len(target):
             return np.bool_(False)
 
-        target_values: np.ndarray = np.array(list(dict(sorted(target.items())).values()))
-        solution_values: np.ndarray = np.array(
+        target_values: npt.NDArray = np.array(list(dict(sorted(target.items())).values()))
+        solution_values: npt.NDArray = np.array(
             list(dict(sorted(system.solution_dict().items())).values())
         )
         if log:
             target_values = np.log10(target_values)
             solution_values = np.log10(solution_values)
 
-        isclose: np.ndarray = np.isclose(target_values, solution_values, rtol=rtol, atol=atol)
+        isclose: npt.NDArray = np.isclose(target_values, solution_values, rtol=rtol, atol=atol)
 
         logger.debug("isclose = %s", isclose)
 

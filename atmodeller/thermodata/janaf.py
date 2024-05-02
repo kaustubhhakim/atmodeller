@@ -197,7 +197,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
             gibbs: float = self.data.DeltaG(temperature) * kilo
 
             logger.debug(
-                "Species = %s, standard Gibbs energy of formation=%f",
+                "Species=%s, standard Gibbs energy of formation=%f",
                 self.species.formula,
                 gibbs,
             )

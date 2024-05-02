@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
+import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
@@ -77,7 +78,7 @@ class BeattieBridgeman(RealGas):
     c: float
     """c constant"""
 
-    def volume_roots(self, temperature: float, pressure: float) -> np.ndarray:
+    def volume_roots(self, temperature: float, pressure: float) -> npt.NDArray:
         r"""Real and potentially physically meaningful volume solutions :cite:p:`HWZ58{equation 2}`
 
         Args:
@@ -104,13 +105,13 @@ class BeattieBridgeman(RealGas):
 
         polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="V")
         logger.debug("Beattie-Bridgeman equation = %s", polynomial)
-        volume_roots: np.ndarray = polynomial.roots()
+        volume_roots: npt.NDArray = polynomial.roots()
         logger.debug("volume_roots = %s", volume_roots)
         # Numerical solution could result in a small imaginery component, even though the real
         # root is purely real.
-        real_roots: np.ndarray = np.real(volume_roots[np.isclose(volume_roots.imag, 0)])
+        real_roots: npt.NDArray = np.real(volume_roots[np.isclose(volume_roots.imag, 0)])
         # Physically meaningful volumes must be positive.
-        positive_roots: np.ndarray = real_roots[real_roots > 0]
+        positive_roots: npt.NDArray = real_roots[real_roots > 0]
         # In general, several roots could be returned, and subclasses will need to determine which
         # is the correct volume to use.
         logger.debug("V = %s", positive_roots)
@@ -131,7 +132,7 @@ class BeattieBridgeman(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        volume_roots: np.ndarray = self.volume_roots(*args, **kwargs)
+        volume_roots: npt.NDArray = self.volume_roots(*args, **kwargs)
 
         return np.max(volume_roots)
 

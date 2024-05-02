@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Iterable, cast
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
 from cmcrameri import cm
@@ -362,12 +363,12 @@ class Plotter:
         for sheet_name in sorted_data:
             out: pd.DataFrame = pd.DataFrame()
             for column in sorted_data[sheet_name].columns:
-                data_reshape: np.ndarray = np.array(sorted_data[sheet_name][column]).reshape(
+                data_reshape: npt.NDArray = np.array(sorted_data[sheet_name][column]).reshape(
                     -1, bin_size
                 )
                 try:
-                    data_average: np.ndarray = np.average(data_reshape, axis=1)
-                    data_std: np.ndarray = cast(np.ndarray, np.std(data_average))
+                    data_average: npt.NDArray = np.average(data_reshape, axis=1)
+                    data_std: npt.NDArray = cast(npt.NDArray, np.std(data_average))
                     out[f"{column}"] = data_average
                     out[f"{column}_std"] = data_std
                 except TypeError:
@@ -423,8 +424,8 @@ class Plotter:
 
         for species, color in zip(species_set, colors_set):
             label: str = species.rstrip("_g")
-            x_data: np.ndarray | pd.Series = binned_data[species][x_axis]
-            y_data: np.ndarray | pd.Series = binned_data[species][y_axis] / scale_factor
+            x_data: npt.NDArray | pd.Series = binned_data[species][x_axis]
+            y_data: npt.NDArray | pd.Series = binned_data[species][y_axis] / scale_factor
             if smooth is not None:
                 y_data = gaussian_filter1d(y_data, sigma=sigma)
             ax.plot(x_data, y_data, color=color, label=label)

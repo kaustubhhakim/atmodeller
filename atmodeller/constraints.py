@@ -124,7 +124,7 @@ class _SpeciesConstraint(ABC, Generic[U]):
 
     @property
     def name(self) -> str:
-        """Name of the constraint"""
+        """Unique name by combing the unique species name and the constraint name"""
         return f"{self.species.name}_{self.constraint}"
 
     @property

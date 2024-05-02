@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 import numpy as np
+import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
@@ -498,7 +499,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
         return volume_integral
 
-    def volume_roots(self, temperature: float, pressure: float) -> np.ndarray:
+    def volume_roots(self, temperature: float, pressure: float) -> npt.NDArray:
         r"""Real and (potentially) physically meaningful volume solutions of the MRK equation
 
         Args:
@@ -520,12 +521,12 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
 
         polynomial: Polynomial = Polynomial(np.array(coefficients), symbol="V")
         logger.debug("MRK equation = %s", polynomial)
-        volume_roots: np.ndarray = polynomial.roots()
+        volume_roots: npt.NDArray = polynomial.roots()
         # Numerical solution could result in a small imaginery component, even though the root is
         # real.
-        real_roots: np.ndarray = np.real(volume_roots[np.isclose(volume_roots.imag, 0)])
+        real_roots: npt.NDArray = np.real(volume_roots[np.isclose(volume_roots.imag, 0)])
         # Physically meaningful volumes must be positive.
-        positive_roots: np.ndarray = real_roots[real_roots > 0]
+        positive_roots: npt.NDArray = real_roots[real_roots > 0]
         # In general, several roots could be returned, and subclasses will need to determine which
         # is the correct volume to use depending on the phase (liquid, gas, etc.)
         logger.debug("V = %s", positive_roots)

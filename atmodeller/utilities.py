@@ -25,6 +25,7 @@ from dataclasses import asdict
 from typing import Any, Callable, Type, TypeVar
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from scipy.constants import kilo, mega
 
@@ -33,7 +34,7 @@ from atmodeller import ATMOSPHERE, OCEAN_MASS_H2
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-MultiplyT = TypeVar("MultiplyT", float, np.ndarray, pd.Series, pd.DataFrame)
+MultiplyT = TypeVar("MultiplyT", float, npt.NDArray, pd.Series, pd.DataFrame)
 
 
 def debug_decorator(logger_in: logging.Logger) -> Callable:
