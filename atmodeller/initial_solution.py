@@ -45,6 +45,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+MIN_LOG10: float = -12
+"""Minimum log10 of the initial solution"""
+MAX_LOG10: float = 5
+"""Maximum log10 of the initial solution"""
+
 
 class InitialSolution(ABC, Generic[T]):
     """Initial solution
@@ -57,9 +62,9 @@ class InitialSolution(ABC, Generic[T]):
     Args:
         value: An object or value used to compute the initial solution
         species: Species
-        min_log10: Minimuim log10 value. Defaults to -12, which is motivated by typical values of
-            oxygen fugacity at the iron-wustite buffer.
-        max_log10: Maximum log10 value. Defaults to 5.
+        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
+            typical values of oxygen fugacity at the iron-wustite buffer.
+        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
 
     Attributes:
         value: An object or value used to compute the initial solution
@@ -73,8 +78,8 @@ class InitialSolution(ABC, Generic[T]):
         value: T,
         *,
         species: Species,
-        min_log10: float = -12,
-        max_log10: float = 5,
+        min_log10: float = MIN_LOG10,
+        max_log10: float = MAX_LOG10,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -89,7 +94,7 @@ class InitialSolution(ABC, Generic[T]):
         """Computes the raw value of the initial solution.
 
         Args:
-            constraints: Constraints on the interior-atmosphere system
+            constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -110,12 +115,12 @@ class InitialSolution(ABC, Generic[T]):
         """Computes the log10 value of the initial solution with additional processing.
 
         Args:
-            constraints: Constraints on the interior-atmosphere system
+            constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
             degree_of_condensation_number: Number of elements to solve for the degree of
                 condensation
-            perturb: Randomaly perturb the log10 value by `perturb_log10`. Defaults to False.
+            perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
             perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
                 to 2.
 
@@ -196,9 +201,9 @@ class InitialSolutionConstant(InitialSolution[float]):
     Args:
         value: A constant pressure for the initial condition in bar. Defaults to 10.
         species: Species
-        min_log10: Minimuim log10 value. Defaults to -12, which is motivated by typical values of
-            oxygen fugacity at the iron-wustite buffer.
-        max_log10: Maximum log10 value. Defaults to 5.
+        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
+            typical values of oxygen fugacity at the iron-wustite buffer.
+        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
 
     Attributes:
         value: A constant pressure for the initial condition in bar.
@@ -220,15 +225,15 @@ class InitialSolutionConstant(InitialSolution[float]):
         return self.value * np.ones(self.species.number)
 
 
-class InitialSolutionDict(InitialSolution[dict[str, float]]):
+class InitialSolutionDict(InitialSolution[dict[str, float | int]]):
     """A dictionary of species and their values for the initial solution
 
     Args:
         value: A dictionary of species and values
         species: Species
-        min_log10: Minimuim log10 value. Defaults to -12, which is motivated by typical values of
-            oxygen fugacity at the iron-wustite buffer.
-        max_log10: Maximum log10 value. Defaults to 5.
+        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
+            typical values of oxygen fugacity at the iron-wustite buffer.
+        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
         fill_value: Initial value for species that are not specified in `value`. Defaults to 1 bar.
 
     Attributes:
@@ -272,9 +277,9 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     Args:
         value: Output for constructing the regressor
         species: Species
-        min_log10: Minimuim log10 value. Defaults to -12, which is motivated by typical values of
-            oxygen fugacity at the iron-wustite buffer.
-        max_log10: Maximum log10 value. Defaults to 5.
+        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
+            typical values of oxygen fugacity at the iron-wustite buffer.
+        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
         species_fill: Dictionary of missing species and their initial values. Defaults to None.
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
@@ -307,14 +312,16 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self,
         value: Output,
         *,
+        species: Species,
+        min_log10: float = MIN_LOG10,
+        max_log10: float = MAX_LOG10,
         species_fill: dict[str, float] | None = None,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
         partial_fit_batch_size: int = 500,
-        **kwargs,
     ):
-        super().__init__(value, **kwargs)
+        super().__init__(value, species=species, min_log10=min_log10, max_log10=max_log10)
         self.species_fill: dict[str, float] = species_fill if species_fill is not None else {}
         self.fit: bool = fit
         # Ensure consistency of arguments and correct handling of fit versus partial refit.
@@ -467,7 +474,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     def get_value(
         self, constraints: SystemConstraints, temperature: float, pressure: float
     ) -> npt.NDArray:
-        """See base class."""
         evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
             temperature=temperature, pressure=pressure
         )
@@ -539,24 +545,39 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             )
 
 
-class InitialSolutionSwitchRegressor(InitialSolution):
-    """An initial solution that uses constant initial value(s) before switching to a regressor.
+class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
+    """An initial solution that uses an initial solution before switching to a regressor.
 
     Args:
-        value: Initial constant regressor
+        value: An initial solution
+        species: Species
+        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
+            typical values of oxygen fugacity at the iron-wustite buffer.
+        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
         fit_batch_size: Number of simulations to generate before fitting the regressor. Defaults
             to 100.
-        **kwargs: Arbitrary keyword arguments to pass to :class:`InitialSolutionRegressor`
+        **kwargs: Keyword arguments that are specific to :class:`InitialSolutionRegressor`
 
     Attributes:
-        value: Initial constant regressor
-        fit_batch_size: Number of simulations to generate before fitting the regressor.
+        value: An initial solution
+        species: Species
+        min_log10: Minimum log10 value
+        max_log10: Maximum log10 value
+        fit_batch_size: Number of simulations to generate before fitting the regressor
     """
 
     @override
-    def __init__(self, value: InitialSolution, fit_batch_size: int = 100, **kwargs):
-        self.value: InitialSolution  # For typing
-        super().__init__(value, **kwargs)
+    def __init__(
+        self,
+        value: InitialSolution,
+        *,
+        species: Species,
+        min_log10: float = MIN_LOG10,
+        max_log10: float = MAX_LOG10,
+        fit_batch_size: int = 100,
+        **kwargs,
+    ):
+        super().__init__(value, species=species, min_log10=min_log10, max_log10=max_log10)
         self.fit_batch_size: int = fit_batch_size
         # Store to instantiate regressor once the switch occurs.
         self._kwargs: dict[str, Any] = kwargs
@@ -571,6 +592,12 @@ class InitialSolutionSwitchRegressor(InitialSolution):
             # The fit keyword argument of InitialSolutionRegressor is effectively ignored
             # because the fit is done once when InitialSolutionRegressor is instantiated and
             # action_fit cannot be triggered regardless of the value of fit.
-            self.value = InitialSolutionRegressor(output, **self._kwargs)
+            self.value = InitialSolutionRegressor(
+                output,
+                species=self.species,
+                min_log10=self.min_log10,
+                max_log10=self.max_log10,
+                **self._kwargs,
+            )
         else:
             self.value.update(output, *args, **kwargs)
