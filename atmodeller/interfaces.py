@@ -20,17 +20,138 @@
 
 from __future__ import annotations
 
+import logging
+import sys
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+from molmass import Formula
+
+from atmodeller.activity.interfaces import ActivityProtocol, ConstantActivity
+from atmodeller.thermodata.interfaces import (
+    ThermodynamicDataForSpeciesProtocol,
+    ThermodynamicDataset,
+)
+from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
+from atmodeller.utilities import UnitConversion
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
     from atmodeller.output import Output
 
-# Type hint indicating covariance using type comments
-TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=_ChemicalSpecies, covariant=True)
+logger: logging.Logger = logging.getLogger(__name__)
+
+
+class ChemicalSpecies:
+    """A chemical species and its properties
+
+    Args:
+        formula: Chemical formula (e.g., CO2, C, CH4, etc.)
+        phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively
+        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF.
+        thermodata_name: Name of the component in the thermodynamic dataset. Defaults to None.
+        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
+    """
+
+    def __init__(
+        self,
+        formula: str,
+        phase: str,
+        *,
+        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
+        thermodata_name: str | None = None,
+        thermodata_filename: str | None = None,
+    ):
+        self._formula: Formula = Formula(formula)
+        self._phase: str = phase
+        thermodata: ThermodynamicDataForSpeciesProtocol | None = (
+            thermodata_dataset.get_species_data(
+                self, name=thermodata_name, filename=thermodata_filename
+            )
+        )
+        assert thermodata is not None
+        self._thermodata: ThermodynamicDataForSpeciesProtocol = thermodata
+        logger.info(
+            "Creating %s %s (hill formula=%s) using thermodynamic data in %s",
+            self.__class__.__name__,
+            self.formula,
+            self.hill_formula,
+            self.thermodata.data_source,
+        )
+
+    @property
+    def elements(self) -> list[str]:
+        """Elements in species"""
+        return list(self.formula.composition().keys())
+
+    @property
+    def formula(self) -> Formula:
+        """Formula object"""
+        return self._formula
+
+    @property
+    def hill_formula(self) -> str:
+        """Hill formula"""
+        return self.formula.formula
+
+    @property
+    def molar_mass(self) -> float:
+        r"""Molar mass in :math:\mathrm{kg}\mathrm{mol}^{-1}"""
+        return UnitConversion.g_to_kg(self.formula.mass)
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining formula and phase"""
+        return f"{self.formula}_{self.phase}"
+
+    @property
+    def phase(self) -> str:
+        """Phase"""
+        return self._phase
+
+    @property
+    def thermodata(self) -> ThermodynamicDataForSpeciesProtocol:
+        """Thermodynamic data for the species"""
+        return self._thermodata
+
+
+class CondensedSpecies(ChemicalSpecies):
+    """A condensed species
+
+    Args:
+        formula: Chemical formula (e.g., C, SiO2, etc.)
+        phase: Phase
+        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
+        thermodata_name: Name in the thermodynamic dataset. Defaults to None.
+        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
+        activity: Activity model. Defaults to unity for a pure component.
+
+    Attributes:
+        activity: Activity model
+    """
+
+    @override
+    def __init__(
+        self,
+        formula: str,
+        phase: str,
+        *,
+        activity: ActivityProtocol = ConstantActivity(),
+        **kwargs,
+    ):
+        super().__init__(formula, phase, **kwargs)
+        self._activity: ActivityProtocol = activity
+
+    @property
+    def activity(self) -> ActivityProtocol:
+        """An activity model"""
+        return self._activity
 
 
 @runtime_checkable
@@ -50,7 +171,7 @@ class ConstraintProtocol(Protocol):
 class SpeciesConstraintProtocol(ConstraintProtocol, Protocol):
 
     @property
-    def species(self) -> _ChemicalSpecies: ...
+    def species(self) -> ChemicalSpecies: ...
 
 
 class ElementConstraintProtocol(ConstraintProtocol, Protocol):
@@ -84,3 +205,7 @@ class InitialSolutionProtocol(Protocol):
     ) -> npt.NDArray[np.float_]: ...
 
     def update(self, output: Output) -> None: ...
+
+
+# Type hint indicating covariance using type comments
+TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies, covariant=True)

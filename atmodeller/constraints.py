@@ -26,8 +26,10 @@ from typing import Generic, TypeVar
 
 import numpy as np
 
-from atmodeller.core import GasSpecies, _ChemicalSpecies, _CondensedSpecies
+from atmodeller.core import GasSpecies
 from atmodeller.interfaces import (
+    ChemicalSpecies,
+    CondensedSpecies,
     ConstraintProtocol,
     ElementConstraintProtocol,
     ReactionNetworkConstraintProtocol,
@@ -44,7 +46,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=ConstraintProtocol)
-U = TypeVar("U", bound=_ChemicalSpecies)
+U = TypeVar("U", bound=ChemicalSpecies)
 
 
 class ElementMassConstraint(ElementConstraintProtocol):
@@ -187,7 +189,7 @@ class _SpeciesConstantConstraint(_SpeciesConstraint[U]):
         return np.log10(self.get_value(temperature, pressure))
 
 
-class ActivityConstraint(_SpeciesConstantConstraint[_CondensedSpecies]):
+class ActivityConstraint(_SpeciesConstantConstraint[CondensedSpecies]):
     """A constant activity
 
     Args:
@@ -198,7 +200,7 @@ class ActivityConstraint(_SpeciesConstantConstraint[_CondensedSpecies]):
     @override
     def __init__(
         self,
-        species: _CondensedSpecies,
+        species: CondensedSpecies,
         value: float = 1,
     ):
         super().__init__(species, value, "activity")
@@ -314,7 +316,7 @@ class MassConstraint(_SpeciesConstantConstraint):
     """
 
     @override
-    def __init__(self, species: _ChemicalSpecies, value: float):
+    def __init__(self, species: ChemicalSpecies, value: float):
         super().__init__(species, value, "mass")
 
     def mass(self, *args, **kwargs) -> float:

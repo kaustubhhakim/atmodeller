@@ -25,18 +25,15 @@ from typing import TYPE_CHECKING, Mapping, Optional
 
 import numpy as np
 import numpy.typing as npt
-from molmass import Formula
 
-from atmodeller.activity.interfaces import ActivityProtocol, ConstantActivity
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
-from atmodeller.interfaces import TypeChemicalSpecies_co
+from atmodeller.interfaces import (
+    ChemicalSpecies,
+    CondensedSpecies,
+    TypeChemicalSpecies_co,
+)
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.thermodata.interfaces import (
-    ThermodynamicDataForSpeciesProtocol,
-    ThermodynamicDataset,
-)
-from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.utilities import UnitConversion, filter_by_type
 
 if sys.version_info < (3, 12):
@@ -50,80 +47,7 @@ if TYPE_CHECKING:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class _ChemicalSpecies:
-    """A chemical species and its properties
-
-    Args:
-        formula: Chemical formula (e.g., CO2, C, CH4, etc.)
-        phase: cr, g, and l for (crystalline) solid, gas, and liquid, respectively
-        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF.
-        thermodata_name: Name of the component in the thermodynamic dataset. Defaults to None.
-        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-    """
-
-    def __init__(
-        self,
-        formula: str,
-        phase: str,
-        *,
-        thermodata_dataset: ThermodynamicDataset = ThermodynamicDatasetJANAF(),
-        thermodata_name: str | None = None,
-        thermodata_filename: str | None = None,
-    ):
-        self._formula: Formula = Formula(formula)
-        self._phase: str = phase
-        thermodata: ThermodynamicDataForSpeciesProtocol | None = (
-            thermodata_dataset.get_species_data(
-                self, name=thermodata_name, filename=thermodata_filename
-            )
-        )
-        assert thermodata is not None
-        self._thermodata: ThermodynamicDataForSpeciesProtocol = thermodata
-        logger.info(
-            "Creating %s %s (hill formula=%s) using thermodynamic data in %s",
-            self.__class__.__name__,
-            self.formula,
-            self.hill_formula,
-            self.thermodata.data_source,
-        )
-
-    @property
-    def elements(self) -> list[str]:
-        """Elements in species"""
-        return list(self.formula.composition().keys())
-
-    @property
-    def formula(self) -> Formula:
-        """Formula object"""
-        return self._formula
-
-    @property
-    def hill_formula(self) -> str:
-        """Hill formula"""
-        return self.formula.formula
-
-    @property
-    def molar_mass(self) -> float:
-        r"""Molar mass in :math:\mathrm{kg}\mathrm{mol}^{-1}"""
-        return UnitConversion.g_to_kg(self.formula.mass)
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining formula and phase"""
-        return f"{self.formula}_{self.phase}"
-
-    @property
-    def phase(self) -> str:
-        """Phase"""
-        return self._phase
-
-    @property
-    def thermodata(self) -> ThermodynamicDataForSpeciesProtocol:
-        """Thermodynamic data for the species"""
-        return self._thermodata
-
-
-class GasSpecies(_ChemicalSpecies):
+class GasSpecies(ChemicalSpecies):
     """A gas species
 
     Args:
@@ -228,40 +152,7 @@ class GasSpecies(_ChemicalSpecies):
         return output
 
 
-class _CondensedSpecies(_ChemicalSpecies):
-    """A condensed species
-
-    Args:
-        formula: Chemical formula (e.g., C, SiO2, etc.)
-        phase: Phase
-        thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
-        thermodata_name: Name in the thermodynamic dataset. Defaults to None.
-        thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-        activity: Activity model. Defaults to unity for a pure component.
-
-    Attributes:
-        activity: Activity model
-    """
-
-    @override
-    def __init__(
-        self,
-        formula: str,
-        phase: str,
-        *,
-        activity: ActivityProtocol = ConstantActivity(),
-        **kwargs,
-    ):
-        super().__init__(formula, phase, **kwargs)
-        self._activity: ActivityProtocol = activity
-
-    @property
-    def activity(self) -> ActivityProtocol:
-        """An activity model"""
-        return self._activity
-
-
-class SolidSpecies(_CondensedSpecies):
+class SolidSpecies(CondensedSpecies):
     """A solid species
 
     Args:
@@ -277,7 +168,7 @@ class SolidSpecies(_CondensedSpecies):
         super().__init__(formula, "cr", **kwargs)
 
 
-class LiquidSpecies(_CondensedSpecies):
+class LiquidSpecies(CondensedSpecies):
     """A liquid species
 
     Args:
@@ -337,9 +228,9 @@ class Species(UserList):
         return len(self.gas_species)
 
     @property
-    def condensed_species(self) -> dict[int, _CondensedSpecies]:
+    def condensed_species(self) -> dict[int, CondensedSpecies]:
         """Condensed species"""
-        return filter_by_type(self, _CondensedSpecies)
+        return filter_by_type(self, CondensedSpecies)
 
     @property
     def condensed_elements(self) -> list[str]:
@@ -356,7 +247,7 @@ class Species(UserList):
         """Number of condensed species"""
         return len(self.condensed_species)
 
-    def find_species(self, find_species: _ChemicalSpecies) -> int:
+    def find_species(self, find_species: ChemicalSpecies) -> int:
         """Finds a species and returns its index.
 
         Args:
@@ -375,7 +266,7 @@ class Species(UserList):
 
         raise ValueError(f"{find_species.name} is not in the species list")
 
-    def check_species_present(self, find_species: _ChemicalSpecies) -> bool:
+    def check_species_present(self, find_species: ChemicalSpecies) -> bool:
         """Checks if a species is present
 
         Args:

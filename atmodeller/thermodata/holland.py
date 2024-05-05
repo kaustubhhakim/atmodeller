@@ -43,7 +43,7 @@ else:
     from typing import override
 
 if TYPE_CHECKING:
-    from atmodeller.core import _ChemicalSpecies
+    from atmodeller.core import ChemicalSpecies
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
     @override
     def get_species_data(
         self,
-        species: _ChemicalSpecies,
+        species: ChemicalSpecies,
         *,
         name: str | None = None,
         **kwargs,
@@ -141,7 +141,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
         @override
         def __init__(
             self,
-            species: _ChemicalSpecies,
+            species: ChemicalSpecies,
             data_source: str,
             data: pd.Series,
             enthalpy_reference_temperature: float,

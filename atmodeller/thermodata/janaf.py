@@ -39,12 +39,12 @@ else:
     from typing import override
 
 if TYPE_CHECKING:
-    from atmodeller.core import _ChemicalSpecies
+    from atmodeller.core import ChemicalSpecies
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def is_homonuclear_diatomic(species: _ChemicalSpecies) -> bool:
+def is_homonuclear_diatomic(species: ChemicalSpecies) -> bool:
     """True if species is homonuclear diatomic, otherwise False."""
     composition: Composition = species.formula.composition()
     if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
@@ -53,7 +53,7 @@ def is_homonuclear_diatomic(species: _ChemicalSpecies) -> bool:
         return False
 
 
-def is_noble(species: _ChemicalSpecies) -> bool:
+def is_noble(species: ChemicalSpecies) -> bool:
     """True if a species is a noble gas, otherwise False"""
     if species.hill_formula in NOBLE_GASES:
         return True
@@ -83,7 +83,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
     @override
     def get_species_data(
         self,
-        species: _ChemicalSpecies,
+        species: ChemicalSpecies,
         *,
         name: str | None = None,
         filename: str | None = None,
@@ -174,7 +174,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
         """Thermodynamic data for a species"""
 
         @override
-        def __init__(self, species: _ChemicalSpecies, data_source: str, data: janaf.JanafPhase):
+        def __init__(self, species: ChemicalSpecies, data_source: str, data: janaf.JanafPhase):
             super().__init__(species, data_source, data)
 
         @override
