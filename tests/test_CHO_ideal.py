@@ -179,7 +179,7 @@ def test_H_basalt_melt() -> None:
         "O2_g": 8.699588020866791e-08,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -211,7 +211,7 @@ def test_H_fO2_plus() -> None:
         "O2_g": 8.699641354691526e-06,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -243,7 +243,7 @@ def test_H_fO2_minus() -> None:
         "O2_g": 8.700876916925329e-10,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -275,7 +275,7 @@ def test_H_five_oceans() -> None:
         "O2_g": 8.706308103092035e-08,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -309,7 +309,7 @@ def test_H_1500K() -> None:
         "O2_g": 2.5006714903237476e-12,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -348,7 +348,7 @@ def test_H_and_C() -> None:
         "CO2_g": 13.404792068284909,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -387,7 +387,7 @@ def test_H_and_C_hill_formula() -> None:
         "O2C_g": 13.404792068284909,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 

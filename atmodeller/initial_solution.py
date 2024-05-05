@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Generic, TypeVar, cast
 
@@ -33,14 +34,14 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Species, _ChemicalSpecies
+from atmodeller.core import Species
+from atmodeller.interfaces import TypeChemicalSpecies_co
 from atmodeller.output import Output
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
-
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -252,14 +253,14 @@ class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
     @override
     def __init__(
         self,
-        value: dict[_ChemicalSpecies, float],
+        value: Mapping[TypeChemicalSpecies_co, float],
         *,
         species: Species,
         min_log10: float = MIN_LOG10,
         max_log10: float = MAX_LOG10,
         fill_value: float = 1,
     ):
-        species_dict: dict[_ChemicalSpecies, float] = {
+        species_dict: dict[TypeChemicalSpecies_co, float] = {
             unique_species: fill_value for unique_species in species
         }
         species_dict |= value
@@ -325,7 +326,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         species: Species,
         min_log10: float = MIN_LOG10,
         max_log10: float = MAX_LOG10,
-        species_fill: dict[_ChemicalSpecies, float] | None = None,
+        species_fill: dict[TypeChemicalSpecies_co, float] | None = None,
         fill_value: float = 1,
         fit: bool = True,
         fit_batch_size: int = 100,
@@ -365,7 +366,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         output: Output,
         *,
         species: Species,
-        species_fill: dict[_ChemicalSpecies, float] | None,
+        species_fill: dict[TypeChemicalSpecies_co, float] | None,
         fill_value: float,
     ) -> None:
         """Conforms the solution in output to the species and their fill values
@@ -379,7 +380,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         solution: pd.DataFrame = output.to_dataframes()["solution"].copy()
         logger.debug("solution = %s", solution)
 
-        species_fill_: dict[_ChemicalSpecies, float] = (
+        species_fill_: dict[TypeChemicalSpecies_co, float] = (
             species_fill if species_fill is not None else {}
         )
         initial_solution_dict: InitialSolutionDict = InitialSolutionDict(

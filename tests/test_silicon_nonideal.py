@@ -95,7 +95,7 @@ def test_SiHO_massSiH_nosolubility() -> None:
         "SiO2_l": 1.0,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
@@ -137,7 +137,7 @@ def test_SiHO_massSiH_solubility() -> None:
         "SiO2_l": 1.0,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -176,7 +176,7 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
         "SiO2_l": 1.0,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -215,7 +215,7 @@ def test_SiHO_massH_logfO2_solubility() -> None:
         "SiO2_l": 1.0,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -252,7 +252,7 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
         "SiO2_l": 1.0,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
@@ -289,7 +289,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
         "SiO2_l": 1.0,
     }
 
-    system.solve(SystemConstraints(constraints))
+    system.solve(constraints)
     assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 

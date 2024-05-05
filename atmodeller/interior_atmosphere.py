@@ -804,8 +804,10 @@ class InteriorAtmosphereSystem:
             constraint: TotalPressureConstraintProtocol = (
                 self.constraints.total_pressure_constraint[0]
             )
-            residual_total_pressure[0] += (
-                np.log10(self.total_pressure) - constraint.get_log10_value()
+            residual_total_pressure[0] += np.log10(
+                self.total_pressure
+            ) - constraint.get_log10_value(
+                temperature=self.planet.surface_temperature, pressure=self.total_pressure
             )
 
         # Combined residual

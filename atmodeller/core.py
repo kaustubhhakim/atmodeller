@@ -29,6 +29,7 @@ from molmass import Formula
 
 from atmodeller.activity.interfaces import ActivityProtocol, ConstantActivity
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
+from atmodeller.interfaces import TypeChemicalSpecies_co
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.thermodata.interfaces import (
@@ -292,7 +293,7 @@ class LiquidSpecies(_CondensedSpecies):
         super().__init__(formula, "l", **kwargs)
 
 
-class Species(UserList[_ChemicalSpecies]):
+class Species(UserList):
     """A list of species
 
     Args:
@@ -301,6 +302,10 @@ class Species(UserList[_ChemicalSpecies]):
     Attributes:
         data: List of species contained in the system
     """
+
+    # Required for typing since UserList itself is not a generic class so pylint: disable=W0246
+    def __init__(self, initlist: list[TypeChemicalSpecies_co] | None = None):
+        super().__init__(initlist)
 
     @property
     def elements(self) -> list[str]:

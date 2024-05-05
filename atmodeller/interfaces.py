@@ -20,16 +20,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 
-from atmodeller.core import _ChemicalSpecies
-
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
     from atmodeller.output import Output
+
+# Type hint indicating covariance using type comments
+TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=_ChemicalSpecies, covariant=True)
 
 
 @runtime_checkable
@@ -41,9 +42,9 @@ class ConstraintProtocol(Protocol):
     @property
     def name(self) -> str: ...
 
-    def get_value(self, *args, **kwargs) -> float: ...
+    def get_value(self, temperature: float, pressure: float) -> float: ...
 
-    def get_log10_value(self, *args, **kwargs) -> float: ...
+    def get_log10_value(self, temperature: float, pressure: float) -> float: ...
 
 
 class SpeciesConstraintProtocol(ConstraintProtocol, Protocol):
