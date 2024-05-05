@@ -286,7 +286,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     Args:
         value: Output for constructing the regressor
         species: Species
-        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`.
+        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
         max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
         species_fill: Dictionary of missing species and their initial values. Defaults to None.
         fill_value: Initial value for species that are not specified in `species_fill`. Defaults to
@@ -514,13 +514,13 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         return value
 
     def action_fit(self, output: Output) -> tuple[int, int] | None:
-        """Determines if a fit of the regressor is necessary.
+        """Checks if a fit is necessary.
 
         Args:
             output: Output
 
         Returns:
-            A tuple: (start_index, end_index) or None
+            The start and end index of the data to fit, or None (meaning no fit necessary)
         """
         trigger_fit: bool = self.fit_batch_size == output.size
 
@@ -528,13 +528,13 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             return (0, output.size)
 
     def action_partial_fit(self, output: Output) -> tuple[int, int] | None:
-        """Determines if a partial refit of the regressor is necessary.
+        """Checks if a partial refit is necessary.
 
         Args:
             output: Output
 
         Returns:
-            A tuple: (start_index, end_index) or None
+            The start and end index of the data to fit, or None (meaning no fit necessary)
         """
         trigger_partial_fit: bool = (
             not (output.size - self.fit_batch_size) % self.partial_fit_batch_size
@@ -569,8 +569,7 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
     Args:
         value: An initial solution
         species: Species
-        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
-            typical values of oxygen fugacity at the iron-wustite buffer.
+        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
         max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
         fit_batch_size: Number of simulations to generate before fitting the regressor. Defaults
             to 100.
@@ -596,7 +595,7 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
         **kwargs,
     ):
         super().__init__(value, species=species, min_log10=min_log10, max_log10=max_log10)
-        self.fit_batch_size: int = fit_batch_size
+        self._fit_batch_size: int = fit_batch_size
         # Store to instantiate regressor once the switch occurs.
         self._kwargs: dict[str, Any] = kwargs
 
@@ -606,7 +605,7 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
 
     @override
     def update(self, output: Output, *args, **kwargs) -> None:
-        if output.size == self.fit_batch_size:
+        if output.size == self._fit_batch_size:
             # The fit keyword argument of InitialSolutionRegressor is effectively ignored because
             # the fit is done once when InitialSolutionRegressor is instantiated and action_fit
             # cannot be triggered regardless of the value of fit.
