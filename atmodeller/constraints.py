@@ -420,9 +420,8 @@ class SystemConstraints(UserList):
         data: A list of constraints
     """
 
-    # Required for typing since UserList itself is not a generic class so pylint: disable=W0246
-    def __init__(self, initlist: list[ConstraintProtocol] | None = None):
-        super().__init__(initlist)
+    # UserList itself is not a generic class, so this is for typing:
+    data: list[ConstraintProtocol]
 
     # TODO: Currently only for element mass constraints, but should be generalised to include
     # species mass constraints

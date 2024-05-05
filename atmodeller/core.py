@@ -27,11 +27,7 @@ import numpy as np
 import numpy.typing as npt
 
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
-from atmodeller.interfaces import (
-    ChemicalSpecies,
-    CondensedSpecies,
-    TypeChemicalSpecies_co,
-)
+from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.utilities import UnitConversion, filter_by_type
@@ -194,14 +190,13 @@ class Species(UserList):
         data: List of species contained in the system
     """
 
-    # Required for typing since UserList itself is not a generic class so pylint: disable=W0246
-    def __init__(self, initlist: list[TypeChemicalSpecies_co] | None = None):
-        super().__init__(initlist)
+    # UserList itself is not a generic class, so this is for typing:
+    data: list[ChemicalSpecies]
 
     @property
     def elements(self) -> list[str]:
         elements: list[str] = []
-        for species in self:
+        for species in self.data:
             elements.extend(species.elements)
         unique_elements: list[str] = list(set(elements))
 
@@ -210,7 +205,7 @@ class Species(UserList):
     @property
     def number(self) -> int:
         """Number of species"""
-        return len(self)
+        return len(self.data)
 
     @property
     def number_elements(self) -> int:
