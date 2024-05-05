@@ -21,17 +21,11 @@
 import logging
 
 import numpy as np
-import pandas as pd
 
 from atmodeller import __version__, debug_logger
 from atmodeller.core import GasSpecies, Species
-from atmodeller.initial_solution import (
-    InitialSolutionConstant,
-    InitialSolutionDict,
-    InitialSolutionRegressor,
-)
+from atmodeller.initial_solution import InitialSolutionConstant, InitialSolutionDict
 from atmodeller.interfaces import InitialSolutionProtocol
-from atmodeller.output import Output
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -77,44 +71,45 @@ def test_dictionary():
     assert np.array_equal(initial_solution.value, np.array([5, 2, 10]))
 
 
-def test_regressor():
-    """Tests a regressor initial condition"""
+# TODO: Work in progress, but will need to generate some data to test the regressor.
+# def test_regressor():
+#     """Tests a regressor initial condition"""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    CO_g: GasSpecies = GasSpecies("CO")
-    CO2_g: GasSpecies = GasSpecies("CO2")
-    species: Species = Species([H2O_g, H2_g, CO_g, CO2_g])
+#     H2O_g: GasSpecies = GasSpecies("H2O")
+#     H2_g: GasSpecies = GasSpecies("H2")
+#     CO_g: GasSpecies = GasSpecies("CO")
+#     CO2_g: GasSpecies = GasSpecies("CO2")
+#     species: Species = Species([H2O_g, H2_g, CO_g, CO2_g])
 
-    output: Output = synthetic_output()
+#     output: Output = synthetic_output()
 
-    initial_solution: InitialSolutionProtocol = InitialSolutionRegressor(
-        output, species=species, species_fill={H2_g: 6}, fill_value=2
-    )
+#     initial_solution: InitialSolutionProtocol = InitialSolutionRegressor(
+#         output, species=species, species_fill={H2_g: 6}, fill_value=2
+#     )
 
-    expected_value: dict[str, list[float]] = {
-        "H2O_g": [1, 2, 3, 4],
-        "H2_g": [6, 6, 6, 6],
-        "CO_g": [5, 6, 7, 8],
-        "CO2_g": [2, 2, 2, 2],
-    }
-    expected_value_df = pd.DataFrame(expected_value)
+#     expected_value: dict[str, list[float]] = {
+#         "H2O_g": [1, 2, 3, 4],
+#         "H2_g": [6, 6, 6, 6],
+#         "CO_g": [5, 6, 7, 8],
+#         "CO2_g": [2, 2, 2, 2],
+#     }
+#     expected_value_df = pd.DataFrame(expected_value)
 
 
-def synthetic_output() -> Output:
-    """Generates synthetic output for testing the initial solution
+# def synthetic_output() -> Output:
+#     """Generates synthetic output for testing the initial solution
 
-    Returns:
-        Synthetic output
-    """
+#     Returns:
+#         Synthetic output
+#     """
 
-    output: Output = Output()
+#     output: Output = Output()
 
-    output["solution"] = [
-        {"H2O_g": 1, "CO_g": 5},
-        {"H2O_g": 2, "CO_g": 6},
-        {"H2O_g": 3, "CO_g": 7},
-        {"H2O_g": 4, "CO_g": 8},
-    ]
+#     output["solution"] = [
+#         {"H2O_g": 1, "CO_g": 5},
+#         {"H2O_g": 2, "CO_g": 6},
+#         {"H2O_g": 3, "CO_g": 7},
+#         {"H2O_g": 4, "CO_g": 8},
+#     ]
 
-    return output
+#     return output

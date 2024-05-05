@@ -45,7 +45,9 @@ from atmodeller.solubility.sulfur_species import (
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 RTOL: float = 1.0e-8
+"""Relative tolerance"""
 ATOL: float = 1.0e-8
+"""Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
 
