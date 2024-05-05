@@ -131,9 +131,6 @@ class CondensedSpecies(ChemicalSpecies):
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
         activity: Activity model. Defaults to unity for a pure component.
-
-    Attributes:
-        activity: Activity model
     """
 
     @override
