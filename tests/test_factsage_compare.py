@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import logging
 
-import pytest
-
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (  # TotalPressureConstraint,
     ActivityConstraint,
@@ -33,7 +31,6 @@ from atmodeller.constraints import (  # TotalPressureConstraint,
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
-from atmodeller.initial_solution import InitialSolutionDict
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
@@ -339,79 +336,79 @@ def test_water_condensed_10bar(helper) -> None:
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-@pytest.mark.skip(reason="Unphysical since temperature is too high for stable liquid H2O")
-def test_graphite_water_condensed_10bar(helper) -> None:
-    """Graphite and condensed water at 10 bar"""
+# @pytest.mark.skip(reason="Unphysical since temperature is too high for stable liquid H2O")
+# def test_graphite_water_condensed_10bar(helper) -> None:
+#     """Graphite and condensed water at 10 bar"""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    O2_g: GasSpecies = GasSpecies("O2")
-    # H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
-    CO_g: GasSpecies = GasSpecies("CO")
-    CO2_g: GasSpecies = GasSpecies("CO2")
-    CH4_g: GasSpecies = GasSpecies("CH4")
-    # C_cr: SolidSpecies = SolidSpecies("C")
+#     H2O_g: GasSpecies = GasSpecies("H2O")
+#     H2_g: GasSpecies = GasSpecies("H2")
+#     O2_g: GasSpecies = GasSpecies("O2")
+#     # H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
+#     CO_g: GasSpecies = GasSpecies("CO")
+#     CO2_g: GasSpecies = GasSpecies("CO2")
+#     CH4_g: GasSpecies = GasSpecies("CH4")
+#     # C_cr: SolidSpecies = SolidSpecies("C")
 
-    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g])  # , C_cr, H2O_l])
+#     species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g])  # , C_cr, H2O_l])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 450
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+#     planet: Planet = Planet()
+#     planet.surface_temperature = 450
+#     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1) * 1
-    c_kg = h_kg
+#     h_kg: float = earth_oceans_to_kg(1) * 1
+#     c_kg = h_kg
 
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            FugacityConstraint(H2O_g, 8),
-            # TotalPressureConstraint(10),
-            ElementMassConstraint("H", h_kg),
-            ElementMassConstraint("C", c_kg),
-            # ActivityConstraint(H2O_l, 1),
-            # ActivityConstraint(C_cr, 1),
-        ]
-    )
+#     constraints: SystemConstraints = SystemConstraints(
+#         [
+#             FugacityConstraint(H2O_g, 8),
+#             # TotalPressureConstraint(10),
+#             ElementMassConstraint("H", h_kg),
+#             ElementMassConstraint("C", c_kg),
+#             # ActivityConstraint(H2O_l, 1),
+#             # ActivityConstraint(C_cr, 1),
+#         ]
+#     )
 
-    # This is the solution when the CH4 fugacity is fixed at 3.428 bar
-    factsage_result_CH4: dict[str, float] = {
-        "CH4_g": 3.4287054461076254,
-        "CO2_g": 0.6361664824724061,
-        "CO_g": 5.249106319198347e-06,
-        "C_cr": 1.0,
-        "H2O_g": 5.919505502971372,
-        "H2O_l": 1.0,
-        "H2_g": 0.01561731936431075,
-        "O2_g": 9.326226158104995e-46,
-        # "degree_of_condensation_C": 0.5687210428967688,
-        # "degree_of_condensation_H": 0.7721952621991293,
-    }
+#     # This is the solution when the CH4 fugacity is fixed at 3.428 bar
+#     factsage_result_CH4: dict[str, float] = {
+#         "CH4_g": 3.4287054461076254,
+#         "CO2_g": 0.6361664824724061,
+#         "CO_g": 5.249106319198347e-06,
+#         "C_cr": 1.0,
+#         "H2O_g": 5.919505502971372,
+#         "H2O_l": 1.0,
+#         "H2_g": 0.01561731936431075,
+#         "O2_g": 9.326226158104995e-46,
+#         # "degree_of_condensation_C": 0.5687210428967688,
+#         # "degree_of_condensation_H": 0.7721952621991293,
+#     }
 
-    # This is the solution when instead, the total pressure is fixed at 10 bar
-    # pylint: disable=unused-variable
-    factsage_result_total_pressure: dict[str, float] = {
-        "CH4_g": 0.6241604132666166,
-        "CO2_g": 3.494658483175357,
-        "CO_g": 1.230275421512879e-05,
-        "C_cr": 1.0,
-        "H2O_g": 5.919505502971371,
-        "H2O_l": 1.0,
-        "H2_g": 0.00666330224360131,
-        "O2_g": 5.123183358036684e-45,
-        "degree_of_condensation_C": 0.6921548202806902,
-        "degree_of_condensation_H": 0.9099995423718071,
-    }
+#     # This is the solution when instead, the total pressure is fixed at 10 bar
+#     # pylint: disable=unused-variable
+#     factsage_result_total_pressure: dict[str, float] = {
+#         "CH4_g": 0.6241604132666166,
+#         "CO2_g": 3.494658483175357,
+#         "CO_g": 1.230275421512879e-05,
+#         "C_cr": 1.0,
+#         "H2O_g": 5.919505502971371,
+#         "H2O_l": 1.0,
+#         "H2_g": 0.00666330224360131,
+#         "O2_g": 5.123183358036684e-45,
+#         "degree_of_condensation_C": 0.6921548202806902,
+#         "degree_of_condensation_H": 0.9099995423718071,
+#     }
 
-    # Start solution
-    data_to_start = factsage_result_CH4
-    # Compare solution
-    data_to_compare = factsage_result_CH4
+#     # Start solution
+#     data_to_start = factsage_result_CH4
+#     # Compare solution
+#     data_to_compare = factsage_result_CH4
 
-    # FIXME: Need to refresh based on new object approach for initialising the dict
-    # initial_solution = InitialSolutionDict(value=data_to_start, species=species)
+#     # FIXME: Need to refresh based on new object approach for initialising the dict
+#     initial_solution = InitialSolutionDict(value=data_to_start, species=species)
 
-    # system.solve(constraints, initial_solution=initial_solution)
-    # system.output(to_excel=True)
-    # assert helper.isclose(system, data_to_compare, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+#     system.solve(constraints, initial_solution=initial_solution)
+#     system.output(to_excel=True)
+#     assert helper.isclose(system, data_to_compare, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 # @pytest.mark.skip(reason="debugging")
