@@ -415,13 +415,11 @@ class SystemConstraints(UserList):
 
     Args:
         initlist: Initial list of constraints. Defaults to None.
-
-    Attributes:
-        data: A list of constraints
     """
 
     # UserList itself is not a generic class, so this is for typing:
     data: list[ConstraintProtocol]
+    """List of constraints"""
 
     # TODO: Currently only for element mass constraints, but should be generalised to include
     # species mass constraints

@@ -185,13 +185,11 @@ class Species(UserList):
 
     Args:
         initlist: Initial list of species. Defaults to None.
-
-    Attributes:
-        data: List of species contained in the system
     """
 
     # UserList itself is not a generic class, so this is for typing:
     data: list[ChemicalSpecies]
+    """List of species"""
 
     @property
     def elements(self) -> list[str]:
