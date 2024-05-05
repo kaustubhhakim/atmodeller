@@ -67,9 +67,6 @@ class InitialSolution(ABC, Generic[T]):
 
     Attributes:
         value: An object or value used to compute the initial solution
-        species: Species
-        min_log10: Minimum log10 value
-        max_log10: Maximum log10 value
     """
 
     def __init__(
@@ -88,14 +85,17 @@ class InitialSolution(ABC, Generic[T]):
 
     @property
     def species(self) -> Species:
+        """Species"""
         return self._species
 
     @property
     def min_log10(self) -> float:
+        """Minimum log10 value"""
         return self._min_log10
 
     @property
     def max_log10(self) -> float:
+        """Maximum log10 value"""
         return self._max_log10
 
     @abstractmethod
@@ -201,9 +201,6 @@ class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
 
     Attributes:
         value: A constant pressure for the initial condition in bar
-        species: Species
-        min_log10: Minimum log10 value
-        max_log10: Maximum log10 value
     """
 
     @override
@@ -245,9 +242,6 @@ class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
 
     Attributes:
         value: A dictionary of species and values for all the gas species
-        species: Species
-        min_log10: Minimum log10 value
-        max_log10: Maximum log10 value
     """
 
     @override
@@ -302,9 +296,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
     Attributes:
         value: Output for constructing the regressor
-        species: Species
-        min_log10: Minimum log10 value
-        max_log10: Maximum log10 value
         fit: Fit the regressor during the model run, which replaces the data used to initialise
             the regressor.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True
@@ -578,9 +569,6 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
 
     Attributes:
         value: An initial solution
-        species: Species
-        min_log10: Minimum log10 value
-        max_log10: Maximum log10 value
         fit_batch_size: Number of simulations to generate before fitting the regressor
     """
 
