@@ -38,7 +38,9 @@ from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
 
 RTOL: float = 1.0e-8
+"""Relative tolerance"""
 ATOL: float = 1.0e-8
+"""Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
 

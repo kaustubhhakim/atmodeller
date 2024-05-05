@@ -20,9 +20,16 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+import numpy as np
+import numpy.typing as npt
 
 from atmodeller.core import _ChemicalSpecies
+
+if TYPE_CHECKING:
+    from atmodeller.constraints import SystemConstraints
+    from atmodeller.output import Output
 
 
 @runtime_checkable
@@ -61,3 +68,18 @@ class ReactionNetworkConstraintProtocol(SpeciesConstraintProtocol, Protocol):
 
 class TotalPressureConstraintProtocol(ConstraintProtocol, Protocol):
     def total_pressure(self, temperature: float, pressure: float) -> float: ...
+
+
+class InitialSolutionProtocol(Protocol):
+    def get_log10_value(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        degree_of_condensation_number: int,
+        perturb: bool = False,
+        perturb_log10: float = 2,
+    ) -> npt.NDArray[np.float_]: ...
+
+    def update(self, output: Output) -> None: ...

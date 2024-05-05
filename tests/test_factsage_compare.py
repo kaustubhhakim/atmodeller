@@ -23,13 +23,12 @@ from __future__ import annotations
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import (
+from atmodeller.constraints import (  # TotalPressureConstraint,
     ActivityConstraint,
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
     SystemConstraints,
-    TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.initial_solution import InitialSolutionDict

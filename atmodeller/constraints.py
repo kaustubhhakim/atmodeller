@@ -436,9 +436,7 @@ class SystemConstraints(UserList):
             filter_by_type(self, TotalPressureConstraintProtocol).values()
         )
         if len(total_pressure) > 1:
-            msg: str = "You can only specify a maximum of one total pressure constraint"
-            logger.error(msg)
-            raise ValueError(msg)
+            raise ValueError("More than one total pressure constraint prescribed")
 
         return total_pressure
 

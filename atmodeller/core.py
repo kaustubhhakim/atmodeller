@@ -305,7 +305,7 @@ class Species(UserList[_ChemicalSpecies]):
     @property
     def elements(self) -> list[str]:
         elements: list[str] = []
-        for species in self.data:
+        for species in self:
             elements.extend(species.elements)
         unique_elements: list[str] = list(set(elements))
 
@@ -314,7 +314,7 @@ class Species(UserList[_ChemicalSpecies]):
     @property
     def number(self) -> int:
         """Number of species"""
-        return len(self.data)
+        return len(self)
 
     @property
     def number_elements(self) -> int:
@@ -352,7 +352,7 @@ class Species(UserList[_ChemicalSpecies]):
         return len(self.condensed_species)
 
     def find_species(self, find_species: _ChemicalSpecies) -> int:
-        """Finds a species and return its index.
+        """Finds a species and returns its index.
 
         Args:
             find_species: Species to find
@@ -361,14 +361,32 @@ class Species(UserList[_ChemicalSpecies]):
             Index of the species
 
         Raises:
-            ValueError: The species is not in the list
+            ValueError: The species is not in the species list
         """
-        for index, species in enumerate(self.data):
-            # is checks for identity (not equality)
+
+        for index, species in enumerate(self):
             if species is find_species:
                 return index
 
-        raise ValueError("Species not found")
+        raise ValueError(f"{find_species.name} is not in the species list")
+
+    def check_species_present(self, find_species: _ChemicalSpecies) -> bool:
+        """Checks if a species is present
+
+        Args:
+            species: Species to find
+
+        Returns:
+            True if the species is present, otherwise False
+        """
+        for species in self:
+            if species is find_species:
+                logger.debug("Found %s in the species list", find_species.name)
+                return True
+
+        logger.debug("%s not found in the species list", find_species.name)
+
+        return False
 
     @property
     def names(self) -> list[str]:

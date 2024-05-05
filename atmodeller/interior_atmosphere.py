@@ -31,8 +31,11 @@ from sklearn.metrics import mean_squared_error
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
-from atmodeller.initial_solution import InitialSolution, InitialSolutionConstant
-from atmodeller.interfaces import TotalPressureConstraintProtocol
+from atmodeller.initial_solution import InitialSolutionConstant
+from atmodeller.interfaces import (
+    InitialSolutionProtocol,
+    TotalPressureConstraintProtocol,
+)
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion, dataclass_to_logger
 
@@ -267,7 +270,7 @@ class _ReactionNetwork:
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
-            species_index: int = self.species.find_species(constraint.species)
+            species_index = self.species.find_species(constraint.species)
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
@@ -404,7 +407,7 @@ class InteriorAtmosphereSystem:
     """A list of species"""
     planet: Planet = field(default_factory=Planet)
     """A planet"""
-    initial_solution: InitialSolution | None = None
+    initial_solution: InitialSolutionProtocol | None = None
     """Initial solution"""
     output: Output = field(init=False, default_factory=Output)
     """Output data"""
@@ -616,7 +619,7 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
-        initial_solution: InitialSolution | None = None,
+        initial_solution: InitialSolutionProtocol | None = None,
         extra_output: dict[str, float] | None = None,
         max_attempts: int = 50,
         perturb_log10: float = 2.0,

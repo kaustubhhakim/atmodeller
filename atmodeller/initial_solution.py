@@ -22,7 +22,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -33,7 +33,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Species
+from atmodeller.core import Species, _ChemicalSpecies
 from atmodeller.output import Output
 
 if sys.version_info < (3, 12):
@@ -41,12 +41,16 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
 MIN_LOG10: float = -12
-"""Minimum log10 of the initial solution"""
+"""Minimum log10 of the initial solution
+
+Motivated by typical values of oxygen fugacity at the iron-wustite buffer
+"""
 MAX_LOG10: float = 5
 """Maximum log10 of the initial solution"""
 
@@ -54,16 +58,10 @@ MAX_LOG10: float = 5
 class InitialSolution(ABC, Generic[T]):
     """Initial solution
 
-    Note:
-        Activity constraints are imposed directly by a private method
-        :meth:`InitialSolution._conform_to_constraints` since their exact solution is known a
-        priori.
-
     Args:
         value: An object or value used to compute the initial solution
         species: Species
-        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
-            typical values of oxygen fugacity at the iron-wustite buffer.
+        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
         max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
 
     Attributes:
@@ -83,15 +81,30 @@ class InitialSolution(ABC, Generic[T]):
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
-        self.species: Species = species
-        self.min_log10: float = min_log10
-        self.max_log10: float = max_log10
+        self._species: Species = species
+        self._min_log10: float = min_log10
+        self._max_log10: float = max_log10
+
+    @property
+    def species(self) -> Species:
+        return self._species
+
+    @property
+    def min_log10(self) -> float:
+        return self._min_log10
+
+    @property
+    def max_log10(self) -> float:
+        return self._max_log10
 
     @abstractmethod
     def get_value(
         self, constraints: SystemConstraints, temperature: float, pressure: float
     ) -> npt.NDArray[np.float_]:
-        """Computes the raw value of the initial solution.
+        """Computes the raw value of the initial solution for the reaction network
+
+        This does not deal with the degree of condensation, which is instead exclusively treated
+        by :meth:`~get_log10_value`.
 
         Args:
             constraints: Constraints
@@ -99,7 +112,7 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
 
         Returns:
-            The initial solution
+            The raw initial solution excluding the degree of condensation (if relevant)
         """
 
     def get_log10_value(
@@ -144,7 +157,14 @@ class InitialSolution(ABC, Generic[T]):
             )
             log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
 
-        self._conform_to_constraints(log10_value, constraints, temperature, pressure)
+        # Apply constraints from the reaction network (acitivities and fugacities)
+        for constraint in constraints.reaction_network_constraints:
+            index: int = self.species.find_species(constraint.species)
+            logger.debug("Setting %s %d", constraint.species, index)
+            log10_value[index] = constraint.get_log10_value(
+                temperature=temperature, pressure=pressure
+            )
+        logger.debug("Conform initial solution to constraints = %s", log10_value)
 
         # When condensates and mass constraints are present, we assume an initial degree of
         # condensation of 0.5 for each element. Recall that the (log10) solution quantity is:
@@ -165,34 +185,8 @@ class InitialSolution(ABC, Generic[T]):
         """
         del output
 
-    def _conform_to_constraints(
-        self,
-        initial_solution: npt.NDArray,
-        constraints: SystemConstraints,
-        temperature: float,
-        pressure: float,
-    ) -> None:
-        """Conforms the initial solution to activity, pressure and fugacity constraints.
 
-        For simplicity, impose both pressure and fugacity constraints as pressure constraints.
-
-        Args:
-            initial_solution: Initial solution to conform to the constraints (in-place).
-            constraints: Constraints
-            temperature: Temperature in K
-            pressure: Pressure in bar
-        """
-        for constraint in constraints.reaction_network_constraints:
-            index: int = self.species.find_species(constraint.species)
-            logger.debug("Setting %s %d", constraint.species, index)
-            initial_solution[index] = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
-            )
-
-        logger.debug("Conform initial solution to constraints = %s", initial_solution)
-
-
-class InitialSolutionConstant(InitialSolution[float]):
+class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
     """A constant value for the initial solution
 
     The default value, which is applied to each species individually, is chosen to be within an
@@ -201,40 +195,52 @@ class InitialSolutionConstant(InitialSolution[float]):
     Args:
         value: A constant pressure for the initial condition in bar. Defaults to 10.
         species: Species
-        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
-            typical values of oxygen fugacity at the iron-wustite buffer.
+        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
         max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
 
     Attributes:
-        value: A constant pressure for the initial condition in bar.
+        value: A constant pressure for the initial condition in bar
         species: Species
         min_log10: Minimum log10 value
         max_log10: Maximum log10 value
     """
 
     @override
-    def __init__(self, value: float = 10, **kwargs):
-        super().__init__(value, **kwargs)
+    def __init__(
+        self,
+        value: float = 10,
+        *,
+        species: Species,
+        min_log10: float = MIN_LOG10,
+        max_log10: float = MAX_LOG10,
+    ):
+        value_array: npt.NDArray = value * np.ones(species.number)
+        super().__init__(value_array, species=species, min_log10=min_log10, max_log10=max_log10)
+        logger.debug("initial_solution = %s", self.asdict())
+
+    def asdict(self) -> dict[str, float]:
+        """Dictionary of the initial solution"""
+        return dict(zip(self.species.names, self.value))
 
     @override
-    def get_value(self, *args, **kwargs) -> npt.NDArray:
+    def get_value(self, *args, **kwargs) -> npt.NDArray[np.float_]:
         del args
         del kwargs
         logger.debug("%s: value = %s", self.__class__.__name__, self.value)
 
-        return self.value * np.ones(self.species.number)
+        # TODO: Treat activities and fugacities differently in terms of numerical value?
+        return self.value
 
 
-class InitialSolutionDict(InitialSolution[dict[str, float | int]]):
+class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
     """A dictionary of species and their values for the initial solution
 
     Args:
         value: A dictionary of species and values
         species: Species
-        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
-            typical values of oxygen fugacity at the iron-wustite buffer.
+        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
         max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
-        fill_value: Initial value for species that are not specified in `value`. Defaults to 1 bar.
+        fill_value: Initial value for species that are not specified in `value`. Defaults to 1.
 
     Attributes:
         value: A dictionary of species and values for all the gas species
@@ -244,31 +250,34 @@ class InitialSolutionDict(InitialSolution[dict[str, float | int]]):
     """
 
     @override
-    def __init__(self, value: dict[str, float | int], fill_value: float = 1, **kwargs):
-        super().__init__(value, **kwargs)
-        self._fill_missing_species(fill_value)
-        self._value: npt.NDArray = np.array(list(self.value.values()))
+    def __init__(
+        self,
+        value: dict[_ChemicalSpecies, float],
+        *,
+        species: Species,
+        min_log10: float = MIN_LOG10,
+        max_log10: float = MAX_LOG10,
+        fill_value: float = 1,
+    ):
+        species_dict: dict[_ChemicalSpecies, float] = {
+            unique_species: fill_value for unique_species in species
+        }
+        species_dict |= value
+        species_ic: npt.NDArray[np.float_] = np.array(list(species_dict.values()))
+        super().__init__(species_ic, species=species, min_log10=min_log10, max_log10=max_log10)
+        logger.debug("initial_solution = %s", self.asdict())
 
-    def _fill_missing_species(self, fill_value: float) -> None:
-        """Fills missing species values.
-
-        Args:
-            fill_value: Fill value to use for missing species
-        """
-        for species_name in self.species.names:
-            if species_name not in self.value:
-                self.value[species_name] = fill_value
-
-        # Must maintain order with species.
-        self.value = {key: self.value[key] for key in self.species.names}
+    def asdict(self) -> dict[str, float]:
+        """Dictionary of the initial solution"""
+        return dict(zip(self.species.names, self.value))
 
     @override
     def get_value(self, *args, **kwargs) -> npt.NDArray:
         del args
         del kwargs
-        logger.debug("%s: value = %s", self.__class__.__name__, self._value)
+        logger.debug("%s: value = %s", self.__class__.__name__, self.value)
 
-        return self._value
+        return self.value
 
 
 class InitialSolutionRegressor(InitialSolution[Output]):
@@ -277,10 +286,11 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     Args:
         value: Output for constructing the regressor
         species: Species
-        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`, which is motivated by
-            typical values of oxygen fugacity at the iron-wustite buffer.
+        min_log10: Minimuim log10 value. Defaults to :data:`MIN_LOG10`.
         max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
         species_fill: Dictionary of missing species and their initial values. Defaults to None.
+        fill_value: Initial value for species that are not specified in `species_fill`. Defaults to
+            1.
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
@@ -294,8 +304,8 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         species: Species
         min_log10: Minimum log10 value
         max_log10: Maximum log10 value
-        species_fill: Dictionary of missing species and their initial values
-        fit: Fit the regressor during the model run
+        fit: Fit the regressor during the model run, which replaces the data used to initialise
+            the regressor.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True
         partial_fit: Partial fit the regressor during the model run
         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
@@ -315,20 +325,23 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         species: Species,
         min_log10: float = MIN_LOG10,
         max_log10: float = MAX_LOG10,
-        species_fill: dict[str, float] | None = None,
+        species_fill: dict[_ChemicalSpecies, float] | None = None,
+        fill_value: float = 1,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
         partial_fit_batch_size: int = 500,
     ):
-        super().__init__(value, species=species, min_log10=min_log10, max_log10=max_log10)
-        self.species_fill: dict[str, float] = species_fill if species_fill is not None else {}
         self.fit: bool = fit
         # Ensure consistency of arguments and correct handling of fit versus partial refit.
         self.fit_batch_size: int = fit_batch_size if self.fit else 0
         self.partial_fit: bool = partial_fit
         self.partial_fit_batch_size: int = partial_fit_batch_size
-        self._conform_output_to_species()
+
+        self._conform_solution(
+            value, species=species, species_fill=species_fill, fill_value=fill_value
+        )
+        super().__init__(value, species=species, min_log10=min_log10, max_log10=max_log10)
         self._fit(self.value)
 
     @classmethod
@@ -336,10 +349,9 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         """Creates a regressor from output read from a pickle file.
 
         Args:
-            pickle_file: Pickle file of the output from a previous (or similar) model run.
-                Importantly, the reaction network must be the same (same number of species in the
-                same order) and the constraints must be the same (also in the same order).
-            **kwargs: Arbitrary keyword arguments to pass through to constructor
+            pickle_file: Pickle file of the output from a previous (or similar) model run. The
+                constraints must be the same as the new model and in the same order.
+            **kwargs: Arbitrary keyword arguments to pass through to the constructor
 
         Returns:
             A regressor
@@ -348,48 +360,67 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
         return cls(output, **kwargs)
 
-    def _conform_output_to_species(self) -> None:
-        """Conforms the output (initial regressor data) to the species for the new model.
+    def _conform_solution(
+        self,
+        output: Output,
+        *,
+        species: Species,
+        species_fill: dict[_ChemicalSpecies, float] | None,
+        fill_value: float,
+    ) -> None:
+        """Conforms the solution in output to the species and their fill values
 
-        Ensures that the column order is correct when initialising the regressor for the new model.
-        Fills in initial values for missing species with user-prescribed data and excludes species
-        that are not in the new model.
+        Args:
+            output: Output
+            species: Species
+            species_fill: Dictionary of missing species and their initial values. Defaults to None.
+            fill_value: Initial value for species that are not specified in `species_fill`.
         """
-        output_dataframes: dict[str, pd.DataFrame] = self.value.to_dataframes()
-        solution_df: pd.DataFrame = output_dataframes["solution"]
-        conformed_solution_df: pd.DataFrame = solution_df.copy()
+        solution: pd.DataFrame = output.to_dataframes()["solution"].copy()
+        logger.debug("solution = %s", solution)
 
-        if self.species is None:
-            species_names: list[str] = self.value.species
-        else:
-            species_names = self.species.names
-        logger.debug("species_names = %s", species_names)
+        species_fill_: dict[_ChemicalSpecies, float] = (
+            species_fill if species_fill is not None else {}
+        )
+        initial_solution_dict: InitialSolutionDict = InitialSolutionDict(
+            species_fill_,
+            species=species,
+            fill_value=fill_value,
+        )
+        fill_df: pd.DataFrame = pd.DataFrame(initial_solution_dict.asdict(), index=[0])
+        fill_df = fill_df.loc[fill_df.index.repeat(len(solution))].reset_index(drop=True)
+        logger.debug("fill_df = %s", fill_df)
 
-        if self.species_fill:
-            fill_df: pd.DataFrame = pd.DataFrame(
-                {col: [self.species_fill[col]] * len(solution_df) for col in self.species_fill}
-            )
-            logger.debug("fill_df = %s", fill_df)
+        # Preference the values in the solution and fill missing species
+        conformed_solution: pd.DataFrame = solution.combine_first(fill_df)[species.names]
+        logger.debug("conformed_solution = %s", conformed_solution)
+        output["solution"] = conformed_solution.to_dict(orient="records")
 
-            # Add columns that don't exist and replace those that do.
-            for column in fill_df.columns:
-                if column in conformed_solution_df:
-                    logger.info("Replacing data in %s with %f", column, self.species_fill[column])
-                else:
-                    logger.info("Adding data in %s with %f", column, self.species_fill[column])
+    def _get_log10_values(
+        self,
+        output: Output,
+        name: str,
+        start_index: int | None,
+        end_index: int | None,
+    ) -> npt.NDArray[np.float_]:
+        """Gets log10 values of either the constraints or the solution from `output`
 
-                conformed_solution_df[column] = fill_df[column]
+        Args:
+            output: Output
+            name: solution or constraints
+            start_index: Start index for fit. Defaults to None, meaning use all available data.
+            end_index: End index for fit. Defaults to None, meaning use all available data.
 
-            # Reorder the columns based on the order of the species for the new model
-            logger.info("Columns before reordering = %s", list(conformed_solution_df.columns))
-            conformed_solution_df = conformed_solution_df[species_names]
-            logger.info("Column after reordering = %s", list(conformed_solution_df.columns))
-            logger.debug("conformed_solution_df = %s", conformed_solution_df)
+        Returns:
+            Log10 values of either the solution or constraints depending on `name`
+        """
+        output_dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
+        data: pd.DataFrame = output_dataframes[name]
+        if start_index is not None and end_index is not None:
+            data = data.iloc[start_index:end_index]
+        data_log10_values: npt.NDArray = np.log10(data.values)
 
-            assert species_names == list(conformed_solution_df.columns)
-
-        # Set the conformed solution to the output so it is used to construct the initial regressor
-        self.value["solution"] = conformed_solution_df.to_dict(orient="records")
+        return data_log10_values
 
     def _fit(
         self,
@@ -405,32 +436,22 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             end_index: End index for fit. Defaults to None, meaning use all available data.
         """
         logger.info("%s: Fit (%s, %s)", self.__class__.__name__, start_index, end_index)
-        output_dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
 
-        constraints: pd.DataFrame = output_dataframes["constraints"]
-        if start_index is not None and end_index is not None:
-            constraints = constraints.iloc[start_index:end_index]
-        constraints_log10_values: npt.NDArray = np.log10(constraints.values)
+        constraints_log10_values: npt.NDArray = self._get_log10_values(
+            output, "constraints", start_index, end_index
+        )
         self._constraints_scalar = StandardScaler().fit(constraints_log10_values)
         constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
             constraints_log10_values
         )
 
-        solution: pd.DataFrame = output_dataframes["solution"]
-        logger.debug("solution = %s", solution)
-
-        if start_index is not None and end_index is not None:
-            solution = solution.iloc[start_index:end_index]
-        solution_log10_values: npt.NDArray = np.log10(solution.values)
+        solution_log10_values: npt.NDArray = self._get_log10_values(
+            output, "solution", start_index, end_index
+        )
         self._solution_scalar = StandardScaler().fit(solution_log10_values)
         solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
             solution_log10_values
         )
-
-        constraint_names = list(constraints.columns)
-        logger.info("%s: Found constraints = %s", self.__class__.__name__, constraint_names)
-        species_names = list(solution.columns)
-        logger.info("%s: Found species = %s", self.__class__.__name__, species_names)
 
         base_regressor: SGDRegressor = SGDRegressor()
         multi_output_regressor: MultiOutputRegressor = MultiOutputRegressor(base_regressor)
@@ -452,18 +473,16 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             end_index: End index for partial fit
         """
         logger.info("%s: Partial fit (%d, %d)", self.__class__.__name__, start_index, end_index)
-        output_dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
 
-        constraints: pd.DataFrame = output_dataframes["constraints"].iloc[start_index:end_index]
-        logger.debug(constraints)
-        constraints_log10_values: npt.NDArray = np.log10(constraints.values)
+        constraints_log10_values: npt.NDArray = self._get_log10_values(
+            output, "constraints", start_index, end_index
+        )
         constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
             constraints_log10_values
         )
-
-        solution: pd.DataFrame = output_dataframes["solution"].iloc[start_index:end_index]
-        logger.debug(solution)
-        solution_log10_values: npt.NDArray = np.log10(solution.values)
+        solution_log10_values: npt.NDArray = self._get_log10_values(
+            output, "solution", start_index, end_index
+        )
         solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
             solution_log10_values
         )
@@ -485,11 +504,10 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             values_constraints_log10
         )
         solution_scaled: npt.NDArray | spmatrix = self._reg.predict(constraints_scaled)
-        solution_original: npt.NDArray | spmatrix = self._solution_scalar.inverse_transform(
-            solution_scaled
+        solution_original: npt.NDArray = cast(
+            npt.NDArray, self._solution_scalar.inverse_transform(solution_scaled)
         )
 
-        assert isinstance(solution_original, np.ndarray)
         value: npt.NDArray = 10 ** solution_original.flatten()
         logger.debug("%s: value = %s", self.__class__.__name__, value)
 
@@ -589,9 +607,9 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
     @override
     def update(self, output: Output, *args, **kwargs) -> None:
         if output.size == self.fit_batch_size:
-            # The fit keyword argument of InitialSolutionRegressor is effectively ignored
-            # because the fit is done once when InitialSolutionRegressor is instantiated and
-            # action_fit cannot be triggered regardless of the value of fit.
+            # The fit keyword argument of InitialSolutionRegressor is effectively ignored because
+            # the fit is done once when InitialSolutionRegressor is instantiated and action_fit
+            # cannot be triggered regardless of the value of fit.
             self.value = InitialSolutionRegressor(
                 output,
                 species=self.species,
