@@ -102,8 +102,7 @@ class GasSpecies(ChemicalSpecies):
         """
         planet: Planet = system.planet
         pressure: float = system.solution_dict()[self.name]
-        # TODO: Use Hill for convention
-        fugacity: float = system.fugacities_dict[f"f{self.formula}"]
+        fugacity: float = system.fugacities_dict[self.hill_formula]
 
         # Atmosphere
         mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
@@ -137,8 +136,7 @@ class GasSpecies(ChemicalSpecies):
         if element is not None:
             try:
                 mass_scale_factor: float = (
-                    UnitConversion.g_to_kg(self.formula.composition()[element].mass)
-                    / self.molar_mass
+                    UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
                 )
             except KeyError:  # Element not in formula so mass is zero.
                 mass_scale_factor = 0
@@ -304,17 +302,12 @@ class Species(UserList):
                 try:
                     species.solubility = solubilities[species.hill_formula]
                     logger.info(
-                        "Found solubility law for %s (hill formula=%s): %s",
-                        species.formula,
+                        "Found solubility law for %s: %s",
                         species.hill_formula,
                         species.solubility.__class__.__name__,
                     )
                 except KeyError:
-                    logger.info(
-                        "No solubility law for %s (hill formula=%s)",
-                        species.formula,
-                        species.hill_formula,
-                    )
+                    logger.info("No solubility law for %s", species.hill_formula)
                     species.solubility = NoSolubility()
 
     def composition_matrix(self) -> npt.NDArray:
@@ -327,7 +320,8 @@ class Species(UserList):
         for species_index, species in enumerate(self.data):
             for element_index, element in enumerate(self.elements):
                 try:
-                    count: int = species.formula.composition()[element].count
+                    # FIXME: protected member access
+                    count: int = species._formula.composition()[element].count
                 except KeyError:
                     count = 0
                 matrix[species_index, element_index] = count

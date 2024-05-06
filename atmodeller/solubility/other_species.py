@@ -108,7 +108,7 @@ class N2_basalt_bernadou(Solubility):
 
     @override
     def concentration(
-        self, fugacity: float, *, temperature: float, pressure: float, fO2: float, **kwargs
+        self, fugacity: float, *, temperature: float, pressure: float, O2: float, **kwargs
     ) -> float:
         del kwargs
         k13: float = np.exp(
@@ -117,7 +117,7 @@ class N2_basalt_bernadou(Solubility):
         k14: float = np.exp(
             -(183733 + 172 * temperature - 5 * pressure) / (GAS_CONSTANT * temperature)
         )
-        molfrac: float = (k13 * fugacity) + ((fO2 ** (-3 / 4)) * k14 * (fugacity**0.5))
+        molfrac: float = (k13 * fugacity) + ((O2 ** (-3 / 4)) * k14 * (fugacity**0.5))
         ppmw: float = UnitConversion.fraction_to_ppm(molfrac)
 
         return ppmw
@@ -146,7 +146,7 @@ class N2_basalt_dasgupta(Solubility):
 
     @override
     def concentration(
-        self, fugacity: float, *, temperature: float, pressure: float, fO2: float, **kwargs
+        self, fugacity: float, *, temperature: float, pressure: float, O2: float, **kwargs
     ) -> float:
         del kwargs
         fugacity_gpa: float = UnitConversion.bar_to_GPa(fugacity)
@@ -157,7 +157,7 @@ class N2_basalt_dasgupta(Solubility):
             + 0.055 * (pressure - 1) / temperature
             - 0.8853 * np.log(temperature)
         )
-        fo2_shift = np.log10(fO2) - logiw_fugacity
+        fo2_shift = np.log10(O2) - logiw_fugacity
         ppmw: float = (fugacity_gpa**0.5) * np.exp(
             (5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)
         )
@@ -179,10 +179,10 @@ class N2_basalt_libourel(Solubility):
         self._power_law: SolubilityPowerLaw = SolubilityPowerLaw(constant=0.0611, exponent=1)
 
     @override
-    def concentration(self, fugacity: float, *, fO2: float, **kwargs) -> float:
+    def concentration(self, fugacity: float, *, O2: float, **kwargs) -> float:
         del kwargs
         ppmw: float = self._power_law.concentration(fugacity)
-        constant: float = (fO2**-0.75) * 5.97e-10
+        constant: float = (O2**-0.75) * 5.97e-10
         power_law: SolubilityPowerLaw = SolubilityPowerLaw(constant=constant, exponent=0.5)
         ppmw += power_law.concentration(fugacity)
 

@@ -100,12 +100,12 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
             Thermodynamic data for the species or None if not available
         """
         del kwargs
-        search_name: str = name if name is not None else str(species.formula)
+        search_name: str = name if name is not None else species.hill_formula
 
         try:
             logger.info(
-                "Searching for %s (name=%s) in %s",
-                species.formula,
+                "Searching for %s (name = %s) in %s",
+                species.hill_formula,
                 search_name,
                 self.data_source,
             )
@@ -161,8 +161,8 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
                 gibbs += self._get_volume_pressure_integral(temperature, pressure)
 
             logger.debug(
-                "Species = %s, standard Gibbs energy of formation=%f",
-                self.species.formula,
+                "Species = %s, standard Gibbs energy of formation = %f",
+                self.species.hill_formula,
                 gibbs,
             )
 

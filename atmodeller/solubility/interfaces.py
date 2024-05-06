@@ -63,7 +63,7 @@ class Solubility(ABC):
             temperature: Temperature in K. Defaults to None.
             pressure: Total pressure in bar. Defaults to None.
             **kwargs: Arbitrary keyword arguments. Keyword arguments that are fugacities must
-                adhere to the naming convention: fO2, fH2, fH2O, etc.
+                adhere to Hill notation: O2, H2, H2O, O2S, etc.
 
         Returns:
             Dissolved volatile concentration in the melt in ppmw

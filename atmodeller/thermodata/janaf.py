@@ -46,7 +46,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 def is_homonuclear_diatomic(species: ChemicalSpecies) -> bool:
     """True if species is homonuclear diatomic, otherwise False."""
-    composition: Composition = species.formula.composition()
+    composition: Composition = species.composition()
     if len(list(composition.keys())) == 1 and list(composition.values())[0].count == 2:
         return True
     else:
@@ -114,8 +114,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
             """
             try:
                 logger.info(
-                    "Searching for %s (formula=%s, name=%s, phase=%s) in %s",
-                    species.formula,
+                    "Searching for %s (name = %s, phase = %s) in %s",
                     species.hill_formula,
                     name,
                     phases[0],
@@ -136,8 +135,8 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
         # First, check exclusively for a filename match if a filename has been specified.
         if filename is not None:
             logger.info(
-                "Searching for %s (filename=%s) in %s",
-                species.formula,
+                "Searching for %s (filename = %s) in %s",
+                species.hill_formula,
                 filename,
                 self.data_source,
             )
@@ -197,8 +196,8 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
             gibbs: float = self.data.DeltaG(temperature) * kilo
 
             logger.debug(
-                "Species=%s, standard Gibbs energy of formation=%f",
-                self.species.formula,
+                "Species = %s, standard Gibbs energy of formation = %f",
+                self.species.hill_formula,
                 gibbs,
             )
 

@@ -420,9 +420,9 @@ class Output(UserDict):
 
         for species in interior_atmosphere.species.gas_species.values():
             pressure: float = interior_atmosphere.solution_dict()[species.name]
-            fugacity: float = interior_atmosphere.fugacities_dict[f"f{species.formula}"]
+            fugacity: float = interior_atmosphere.fugacities_dict[species.hill_formula]
             fugacity_coefficient: float = (
-                10 ** interior_atmosphere.log10_fugacity_coefficients_dict[str(species.formula)]
+                10 ** interior_atmosphere.log10_fugacity_coefficients_dict[species.hill_formula]
             )
             volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
 

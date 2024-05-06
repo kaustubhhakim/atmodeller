@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
-from molmass import Formula
+from molmass import Composition, Formula
 
 from atmodeller.activity.interfaces import ActivityProtocol, ConstantActivity
 from atmodeller.thermodata.interfaces import (
@@ -78,37 +78,35 @@ class ChemicalSpecies:
         assert thermodata is not None
         self._thermodata: ThermodynamicDataForSpeciesProtocol = thermodata
         logger.info(
-            "Creating %s %s (hill formula=%s) using thermodynamic data in %s",
+            "Creating %s for %s using thermodynamic data in %s",
             self.__class__.__name__,
-            self.formula,
             self.hill_formula,
             self.thermodata.data_source,
         )
 
+    def composition(self, isotopic: bool = False) -> Composition:
+        """Composition of the species"""
+        return self._formula.composition(isotopic)
+
     @property
     def elements(self) -> list[str]:
         """Elements in species"""
-        return list(self.formula.composition().keys())
-
-    @property
-    def formula(self) -> Formula:
-        """Formula object"""
-        return self._formula
+        return list(self.composition().keys())
 
     @property
     def hill_formula(self) -> str:
         """Hill formula"""
-        return self.formula.formula
+        return self._formula.formula
 
     @property
     def molar_mass(self) -> float:
         r"""Molar mass in :math:\mathrm{kg}\mathrm{mol}^{-1}"""
-        return UnitConversion.g_to_kg(self.formula.mass)
+        return UnitConversion.g_to_kg(self._formula.mass)
 
     @property
     def name(self) -> str:
-        """Unique name by combining formula and phase"""
-        return f"{self.formula}_{self.phase}"
+        """Unique name by combining Hill notation and phase"""
+        return f"{self.hill_formula}_{self.phase}"
 
     @property
     def phase(self) -> str:

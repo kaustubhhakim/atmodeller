@@ -531,7 +531,7 @@ class InteriorAtmosphereSystem:
     def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients (relevant for gas species only) in a dictionary"""
         output: dict[str, float] = {
-            str(species.formula): np.log10(
+            str(species.hill_formula): np.log10(
                 species.eos.fugacity_coefficient(
                     temperature=self.planet.surface_temperature, pressure=self.total_pressure
                 )
@@ -546,7 +546,7 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = {}
         for key, value in self.log10_fugacity_coefficients_dict.items():
             # TODO: Not clean to append _g suffix to denote gas phase.
-            output[f"f{key}"] = 10 ** (np.log10(self.solution_dict()[f"{key}_g"]) + value)
+            output[key] = 10 ** (np.log10(self.solution_dict()[f"{key}_g"]) + value)
 
         return output
 

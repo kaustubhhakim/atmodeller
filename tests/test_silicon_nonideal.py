@@ -94,7 +94,7 @@ def test_SiHO_massSiH_nosolubility() -> None:
         "O2_g": 8.041858631374242e-05,
         "OSi_g": 297.7208780281457,
         "H4Si_g": 3.8854445389482284,
-        "SiO2_l": 1.0,
+        "O2Si_l": 1.0,
     }
 
     system.solve(constraints)
@@ -136,7 +136,7 @@ def test_SiHO_massSiH_solubility() -> None:
         "O2_g": 2.2005226675444582e-05,
         "OSi_g": 569.1471756022945,
         "H4Si_g": 4.292996959380682,
-        "SiO2_l": 1.0,
+        "O2Si_l": 1.0,
     }
 
     system.solve(constraints)
@@ -175,7 +175,7 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
         "O2_g": 0.03382190282100078,
         "OSi_g": 14.517388181293816,
         "H4Si_g": 0.008762061109896661,
-        "SiO2_l": 1.0,
+        "O2Si_l": 1.0,
     }
 
     system.solve(constraints)
@@ -214,7 +214,7 @@ def test_SiHO_massH_logfO2_solubility() -> None:
         "O2_g": 0.025481748164747447,
         "OSi_g": 16.72526080495589,
         "H4Si_g": 9.750334904890755e-05,
-        "SiO2_l": 1.0,
+        "O2Si_l": 1.0,
     }
 
     system.solve(constraints)
@@ -251,7 +251,7 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
         "O2_g": 0.02877934211561468,
         "OSi_g": 15.737910722708122,
         "H4Si_g": 0.002384364181797566,
-        "SiO2_l": 1.0,
+        "O2Si_l": 1.0,
     }
 
     system.solve(constraints)
@@ -288,7 +288,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
         "O2_g": 0.03426380501584421,
         "OSi_g": 14.42346859651946,
         "H4Si_g": 0.00939136258814609,
-        "SiO2_l": 1.0,
+        "O2Si_l": 1.0,
     }
 
     system.solve(constraints)
