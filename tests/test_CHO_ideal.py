@@ -380,11 +380,11 @@ def test_H_and_C_hill_formula() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "OH2_g": 0.25824358142493425,
+        "H2O_g": 0.25824358142493425,
         "H2_g": 0.2521806525810137,
         "O2_g": 8.740121617121534e-08,
-        "OC_g": 59.6819921102523,
-        "O2C_g": 13.404792068284909,
+        "CO_g": 59.6819921102523,
+        "CO2_g": 13.404792068284909,
     }
 
     system.solve(constraints)

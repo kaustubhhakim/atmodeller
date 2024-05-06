@@ -85,4 +85,6 @@ class ThermodynamicDatasetCombined(ThermodynamicDataset):
             if dataset is not None:
                 return dataset.get_species_data(species, **kwargs)
 
-        raise KeyError(f"Thermodynamic data for {species.formula} is not available in any dataset")
+        raise KeyError(
+            f"Thermodynamic data for {species.hill_formula} not available in any dataset"
+        )
