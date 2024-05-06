@@ -367,50 +367,71 @@ def test_graphite_water_condensed_10bar(helper) -> None:
             TotalPressureConstraint(10),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            ElementMassConstraint("O", 2.48703e21),
+            # ElementMassConstraint("O", 2.48703e21), # result 1
+            # ElementMassConstraint("O", 1.14375e21),  # result 2
+            ElementMassConstraint("O", 1.14375e20),  # result 3
             ActivityConstraint(H2O_l, 1),
             ActivityConstraint(C_cr, 1),
         ]
     )
 
     # FIXME This is not the FacSage result, but rather the result of atmodeller
-    result1: dict[str, float] = {
-        "CH4_g": 0.20287679349339546,
-        "CO2_g": 5.291870481346229,
-        "CO_g": 5.3978318685692555e-06,
-        "C_cr": 1.0,
-        "H2O_g": 4.502876884247701,
-        "H2O_l": 1.0,
-        "H2_g": 0.0023704431166883567,
-        "O2_g": 7.212892379311266e-47,
-        "degree_of_condensation_C": 0.8999595234303465,
-        "degree_of_condensation_H": 0.9947717711432327,
-        "degree_of_condensation_O": 0.9841110043750718,
-    }
-
-    # result2: dict[str, float] = {
-    #     "CH4_g": 5.281762078795556,
-    #     "CO2_g": 0.20326506548789883,
-    #     "CO_g": 1.0579036658096088e-06,
+    # Paolo ran this case 6/5/24 and C not stable
+    # result1: dict[str, float] = {
+    #     "CH4_g": 0.20287679349339546,
+    #     "CO2_g": 5.291870481346229,
+    #     "CO_g": 5.3978318685692555e-06,
     #     "C_cr": 1.0,
-    #     "H2O_g": 4.502876884247723,
+    #     "H2O_g": 4.502876884247701,
     #     "H2O_l": 1.0,
-    #     "H2_g": 0.012094913564836662,
-    #     "O2_g": 2.7705308491694166e-48,
-    #     "degree_of_condensation_C": 0.8187657550942917,
-    #     "degree_of_condensation_H": 0.9708675913274774,
+    #     "H2_g": 0.0023704431166883567,
+    #     "O2_g": 7.212892379311266e-47,
+    #     "degree_of_condensation_C": 0.8999595234303465,
+    #     "degree_of_condensation_H": 0.9947717711432327,
+    #     "degree_of_condensation_O": 0.9841110043750718,
     # }
 
-    initial_solution_result1 = InitialSolutionDict(
-        value={H2O_g: 4.5, H2_g: 0.002, O2_g: 1.0e-47, CO2_g: 5.3}, species=species
-    )
-    # initial_solution_result2 = InitialSolutionDict(
-    #     value={H2O_g: 4.5, H2_g: 0.012, O2_g: 1.0e-48, CO2_g: 0.2}, species=species
-    # )
+    # result2: dict[str, float] = {
+    #     "CH4_g": 5.281762065097921,
+    #     "CO2_g": 0.20326506601504474,
+    #     "CO_g": 1.0579036671813901e-06,
+    #     "C_cr": 1.0,
+    #     "H2O_g": 4.502876884247718,
+    #     "H2O_l": 1.0,
+    #     "H2_g": 0.012094913549153272,
+    #     "O2_g": 2.770530856354487e-48,
+    #     "degree_of_condensation_C": 0.8187657730751349,
+    #     "degree_of_condensation_H": 0.9708675898421573,
+    #     "degree_of_condensation_O": 0.9795959100035376,
+    # }
 
-    system.solve(constraints, initial_solution=initial_solution_result1)
+    result3: dict[str, float] = {
+        "CH4_g": 5.2817620816185125,
+        "CO2_g": 0.20326506537926034,
+        "CO_g": 1.0579036655269031e-06,
+        "C_cr": 1.0,
+        "H2O_g": 4.502876884247718,
+        "H2O_l": 1.0,
+        "H2_g": 0.01209491356806884,
+        "O2_g": 2.770530847688679e-48,
+        "degree_of_condensation_C": 0.8187657537177384,
+        "degree_of_condensation_H": 0.9708675915401346,
+        "degree_of_condensation_O": 0.7959590940622816,
+    }
+
+    # initial_solution_result1 = InitialSolutionDict(
+    #     value={H2O_g: 4.5, H2_g: 0.002, O2_g: 1.0e-47, CO2_g: 5.3}, species=species
+    # )
+    # initial_solution_result2 = InitialSolutionDict(
+    #     value={H2O_g: 4.5, H2_g: 0.012, O2_g: 2.7e-48, CO2_g: 0.2, CH4_g: 5.28}, species=species
+    # )
+    initial_solution_result3 = InitialSolutionDict(
+        value={H2O_g: 4.5, H2_g: 0.012, O2_g: 2.7e-48, CO2_g: 0.2, CH4_g: 5.28}, species=species
+    )
+
+    system.solve(constraints, initial_solution=initial_solution_result3)
     # system.output(to_excel=True)
-    assert helper.isclose(system, result1, log=False, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(system, result3, log=False, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 # @pytest.mark.skip(reason="debugging")
