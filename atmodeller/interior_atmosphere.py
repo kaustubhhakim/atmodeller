@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import pprint
 from dataclasses import dataclass, field
+from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -30,7 +31,7 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Species
+from atmodeller.core import GasSpecies, Species
 from atmodeller.initial_solution import InitialSolutionConstant
 from atmodeller.interfaces import (
     InitialSolutionProtocol,
@@ -507,6 +508,67 @@ class InteriorAtmosphereSystem:
 
         return output
 
+    def mass(
+        self,
+        *,
+        species: GasSpecies,
+        element: Optional[str] = None,
+    ) -> dict[str, float]:
+        """Calculates the total mass of the species or element in each reservoir
+
+        Args:
+            species: A gas species
+            element: Returns the mass for an element. Defaults to None to return the species mass.
+
+        Returns:
+            Total reservoir masses of the species or element
+        """
+        planet: Planet = self.planet
+        pressure: float = self.solution_dict()[species.name]
+        fugacity: float = self.fugacities_dict[species.hill_formula]
+
+        # Atmosphere
+        mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
+        mass_in_atmosphere *= (
+            planet.surface_area * species.molar_mass / self.atmospheric_mean_molar_mass
+        )
+
+        # Melt
+        ppmw_in_melt: float = species.solubility.concentration(
+            fugacity=fugacity,
+            temperature=planet.surface_temperature,
+            pressure=self.total_pressure,
+            **self.fugacities_dict,
+        )
+        mass_in_melt: float = (
+            self.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
+        )
+
+        # Solid
+        ppmw_in_solid: float = ppmw_in_melt * species.solid_melt_distribution_coefficient
+        mass_in_solid: float = (
+            self.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+        )
+
+        output: dict[str, float] = {
+            "atmosphere": mass_in_atmosphere,
+            "melt": mass_in_melt,
+            "solid": mass_in_solid,
+        }
+
+        if element is not None:
+            try:
+                mass_scale_factor: float = (
+                    UnitConversion.g_to_kg(species.composition()[element].mass)
+                    / species.molar_mass
+                )
+            except KeyError:  # Element not in formula so mass is zero.
+                mass_scale_factor = 0
+            for key in output:
+                output[key] *= mass_scale_factor
+
+        return output
+
     def solution_dict(self) -> dict[str, float]:
         """Solution for all species in a dictionary
 
@@ -776,8 +838,8 @@ class InteriorAtmosphereSystem:
             # Gas species
             for species in self.species.gas_species.values():
                 residual_mass[constraint_index] += sum(
-                    species.mass(
-                        system=self,
+                    self.mass(
+                        species=species,
                         element=mass_constraint.element,
                     ).values()
                 )

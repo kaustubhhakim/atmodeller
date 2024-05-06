@@ -305,8 +305,8 @@ class Output(UserDict):
         for element in interior_atmosphere.species.elements:
             mass[element] = {"atmosphere": 0, "melt": 0, "solid": 0}
             for species in interior_atmosphere.species.gas_species.values():
-                species_masses: dict[str, float] = species.mass(
-                    interior_atmosphere, element=element
+                species_masses: dict[str, float] = interior_atmosphere.mass(
+                    species=species, element=element
                 )
                 mass[element]["atmosphere"] += species_masses["atmosphere"]
                 mass[element]["melt"] += species_masses["melt"]
@@ -415,7 +415,7 @@ class Output(UserDict):
         atmosphere_total_species_moles: float = 0
 
         for species in interior_atmosphere.species.gas_species.values():
-            species_masses: dict[str, float] = species.mass(interior_atmosphere)
+            species_masses: dict[str, float] = interior_atmosphere.mass(species=species)
             atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
 
         for species in interior_atmosphere.species.gas_species.values():
@@ -426,7 +426,7 @@ class Output(UserDict):
             )
             volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
 
-            species_masses: dict[str, float] = species.mass(interior_atmosphere)
+            species_masses: dict[str, float] = interior_atmosphere.mass(species=species)
             atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
                 molar_mass=species.molar_mass,
                 mass=species_masses["atmosphere"],

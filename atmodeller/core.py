@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections import UserList
-from typing import TYPE_CHECKING, Mapping, Optional
+from typing import Mapping
 
 import numpy as np
 import numpy.typing as npt
@@ -30,15 +30,12 @@ from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.utilities import UnitConversion, filter_by_type
+from atmodeller.utilities import filter_by_type
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
-
-if TYPE_CHECKING:
-    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -84,66 +81,6 @@ class GasSpecies(ChemicalSpecies):
     def solid_melt_distribution_coefficient(self) -> float:
         """Distribution coefficient between solid and melt"""
         return self._solid_melt_distribution_coefficient
-
-    def mass(
-        self,
-        system: InteriorAtmosphereSystem,
-        *,
-        element: Optional[str] = None,
-    ) -> dict[str, float]:
-        """Calculates the total mass of the species or element in each reservoir
-
-        Args:
-            system: Interior atmosphere system
-            element: Returns the mass for an element. Defaults to None to return the species mass.
-
-        Returns:
-            Total reservoir masses of the species or element
-        """
-        planet: Planet = system.planet
-        pressure: float = system.solution_dict()[self.name]
-        fugacity: float = system.fugacities_dict[self.hill_formula]
-
-        # Atmosphere
-        mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
-        mass_in_atmosphere *= (
-            planet.surface_area * self.molar_mass / system.atmospheric_mean_molar_mass
-        )
-
-        # Melt
-        ppmw_in_melt: float = self.solubility.concentration(
-            fugacity=fugacity,
-            temperature=planet.surface_temperature,
-            pressure=system.total_pressure,
-            **system.fugacities_dict,
-        )
-        mass_in_melt: float = (
-            system.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
-        )
-
-        # Solid
-        ppmw_in_solid: float = ppmw_in_melt * self.solid_melt_distribution_coefficient
-        mass_in_solid: float = (
-            system.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
-        )
-
-        output: dict[str, float] = {
-            "atmosphere": mass_in_atmosphere,
-            "melt": mass_in_melt,
-            "solid": mass_in_solid,
-        }
-
-        if element is not None:
-            try:
-                mass_scale_factor: float = (
-                    UnitConversion.g_to_kg(self.composition()[element].mass) / self.molar_mass
-                )
-            except KeyError:  # Element not in formula so mass is zero.
-                mass_scale_factor = 0
-            for key in output:
-                output[key] *= mass_scale_factor
-
-        return output
 
 
 class SolidSpecies(CondensedSpecies):
