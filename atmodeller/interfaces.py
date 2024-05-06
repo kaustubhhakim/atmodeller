@@ -85,7 +85,14 @@ class ChemicalSpecies:
         )
 
     def composition(self, isotopic: bool = False) -> Composition:
-        """Composition of the species"""
+        """Composition of the species
+
+        Args:
+            isotopic: list isotopes separately as opposed to part of an element.
+
+        Returns:
+            Composition
+        """
         return self._formula.composition(isotopic)
 
     @property

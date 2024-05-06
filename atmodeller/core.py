@@ -320,8 +320,7 @@ class Species(UserList):
         for species_index, species in enumerate(self.data):
             for element_index, element in enumerate(self.elements):
                 try:
-                    # FIXME: protected member access
-                    count: int = species._formula.composition()[element].count
+                    count: int = species.composition()[element].count
                 except KeyError:
                     count = 0
                 matrix[species_index, element_index] = count
