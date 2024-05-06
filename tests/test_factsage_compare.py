@@ -23,12 +23,13 @@ from __future__ import annotations
 import logging
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import (  # TotalPressureConstraint,
+from atmodeller.constraints import (
     ActivityConstraint,
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
     SystemConstraints,
+    TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
@@ -304,7 +305,7 @@ def test_water_condensed_10bar(helper) -> None:
     H2_g: GasSpecies = GasSpecies("H2")
     H2O_g: GasSpecies = GasSpecies("H2O")
     O2_g: GasSpecies = GasSpecies("O2")
-    H2O_l: LiquidSpecies = LiquidSpecies("H2O")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
 
     species: Species = Species([H2_g, H2O_g, O2_g, H2O_l])
 
