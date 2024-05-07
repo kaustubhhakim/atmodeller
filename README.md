@@ -38,9 +38,16 @@ If you want to use a GUI to install the code, particularly if you are a Windows 
 
 ### 1. Obtain the source code
 
-Navigate to a location on your computer and obtain the source code:
+Navigate to a location on your computer and obtain the source code. To clone using ssh, where you must use a password-protected SSH key:
 
     git clone git@github.com:ExPlanetology/atmodeller.git
+    cd atmodeller
+
+Instructions for connecting to GitHub with SSH are available [here](https://docs.github.com/en/authentication/connecting-to-github-with-ssh).
+
+If you do not have SSH keys set up, instead you can clone using HTTPS:
+
+    git clone https://github.com/ExPlanetology/atmodeller.git
     cd atmodeller
 
 ### 2. Create a Python environment
