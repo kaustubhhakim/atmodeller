@@ -16,6 +16,8 @@
 #
 """Tests for the EOS models from :cite:t:`HWZ58`"""
 
+# Convenient to use species chemical formulae so pylint: disable=invalid-name
+
 from __future__ import annotations
 
 import logging
