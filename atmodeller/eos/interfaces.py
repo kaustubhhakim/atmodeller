@@ -109,7 +109,7 @@ class RealGas(ABC):
 
         if self.calibration.pressure_min is not None:
             if self.calibration.pressure_min > pressure:
-                logger.warning(
+                logger.info(
                     "%sPressure (%0.1f) < Minimum calibration pressure (%0.1f)",
                     prefix,
                     pressure,
@@ -119,7 +119,7 @@ class RealGas(ABC):
 
         if self.calibration.pressure_max is not None:
             if self.calibration.pressure_max < pressure:
-                logger.warning(
+                logger.info(
                     "%sPressure (%0.1f) > Maximum calibration pressure (%0.1f)",
                     prefix,
                     pressure,
@@ -129,7 +129,7 @@ class RealGas(ABC):
 
         if self.calibration.temperature_min is not None:
             if self.calibration.temperature_min > temperature:
-                logger.warning(
+                logger.info(
                     "%sTemperature (%0.1f) < Minimum calibration temperature (%0.1f)",
                     prefix,
                     temperature,
@@ -139,7 +139,7 @@ class RealGas(ABC):
 
         if self.calibration.temperature_max is not None:
             if self.calibration.temperature_max < temperature:
-                logger.warning(
+                logger.info(
                     "%sTemperature (%0.1f) > Maximum calibration temperature (%0.1f)",
                     prefix,
                     temperature,
