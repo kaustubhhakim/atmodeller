@@ -52,6 +52,7 @@ from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import (
     CombinedEOSModel,
     CorrespondingStatesMixin,
+    ExperimentalCalibration,
     RealGas,
     critical_parameters,
 )
@@ -295,6 +296,7 @@ _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
     c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
     d_coefficients=(0, 0, 0, 0, 0),
+    calibration=ExperimentalCalibration(pressure_max=1000),
 )
 """H2 low pressure (<1000 bar) :cite:p:`SS92{Table 1b}`
 
@@ -309,11 +311,14 @@ _H2_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
     b_coefficients=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5),
     c_coefficients=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10),
     d_coefficients=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0),
+    calibration=ExperimentalCalibration(pressure_min=1000),
 )
 """H2 high pressure (>1000 bar) :cite:p:`SS92{Table 1b}`
 
-This model is not a corresponding states model and requires the actual temperature and pressure.
-It has been superseded by a refitted model. 
+This model cannot be a corresponding states model because the data do not appear correct when
+plotted, so presumably it requires the actual temperature and pressure (hence
+`critical_temperature` and `critical_pressure` are not provided as arguments). Visually, the fit
+compares well to :obj:`_H2_high_pressure_SS92_refit`.
 """
 
 _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
@@ -323,6 +328,7 @@ _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
     b_coefficients=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
     c_coefficients=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
     d_coefficients=(2.28281107e-11, 0, -1.07138603e-08, 0, 3.67720815e-07, 0, 0, 0),
+    calibration=ExperimentalCalibration(pressure_min=1000),
 )
 """H2 high pressure (>1000 bar)
 
@@ -334,7 +340,7 @@ pressure.
 """
 
 H2_SS92: RealGas = CombinedEOSModel(
-    models=(_H2_low_pressure_SS92, _H2_high_pressure_SS92_refit), upper_pressure_bounds=(1000,)
+    models=(_H2_low_pressure_SS92, _H2_high_pressure_SS92), upper_pressure_bounds=(1000,)
 )
 """H2 EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1b}`"""
 
@@ -379,6 +385,7 @@ SO2_SS92: RealGas = SaxenaEightCoefficients(
         0.55542e-4,
     ),
     d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    calibration=ExperimentalCalibration(pressure_min=1, pressure_max=10e3),
 )
 """SO2 EOS :cite:p:`SS92{Table 1c}`"""
 
@@ -389,6 +396,7 @@ _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
     b_coefficients=(0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515),
     c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
     d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    calibration=ExperimentalCalibration(pressure_min=1, pressure_max=500),
 )
 """H2S low pressure (1-500 bar) :cite:p:`SS92{Table 1d}`"""
 
@@ -417,16 +425,21 @@ _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
         -0.27985e-3,
     ),
     d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    calibration=ExperimentalCalibration(pressure_min=500, pressure_max=10e3),
 )
 """H2S high pressure (500-10000 bar) :cite:p:`SS92{Table 1d}`"""
 
 H2S_SS92: RealGas = CombinedEOSModel(
-    models=(_H2S_low_pressure_SS92, _H2S_high_pressure_SS92), upper_pressure_bounds=(500,)
+    models=(_H2S_low_pressure_SS92, _H2S_high_pressure_SS92),
+    upper_pressure_bounds=(500,),
+    calibration=ExperimentalCalibration(pressure_min=1, pressure_max=10e3),
 )
 """H2S EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1d}`"""
 
 
-def get_corresponding_states_SS92(species: str) -> RealGas:
+def get_corresponding_states_SS92(
+    species: str, calibration: ExperimentalCalibration = ExperimentalCalibration()
+) -> RealGas:
     """Corresponding states :cite:p:`SS92{Table 1a}`
 
     Coefficients for the low and medium pressure regimes are from
@@ -437,7 +450,8 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
 
     Args:
         species: A species, which must be a key in
-            :obj:`atmodeller.eos.interfaces.critical_parameters`
+            :obj:`.interfaces.critical_parameters`
+        calibration: Calibration temperature and pressure range. Defaults to empty.
 
     Returns:
         A corresponding states model for the species
@@ -455,6 +469,7 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
         # Saxena and Fei (1987) CMP, Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
         c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
         d_coefficients=(0, 0, 0, 0, 0),
+        calibration=ExperimentalCalibration(pressure_max=1000),
     )
 
     # Table 1a, 1000-5000 bar
@@ -466,6 +481,7 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
         # Saxena and Fei (1987) CMP, Eq. 21, C first coefficient = 1.4164e-4 (not negative)
         c_coefficients=(0, 0, 0, 0, 1.4164e-4, 0, 0, -2.8349e-6),
         d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+        calibration=ExperimentalCalibration(pressure_min=1000, pressure_max=5000),
     )
 
     # Table 1a, >5000 bar
@@ -477,10 +493,13 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
         b_coefficients=(0, 0, 5.5125e-2, 0, 3.9344e-2, 0, 0, 0),
         c_coefficients=(0, 0, -1.8935e-6, 0, -1.1092e-5, 0, -2.1892e-5, 0),
         d_coefficients=(0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0),
+        calibration=ExperimentalCalibration(pressure_min=5000),
     )
 
     combined_model: RealGas = CombinedEOSModel(
-        models=(low_pressure, medium_pressure, high_pressure), upper_pressure_bounds=(1000, 5000)
+        models=(low_pressure, medium_pressure, high_pressure),
+        upper_pressure_bounds=(1000, 5000),
+        calibration=calibration,
     )
 
     return combined_model

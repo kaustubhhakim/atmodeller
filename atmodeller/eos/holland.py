@@ -101,7 +101,7 @@ class MRKCorrespondingStatesHP91(MRKExplicitABC):
 
         Args:
             species: A species, which must be a key in
-                :obj:`atmodeller.eos.interfaces.critical_parameters`
+                :obj:`.interfaces.critical_parameters`
             calibration: Calibration temperature and pressure range. Defaults to empty.
 
         Returns:
@@ -148,7 +148,7 @@ class CORKCorrespondingStatesHP91(CORK):
 
         Args:
             species: A species, which must be a key in
-                :obj:`atmodeller.eos.interfaces.critical_parameters`
+                :obj:`.interfaces.critical_parameters`
             calibration: Calibration temperature and pressure range. Defaults to empty.
 
         Returns:
