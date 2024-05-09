@@ -1004,35 +1004,24 @@ class CombinedEOSModel(RealGas):
         index: int = self._get_index(pressure)
 
         if index == 0:
-            volume: float = self.models[0].volume_integral(temperature, pressure)
+            return self.models[0].volume_integral(temperature, pressure)
 
-        elif index == 1:
-            volume0: float = self.models[0].volume_integral(
-                temperature, self.upper_pressure_bounds[0]
-            )
-            dvolume1: float = self.models[1].volume_integral(temperature, pressure) - self.models[
-                1
-            ].volume_integral(temperature, self.upper_pressure_bounds[0])
+        elif index > 0 and index <= len(self.models):
+            logger.debug("Performing pressure integration")
+            volume = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
+            for i in range(1, index):
+                dvolume = self.models[i].volume_integral(
+                    temperature, self.upper_pressure_bounds[i]
+                ) - self.models[i].volume_integral(temperature, self.upper_pressure_bounds[i - 1])
+                volume += dvolume
+            dvolume_last = self.models[index].volume_integral(temperature, pressure) - self.models[
+                index
+            ].volume_integral(temperature, self.upper_pressure_bounds[index - 1])
 
-            return volume0 + dvolume1
-
-        elif index == 2:
-            volume0: float = self.models[0].volume_integral(
-                temperature, self.upper_pressure_bounds[0]
-            )
-            dvolume1: float = self.models[1].volume_integral(
-                temperature, self.upper_pressure_bounds[1]
-            ) - self.models[1].volume_integral(temperature, self.upper_pressure_bounds[0])
-            dvolume2: float = self.models[2].volume_integral(temperature, pressure) - self.models[
-                2
-            ].volume_integral(temperature, self.upper_pressure_bounds[1])
-
-            return volume0 + dvolume1 + dvolume2
+            return volume + dvolume_last
 
         else:
-            raise ValueError("Index cannot be greater than 2")
-
-        return volume
+            raise ValueError("Index cannot be greater than the number of models")
 
 
 @dataclass(frozen=True)
