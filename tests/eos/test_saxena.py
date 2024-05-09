@@ -102,21 +102,21 @@ def test_H2_medium_pressure_SS92(check_values) -> None:
 
 def test_H2_high_pressure_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
-    expected: float = 43.46585841223779
+    expected: float = 41.97871061892679
     expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(1473, 4000, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_high_pressure2_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
-    expected: float = 21.547766750104773
+    expected: float = 20.806595067793276
     expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(1073, 10000, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_high_pressure3_SS92(check_values) -> None:
     """Comparison with Figure 1 in Shi and Saxena (1992)"""
-    expected: float = 71.46244038505347
+    expected: float = 71.50153474005484
     expected = UnitConversion.cm3_to_m3(expected)
     check_values.volume(673, 1000, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 

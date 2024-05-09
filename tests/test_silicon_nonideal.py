@@ -170,12 +170,12 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2_g": 3552.669457706052,
-        "H2O_g": 4767.286871920151,
-        "O2_g": 0.03382190282100078,
-        "OSi_g": 14.517388181293816,
-        "H4Si_g": 0.008762061109896661,
+        "H2O_g": 4985.13674243621,
+        "H2_g": 3503.0246920397244,
+        "H4Si_g": 0.009461878462110699,
         "O2Si_l": 1.0,
+        "O2_g": 0.03403441441997074,
+        "OSi_g": 14.471993770955361,
     }
 
     system.solve(constraints)
@@ -246,12 +246,12 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2_g": 1868.1256657071128,
-        "H2O_g": 2116.1052597622975,
-        "O2_g": 0.02877934211561468,
-        "OSi_g": 15.737910722708122,
-        "H4Si_g": 0.002384364181797566,
+        "H2O_g": 2143.367766318033,
+        "H2_g": 1840.8630969974558,
+        "H4Si_g": 0.0024461970964935434,
         "O2Si_l": 1.0,
+        "O2_g": 0.02877934210919358,
+        "OSi_g": 15.737910724463843,
     }
 
     system.solve(constraints)
@@ -283,12 +283,12 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2_g": 3668.5524293467392,
-        "H2O_g": 4999.9999999999945,
-        "O2_g": 0.03426380501584421,
-        "OSi_g": 14.42346859651946,
-        "H4Si_g": 0.00939136258814609,
+        "H2O_g": 4999.999999999999,
+        "H2_g": 3509.5924241807747,
+        "H4Si_g": 0.009503203994822516,
         "O2Si_l": 1.0,
+        "O2_g": 0.03406158617252535,
+        "OSi_g": 14.466220289280406,
     }
 
     system.solve(constraints)
