@@ -30,6 +30,7 @@ from atmodeller.constraints import (
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
+    PressureConstraint,
     SystemConstraints,
     TotalPressureConstraint,
 )
@@ -218,7 +219,7 @@ def test_CHO_highly_oxidised(helper) -> None:
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_CHO_low_temperature(helper) -> None:
+def test_CHO_middle_temperature(helper) -> None:
     """C-H-O system at 873 K"""
 
     H2_g: GasSpecies = GasSpecies("H2")
@@ -252,6 +253,46 @@ def test_CHO_low_temperature(helper) -> None:
         "CO2_g": 7.48e-4,
         "CH4_g": 19.548,
         "O2_g": 1.27e-25,
+    }
+
+    system.solve(constraints)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_CHO_low_temperature(helper) -> None:
+    """C-H-O system at 450 K"""
+
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+
+    planet: Planet = Planet()
+    planet.surface_temperature = 450
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    h_kg: float = earth_oceans_to_kg(1)
+    c_kg: float = 1 * h_kg
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            PressureConstraint(H2O_g, 8),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
+        ]
+    )
+
+    factsage_result: dict[str, float] = {
+        "H2_g": 55.475,
+        "H2O_g": 8.0,
+        "CO_g": 2.12e-16,
+        "CO2_g": 1.24e-14,
+        "CH4_g": 16.037,
+        "O2_g": 7.85e-54,
     }
 
     system.solve(constraints)
