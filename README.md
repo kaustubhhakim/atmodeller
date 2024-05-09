@@ -83,6 +83,17 @@ See this [developer setup guide](https://gist.github.com/djbower/c66474000029730
 
 Documentation will eventually be available on readthedocs, but for the time being you can compile (and contribute if you wish) to the documentation in the `docs/` directory. To compile the documentation you will need to use Poetry and the option `--with docs` when you run `poetry install`. See [here](https://python-poetry.org/docs/managing-dependencies/) for further information.
 
+Once the necessary dependencies are installed to compile the documentation, you can navigate into the `docs/` directory and run:
+
+	make html
+	
+And/or to compile the documentation as a PDF (`latexpdf` must be available on your system):
+
+	make latexpdf
+	
+	
+This will build the documentation in the appropriately named subdirectory in `_build`.
+
 ## Tutorial
 
 Several Jupyter notebook tutorials are provided in `notebooks/`.
