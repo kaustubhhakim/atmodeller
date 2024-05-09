@@ -56,6 +56,7 @@ from scipy.constants import kilo
 
 from atmodeller.eos.interfaces import (
     CORK,
+    ExperimentalCalibration,
     MRKCriticalBehaviour,
     MRKExplicitABC,
     MRKImplicitABC,
@@ -70,6 +71,9 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+# Common calibration parameters from Holland and Powell (1991)
+CALIBRATION_HP91: ExperimentalCalibration = ExperimentalCalibration(0, 50e3, 400, 1900)
+
 
 @dataclass(kw_only=True)
 class MRKCorrespondingStatesHP91(MRKExplicitABC):
@@ -81,18 +85,24 @@ class MRKCorrespondingStatesHP91(MRKExplicitABC):
 
         * `a` coefficients have been multiplied by 1e-4
         * `b0` has been multiplied by 1e-2
+
+    Args:
+        calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
     a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e-9, -8.63920e-10, 0))
     b0: float = field(init=False, default=9.18301e-6)
 
     @classmethod
-    def get_species(cls, species: str) -> RealGas:
+    def get_species(
+        cls, species: str, calibration: ExperimentalCalibration = ExperimentalCalibration()
+    ) -> RealGas:
         """Gets an MRK corresponding states model for a given species.
 
         Args:
             species: A species, which must be a key in
                 :obj:`atmodeller.eos.interfaces.critical_parameters`
+            calibration: Calibration temperature and pressure range. Defaults to empty.
 
         Returns:
             A corresponding states model for the species
@@ -100,6 +110,7 @@ class MRKCorrespondingStatesHP91(MRKExplicitABC):
         return cls(
             critical_temperature=critical_parameters[species].temperature,
             critical_pressure=critical_parameters[species].pressure,
+            calibration=calibration,
         )
 
 
@@ -121,6 +132,7 @@ class CORKCorrespondingStatesHP91(CORK):
         critical_temperature: Critical temperature in K
         critical_pressure: Critical pressure in bar
         mrk: Fugacity model for computing the MRK contribution
+        calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
     P0: float = field(init=False, default=0)
@@ -129,12 +141,15 @@ class CORKCorrespondingStatesHP91(CORK):
     c_virial: tuple[float, float] = field(init=False, default=(0, 0))
 
     @classmethod
-    def get_species(cls, species: str) -> RealGas:
+    def get_species(
+        cls, species: str, calibration: ExperimentalCalibration = ExperimentalCalibration()
+    ) -> RealGas:
         """Gets a CORK corresponding states model for a given species
 
         Args:
             species: A species, which must be a key in
                 :obj:`atmodeller.eos.interfaces.critical_parameters`
+            calibration: Calibration temperature and pressure range. Defaults to empty.
 
         Returns:
             A corresponding states model for the species
@@ -145,9 +160,12 @@ class CORKCorrespondingStatesHP91(CORK):
             mrk=mrk,
             critical_temperature=critical_parameters[species].temperature,
             critical_pressure=critical_parameters[species].pressure,
+            calibration=calibration,
         )
 
 
+# Doesn't really make sense to specify a calibration range for the MRK EOS because they are a
+# building block for the CORK EOS.
 CO2_MRK_simple_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2")
 """CO2 MRK corresponding states :cite:p:`HP91`"""
 CH4_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4")
@@ -163,19 +181,19 @@ S2_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("S2")
 H2S_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S")
 """H2S MRK corresponding states :cite:p:`HP91`"""
 
-CO2_CORK_simple_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO2")
+CO2_CORK_simple_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO2", CALIBRATION_HP91)
 """CO2 CORK corresponding states :cite:p:`HP91`"""
-CH4_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CH4")
+CH4_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CH4", CALIBRATION_HP91)
 """CH4 CORK corresponding states :cite:p:`HP91`"""
-H2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("H2_Holland")
+H2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("H2_Holland", CALIBRATION_HP91)
 """H2 CORK corresponding states :cite:p:`HP91`"""
-CO_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO")
+CO_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO", CALIBRATION_HP91)
 """CO CORK corresponding states :cite:p:`HP91`"""
-N2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("N2")
+N2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("N2", CALIBRATION_HP91)
 """N2 CORK corresponding states :cite:p:`HP91`"""
-S2_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("S2")
+S2_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("S2", CALIBRATION_HP91)
 """S2 CORK corresponding states :cite:p:`HP11`"""
-H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S")
+H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S", CALIBRATION_HP91)
 """H2S CORK corresponding states :cite:p:`HP11`"""
 
 # For any subclass of MRKImplicitABC, note the unit conversion to SI and pressure in bar compared
@@ -195,7 +213,11 @@ b0_H2O: float = 1.465e-5
 
 @dataclass(kw_only=True)
 class _MRKH2OLiquidHP91(MRKImplicitABC):
-    """MRK for liquid H2O :cite:p`HP91{Equation 6}`"""
+    """MRK for liquid H2O :cite:p`HP91{Equation 6}`
+
+    Args:
+        calibration: Calibration temperature and pressure range. Defaults to empty.
+    """
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -236,7 +258,11 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
 
 @dataclass(kw_only=True)
 class _MRKH2OGasHP91(MRKImplicitABC):
-    """MRK for gaseous H2O :cite:p:`HP91{Equation 6a}`"""
+    """MRK for gaseous H2O :cite:p:`HP91{Equation 6a}`
+
+    Args:
+        calibration: Calibration temperature and pressure range. Defaults to empty.
+    """
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -274,7 +300,11 @@ class _MRKH2OGasHP91(MRKImplicitABC):
 
 @dataclass(kw_only=True)
 class _MRKH2OFluidHP91(MRKImplicitABC):
-    """MRK for supercritical H2O :cite:p:`HP91{Equation 6}`"""
+    """MRK for supercritical H2O :cite:p:`HP91{Equation 6}`
+
+    Args:
+        calibration: Calibration temperature and pressure range. Defaults to empty.
+    """
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -318,7 +348,11 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
 
 @dataclass(kw_only=True)
 class MRKCO2HP91(MRKImplicitABC):
-    """MRK for CO2 :cite:p:`HP91`"""
+    """MRK for CO2 :cite:p:`HP91`
+
+    Args:
+        calibration: Calibration temperature and pressure range. Defaults to empty.
+    """
 
     a_coefficients: tuple[float, ...] = field(
         init=False,
@@ -364,7 +398,11 @@ This is the same as the CO2 MRK model in :cite:t:`HP91`.
 
 @dataclass(kw_only=True)
 class MRKH2OHP91(MRKCriticalBehaviour):
-    """MRK for H2O that includes critical behaviour"""
+    """MRK for H2O that includes critical behaviour
+
+    Args:
+        calibration: Calibration temperature and pressure range. Defaults to empty.
+    """
 
     mrk_fluid: MRKImplicitABC = field(init=False, default_factory=_MRKH2OFluidHP91)
     mrk_gas: MRKImplicitABC = field(init=False, default_factory=_MRKH2OGasHP91)
@@ -420,6 +458,7 @@ CO2_CORK_HP91: RealGas = CORK(
     mrk=CO2_MRK_HP91,
     a_virial=_a_conversion((1.33790e-2, -1.01740e-5)),
     b_virial=_b_conversion((-2.26924e-1, 7.73793e-5)),
+    calibration=CALIBRATION_HP91,
 )
 """CO2 CORK :cite:p:`HP91`"""
 
@@ -428,6 +467,7 @@ CO2_CORK_HP98: RealGas = CORK(
     mrk=CO2_MRK_HP98,
     a_virial=_a_conversion((5.40776e-3, -1.59046e-6)),
     b_virial=_b_conversion((-1.78198e-1, 2.45317e-5)),
+    calibration=ExperimentalCalibration(0, 120e3, 400, 1900),
 )
 """CO2 CORK :cite:p:`HP98`"""
 
@@ -436,6 +476,7 @@ H2O_CORK_HP91: RealGas = CORK(
     mrk=MRKH2OHP91(),
     a_virial=_a_conversion((-3.2297554e-3, 2.2215221e-6)),
     b_virial=_b_conversion((-3.025650e-2, -5.343144e-6)),
+    calibration=ExperimentalCalibration(0, 50e3, 400, 1700),
 )
 """H2O CORK :cite:p:`HP91`"""
 
@@ -445,6 +486,7 @@ H2O_CORK_HP98: RealGas = CORK(
     a_virial=_a_conversion((1.9853e-3, 0)),
     b_virial=_b_conversion((-8.9090e-2, 0)),
     c_virial=_c_conversion((8.0331e-2, 0)),
+    calibration=ExperimentalCalibration(0, 120e3, 400, 1700),
 )
 """H2O CORK :cite:p:`HP98`"""
 
@@ -456,7 +498,7 @@ def get_holland_eos_models() -> dict[str, RealGas]:
     states models are used when a bespoke fit to just that species is not available.
 
     Returns:
-        Dictionary of preferred EOS models for each species
+        Dictionary of EOS models for each species
     """
     models: dict[str, RealGas] = {}
     models["CH4"] = CH4_CORK_HP91

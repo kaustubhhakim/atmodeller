@@ -525,7 +525,7 @@ def get_saxena_eos_models() -> dict[str, RealGas]:
     states models are used when a bespoke fit to just that species is not available.
 
     Returns:
-        Dictionary of preferred EOS models for each species
+        Dictionary of EOS models for each species
     """
     models: dict[str, RealGas] = {}
     models["Ar"] = Ar_SF87
