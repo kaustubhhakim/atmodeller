@@ -1002,7 +1002,35 @@ class CombinedEOSModel(RealGas):
     @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
         index: int = self._get_index(pressure)
-        volume: float = self.models[index].volume_integral(temperature, pressure)
+
+        if index == 0:
+            volume: float = self.models[0].volume_integral(temperature, pressure)
+
+        elif index == 1:
+            volume0: float = self.models[0].volume_integral(
+                temperature, self.upper_pressure_bounds[0]
+            )
+            dvolume1: float = self.models[1].volume_integral(temperature, pressure) - self.models[
+                1
+            ].volume_integral(temperature, self.upper_pressure_bounds[0])
+
+            return volume0 + dvolume1
+
+        elif index == 2:
+            volume0: float = self.models[0].volume_integral(
+                temperature, self.upper_pressure_bounds[0]
+            )
+            dvolume1: float = self.models[1].volume_integral(
+                temperature, self.upper_pressure_bounds[1]
+            ) - self.models[1].volume_integral(temperature, self.upper_pressure_bounds[0])
+            dvolume2: float = self.models[2].volume_integral(temperature, pressure) - self.models[
+                2
+            ].volume_integral(temperature, self.upper_pressure_bounds[1])
+
+            return volume0 + dvolume1 + dvolume2
+
+        else:
+            raise ValueError("Index cannot be greater than 2")
 
         return volume
 
