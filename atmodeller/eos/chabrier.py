@@ -23,6 +23,18 @@ Examples:
         model = H2_CD21
         fugacity_coefficient = model.fugacity_coefficient(temperature=2000, pressure=1000)
         print(fugacity_coefficient)
+
+    Get the preferred EOS models for various species from the Chabrier and colleagues models::
+
+        from atmodeller.eos.chabrier import get_chabrier_eos_models
+        models = get_chabrier_eos_models()
+        # List the available species
+        models.keys()
+        # Get the EOS model for H2
+        h2_model = models['H2']
+        # Determine the fugacity coefficient at 2000 K and 1000 bar
+        fugacity_coefficient = h2_model.fugacity_coefficient(temperature=2000, pressure=1000)
+        print(fugacity_coefficient)
 """
 
 from __future__ import annotations
@@ -51,6 +63,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 CHABRIER_DIRECTORY: Path = Path("chabrier")
+"""Directory of the chabrier data within the main data directory"""
 
 
 @dataclass(kw_only=True)
@@ -59,8 +72,6 @@ class Chabrier(RealGas):
 
     This uses the rho-T-P tables to lookup density (rho).
 
-    This form of the EOS can also be used for the models in :cite:t:`CD21`.
-
     Args:
         filename: Filename of the density-T-P data
     """
@@ -68,9 +79,9 @@ class Chabrier(RealGas):
     filename: Path
     """Filename of the density-T-P data"""
     standard_state_pressure: float = field(init=False, default=1)
-    """Standard state pressure with the appropriate units"""
+    """Standard state pressure with the appropriate units. Set to 1 bar"""
     log10density_func: RectBivariateSpline = field(init=False)
-    """Spline to evalute the density"""
+    """Spline to evaluate the density"""
 
     def __post_init__(self):
         self._create_spline()
@@ -102,8 +113,8 @@ class Chabrier(RealGas):
         """Gets molar density
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Molar density in # FIXME units?
@@ -117,7 +128,8 @@ class Chabrier(RealGas):
 
         return molar_density
 
-    # FIXME: Must implement this method.
+    # FIXME: Must implement this method. Below is just a hack so that the class can be
+    # instantiated.
     @override
     def volume(self, temperature: float, pressure: float) -> float: ...
 
