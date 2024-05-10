@@ -12,6 +12,14 @@ Subpackages
 Submodules
 ----------
 
+atmodeller.eos.chabrier module
+------------------------------
+
+.. automodule:: atmodeller.eos.chabrier
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.eos.holland module
 -----------------------------
 

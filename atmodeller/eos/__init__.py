@@ -15,3 +15,9 @@
 # see <https://www.gnu.org/licenses/>.
 #
 """EOS package"""
+
+import importlib.resources
+from importlib.abc import Traversable
+
+DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
+"""Data directory, which is the same as the package directory"""
