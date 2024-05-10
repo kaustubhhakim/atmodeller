@@ -282,6 +282,7 @@ class Plotter:
         plot_data: pd.DataFrame | None = None,
         column_name: str | None = None,
         column_index: int | None = None,
+        index_shift: int = 1,
     ) -> Axes:
         """Gets axes from a grid.
 
@@ -305,7 +306,7 @@ class Plotter:
             logger.info("Getting column index for %s", column_name)
             # Recall that the first column is the category, hence must minus one
             column_index = cast(int, plot_data.columns.get_loc(column_name))
-            column_index -= 1
+            column_index -= index_shift
             logger.info("column_index = %s", column_index)
 
         try:
@@ -367,13 +368,13 @@ class Plotter:
                     -1, bin_size
                 )
                 try:
-                    data_average: npt.NDArray = np.average(data_reshape, axis=1)
-                    data_std: npt.NDArray = cast(npt.NDArray, np.std(data_average))
-                    out[f"{column}"] = data_average
+                    data_median: npt.NDArray = np.median(data_reshape, axis=1)
+                    data_std: npt.NDArray = cast(npt.NDArray, np.std(data_reshape, axis=1))
+                    out[f"{column}"] = data_median
                     out[f"{column}_std"] = data_std
                 except TypeError:
                     logger.warning(
-                        "Cannot compute an average for column = %s due to invalid type", column
+                        "Cannot compute a median for column = %s due to invalid type", column
                     )
             output[sheet_name] = out
 
@@ -428,13 +429,19 @@ class Plotter:
             y_data: npt.NDArray | pd.Series = binned_data[species][y_axis] / scale_factor
             if smooth is not None:
                 y_data = gaussian_filter1d(y_data, sigma=sigma)
+                y_minus = gaussian_filter1d(
+                    y_data - binned_data[species][f"{y_axis}_std"] / scale_factor, sigma=sigma
+                )
+                y_plus = gaussian_filter1d(
+                    y_data + binned_data[species][f"{y_axis}_std"] / scale_factor, sigma=sigma
+                )
             ax.plot(x_data, y_data, color=color, label=label)
 
             if fill_between:
                 ax.fill_between(
                     binned_data[species][x_axis],
-                    y_data - binned_data[species][f"{y_axis}_std"] / scale_factor,
-                    y_data + binned_data[species][f"{y_axis}_std"] / scale_factor,
+                    y_minus,
+                    y_plus,
                     color=color,
                     alpha=0.2,
                     # label=label,
@@ -444,6 +451,7 @@ class Plotter:
             xlabel = x_axis
         if ylabel is None:
             ylabel = y_axis
+
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_yscale(yscale)
@@ -595,9 +603,123 @@ class Plotter:
             column_name = "Molar mass (g/mol)"
             logger.info("Setting axis properties for %s", column_name)
             axis: Axes = self.get_axes(grid, plot_data=data, column_name=column_name)
-            ticks = range(0, 41, 10)
-            axis.set_xlim(0, 45)
-            axis.set_ylim(0, 45)
+            ticks = range(0, 51, 10)
+            axis.set_xlim(0, 55)
+            axis.set_ylim(0, 55)
+            axis.set_xticks(ticks)
+            axis.set_yticks(ticks)
+
+        return grid
+
+    def species_pairplot_scatter(
+        self,
+        *,
+        species: dict[str, AxesSpec | None],
+        mass_or_moles: str = "moles",
+        plot_atmosphere: bool = True,
+    ) -> sns.PairGrid:
+        """Plots a pair plot of species and/or atmospheric properties.
+
+        Plots a scatter plot with a kde overlay.
+
+        Args:
+            species: A dict of species or elements to plot, which can be empty.
+            mass_or_moles: Plot the species by mass or moles. Defaults to moles.
+            plot_atmosphere: Plots atmosphere quantities. Defaults to True.
+
+        Returns:
+            The grid
+        """
+        suffix, units = self.get_units(mass_or_moles)
+
+        output: list[pd.Series] = []
+
+        for entry in species:
+            # Try to find species totals (i.e. assume species is an elemental total)
+            try:
+                totals: pd.DataFrame = self.dataframes[f"{entry}_totals"]
+            # Otherwise, get the species directly
+            except KeyError:
+                totals = self.dataframes[entry]
+            atmos: pd.Series = UnitConversion.ppm_to_percent(totals[f"atmosphere_{suffix}"])
+            atmos.name = f"{entry.removesuffix('_g')} atmos ({units})"
+            output.append(atmos)
+
+        if plot_atmosphere:
+            atmosphere: pd.DataFrame = self.dataframes["atmosphere"]
+            pressure: pd.Series = atmosphere["pressure"] / kilo  # to kbar
+            pressure.name = "Pressure (kbar)"
+            mean_molar_mass: pd.Series = atmosphere["mean_molar_mass"] * kilo  # to g/mol
+            mean_molar_mass.name = "Molar mass (g/mol)"
+            atmosphere_series: list[pd.Series] = [pressure, mean_molar_mass]
+            output.extend(atmosphere_series)
+
+        # Categorise C/H, which is cleaner and also better behaved with the seaborn legend
+        # This assumes that C/H is log10 distributed between -1 and 1
+        CH_sizes: dict[str, float] = {"0.5 > C/H": 20, "0.5 < C/H < 2.2": 35, "2.2 < C/H": 50}
+        CH_ratio = pd.cut(
+            self.dataframes["extra"]["C/H ratio"],
+            [0.1, 0.464158883717533, 2.154434688378294, 10],
+            labels=list(CH_sizes.keys()),
+        )
+
+        data: pd.DataFrame = pd.concat(output, axis=1)
+
+        sns.set_theme(style="white", font_scale=1.3)
+
+        grid: sns.PairGrid = sns.pairplot(
+            data,
+            corner=True,
+            diag_kind="kde",
+            plot_kws={
+                "size": CH_ratio,
+                "legend": "auto",
+                "alpha": 0.3,
+                "hue": self.dataframes["extra"]["fO2_shift"],
+                "hue_norm": (-5, 5),
+                "sizes": CH_sizes,
+                "size_order": reversed(list(CH_sizes.keys())),
+                "palette": "crest",
+            },
+        )
+
+        grid.map_lower(sns.kdeplot, levels=[0.33, 0.66, 1], clip=(0, None), color="orangered")
+        grid.add_legend()
+
+        plt.subplots_adjust(hspace=0.15, wspace=0.15)
+        sns.move_legend(grid, "center left", bbox_to_anchor=(0.6, 0.6))
+
+        for nn, (species_name, species_axes_spec) in enumerate(species.items()):
+            if species_axes_spec is not None:
+                logger.info("Setting axis properties for %s", species_name)
+                axis: Axes = self.get_axes(grid, column_index=nn, index_shift=0)
+                axis.set_xlim(*species_axes_spec.xylim)
+                axis.set_ylim(*species_axes_spec.xylim)
+                axis.set_xticks(species_axes_spec.ticks)
+                axis.set_yticks(species_axes_spec.ticks)
+            else:
+                logger.info("Using default axis properties for %s", species_name)
+
+        if plot_atmosphere:
+            # Axes for atmosphere quantites are currently set once here.
+            column_name: str = "Pressure (kbar)"
+            logger.info("Setting axis properties for %s", column_name)
+            axis: Axes = self.get_axes(
+                grid, plot_data=data, column_name=column_name, index_shift=0
+            )
+            ticks = range(0, 16, 5)
+            axis.set_xlim(0, 15)
+            axis.set_ylim(0, 15)
+            axis.set_xticks(ticks)
+            axis.set_yticks(ticks)
+            column_name = "Molar mass (g/mol)"
+            logger.info("Setting axis properties for %s", column_name)
+            axis: Axes = self.get_axes(
+                grid, plot_data=data, column_name=column_name, index_shift=0
+            )
+            ticks = range(0, 51, 10)
+            axis.set_xlim(0, 55)
+            axis.set_ylim(0, 55)
             axis.set_xticks(ticks)
             axis.set_yticks(ticks)
 
@@ -623,14 +745,14 @@ class Plotter:
 
         output: list[pd.Series] = [colour_category.get_category(self.output)]
 
-        for element in "H":  # , "O"):
+        for element in "H":
             for reservoir in reservoirs:
                 series_data: pd.Series = self.get_element_ratio_in_reservoir(
                     "C", element, reservoir=reservoir, mass_or_moles=mass_or_moles
                 )
                 output.append(series_data)
 
-        for element in ("C", "H"):  # , "O"):
+        for element in ("C", "H"):
             element_data: pd.DataFrame = self.dataframes[f"{element}_totals"]
             interior: pd.Series = element_data["melt_mass"] * 100 / element_data["total_mass"]
             interior.name = f"{element} melt (wt.%)"
