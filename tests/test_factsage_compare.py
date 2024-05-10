@@ -397,7 +397,7 @@ def test_graphite_water_condensed_10bar(helper) -> None:
     species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
 
     planet: Planet = Planet()
-    planet.surface_temperature = 440
+    planet.surface_temperature = 400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     h_kg: float = earth_oceans_to_kg(1) * 2
@@ -408,9 +408,9 @@ def test_graphite_water_condensed_10bar(helper) -> None:
             TotalPressureConstraint(10),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            # ElementMassConstraint("O", 2.48703e21), # result 1
+            ElementMassConstraint("O", 2.48703e21),  # result 1
             # ElementMassConstraint("O", 1.14375e21),  # result 2
-            ElementMassConstraint("O", 1.14375e20),  # result 3
+            # ElementMassConstraint("O", 1.14375e20),  # result 3
             ActivityConstraint(H2O_l, 1),
             ActivityConstraint(C_cr, 1),
         ]
@@ -471,7 +471,7 @@ def test_graphite_water_condensed_10bar(helper) -> None:
     )
 
     system.solve(constraints, initial_solution=initial_solution_result3)
-    # system.output(to_excel=True)
+    system.output(to_excel=True)
     assert helper.isclose(system, result3, log=False, rtol=TOLERANCE, atol=TOLERANCE)
 
 
