@@ -63,7 +63,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 CHABRIER_DIRECTORY: Path = Path("chabrier")
-"""Directory of the chabrier data within the main data directory"""
+"""Directory of the Chabrier data within :obj:`~atmodeller.eos.DATA_DIRECTORY`."""
 
 
 @dataclass(kw_only=True)
@@ -73,7 +73,7 @@ class Chabrier(RealGas):
     This uses the rho-T-P tables to lookup density (rho).
 
     Args:
-        filename: Filename of the density-T-P data
+        filename: Filename of the density-T-P data in :obj:`CHABRIER_DIRECTORY`.
     """
 
     filename: Path
