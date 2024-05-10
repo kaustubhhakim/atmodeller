@@ -84,10 +84,17 @@ class Chabrier(RealGas):
     """Spline to evaluate the density"""
 
     def __post_init__(self):
+        """init method to create spline lookup for density from :cite:t:`CD21` T-P-rhp tables.
+        """
+
         self._create_spline()
 
     def _create_spline(self) -> None:
-        """Sets spline lookup for density from :cite:t:`CD21` rho-T-P tables"""
+        """Sets spline lookup for density from :cite:t:`CD21` T-P-rhp tables.
+
+        The first 3 columns contain log10 T [K], log10 P [GPa], log10 rho [g/cc].
+        """
+
         data: AbstractContextManager[Path] = importlib.resources.as_file(
             DATA_DIRECTORY.joinpath(str(CHABRIER_DIRECTORY.joinpath(self.filename)))
         )
@@ -110,34 +117,67 @@ class Chabrier(RealGas):
         )
 
     def get_molar_density(self, temperature: float, pressure: float) -> float:
-        """Gets molar density
+        r"""Gets molar density
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Molar density in # FIXME units?
+            Molar density in :math:`\mathrm{mol}\mathrm{m}^{-3}`
         """
 
-        log10molar_density_gcc = self.log10density_func(
+        # get log10 (density [g/cm3]) from the Chabrier H2 table; covert bar to GPa for pressure
+        log10density_gcc = self.log10density_func(
             np.log10(temperature), np.log10(UnitConversion.bar_to_GPa(pressure))
         )
-        # Convert units from g/cc to mol/m3 for H2
-        molar_density: float = 1e6 / 2.016 * np.power(10, log10molar_density_gcc.item())
-
+        # Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
+        molar_density: float = np.power(10, log10density_gcc.item()) / (
+            UnitConversion.cm3_to_m3(1) * 2.016
+        )
+        print(log10density_gcc.item(), molar_density)
+        print(1/molar_density, temperature * GAS_CONSTANT_BAR / pressure)
         return molar_density
 
-    # FIXME: Must implement this method. Below is just a hack so that the class can be
-    # instantiated.
+    # Implemented the volume method 
     @override
-    def volume(self, temperature: float, pressure: float) -> float: ...
+    def volume(self, temperature: float, pressure: float) -> float: 
+        r"""Volume :cite:p:`CD21
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+        """
+        
+        # get molar volume (m3/mol) as the inverse of molar density (mol/m3)
+        volume: float = 1 / self.get_molar_density(temperature, pressure) 
+
+        return volume
 
     @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        volume_integral: float = -1 * np.log(pressure / self.standard_state_pressure) + (
+        r"""Volume integral :cite:p:`CD21`
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+        """
+
+        # follows the standard V dP integral and replaces molar_volume by 1 / molar_density
+        volume_integral: float = (
             pressure - self.standard_state_pressure
-        ) / (self.get_molar_density(temperature, pressure) * GAS_CONSTANT_BAR * temperature)
+            ) / self.get_molar_density(
+                temperature, pressure
+                                       ) - GAS_CONSTANT_BAR * temperature * np.log(
+                pressure / self.standard_state_pressure
+                ) 
+        
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
@@ -159,3 +199,14 @@ def get_chabrier_eos_models() -> dict[str, RealGas]:
     models["H2"] = H2_CD21
 
     return models
+
+if __name__ == '__main__':
+
+    models = get_chabrier_eos_models()
+    # List the available species
+    models.keys()
+    # Get the EOS model for H2
+    h2_model = models['H2']
+    # Determine the fugacity coefficient at 2000 K and 1000 bar
+    fugacity_coefficient = h2_model.fugacity_coefficient(temperature=100, pressure=1000)
+    print(fugacity_coefficient)
