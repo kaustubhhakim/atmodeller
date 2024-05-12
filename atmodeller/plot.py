@@ -33,6 +33,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from scipy.constants import kilo
 from scipy.ndimage import gaussian_filter1d
 
@@ -149,7 +150,7 @@ class Category:
 oxygen_fugacity_categories: dict[str, float] = {"Reduced": -1, "IW": 1, "Oxidised": 5}
 oxygen_fugacity: Category = Category(
     dataframe_name="extra",
-    column_name="fO2_shift",
+    column_name="fO2 (delta IW)",
     categories_dict=oxygen_fugacity_categories,
     category_name="Oxygen fugacity",
 )
@@ -214,21 +215,31 @@ class Plotter:
 
         return kws
 
-    def get_units(self, mass_or_moles: str = "moles") -> tuple[str, str]:
+    def get_units(
+        self, mass_or_moles: str = "moles", log10_transform: bool = False
+    ) -> tuple[str, ...]:
         """Gets the units.
 
         Args:
-            mass_or_moles: mass or moles
+            mass_or_moles: mass, moles, or pressure
+            log10_transform: Transform all quantities to log10. Defaults to False.
 
         Returns:
             A tuple with the name and the units
         """
         if mass_or_moles == "moles":
-            return ("ppm", "mol.%")
+            out: list[str] = ["ppm", "mol.%"]
         elif mass_or_moles == "mass":
-            return ("ppmw", "wt.%")
+            out = ["ppmw", "wt.%"]
+        elif mass_or_moles == "pressure":
+            out = ["pressure", "bar"]
         else:
             raise ValueError(f"{mass_or_moles} is unknown")
+
+        if log10_transform:
+            out[1] = f"log10({out[1]})"
+
+        return tuple(out)
 
     @classmethod
     def read_pickle(cls, pickle_file: Path | str) -> Plotter:
@@ -420,7 +431,7 @@ class Plotter:
             fill_between: True to plot one std either side of the mean. Defaults to True.
         """
         fig, ax = plt.subplots()
-        x_axis: str = "fO2_shift"
+        x_axis: str = "fO2 (delta IW)"
         binned_data: dict[str, pd.DataFrame] = self.bin_data("extra", x_axis, bin_size)
 
         for species, color in zip(species_set, colors_set):
@@ -617,6 +628,10 @@ class Plotter:
         species: dict[str, AxesSpec | None],
         mass_or_moles: str = "moles",
         plot_atmosphere: bool = True,
+        sns_bbox_to_anchor: tuple[float, float] = (0.6, 0.6),
+        bbox_to_anchor: tuple[float, float] = (0, 0),
+        log10_transform: bool = False,
+        name: str = "",
     ) -> sns.PairGrid:
         """Plots a pair plot of species and/or atmospheric properties.
 
@@ -624,13 +639,17 @@ class Plotter:
 
         Args:
             species: A dict of species or elements to plot, which can be empty.
-            mass_or_moles: Plot the species by mass or moles. Defaults to moles.
+            mass_or_moles: Plot the species by mass or moles or bar. Defaults to moles.
             plot_atmosphere: Plots atmosphere quantities. Defaults to True.
+            sns: Seaborn positioning of the legend. Defaults to (0.6, 0.6).
+            bbox_to_anchor: Positioning of the data density legend. Defaults to (0, 0).
+            log10_transform: Transform all quantities to log10. Defaults to False.
+            name: Extra name for label. Defaults to empty string.
 
         Returns:
             The grid
         """
-        suffix, units = self.get_units(mass_or_moles)
+        suffix, units = self.get_units(mass_or_moles, log10_transform)
 
         output: list[pd.Series] = []
 
@@ -641,8 +660,16 @@ class Plotter:
             # Otherwise, get the species directly
             except KeyError:
                 totals = self.dataframes[entry]
-            atmos: pd.Series = UnitConversion.ppm_to_percent(totals[f"atmosphere_{suffix}"])
-            atmos.name = f"{entry.removesuffix('_g')} atmos ({units})"
+            if mass_or_moles == "pressure":
+                atmos: pd.Series = totals[f"atmosphere_{suffix}"]
+            else:
+                atmos = UnitConversion.ppm_to_percent(totals[f"atmosphere_{suffix}"])
+            if log10_transform:
+                atmos = cast(pd.Series, np.log10(atmos))
+            if name:
+                atmos.name = f"{entry.removesuffix('_g')} {name} ({units})"
+            else:
+                atmos.name = f"{entry.removesuffix('_g')} ({units})"
             output.append(atmos)
 
         if plot_atmosphere:
@@ -656,7 +683,7 @@ class Plotter:
 
         # Categorise C/H, which is cleaner and also better behaved with the seaborn legend
         # This assumes that C/H is log10 distributed between -1 and 1
-        CH_sizes: dict[str, float] = {"0.5 > C/H": 20, "0.5 < C/H < 2.2": 35, "2.2 < C/H": 50}
+        CH_sizes: dict[str, float] = {"0.5 > C/H": 5, "0.5 < C/H < 2.2": 10, "2.2 < C/H": 15}
         CH_ratio = pd.cut(
             self.dataframes["extra"]["C/H ratio"],
             [0.1, 0.464158883717533, 2.154434688378294, 10],
@@ -675,7 +702,7 @@ class Plotter:
                 "size": CH_ratio,
                 "legend": "auto",
                 "alpha": 0.3,
-                "hue": self.dataframes["extra"]["fO2_shift"],
+                "hue": self.dataframes["extra"]["fO2 (delta IW)"],
                 "hue_norm": (-5, 5),
                 "sizes": CH_sizes,
                 "size_order": reversed(list(CH_sizes.keys())),
@@ -683,11 +710,36 @@ class Plotter:
             },
         )
 
-        grid.map_lower(sns.kdeplot, levels=[0.33, 0.66, 1], clip=(0, None), color="orangered")
+        grid.map_lower(
+            sns.kdeplot,
+            # Must match with the legend specification below
+            levels=[0.33, 0.68],
+            # clip=(0, None),
+            alpha=1.0,
+            legend=True,
+            # Keyword arguments passed to matplotlib contour
+            # These must match with the legend specification below
+            colors=["black"],
+            linestyles=["dashed", "solid"],
+        )
+
         grid.add_legend()
 
-        plt.subplots_adjust(hspace=0.15, wspace=0.15)
-        sns.move_legend(grid, "center left", bbox_to_anchor=(0.6, 0.6))
+        # Easier to create a second legend than try to amend the seaborn legend
+        # Entries must match the contour specifications above
+        extra_legend_elements = [
+            Line2D([0], [0], color="k", ls="--", label=r"0.33"),
+            Line2D([0], [0], color="k", label=r"0.68"),
+        ]
+        plt.legend(
+            handles=extra_legend_elements,
+            title="Density contours",
+            frameon=False,
+            bbox_to_anchor=bbox_to_anchor,
+        )
+
+        plt.subplots_adjust(hspace=0.2, wspace=0.2)
+        sns.move_legend(grid, "center left", bbox_to_anchor=sns_bbox_to_anchor)
 
         for nn, (species_name, species_axes_spec) in enumerate(species.items()):
             if species_axes_spec is not None:
