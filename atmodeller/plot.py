@@ -713,7 +713,7 @@ class Plotter:
         grid.map_lower(
             sns.kdeplot,
             # Must match with the legend specification below
-            levels=[0.33, 0.68],
+            levels=[0.33, 0.66],
             # clip=(0, None),
             alpha=1.0,
             legend=True,
@@ -729,7 +729,7 @@ class Plotter:
         # Entries must match the contour specifications above
         extra_legend_elements = [
             Line2D([0], [0], color="k", ls="--", label=r"0.33"),
-            Line2D([0], [0], color="k", label=r"0.68"),
+            Line2D([0], [0], color="k", label=r"0.66"),
         ]
         plt.legend(
             handles=extra_legend_elements,
