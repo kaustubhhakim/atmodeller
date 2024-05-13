@@ -728,12 +728,12 @@ class Plotter:
         # Easier to create a second legend than try to amend the seaborn legend
         # Entries must match the contour specifications above
         extra_legend_elements = [
-            Line2D([0], [0], color="k", ls="--", label=r"0.33"),
-            Line2D([0], [0], color="k", label=r"0.66"),
+            Line2D([0], [0], color="k", ls="--", label=r"33%"),
+            Line2D([0], [0], color="k", label=r"66%"),
         ]
         plt.legend(
             handles=extra_legend_elements,
-            title="Density contours",
+            title="Quantile level",
             frameon=False,
             bbox_to_anchor=bbox_to_anchor,
         )
