@@ -37,11 +37,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class CH4_basalt_ardia(Solubility):
-    """Ardia et al. 2013, CH4 solubility in haplobasalt (Fe-free) silicate melt.
+    """CH4 solubility in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`
 
-    https://ui.adsabs.harvard.edu/abs/2013GeCoA.114...52A/abstract
-
-    Experiments conducted at 0.7-3 GPa and 1400-1450 C. Equations 7a and 8, values for lnK0 and
+    Experiments conducted at 0.7-3 GPa and 1400-1450 C. :cite:t:`AHW13{Equations 7a, 8}`, values for lnK0 and
     deltaV from the text.
     """
 
@@ -57,13 +55,11 @@ class CH4_basalt_ardia(Solubility):
 
 
 class CO_basalt_armstrong(Solubility):
-    """Armstrong et al. 2015. Solubility of volatiles in mafic melts under reduced conditions
-
-    https://ui.adsabs.harvard.edu/abs/2015GeCoA.171..283A/abstract
+    """Solubility of volatiles in mafic melts under reduced conditions :cite:p:`AHS15`
 
     Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
-    IW-3.65 to IW+1.46. Equation 10, log-scale linear fit for CO and includes dependence on total
-    pressure. The fitting coefficients also use data from Stanley et al. 2014 (experiments from
+    IW-3.65 to IW+1.46. :cite:t:`AHS15{Equation 10}`, log-scale linear fit for CO and includes dependence on total
+    pressure. The fitting coefficients also use data from :cite:p:`SHW14` (experiments from
     1-1.2 GPa).
     """
 
@@ -77,9 +73,7 @@ class CO_basalt_armstrong(Solubility):
 
 
 class CO_basalt_yoshioka(Solubility):
-    """Yoshioka et al. 2019. Carbon solubility in silicate melts
-
-    https://ui.adsabs.harvard.edu/abs/2019GeCoA.259..129Y/abstract
+    """Carbon solubility in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
     CO-CO2 fluid phase at 3 GPa and 1500 C. Log-scale linear expression for solubility of CO in
@@ -96,9 +90,7 @@ class CO_basalt_yoshioka(Solubility):
 
 
 class CO_rhyolite_yoshioka(Solubility):
-    """Yoshioka et al. 2019. Carbon solubility in silicate melts
-
-    https://ui.adsabs.harvard.edu/abs/2019GeCoA.259..129Y/abstract
+    """Carbon solubility in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
     CO-CO2 fluid phase at 3 GPa and 1500 C. Henry's Law, their expression for solubility of CO in
@@ -117,7 +109,7 @@ class CO_rhyolite_yoshioka(Solubility):
 class CO2_basalt_dixon(Solubility):
     """CO2 solubilities in MORB liquids :cite:p:`DSH95`
 
-    Equation 6 for mole fraction of dissolved carbonate (CO3^2-) and then converting to ppmw for
+    :cite:t:`DSH95{Equation 6}`for mole fraction of dissolved carbonate (CO3^2-) and then converting to ppmw for
     CO2 experiments conducted at 1200 C, 210-980 bars with mixed H2O-CO2 vapor phase (CO2 vapor
     mole fraction varied from 0.42-0.97).
     """

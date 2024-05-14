@@ -38,7 +38,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 class H2_andesite_hirschmann(Solubility):
     """H2 in synthetic andesite :cite:p:`HWA12`
 
-    Log-scale linear fit to fH2 vs H2 concentration for andesite in Table 2. Experiments conducted
+    Log-scale linear fit to fH2 vs H2 concentration for andesite in :cite:t:`HWA12{Table 2}`. Experiments conducted
     from 0.7-3 GPa at 1400 C.
     """
 
@@ -53,7 +53,7 @@ class H2_andesite_hirschmann(Solubility):
 class H2_basalt_hirschmann(Solubility):
     """H2 in synthetic basalt :cite:p:`HWA12`
 
-    Log-scale linear fit to fH2 vs. H2 concentration for basalt in Table 2. Experiments conducted
+    Log-scale linear fit to fH2 vs. H2 concentration for basalt in :cite:t:`HWA12{Table 2}`. Experiments conducted
     from 0.7-3 GPa, 1400 C.
     """
 
@@ -66,11 +66,9 @@ class H2_basalt_hirschmann(Solubility):
 
 
 class H2_silicic_melts_gaillard(SolubilityPowerLaw):
-    """Gaillard et al. 2003. Fe-H redox exchange in silicate glasses
+    """Fe-H redox exchange in silicate glasses :cite:p:`GSM03`
 
-    https://ui.adsabs.harvard.edu/abs/2003GeCoA..67.2427G/abstract
-
-    Power law fit for fH2 vs. H2 (ppm-wt) from Table 4 data. Experiments at pressures from 0.02-70
+    Power law fit for fH2 vs. H2 (ppm-wt) from :cite:t:`GSM03{Table 4}` data. Experiments at pressures from 0.02-70
     bar, temperatures from 300-1000C.
     """
 
@@ -82,7 +80,7 @@ class H2_silicic_melts_gaillard(SolubilityPowerLaw):
 class H2O_ano_dio_newcombe(SolubilityPowerLaw):
     """H2O in anorthite-diopside-eutectic compositions :cite:p:`NBB17`
 
-    Power law from Figure 5(A) for anorthite-diopside glass. Experiments conducted at 1 atm and
+    Power law from :cite:t:`NBB17{Figure 5(A)}` for anorthite-diopside glass. Experiments conducted at 1 atm and
     1350 C. Melts equilibrated in 1 atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3
     to IW+4.8 and pH2/pH2O from 0.003-24.
     """
@@ -95,7 +93,7 @@ class H2O_ano_dio_newcombe(SolubilityPowerLaw):
 class H2O_basalt_dixon(SolubilityPowerLaw):
     """H2O solubilities in MORB liquids :cite:p:`DSH95`
 
-    Refitted data to a power law by Paolo Sossi (fitting Figure 4, TODO: CHECK). Experiments
+    Refitted data to a power law by Paolo Sossi (fitting :cite:t:`DSH95{Figure 4}`, TODO: CHECK). Experiments
     conducted at 1200 C, 200-717 bars with pure H2O.
     """
 
@@ -107,8 +105,8 @@ class H2O_basalt_dixon(SolubilityPowerLaw):
 class H2O_basalt_mitchell(SolubilityPowerLaw):
     """H2O solubility in basaltic melt :cite:p:`MGO17`
 
-    Refitted the H2O wt. % vs. fH2O fitted line from their Figure 8 to a power-law. Experiments
-    conducted at 1200 C and 1000 MPa total pressure. Mitchell's Figure 8 fit includes data from
+    Refitted the H2O wt. % vs. fH2O fitted line from :cite:t:`MGO17{Figure 8}` to a power-law. Experiments
+    conducted at 1200 C and 1000 MPa total pressure. This fit includes data from
     their experiments and prior studies on H2O solubility in basaltic melt at 1200 C and P at or
     below 600 MPa.
     """
@@ -121,7 +119,7 @@ class H2O_basalt_mitchell(SolubilityPowerLaw):
 class H2O_basalt_wilson(SolubilityPowerLaw):
     """H2O in basalt :cite:p:`WH81,HBO64`
 
-    Equation 30, and converting from weight % to ppmw. Not clear what all experimental data is used
+    :cite:t:`WH81{Equation 30}`, and converting from weight % to ppmw. Not clear what all experimental data is used
     to derive this fit, but it fits data at 1100 C and 1000-6000 bars H2O from :cite:t:`HBO64`
     decently well (their Table 3).
     """
@@ -134,7 +132,7 @@ class H2O_basalt_wilson(SolubilityPowerLaw):
 class H2O_lunar_glass_newcombe(SolubilityPowerLaw):
     """H2O in lunar basalt :cite:p:`NBB17`
 
-    Power law from Figure 5(A) for Lunar glass. Experiments conducted at 1 atm and 1350 C. Melts
+    Power law from :cite:t:`NBB17{Figure 5(A)}` for Lunar glass. Experiments conducted at 1 atm and 1350 C. Melts
     equilibrated in 1-atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3 to IW+4.8.
     """
 
@@ -144,9 +142,7 @@ class H2O_lunar_glass_newcombe(SolubilityPowerLaw):
 
 
 class H2O_peridotite_sossi(SolubilityPowerLaw):
-    """Sossi et al. (2023). Solubility of water in peridotite liquids
-
-    https://ui.adsabs.harvard.edu/abs/2023E%26PSL.60117894S/abstract
+    """Solubility of water in peridotite liquids :cite:p:`STB23`
 
     Power law parameters in the abstract for peridotitic glasses. Experiments conducted at 2173 K
     and 1 bar and range of fO2 from IW-1.9 to IW+6.0.
