@@ -759,9 +759,9 @@ class Plotter:
             axis: Axes = self.get_axes(
                 grid, plot_data=data, column_name=column_name, index_shift=0
             )
-            ticks = range(0, 16, 5)
-            axis.set_xlim(0, 15)
-            axis.set_ylim(0, 15)
+            ticks = range(0, 11, 2)
+            axis.set_xlim(0, 11)
+            axis.set_ylim(0, 11)
             axis.set_xticks(ticks)
             axis.set_yticks(ticks)
             column_name = "Molar mass (g/mol)"
@@ -856,5 +856,154 @@ class Plotter:
 
         plt.subplots_adjust(hspace=0.15, wspace=0.15)
         sns.move_legend(grid, "center left", bbox_to_anchor=(0.6, 0.6))
+
+        return grid
+
+    def ratios_pairplot_scatter(
+        self,
+        reservoirs: Iterable[str] = ("atmosphere", "melt", "total"),
+        mass_or_moles: str = "moles",
+        # plot_atmosphere: bool = True,
+        sns_bbox_to_anchor: tuple[float, float] = (0.6, 0.6),
+        bbox_to_anchor: tuple[float, float] = (0, 0),
+        # log10_transform: bool = False,
+        # name: str = "",
+    ) -> sns.PairGrid:
+        """Plots a pair of C/H and C/O ratios in the reservoirs and atmospheric properties
+
+        Args:
+            reservoirs: Reservoirs to plot. Defaults to all reservoirs.
+            mass_or_moles: Compute ratios by mass or moles. Defaults to moles.
+            plot_atmosphere: Plots atmosphere quantities. Defaults to True.
+            sns: Seaborn positioning of the legend. Defaults to (0.6, 0.6).
+            bbox_to_anchor: Positioning of the data density legend. Defaults to (0, 0).
+            log10_transform: Transform all quantities to log10. Defaults to False.
+            name: Extra name for label. Defaults to empty string.
+
+        Returns:
+            The grid
+        """
+        output: list[pd.Series] = []
+
+        for element in "H":
+            for reservoir in reservoirs:
+                series_data: pd.Series = self.get_element_ratio_in_reservoir(
+                    "C", element, reservoir=reservoir, mass_or_moles=mass_or_moles
+                )
+                series_data = np.log10(series_data)
+                output.append(series_data)
+
+        for element in ("C", "H"):
+            element_data: pd.DataFrame = self.dataframes[f"{element}_totals"]
+            interior: pd.Series = element_data["melt_mass"] * 100 / element_data["total_mass"]
+            interior = np.log10(interior)
+            interior.name = f"{element} melt (log10(wt.%))"
+            output.append(interior)
+
+        atmosphere: pd.DataFrame = self.dataframes["atmosphere"]
+        # pressure: pd.Series = atmosphere["pressure"] / kilo  # to kbar
+        # pressure.name = "Pressure (kbar)"
+        mean_molar_mass: pd.Series = atmosphere["mean_molar_mass"] * kilo  # to g/mol
+        mean_molar_mass.name = "Molar mass (g/mol)"
+        atmosphere_series: list[pd.Series] = [mean_molar_mass]
+        output.extend(atmosphere_series)
+
+        # Categorise C/H, which is cleaner and also better behaved with the seaborn legend
+        # This assumes that C/H is log10 distributed between -1 and 1
+        CH_sizes: dict[str, float] = {"0.5 > C/H": 5, "0.5 < C/H < 2.2": 10, "2.2 < C/H": 15}
+        CH_ratio = pd.cut(
+            self.dataframes["extra"]["C/H ratio"],
+            [0.1, 0.464158883717533, 2.154434688378294, 10],
+            labels=list(CH_sizes.keys()),
+        )
+
+        data: pd.DataFrame = pd.concat(output, axis=1)
+
+        sns.set_theme(style="white", font_scale=1.3)
+
+        grid: sns.PairGrid = sns.pairplot(
+            data,
+            corner=True,
+            diag_kind="kde",
+            plot_kws={
+                "size": CH_ratio,
+                "legend": "auto",
+                "alpha": 0.3,
+                "hue": self.dataframes["extra"]["fO2 (delta IW)"],
+                "hue_norm": (-5, 5),
+                "sizes": CH_sizes,
+                "size_order": reversed(list(CH_sizes.keys())),
+                "palette": "crest",
+            },
+        )
+
+        grid.map_lower(
+            sns.kdeplot,
+            # Must match with the legend specification below
+            levels=[0.33, 0.66],
+            # clip=(0, None),
+            alpha=1.0,
+            legend=True,
+            # Keyword arguments passed to matplotlib contour
+            # These must match with the legend specification below
+            colors=["black"],
+            linestyles=["dashed", "solid"],
+        )
+
+        grid.add_legend()
+
+        # Easier to create a second legend than try to amend the seaborn legend
+        # Entries must match the contour specifications above
+        extra_legend_elements = [
+            Line2D([0], [0], color="k", ls="--", label=r"33%"),
+            Line2D([0], [0], color="k", label=r"66%"),
+        ]
+        plt.legend(
+            handles=extra_legend_elements,
+            title="Quantile level",
+            frameon=False,
+            bbox_to_anchor=bbox_to_anchor,
+        )
+
+        plt.subplots_adjust(hspace=0.2, wspace=0.2)
+        sns.move_legend(grid, "center left", bbox_to_anchor=sns_bbox_to_anchor)
+
+        # These axes are all tuned for ratios in moles and interior storage in wt.%
+        axes = self.get_axes(grid, column_index=0)
+        # specs: AxesSpec = AxesSpec(xylim=(0, 1500), ticks=[0, 500, 1000, 1500])
+        # axes.set_xlim(specs.xylim)
+        # axes.set_ylim(specs.xylim)
+        # axes.set_xticks(specs.ticks)
+        # axes.set_yticks(specs.ticks)
+
+        # axes = self.get_axes(grid, column_index=1)
+        # specs: AxesSpec = AxesSpec(xylim=(-1, 1), ticks=[-1, 0, 1])
+        # axes.set_xlim(specs.xylim)
+        # axes.set_ylim(specs.xylim)
+        # axes.set_xticks(specs.ticks)
+        # axes.set_yticks(specs.ticks)
+
+        # axes = self.get_axes(grid, column_index=2)
+        # specs: AxesSpec = AxesSpec(xylim=(0, 25), ticks=[0, 5, 10, 15, 20, 25])
+        # axes.set_xlim(specs.xylim)
+        # axes.set_ylim(specs.xylim)
+        # axes.set_xticks(specs.ticks)
+        # axes.set_yticks(specs.ticks)
+
+        # axes = self.get_axes(grid, column_index=3)
+        # specs: AxesSpec = AxesSpec(xylim=(25, 100), ticks=[25, 50, 75, 100])
+        # axes.set_xlim(specs.xylim)
+        # axes.set_ylim(specs.xylim)
+        # axes.set_xticks(specs.ticks)
+        # axes.set_yticks(specs.ticks)
+
+        column_name = "Molar mass (g/mol)"
+        logger.info("Setting axis properties for %s", column_name)
+        axis: Axes = self.get_axes(grid, plot_data=data, column_name=column_name, index_shift=0)
+        ticks = range(0, 51, 10)
+        axis.set_xlim(0, 55)
+        axis.set_ylim(0, 55)
+        axis.set_xticks(ticks)
+        axis.set_yticks(ticks)
 
         return grid
