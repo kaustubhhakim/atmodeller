@@ -48,10 +48,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.interpolate import RectBivariateSpline
 from scipy.integrate import trapezoid
+from scipy.interpolate import RectBivariateSpline
 
-from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.utilities import UnitConversion
@@ -85,9 +84,6 @@ class Chabrier(RealGas):
     """Spline to evaluate the density"""
 
     def __post_init__(self):
-        """init method to create spline lookup for density from :cite:t:`CD21` T-P-rhp tables.
-        """
-
         self._create_spline()
 
     def _create_spline(self) -> None:
@@ -117,20 +113,9 @@ class Chabrier(RealGas):
             pivot_table.index.to_numpy(), pivot_table.columns.to_numpy(), pivot_table.to_numpy()
         )
 
-    # Implemented the volume method 
     @override
-    def volume(self, temperature: float, pressure: float) -> float: 
-        r"""Volume :cite:p:`CD21
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-        """
-        
-        # get log10 (density [g/cm3]) from the Chabrier H2 table; covert bar to GPa for pressure
+    def volume(self, temperature: float, pressure: float) -> float:
+        # Get log10 (density [g/cm3]) from the Chabrier H2 table
         log10density_gcc = self.log10density_func(
             np.log10(temperature), np.log10(UnitConversion.bar_to_GPa(pressure))
         )
@@ -138,32 +123,18 @@ class Chabrier(RealGas):
         molar_density: float = np.power(10, log10density_gcc.item()) / (
             UnitConversion.cm3_to_m3(1) * 2.016
         )
-
-        # get molar volume (m3/mol) as the inverse of molar density (mol/m3)
-        volume: float = 1 / molar_density 
+        volume: float = 1 / molar_density
 
         return volume
 
     @override
     def volume_integral(self, temperature: float, pressure: float) -> float:
-        r"""Volume integral :cite:p:`CD21`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-        """
-
-        # for loop for the first part of the integral
-        pressures = np.logspace(np.log10(self.standard_state_pressure), np.log10(
-            pressure), num=1000)
-
+        # For loop for the first part of the integral
+        pressures = np.logspace(
+            np.log10(self.standard_state_pressure), np.log10(pressure), num=1000
+        )
         volumes = np.array([self.volume(temperature, pressure) for pressure in pressures])
-
         volume_integral = trapezoid(volumes, pressures)
-        
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
