@@ -49,6 +49,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.interpolate import RectBivariateSpline
+from scipy.integrate import trapezoid
 
 from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.eos import DATA_DIRECTORY
@@ -116,29 +117,6 @@ class Chabrier(RealGas):
             pivot_table.index.to_numpy(), pivot_table.columns.to_numpy(), pivot_table.to_numpy()
         )
 
-    def get_molar_density(self, temperature: float, pressure: float) -> float:
-        r"""Gets molar density
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Molar density in :math:`\mathrm{mol}\mathrm{m}^{-3}`
-        """
-
-        # get log10 (density [g/cm3]) from the Chabrier H2 table; covert bar to GPa for pressure
-        log10density_gcc = self.log10density_func(
-            np.log10(temperature), np.log10(UnitConversion.bar_to_GPa(pressure))
-        )
-        # Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
-        molar_density: float = np.power(10, log10density_gcc.item()) / (
-            UnitConversion.cm3_to_m3(1) * 2.016
-        )
-        print(log10density_gcc.item(), molar_density)
-        print(1/molar_density, temperature * GAS_CONSTANT_BAR / pressure)
-        return molar_density
-
     # Implemented the volume method 
     @override
     def volume(self, temperature: float, pressure: float) -> float: 
@@ -152,8 +130,17 @@ class Chabrier(RealGas):
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         
+        # get log10 (density [g/cm3]) from the Chabrier H2 table; covert bar to GPa for pressure
+        log10density_gcc = self.log10density_func(
+            np.log10(temperature), np.log10(UnitConversion.bar_to_GPa(pressure))
+        )
+        # Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
+        molar_density: float = np.power(10, log10density_gcc.item()) / (
+            UnitConversion.cm3_to_m3(1) * 2.016
+        )
+
         # get molar volume (m3/mol) as the inverse of molar density (mol/m3)
-        volume: float = 1 / self.get_molar_density(temperature, pressure) 
+        volume: float = 1 / molar_density 
 
         return volume
 
@@ -169,14 +156,13 @@ class Chabrier(RealGas):
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
 
-        # follows the standard V dP integral and replaces molar_volume by 1 / molar_density
-        volume_integral: float = (
-            pressure - self.standard_state_pressure
-            ) / self.get_molar_density(
-                temperature, pressure
-                                       ) - GAS_CONSTANT_BAR * temperature * np.log(
-                pressure / self.standard_state_pressure
-                ) 
+        # for loop for the first part of the integral
+        pressures = np.logspace(np.log10(self.standard_state_pressure), np.log10(
+            pressure), num=1000)
+
+        volumes = np.array([self.volume(temperature, pressure) for pressure in pressures])
+
+        volume_integral = trapezoid(volumes, pressures)
         
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
@@ -199,14 +185,3 @@ def get_chabrier_eos_models() -> dict[str, RealGas]:
     models["H2"] = H2_CD21
 
     return models
-
-if __name__ == '__main__':
-
-    models = get_chabrier_eos_models()
-    # List the available species
-    models.keys()
-    # Get the EOS model for H2
-    h2_model = models['H2']
-    # Determine the fugacity coefficient at 2000 K and 1000 bar
-    fugacity_coefficient = h2_model.fugacity_coefficient(temperature=100, pressure=1000)
-    print(fugacity_coefficient)
