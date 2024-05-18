@@ -40,9 +40,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 class Cl2_ano_dio_for_thomas(Solubility):
     """Solubility of chlorine in silicate melts :cite:p:`TW21`
 
-    Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl concentration and Cl
-    fugacity for CMAS composition (An50Di28Fo22 (anorthite-diopside-forsterite), Fe-free low-degree
-    mantle melt) at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 1200-1500 C
+    Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl
+    concentration and Cl fugacity for CMAS composition (An50Di28Fo22
+    (anorthite-diopside-forsterite), Fe-free low-degree mantle melt) at 1400 C and 1.5 GPa.
+    Experiments from 0.5-2 GPa and 1200-1500 C
     """
 
     @override
@@ -57,8 +58,9 @@ class Cl2_ano_dio_for_thomas(Solubility):
 class Cl2_basalt_thomas(Solubility):
     """Solubility of chlorine in silicate melts :cite:p:`TW21`
 
-    Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl concentration and Cl
-    fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 1200-1500 C
+    Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl
+    concentration and Cl fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from
+    0.5-2 GPa and 1200-1500 C
     """
 
     @override
@@ -93,11 +95,11 @@ class He_basalt(Solubility):
 class N2_basalt_bernadou(Solubility):
     """N2 in basaltic silicate melt :cite:p:`BGF21`
 
-    :cite:t:`BFG21{Equation 18}` and using :cite:t:`BFG21{Equations 19-20}` and the values for the thermodynamic constants from :cite:t:`BFG21{Table 6}`.
-    Experiments on basaltic samples at fluid saturation in C-H-O-N system, pressure range:
-    0.8-10 kbar, temperature range: 1200-1300 C; fO2 range: IW+4.9 to IW-4.7. Using their
-    experimental results and a database for N concentrations at fluid saturation from 1 bar to 10
-    kbar, calibrated their solubility law.
+    :cite:t:`BFG21{Equation 18}` and using :cite:t:`BFG21{Equations 19-20}` and the values for the
+    thermodynamic constants from :cite:t:`BFG21{Table 6}`. Experiments on basaltic samples at fluid
+    saturation in C-H-O-N system, pressure range: 0.8-10 kbar, temperature range: 1200-1300 C;
+    fO2 range: IW+4.9 to IW-4.7. Using their experimental results and a database for N
+    concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solubility law.
     """
 
     @override
@@ -165,8 +167,9 @@ class N2_basalt_dasgupta(Solubility):
 class N2_basalt_libourel(Solubility):
     """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
-    :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1 atm and 1425 C
-    (two experiments at 1400 C), fO2 from IW-8.3 to IW+8.7 using mixtures of CO, CO2 and N2 gases.
+    :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
+    atm and 1425 C (two experiments at 1400 C), fO2 from IW-8.3 to IW+8.7 using mixtures of CO, CO2
+    and N2 gases.
     """
 
     def __init__(self):

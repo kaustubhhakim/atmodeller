@@ -38,8 +38,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 class H2_andesite_hirschmann(Solubility):
     """H2 in synthetic andesite :cite:p:`HWA12`
 
-    Log-scale linear fit to fH2 vs H2 concentration for andesite in :cite:t:`HWA12{Table 2}`. Experiments conducted
-    from 0.7-3 GPa at 1400 C.
+    Log-scale linear fit to fH2 vs H2 concentration for andesite in :cite:t:`HWA12{Table 2}`.
+    Experiments conducted from 0.7-3 GPa at 1400 C.
     """
 
     @override
@@ -53,8 +53,8 @@ class H2_andesite_hirschmann(Solubility):
 class H2_basalt_hirschmann(Solubility):
     """H2 in synthetic basalt :cite:p:`HWA12`
 
-    Log-scale linear fit to fH2 vs. H2 concentration for basalt in :cite:t:`HWA12{Table 2}`. Experiments conducted
-    from 0.7-3 GPa, 1400 C.
+    Log-scale linear fit to fH2 vs. H2 concentration for basalt in :cite:t:`HWA12{Table 2}`.
+    Experiments conducted from 0.7-3 GPa, 1400 C.
     """
 
     @override
@@ -68,8 +68,8 @@ class H2_basalt_hirschmann(Solubility):
 class H2_silicic_melts_gaillard(SolubilityPowerLaw):
     """Fe-H redox exchange in silicate glasses :cite:p:`GSM03`
 
-    Power law fit for fH2 vs. H2 (ppm-wt) from :cite:t:`GSM03{Table 4}` data. Experiments at pressures from 0.02-70
-    bar, temperatures from 300-1000C.
+    Power law fit for fH2 vs. H2 (ppm-wt) from :cite:t:`GSM03{Table 4}` data. Experiments at
+    pressures from 0.02-70 bar, temperatures from 300-1000C.
     """
 
     @override
@@ -80,9 +80,9 @@ class H2_silicic_melts_gaillard(SolubilityPowerLaw):
 class H2O_ano_dio_newcombe(SolubilityPowerLaw):
     """H2O in anorthite-diopside-eutectic compositions :cite:p:`NBB17`
 
-    Power law from :cite:t:`NBB17{Figure 5(A)}` for anorthite-diopside glass. Experiments conducted at 1 atm and
-    1350 C. Melts equilibrated in 1 atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3
-    to IW+4.8 and pH2/pH2O from 0.003-24.
+    Power law from :cite:t:`NBB17{Figure 5(A)}` for anorthite-diopside glass. Experiments conducted
+    at 1 atm and 1350 C. Melts equilibrated in 1 atm furnace with H2/CO2 gas mixtures that spanned
+    fO2 from IW-3 to IW+4.8 and pH2/pH2O from 0.003-24.
     """
 
     @override

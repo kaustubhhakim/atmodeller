@@ -91,7 +91,7 @@ def test_CHO_reduced(helper) -> None:
 
 
 def test_CHO_IW(helper) -> None:
-    """C-H-O system at IW
+    """C-H-O system at IW+0.5
 
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
