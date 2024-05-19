@@ -93,8 +93,8 @@ class H2O_ano_dio_newcombe(SolubilityPowerLaw):
 class H2O_basalt_dixon(SolubilityPowerLaw):
     """H2O solubilities in MORB liquids :cite:p:`DSH95`
 
-    Refitted data to a power law by Paolo Sossi (fitting :cite:t:`DSH95{Figure 4}`, TODO: CHECK). Experiments
-    conducted at 1200 C, 200-717 bars with pure H2O.
+    Refitted data to a power law by Paolo Sossi (fitting :cite:t:`DSH95{Figure 4}`, TODO: CHECK).
+    Experiments conducted at 1200 C, 200-717 bars with pure H2O.
     """
 
     @override
@@ -105,8 +105,8 @@ class H2O_basalt_dixon(SolubilityPowerLaw):
 class H2O_basalt_mitchell(SolubilityPowerLaw):
     """H2O solubility in basaltic melt :cite:p:`MGO17`
 
-    Refitted the H2O wt. % vs. fH2O fitted line from :cite:t:`MGO17{Figure 8}` to a power-law. Experiments
-    conducted at 1200 C and 1000 MPa total pressure. This fit includes data from
+    Refitted the H2O wt. % vs. fH2O fitted line from :cite:t:`MGO17{Figure 8}` to a power-law.
+    Experiments conducted at 1200 C and 1000 MPa total pressure. This fit includes data from
     their experiments and prior studies on H2O solubility in basaltic melt at 1200 C and P at or
     below 600 MPa.
     """
@@ -119,9 +119,9 @@ class H2O_basalt_mitchell(SolubilityPowerLaw):
 class H2O_basalt_wilson(SolubilityPowerLaw):
     """H2O in basalt :cite:p:`WH81,HBO64`
 
-    :cite:t:`WH81{Equation 30}`, and converting from weight % to ppmw. Not clear what all experimental data is used
-    to derive this fit, but it fits data at 1100 C and 1000-6000 bars H2O from :cite:t:`HBO64`
-    decently well (their Table 3).
+    :cite:t:`WH81{Equation 30}`, and converting from weight % to ppmw. Not clear what all
+    experimental data is used to derive this fit, but it fits data at 1100 C and 1000-6000 bars H2O
+    from :cite:t:`HBO64` decently well (their Table 3).
     """
 
     @override
@@ -132,8 +132,9 @@ class H2O_basalt_wilson(SolubilityPowerLaw):
 class H2O_lunar_glass_newcombe(SolubilityPowerLaw):
     """H2O in lunar basalt :cite:p:`NBB17`
 
-    Power law from :cite:t:`NBB17{Figure 5(A)}` for Lunar glass. Experiments conducted at 1 atm and 1350 C. Melts
-    equilibrated in 1-atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3 to IW+4.8.
+    Power law from :cite:t:`NBB17{Figure 5(A)}` for Lunar glass. Experiments conducted at 1 atm and
+    1350 C. Melts equilibrated in 1-atm furnace with H2/CO2 gas mixtures that spanned fO2 from IW-3
+    to IW+4.8.
     """
 
     @override
