@@ -31,7 +31,7 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import GasSpecies, Species
+from atmodeller.core import GasSpecies, Solution, Species
 from atmodeller.initial_solution import InitialSolutionConstant
 from atmodeller.interfaces import (
     InitialSolutionProtocol,
@@ -114,7 +114,7 @@ class _ReactionNetwork:
 
     @property
     def number_reactions(self) -> int:
-        if self.species.number == 1:
+        if self.species.number_species() == 1:
             return 0
         else:
             assert self.reaction_matrix is not None
@@ -132,30 +132,30 @@ class _ReactionNetwork:
         Returns:
             A matrix of the reaction stoichiometry.
         """
-        if self.species.number == 1:
+        if self.species.number_species() == 1:
             logger.debug("Only one species therefore no reactions")
             return None
 
         matrix1: npt.NDArray = self.species.composition_matrix()
-        matrix2: npt.NDArray = np.eye(self.species.number)
+        matrix2: npt.NDArray = np.eye(self.species.number_species())
         augmented_matrix: npt.NDArray = np.hstack((matrix1, matrix2))
         logger.debug("augmented_matrix = \n%s", augmented_matrix)
 
         # Forward elimination
-        for i in range(self.species.number_elements):  # Note only over the number of elements.
+        for i in range(self.species.number_elements()):  # Note only over the number of elements.
             # Check if the pivot element is zero.
             if augmented_matrix[i, i] == 0:
                 # Swap rows to get a non-zero pivot element.
                 nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
                 augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
             # Perform row operations to eliminate values below the pivot.
-            for j in range(i + 1, self.species.number):
+            for j in range(i + 1, self.species.number_species()):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
         logger.debug("Augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
         # Backward substitution
-        for i in range(self.species.number_elements - 1, -1, -1):
+        for i in range(self.species.number_elements() - 1, -1, -1):
             # Normalize the pivot row.
             augmented_matrix[i] /= augmented_matrix[i, i]
             # Eliminate values above the pivot.
@@ -167,7 +167,7 @@ class _ReactionNetwork:
 
         reduced_matrix1: npt.NDArray = augmented_matrix[:, : matrix1.shape[1]]
         reaction_matrix: npt.NDArray = augmented_matrix[
-            self.species.number_elements :, matrix1.shape[1] :
+            self.species.number_elements() :, matrix1.shape[1] :
         ]
         logger.debug("Reduced_matrix1 = \n%s", reduced_matrix1)
         logger.debug("Reaction_matrix = \n%s", reaction_matrix)
@@ -254,17 +254,17 @@ class _ReactionNetwork:
 
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
-        if nrows == self.species.number:
+        if nrows == self.species.number_species():
             msg: str = "The necessary number of constraints will be applied to "
             msg += "the reaction network to solve the system"
             logger.debug(msg)
         else:
-            num: int = self.species.number - nrows
+            num: int = self.species.number_species() - nrows
             logger.debug(
                 "%d additional (mass) constraint(s) are necessary to solve the system", num
             )
 
-        coeff: npt.NDArray = np.zeros((nrows, self.species.number))
+        coeff: npt.NDArray = np.zeros((nrows, self.species.number_species()))
         if self.reaction_matrix is not None:
             coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
@@ -415,7 +415,7 @@ class InteriorAtmosphereSystem:
     _reaction_network: _ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
-    _log_solution: npt.NDArray = field(init=False)
+    _solution: Solution = field(init=False)
     _residual: npt.NDArray = field(init=False)
     _failed_solves: int = 0
 
@@ -425,7 +425,6 @@ class InteriorAtmosphereSystem:
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionConstant(species=self.species)
         self._reaction_network = _ReactionNetwork(species=self.species)
-        self._log_solution = np.zeros_like(self.species, dtype=np.float_)
 
     @property
     def number_of_solves(self) -> int:
@@ -436,35 +435,6 @@ class InteriorAtmosphereSystem:
     def constraints(self) -> SystemConstraints:
         """Constraints"""
         return self._constraints
-
-    @property
-    def log_solution(self) -> npt.NDArray:
-        """The solution.
-
-        For gas species and condensed species the solution is the log10 activity and log10 partial
-        pressure, respectively. Subsequent entries in the solution array relate to the degree of
-        condensation for elements in condensed species, if applicable.
-        """
-        return self._log_solution
-
-    @property
-    def degree_of_condensation_elements(self) -> list[str]:
-        """Elements to solve for the degree of condensation
-
-        The elements for which to calculate the degree of condensation depends on both which
-        elements are in condensed species and which mass constraints are applied.
-        """
-        condensation: list[str] = []
-        for constraint in self.constraints.mass_constraints:
-            if constraint.element in self.species.condensed_elements:
-                condensation.append(constraint.element)
-
-        return condensation
-
-    @property
-    def degree_of_condensation_number(self) -> int:
-        """Number of elements to solve for the degree of condensation"""
-        return len(self.degree_of_condensation_elements)
 
     @property
     def failed_solves(self) -> int:
@@ -478,11 +448,6 @@ class InteriorAtmosphereSystem:
         )
 
         return self._failed_solves
-
-    @property
-    def solution(self) -> npt.NDArray:
-        """Solution"""
-        return 10**self.log_solution
 
     @property
     def residual_dict(self) -> dict[str, float]:
@@ -524,7 +489,7 @@ class InteriorAtmosphereSystem:
             Total reservoir masses of the species or element
         """
         planet: Planet = self.planet
-        pressure: float = self.solution_dict()[species.name]
+        pressure: float = self._solution.solution_dict()[species.name]
         fugacity: float = self.fugacities_dict[species.hill_formula]
 
         # Atmosphere
@@ -569,26 +534,6 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    def solution_dict(self) -> dict[str, float]:
-        """Solution for all species in a dictionary
-
-        This is convenient for a quick check of the solution, but in general you will use
-        self.output to return a dictionary of all the data or export the data to Excel or a
-        DataFrame.
-        """
-        output: dict[str, float] = {}
-        # Gas species partial pressures
-        for name, solution in zip(self.species.names, self.solution[: self.species.number]):
-            output[name] = solution
-        # Degree of condensation for elements in condensed species
-        for degree_of_condensation, solution in zip(
-            self.degree_of_condensation_elements, self.solution[self.species.number :]
-        ):
-            key: str = f"degree_of_condensation_{degree_of_condensation}"
-            output[key] = solution / (1 + solution)
-
-        return output
-
     @property
     def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
         """Fugacity coefficients (relevant for gas species only) in a dictionary"""
@@ -608,7 +553,7 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = {}
         for key, value in self.log10_fugacity_coefficients_dict.items():
             # TODO: Not clean to append _g suffix to denote gas phase.
-            output[key] = 10 ** (np.log10(self.solution_dict()[f"{key}_g"]) + value)
+            output[key] = 10 ** (np.log10(self._solution.solution_dict()[f"{key}_g"]) + value)
 
         return output
 
@@ -624,14 +569,14 @@ class InteriorAtmosphereSystem:
         """Total pressure."""
         indices: list[int] = list(self.species.gas_species.keys())
 
-        return sum(float(self.solution[index]) for index in indices)
+        return sum(float(self._solution.solution[index]) for index in indices)
 
     @property
     def atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere."""
         mu_atmosphere: float = 0
         for index, species in self.species.gas_species.items():
-            mu_atmosphere += species.molar_mass * self.solution[index]
+            mu_atmosphere += species.molar_mass * self._solution.solution[index]
         mu_atmosphere /= self.total_pressure
 
         return mu_atmosphere
@@ -650,11 +595,11 @@ class InteriorAtmosphereSystem:
             True if the solution is close to the target, otherwise False
         """
 
-        if len((self.solution_dict())) != len(target_dict):
+        if len((self._solution.solution_dict())) != len(target_dict):
             return np.bool_(False)
 
         target_values: list = list(dict(sorted(target_dict.items())).values())
-        solution_values: list = list(dict(sorted(self.solution_dict().items())).values())
+        solution_values: list = list(dict(sorted(self._solution.solution_dict().items())).values())
         isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
 
         return isclose
@@ -709,8 +654,9 @@ class InteriorAtmosphereSystem:
         logger.info("Solving system number %d", self.number_of_solves)
 
         self._constraints = constraints
+        self._solution = Solution(self.species, self.constraints)
 
-        if self.degree_of_condensation_number > 0:
+        if self._solution.degree_of_condensation_number > 0:
             logger.info("Solving for condensed species and mass constraints")
             logger.info("Reducing max_attempts to 1")
             max_attempts = 1
@@ -729,7 +675,7 @@ class InteriorAtmosphereSystem:
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
-            degree_of_condensation_number=self.degree_of_condensation_number,
+            degree_of_condensation_number=self._solution.degree_of_condensation_number,
         )
 
         for attempt in range(max_attempts):
@@ -767,7 +713,7 @@ class InteriorAtmosphereSystem:
                 self._residual = sol.fun
                 self.output.add(self, extra_output)
                 initial_solution.update(self.output)
-                logger.info(pprint.pformat(self.solution_dict()))
+                logger.info(pprint.pformat(self._solution.solution_dict()))
                 break
             else:
                 logger.warning("The solver failed.")
@@ -776,7 +722,7 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        degree_of_condensation_number=self.degree_of_condensation_number,
+                        degree_of_condensation_number=self._solution.degree_of_condensation_number,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )
@@ -784,7 +730,7 @@ class InteriorAtmosphereSystem:
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
             self._failed_solves += 1
-            if self.degree_of_condensation_number > 0:
+            if self._solution.degree_of_condensation_number > 0:
                 logger.info("Probably no solution for condensed species and imposed constraints")
                 logger.info("Remove some condensed species and try again")
 
@@ -813,10 +759,10 @@ class InteriorAtmosphereSystem:
         """
 
         # This must be set here
-        self._log_solution = log_solution
+        self._solution.log_solution = log_solution
 
         # Exclude the degree of condensation for the reaction network
-        log_solution_reaction: npt.NDArray = log_solution[: self.species.number]
+        log_solution_reaction: npt.NDArray = log_solution[: self.species.number_species()]
 
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
@@ -847,10 +793,10 @@ class InteriorAtmosphereSystem:
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
             # Condensed species
-            for nn, condensed_element in enumerate(self.degree_of_condensation_elements):
+            for nn, condensed_element in enumerate(self._solution.degree_of_condensation_elements):
                 if condensed_element == mass_constraint.element:
                     residual_mass[constraint_index] += np.log10(
-                        self.solution[self.species.number + nn] + 1
+                        self._solution.solution[self.species.number_species() + nn] + 1
                     )
 
             # Mass values are constant so no need to pass any arguments to get_value().

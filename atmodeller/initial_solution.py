@@ -212,7 +212,7 @@ class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
         min_log10: float = MIN_LOG10,
         max_log10: float = MAX_LOG10,
     ):
-        value_array: npt.NDArray = value * np.ones(species.number)
+        value_array: npt.NDArray = value * np.ones(species.number_species())
         super().__init__(value_array, species=species, min_log10=min_log10, max_log10=max_log10)
         logger.debug("initial_solution = %s", self.asdict())
 

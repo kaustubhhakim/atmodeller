@@ -302,7 +302,7 @@ class Output(UserDict):
         # Sum all the elements across the species.
         mass: dict[str, Any] = {}
 
-        for element in interior_atmosphere.species.elements:
+        for element in interior_atmosphere.species.elements():
             mass[element] = {"atmosphere": 0, "melt": 0, "solid": 0}
             for species in interior_atmosphere.species.gas_species.values():
                 species_masses: dict[str, float] = interior_atmosphere.mass(
@@ -342,21 +342,21 @@ class Output(UserDict):
             )
             # Add contribution from condensation for the elements
             # TODO: Only robust for a single condensed element
-            if element in interior_atmosphere.degree_of_condensation_elements:
-                degree_of_condensation: float = interior_atmosphere.solution_dict()[
+            if element in interior_atmosphere._solution.degree_of_condensation_elements:
+                degree_of_condensation: float = interior_atmosphere._solution.solution_dict()[
                     f"degree_of_condensation_{element}"
                 ]
             # TODO: Clean up this clunky exception logic for oxygen
             elif (
                 element == "O"
                 # TODO: Add condition to check for H2O and only H2O with O?
-                and "O" not in interior_atmosphere.degree_of_condensation_elements
-                and "H" in interior_atmosphere.degree_of_condensation_elements
+                and "O" not in interior_atmosphere._solution.degree_of_condensation_elements
+                and "H" in interior_atmosphere._solution.degree_of_condensation_elements
                 # Below assume only C and H2O can exist as condensed. Ugly.
                 and interior_atmosphere.species.number_condensed_species <= 2
             ):
                 logger.warning("Back-computing oxygen in condensed phase (H2O)")
-                degree_of_condensation_H: float = interior_atmosphere.solution_dict()[
+                degree_of_condensation_H: float = interior_atmosphere._solution.solution_dict()[
                     "degree_of_condensation_H"
                 ]
                 # Compute moles of condensed H. Repeats calculation done in SpeciesOutput
@@ -419,7 +419,7 @@ class Output(UserDict):
             atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
 
         for species in interior_atmosphere.species.gas_species.values():
-            pressure: float = interior_atmosphere.solution_dict()[species.name]
+            pressure: float = interior_atmosphere._solution.solution_dict()[species.name]
             fugacity: float = interior_atmosphere.fugacities_dict[species.hill_formula]
             fugacity_coefficient: float = (
                 10 ** interior_atmosphere.log10_fugacity_coefficients_dict[species.hill_formula]
@@ -469,7 +469,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         data_list: list[dict[str, float]] = self.data.setdefault("solution", [])
-        data_list.append(interior_atmosphere.solution_dict())
+        data_list.append(interior_atmosphere._solution.solution_dict())
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Output as a dictionary of dataframes
