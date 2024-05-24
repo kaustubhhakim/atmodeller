@@ -335,8 +335,7 @@ class Solution:
             self._species.number_species()
             # FIXME: add lambda
             # + self._species.number_condensed_species
-            # FIXME: Includes oxygen so might break for H2O cases
-            + self._species.number_elements(CondensedSpecies)
+            + self.number_condensed_elements
         )
 
     @property
@@ -467,22 +466,17 @@ class Solution:
     #     """Assembles the auxilliary equations"""
 
     @property
-    def degree_of_condensation_number(self) -> int:
-        """Number of elements to solve for the degree of condensation"""
-        return len(self.degree_of_condensation_elements)
+    def number_condensed_elements(self) -> int:
+        """Number of elements that are present in a condensed species"""
+        return len(self.condensed_elements)
 
     @property
-    def degree_of_condensation_elements(self) -> list[str]:
-        """Elements to solve for the degree of condensation
+    def condensed_elements(self) -> list[str]:
+        """Elements in condensed species that should adhere to mass balance
 
         The elements for which to calculate the degree of condensation depends on both which
         elements are in condensed species and which mass constraints are applied.
         """
-        # condensation: list[str] = list(self.species.elements(CondensedSpecies))
-        # FIXME: Hack to remove O for testing
-        # if "O" in condensation:
-        #    condensation.remove("O")
-
         condensation: list[str] = []
         for constraint in self._constraints.mass_constraints:
             if constraint.element in self._species.elements_in_condensed_species:

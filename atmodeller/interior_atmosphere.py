@@ -587,7 +587,7 @@ class InteriorAtmosphereSystem:
         self._constraints = constraints
         self._solution = Solution(self.species, self.constraints, self.planet.surface_temperature)
 
-        if self._solution.degree_of_condensation_number > 0:
+        if self._solution.number_condensed_elements > 0:
             logger.info("Solving for condensed species and mass constraints")
             logger.info("Reducing max_attempts to 1")
             max_attempts = 1
@@ -606,7 +606,7 @@ class InteriorAtmosphereSystem:
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
-            degree_of_condensation_number=self._solution.degree_of_condensation_number,
+            degree_of_condensation_number=self._solution.number_condensed_elements,
         )
 
         for attempt in range(max_attempts):
@@ -653,7 +653,7 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        degree_of_condensation_number=self._solution.degree_of_condensation_number,
+                        degree_of_condensation_number=self._solution.number_condensed_elements,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )
@@ -661,7 +661,7 @@ class InteriorAtmosphereSystem:
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
             self._failed_solves += 1
-            if self._solution.degree_of_condensation_number > 0:
+            if self._solution.number_condensed_elements > 0:
                 logger.info("Probably no solution for condensed species and imposed constraints")
                 logger.info("Remove some condensed species and try again")
 
@@ -724,7 +724,7 @@ class InteriorAtmosphereSystem:
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
             # Condensed species
-            for condensed_element in self._solution.degree_of_condensation_elements:
+            for condensed_element in self._solution.condensed_elements:
                 if condensed_element == mass_constraint.element:
                     residual_mass[constraint_index] += np.log10(
                         10 ** self._solution._beta_solution[condensed_element] + 1

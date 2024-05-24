@@ -319,7 +319,7 @@ class Output(UserDict):
             molar_mass: float = UnitConversion.g_to_kg(formula.mass)
             atmosphere_total_element_moles += element_mass["atmosphere"] / molar_mass
 
-        # Create and add the output.
+        # Create and add the output
         for element, element_mass in mass.items():
             logger.info("Adding %s to output", element)
             formula: Formula = Formula(element)
@@ -342,7 +342,7 @@ class Output(UserDict):
             )
             # Add contribution from condensation for the elements
             # TODO: Only robust for a single condensed element
-            if element in interior_atmosphere._solution.degree_of_condensation_elements:
+            if element in interior_atmosphere._solution.condensed_elements:
                 degree_of_condensation: float = interior_atmosphere._solution.solution_dict()[
                     f"degree_of_condensation_{element}"
                 ]
@@ -350,8 +350,8 @@ class Output(UserDict):
             elif (
                 element == "O"
                 # TODO: Add condition to check for H2O and only H2O with O?
-                and "O" not in interior_atmosphere._solution.degree_of_condensation_elements
-                and "H" in interior_atmosphere._solution.degree_of_condensation_elements
+                and "O" not in interior_atmosphere._solution.condensed_elements
+                and "H" in interior_atmosphere._solution.condensed_elements
                 # Below assume only C and H2O can exist as condensed. Ugly.
                 and interior_atmosphere.species.number_condensed_species <= 2
             ):
