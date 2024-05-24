@@ -98,7 +98,7 @@ def test_SiHO_massSiH_nosolubility() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 @pytest.mark.skip(reason="with condensed species mass balance another constraint is now required")
@@ -140,7 +140,7 @@ def test_SiHO_massSiH_solubility() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_massH_logfO2_nosolubility() -> None:
@@ -179,7 +179,7 @@ def test_SiHO_massH_logfO2_nosolubility() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_massH_logfO2_solubility() -> None:
@@ -218,7 +218,7 @@ def test_SiHO_massH_logfO2_solubility() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
@@ -255,7 +255,7 @@ def test_SiHO_totalpressure_logfO2_nosolubility() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
@@ -292,7 +292,7 @@ def test_SiHO_fugacityH2O_logfO2_nosolubility() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target_pressures, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target_pressures, rtol=RTOL, atol=ATOL)
 
 
 if __name__ == "__main__":

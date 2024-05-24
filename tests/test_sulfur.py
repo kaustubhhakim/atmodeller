@@ -84,7 +84,7 @@ def test_S2_SO_Sulfide_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_Sulfide_IW() -> None:
@@ -117,7 +117,7 @@ def test_AllS_Sulfide_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_Sulfate_IW() -> None:
@@ -150,7 +150,7 @@ def test_AllS_Sulfate_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IW() -> None:
@@ -183,7 +183,7 @@ def test_AllS_TotalSolubility_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IWp3() -> None:
@@ -216,7 +216,7 @@ def test_AllS_TotalSolubility_IWp3() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_AllS_TotalSolubility_IWm3() -> None:
@@ -249,7 +249,7 @@ def test_AllS_TotalSolubility_IWm3() -> None:
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_HOS_Species_IW() -> None:
@@ -289,7 +289,7 @@ def test_HOS_Species_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_CHONS_Species_IW_MixConstraints() -> None:
@@ -339,7 +339,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_COS_Species_IW() -> None:
@@ -378,7 +378,7 @@ def test_COS_Species_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_CHOS_Species_IW() -> None:
@@ -424,4 +424,4 @@ def test_CHOS_Species_IW() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)

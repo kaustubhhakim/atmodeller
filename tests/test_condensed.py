@@ -87,4 +87,4 @@ def test_water_condensed_100bar() -> None:
     # msg: str = "Compatible with FactSage result"
     # system.isclose_tolerance(factsage_comparison, msg)
 
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)

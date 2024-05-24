@@ -74,7 +74,7 @@ def test_H2O() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2() -> None:
@@ -106,7 +106,7 @@ def test_H_fO2() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_holland() -> None:
@@ -148,7 +148,7 @@ def test_H_fO2_holland() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_basalt_melt() -> None:
@@ -180,7 +180,7 @@ def test_H_basalt_melt() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_plus() -> None:
@@ -212,7 +212,7 @@ def test_H_fO2_plus() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_minus() -> None:
@@ -244,7 +244,7 @@ def test_H_fO2_minus() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_five_oceans() -> None:
@@ -276,7 +276,7 @@ def test_H_five_oceans() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_1500K() -> None:
@@ -310,7 +310,7 @@ def test_H_1500K() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C() -> None:
@@ -349,7 +349,7 @@ def test_H_and_C() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C_hill_formula() -> None:
@@ -388,7 +388,7 @@ def test_H_and_C_hill_formula() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C_total_pressure() -> None:
@@ -425,4 +425,4 @@ def test_H_and_C_total_pressure() -> None:
     }
 
     system.solve(constraints, factor=1)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system._solution.isclose(target, rtol=RTOL, atol=ATOL)
