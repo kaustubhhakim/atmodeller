@@ -269,7 +269,7 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        for species in interior_atmosphere.species.condensed_species.values():
+        for species in interior_atmosphere.species.condensed_species:
             activity: float = species.activity.activity(
                 temperature=interior_atmosphere.planet.surface_temperature,
                 pressure=interior_atmosphere.total_pressure,
@@ -304,7 +304,7 @@ class Output(UserDict):
 
         for element in interior_atmosphere.species.elements():
             mass[element] = {"atmosphere": 0, "melt": 0, "solid": 0}
-            for species in interior_atmosphere.species.gas_species.values():
+            for species in interior_atmosphere.species.gas_species:
                 species_masses: dict[str, float] = interior_atmosphere.mass(
                     species=species, element=element
                 )
@@ -414,16 +414,16 @@ class Output(UserDict):
         """
         atmosphere_total_species_moles: float = 0
 
-        for species in interior_atmosphere.species.gas_species.values():
+        for species in interior_atmosphere.species.gas_species:
             species_masses: dict[str, float] = interior_atmosphere.mass(species=species)
             atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
 
-        for species in interior_atmosphere.species.gas_species.values():
-            pressure: float = interior_atmosphere._solution.solution_dict()[species.name]
-            fugacity: float = interior_atmosphere.fugacities_dict[species.hill_formula]
-            fugacity_coefficient: float = (
-                10 ** interior_atmosphere.log10_fugacity_coefficients_dict[species.hill_formula]
-            )
+        for species in interior_atmosphere.species.gas_species:
+            pressure: float = interior_atmosphere._solution.gas_pressures[species]
+            fugacity: float = interior_atmosphere._solution.gas_fugacities[species]
+            fugacity_coefficient: float = interior_atmosphere._solution.fugacity_coefficients[
+                species
+            ]
             volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
 
             species_masses: dict[str, float] = interior_atmosphere.mass(species=species)

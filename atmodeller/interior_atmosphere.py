@@ -346,11 +346,11 @@ class _ReactionNetwork:
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
-        for index, gas_species in self.species.gas_species.items():
+        for gas_species in self.species.gas_species:
             fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
-            fugacity_coefficients[index] = fugacity_coefficient
+            fugacity_coefficients[self.species.find_species(gas_species)] = fugacity_coefficient
 
         log_fugacity_coefficients: npt.NDArray = np.log10(fugacity_coefficients)
         logger.debug("Fugacity coefficient vector = %s", log_fugacity_coefficients)
@@ -479,31 +479,33 @@ class InteriorAtmosphereSystem:
         species: GasSpecies,
         element: Optional[str] = None,
     ) -> dict[str, float]:
-        """Calculates the total mass of the species or element in each reservoir
+        """Calculates the mass of the species or one of its elements in each reservoir
 
         Args:
             species: A gas species
-            element: Returns the mass for an element. Defaults to None to return the species mass.
+            element: Compute the mass for an element in the species. Defaults to None to compute
+                the species mass.
 
         Returns:
             Total reservoir masses of the species or element
         """
-        planet: Planet = self.planet
-        pressure: float = self._solution.solution_dict()[species.name]
-        fugacity: float = self.fugacities_dict[species.hill_formula]
+        pressure: float = self._solution.gas_pressures[species]
+        fugacity: float = self._solution.gas_fugacities[species]
 
         # Atmosphere
-        mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
+        mass_in_atmosphere: float = (
+            UnitConversion.bar_to_Pa(pressure) / self.planet.surface_gravity
+        )
         mass_in_atmosphere *= (
-            planet.surface_area * species.molar_mass / self.atmospheric_mean_molar_mass
+            self.planet.surface_area * species.molar_mass / self.atmospheric_mean_molar_mass
         )
 
         # Melt
         ppmw_in_melt: float = species.solubility.concentration(
             fugacity=fugacity,
-            temperature=planet.surface_temperature,
+            temperature=self.planet.surface_temperature,
             pressure=self.total_pressure,
-            **self.fugacities_dict,
+            **self._solution.gas_fugacities_by_hill_formula,
         )
         mass_in_melt: float = (
             self.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
@@ -535,29 +537,6 @@ class InteriorAtmosphereSystem:
         return output
 
     @property
-    def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
-        """Fugacity coefficients (relevant for gas species only) in a dictionary"""
-        output: dict[str, float] = {
-            str(species.hill_formula): np.log10(
-                species.eos.fugacity_coefficient(
-                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
-                )
-            )
-            for species in self.species.gas_species.values()
-        }
-        return output
-
-    @property
-    def fugacities_dict(self) -> dict[str, float]:
-        """Fugacities of all species in a dictionary."""
-        output: dict[str, float] = {}
-        for key, value in self.log10_fugacity_coefficients_dict.items():
-            # TODO: Not clean to append _g suffix to denote gas phase.
-            output[key] = 10 ** (np.log10(self._solution.solution_dict()[f"{key}_g"]) + value)
-
-        return output
-
-    @property
     def total_mass(self) -> float:
         """Total mass."""
         mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
@@ -567,60 +546,12 @@ class InteriorAtmosphereSystem:
     @property
     def total_pressure(self) -> float:
         """Total pressure."""
-        indices: list[int] = list(self.species.gas_species.keys())
-
-        return sum(float(self._solution.solution[index]) for index in indices)
+        return self._solution.total_pressure
 
     @property
     def atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere."""
-        mu_atmosphere: float = 0
-        for index, species in self.species.gas_species.items():
-            mu_atmosphere += species.molar_mass * self._solution.solution[index]
-        mu_atmosphere /= self.total_pressure
-
-        return mu_atmosphere
-
-    def isclose(
-        self, target_dict: dict[str, float], rtol: float = 1.0e-5, atol: float = 1.0e-8
-    ) -> np.bool_:
-        """Determines if the solution pressures are close to target values within a tolerance.
-
-        Args:
-            target_dict: Dictionary of the target values
-            rtol: Relative tolerance
-            atol: Absolute tolerance
-
-        Returns:
-            True if the solution is close to the target, otherwise False
-        """
-
-        if len((self._solution.solution_dict())) != len(target_dict):
-            return np.bool_(False)
-
-        target_values: list = list(dict(sorted(target_dict.items())).values())
-        solution_values: list = list(dict(sorted(self._solution.solution_dict().items())).values())
-        isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
-
-        return isclose
-
-    def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
-        """Writes a log message with the tightest tolerance that is satisfied.
-
-        Args:
-            target_dict: Dictionary of the target values
-            message: Message prefix to write to the logger when a tolerance is satisfied
-
-        Returns:
-            The tightest tolerance satisfied
-        """
-        for log_tolerance in (-6, -5, -4, -3, -2, -1):
-            tol: float = 10**log_tolerance
-            if self.isclose(target_dict, rtol=tol, atol=tol):
-                logger.info("%s (tol = %f)".lstrip(), message, tol)
-                return tol
-
-        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
+        return self._solution.gas_molar_mass
 
     def solve(
         self,
@@ -654,7 +585,7 @@ class InteriorAtmosphereSystem:
         logger.info("Solving system number %d", self.number_of_solves)
 
         self._constraints = constraints
-        self._solution = Solution(self.species, self.constraints)
+        self._solution = Solution(self.species, self.constraints, self.planet.surface_temperature)
 
         if self._solution.degree_of_condensation_number > 0:
             logger.info("Solving for condensed species and mass constraints")
@@ -759,7 +690,7 @@ class InteriorAtmosphereSystem:
         """
 
         # This must be set here
-        self._solution.log_solution = log_solution
+        self._solution.data = log_solution
 
         # Exclude the degree of condensation for the reaction network
         log_solution_reaction: npt.NDArray = log_solution[: self.species.number_species()]
@@ -782,7 +713,7 @@ class InteriorAtmosphereSystem:
         # Hence constraint.species is an element.
         for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
             # Gas species
-            for species in self.species.gas_species.values():
+            for species in self.species.gas_species:
                 residual_mass[constraint_index] += sum(
                     self.mass(
                         species=species,
@@ -793,10 +724,10 @@ class InteriorAtmosphereSystem:
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
             # Condensed species
-            for nn, condensed_element in enumerate(self._solution.degree_of_condensation_elements):
+            for condensed_element in self._solution.degree_of_condensation_elements:
                 if condensed_element == mass_constraint.element:
                     residual_mass[constraint_index] += np.log10(
-                        self._solution.solution[self.species.number_species() + nn] + 1
+                        10 ** self._solution._beta_solution[condensed_element] + 1
                     )
 
             # Mass values are constant so no need to pass any arguments to get_value().

@@ -41,6 +41,7 @@ else:
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
 
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -131,9 +132,9 @@ class Species(UserList):
     """List of species"""
 
     @property
-    def gas_species(self) -> dict[int, GasSpecies]:
+    def gas_species(self) -> list[GasSpecies]:
         """Gas species"""
-        return filter_by_type(self, GasSpecies)
+        return list(filter_by_type(self, GasSpecies).values())
 
     @property
     def number_gas_species(self) -> int:
@@ -146,9 +147,9 @@ class Species(UserList):
         return self.elements(GasSpecies)
 
     @property
-    def condensed_species(self) -> dict[int, CondensedSpecies]:
+    def condensed_species(self) -> list[CondensedSpecies]:
         """Condensed species"""
-        return filter_by_type(self, CondensedSpecies)
+        return list(filter_by_type(self, CondensedSpecies).values())
 
     @property
     def number_condensed_species(self) -> int:
@@ -261,7 +262,7 @@ class Species(UserList):
             except KeyError as exc:
                 raise ValueError(f"Cannot find solubilities for {melt_composition}") from exc
 
-            for species in self.gas_species.values():
+            for species in self.gas_species:
                 try:
                     species.solubility = solubilities[species.hill_formula]
                     logger.info(
@@ -295,76 +296,175 @@ class Species(UserList):
 
 @dataclass
 class Solution:
-    """The solution"""
+    """The solution
 
-    species: Species
-    constraints: SystemConstraints
-    _data: dict = field(init=False, default_factory=dict)
+    Stores and updates the solution and assembles the appropriate vectors to solve the coupled
+    reaction network and mass balance system.
+
+    The ordering of the solution vector must be maintained for consistency and is organised as
+    follows:
+
+    # FIXME: Note log10 or not quantities
+
+        1. Species activities and fugacities, ordered according to the input species list
+        2. Lambda factors for condensed phase species
+        3. Beta factors for elements in condensed phases
+
+    Args:
+        _species: Species
+        _constraints: Constraints
+        _temperature: Temperature
+    """
+
+    _species: Species
+    _constraints: SystemConstraints
+    _temperature: float
+    _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
+    # FIXME: add lambda
+    # _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
+    _beta_solution: dict[str, float] = field(init=False, default_factory=dict)
 
     def __post_init__(self):
-        """Sets the order/indexing of the arrays"""
-        # Work using species to set up ordering and indexing
-        self.data = np.zeros_like(self.species, dtype=np.float_)
-        # Create ordered dict
-        for species in self.species:
-            self._data[species] = 0
-        for elements in self.species.elements(CondensedSpecies):
-            self._data[elements] = 0
+        self.data = np.zeros(self.number)
+        logger.debug("solution data = %s", self.data)
 
-    # TODO: Rename, since some terms not log.
     @property
-    def log_solution(self) -> npt.NDArray:
-        """The solution.
+    def number(self) -> int:
+        """Number of solution quantities"""
+        return (
+            self._species.number_species()
+            # FIXME: add lambda
+            # + self._species.number_condensed_species
+            # FIXME: Includes oxygen so might break for H2O cases
+            + self._species.number_elements(CondensedSpecies)
+        )
 
-        For gas species and condensed species the solution is the log10 activity and log10 partial
-        pressure, respectively. Subsequent entries in the solution array relate to the degree of
-        condensation for elements in condensed species, if applicable.
+    @property
+    def data(self) -> dict[ChemicalSpecies | str, float]:
+        # FIXME: add lambda
+        # return self._species_solution | self._lambda_solution | self._beta_solution
+        return self._species_solution | self._beta_solution
+
+    @data.setter
+    def data(self, value: npt.NDArray) -> None:
+        """Sets the solution dictionaries
+
+        Args:
+            value: A vector, which is usually passed by the solver
         """
-        return np.array(list(self._data.values()))
-
-    @log_solution.setter
-    def log_solution(self, value: npt.NDArray) -> None:
-        """The solution."""
-        for nn, key in enumerate(self._data):
-            self._data[key] = value[nn]
-
-    @property
-    def solution(self) -> npt.NDArray:
-        """Solution"""
-        return 10**self.log_solution
-
-    @property
-    def assemble_reaction(self) -> npt.NDArray:
-        """Assembles modified activities, partial pressures, and lamdba factors"""
+        species_index: int = 0
+        lambda_index: int = 0
+        start_index: int = 0
+        for species_index, species in enumerate(self._species):
+            self._species_solution[species] = value[start_index + species_index]
+        start_index += species_index + 1
+        # FIXME: add lambda
+        # for lambda_index, species in enumerate(self._species.condensed_species):
+        #    self._lambda_solution[species] = value[start_index + lambda_index]
+        start_index += lambda_index
+        for beta_index, element in enumerate(self._species.elements(CondensedSpecies)):
+            self._beta_solution[element] = value[start_index + beta_index]
 
     @property
-    def assemble_auxilliary(self) -> npt.NDArray:
-        """Assembles the auxilliary equations"""
+    def log10_gas_pressures(self) -> dict[GasSpecies, float]:
+        """Log10 gas pressures"""
+        return {species: self._species_solution[species] for species in self._species.gas_species}
 
     @property
-    def activities_dict(self) -> dict[str, float]:
-        """Gets the activities"""
-        # Compute from activities_pressures which contains the modified activities
+    def gas_pressures(self) -> dict[GasSpecies, float]:
+        """Gas pressures"""
+        return {key: 10**value for key, value in self.log10_gas_pressures.items()}
 
     @property
-    def log10_activities_dict(self) -> dict[str, float]:
-        """Gets the log10 activities"""
-        # Compute from activities_pressures which contraints the modified activities
+    def total_pressure(self) -> float:
+        """Total pressure"""
+        return sum(self.gas_pressures.values())
 
     @property
-    def degree_of_condensation_dict(self) -> dict[str, float]:
-        """Gets the degree of condensation"""
-        # Compute from betas
+    def gas_molar_mass(self) -> float:
+        """Molar mass of the gas"""
+        mass: float = 0
+        for species in self._species.gas_species:
+            mass += species.molar_mass * self.gas_pressures[species]
+        mass /= self.total_pressure
+
+        return mass
 
     @property
-    def pressures_dict(self) -> dict[str, float]:
-        """Gets the pressures"""
-        # Compute from activities_pressures which contains the modified pressures
+    def log10_fugacity_coefficients(self) -> dict[GasSpecies, float]:
+        """Log10 fugacity coefficients"""
+        log10_coefficients: dict[GasSpecies, float] = {}
+        for species in self._species.gas_species:
+            log10_coefficients[species] = np.log10(
+                species.eos.fugacity_coefficient(self._temperature, self.total_pressure)
+            )
+
+        return log10_coefficients
 
     @property
-    def log10_pressures_dict(self) -> dict[str, float]:
-        """Gets the log10 pressures"""
-        # Compute from activities_pressures the log10 pressures
+    def fugacity_coefficients(self) -> dict[GasSpecies, float]:
+        """Fugacity coefficients"""
+        return {key: 10**value for key, value in self.log10_fugacity_coefficients.items()}
+
+    @property
+    def log10_gas_fugacities(self) -> dict[GasSpecies, float]:
+        """Log10 gas fugacities"""
+        log10_fugacities: dict[GasSpecies, float] = {}
+        for species in self._species.gas_species:
+            log10_fugacities[species] = (
+                self.log10_gas_pressures[species] + self.log10_fugacity_coefficients[species]
+            )
+
+        return log10_fugacities
+
+    @property
+    def gas_fugacities(self) -> dict[GasSpecies, float]:
+        """Gas fugacities"""
+        return {key: 10**value for key, value in self.log10_gas_fugacities.items()}
+
+    @property
+    def gas_fugacities_by_hill_formula(self) -> dict[str, float]:
+        """Gas fugacities by hill formula"""
+        return {key.hill_formula: value for key, value in self.gas_fugacities.items()}
+
+    @property
+    def modified_activities(self) -> dict[CondensedSpecies, float]:
+        """Modified activities"""
+        return {
+            species: self._species_solution[species] for species in self._species.condensed_species
+        }
+
+    @property
+    def log10_activities(self) -> dict[CondensedSpecies, float]:
+        """Log10 activities"""
+        activities: dict[CondensedSpecies, float] = {}
+        for species in self._species.condensed_species:
+            # FIXME: add lambda
+            activities[species] = (
+                self.modified_activities[species] - 0  #  self._lambda_solution[species]
+            )
+
+        return activities
+
+    @property
+    def activities(self) -> dict[CondensedSpecies, float]:
+        """Activities"""
+        return {species: 10**value for species, value in self.log10_activities.items()}
+
+    @property
+    def degree_of_condensation(self) -> dict[str, float]:
+        """Degree of condensation for elements"""
+        return {
+            element: 10**value / (1 + 10**value) for element, value in self._beta_solution.items()
+        }
+
+    # @property
+    # def assemble_reaction(self) -> npt.NDArray:
+    #     """Assembles modified activities, partial pressures, and lamdba factors"""
+
+    # @property
+    # def assemble_auxilliary(self) -> npt.NDArray:
+    #     """Assembles the auxilliary equations"""
 
     @property
     def degree_of_condensation_number(self) -> int:
@@ -384,40 +484,61 @@ class Solution:
         #    condensation.remove("O")
 
         condensation: list[str] = []
-        for constraint in self.constraints.mass_constraints:
-            if constraint.element in self.species.elements_in_condensed_species:
+        for constraint in self._constraints.mass_constraints:
+            if constraint.element in self._species.elements_in_condensed_species:
                 condensation.append(constraint.element)
 
         return condensation
 
     def solution_dict(self) -> dict[str, float]:
-        """Solution for all species in a dictionary
-
-        This is convenient for a quick check of the solution, but in general you will use
-        self.output to return a dictionary of all the data or export the data to Excel or a
-        DataFrame.
-        """
+        """Solution in a dictionary"""
         output: dict[str, float] = {}
-        # Gas species partial pressures
-        for name, solution in zip(
-            self.species.names, self.solution[: self.species.number_species()]
-        ):
-            output[name] = solution
-        # Degree of condensation for elements in condensed species
-        for degree_of_condensation, solution in zip(
-            self.degree_of_condensation_elements, self.solution[self.species.number_species() :]
-        ):
-            key: str = f"degree_of_condensation_{degree_of_condensation}"
-            output[key] = solution / (1 + solution)
+        for species, pressure in self.gas_pressures.items():
+            output[species.name] = pressure
+        for species, activity in self.activities.items():
+            output[species.name] = activity
+        for element, degree_of_condensation in self.degree_of_condensation.items():
+            output[f"degree_of_condensation_{element}"] = degree_of_condensation
 
         return output
 
-    # @property
-    # def fugacities_dict(self) -> dict[str, float]:
-    #     """Fugacities of all species in a dictionary."""
-    #     output: dict[str, float] = {}
-    #     for key, value in self.log10_fugacity_coefficients_dict.items():
-    #         # TODO: Not clean to append _g suffix to denote gas phase.
-    #         output[key] = 10 ** (np.log10(self.solution_dict()[f"{key}_g"]) + value)
+    def isclose(
+        self, target_dict: dict[str, float], rtol: float = 1.0e-5, atol: float = 1.0e-8
+    ) -> np.bool_:
+        """Determines if the solution pressures are close to target values within a tolerance.
 
-    #     return output
+        Args:
+            target_dict: Dictionary of the target values
+            rtol: Relative tolerance
+            atol: Absolute tolerance
+
+        Returns:
+            True if the solution is close to the target, otherwise False
+        """
+
+        if len((self.solution_dict())) != len(target_dict):
+            return np.bool_(False)
+
+        target_values: list = list(dict(sorted(target_dict.items())).values())
+        solution_values: list = list(dict(sorted(self.solution_dict().items())).values())
+        isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
+
+        return isclose
+
+    def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
+        """Writes a log message with the tightest tolerance that is satisfied.
+
+        Args:
+            target_dict: Dictionary of the target values
+            message: Message prefix to write to the logger when a tolerance is satisfied
+
+        Returns:
+            The tightest tolerance satisfied
+        """
+        for log_tolerance in (-6, -5, -4, -3, -2, -1):
+            tol: float = 10**log_tolerance
+            if self.isclose(target_dict, rtol=tol, atol=tol):
+                logger.info("%s (tol = %f)".lstrip(), message, tol)
+                return tol
+
+        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
