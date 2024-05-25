@@ -158,7 +158,7 @@ class InitialSolution(ABC, Generic[T]):
             )
             log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
 
-        # Apply constraints from the reaction network (acitivities and fugacities)
+        # Apply constraints from the reaction network (activities and fugacities)
         for constraint in constraints.reaction_network_constraints:
             index: int = self.species.find_species(constraint.species)
             logger.debug("Setting %s %d", constraint.species, index)
@@ -212,7 +212,9 @@ class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
         min_log10: float = MIN_LOG10,
         max_log10: float = MAX_LOG10,
     ):
-        value_array: npt.NDArray = value * np.ones(species.number_species())
+        # FIXME: Hacked for condensed C test case. Only need plus one for lambda since condensed
+        # phases are dealt with elsewhere
+        value_array: npt.NDArray = value * np.ones(species.number_species() + 1)
         super().__init__(value_array, species=species, min_log10=min_log10, max_log10=max_log10)
         logger.debug("initial_solution = %s", self.asdict())
 

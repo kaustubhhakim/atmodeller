@@ -320,32 +320,19 @@ class Solution:
     _constraints: SystemConstraints
     _temperature: float
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
-    # FIXME: add lambda
-    # _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
+    _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
     _beta_solution: dict[str, float] = field(init=False, default_factory=dict)
-
-    def __post_init__(self):
-        self.data = np.zeros(self.number)
-        logger.debug("solution data = %s", self.data)
 
     @property
     def number(self) -> int:
         """Number of solution quantities"""
         return (
             self._species.number_species()
-            # FIXME: add lambda
-            # + self._species.number_condensed_species
+            + self._species.number_condensed_species
             + self.number_condensed_elements
         )
 
-    @property
-    def data(self) -> dict[ChemicalSpecies | str, float]:
-        # FIXME: add lambda
-        # return self._species_solution | self._lambda_solution | self._beta_solution
-        return self._species_solution | self._beta_solution
-
-    @data.setter
-    def data(self, value: npt.NDArray) -> None:
+    def set_data(self, value: npt.NDArray) -> None:
         """Sets the solution dictionaries
 
         Args:
@@ -357,12 +344,28 @@ class Solution:
         for species_index, species in enumerate(self._species):
             self._species_solution[species] = value[start_index + species_index]
         start_index += species_index + 1
-        # FIXME: add lambda
-        # for lambda_index, species in enumerate(self._species.condensed_species):
-        #    self._lambda_solution[species] = value[start_index + lambda_index]
-        start_index += lambda_index
-        for beta_index, element in enumerate(self._species.elements(CondensedSpecies)):
+        for lambda_index, species in enumerate(self._species.condensed_species):
+            self._lambda_solution[species] = value[start_index + lambda_index]
+        start_index += lambda_index + 1
+        for beta_index, element in enumerate(self.condensed_elements):
             self._beta_solution[element] = value[start_index + beta_index]
+
+    @property
+    def species_array(self) -> npt.NDArray:
+        return np.array(list(self._species_solution.values()))
+
+    @property
+    def lambda_array(self) -> npt.NDArray:
+        lambda_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
+        for species in self._species.condensed_species:
+            index: int = self._species.find_species(species)
+            lambda_array[index] = self._lambda_solution[species]
+
+        return lambda_array
+
+    @property
+    def beta_array(self) -> npt.NDArray:
+        return np.array(list(self._beta_solution.values()))
 
     @property
     def log10_gas_pressures(self) -> dict[GasSpecies, float]:

@@ -42,13 +42,13 @@ logger: logging.Logger = debug_logger()
 def test_C_half_condensed(helper) -> None:
     """Graphite with 50% condensed C mass fraction"""
 
-    C_cr: SolidSpecies = SolidSpecies("C")
     O2_g: GasSpecies = GasSpecies("O2")
     H2_g: GasSpecies = GasSpecies("H2")
     CO_g: GasSpecies = GasSpecies("CO")
     H2O_g: GasSpecies = GasSpecies("H2O")
     CO2_g: GasSpecies = GasSpecies("CO2")
     CH4_g: GasSpecies = GasSpecies("CH4")
+    C_cr: SolidSpecies = SolidSpecies("C")
 
     species: Species = Species([O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr])
 
@@ -67,7 +67,8 @@ def test_C_half_condensed(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            ActivityConstraint(C_cr, 1),
+            # TODO: Should no longer be required to specify
+            # ActivityConstraint(C_cr, 1),
         ]
     )
 

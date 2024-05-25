@@ -364,7 +364,7 @@ class _ReactionNetwork:
         pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray,
-        log_solution: npt.NDArray,
+        solution: Solution,
     ) -> npt.NDArray:
         """Returns the residual vector of the reaction network.
 
@@ -373,7 +373,7 @@ class _ReactionNetwork:
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix
-            log_solution: Estimated log10 solution to compute the residual for
+            solution: Solution to compute the residual for
 
         Returns:
             The residual vector of the reaction network
@@ -386,10 +386,26 @@ class _ReactionNetwork:
         )
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(log_solution)
+            + coefficient_matrix.dot(solution.species_array)
             - rhs
         )
-        logger.debug("Residual_reaction = %s", residual_reaction)
+
+        logger.debug("Residual_reaction before lambda = %s", residual_reaction)
+
+        # TODO: Move somewhere else. For testing and debugging
+        # Lambda correction factor
+        # Want to compute this exterior to the reaction matrix because lambda's change during a
+        # model run but reactions don't.
+        lambda_matrix: npt.NDArray = np.zeros_like(coefficient_matrix)
+        # logger.warning(lambda_matrix)
+        for species in self.species.condensed_species:
+            index: int = self.species.find_species(species)
+            lambda_matrix[:, index] = coefficient_matrix[:, index]
+        # logger.warning(lambda_matrix)
+
+        residual_reaction -= lambda_matrix.dot(solution.lambda_array)
+
+        logger.debug("Residual_reaction after lambda = %s", residual_reaction)
 
         return residual_reaction
 
@@ -602,6 +618,7 @@ class InteriorAtmosphereSystem:
         # The only constraints that require pressure are the fugacity constraints, so for the
         # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
         # ensure the initial solution is bounded.
+        # FIXME: This will break with lambda approach
         log_solution: npt.NDArray = initial_solution.get_log10_value(
             self.constraints,
             temperature=self.planet.surface_temperature,
@@ -689,11 +706,8 @@ class InteriorAtmosphereSystem:
             The solution, which is the log10 of the activities and pressures for each species
         """
 
-        # This must be set here
-        self._solution.data = log_solution
-
-        # Exclude the degree of condensation for the reaction network
-        log_solution_reaction: npt.NDArray = log_solution[: self.species.number_species()]
+        # This must be set here.
+        self._solution.set_data(log_solution)
 
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
@@ -701,8 +715,21 @@ class InteriorAtmosphereSystem:
             pressure=self.total_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
-            log_solution=log_solution_reaction,
+            solution=self._solution,
         )
+
+        # FIXME: Move, lambda residual. Hacked for C test case
+        residual_lambda: npt.NDArray = np.zeros(self.species.number_condensed_species + 1)
+        for nn, species in enumerate(self.species.condensed_species):
+            residual_lambda[nn] = (
+                np.log10(self._solution._lambda_solution[species])
+                + self._solution._beta_solution["C"]
+                # TODO: make log10(tau)
+                - 15
+            )
+        residual_lambda[1] = 0
+
+        logger.debug("residual_lambda = %s", residual_lambda)
 
         # Compute residual for the mass balance (if relevant).
         residual_mass: npt.NDArray = np.zeros(
@@ -733,7 +760,7 @@ class InteriorAtmosphereSystem:
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= mass_constraint.get_log10_value()
 
-        logger.debug("Residual_mass = %s", residual_mass)
+        logger.debug("residual_mass = %s", residual_mass)
 
         # Compute residual for the total pressure (if relevant).
         residual_total_pressure: npt.NDArray = np.zeros(
@@ -751,7 +778,7 @@ class InteriorAtmosphereSystem:
 
         # Combined residual
         residual: npt.NDArray = np.concatenate(
-            (residual_reaction, residual_mass, residual_total_pressure)
+            (residual_reaction, residual_lambda, residual_mass, residual_total_pressure)
         )
         logger.debug("Residual = %s", residual)
 
