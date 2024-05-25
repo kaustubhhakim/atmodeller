@@ -441,9 +441,8 @@ class Solution:
         """Log10 activities"""
         activities: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
-            # FIXME: add lambda
             activities[species] = (
-                self.modified_activities[species] - 0  #  self._lambda_solution[species]
+                self.modified_activities[species] - self._lambda_solution[species]
             )
 
         return activities

@@ -50,6 +50,7 @@ def test_C_half_condensed(helper) -> None:
     CH4_g: GasSpecies = GasSpecies("CH4")
     C_cr: SolidSpecies = SolidSpecies("C")
 
+    # TODO: Automatically reorder to have condensed species at the end?
     species: Species = Species([O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr])
 
     planet: Planet = Planet()
@@ -67,8 +68,7 @@ def test_C_half_condensed(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            # TODO: Should no longer be required to specify
-            # ActivityConstraint(C_cr, 1),
+            ActivityConstraint(C_cr, 1),  # Taking log imposes 0 on rhs
         ]
     )
 

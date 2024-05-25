@@ -401,7 +401,7 @@ class _ReactionNetwork:
         for species in self.species.condensed_species:
             index: int = self.species.find_species(species)
             lambda_matrix[:, index] = coefficient_matrix[:, index]
-        # logger.warning(lambda_matrix)
+        logger.debug("lambda_matrix = %s", lambda_matrix)
 
         residual_reaction -= lambda_matrix.dot(solution.lambda_array)
 
@@ -719,15 +719,15 @@ class InteriorAtmosphereSystem:
         )
 
         # FIXME: Move, lambda residual. Hacked for C test case
-        residual_lambda: npt.NDArray = np.zeros(self.species.number_condensed_species + 1)
+        residual_lambda: npt.NDArray = np.zeros(self.species.number_condensed_species)
         for nn, species in enumerate(self.species.condensed_species):
             residual_lambda[nn] = (
                 np.log10(self._solution._lambda_solution[species])
                 + self._solution._beta_solution["C"]
                 # TODO: make log10(tau)
-                - 15
+                # TODO: Integer values less than -13 drive the solver too hard (blow up noise).
+                - 13
             )
-        residual_lambda[1] = 0
 
         logger.debug("residual_lambda = %s", residual_lambda)
 
