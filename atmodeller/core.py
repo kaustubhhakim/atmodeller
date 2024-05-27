@@ -299,8 +299,8 @@ class Solution:
     """The solution
 
     Stores and updates the solution and assembles the appropriate vectors to solve the coupled
-    reaction network and mass balance system. The ordering of the solution vector must be
-    maintained for consistency and is organised as follows:
+    reaction network and mass balance system. All quantities must be positive so log is used. The
+    ordering of the solution vector must be maintained for consistency and is organised as follows:
 
     1. Species fugacities and activities, ordered according to the input species list where
     condensed species must be at the end (this seems to improve convergence when lambda factors are
@@ -319,6 +319,7 @@ class Solution:
     _species: Species
     _constraints: SystemConstraints
     _temperature: float
+    # These are all log10
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
     _beta_solution: dict[str, float] = field(init=False, default_factory=dict)
     _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
@@ -461,9 +462,7 @@ class Solution:
         """Log10 activities"""
         activities: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
-            activities[species] = (
-                self.modified_activities[species] + self._lambda_solution[species]
-            )
+            activities[species] = self.modified_activities[species]
 
         return activities
 

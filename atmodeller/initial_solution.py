@@ -175,7 +175,7 @@ class InitialSolution(ABC, Generic[T]):
         log10_value = np.append(log10_value, log_degree_of_condensation)
 
         # FIXME: Finally, append a lambda value
-        log10_value = np.append(log10_value, 1)
+        log10_value = np.append(log10_value, -12)
 
         return log10_value
 

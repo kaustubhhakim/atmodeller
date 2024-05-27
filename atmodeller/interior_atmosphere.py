@@ -397,7 +397,7 @@ class _ReactionNetwork:
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
             + coefficient_matrix.dot(solution.species_array)
-            + lambda_matrix.dot(solution.lambda_array)
+            + lambda_matrix.dot(10**solution.lambda_array)
             - rhs
         )
 
@@ -406,7 +406,7 @@ class _ReactionNetwork:
         lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
         lambda_matrix2[self.number_reactions :, :] = 0
         logger.debug("lambda_matrix2 = %s", lambda_matrix2)
-        # residual_reaction -= lambda_matrix2.dot(solution.lambda_array)
+        # residual_reaction -= lambda_matrix2.dot(10**solution.lambda_array)
 
         logger.debug("Residual_reaction after lambda = %s", residual_reaction)
 
@@ -725,11 +725,11 @@ class InteriorAtmosphereSystem:
         residual_lambda: npt.NDArray = np.zeros(self.species.number_condensed_species)
         for nn, species in enumerate(self.species.condensed_species):
             residual_lambda[nn] = (
-                np.log10(self._solution._lambda_solution[species])
+                self._solution._lambda_solution[species]
                 + self._solution._beta_solution["C"]
                 # TODO: make log10(tau)
                 # TODO: Integer values less than -13 drive the solver too hard (blow up noise).
-                - 11
+                + 13
             )
 
         logger.debug("residual_lambda = %s", residual_lambda)
