@@ -332,7 +332,25 @@ class Solution:
             + self.number_condensed_elements
         )
 
-    def set_data(self, value: npt.NDArray) -> None:
+    @property
+    def data(self) -> npt.NDArray:
+        data: npt.NDArray = np.zeros(self.number, dtype=np.float_)
+        species_index: int = 0
+        beta_index: int = 0
+        start_index: int = 0
+        for species_index, species in enumerate(self._species):
+            data[start_index + species_index] = self._species_solution[species]
+        start_index += species_index + 1
+        for beta_index, element in enumerate(self.condensed_elements):
+            data[start_index + beta_index] = self._beta_solution[element]
+        start_index += beta_index + 1
+        for lambda_index, species in enumerate(self._species.condensed_species):
+            data[start_index + lambda_index] = self._lambda_solution[species]
+
+        return data
+
+    @data.setter
+    def data(self, value: npt.NDArray) -> None:
         """Sets the solution dictionaries
 
         Args:

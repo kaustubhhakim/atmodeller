@@ -707,7 +707,7 @@ class InteriorAtmosphereSystem:
         """
 
         # This must be set here.
-        self._solution.set_data(log_solution)
+        self._solution.data = log_solution
 
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
