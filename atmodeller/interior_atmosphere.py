@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import pprint
 from dataclasses import dataclass, field
@@ -297,7 +298,7 @@ class _ReactionNetwork:
         Returns:
             The right-hand side vector of values
         """
-        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
+        nrows: int = self.number_reactions + constraints.number_reaction_network_constraints
         rhs: npt.NDArray = np.zeros(nrows, dtype=float)
 
         # Reactions
@@ -353,7 +354,7 @@ class _ReactionNetwork:
             fugacity_coefficients[self.species.find_species(gas_species)] = fugacity_coefficient
 
         log_fugacity_coefficients: npt.NDArray = np.log10(fugacity_coefficients)
-        logger.debug("Fugacity coefficient vector = %s", log_fugacity_coefficients)
+        logger.debug("Log10 fugacity coefficient vector = %s", log_fugacity_coefficients)
 
         return log_fugacity_coefficients
 
@@ -378,32 +379,34 @@ class _ReactionNetwork:
         Returns:
             The residual vector of the reaction network
         """
-        rhs: npt.NDArray = self._assemble_right_hand_side_values(
-            temperature=temperature, pressure=pressure, constraints=constraints
-        )
         log_fugacity_coefficients: npt.NDArray = self._assemble_log_fugacity_coefficients(
             temperature=temperature, pressure=pressure
         )
-        residual_reaction: npt.NDArray = (
-            coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(solution.species_array)
-            - rhs
-        )
 
-        logger.debug("Residual_reaction before lambda = %s", residual_reaction)
-
-        # TODO: Move somewhere else. For testing and debugging
-        # Lambda correction factor
-        # Want to compute this exterior to the reaction matrix because lambda's change during a
-        # model run but reactions don't.
+        # Lambda correction factor (condensate stability switch criteria)
         lambda_matrix: npt.NDArray = np.zeros_like(coefficient_matrix)
         for species in self.species.condensed_species:
             index: int = self.species.find_species(species)
             lambda_matrix[:, index] = coefficient_matrix[:, index]
-        # lambda_matrix[self.number_reactions :, :] = 0
         logger.debug("lambda_matrix = %s", lambda_matrix)
 
-        residual_reaction -= lambda_matrix.dot(solution.lambda_array)
+        rhs: npt.NDArray = self._assemble_right_hand_side_values(
+            temperature=temperature, pressure=pressure, constraints=constraints
+        )
+
+        residual_reaction: npt.NDArray = (
+            coefficient_matrix.dot(log_fugacity_coefficients)
+            + coefficient_matrix.dot(solution.species_array)
+            + lambda_matrix.dot(solution.lambda_array)
+            - rhs
+        )
+
+        logger.debug("Residual_reaction = %s", residual_reaction)
+
+        # lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
+        # lambda_matrix2[self.number_reactions :, :] = 0
+        # logger.debug("lambda_matrix2 = %s", lambda_matrix2)
+        # residual_reaction -= lambda_matrix2.dot(solution.lambda_array)
 
         logger.debug("Residual_reaction after lambda = %s", residual_reaction)
 
@@ -726,7 +729,7 @@ class InteriorAtmosphereSystem:
                 + self._solution._beta_solution["C"]
                 # TODO: make log10(tau)
                 # TODO: Integer values less than -13 drive the solver too hard (blow up noise).
-                - 13
+                - 11
             )
 
         logger.debug("residual_lambda = %s", residual_lambda)

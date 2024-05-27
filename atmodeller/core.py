@@ -462,7 +462,7 @@ class Solution:
         activities: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
             activities[species] = (
-                self.modified_activities[species] - self._lambda_solution[species]
+                self.modified_activities[species] + self._lambda_solution[species]
             )
 
         return activities
@@ -507,6 +507,8 @@ class Solution:
             output[species.name] = activity
         for element, degree_of_condensation in self.degree_of_condensation.items():
             output[f"degree_of_condensation_{element}"] = degree_of_condensation
+
+        logger.warning("data = %s", self.data)
 
         return output
 

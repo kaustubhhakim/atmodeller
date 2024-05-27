@@ -89,7 +89,7 @@ def test_C_half_condensed(helper) -> None:
     }
 
     system.solve(constraints)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(system, factsage_result, log=False, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_IW(helper) -> None:
