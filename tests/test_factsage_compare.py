@@ -316,11 +316,8 @@ def test_C_half_condensed(helper) -> None:
     planet.surface_temperature = 873
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    # TODO: These were updated compared to previous FactSage comparison
-    h_kg: float = earth_oceans_to_kg(1)  # earth_oceans_to_kg(0.201991413)
-    c_kg: float = 5 * h_kg  # * (1 - 0.4569851350481659)  # 4.950705503505735 * h_kg
-    # h_kg = c_kg * 0.201991413  # 3.13087e19
-    # print(h_kg / earth_oceans_to_kg(1))
+    h_kg: float = earth_oceans_to_kg(1)
+    c_kg: float = 5 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
         [

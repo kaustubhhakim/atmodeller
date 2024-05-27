@@ -14,7 +14,11 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Tests for ideal C-H-O interior-atmosphere systems"""
+"""Tests for ideal C-H-O interior-atmosphere systems
+
+In particular, these test the stable/unstable condensates algorithm. Note that condensed species
+must be at the end of the species list.
+"""
 
 # Convenient to use naming convention so pylint: disable=C0103
 
@@ -30,6 +34,11 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, SolidSpecies
+from atmodeller.initial_solution import (
+    InitialSolution,
+    InitialSolutionConstant,
+    InitialSolutionDict,
+)
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
@@ -40,7 +49,7 @@ logger: logging.Logger = debug_logger()
 
 
 def test_C_half_condensed(helper) -> None:
-    """Graphite with 50% condensed C mass fraction"""
+    """Graphite stable with around 50% condensed C mass fraction"""
 
     O2_g: GasSpecies = GasSpecies("O2")
     H2_g: GasSpecies = GasSpecies("H2")
@@ -50,37 +59,80 @@ def test_C_half_condensed(helper) -> None:
     CH4_g: GasSpecies = GasSpecies("CH4")
     C_cr: SolidSpecies = SolidSpecies("C")
 
-    # TODO: Automatically reorder to have condensed species at the end?
     species: Species = Species([O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr])
 
     planet: Planet = Planet()
     planet.surface_temperature = 873
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    # TODO: These were updated compared to previous FactSage comparison
-    h_kg: float = earth_oceans_to_kg(1)  # earth_oceans_to_kg(0.201991413)
-    c_kg: float = 5 * h_kg  # * (1 - 0.4569851350481659)  # 4.950705503505735 * h_kg
-    # h_kg = c_kg * 0.201991413  # 3.13087e19
-    # print(h_kg / earth_oceans_to_kg(1))
+    h_kg: float = earth_oceans_to_kg(1)
+    c_kg: float = 5 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
         [
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            ActivityConstraint(C_cr, 1),  # Taking log imposes 0 on rhs
+            ActivityConstraint(C_cr, 1),
         ]
     )
 
     factsage_result: dict[str, float] = {
-        "CH4_g": 96.74,
-        "CO2_g": 0.061195,
-        "CO_g": 0.07276,
-        "C_cr": 1.0,
-        "H2O_g": 4.527,
-        "H2_g": 14.564,
         "O2_g": 1.27e-25,
+        "H2_g": 14.564,
+        "CO_g": 0.07276,
+        "H2O_g": 4.527,
+        "CO2_g": 0.061195,
+        "CH4_g": 96.74,
+        "C_cr": 1.0,
         "degree_of_condensation_C": 0.456983,
+    }
+
+    system.solve(constraints)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_CHO_IW(helper) -> None:
+    """C-H-O system at IW+0.5
+
+    Similar to :cite:p:`BHS22{Table E, row 2}`
+    """
+
+    O2_g: GasSpecies = GasSpecies("O2")
+    H2_g: GasSpecies = GasSpecies("H2")
+    CO_g: GasSpecies = GasSpecies("CO")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    C_cr: SolidSpecies = SolidSpecies("C")
+
+    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g, C_cr])
+
+    planet: Planet = Planet()
+    planet.surface_temperature = 1400
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    h_kg: float = earth_oceans_to_kg(3)
+    c_kg: float = 1 * h_kg
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(0.5)),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
+            ActivityConstraint(C_cr, 1),
+        ]
+    )
+
+    factsage_result: dict[str, float] = {
+        "O2_g": 4.11e-13,
+        "H2_g": 236.98,
+        "CO_g": 46.42,
+        "H2O_g": 337.16,
+        "CO2_g": 30.88,
+        "CH4_g": 28.66,
+        "C_cr": 0,
+        "degree_of_condensation_C": 0,
     }
 
     system.solve(constraints)
