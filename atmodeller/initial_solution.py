@@ -174,6 +174,9 @@ class InitialSolution(ABC, Generic[T]):
         log_degree_of_condensation: npt.NDArray = np.zeros(degree_of_condensation_number)
         log10_value = np.append(log10_value, log_degree_of_condensation)
 
+        # FIXME: Finally, append a lambda value
+        log10_value = np.append(log10_value, 1)
+
         return log10_value
 
     def update(self, output: Output) -> None:
@@ -212,9 +215,7 @@ class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
         min_log10: float = MIN_LOG10,
         max_log10: float = MAX_LOG10,
     ):
-        # FIXME: Hacked for condensed C test case. Only need plus one for lambda since condensed
-        # phases are dealt with elsewhere
-        value_array: npt.NDArray = value * np.ones(species.number_species() + 1)
+        value_array: npt.NDArray = value * np.ones(species.number_species())
         super().__init__(value_array, species=species, min_log10=min_log10, max_log10=max_log10)
         logger.debug("initial_solution = %s", self.asdict())
 

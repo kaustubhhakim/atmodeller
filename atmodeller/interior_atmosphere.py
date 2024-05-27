@@ -397,10 +397,10 @@ class _ReactionNetwork:
         # Want to compute this exterior to the reaction matrix because lambda's change during a
         # model run but reactions don't.
         lambda_matrix: npt.NDArray = np.zeros_like(coefficient_matrix)
-        # logger.warning(lambda_matrix)
         for species in self.species.condensed_species:
             index: int = self.species.find_species(species)
             lambda_matrix[:, index] = coefficient_matrix[:, index]
+        # lambda_matrix[self.number_reactions :, :] = 0
         logger.debug("lambda_matrix = %s", lambda_matrix)
 
         residual_reaction -= lambda_matrix.dot(solution.lambda_array)

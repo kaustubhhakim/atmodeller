@@ -299,16 +299,16 @@ class Solution:
     """The solution
 
     Stores and updates the solution and assembles the appropriate vectors to solve the coupled
-    reaction network and mass balance system.
+    reaction network and mass balance system. The ordering of the solution vector must be
+    maintained for consistency and is organised as follows:
 
-    The ordering of the solution vector must be maintained for consistency and is organised as
-    follows:
+    1. Species fugacities and activities, ordered according to the input species list where
+    condensed species must be at the end (this seems to improve convergence when lambda factors are
+    used).
 
-    # FIXME: Note log10 or not quantities
+    2. Beta factors for elements in condensed species to keep track of condensed mass
 
-        1. Species activities and fugacities, ordered according to the input species list
-        2. Lambda factors for condensed phase species
-        3. Beta factors for elements in condensed phases
+    3. Lambda factors for condensed species
 
     Args:
         _species: Species
@@ -320,8 +320,8 @@ class Solution:
     _constraints: SystemConstraints
     _temperature: float
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
-    _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
     _beta_solution: dict[str, float] = field(init=False, default_factory=dict)
+    _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
 
     @property
     def number(self) -> int:
@@ -336,23 +336,29 @@ class Solution:
         """Sets the solution dictionaries
 
         Args:
-            value: A vector, which is usually passed by the solver
+            value: A vector, which is usually passed by the solver. Must be ordered by the
+                fugacities and activities of species, then the beta factors, then the lambda
+                factors.
         """
         species_index: int = 0
-        lambda_index: int = 0
+        beta_index: int = 0
         start_index: int = 0
         for species_index, species in enumerate(self._species):
             self._species_solution[species] = value[start_index + species_index]
         start_index += species_index + 1
-        for lambda_index, species in enumerate(self._species.condensed_species):
-            self._lambda_solution[species] = value[start_index + lambda_index]
-        start_index += lambda_index + 1
         for beta_index, element in enumerate(self.condensed_elements):
             self._beta_solution[element] = value[start_index + beta_index]
+        start_index += beta_index + 1
+        for lambda_index, species in enumerate(self._species.condensed_species):
+            self._lambda_solution[species] = value[start_index + lambda_index]
 
     @property
     def species_array(self) -> npt.NDArray:
         return np.array(list(self._species_solution.values()))
+
+    @property
+    def beta_array(self) -> npt.NDArray:
+        return np.array(list(self._beta_solution.values()))
 
     @property
     def lambda_array(self) -> npt.NDArray:
@@ -362,10 +368,6 @@ class Solution:
             lambda_array[index] = self._lambda_solution[species]
 
         return lambda_array
-
-    @property
-    def beta_array(self) -> npt.NDArray:
-        return np.array(list(self._beta_solution.values()))
 
     @property
     def log10_gas_pressures(self) -> dict[GasSpecies, float]:
@@ -458,14 +460,6 @@ class Solution:
         return {
             element: 10**value / (1 + 10**value) for element, value in self._beta_solution.items()
         }
-
-    # @property
-    # def assemble_reaction(self) -> npt.NDArray:
-    #     """Assembles modified activities, partial pressures, and lamdba factors"""
-
-    # @property
-    # def assemble_auxilliary(self) -> npt.NDArray:
-    #     """Assembles the auxilliary equations"""
 
     @property
     def number_condensed_elements(self) -> int:
