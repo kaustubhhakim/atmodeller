@@ -403,9 +403,9 @@ class _ReactionNetwork:
 
         logger.debug("Residual_reaction = %s", residual_reaction)
 
-        # lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
-        # lambda_matrix2[self.number_reactions :, :] = 0
-        # logger.debug("lambda_matrix2 = %s", lambda_matrix2)
+        lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
+        lambda_matrix2[self.number_reactions :, :] = 0
+        logger.debug("lambda_matrix2 = %s", lambda_matrix2)
         # residual_reaction -= lambda_matrix2.dot(solution.lambda_array)
 
         logger.debug("Residual_reaction after lambda = %s", residual_reaction)
