@@ -406,7 +406,7 @@ class _ReactionNetwork:
         lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
         lambda_matrix2[self.number_reactions :, :] = 0
         logger.debug("lambda_matrix2 = %s", lambda_matrix2)
-        # residual_reaction -= lambda_matrix2.dot(10**solution.lambda_array)
+        residual_reaction -= lambda_matrix2.dot(10**solution.lambda_array)
 
         logger.debug("Residual_reaction after lambda = %s", residual_reaction)
 
@@ -729,7 +729,7 @@ class InteriorAtmosphereSystem:
                 + self._solution._beta_solution["C"]
                 # TODO: make log10(tau)
                 # TODO: Integer values less than -13 drive the solver too hard (blow up noise).
-                + 13
+                + 15
             )
 
         logger.debug("residual_lambda = %s", residual_lambda)

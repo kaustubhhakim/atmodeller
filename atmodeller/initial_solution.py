@@ -167,6 +167,9 @@ class InitialSolution(ABC, Generic[T]):
             )
         logger.debug("Conform initial solution to constraints = %s", log10_value)
 
+        # FIXME: Below requires knowledge of how many beta and lambda factors to solve for.
+        # Arguments could be prescribed dynamically or known at instantiation?
+
         # When condensates and mass constraints are present, we assume an initial degree of
         # condensation of 0.5 for each element. Recall that the (log10) solution quantity is:
         # beta = log10(mu) = log10(d/(1-d)), where beta is the log10 mass of the condensed element,
@@ -174,7 +177,8 @@ class InitialSolution(ABC, Generic[T]):
         log_degree_of_condensation: npt.NDArray = np.zeros(degree_of_condensation_number)
         log10_value = np.append(log10_value, log_degree_of_condensation)
 
-        # FIXME: Finally, append a lambda value
+        # FIXME: Finally, append a lambda value. Here we assume the condensate is stable (log10
+        # value is 0 so value of activity is unity).
         log10_value = np.append(log10_value, -12)
 
         return log10_value
