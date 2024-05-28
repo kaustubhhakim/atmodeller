@@ -43,6 +43,11 @@ from atmodeller.utilities import UnitConversion, dataclass_to_logger
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+TAU: float = 1e-15
+"""Tau factor for the calculation of the auxilliary equations for condensate stability"""
+log10_TAU: float = np.log10(TAU)
+"""Log10 of Tau"""
+
 
 @dataclass(kw_only=True)
 class Planet:
@@ -390,6 +395,10 @@ class _ReactionNetwork:
             lambda_matrix[:, index] = coefficient_matrix[:, index]
         logger.debug("lambda_matrix = %s", lambda_matrix)
 
+        lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
+        lambda_matrix2[self.number_reactions :, :] = 0
+        logger.debug("lambda_matrix2 = %s", lambda_matrix2)
+
         rhs: npt.NDArray = self._assemble_right_hand_side_values(
             temperature=temperature, pressure=pressure, constraints=constraints
         )
@@ -398,17 +407,11 @@ class _ReactionNetwork:
             coefficient_matrix.dot(log_fugacity_coefficients)
             + coefficient_matrix.dot(solution.species_array)
             + lambda_matrix.dot(10**solution.lambda_array)
+            - lambda_matrix2.dot(10**solution.lambda_array)
             - rhs
         )
 
         logger.debug("Residual_reaction = %s", residual_reaction)
-
-        lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
-        lambda_matrix2[self.number_reactions :, :] = 0
-        logger.debug("lambda_matrix2 = %s", lambda_matrix2)
-        residual_reaction -= lambda_matrix2.dot(10**solution.lambda_array)
-
-        logger.debug("Residual_reaction after lambda = %s", residual_reaction)
 
         return residual_reaction
 
@@ -674,6 +677,7 @@ class InteriorAtmosphereSystem:
                         temperature=self.planet.surface_temperature,
                         pressure=1,
                         degree_of_condensation_number=self._solution.number_condensed_elements,
+                        number_of_condensed_species=self.species.number_condensed_species,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )
@@ -727,9 +731,7 @@ class InteriorAtmosphereSystem:
             residual_lambda[nn] = (
                 self._solution._lambda_solution[species]
                 + self._solution._beta_solution["C"]
-                # TODO: make log10(tau)
-                # TODO: Integer values less than -13 drive the solver too hard (blow up noise).
-                + 15
+                - log10_TAU
             )
 
         logger.debug("residual_lambda = %s", residual_lambda)

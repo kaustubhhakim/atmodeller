@@ -299,12 +299,10 @@ class Solution:
     """The solution
 
     Stores and updates the solution and assembles the appropriate vectors to solve the coupled
-    reaction network and mass balance system. All quantities must be positive so log is used. The
+    reaction network and mass balance system. All quantities must be positive so log10 is used. The
     ordering of the solution vector must be maintained for consistency and is organised as follows:
 
-    1. Species fugacities and activities, ordered according to the input species list where
-    condensed species must be at the end (this seems to improve convergence when lambda factors are
-    used).
+    1. Species fugacities and activities, ordered according to the input species list
 
     2. Beta factors for elements in condensed species to keep track of condensed mass
 
@@ -375,9 +373,10 @@ class Solution:
     def species_array(self) -> npt.NDArray:
         return np.array(list(self._species_solution.values()))
 
-    @property
-    def beta_array(self) -> npt.NDArray:
-        return np.array(list(self._beta_solution.values()))
+    # Not used
+    # @property
+    # def beta_array(self) -> npt.NDArray:
+    #     return np.array(list(self._beta_solution.values()))
 
     @property
     def lambda_array(self) -> npt.NDArray:
