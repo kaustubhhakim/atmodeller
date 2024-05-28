@@ -327,8 +327,8 @@ class Solution:
         """Number of solution quantities"""
         return (
             self._species.number_species()
-            + self._species.number_condensed_species
             + self.number_condensed_elements
+            + self._species.number_condensed_species
         )
 
     @property

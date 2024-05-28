@@ -296,7 +296,7 @@ class _ReactionNetwork:
         """Assembles the right-hand side vector of values for the system of equations.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
 
@@ -363,6 +363,29 @@ class _ReactionNetwork:
 
         return log_fugacity_coefficients
 
+    def get_lambda_matrices(
+        self, coefficient_matrix: npt.NDArray
+    ) -> tuple[npt.NDArray, npt.NDArray]:
+        """Gets the lambda matrices used to calculate condensate stability
+
+        Args:
+            coefficient_matrix: Coefficient matrix
+
+        Returns:
+            Lambda matrices in a tuple
+        """
+        lambda_activity_modifier: npt.NDArray = np.zeros_like(coefficient_matrix)
+        for species in self.species.condensed_species:
+            index: int = self.species.find_species(species)
+            lambda_activity_modifier[:, index] = coefficient_matrix[:, index]
+        lambda_reaction_modifier: npt.NDArray = copy.deepcopy(lambda_activity_modifier)
+        lambda_reaction_modifier[self.number_reactions :, :] = 0
+
+        logger.debug("lambda_activity_modifier = %s", lambda_activity_modifier)
+        logger.debug("lambda_reaction_modifier = %s", lambda_reaction_modifier)
+
+        return lambda_activity_modifier, lambda_reaction_modifier
+
     def get_residual(
         self,
         *,
@@ -370,6 +393,8 @@ class _ReactionNetwork:
         pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray,
+        lambda_activity_modifier: npt.NDArray,
+        lambda_reaction_modifier: npt.NDArray,
         solution: Solution,
     ) -> npt.NDArray:
         """Returns the residual vector of the reaction network.
@@ -379,6 +404,8 @@ class _ReactionNetwork:
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix
+            lambda_activity_modifier: Lambda matrix for modifying activities
+            lambda_reaction_modifier: Lambda matrix for modifying reactions
             solution: Solution to compute the residual for
 
         Returns:
@@ -388,17 +415,6 @@ class _ReactionNetwork:
             temperature=temperature, pressure=pressure
         )
 
-        # Lambda correction factor (condensate stability switch criteria)
-        lambda_matrix: npt.NDArray = np.zeros_like(coefficient_matrix)
-        for species in self.species.condensed_species:
-            index: int = self.species.find_species(species)
-            lambda_matrix[:, index] = coefficient_matrix[:, index]
-        logger.debug("lambda_matrix = %s", lambda_matrix)
-
-        lambda_matrix2: npt.NDArray = copy.deepcopy(lambda_matrix)
-        lambda_matrix2[self.number_reactions :, :] = 0
-        logger.debug("lambda_matrix2 = %s", lambda_matrix2)
-
         rhs: npt.NDArray = self._assemble_right_hand_side_values(
             temperature=temperature, pressure=pressure, constraints=constraints
         )
@@ -406,8 +422,8 @@ class _ReactionNetwork:
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
             + coefficient_matrix.dot(solution.species_array)
-            + lambda_matrix.dot(10**solution.lambda_array)
-            - lambda_matrix2.dot(10**solution.lambda_array)
+            + lambda_activity_modifier.dot(10**solution.lambda_array)
+            - lambda_reaction_modifier.dot(10**solution.lambda_array)
             - rhs
         )
 
@@ -609,11 +625,6 @@ class InteriorAtmosphereSystem:
         self._constraints = constraints
         self._solution = Solution(self.species, self.constraints, self.planet.surface_temperature)
 
-        if self._solution.number_condensed_elements > 0:
-            logger.info("Solving for condensed species and mass constraints")
-            logger.info("Reducing max_attempts to 1")
-            max_attempts = 1
-
         if initial_solution is None:
             initial_solution = self.initial_solution
         assert initial_solution is not None
@@ -621,6 +632,10 @@ class InteriorAtmosphereSystem:
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
+        lambda_activity_modifier, lambda_reaction_modifier = (
+            self._reaction_network.get_lambda_matrices(coefficient_matrix)
+        )
+
         # The only constraints that require pressure are the fugacity constraints, so for the
         # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
         # ensure the initial solution is bounded.
@@ -639,7 +654,7 @@ class InteriorAtmosphereSystem:
                 sol = root(
                     self._objective_func,
                     log_solution,
-                    args=(coefficient_matrix,),
+                    args=(coefficient_matrix, lambda_activity_modifier, lambda_reaction_modifier),
                     method=method,
                     tol=tol,
                     options=options,
@@ -702,12 +717,16 @@ class InteriorAtmosphereSystem:
         self,
         log_solution: npt.NDArray,
         coefficient_matrix: npt.NDArray,
+        lambda_activity_modifier: npt.NDArray,
+        lambda_reaction_modifier: npt.NDArray,
     ) -> npt.NDArray:
         """Objective function for the non-linear system.
 
         Args:
             log_solution: Log10 of the activities and pressures of each species
             coefficient_matrix: Coefficient matrix
+            lambda_activity_modifier: Lambda matrix for modifying activities
+            lambda_reaction_modifier: Lambda matrix for modifying reactions
 
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
@@ -722,11 +741,15 @@ class InteriorAtmosphereSystem:
             pressure=self.total_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
+            lambda_activity_modifier=lambda_activity_modifier,
+            lambda_reaction_modifier=lambda_reaction_modifier,
             solution=self._solution,
         )
 
         # FIXME: Move, lambda residual. Hacked for C test case
-        residual_lambda: npt.NDArray = np.zeros(self.species.number_condensed_species)
+        residual_lambda: npt.NDArray = np.zeros(
+            self.species.number_condensed_species, dtype=np.float_
+        )
         for nn, species in enumerate(self.species.condensed_species):
             residual_lambda[nn] = (
                 self._solution._lambda_solution[species]
