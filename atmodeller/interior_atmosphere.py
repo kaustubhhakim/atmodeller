@@ -621,12 +621,12 @@ class InteriorAtmosphereSystem:
         # The only constraints that require pressure are the fugacity constraints, so for the
         # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
         # ensure the initial solution is bounded.
-        # FIXME: This will break with lambda approach
         log_solution: npt.NDArray = initial_solution.get_log10_value(
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
             degree_of_condensation_number=self._solution.number_condensed_elements,
+            number_of_condensed_species=self.species.number_condensed_species,
         )
 
         for attempt in range(max_attempts):

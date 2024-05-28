@@ -126,9 +126,9 @@ def test_CHO_IW(helper) -> None:
         "H2O_g": 337.16,
         "CO2_g": 30.88,
         "CH4_g": 28.66,
+        "C_cr": 0.12202,
         # FactSage also predicts no C, so these values are set close to the atmodeller output so
         # the test knows to pass.
-        "C_cr": 0.12,
         "degree_of_condensation_C": 1.1e-15,
     }
 

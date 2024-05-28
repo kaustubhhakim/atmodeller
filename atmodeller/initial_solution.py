@@ -123,6 +123,7 @@ class InitialSolution(ABC, Generic[T]):
         temperature: float,
         pressure: float,
         degree_of_condensation_number: int,
+        number_of_condensed_species: int,
         perturb: bool = False,
         perturb_log10: float = 2,
     ) -> npt.NDArray[np.float_]:
@@ -134,6 +135,8 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
             degree_of_condensation_number: Number of elements to solve for the degree of
                 condensation
+            number_of_condensed_species: Number of condensed species to solve for the condensate
+                stability factors (lambda factors)
             perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
             perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
                 to 2.
@@ -167,9 +170,6 @@ class InitialSolution(ABC, Generic[T]):
             )
         logger.debug("Conform initial solution to constraints = %s", log10_value)
 
-        # FIXME: Below requires knowledge of how many beta and lambda factors to solve for.
-        # Arguments could be prescribed dynamically or known at instantiation?
-
         # When condensates and mass constraints are present, we assume an initial degree of
         # condensation of 0.5 for each element. Recall that the (log10) solution quantity is:
         # beta = log10(mu) = log10(d/(1-d)), where beta is the log10 mass of the condensed element,
@@ -177,9 +177,10 @@ class InitialSolution(ABC, Generic[T]):
         log_degree_of_condensation: npt.NDArray = np.zeros(degree_of_condensation_number)
         log10_value = np.append(log10_value, log_degree_of_condensation)
 
-        # FIXME: Finally, append a lambda value. Here we assume the condensate is stable (log10
-        # value is 0 so value of activity is unity).
-        log10_value = np.append(log10_value, -12)
+        # Small lambda factors assume the condensates are stable, which is probably a reasonable
+        # assumption given that the user has chosen to include them in the species list.
+        log_lambda: npt.NDArray = -12 * np.ones(number_of_condensed_species)
+        log10_value = np.append(log10_value, log_lambda)
 
         return log10_value
 
