@@ -506,8 +506,6 @@ class Solution:
         for element, degree_of_condensation in self.degree_of_condensation.items():
             output[f"degree_of_condensation_{element}"] = degree_of_condensation
 
-        logger.warning("data = %s", self.data)
-
         return output
 
     def isclose(
