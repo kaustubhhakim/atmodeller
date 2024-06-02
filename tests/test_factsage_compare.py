@@ -39,7 +39,7 @@ from atmodeller.utilities import earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
 
-# 3% tolerance of log values to satisfy comparison with FactSage
+# 5% tolerance of log values to satisfy comparison with FactSage
 TOLERANCE: float = 5.0e-2
 FACTSAGE_COMPARISON: str = "Comparing with FactSage result"
 
@@ -296,7 +296,7 @@ def test_CHO_low_temperature(helper) -> None:
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_C_half_condensed(helper) -> None:
+def test_graphite_condensed(helper) -> None:
     """Graphite stable with around 50% condensed C mass fraction"""
 
     O2_g: GasSpecies = GasSpecies("O2")
@@ -340,7 +340,7 @@ def test_C_half_condensed(helper) -> None:
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_C_unstable(helper) -> None:
+def test_graphite_unstable(helper) -> None:
     """C-H-O system at IW+0.5 with graphite unstable
 
     Similar to :cite:p:`BHS22{Table E, row 2}`
@@ -389,7 +389,7 @@ def test_C_unstable(helper) -> None:
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_water_condensed_10bar(helper) -> None:
+def test_water_condensed(helper) -> None:
     """Condensed water at 10 bar"""
 
     H2_g: GasSpecies = GasSpecies("H2")
@@ -424,18 +424,18 @@ def test_water_condensed_10bar(helper) -> None:
     }
 
     system.solve(constraints)
-    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_C_water_430K_10bar(helper) -> None:
+def test_graphite_water_condensed(helper) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
     H2_g: GasSpecies = GasSpecies("H2")
     O2_g: GasSpecies = GasSpecies("O2")
-    # FIXME: Using the 10 bar data pushes the atmodeller result away from FactSage. Unsure why.
-    H2O_l: LiquidSpecies = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
+    # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O")  # , thermodata_filename="H-066",
+    # thermodata_name="Water, 10 Bar")
     CO_g: GasSpecies = GasSpecies("CO")
     CO2_g: GasSpecies = GasSpecies("CO2")
     CH4_g: GasSpecies = GasSpecies("CH4")
