@@ -18,7 +18,6 @@
 
 from __future__ import annotations
 
-import copy
 import logging
 import pprint
 from dataclasses import dataclass, field
@@ -158,7 +157,7 @@ class _ReactionNetwork:
             for j in range(i + 1, self.species.number_species()):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug("Augmented_matrix after forward elimination = \n%s", augmented_matrix)
+        logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
         # Backward substitution
         for i in range(self.species.number_elements() - 1, -1, -1):
@@ -169,14 +168,14 @@ class _ReactionNetwork:
                 if augmented_matrix[j, i] != 0:
                     ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
                     augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug("Augmented_matrix after backward substitution = \n%s", augmented_matrix)
+        logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
         reduced_matrix1: npt.NDArray = augmented_matrix[:, : matrix1.shape[1]]
         reaction_matrix: npt.NDArray = augmented_matrix[
             self.species.number_elements() :, matrix1.shape[1] :
         ]
-        logger.debug("Reduced_matrix1 = \n%s", reduced_matrix1)
-        logger.debug("Reaction_matrix = \n%s", reaction_matrix)
+        logger.debug("reduced_matrix1 = \n%s", reduced_matrix1)
+        logger.debug("reaction_matrix = \n%s", reaction_matrix)
 
         return reaction_matrix
 
@@ -363,28 +362,24 @@ class _ReactionNetwork:
 
         return log_fugacity_coefficients
 
-    def get_lambda_matrices(
-        self, coefficient_matrix: npt.NDArray
-    ) -> tuple[npt.NDArray, npt.NDArray]:
-        """Gets the lambda matrices used to calculate condensate stability
+    def get_stability_matrix(self, coefficient_matrix: npt.NDArray) -> npt.NDArray:
+        """Gets the stability matrix used to implement condensate stability
 
         Args:
             coefficient_matrix: Coefficient matrix
 
         Returns:
-            Lambda matrices in a tuple
+            Stability matrix
         """
-        lambda_activity_modifier: npt.NDArray = np.zeros_like(coefficient_matrix)
+        stability_matrix: npt.NDArray = np.zeros_like(coefficient_matrix)
         for species in self.species.condensed_species:
             index: int = self.species.find_species(species)
-            lambda_activity_modifier[:, index] = coefficient_matrix[:, index]
-        lambda_reaction_modifier: npt.NDArray = copy.deepcopy(lambda_activity_modifier)
-        lambda_reaction_modifier[self.number_reactions :, :] = 0
+            stability_matrix[:, index] = coefficient_matrix[:, index]
+        stability_matrix[: self.number_reactions, :] = 0
 
-        logger.debug("lambda_activity_modifier = %s", lambda_activity_modifier)
-        logger.debug("lambda_reaction_modifier = %s", lambda_reaction_modifier)
+        logger.debug("stability_matrix = %s", stability_matrix)
 
-        return lambda_activity_modifier, lambda_reaction_modifier
+        return stability_matrix
 
     def get_residual(
         self,
@@ -393,8 +388,7 @@ class _ReactionNetwork:
         pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray,
-        lambda_activity_modifier: npt.NDArray,
-        lambda_reaction_modifier: npt.NDArray,
+        stability_matrix: npt.NDArray,
         solution: Solution,
     ) -> npt.NDArray:
         """Returns the residual vector of the reaction network.
@@ -404,8 +398,7 @@ class _ReactionNetwork:
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix
-            lambda_activity_modifier: Lambda matrix for modifying activities
-            lambda_reaction_modifier: Lambda matrix for modifying reactions
+            stability_matrix: Stability matrix for condensate stability
             solution: Solution to compute the residual for
 
         Returns:
@@ -422,8 +415,7 @@ class _ReactionNetwork:
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
             + coefficient_matrix.dot(solution.species_array)
-            + lambda_activity_modifier.dot(10**solution.lambda_array)
-            - lambda_reaction_modifier.dot(10**solution.lambda_array)
+            + stability_matrix.dot(10**solution.lambda_array)
             - rhs
         )
 
@@ -632,8 +624,8 @@ class InteriorAtmosphereSystem:
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
-        lambda_activity_modifier, lambda_reaction_modifier = (
-            self._reaction_network.get_lambda_matrices(coefficient_matrix)
+        stability_matrix: npt.NDArray = self._reaction_network.get_stability_matrix(
+            coefficient_matrix
         )
 
         # The only constraints that require pressure are the fugacity constraints, so for the
@@ -654,7 +646,7 @@ class InteriorAtmosphereSystem:
                 sol = root(
                     self._objective_func,
                     log_solution,
-                    args=(coefficient_matrix, lambda_activity_modifier, lambda_reaction_modifier),
+                    args=(coefficient_matrix, stability_matrix),
                     method=method,
                     tol=tol,
                     options=options,
@@ -717,16 +709,14 @@ class InteriorAtmosphereSystem:
         self,
         log_solution: npt.NDArray,
         coefficient_matrix: npt.NDArray,
-        lambda_activity_modifier: npt.NDArray,
-        lambda_reaction_modifier: npt.NDArray,
+        stability_matrix: npt.NDArray,
     ) -> npt.NDArray:
         """Objective function for the non-linear system.
 
         Args:
             log_solution: Log10 of the activities and pressures of each species
             coefficient_matrix: Coefficient matrix
-            lambda_activity_modifier: Lambda matrix for modifying activities
-            lambda_reaction_modifier: Lambda matrix for modifying reactions
+            stability_matrix: Stability matrix for condensate stability
 
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
@@ -741,8 +731,7 @@ class InteriorAtmosphereSystem:
             pressure=self.total_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
-            lambda_activity_modifier=lambda_activity_modifier,
-            lambda_reaction_modifier=lambda_reaction_modifier,
+            stability_matrix=stability_matrix,
             solution=self._solution,
         )
 
