@@ -419,7 +419,7 @@ class _ReactionNetwork:
             - rhs
         )
 
-        logger.debug("Residual_reaction = %s", residual_reaction)
+        logger.debug("residual_reaction = %s", residual_reaction)
 
         return residual_reaction
 
@@ -455,6 +455,11 @@ class InteriorAtmosphereSystem:
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionConstant(species=self.species)
         self._reaction_network = _ReactionNetwork(species=self.species)
+
+    @property
+    def solution(self) -> Solution:
+        """The solution"""
+        return self._solution
 
     @property
     def number_of_solves(self) -> int:
@@ -735,18 +740,18 @@ class InteriorAtmosphereSystem:
             solution=self._solution,
         )
 
-        residual_lambda: npt.NDArray = np.zeros(
+        residual_stability: npt.NDArray = np.zeros(
             self.species.number_condensed_species, dtype=np.float_
         )
         for nn, species in enumerate(self.species.condensed_species):
-            residual_lambda[nn] = self._solution._lambda_solution[species] - log10_TAU
+            residual_stability[nn] = self._solution._lambda_solution[species] - log10_TAU
             for element in species.elements:
                 try:
-                    residual_lambda += self._solution._beta_solution[element]
+                    residual_stability += self._solution._beta_solution[element]
                 except KeyError:
                     pass
 
-        logger.debug("residual_lambda = %s", residual_lambda)
+        logger.debug("residual_stability = %s", residual_stability)
 
         # Compute residual for the mass balance (if relevant).
         residual_mass: npt.NDArray = np.zeros(
@@ -795,7 +800,7 @@ class InteriorAtmosphereSystem:
 
         # Combined residual
         residual: npt.NDArray = np.concatenate(
-            (residual_reaction, residual_lambda, residual_mass, residual_total_pressure)
+            (residual_reaction, residual_stability, residual_mass, residual_total_pressure)
         )
         logger.debug("residual = %s", residual)
 
