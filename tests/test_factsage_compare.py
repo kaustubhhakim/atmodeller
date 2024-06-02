@@ -39,9 +39,8 @@ from atmodeller.utilities import earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
 
-# 5% tolerance of log values to satisfy comparison with FactSage
 TOLERANCE: float = 5.0e-2
-FACTSAGE_COMPARISON: str = "Comparing with FactSage result"
+"""Tolerance of log output to satisfy comparison with FactSage"""
 
 
 def test_CHO_reduced(helper) -> None:
