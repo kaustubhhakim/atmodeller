@@ -746,16 +746,16 @@ class InteriorAtmosphereSystem:
             solution=self._solution,
         )
 
-        # FIXME: Move, lambda residual. Hacked for C test case
         residual_lambda: npt.NDArray = np.zeros(
             self.species.number_condensed_species, dtype=np.float_
         )
         for nn, species in enumerate(self.species.condensed_species):
-            residual_lambda[nn] = (
-                self._solution._lambda_solution[species]
-                + self._solution._beta_solution["C"]
-                - log10_TAU
-            )
+            residual_lambda[nn] = self._solution._lambda_solution[species] - log10_TAU
+            for element in species.elements:
+                try:
+                    residual_lambda += self._solution._beta_solution[element]
+                except KeyError:
+                    pass
 
         logger.debug("residual_lambda = %s", residual_lambda)
 
@@ -808,6 +808,6 @@ class InteriorAtmosphereSystem:
         residual: npt.NDArray = np.concatenate(
             (residual_reaction, residual_lambda, residual_mass, residual_total_pressure)
         )
-        logger.debug("Residual = %s", residual)
+        logger.debug("residual = %s", residual)
 
         return residual

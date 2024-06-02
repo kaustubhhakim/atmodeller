@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import logging
 
-import pytest
-
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     ActivityConstraint,
@@ -35,7 +33,6 @@ from atmodeller.constraints import (
     TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
-from atmodeller.initial_solution import InitialSolutionDict
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
@@ -431,7 +428,7 @@ def test_water_condensed_10bar(helper) -> None:
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_C_water_10bar(helper) -> None:
+def test_C_water_430K_10bar(helper) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -450,13 +447,16 @@ def test_C_water_10bar(helper) -> None:
     planet.surface_temperature = 430
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
+    h_kg: float = 3.10e20
+    c_kg: float = 1.08e20
+
     constraints: SystemConstraints = SystemConstraints(
         [
-            # TotalPressureConstraint(10),
-            PressureConstraint(H2O_g, 5.383794461969687),
+            TotalPressureConstraint(10),
             ActivityConstraint(H2O_l, 1),
-            PressureConstraint(CO2_g, 4.2869747466457575),
-            # ActivityConstraint(C_cr, 1),
+            ActivityConstraint(C_cr, 1),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
         ]
     )
 
@@ -469,169 +469,9 @@ def test_C_water_10bar(helper) -> None:
         "H2O_l": 1.0,
         "H2_g": 0.0023,
         "O2_g": 4.74e-48,
+        "degree_of_condensation_C": 0.892,
+        "degree_of_condensation_H": 0.992,
     }
 
-    system.solve(
-        constraints,
-        initial_solution=InitialSolutionDict({H2O_g: 5, CO2_g: 4, CO_g: 1e-6}, species=species),
-    )
-    assert helper.isclose(system, factsage_result, log=False, rtol=TOLERANCE, atol=TOLERANCE)
-
-
-# @pytest.mark.skip(reason="Unphysical since temperature is too high for stable liquid H2O")
-def test_graphite_water_condensed_10bar_fixme(helper) -> None:
-    """Graphite and condensed water at 10 bar"""
-
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    O2_g: GasSpecies = GasSpecies("O2")
-    H2O_l: LiquidSpecies = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
-    CO_g: GasSpecies = GasSpecies("CO")
-    CO2_g: GasSpecies = GasSpecies("CO2")
-    CH4_g: GasSpecies = GasSpecies("CH4")
-    C_cr: SolidSpecies = SolidSpecies("C")
-
-    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
-
-    planet: Planet = Planet()
-    planet.surface_temperature = 430
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-
-    # h_kg: float = 2.538641e18  # earth_oceans_to_kg(1) * 2
-    # c_kg = 1.163850e19  # 1.08e19 * 10
-
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            TotalPressureConstraint(10),
-            # ElementMassConstraint("H", h_kg),
-            # PressureConstraint(H2O_g, 5.3672),
-            # ElementMassConstraint("C", c_kg),
-            # ElementMassConstraint("O", 2.48703e21),  # result 1
-            # ElementMassConstraint("O", 1.14375e21),  # result 2
-            # ElementMassConstraint("O", 1.14375e20),  # result 3
-            # FugacityConstraint(CO2_g, 4.3064),
-            # FugacityConstraint(H2O_g, 5.3672),
-            ActivityConstraint(H2O_l, 1),
-            ActivityConstraint(C_cr, 1),
-        ]
-    )
-
-    # FIXME This is not the FacSage result, but rather the result of atmodeller
-    # Paolo ran this case 6/5/24 and C not stable
-    # result1: dict[str, float] = {
-    #     "CH4_g": 0.20287679349339546,
-    #     "CO2_g": 5.291870481346229,
-    #     "CO_g": 5.3978318685692555e-06,
-    #     "C_cr": 1.0,
-    #     "H2O_g": 4.502876884247701,
-    #     "H2O_l": 1.0,
-    #     "H2_g": 0.0023704431166883567,
-    #     "O2_g": 7.212892379311266e-47,
-    #     "degree_of_condensation_C": 0.8999595234303465,
-    #     "degree_of_condensation_H": 0.9947717711432327,
-    #     "degree_of_condensation_O": 0.9841110043750718,
-    # }
-
-    # result2: dict[str, float] = {
-    #     "CH4_g": 5.281762065097921,
-    #     "CO2_g": 0.20326506601504474,
-    #     "CO_g": 1.0579036671813901e-06,
-    #     "C_cr": 1.0,
-    #     "H2O_g": 4.502876884247718,
-    #     "H2O_l": 1.0,
-    #     "H2_g": 0.012094913549153272,
-    #     "O2_g": 2.770530856354487e-48,
-    #     "degree_of_condensation_C": 0.8187657730751349,
-    #     "degree_of_condensation_H": 0.9708675898421573,
-    #     "degree_of_condensation_O": 0.9795959100035376,
-    # }
-
-    result3: dict[str, float] = {
-        "CH4_g": 5.2817620816185125,
-        "CO2_g": 0.20326506537926034,
-        "CO_g": 1.0579036655269031e-06,
-        "C_cr": 1.0,
-        "H2O_g": 4.502876884247718,
-        "H2O_l": 1.0,
-        "H2_g": 0.01209491356806884,
-        "O2_g": 2.770530847688679e-48,
-        "degree_of_condensation_C": 0.8187657537177384,
-        "degree_of_condensation_H": 0.9708675915401346,
-        "degree_of_condensation_O": 0.7959590940622816,
-    }
-
-    # initial_solution_result1 = InitialSolutionDict(
-    #     value={H2O_g: 4.5, H2_g: 0.002, O2_g: 1.0e-47, CO2_g: 5.3}, species=species
-    # )
-    # initial_solution_result2 = InitialSolutionDict(
-    #     value={H2O_g: 4.5, H2_g: 0.012, O2_g: 2.7e-48, CO2_g: 0.2, CH4_g: 5.28}, species=species
-    # )
-    initial_solution_result3 = InitialSolutionDict(
-        value={H2O_g: 4.5, H2_g: 0.012, O2_g: 2.7e-48, CO2_g: 0.2, CH4_g: 5.28}, species=species
-    )
-
-    system.solve(constraints, initial_solution=initial_solution_result3)
-    system.output(to_excel=True)
-    assert helper.isclose(system, result3, log=False, rtol=TOLERANCE, atol=TOLERANCE)
-
-
-# @pytest.mark.skip(reason="debugging")
-# def test_graphite_water_condensed_10bar_paolo(helper) -> None:
-#     """Condensed water at 10 bar"""
-
-#     species_with_water: Species = Species(
-#         [
-#             GasSpecies(formula="H2O"),
-#             GasSpecies(formula="H2"),  # Very low abundance
-#             GasSpecies(formula="O2"),
-#             LiquidSpecies(formula="H2O", thermodata_name="Water, 10 Bar"),
-#             GasSpecies(formula="CO"),
-#             GasSpecies(formula="CO2"),
-#             GasSpecies(formula="CH4"),
-#             SolidSpecies(formula="C"),
-#         ]
-#     )
-#     planet: Planet = Planet()
-#     planet.surface_temperature = 430
-#     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-#         species=species_with_water, planet=planet
-#     )
-
-#     # h_kg: float = earth_oceans_to_kg(1)
-
-#     h_kg: float = 2e20 / 1000  # kg
-#     c_kg: float = 1.1e21 / 1000  # kg
-#     # Oxygen
-#     o_kg: float = 1.144e21 / 1000  # kg
-
-#     # Total pressure of 10 bar. FIXME: Need to manually tweak to get 10 bar
-#     constraints: SystemConstraints = SystemConstraints(
-#         [
-#             # TotalPressureConstraint(value=10),
-#             # FugacityConstraint(species="O2", value=5.3267e-58),
-#             FugacityConstraint(species="H2O", value=5),  # 6.6205),
-#             # FugacityConstraint(species="H2O", value=3.0157),
-#             MassConstraint(species="H", value=h_kg),
-#             MassConstraint(species="C", value=c_kg),
-#         ]
-#     )
-
-#     factsage_result: dict[str, float] = {
-#         "H2O_g": 5.4383,
-#         "H2_g": 0.00839,
-#         "O2_g": 3.75e-49,
-#         "H2O_l": 1.0,
-#         "C_cr": 1.0,
-#         "CH4_g": 4.21,
-#         "CO2_g": 0.34,
-#         "CO_g": 7.82e-7,
-#         "degree_of_condensation_H": 0.5,
-#         "degree_of_condensation_C": 0.82,
-#     }
-
-#     # msg: str = "Compatible with FactSage result"
-#     # system.isclose_tolerance(factsage_comparison, msg)
-
-#     system.solve(constraints)
-#     system.output(to_excel=True)
-#     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    system.solve(constraints)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
