@@ -123,6 +123,7 @@ class InitialSolution(ABC, Generic[T]):
         temperature: float,
         pressure: float,
         degree_of_condensation_number: int,
+        number_of_condensed_species: int,
         perturb: bool = False,
         perturb_log10: float = 2,
     ) -> npt.NDArray[np.float_]:
@@ -134,6 +135,8 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
             degree_of_condensation_number: Number of elements to solve for the degree of
                 condensation
+            number_of_condensed_species: Number of condensed species to solve for the condensate
+                stability factors (lambda factors)
             perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
             perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
                 to 2.
@@ -158,7 +161,7 @@ class InitialSolution(ABC, Generic[T]):
             )
             log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
 
-        # Apply constraints from the reaction network (acitivities and fugacities)
+        # Apply constraints from the reaction network (activities and fugacities)
         for constraint in constraints.reaction_network_constraints:
             index: int = self.species.find_species(constraint.species)
             logger.debug("Setting %s %d", constraint.species, index)
@@ -173,6 +176,11 @@ class InitialSolution(ABC, Generic[T]):
         # and d is the degree of condensation. Hence d = 0.5 gives mu = 1 gives beta = 0
         log_degree_of_condensation: npt.NDArray = np.zeros(degree_of_condensation_number)
         log10_value = np.append(log10_value, log_degree_of_condensation)
+
+        # Small lambda factors assume the condensates are stable, which is probably a reasonable
+        # assumption given that the user has chosen to include them in the species list.
+        log_lambda: npt.NDArray = -12 * np.ones(number_of_condensed_species)
+        log10_value = np.append(log10_value, log_lambda)
 
         return log10_value
 
@@ -212,7 +220,7 @@ class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
         min_log10: float = MIN_LOG10,
         max_log10: float = MAX_LOG10,
     ):
-        value_array: npt.NDArray = value * np.ones(species.number)
+        value_array: npt.NDArray = value * np.ones(species.number_species())
         super().__init__(value_array, species=species, min_log10=min_log10, max_log10=max_log10)
         logger.debug("initial_solution = %s", self.asdict())
 

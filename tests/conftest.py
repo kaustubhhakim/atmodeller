@@ -40,12 +40,12 @@ class Helper:
         atol: float = 1.0e-6,
     ) -> np.bool_:
 
-        if len((system.solution_dict())) != len(target):
+        if len((system.solution.solution_dict())) != len(target):
             return np.bool_(False)
 
         target_values: npt.NDArray = np.array(list(dict(sorted(target.items())).values()))
         solution_values: npt.NDArray = np.array(
-            list(dict(sorted(system.solution_dict().items())).values())
+            list(dict(sorted(system.solution.solution_dict().items())).values())
         )
         if log:
             target_values = np.log10(target_values)

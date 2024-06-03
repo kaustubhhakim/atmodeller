@@ -89,7 +89,7 @@ def test_pH2_fO2_holland() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system.solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_fH2_fO2_holland() -> None:
@@ -124,7 +124,7 @@ def test_fH2_fO2_holland() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system.solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C_holland() -> None:
@@ -169,4 +169,4 @@ def test_H_and_C_holland() -> None:
     }
 
     system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert system.solution.isclose(target, rtol=RTOL, atol=ATOL)

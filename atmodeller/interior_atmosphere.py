@@ -31,7 +31,7 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import GasSpecies, Species
+from atmodeller.core import GasSpecies, Solution, Species
 from atmodeller.initial_solution import InitialSolutionConstant
 from atmodeller.interfaces import (
     InitialSolutionProtocol,
@@ -41,6 +41,11 @@ from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion, dataclass_to_logger
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+TAU: float = 1e-15
+"""Tau factor for the calculation of the auxilliary equations for condensate stability"""
+log10_TAU: float = np.log10(TAU)
+"""Log10 of Tau"""
 
 
 @dataclass(kw_only=True)
@@ -114,7 +119,7 @@ class _ReactionNetwork:
 
     @property
     def number_reactions(self) -> int:
-        if self.species.number == 1:
+        if self.species.number_species() == 1:
             return 0
         else:
             assert self.reaction_matrix is not None
@@ -132,30 +137,30 @@ class _ReactionNetwork:
         Returns:
             A matrix of the reaction stoichiometry.
         """
-        if self.species.number == 1:
+        if self.species.number_species() == 1:
             logger.debug("Only one species therefore no reactions")
             return None
 
         matrix1: npt.NDArray = self.species.composition_matrix()
-        matrix2: npt.NDArray = np.eye(self.species.number)
+        matrix2: npt.NDArray = np.eye(self.species.number_species())
         augmented_matrix: npt.NDArray = np.hstack((matrix1, matrix2))
         logger.debug("augmented_matrix = \n%s", augmented_matrix)
 
         # Forward elimination
-        for i in range(self.species.number_elements):  # Note only over the number of elements.
+        for i in range(self.species.number_elements()):  # Note only over the number of elements.
             # Check if the pivot element is zero.
             if augmented_matrix[i, i] == 0:
                 # Swap rows to get a non-zero pivot element.
                 nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
                 augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
             # Perform row operations to eliminate values below the pivot.
-            for j in range(i + 1, self.species.number):
+            for j in range(i + 1, self.species.number_species()):
                 ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug("Augmented_matrix after forward elimination = \n%s", augmented_matrix)
+        logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
         # Backward substitution
-        for i in range(self.species.number_elements - 1, -1, -1):
+        for i in range(self.species.number_elements() - 1, -1, -1):
             # Normalize the pivot row.
             augmented_matrix[i] /= augmented_matrix[i, i]
             # Eliminate values above the pivot.
@@ -163,14 +168,14 @@ class _ReactionNetwork:
                 if augmented_matrix[j, i] != 0:
                     ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
                     augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug("Augmented_matrix after backward substitution = \n%s", augmented_matrix)
+        logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
         reduced_matrix1: npt.NDArray = augmented_matrix[:, : matrix1.shape[1]]
         reaction_matrix: npt.NDArray = augmented_matrix[
-            self.species.number_elements :, matrix1.shape[1] :
+            self.species.number_elements() :, matrix1.shape[1] :
         ]
-        logger.debug("Reduced_matrix1 = \n%s", reduced_matrix1)
-        logger.debug("Reaction_matrix = \n%s", reaction_matrix)
+        logger.debug("reduced_matrix1 = \n%s", reduced_matrix1)
+        logger.debug("reaction_matrix = \n%s", reaction_matrix)
 
         return reaction_matrix
 
@@ -254,17 +259,17 @@ class _ReactionNetwork:
 
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
-        if nrows == self.species.number:
+        if nrows == self.species.number_species():
             msg: str = "The necessary number of constraints will be applied to "
             msg += "the reaction network to solve the system"
             logger.debug(msg)
         else:
-            num: int = self.species.number - nrows
+            num: int = self.species.number_species() - nrows
             logger.debug(
                 "%d additional (mass) constraint(s) are necessary to solve the system", num
             )
 
-        coeff: npt.NDArray = np.zeros((nrows, self.species.number))
+        coeff: npt.NDArray = np.zeros((nrows, self.species.number_species()))
         if self.reaction_matrix is not None:
             coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
@@ -290,14 +295,14 @@ class _ReactionNetwork:
         """Assembles the right-hand side vector of values for the system of equations.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
 
         Returns:
             The right-hand side vector of values
         """
-        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
+        nrows: int = self.number_reactions + constraints.number_reaction_network_constraints
         rhs: npt.NDArray = np.zeros(nrows, dtype=float)
 
         # Reactions
@@ -346,16 +351,35 @@ class _ReactionNetwork:
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
-        for index, gas_species in self.species.gas_species.items():
+        for gas_species in self.species.gas_species:
             fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
-            fugacity_coefficients[index] = fugacity_coefficient
+            fugacity_coefficients[self.species.find_species(gas_species)] = fugacity_coefficient
 
         log_fugacity_coefficients: npt.NDArray = np.log10(fugacity_coefficients)
-        logger.debug("Fugacity coefficient vector = %s", log_fugacity_coefficients)
+        logger.debug("Log10 fugacity coefficient vector = %s", log_fugacity_coefficients)
 
         return log_fugacity_coefficients
+
+    def get_stability_matrix(self, coefficient_matrix: npt.NDArray) -> npt.NDArray:
+        """Gets the stability matrix used to implement condensate stability
+
+        Args:
+            coefficient_matrix: Coefficient matrix
+
+        Returns:
+            Stability matrix
+        """
+        stability_matrix: npt.NDArray = np.zeros_like(coefficient_matrix)
+        for species in self.species.condensed_species:
+            index: int = self.species.find_species(species)
+            stability_matrix[:, index] = coefficient_matrix[:, index]
+        stability_matrix[: self.number_reactions, :] = 0
+
+        logger.debug("stability_matrix = %s", stability_matrix)
+
+        return stability_matrix
 
     def get_residual(
         self,
@@ -364,7 +388,8 @@ class _ReactionNetwork:
         pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray,
-        log_solution: npt.NDArray,
+        stability_matrix: npt.NDArray,
+        solution: Solution,
     ) -> npt.NDArray:
         """Returns the residual vector of the reaction network.
 
@@ -373,23 +398,28 @@ class _ReactionNetwork:
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix
-            log_solution: Estimated log10 solution to compute the residual for
+            stability_matrix: Stability matrix for condensate stability
+            solution: Solution to compute the residual for
 
         Returns:
             The residual vector of the reaction network
         """
-        rhs: npt.NDArray = self._assemble_right_hand_side_values(
-            temperature=temperature, pressure=pressure, constraints=constraints
-        )
         log_fugacity_coefficients: npt.NDArray = self._assemble_log_fugacity_coefficients(
             temperature=temperature, pressure=pressure
         )
+
+        rhs: npt.NDArray = self._assemble_right_hand_side_values(
+            temperature=temperature, pressure=pressure, constraints=constraints
+        )
+
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(log_solution)
+            + coefficient_matrix.dot(solution.species_array)
+            + stability_matrix.dot(10**solution.lambda_array)
             - rhs
         )
-        logger.debug("Residual_reaction = %s", residual_reaction)
+
+        logger.debug("residual_reaction = %s", residual_reaction)
 
         return residual_reaction
 
@@ -415,7 +445,7 @@ class InteriorAtmosphereSystem:
     _reaction_network: _ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
-    _log_solution: npt.NDArray = field(init=False)
+    _solution: Solution = field(init=False)
     _residual: npt.NDArray = field(init=False)
     _failed_solves: int = 0
 
@@ -425,7 +455,11 @@ class InteriorAtmosphereSystem:
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionConstant(species=self.species)
         self._reaction_network = _ReactionNetwork(species=self.species)
-        self._log_solution = np.zeros_like(self.species, dtype=np.float_)
+
+    @property
+    def solution(self) -> Solution:
+        """The solution"""
+        return self._solution
 
     @property
     def number_of_solves(self) -> int:
@@ -436,35 +470,6 @@ class InteriorAtmosphereSystem:
     def constraints(self) -> SystemConstraints:
         """Constraints"""
         return self._constraints
-
-    @property
-    def log_solution(self) -> npt.NDArray:
-        """The solution.
-
-        For gas species and condensed species the solution is the log10 activity and log10 partial
-        pressure, respectively. Subsequent entries in the solution array relate to the degree of
-        condensation for elements in condensed species, if applicable.
-        """
-        return self._log_solution
-
-    @property
-    def degree_of_condensation_elements(self) -> list[str]:
-        """Elements to solve for the degree of condensation
-
-        The elements for which to calculate the degree of condensation depends on both which
-        elements are in condensed species and which mass constraints are applied.
-        """
-        condensation: list[str] = []
-        for constraint in self.constraints.mass_constraints:
-            if constraint.element in self.species.condensed_elements:
-                condensation.append(constraint.element)
-
-        return condensation
-
-    @property
-    def degree_of_condensation_number(self) -> int:
-        """Number of elements to solve for the degree of condensation"""
-        return len(self.degree_of_condensation_elements)
 
     @property
     def failed_solves(self) -> int:
@@ -478,11 +483,6 @@ class InteriorAtmosphereSystem:
         )
 
         return self._failed_solves
-
-    @property
-    def solution(self) -> npt.NDArray:
-        """Solution"""
-        return 10**self.log_solution
 
     @property
     def residual_dict(self) -> dict[str, float]:
@@ -514,37 +514,39 @@ class InteriorAtmosphereSystem:
         species: GasSpecies,
         element: Optional[str] = None,
     ) -> dict[str, float]:
-        """Calculates the total mass of the species or element in each reservoir
+        """Calculates the mass of the species or one of its elements in each reservoir
 
         Args:
             species: A gas species
-            element: Returns the mass for an element. Defaults to None to return the species mass.
+            element: Compute the mass for an element in the species. Defaults to None to compute
+                the species mass.
 
         Returns:
             Total reservoir masses of the species or element
         """
-        planet: Planet = self.planet
-        pressure: float = self.solution_dict()[species.name]
-        fugacity: float = self.fugacities_dict[species.hill_formula]
+        pressure: float = self._solution.gas_pressures[species]
+        fugacity: float = self._solution.gas_fugacities[species]
 
         # Atmosphere
-        mass_in_atmosphere: float = UnitConversion.bar_to_Pa(pressure) / planet.surface_gravity
+        mass_in_atmosphere: float = (
+            UnitConversion.bar_to_Pa(pressure) / self.planet.surface_gravity
+        )
         mass_in_atmosphere *= (
-            planet.surface_area * species.molar_mass / self.atmospheric_mean_molar_mass
+            self.planet.surface_area * species.molar_mass / self.atmospheric_mean_molar_mass
         )
 
         # Melt
         ppmw_in_melt: float = species.solubility.concentration(
             fugacity=fugacity,
-            temperature=planet.surface_temperature,
+            temperature=self.planet.surface_temperature,
             pressure=self.total_pressure,
-            **self.fugacities_dict,
+            **self._solution.gas_fugacities_by_hill_formula,
         )
         mass_in_melt: float = (
             self.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
         )
 
-        # Solid
+        # Trapped in the solid mantle
         ppmw_in_solid: float = ppmw_in_melt * species.solid_melt_distribution_coefficient
         mass_in_solid: float = (
             self.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
@@ -553,7 +555,7 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = {
             "atmosphere": mass_in_atmosphere,
             "melt": mass_in_melt,
-            "solid": mass_in_solid,
+            "solid": mass_in_solid,  # trapped in the solid mantle
         }
 
         if element is not None:
@@ -569,49 +571,6 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    def solution_dict(self) -> dict[str, float]:
-        """Solution for all species in a dictionary
-
-        This is convenient for a quick check of the solution, but in general you will use
-        self.output to return a dictionary of all the data or export the data to Excel or a
-        DataFrame.
-        """
-        output: dict[str, float] = {}
-        # Gas species partial pressures
-        for name, solution in zip(self.species.names, self.solution[: self.species.number]):
-            output[name] = solution
-        # Degree of condensation for elements in condensed species
-        for degree_of_condensation, solution in zip(
-            self.degree_of_condensation_elements, self.solution[self.species.number :]
-        ):
-            key: str = f"degree_of_condensation_{degree_of_condensation}"
-            output[key] = solution / (1 + solution)
-
-        return output
-
-    @property
-    def log10_fugacity_coefficients_dict(self) -> dict[str, float]:
-        """Fugacity coefficients (relevant for gas species only) in a dictionary"""
-        output: dict[str, float] = {
-            str(species.hill_formula): np.log10(
-                species.eos.fugacity_coefficient(
-                    temperature=self.planet.surface_temperature, pressure=self.total_pressure
-                )
-            )
-            for species in self.species.gas_species.values()
-        }
-        return output
-
-    @property
-    def fugacities_dict(self) -> dict[str, float]:
-        """Fugacities of all species in a dictionary."""
-        output: dict[str, float] = {}
-        for key, value in self.log10_fugacity_coefficients_dict.items():
-            # TODO: Not clean to append _g suffix to denote gas phase.
-            output[key] = 10 ** (np.log10(self.solution_dict()[f"{key}_g"]) + value)
-
-        return output
-
     @property
     def total_mass(self) -> float:
         """Total mass."""
@@ -622,60 +581,12 @@ class InteriorAtmosphereSystem:
     @property
     def total_pressure(self) -> float:
         """Total pressure."""
-        indices: list[int] = list(self.species.gas_species.keys())
-
-        return sum(float(self.solution[index]) for index in indices)
+        return self._solution.total_pressure
 
     @property
     def atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere."""
-        mu_atmosphere: float = 0
-        for index, species in self.species.gas_species.items():
-            mu_atmosphere += species.molar_mass * self.solution[index]
-        mu_atmosphere /= self.total_pressure
-
-        return mu_atmosphere
-
-    def isclose(
-        self, target_dict: dict[str, float], rtol: float = 1.0e-5, atol: float = 1.0e-8
-    ) -> np.bool_:
-        """Determines if the solution pressures are close to target values within a tolerance.
-
-        Args:
-            target_dict: Dictionary of the target values
-            rtol: Relative tolerance
-            atol: Absolute tolerance
-
-        Returns:
-            True if the solution is close to the target, otherwise False
-        """
-
-        if len((self.solution_dict())) != len(target_dict):
-            return np.bool_(False)
-
-        target_values: list = list(dict(sorted(target_dict.items())).values())
-        solution_values: list = list(dict(sorted(self.solution_dict().items())).values())
-        isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
-
-        return isclose
-
-    def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
-        """Writes a log message with the tightest tolerance that is satisfied.
-
-        Args:
-            target_dict: Dictionary of the target values
-            message: Message prefix to write to the logger when a tolerance is satisfied
-
-        Returns:
-            The tightest tolerance satisfied
-        """
-        for log_tolerance in (-6, -5, -4, -3, -2, -1):
-            tol: float = 10**log_tolerance
-            if self.isclose(target_dict, rtol=tol, atol=tol):
-                logger.info("%s (tol = %f)".lstrip(), message, tol)
-                return tol
-
-        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
+        return self._solution.gas_molar_mass
 
     def solve(
         self,
@@ -709,11 +620,7 @@ class InteriorAtmosphereSystem:
         logger.info("Solving system number %d", self.number_of_solves)
 
         self._constraints = constraints
-
-        if self.degree_of_condensation_number > 0:
-            logger.info("Solving for condensed species and mass constraints")
-            logger.info("Reducing max_attempts to 1")
-            max_attempts = 1
+        self._solution = Solution(self.species, self.constraints, self.planet.surface_temperature)
 
         if initial_solution is None:
             initial_solution = self.initial_solution
@@ -722,6 +629,10 @@ class InteriorAtmosphereSystem:
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
+        stability_matrix: npt.NDArray = self._reaction_network.get_stability_matrix(
+            coefficient_matrix
+        )
+
         # The only constraints that require pressure are the fugacity constraints, so for the
         # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
         # ensure the initial solution is bounded.
@@ -729,7 +640,8 @@ class InteriorAtmosphereSystem:
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
-            degree_of_condensation_number=self.degree_of_condensation_number,
+            degree_of_condensation_number=self._solution.number_condensed_elements,
+            number_of_condensed_species=self.species.number_condensed_species,
         )
 
         for attempt in range(max_attempts):
@@ -739,7 +651,7 @@ class InteriorAtmosphereSystem:
                 sol = root(
                     self._objective_func,
                     log_solution,
-                    args=(coefficient_matrix,),
+                    args=(coefficient_matrix, stability_matrix),
                     method=method,
                     tol=tol,
                     options=options,
@@ -767,7 +679,7 @@ class InteriorAtmosphereSystem:
                 self._residual = sol.fun
                 self.output.add(self, extra_output)
                 initial_solution.update(self.output)
-                logger.info(pprint.pformat(self.solution_dict()))
+                logger.info(pprint.pformat(self._solution.solution_dict()))
                 break
             else:
                 logger.warning("The solver failed.")
@@ -776,7 +688,8 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        degree_of_condensation_number=self.degree_of_condensation_number,
+                        degree_of_condensation_number=self._solution.number_condensed_elements,
+                        number_of_condensed_species=self.species.number_condensed_species,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )
@@ -784,7 +697,7 @@ class InteriorAtmosphereSystem:
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
             self._failed_solves += 1
-            if self.degree_of_condensation_number > 0:
+            if self._solution.number_condensed_elements > 0:
                 logger.info("Probably no solution for condensed species and imposed constraints")
                 logger.info("Remove some condensed species and try again")
 
@@ -801,22 +714,21 @@ class InteriorAtmosphereSystem:
         self,
         log_solution: npt.NDArray,
         coefficient_matrix: npt.NDArray,
+        stability_matrix: npt.NDArray,
     ) -> npt.NDArray:
         """Objective function for the non-linear system.
 
         Args:
             log_solution: Log10 of the activities and pressures of each species
             coefficient_matrix: Coefficient matrix
+            stability_matrix: Stability matrix for condensate stability
 
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
         """
 
-        # This must be set here
-        self._log_solution = log_solution
-
-        # Exclude the degree of condensation for the reaction network
-        log_solution_reaction: npt.NDArray = log_solution[: self.species.number]
+        # This must be set here.
+        self._solution.data = log_solution
 
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
@@ -824,8 +736,22 @@ class InteriorAtmosphereSystem:
             pressure=self.total_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
-            log_solution=log_solution_reaction,
+            stability_matrix=stability_matrix,
+            solution=self._solution,
         )
+
+        residual_stability: npt.NDArray = np.zeros(
+            self.species.number_condensed_species, dtype=np.float_
+        )
+        for nn, species in enumerate(self.species.condensed_species):
+            residual_stability[nn] = self.solution._lambda_solution[species] - log10_TAU
+            for element in species.elements:
+                try:
+                    residual_stability += self.solution._beta_solution[element]
+                except KeyError:
+                    pass
+
+        logger.debug("residual_stability = %s", residual_stability)
 
         # Compute residual for the mass balance (if relevant).
         residual_mass: npt.NDArray = np.zeros(
@@ -836,7 +762,7 @@ class InteriorAtmosphereSystem:
         # Hence constraint.species is an element.
         for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
             # Gas species
-            for species in self.species.gas_species.values():
+            for species in self.species.gas_species:
                 residual_mass[constraint_index] += sum(
                     self.mass(
                         species=species,
@@ -847,16 +773,16 @@ class InteriorAtmosphereSystem:
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
             # Condensed species
-            for nn, condensed_element in enumerate(self.degree_of_condensation_elements):
+            for condensed_element in self._solution.condensed_elements:
                 if condensed_element == mass_constraint.element:
                     residual_mass[constraint_index] += np.log10(
-                        self.solution[self.species.number + nn] + 1
+                        10 ** self._solution._beta_solution[condensed_element] + 1
                     )
 
             # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= mass_constraint.get_log10_value()
 
-        logger.debug("Residual_mass = %s", residual_mass)
+        logger.debug("residual_mass = %s", residual_mass)
 
         # Compute residual for the total pressure (if relevant).
         residual_total_pressure: npt.NDArray = np.zeros(
@@ -874,8 +800,8 @@ class InteriorAtmosphereSystem:
 
         # Combined residual
         residual: npt.NDArray = np.concatenate(
-            (residual_reaction, residual_mass, residual_total_pressure)
+            (residual_reaction, residual_stability, residual_mass, residual_total_pressure)
         )
-        logger.debug("Residual = %s", residual)
+        logger.debug("residual = %s", residual)
 
         return residual
