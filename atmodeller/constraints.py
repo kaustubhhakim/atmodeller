@@ -410,9 +410,6 @@ class TotalPressureConstraint(ConstraintProtocol):
 class SystemConstraints(UserList):
     """A collection of constraints
 
-    It provides methods to filter constraints based on their types, such as activity, fugacity,
-    mass, pressure, and reaction network constraints.
-
     Args:
         initlist: Initial list of constraints. Defaults to None.
     """
@@ -457,7 +454,7 @@ class SystemConstraints(UserList):
             pressure: Pressure in bar
 
         Returns:
-            A dictionary of the evaluated constraints (same order as the constraints list)
+            A dictionary of the evaluated constraints in the same order as the constraints
         """
         evaluated_constraints: dict[str, float] = {}
         for constraint in self.data:
@@ -476,7 +473,7 @@ class SystemConstraints(UserList):
             pressure: Pressure in bar
 
         Returns:
-            A dictionary of the log10 evaluated constraints (same order as the constraints list)
+            A dictionary of the log10 evaluated constraints in the same order as the constraints
         """
         return {
             key: np.log10(value) for key, value in self.evaluate(temperature, pressure).items()

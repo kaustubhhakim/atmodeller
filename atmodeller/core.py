@@ -491,18 +491,11 @@ class Solution:
         return {key.hill_formula: value for key, value in self.gas_fugacities.items()}
 
     @property
-    def modified_activities(self) -> dict[CondensedSpecies, float]:
-        """Modified activities"""
-        return {
-            species: self._species_solution[species] for species in self._species.condensed_species
-        }
-
-    @property
     def log10_activities(self) -> dict[CondensedSpecies, float]:
         """Log10 activities"""
         activities: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
-            activities[species] = self.modified_activities[species]
+            activities[species] = self._species_solution[species]
 
         return activities
 
