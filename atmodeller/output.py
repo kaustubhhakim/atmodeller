@@ -335,6 +335,7 @@ class Output(UserDict):
                 mass=element_mass["melt"],
                 reservoir_mass=interior_atmosphere.planet.mantle_melt_mass,
             )
+            # Trapped in the solid mantle
             solid: ReservoirOutput = ReservoirOutput(
                 molar_mass=molar_mass,
                 mass=element_mass["solid"],

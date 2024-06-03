@@ -546,7 +546,7 @@ class InteriorAtmosphereSystem:
             self.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
         )
 
-        # Solid
+        # Trapped in the solid mantle
         ppmw_in_solid: float = ppmw_in_melt * species.solid_melt_distribution_coefficient
         mass_in_solid: float = (
             self.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
@@ -555,7 +555,7 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = {
             "atmosphere": mass_in_atmosphere,
             "melt": mass_in_melt,
-            "solid": mass_in_solid,
+            "solid": mass_in_solid,  # trapped in the solid mantle
         }
 
         if element is not None:
@@ -744,10 +744,10 @@ class InteriorAtmosphereSystem:
             self.species.number_condensed_species, dtype=np.float_
         )
         for nn, species in enumerate(self.species.condensed_species):
-            residual_stability[nn] = self._solution._lambda_solution[species] - log10_TAU
+            residual_stability[nn] = self.solution._lambda_solution[species] - log10_TAU
             for element in species.elements:
                 try:
-                    residual_stability += self._solution._beta_solution[element]
+                    residual_stability += self.solution._beta_solution[element]
                 except KeyError:
                     pass
 

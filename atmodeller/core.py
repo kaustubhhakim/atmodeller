@@ -53,8 +53,8 @@ class GasSpecies(ChemicalSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-        solid_melt_distribution_coefficient: Distribution coefficient between solid and melt.
-            Defaults to 0.
+        solid_melt_distribution_coefficient: Distribution coefficient between the gas trapped in
+            solids and melt. Defaults to 0.
         solubility: Solubility model. Defaults to no solubility
         eos: A gas equation of state. Defaults to an ideal gas.
 
@@ -84,7 +84,7 @@ class GasSpecies(ChemicalSpecies):
 
     @property
     def solid_melt_distribution_coefficient(self) -> float:
-        """Distribution coefficient between solid and melt"""
+        """Distribution coefficient between the gas trapped in solids and melt"""
         return self._solid_melt_distribution_coefficient
 
 
