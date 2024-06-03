@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import pprint
 import sys
@@ -44,7 +45,7 @@ from atmodeller.utilities import UnitConversion, dataclass_to_logger
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
-    from typing import overrides
+    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -384,10 +385,8 @@ class ReactionNetwork:
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix
-            stability_matrix: Stability matrix for condensate stability
             solution: Solution to compute the residual for
-            **kwargs: Catches additional keyword arguments used by child classes, but not used by
-                this base class.
+            **kwargs: Catches additional keyword arguments used by child classes
 
         Returns:
             The residual vector of the reaction network
@@ -424,36 +423,49 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         reaction_matrix: The reaction stoichiometry matrix
     """
 
-    def get_stability_matrix(
+    def get_activity_modifier(
         self, *, constraints: SystemConstraints, solution: Solution
     ) -> npt.NDArray:
-        """Gets the condensate stability matrix
+        """Gets the activity modifier matrix for condensate stability
 
         Args:
             constraints: Constraints
             solution: Solution
 
         Returns:
-            Stability matrix
+            Activity modifier matrix
         """
-        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
-        stability: npt.NDArray = np.zeros((nrows, self.species.number_species()))
+        coefficient_matrix: npt.NDArray = self.get_coefficient_matrix(constraints=constraints)
+        activity_modifier: npt.NDArray = np.zeros_like(coefficient_matrix)
+        for species in solution.condensed_species_to_solve:
+            index: int = self.species.find_species(species)
+            activity_modifier[:, index] = coefficient_matrix[:, index]
 
-        for index, constraint in enumerate(constraints.reaction_network_constraints):
-            row_index: int = self.number_reactions + index
-            species_index: int = self.species.find_species(constraint.species)
-            if constraint.species in solution.condensed_species_to_solve:
-                logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
-                logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
-                value: int = 1
-            else:
-                value = 0
+        logger.debug("activity_modifier = %s", activity_modifier)
 
-            stability[row_index, species_index] = value
+        return activity_modifier
 
-        logger.debug("stability = %s", stability)
+    def get_equilibrium_modifier(
+        self, *, constraints: SystemConstraints, solution: Solution
+    ) -> npt.NDArray:
+        """Gets the equilibrium constant modifier matrix for condensate stability
 
-        return stability
+        Args:
+            constraints: Constraints
+            solution: Solution
+
+        Returns:
+            Equilibrium constant modifier matrix
+        """
+        activity_modifier: npt.NDArray = self.get_activity_modifier(
+            constraints=constraints, solution=solution
+        )
+        equilibrium_modifier: npt.NDArray = copy.deepcopy(activity_modifier)
+        equilibrium_modifier[self.number_reactions :, :] = 0
+
+        logger.debug("equilibrium_modifier = %s", equilibrium_modifier)
+
+        return equilibrium_modifier
 
     def get_stability_residual(self, solution: Solution) -> npt.NDArray:
         """Returns the residual vector of condensate stability
@@ -491,7 +503,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray,
         solution: Solution,
-        stability_matrix: npt.NDArray,
+        activity_modifier: npt.NDArray,
+        equilibrium_modifier: npt.NDArray,
     ) -> npt.NDArray:
 
         # Residual of the reaction network without a stability consideration
@@ -503,8 +516,9 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             solution=solution,
         )
 
-        # Reaction network correction factor for condensate stability
-        residual_reaction += stability_matrix.dot(10**solution.lambda_array)
+        # Reaction network correction factors for condensate stability
+        residual_reaction += activity_modifier.dot(10**solution.lambda_array)
+        residual_reaction -= equilibrium_modifier.dot(10**solution.lambda_array)
 
         # Residual for the auxiliary stability equations
         residual_stability: npt.NDArray = self.get_stability_residual(solution)
@@ -717,12 +731,14 @@ class InteriorAtmosphereSystem:
             initial_solution = self.initial_solution
         assert initial_solution is not None
 
-        # These matrices depend on the constraints, but can be computed once for any given
-        # solve
+        # These matrices depend on the constraints, but can be computed once for any given solve
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
-        stability_matrix: npt.NDArray = self._reaction_network.get_stability_matrix(
+        activity_modifier: npt.NDArray = self._reaction_network.get_activity_modifier(
+            constraints=constraints, solution=self._solution
+        )
+        equilibrium_modifier: npt.NDArray = self._reaction_network.get_equilibrium_modifier(
             constraints=constraints, solution=self._solution
         )
 
@@ -744,7 +760,11 @@ class InteriorAtmosphereSystem:
                 sol = root(
                     self._objective_func,
                     log_solution,
-                    args=(coefficient_matrix, stability_matrix),
+                    args=(
+                        coefficient_matrix,
+                        activity_modifier,
+                        equilibrium_modifier,
+                    ),
                     method=method,
                     tol=tol,
                     options=options,
@@ -807,14 +827,16 @@ class InteriorAtmosphereSystem:
         self,
         log_solution: npt.NDArray,
         coefficient_matrix: npt.NDArray,
-        stability_matrix: npt.NDArray,
+        activity_modifier: npt.NDArray,
+        equilibrium_modifier: npt.NDArray,
     ) -> npt.NDArray:
         """Objective function for the non-linear system.
 
         Args:
             log_solution: Log10 of the activities and pressures of each species
             coefficient_matrix: Coefficient matrix
-            stability_matrix: Stability matrix for condensates
+            activity_modifier: Activity modifier matrix for condensate stability
+            equilibrium_modifier: Equilibrium modifier matrix for condensate stability
 
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
@@ -829,7 +851,8 @@ class InteriorAtmosphereSystem:
             pressure=self.total_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
-            stability_matrix=stability_matrix,
+            activity_modifier=activity_modifier,
+            equilibrium_modifier=equilibrium_modifier,
             solution=self._solution,
         )
 
