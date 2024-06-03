@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import pprint
+import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -34,11 +35,17 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.core import GasSpecies, Solution, Species
 from atmodeller.initial_solution import InitialSolutionConstant
 from atmodeller.interfaces import (
+    CondensedSpecies,
     InitialSolutionProtocol,
     TotalPressureConstraintProtocol,
 )
 from atmodeller.output import Output
 from atmodeller.utilities import UnitConversion, dataclass_to_logger
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import overrides
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -98,7 +105,7 @@ class Planet:
         dataclass_to_logger(self, logger)
 
 
-class _ReactionNetwork:
+class ReactionNetwork:
     """Determines the reactions to solve a chemical network.
 
     Args:
@@ -106,7 +113,6 @@ class _ReactionNetwork:
 
     Attributes:
         species: Species
-        species_matrix: The stoichiometry matrix of the species in terms of elements
         reaction_matrix: The reaction stoichiometry matrix
     """
 
@@ -128,14 +134,14 @@ class _ReactionNetwork:
     def _partial_gaussian_elimination(self) -> npt.NDArray | None:
         """Performs a partial gaussian elimination to determine the required reactions.
 
-        A copy of `self.species_matrix` is first (partially) reduced to row echelon form by
+        The species composition matrix is first (partially) reduced to row echelon form by
         forward elimination, and then subsequently (partially) reduced to reduced row echelon form
         by backward substitution. Applying the same operations to the identity matrix (as part of
         the augmented matrix) reveals r reactions, where r = number of species - number of
         elements. These reactions are given in the last r rows of the reduced matrix.
 
         Returns:
-            A matrix of the reaction stoichiometry.
+            A matrix of the reaction stoichiometry
         """
         if self.species.number_species() == 1:
             logger.debug("Only one species therefore no reactions")
@@ -248,7 +254,7 @@ class _ReactionNetwork:
         return gibbs_energy
 
     def get_coefficient_matrix(self, *, constraints: SystemConstraints) -> npt.NDArray:
-        """Builds the coefficient matrix.
+        """Gets the coefficient matrix.
 
         Args:
             constraints: Constraints for the system of equations
@@ -280,8 +286,8 @@ class _ReactionNetwork:
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
-        logger.debug("Species = %s", self.species.names)
-        logger.debug("Coefficient matrix = \n%s", coeff)
+        logger.debug("species = %s", self.species.names)
+        logger.debug("coefficient matrix = \n%s", coeff)
 
         return coeff
 
@@ -362,25 +368,6 @@ class _ReactionNetwork:
 
         return log_fugacity_coefficients
 
-    def get_stability_matrix(self, coefficient_matrix: npt.NDArray) -> npt.NDArray:
-        """Gets the stability matrix used to implement condensate stability
-
-        Args:
-            coefficient_matrix: Coefficient matrix
-
-        Returns:
-            Stability matrix
-        """
-        stability_matrix: npt.NDArray = np.zeros_like(coefficient_matrix)
-        for species in self.species.condensed_species:
-            index: int = self.species.find_species(species)
-            stability_matrix[:, index] = coefficient_matrix[:, index]
-        stability_matrix[: self.number_reactions, :] = 0
-
-        logger.debug("stability_matrix = %s", stability_matrix)
-
-        return stability_matrix
-
     def get_residual(
         self,
         *,
@@ -388,7 +375,6 @@ class _ReactionNetwork:
         pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray,
-        stability_matrix: npt.NDArray,
         solution: Solution,
     ) -> npt.NDArray:
         """Returns the residual vector of the reaction network.
@@ -418,12 +404,113 @@ class _ReactionNetwork:
             - rhs
         )
 
-        if solution.number_condensed_species_to_solve:
-            residual_reaction += stability_matrix.dot(10**solution.lambda_array)
-
         logger.debug("residual_reaction = %s", residual_reaction)
 
         return residual_reaction
+
+
+class ReactionNetworkWithCondensateStability(ReactionNetwork):
+    """A reaction network with condensate stability
+
+    This automatically determines condensate stability using the extended law of mass-action
+    (xLMA) equations :cite:p:`LKS17`. Also see :cite:p:`KSP42`.
+
+    Args:
+        species: Species
+
+    Attributes:
+        species: Species
+        reaction_matrix: The reaction stoichiometry matrix
+    """
+
+    def get_stability_matrix(
+        self, *, constraints: SystemConstraints, solution: Solution
+    ) -> npt.NDArray:
+        """Gets the condensate stability matrix
+
+        Args:
+            constraints: Constraints
+            solution: Solution
+
+        Returns:
+            Stability matrix
+        """
+        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
+        stability: npt.NDArray = np.zeros((nrows, self.species.number_species()))
+
+        if solution.number_condensed_elements_to_solve:
+            for index, constraint in enumerate(constraints.reaction_network_constraints):
+                if isinstance(constraint.species, CondensedSpecies):
+                    logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
+                    row_index: int = self.number_reactions + index
+                    species_index = self.species.find_species(constraint.species)
+                    logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
+                    stability[row_index, species_index] = 1
+
+        logger.debug("stability = %s", stability)
+
+        return stability
+
+    def get_stability_residual(self, solution: Solution) -> npt.NDArray:
+        """Returns the residual vector of condensate stability
+
+        Args:
+            solution: Solution to compute the residual for
+
+        Returns:
+            The residual vector of condensate stability
+        """
+        residual_stability: npt.NDArray = np.zeros(
+            solution.number_condensed_species_to_solve, dtype=np.float_
+        )
+        for nn, species in enumerate(solution.condensed_species_to_solve):
+            residual_stability[nn] = solution._lambda_solution[species] - log10_TAU
+            # The xLMA usually uses the condensate number density or similar, but it's simpler to
+            # satisfy the auxiliary equations using the condensed mass of elements in the
+            # condensate.
+            for element in species.elements:
+                try:
+                    residual_stability += solution._beta_solution[element]
+                except KeyError:
+                    pass
+
+        logger.debug("residual_stability = %s", residual_stability)
+
+        return residual_stability
+
+    @override
+    def get_residual(
+        self,
+        *,
+        temperature: float,
+        pressure: float,
+        constraints: SystemConstraints,
+        coefficient_matrix: npt.NDArray,
+        solution: Solution,
+    ) -> npt.NDArray:
+
+        residual_reaction: npt.NDArray = super().get_residual(
+            temperature=temperature,
+            pressure=pressure,
+            constraints=constraints,
+            coefficient_matrix=coefficient_matrix,
+            solution=solution,
+        )
+
+        stability: npt.NDArray = self.get_stability_matrix(
+            constraints=constraints, solution=solution
+        )
+
+        # Reaction network correction factor for condensate stability
+        residual_reaction += stability.dot(10**solution.lambda_array)
+
+        # Residual for the auxiliary stability equations
+        residual_stability: npt.NDArray = self.get_stability_residual(solution)
+
+        residual: npt.NDArray = np.concatenate((residual_reaction, residual_stability))
+        logger.debug("residual_reaction = %s", residual_reaction)
+
+        return residual
 
 
 @dataclass(kw_only=True)
@@ -444,7 +531,7 @@ class InteriorAtmosphereSystem:
     """Initial solution"""
     output: Output = field(init=False, default_factory=Output)
     """Output data"""
-    _reaction_network: _ReactionNetwork = field(init=False)
+    _reaction_network: ReactionNetwork = field(init=False)
     # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
     _solution: Solution = field(init=False)
@@ -456,7 +543,7 @@ class InteriorAtmosphereSystem:
         self.species.conform_solubilities_to_composition(self.planet.melt_composition)
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionConstant(species=self.species)
-        self._reaction_network = _ReactionNetwork(species=self.species)
+        self._reaction_network = ReactionNetworkWithCondensateStability(species=self.species)
 
     @property
     def solution(self) -> Solution:
@@ -631,9 +718,6 @@ class InteriorAtmosphereSystem:
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
             constraints=self.constraints
         )
-        stability_matrix: npt.NDArray = self._reaction_network.get_stability_matrix(
-            coefficient_matrix
-        )
 
         # The only constraints that require pressure are the fugacity constraints, so for the
         # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
@@ -653,7 +737,7 @@ class InteriorAtmosphereSystem:
                 sol = root(
                     self._objective_func,
                     log_solution,
-                    args=(coefficient_matrix, stability_matrix),
+                    args=(coefficient_matrix),
                     method=method,
                     tol=tol,
                     options=options,
@@ -716,7 +800,6 @@ class InteriorAtmosphereSystem:
         self,
         log_solution: npt.NDArray,
         coefficient_matrix: npt.NDArray,
-        stability_matrix: npt.NDArray,
     ) -> npt.NDArray:
         """Objective function for the non-linear system.
 
@@ -738,22 +821,8 @@ class InteriorAtmosphereSystem:
             pressure=self.total_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
-            stability_matrix=stability_matrix,
             solution=self._solution,
         )
-
-        residual_stability: npt.NDArray = np.zeros(
-            self.solution.number_condensed_species_to_solve, dtype=np.float_
-        )
-        for nn, species in enumerate(self.solution.condensed_species_to_solve):
-            residual_stability[nn] = self.solution._lambda_solution[species] - log10_TAU
-            for element in species.elements:
-                try:
-                    residual_stability += self.solution._beta_solution[element]
-                except KeyError:
-                    pass
-
-        logger.debug("residual_stability = %s", residual_stability)
 
         # Compute residual for the mass balance (if relevant).
         residual_mass: npt.NDArray = np.zeros(
@@ -802,7 +871,7 @@ class InteriorAtmosphereSystem:
 
         # Combined residual
         residual: npt.NDArray = np.concatenate(
-            (residual_reaction, residual_stability, residual_mass, residual_total_pressure)
+            (residual_reaction, residual_mass, residual_total_pressure)
         )
         logger.debug("residual = %s", residual)
 

@@ -299,8 +299,9 @@ class Solution:
     """The solution
 
     Stores and updates the solution and assembles the appropriate vectors to solve the coupled
-    reaction network and mass balance system. All quantities must be positive so log10 is used. The
-    ordering of the solution vector must be maintained for consistency and is organised as follows:
+    reaction network and mass balance system. Importantly, the solution quantities depend on the
+    applied constraints. All quantities must be positive so log10 is used. The ordering of the
+    solution vector must be maintained for consistency and is organised as follows:
 
     1. Species fugacities and activities, ordered according to the input species list
 

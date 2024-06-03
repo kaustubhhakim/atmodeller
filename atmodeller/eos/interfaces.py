@@ -1007,7 +1007,7 @@ class CombinedEOSModel(RealGas):
             return self.models[0].volume_integral(temperature, pressure)
 
         elif index > 0 and index <= len(self.models):
-            logger.debug("Performing pressure integration")
+            # logger.debug("Performing pressure integration")
             volume = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
             for i in range(1, index):
                 dvolume = self.models[i].volume_integral(
