@@ -343,7 +343,7 @@ class Output(UserDict):
             )
             # Add contribution from condensation for the elements
             # TODO: Only robust for a single condensed element
-            if element in interior_atmosphere._solution.condensed_elements:
+            if element in interior_atmosphere._solution.condensed_elements_to_solve:
                 degree_of_condensation: float = interior_atmosphere._solution.solution_dict()[
                     f"degree_of_condensation_{element}"
                 ]
@@ -351,8 +351,8 @@ class Output(UserDict):
             elif (
                 element == "O"
                 # TODO: Add condition to check for H2O and only H2O with O?
-                and "O" not in interior_atmosphere._solution.condensed_elements
-                and "H" in interior_atmosphere._solution.condensed_elements
+                and "O" not in interior_atmosphere._solution.condensed_elements_to_solve
+                and "H" in interior_atmosphere._solution.condensed_elements_to_solve
                 # Below assume only C and H2O can exist as condensed. Ugly.
                 and interior_atmosphere.species.number_condensed_species <= 2
             ):

@@ -327,9 +327,45 @@ class Solution:
         """Number of solution quantities"""
         return (
             self._species.number_species()
-            + self.number_condensed_elements
-            + self._species.number_condensed_species
+            + self.number_condensed_elements_to_solve
+            + self.number_condensed_species_to_solve
         )
+
+    @property
+    def condensed_elements_to_solve(self) -> list[str]:
+        """Elements in condensed species that should adhere to mass balance
+
+        The elements for which to calculate the degree of condensation depends on both which
+        elements are in condensed species and which mass constraints are applied.
+        """
+        condensation: list[str] = []
+        for constraint in self._constraints.mass_constraints:
+            if constraint.element in self._species.elements_in_condensed_species:
+                condensation.append(constraint.element)
+
+        return condensation
+
+    @property
+    def number_condensed_elements_to_solve(self) -> int:
+        """Number of elements in condensed species to solve for mass balance"""
+        return len(self.condensed_elements_to_solve)
+
+    @property
+    def condensed_species_to_solve(self) -> list[CondensedSpecies]:
+        """Condensed species to solve for stability requires they participate in mass balance"""
+        condensed_species: list[CondensedSpecies] = []
+        for species in self._species.condensed_species:
+            for constraint in self._constraints.mass_constraints:
+                if constraint.element in species.composition():
+                    condensed_species.append(species)
+                    break
+
+        return condensed_species
+
+    @property
+    def number_condensed_species_to_solve(self) -> int:
+        """Number of condensed species to solve for stability"""
+        return len(self.condensed_species_to_solve)
 
     @property
     def data(self) -> npt.NDArray:
@@ -340,10 +376,10 @@ class Solution:
         for species_index, species in enumerate(self._species):
             data[start_index + species_index] = self._species_solution[species]
         start_index += species_index + 1
-        for beta_index, element in enumerate(self.condensed_elements):
+        for beta_index, element in enumerate(self.condensed_elements_to_solve):
             data[start_index + beta_index] = self._beta_solution[element]
         start_index += beta_index + 1
-        for lambda_index, species in enumerate(self._species.condensed_species):
+        for lambda_index, species in enumerate(self.condensed_species_to_solve):
             data[start_index + lambda_index] = self._lambda_solution[species]
 
         return data
@@ -363,10 +399,10 @@ class Solution:
         for species_index, species in enumerate(self._species):
             self._species_solution[species] = value[start_index + species_index]
         start_index += species_index + 1
-        for beta_index, element in enumerate(self.condensed_elements):
+        for beta_index, element in enumerate(self.condensed_elements_to_solve):
             self._beta_solution[element] = value[start_index + beta_index]
         start_index += beta_index + 1
-        for lambda_index, species in enumerate(self._species.condensed_species):
+        for lambda_index, species in enumerate(self.condensed_species_to_solve):
             self._lambda_solution[species] = value[start_index + lambda_index]
 
     @property
@@ -381,9 +417,13 @@ class Solution:
     @property
     def lambda_array(self) -> npt.NDArray:
         lambda_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
-        for species in self._species.condensed_species:
+        for species in self.condensed_species_to_solve:
             index: int = self._species.find_species(species)
             lambda_array[index] = self._lambda_solution[species]
+
+        # FIXME: For no condensed species this returns a zero vector, but then the 10** is later
+        # raised
+        logger.debug("lambda_array = %s", lambda_array)
 
         return lambda_array
 
@@ -476,25 +516,6 @@ class Solution:
         return {
             element: 10**value / (1 + 10**value) for element, value in self._beta_solution.items()
         }
-
-    @property
-    def number_condensed_elements(self) -> int:
-        """Number of elements that are present in a condensed species"""
-        return len(self.condensed_elements)
-
-    @property
-    def condensed_elements(self) -> list[str]:
-        """Elements in condensed species that should adhere to mass balance
-
-        The elements for which to calculate the degree of condensation depends on both which
-        elements are in condensed species and which mass constraints are applied.
-        """
-        condensation: list[str] = []
-        for constraint in self._constraints.mass_constraints:
-            if constraint.element in self._species.elements_in_condensed_species:
-                condensation.append(constraint.element)
-
-        return condensation
 
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""

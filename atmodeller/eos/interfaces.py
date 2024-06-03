@@ -723,7 +723,7 @@ class MRKCriticalBehaviour(RealGas):
                 pressure,
                 Psat,
             )
-            logger.debug("Gas phase")
+            # logger.debug("Gas phase")
             volume_integral = self.mrk_gas.volume_integral(temperature, pressure)
 
         elif temperature <= self.Ta and pressure > Psat:
@@ -734,13 +734,13 @@ class MRKCriticalBehaviour(RealGas):
                 pressure,
                 Psat,
             )
-            logger.debug("Performing pressure integration")
+            # logger.debug("Performing pressure integration")
             volume_integral = self.mrk_gas.volume_integral(temperature, Psat)
             volume_integral -= self.mrk_liquid.volume_integral(temperature, Psat)
             volume_integral += self.mrk_liquid.volume_integral(temperature, pressure)
 
         else:
-            logger.debug("Fluid phase")
+            # logger.debug("Fluid phase")
             volume_integral = self.mrk_fluid.volume_integral(temperature, pressure)
 
         return volume_integral

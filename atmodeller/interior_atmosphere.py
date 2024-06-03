@@ -415,9 +415,11 @@ class _ReactionNetwork:
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
             + coefficient_matrix.dot(solution.species_array)
-            + stability_matrix.dot(10**solution.lambda_array)
             - rhs
         )
+
+        if solution.number_condensed_species_to_solve:
+            residual_reaction += stability_matrix.dot(10**solution.lambda_array)
 
         logger.debug("residual_reaction = %s", residual_reaction)
 
@@ -640,8 +642,8 @@ class InteriorAtmosphereSystem:
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
-            degree_of_condensation_number=self._solution.number_condensed_elements,
-            number_of_condensed_species=self.species.number_condensed_species,
+            degree_of_condensation_number=self._solution.number_condensed_elements_to_solve,
+            number_of_condensed_species=self._solution.number_condensed_species_to_solve,
         )
 
         for attempt in range(max_attempts):
@@ -688,8 +690,8 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        degree_of_condensation_number=self._solution.number_condensed_elements,
-                        number_of_condensed_species=self.species.number_condensed_species,
+                        degree_of_condensation_number=self._solution.number_condensed_elements_to_solve,
+                        number_of_condensed_species=self._solution.number_condensed_species_to_solve,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )
@@ -697,7 +699,7 @@ class InteriorAtmosphereSystem:
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
             self._failed_solves += 1
-            if self._solution.number_condensed_elements > 0:
+            if self._solution.number_condensed_elements_to_solve > 0:
                 logger.info("Probably no solution for condensed species and imposed constraints")
                 logger.info("Remove some condensed species and try again")
 
@@ -741,9 +743,9 @@ class InteriorAtmosphereSystem:
         )
 
         residual_stability: npt.NDArray = np.zeros(
-            self.species.number_condensed_species, dtype=np.float_
+            self.solution.number_condensed_species_to_solve, dtype=np.float_
         )
-        for nn, species in enumerate(self.species.condensed_species):
+        for nn, species in enumerate(self.solution.condensed_species_to_solve):
             residual_stability[nn] = self.solution._lambda_solution[species] - log10_TAU
             for element in species.elements:
                 try:
@@ -773,7 +775,7 @@ class InteriorAtmosphereSystem:
             residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
 
             # Condensed species
-            for condensed_element in self._solution.condensed_elements:
+            for condensed_element in self._solution.condensed_elements_to_solve:
                 if condensed_element == mass_constraint.element:
                     residual_mass[constraint_index] += np.log10(
                         10 ** self._solution._beta_solution[condensed_element] + 1

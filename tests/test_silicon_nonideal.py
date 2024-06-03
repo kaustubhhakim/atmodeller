@@ -56,6 +56,47 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
+def test_SiHO_nomass_nosolubility() -> None:
+    """Tests H2-H2O and SiO-SiH4 without solubility."""
+
+    H2_g: GasSpecies = GasSpecies("H2", eos=eos_models["H2"])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    OSi_g: GasSpecies = GasSpecies("OSi")
+    H4Si_g: GasSpecies = GasSpecies("H4Si")
+    SiO2_l: LiquidSpecies = LiquidSpecies("SiO2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, OSi_g, H4Si_g, SiO2_l])
+
+    oceans: float = 50
+    # sih_ratio: float = 1
+    planet: Planet = Planet(surface_temperature=3400)
+    h_kg: float = earth_oceans_to_kg(oceans)
+    # si_kg: float = sih_ratio * h_kg
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-1)),
+            ElementMassConstraint("H", h_kg),
+            ActivityConstraint(SiO2_l, 1),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    target: dict[str, float] = {
+        "H2O_g": 1397.1156389723287,
+        "H2_g": 3643.977131630905,
+        "H4Si_g": 0.0958295345668093,
+        "O2Si_l": 1.0,
+        "O2_g": 0.0029971781267887337,
+        "OSi_g": 48.76758291683035,
+    }
+
+    system.solve(constraints)
+    assert system.solution.isclose(target, rtol=RTOL, atol=ATOL)
+
+
 def test_SiHO_nosolubility() -> None:
     """Tests H2-H2O and SiO-SiH4 without solubility."""
 
