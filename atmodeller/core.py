@@ -422,8 +422,6 @@ class Solution:
             index: int = self._species.find_species(species)
             lambda_array[index] = self._lambda_solution[species]
 
-        # FIXME: For no condensed species this returns a zero vector, but then the 10** is later
-        # raised
         logger.debug("lambda_array = %s", lambda_array)
 
         return lambda_array
