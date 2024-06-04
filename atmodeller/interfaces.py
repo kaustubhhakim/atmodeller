@@ -21,25 +21,18 @@
 from __future__ import annotations
 
 import logging
-import sys
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 from molmass import Composition, Formula
 
-from atmodeller.activity.interfaces import ActivityProtocol, ConstantActivity
 from atmodeller.thermodata.interfaces import (
     ThermodynamicDataForSpeciesProtocol,
     ThermodynamicDataset,
 )
 from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.utilities import UnitConversion
-
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
 
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
@@ -135,25 +128,7 @@ class CondensedSpecies(ChemicalSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-        activity: Activity model. Defaults to unity for a pure component.
     """
-
-    @override
-    def __init__(
-        self,
-        formula: str,
-        phase: str,
-        *,
-        activity: ActivityProtocol = ConstantActivity(),
-        **kwargs,
-    ):
-        super().__init__(formula, phase, **kwargs)
-        self._activity: ActivityProtocol = activity
-
-    @property
-    def activity(self) -> ActivityProtocol:
-        """An activity model"""
-        return self._activity
 
 
 @runtime_checkable
