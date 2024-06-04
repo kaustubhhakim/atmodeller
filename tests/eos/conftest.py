@@ -23,7 +23,9 @@ from atmodeller.eos.interfaces import RealGas
 
 # Tolerances to compare the test results with target output.
 RTOL: float = 1.0e-8
+"""Relative tolerance"""
 ATOL: float = 1.0e-8
+"""Absolute tolerance"""
 
 
 class CheckValues:
@@ -31,42 +33,30 @@ class CheckValues:
 
     @staticmethod
     def compressibility(
-        temperature: float,
-        pressure: float,
-        fugacity_model: RealGas,
-        expected: float,
-        *,
-        rtol=RTOL,
-        atol=ATOL
+        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
     ) -> None:
         """Checks the compressibility parameter
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure
             fugacity_model: Fugacity model
             expected: The expected value
             rtol: Relative tolerance
             atol: Absolute tolerance
         """
-        compressibility: float = fugacity_model.compressibility_parameter(temperature, pressure)
+        compressibility: float = eos.compressibility_parameter(temperature, pressure)
 
         assert compressibility == approx(expected, rtol, atol)
 
     @staticmethod
     def fugacity_coefficient(
-        temperature: float,
-        pressure: float,
-        fugacity_model: RealGas,
-        expected: float,
-        *,
-        rtol=RTOL,
-        atol=ATOL
+        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
     ) -> None:
         """Checks the fugacity coefficient.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure
             fugacity_model: Fugacity model
             expected: The expected value
@@ -74,30 +64,24 @@ class CheckValues:
             atol: Absolute tolerance
         """
 
-        fugacity_coeff: float = fugacity_model.fugacity_coefficient(temperature, pressure)
+        fugacity_coeff: float = eos.fugacity_coefficient(temperature, pressure)
 
         assert fugacity_coeff == approx(expected, rtol, atol)
 
     @staticmethod
     def volume(
-        temperature: float,
-        pressure: float,
-        fugacity_model: RealGas,
-        expected: float,
-        *,
-        rtol=RTOL,
-        atol=ATOL
+        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
     ) -> None:
         """Checks the volume.
 
         Args:
-            temperature: Temperature in kelvin
+            temperature: Temperature in K
             pressure: Pressure
             fugacity_model: Fugacity model
             expected: The expected value
         """
 
-        volume: float = fugacity_model.volume(temperature, pressure)
+        volume: float = eos.volume(temperature, pressure)
 
         assert volume == approx(expected, rtol, atol)
 
