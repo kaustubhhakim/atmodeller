@@ -118,6 +118,9 @@ class ChemicalSpecies:
         """Thermodynamic data for the species"""
         return self._thermodata
 
+    def __str__(self) -> str:
+        return self.name
+
 
 class CondensedSpecies(ChemicalSpecies):
     """A condensed species

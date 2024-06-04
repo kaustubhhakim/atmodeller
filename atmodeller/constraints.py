@@ -26,7 +26,7 @@ from typing import Generic, TypeVar
 
 import numpy as np
 
-from atmodeller.core import GasSpecies
+from atmodeller.core import GasSpecies, Species
 from atmodeller.interfaces import (
     ChemicalSpecies,
     CondensedSpecies,
@@ -418,11 +418,33 @@ class SystemConstraints(UserList):
     data: list[ConstraintProtocol]
     """List of constraints"""
 
-    # TODO: Currently only for element mass constraints, but should be generalised to include
-    # species mass constraints
+    def add_activity_constraints(self, species: Species) -> None:
+        """Adds activity constraints
+
+        These constraints allow condensed phases to either be stable (activity of unity) or
+        unstable (activity less than unity).
+
+        Args:
+            species: Species
+        """
+        for condensed_species in species.condensed_species:
+            if condensed_species not in self.constrained_species:
+                logger.debug("Automatically adding activity constraint for %s", condensed_species)
+                self.append(ActivityConstraint(condensed_species, 1))
+            else:
+                logger.debug("Activity constraint for %s already included", condensed_species)
+
+    @property
+    def constrained_species(self) -> list[ChemicalSpecies]:
+        """Constraints applied to species
+
+        Species constraints are only applied in the context of the reaction network
+        """
+        return [constraint.species for constraint in self.reaction_network_constraints]
+
     @property
     def mass_constraints(self) -> list[ElementMassConstraint]:
-        """Constraints related to mass conservation"""
+        """Constraints related to element mass conservation"""
         return list(filter_by_type(self, ElementMassConstraint).values())
 
     @property

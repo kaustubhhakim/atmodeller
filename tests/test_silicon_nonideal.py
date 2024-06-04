@@ -24,7 +24,6 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    ActivityConstraint,
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
@@ -78,7 +77,6 @@ def test_SiHO_nomass_nosolubility() -> None:
         [
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-1)),
             ElementMassConstraint("H", h_kg),
-            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
@@ -120,7 +118,6 @@ def test_SiHO_nosolubility() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("Si", si_kg),
-            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
@@ -163,7 +160,6 @@ def test_SiHO_solubility() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("Si", si_kg),
-            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
@@ -206,7 +202,6 @@ def test_SiHO_fugacityH2O_nosolubility() -> None:
             FugacityConstraint(H2O_g, 5000),  # Same as partial pressure since H2O is ideal
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("Si", si_kg),
-            ActivityConstraint(SiO2_l, 1),
         ]
     )
 
