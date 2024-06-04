@@ -270,10 +270,12 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         for species in interior_atmosphere.species.condensed_species:
-            activity: float = species.activity.activity(
-                temperature=interior_atmosphere.planet.surface_temperature,
-                pressure=interior_atmosphere.total_pressure,
-            )
+            # FIXME: What about an activity model now
+            # activity: float = species.activity.activity(
+            #    temperature=interior_atmosphere.planet.surface_temperature,
+            #    pressure=interior_atmosphere.total_pressure,
+            # )
+            activity: float = interior_atmosphere.solution.activities[species]
             output = CondensedSpeciesOutput(activity=activity)
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output.asdict())
@@ -343,21 +345,21 @@ class Output(UserDict):
             )
             # Add contribution from condensation for the elements
             # TODO: Only robust for a single condensed element
-            if element in interior_atmosphere._solution.condensed_elements_to_solve:
-                degree_of_condensation: float = interior_atmosphere._solution.solution_dict()[
+            if element in interior_atmosphere.solution.condensed_elements_to_solve:
+                degree_of_condensation: float = interior_atmosphere.solution.solution_dict()[
                     f"degree_of_condensation_{element}"
                 ]
             # TODO: Clean up this clunky exception logic for oxygen
             elif (
                 element == "O"
                 # TODO: Add condition to check for H2O and only H2O with O?
-                and "O" not in interior_atmosphere._solution.condensed_elements_to_solve
-                and "H" in interior_atmosphere._solution.condensed_elements_to_solve
+                and "O" not in interior_atmosphere.solution.condensed_elements_to_solve
+                and "H" in interior_atmosphere.solution.condensed_elements_to_solve
                 # Below assume only C and H2O can exist as condensed. Ugly.
                 and interior_atmosphere.species.number_condensed_species <= 2
             ):
                 logger.warning("Back-computing oxygen in condensed phase (H2O)")
-                degree_of_condensation_H: float = interior_atmosphere._solution.solution_dict()[
+                degree_of_condensation_H: float = interior_atmosphere.solution.solution_dict()[
                     "degree_of_condensation_H"
                 ]
                 # Compute moles of condensed H. Repeats calculation done in SpeciesOutput
@@ -420,9 +422,9 @@ class Output(UserDict):
             atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
 
         for species in interior_atmosphere.species.gas_species:
-            pressure: float = interior_atmosphere._solution.gas_pressures[species]
-            fugacity: float = interior_atmosphere._solution.gas_fugacities[species]
-            fugacity_coefficient: float = interior_atmosphere._solution.fugacity_coefficients[
+            pressure: float = interior_atmosphere.solution.gas_pressures[species]
+            fugacity: float = interior_atmosphere.solution.gas_fugacities[species]
+            fugacity_coefficient: float = interior_atmosphere.solution.fugacity_coefficients[
                 species
             ]
             volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
@@ -470,7 +472,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         data_list: list[dict[str, float]] = self.data.setdefault("solution", [])
-        data_list.append(interior_atmosphere._solution.solution_dict())
+        data_list.append(interior_atmosphere.solution.solution_dict())
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Output as a dictionary of dataframes
