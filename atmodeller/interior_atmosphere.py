@@ -725,6 +725,8 @@ class InteriorAtmosphereSystem:
         logger.info("Solving system number %d", self.number_of_solves)
 
         self._constraints = constraints
+        self._constraints.add_activity_constraints(self.species)
+
         self._solution = Solution(self.species, self.constraints, self.planet.surface_temperature)
 
         if initial_solution is None:

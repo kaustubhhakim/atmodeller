@@ -24,7 +24,6 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    ActivityConstraint,
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
@@ -320,7 +319,6 @@ def test_graphite_condensed(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            ActivityConstraint(C_cr, 1),
         ]
     )
 
@@ -367,7 +365,6 @@ def test_graphite_unstable(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(0.5)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
-            ActivityConstraint(C_cr, 1),
         ]
     )
 
@@ -410,7 +407,6 @@ def test_water_condensed(helper) -> None:
             FugacityConstraint(H2_g, value=7),
             # ElementMassConstraint("O", o_kg),
             ElementMassConstraint("H", h_kg),
-            ActivityConstraint(H2O_l, 1),
         ]
     )
 
@@ -452,8 +448,6 @@ def test_graphite_water_condensed(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             TotalPressureConstraint(10),
-            ActivityConstraint(H2O_l, 1),
-            ActivityConstraint(C_cr, 1),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
         ]
