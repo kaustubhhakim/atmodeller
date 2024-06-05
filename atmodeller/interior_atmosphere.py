@@ -740,11 +740,9 @@ class InteriorAtmosphereSystem:
         # Mass constraints are currently only ever specified in terms of elements. Hence
         # constraint.species is an element.
         for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
-
             residual_mass[constraint_index] = np.log10(
                 sum(self.element_mass(mass_constraint.element).values())
             )
-            # Mass values are constant so no need to pass any arguments to get_value().
             residual_mass[constraint_index] -= mass_constraint.get_log10_value()
 
         logger.debug("residual_mass = %s", residual_mass)
@@ -753,19 +751,19 @@ class InteriorAtmosphereSystem:
 
     @property
     def total_mass(self) -> float:
-        """Total mass."""
+        """Total mass"""
         mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
         mass *= self.planet.surface_area
         return mass
 
     @property
     def total_pressure(self) -> float:
-        """Total pressure."""
+        """Total pressure"""
         return self._solution.total_pressure
 
     @property
     def atmospheric_mean_molar_mass(self) -> float:
-        """Mean molar mass of the atmosphere."""
+        """Mean molar mass of the atmosphere"""
         return self._solution.gas_molar_mass
 
     def solve(
