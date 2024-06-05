@@ -26,9 +26,13 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from molmass import Formula
 
+from atmodeller.core import Solution
+from atmodeller.interfaces import CondensedSpecies
 from atmodeller.utilities import UnitConversion, delete_entries_with_suffix, flatten
 
 if TYPE_CHECKING:
@@ -344,7 +348,6 @@ class Output(UserDict):
                 reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
             )
             # Add contribution from condensation for the elements
-            # TODO: Only robust for a single condensed element
             if element in interior_atmosphere.solution.condensed_elements_to_solve:
                 degree_of_condensation: float = interior_atmosphere.solution.solution_dict()[
                     f"degree_of_condensation_{element}"
@@ -589,3 +592,64 @@ class Output(UserDict):
 
         if to_dict:
             return self.data
+
+    def element_condensate_mapping(self, interior_atmosphere: InteriorAtmosphereSystem):
+        """FIXME: Hack for testing"""
+        out: ElementCondensateMapping = ElementCondensateMapping(interior_atmosphere._solution)
+        out.element_condensate_mapping()
+
+
+class ElementCondensateMapping:
+    """Maps the condensed elemental masses to condensate species :cite:p:`KSP24{Appendix B}`."""
+
+    def __init__(self, solution: Solution):
+        self._solution: Solution = solution
+
+    def element_condensate_mapping(self):
+        """Computes the element condensate mapping matrix"""
+        # Should form the rows
+        condensed_elements: list[str] = self._solution.condensed_elements_to_solve
+        # Should form the columns
+        condensed_species: list[CondensedSpecies] = self._solution.condensed_species_to_solve
+
+        mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
+
+        logger.warning("Testing element-condensate mapping")
+        logger.debug("mapping empty = %s", mapping)
+        logger.debug("condensed_elements = %s", condensed_elements)
+        logger.debug("condensed_species = %s", condensed_species)
+
+        # Rows
+        for ii, condensed_element in enumerate(condensed_elements):
+            # Columns
+            for jj, species in enumerate(condensed_species):
+                logger.debug(species.composition())
+                if condensed_element in species.composition():
+                    mapping[ii, jj] = species.composition()[condensed_element].count
+
+        logger.debug("mapping = %s", mapping)
+
+        # Find associations
+        associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
+        logger.debug("associations = %s", associations)
+        try:
+            assert np.all(associations == 1)
+        except AssertionError:
+            logger.error("Cannot map elements to condensate without an iteration")
+
+        # Required for iteration, but not when can be calculated in one
+        # sorted_indices = np.argsort(associations)
+        # logger.debug("sorted_indices = %s", sorted_indices)
+        # sorted_mapping = mapping[sorted_indices]
+        # logger.debug("sorted_mapping = %s", sorted_mapping)
+
+        # FIXME: Beta is not the same as condensed mass.
+        # Ordered the same as for condensed species
+        beta: dict[str, float] = self._solution._beta_solution
+        logger.debug("beta = %s", beta)
+
+        beta_moles: list[float] = [
+            value / UnitConversion.g_to_kg(Formula(element).mass)
+            for element, value in beta.items()
+        ]
+        logger.debug("beta_moles = %s", beta_moles)

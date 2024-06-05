@@ -39,7 +39,7 @@ NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
 OCEAN_MOLES: float = 7.68894973907177e22
 """Moles of H2 (or H2O) in one present-day Earth ocean"""
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
-"""Mass of H2 in one present-day Earth ocean"""
+"""Mass of H2 in one present-day Earth ocean in grams"""
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config

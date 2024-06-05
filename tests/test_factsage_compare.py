@@ -467,4 +467,8 @@ def test_graphite_water_condensed(helper) -> None:
     }
 
     system.solve(constraints)
+
+    # FIXME: For test element-condensate mapping
+    system.output.element_condensate_mapping(system)
+
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
