@@ -613,13 +613,13 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    def mass(
+    def species_gas_mass(
         self,
-        *,
         species: GasSpecies,
+        *,
         element: Optional[str] = None,
     ) -> dict[str, float]:
-        """Calculates the mass of the species or one of its elements in each reservoir
+        """Calculates the mass of the gas species or one of its elements in each reservoir
 
         Args:
             species: A gas species
@@ -627,7 +627,7 @@ class InteriorAtmosphereSystem:
                 the species mass.
 
         Returns:
-            Total reservoir masses of the species or element
+            Total reservoir masses of the species or element in the species
         """
         pressure: float = self._solution.gas_pressures[species]
         fugacity: float = self._solution.gas_fugacities[species]
@@ -675,6 +675,81 @@ class InteriorAtmosphereSystem:
                 output[key] *= mass_scale_factor
 
         return output
+
+    def element_gas_mass(self, element: str) -> dict[str, float]:
+        """Calculates the mass of an element in all gas species in each reservoir.
+
+        Args:
+            element: Element to compute the mass for.
+
+        Returns:
+            Gas reservoir masses of the element
+        """
+        mass: dict[str, float] = {"atmosphere": 0, "melt": 0, "solid": 0}
+
+        for species in self.species.gas_species:
+            species_mass: dict[str, float] = self.species_gas_mass(species, element=element)
+            for key, value in species_mass.items():
+                mass[key] += value
+
+        return mass
+
+    def element_condensed_mass(self, element: str) -> dict[str, float]:
+        """Calculates the mass of an element in all condensed species.
+
+        Args:
+            element: Element to compute the mass for.
+
+        Returns:
+            Condensed mass of the element
+        """
+        mass: dict[str, float] = {}
+
+        if element in self._solution.condensed_elements_to_solve:
+            mass["condensed"] = sum(self.element_gas_mass(element).values())
+            mass["condensed"] *= 10 ** self._solution._beta_solution[element]
+        else:
+            mass["condensed"] = 0
+
+        return mass
+
+    def element_mass(self, element: str) -> dict[str, float]:
+        """Calculates the mass of an element.
+
+        Args:
+            element: Element to compute the mass for.
+
+        Returns:
+            Total mass of the element
+        """
+        element_gas_mass: dict[str, float] = self.element_gas_mass(element)
+        element_condensed_mass: dict[str, float] = self.element_condensed_mass(element)
+        element_mass: dict[str, float] = element_gas_mass | element_condensed_mass
+
+        logger.debug("element_mass for %s = %s", element, element_mass)
+
+        return element_mass
+
+    def get_mass_residual(self):
+        """Returns the residual vector of the mass balance."""
+
+        residual_mass: npt.NDArray = np.zeros(
+            len(self.constraints.mass_constraints), dtype=np.float_
+        )
+
+        # Mass constraints are currently only ever specified in terms of elements. Hence
+        # constraint.species is an element.
+        for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
+
+            residual_mass[constraint_index] = np.log10(
+                sum(self.element_mass(mass_constraint.element).values())
+            )
+            # Mass values are constant so no need to pass any arguments to get_value().
+            residual_mass[constraint_index] -= mass_constraint.get_log10_value()
+
+        logger.debug("residual_mass = %s", residual_mass)
+
+        return residual_mass
 
     @property
     def total_mass(self) -> float:
@@ -858,36 +933,8 @@ class InteriorAtmosphereSystem:
             solution=self._solution,
         )
 
-        # Compute residual for the mass balance (if relevant).
-        residual_mass: npt.NDArray = np.zeros(
-            len(self.constraints.mass_constraints), dtype=np.float_
-        )
-
-        # Recall that mass constraints are currently only ever specified in terms of elements.
-        # Hence constraint.species is an element.
-        for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
-            # Gas species
-            for species in self.species.gas_species:
-                residual_mass[constraint_index] += sum(
-                    self.mass(
-                        species=species,
-                        element=mass_constraint.element,
-                    ).values()
-                )
-
-            residual_mass[constraint_index] = np.log10(residual_mass[constraint_index])
-
-            # Condensed species
-            for condensed_element in self._solution.condensed_elements_to_solve:
-                if condensed_element == mass_constraint.element:
-                    residual_mass[constraint_index] += np.log10(
-                        10 ** self._solution._beta_solution[condensed_element] + 1
-                    )
-
-            # Mass values are constant so no need to pass any arguments to get_value().
-            residual_mass[constraint_index] -= mass_constraint.get_log10_value()
-
-        logger.debug("residual_mass = %s", residual_mass)
+        # Compute residual for the mass balance.
+        residual_mass: npt.NDArray = self.get_mass_residual()
 
         # Compute residual for the total pressure (if relevant).
         residual_total_pressure: npt.NDArray = np.zeros(

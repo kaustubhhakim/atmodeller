@@ -31,7 +31,6 @@ import numpy.typing as npt
 import pandas as pd
 from molmass import Formula
 
-from atmodeller.core import Solution
 from atmodeller.interfaces import CondensedSpecies
 from atmodeller.utilities import UnitConversion, delete_entries_with_suffix, flatten
 
@@ -274,11 +273,6 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         for species in interior_atmosphere.species.condensed_species:
-            # FIXME: What about an activity model now
-            # activity: float = species.activity.activity(
-            #    temperature=interior_atmosphere.planet.surface_temperature,
-            #    pressure=interior_atmosphere.total_pressure,
-            # )
             activity: float = interior_atmosphere.solution.activities[species]
             output = CondensedSpeciesOutput(activity=activity)
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
@@ -296,6 +290,61 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
 
+    def element_condensate_mapping(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+        """Computes the element condensate mapping matrix
+
+        Args:
+            interior_atmosphere: Interior atmosphere system
+        """
+        # Should form the rows
+        condensed_elements: list[str] = interior_atmosphere._solution.condensed_elements_to_solve
+        # Should form the columns
+        condensed_species: list[CondensedSpecies] = (
+            interior_atmosphere._solution.condensed_species_to_solve
+        )
+
+        mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
+
+        logger.warning("Testing element-condensate mapping")
+        logger.debug("mapping empty = %s", mapping)
+        logger.debug("condensed_elements = %s", condensed_elements)
+        logger.debug("condensed_species = %s", condensed_species)
+
+        # Rows
+        for ii, condensed_element in enumerate(condensed_elements):
+            # Columns
+            for jj, species in enumerate(condensed_species):
+                logger.debug(species.composition())
+                if condensed_element in species.composition():
+                    mapping[ii, jj] = species.composition()[condensed_element].count
+
+        logger.debug("mapping = %s", mapping)
+
+        # Find associations
+        associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
+        logger.debug("associations = %s", associations)
+        try:
+            assert np.all(associations == 1)
+        except AssertionError:
+            logger.error("Cannot map elements to condensate without an iteration")
+
+        # Required for iteration, but not when can be calculated in one
+        # sorted_indices = np.argsort(associations)
+        # logger.debug("sorted_indices = %s", sorted_indices)
+        # sorted_mapping = mapping[sorted_indices]
+        # logger.debug("sorted_mapping = %s", sorted_mapping)
+
+        # FIXME: Beta is not the same as condensed mass.
+        # Ordered the same as for condensed species
+        beta: dict[str, float] = interior_atmosphere._solution._beta_solution
+        logger.debug("beta = %s", beta)
+
+        beta_moles: list[float] = [
+            value / UnitConversion.g_to_kg(Formula(element).mass)
+            for element, value in beta.items()
+        ]
+        logger.debug("beta_moles = %s", beta_moles)
+
     def _add_elements(self, interior_atmosphere: InteriorAtmosphereSystem) -> float:
         """Adds elements.
 
@@ -309,14 +358,14 @@ class Output(UserDict):
         mass: dict[str, Any] = {}
 
         for element in interior_atmosphere.species.elements():
-            mass[element] = {"atmosphere": 0, "melt": 0, "solid": 0}
-            for species in interior_atmosphere.species.gas_species:
-                species_masses: dict[str, float] = interior_atmosphere.mass(
-                    species=species, element=element
-                )
-                mass[element]["atmosphere"] += species_masses["atmosphere"]
-                mass[element]["melt"] += species_masses["melt"]
-                mass[element]["solid"] += species_masses["solid"]
+            mass[element] = interior_atmosphere.element_gas_mass(element)
+            # old below
+            # species_masses: dict[str, float] = interior_atmosphere.species_gas_mass(
+            #    species=species, element=element
+            # )
+            # mass[element]["atmosphere"] += species_masses["atmosphere"]
+            # mass[element]["melt"] += species_masses["melt"]
+            # mass[element]["solid"] += species_masses["solid"]
 
         # Preprocess to get total number of moles of elements in the atmosphere
         atmosphere_total_element_moles: float = 0
@@ -352,6 +401,7 @@ class Output(UserDict):
                 degree_of_condensation: float = interior_atmosphere.solution.solution_dict()[
                     f"degree_of_condensation_{element}"
                 ]
+
             # TODO: Clean up this clunky exception logic for oxygen
             elif (
                 element == "O"
@@ -386,6 +436,7 @@ class Output(UserDict):
                 )
             else:
                 degree_of_condensation = 0
+
             output = SpeciesOutput(
                 atmosphere=atmosphere,
                 melt=melt,
@@ -421,7 +472,9 @@ class Output(UserDict):
         atmosphere_total_species_moles: float = 0
 
         for species in interior_atmosphere.species.gas_species:
-            species_masses: dict[str, float] = interior_atmosphere.mass(species=species)
+            species_masses: dict[str, float] = interior_atmosphere.species_gas_mass(
+                species=species
+            )
             atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
 
         for species in interior_atmosphere.species.gas_species:
@@ -432,7 +485,9 @@ class Output(UserDict):
             ]
             volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
 
-            species_masses: dict[str, float] = interior_atmosphere.mass(species=species)
+            species_masses: dict[str, float] = interior_atmosphere.species_gas_mass(
+                species=species
+            )
             atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
                 molar_mass=species.molar_mass,
                 mass=species_masses["atmosphere"],
@@ -592,64 +647,3 @@ class Output(UserDict):
 
         if to_dict:
             return self.data
-
-    def element_condensate_mapping(self, interior_atmosphere: InteriorAtmosphereSystem):
-        """FIXME: Hack for testing"""
-        out: ElementCondensateMapping = ElementCondensateMapping(interior_atmosphere._solution)
-        out.element_condensate_mapping()
-
-
-class ElementCondensateMapping:
-    """Maps the condensed elemental masses to condensate species :cite:p:`KSP24{Appendix B}`."""
-
-    def __init__(self, solution: Solution):
-        self._solution: Solution = solution
-
-    def element_condensate_mapping(self):
-        """Computes the element condensate mapping matrix"""
-        # Should form the rows
-        condensed_elements: list[str] = self._solution.condensed_elements_to_solve
-        # Should form the columns
-        condensed_species: list[CondensedSpecies] = self._solution.condensed_species_to_solve
-
-        mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
-
-        logger.warning("Testing element-condensate mapping")
-        logger.debug("mapping empty = %s", mapping)
-        logger.debug("condensed_elements = %s", condensed_elements)
-        logger.debug("condensed_species = %s", condensed_species)
-
-        # Rows
-        for ii, condensed_element in enumerate(condensed_elements):
-            # Columns
-            for jj, species in enumerate(condensed_species):
-                logger.debug(species.composition())
-                if condensed_element in species.composition():
-                    mapping[ii, jj] = species.composition()[condensed_element].count
-
-        logger.debug("mapping = %s", mapping)
-
-        # Find associations
-        associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
-        logger.debug("associations = %s", associations)
-        try:
-            assert np.all(associations == 1)
-        except AssertionError:
-            logger.error("Cannot map elements to condensate without an iteration")
-
-        # Required for iteration, but not when can be calculated in one
-        # sorted_indices = np.argsort(associations)
-        # logger.debug("sorted_indices = %s", sorted_indices)
-        # sorted_mapping = mapping[sorted_indices]
-        # logger.debug("sorted_mapping = %s", sorted_mapping)
-
-        # FIXME: Beta is not the same as condensed mass.
-        # Ordered the same as for condensed species
-        beta: dict[str, float] = self._solution._beta_solution
-        logger.debug("beta = %s", beta)
-
-        beta_moles: list[float] = [
-            value / UnitConversion.g_to_kg(Formula(element).mass)
-            for element, value in beta.items()
-        ]
-        logger.debug("beta_moles = %s", beta_moles)

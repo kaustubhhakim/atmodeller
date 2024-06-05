@@ -422,8 +422,6 @@ class Solution:
             index: int = self._species.find_species(species)
             lambda_array[index] = self._lambda_solution[species]
 
-        logger.debug("lambda_array = %s", lambda_array)
-
         return lambda_array
 
     @property
