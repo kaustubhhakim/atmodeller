@@ -90,52 +90,6 @@ class ReservoirOutputMoleFraction(ReservoirOutput):
 
 
 @dataclass(kw_only=True)
-class AtmosphereReservoirOutput(ReservoirOutputMoleFraction):
-    r"""A species in the atmosphere
-
-    Args:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
-        reservoir_mass: Total mass of the atmosphere
-        reservoir_moles: Total moles of the reservoir
-        fugacity: Fugacity in bar
-        fugacity_coefficient: Fugacity coefficient
-        pressure: Pressure in bar
-        volume_mixing_ratio: Volume mixing ratio
-    """
-
-    fugacity: float
-    """Fugacity"""
-    fugacity_coefficient: float
-    """Fugacity coefficient"""
-    pressure: float
-    """Pressure"""
-    volume_mixing_ratio: float
-    """Volume mixing ratio"""
-
-
-@dataclass(kw_only=True)
-class CondensedSpeciesOutput:
-    """Output for a condensed species
-
-    Args:
-        mass: Mass of the condensed species in kg
-        activity: Activity
-    """
-
-    activity: float
-    """Activity"""
-    mass: float
-    """Mass in kg"""
-
-    def asdict(self) -> dict[str, float]:
-        """Data as a dictionary"""
-        output_dict: dict[str, Any] = asdict(self)
-
-        return output_dict
-
-
-@dataclass(kw_only=True)
 class SpeciesOutput:
     """Output for a species"""
 
@@ -247,7 +201,6 @@ class Output(UserDict):
 
         Args:
             interior_atmosphere: Interior atmosphere system
-            element_moles: Total number of moles of elements
         """
         atmosphere: dict[str, float] = {}
         atmosphere["pressure"] = interior_atmosphere.total_pressure
@@ -262,20 +215,19 @@ class Output(UserDict):
 
         Args:
             interior_atmosphere: Interior atmosphere system
-
-        Returns:
-            Condensed element masses
         """
         condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = (
             interior_atmosphere.condensed_species_masses()
         )
 
         for species in interior_atmosphere.species.condensed_species:
-            activity: float = interior_atmosphere.solution.activities[species]
-            mass: float = sum(condensed_species_masses[species].values())
-            output = CondensedSpeciesOutput(mass=mass, activity=activity)
+            output: dict[str, float] = {}
+            output["activity"] = interior_atmosphere.solution.activities[species]
+            output["mass"] = sum(condensed_species_masses[species].values())
+            output["moles"] = output["mass"] / species.molar_mass
+            output["molar_mass"] = species.molar_mass
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
-            data_list.append(output.asdict())
+            data_list.append(output)
 
     def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds constraints.
@@ -292,15 +244,11 @@ class Output(UserDict):
     def _add_elements(
         self,
         interior_atmosphere: InteriorAtmosphereSystem,
-    ) -> float:
+    ) -> None:
         """Adds elements.
 
         Args:
             interior_atmosphere: Interior atmosphere system
-            condensed_element_mass: Condensed element masses
-
-        Returns:
-            Total number of moles of elements
         """
         mass: dict[str, Any] = {}
 
@@ -312,15 +260,13 @@ class Output(UserDict):
         # Preprocess to get total number of moles of elements in the atmosphere
         atmosphere_total_element_moles: float = 0
         for element, element_mass in mass.items():
-            formula: Formula = Formula(element)
-            molar_mass: float = UnitConversion.g_to_kg(formula.mass)
+            molar_mass: float = UnitConversion.g_to_kg(Formula(element).mass)
             atmosphere_total_element_moles += element_mass["atmosphere_mass"] / molar_mass
 
         # Create and add the output
         for element, element_mass in mass.items():
             logger.info("Adding %s to output", element)
-            formula: Formula = Formula(element)
-            molar_mass: float = UnitConversion.g_to_kg(formula.mass)
+            molar_mass: float = UnitConversion.g_to_kg(Formula(element).mass)
             atmosphere: ReservoirOutput = ReservoirOutputMoleFraction(
                 molar_mass=molar_mass,
                 mass=element_mass["atmosphere_mass"],
@@ -349,11 +295,9 @@ class Output(UserDict):
                 condensed_mass=condensed_element_mass_element,
             )
             # Create a unique key name to avoid a potential name conflict with atomic species
-            key_name: str = f"{element}_totals"
+            key_name: str = f"{element}_total"
             data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
             data_list.append(output.asdict())
-
-        return atmosphere_total_element_moles
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the planetary properties.
@@ -383,6 +327,10 @@ class Output(UserDict):
             output["total_mass"] = (
                 output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
             )
+            output["atmosphere_moles"] = output["atmosphere_mass"] / output["molar_mass"]
+            output["melt_moles"] = output["melt_mass"] / output["molar_mass"]
+            output["solid_moles"] = output["solid_mass"] / output["molar_mass"]
+            output["total_moles"] = output["total_mass"] / output["molar_mass"]
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)
 
