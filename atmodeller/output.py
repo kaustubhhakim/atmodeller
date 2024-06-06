@@ -22,7 +22,7 @@ import copy
 import logging
 import pickle
 from collections import UserDict
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -30,112 +30,12 @@ import pandas as pd
 from molmass import Formula
 
 from atmodeller.interfaces import CondensedSpecies
-from atmodeller.utilities import UnitConversion, delete_entries_with_suffix, flatten
+from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass(kw_only=True)
-class ReservoirOutput:
-    r"""Mass and moles of a species (or element) in a reservoir
-
-    Args:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
-        reservoir_mass: Mass of the reservoir in kg. For the atmosphere reservoir this is the total
-            mass of the atmosphere. For a mantle reservoir this is the total mass of the silicate
-            component only (i.e. not including the volatile mass).
-    """
-
-    mass: float
-    """Mass of the species in the reservoir in kg"""
-    molar_mass: float
-    r"""Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`"""
-    reservoir_mass: float
-    """Mass of the mantle reservoir in kg"""
-    moles: float = field(init=False)
-    """Number of moles"""
-    ppmw: float = field(init=False, default=0)
-    """Parts-per-million by weight of the species relative to the reservoir"""
-
-    def __post_init__(self):
-        self.moles = self.mass / self.molar_mass
-        if self.reservoir_mass > 0:
-            self.ppmw = UnitConversion.fraction_to_ppm(self.mass / self.reservoir_mass)
-
-
-@dataclass(kw_only=True)
-class ReservoirOutputMoleFraction(ReservoirOutput):
-    r"""Additionally computes the ppm by moles
-
-    Args:
-        mass: Mass of the species in the reservoir in kg
-        molar_mass: Molar mass of the species in :math:`\mathrm{kg}\mathrm{mol}^{-1}`
-        reservoir_mass: Mass of the reservoir in kg
-        reservoir_moles: Total moles of the reservoir
-    """
-
-    reservoir_moles: float
-    """Total moles of the reservoir"""
-    ppm: float = field(init=False, default=0)
-    """Parts-per-million by moles of the species relative to the reservoir"""
-
-    def __post_init__(self):
-        super().__post_init__()
-        if self.reservoir_moles > 0:
-            self.ppm = UnitConversion.fraction_to_ppm(self.moles / self.reservoir_moles)
-
-
-@dataclass(kw_only=True)
-class SpeciesOutput:
-    """Output for a species"""
-
-    atmosphere: ReservoirOutput
-    melt: ReservoirOutput
-    solid: ReservoirOutput
-    condensed_mass: float = 0
-    total_mass: float = field(init=False)
-    degree_of_condensation: float = field(init=False)
-    condensed_moles: float = field(init=False)
-    total_moles: float = field(init=False)
-
-    def __post_init__(self):
-        self.total_mass = (
-            self.atmosphere.mass + self.melt.mass + self.solid.mass + self.condensed_mass
-        )
-        self.degree_of_condensation = self.condensed_mass / self.total_mass
-        doc_factor: float = self.degree_of_condensation / (1 - self.degree_of_condensation)
-        self.condensed_moles = doc_factor * (
-            self.atmosphere.moles + self.melt.moles + self.solid.moles
-        )
-        self.total_moles = (
-            self.atmosphere.moles + self.melt.moles + self.solid.moles + self.condensed_moles
-        )
-
-    def asdict(self) -> dict[str, float]:
-        """Data as a dictionary
-
-        Deletes some entries to avoid duplication of output quantities. For example, the reservoir
-        masses also appear in the 'planet' output.
-        """
-        output_dict: dict[str, float] = flatten(asdict(self))
-        # It's useful to see the exact value of the molar mass for calculations, but we only need
-        # to output it once.
-        molar_mass: float = output_dict["atmosphere_molar_mass"]
-        output_dict = delete_entries_with_suffix(output_dict, "molar_mass")
-        output_dict["molar_mass"] = molar_mass
-        output_dict = delete_entries_with_suffix(output_dict, "reservoir_mass")
-        output_dict = delete_entries_with_suffix(output_dict, "reservoir_moles")
-        # TODO: A better approach would be to not calculate these for gas species at all
-        if self.degree_of_condensation == 0:
-            del output_dict["degree_of_condensation"]
-            del output_dict["condensed_mass"]
-            del output_dict["condensed_moles"]
-
-        return output_dict
 
 
 class Output(UserDict):
@@ -189,6 +89,7 @@ class Output(UserDict):
         self._add_planet(interior_atmosphere)
         self._add_residual(interior_atmosphere)
         self._add_solution(interior_atmosphere)
+
         if extra_output is not None:
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
             data_list.append(extra_output)
@@ -226,6 +127,7 @@ class Output(UserDict):
             output["mass"] = sum(condensed_species_masses[species].values())
             output["moles"] = output["mass"] / species.molar_mass
             output["molar_mass"] = species.molar_mass
+
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)
 
@@ -251,7 +153,6 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         mass: dict[str, Any] = {}
-
         condensed_element_masses: dict[str, float] = interior_atmosphere.condensed_element_masses()
 
         for element in interior_atmosphere.species.elements():
@@ -265,39 +166,45 @@ class Output(UserDict):
 
         # Create and add the output
         for element, element_mass in mass.items():
+            output: dict[str, float] = {}
             logger.info("Adding %s to output", element)
-            molar_mass: float = UnitConversion.g_to_kg(Formula(element).mass)
-            atmosphere: ReservoirOutput = ReservoirOutputMoleFraction(
-                molar_mass=molar_mass,
-                mass=element_mass["atmosphere_mass"],
-                reservoir_mass=interior_atmosphere.total_mass,
-                reservoir_moles=atmosphere_total_element_moles,
-            )
-            melt: ReservoirOutput = ReservoirOutput(
-                molar_mass=molar_mass,
-                mass=element_mass["melt_mass"],
-                reservoir_mass=interior_atmosphere.planet.mantle_melt_mass,
-            )
-            # Trapped in the solid mantle
-            solid: ReservoirOutput = ReservoirOutput(
-                molar_mass=molar_mass,
-                mass=element_mass["solid_mass"],
-                reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
-            )
+            output["molar_mass"] = UnitConversion.g_to_kg(Formula(element).mass)
+            output["atmosphere_mass"] = element_mass["atmosphere_mass"]
+            output["melt_mass"] = element_mass["melt_mass"]
+            output["solid_mass"] = element_mass["solid_mass"]
             try:
-                condensed_element_mass_element = condensed_element_masses[element]
+                output["condensed_mass"] = condensed_element_masses[element]
             except KeyError:
-                condensed_element_mass_element = 0
-            output = SpeciesOutput(
-                atmosphere=atmosphere,
-                melt=melt,
-                solid=solid,
-                condensed_mass=condensed_element_mass_element,
+                output["condensed_mass"] = 0
+            output["total_mass"] = (
+                output["atmosphere_mass"]
+                + output["melt_mass"]
+                + output["solid_mass"]
+                + output["condensed_mass"]
             )
+            output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
+            output["atmosphere_moles"] = output["atmosphere_mass"] / output["molar_mass"]
+            output["melt_moles"] = output["melt_mass"] / output["molar_mass"]
+            output["solid_moles"] = output["solid_mass"] / output["molar_mass"]
+            output["condensed_moles"] = output["condensed_mass"] / output["molar_mass"]
+            output["total_moles"] = output["total_mass"] / output["molar_mass"]
+            if interior_atmosphere.planet.mantle_melt_mass:
+                output["melt_ppmw"] = (
+                    output["melt_mass"] / interior_atmosphere.planet.mantle_melt_mass
+                )
+            else:
+                output["melt_ppmw"] = 0
+            if interior_atmosphere.planet.mantle_solid_mass:
+                output["solid_ppmw"] = (
+                    output["solid_mass"] / interior_atmosphere.planet.mantle_solid_mass
+                )
+            else:
+                output["solid_ppmw"] = 0
+
             # Create a unique key name to avoid a potential name conflict with atomic species
             key_name: str = f"{element}_total"
             data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
-            data_list.append(output.asdict())
+            data_list.append(output)
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the planetary properties.
