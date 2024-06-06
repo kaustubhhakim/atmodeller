@@ -344,6 +344,8 @@ class Solution:
             if constraint.element in self._species.elements_in_condensed_species:
                 condensation.append(constraint.element)
 
+        logger.debug("condensation = %s", condensation)
+
         return condensation
 
     @property
@@ -360,6 +362,8 @@ class Solution:
                 if constraint.element in species.composition():
                     condensed_species.append(species)
                     break
+
+        logger.debug("condensed_species = %s", condensed_species)
 
         return condensed_species
 

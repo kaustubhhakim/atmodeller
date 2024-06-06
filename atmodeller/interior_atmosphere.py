@@ -265,16 +265,6 @@ class ReactionNetwork:
 
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
-        if nrows == self.species.number_species():
-            msg: str = "The necessary number of constraints will be applied to "
-            msg += "the reaction network to solve the system"
-            logger.debug(msg)
-        else:
-            num: int = self.species.number_species() - nrows
-            logger.debug(
-                "%d additional (mass) constraint(s) are necessary to solve the system", num
-            )
-
         coeff: npt.NDArray = np.zeros((nrows, self.species.number_species()))
         if self.reaction_matrix is not None:
             coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
