@@ -603,68 +603,79 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    def species_gas_mass(
+    def gas_species_reservoir_masses(
         self,
         species: GasSpecies,
-        *,
-        element: Optional[str] = None,
     ) -> dict[str, float]:
-        """Calculates the mass of the gas species or one of its elements in each reservoir
+        """Calculates the masses of the gas species in the atmosphere-mantle system
+
+        Additional quantities are saved during the calculation for subsequent (and self-consistent)
+        output.
 
         Args:
             species: A gas species
-            element: Compute the mass for an element in the species. Defaults to None to compute
-                the species mass.
 
         Returns:
-            Total reservoir masses of the species or element in the species
+            A dictionary that includes the reservoir masses of the species
         """
-        pressure: float = self._solution.gas_pressures[species]
-        fugacity: float = self._solution.gas_fugacities[species]
+        output: dict[str, float] = {}
+        output["pressure"] = self.solution.gas_pressures[species]
+        output["fugacity"] = self.solution.gas_fugacities[species]
 
         # Atmosphere
-        mass_in_atmosphere: float = (
-            UnitConversion.bar_to_Pa(pressure) / self.planet.surface_gravity
+        output["atmosphere_mass"] = (
+            UnitConversion.bar_to_Pa(output["pressure"]) / self.planet.surface_gravity
         )
-        mass_in_atmosphere *= (
+        output["atmosphere_mass"] *= (
             self.planet.surface_area * species.molar_mass / self.atmospheric_mean_molar_mass
         )
 
         # Melt
-        ppmw_in_melt: float = species.solubility.concentration(
-            fugacity=fugacity,
+        output["melt_ppmw"] = species.solubility.concentration(
+            fugacity=output["fugacity"],
             temperature=self.planet.surface_temperature,
             pressure=self.total_pressure,
-            **self._solution.gas_fugacities_by_hill_formula,
+            **self.solution.gas_fugacities_by_hill_formula,
         )
-        mass_in_melt: float = (
-            self.planet.mantle_melt_mass * ppmw_in_melt * UnitConversion.ppm_to_fraction()
+        output["melt_mass"] = (
+            self.planet.mantle_melt_mass * output["melt_ppmw"] * UnitConversion.ppm_to_fraction()
         )
 
         # Trapped in the solid mantle
-        ppmw_in_solid: float = ppmw_in_melt * species.solid_melt_distribution_coefficient
-        mass_in_solid: float = (
-            self.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
+        output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
+        output["solid_mass"] = (
+            self.planet.mantle_solid_mass * output["solid_ppmw"] * UnitConversion.ppm_to_fraction()
         )
 
+        return output
+
+    def element_mass_in_gas_species_reservoirs(self, species: GasSpecies, element: str):
+        """Calculates the mass of an element in the reservoirs of a gas species.
+
+        Args:
+            species: A gas species
+            element: Compute the mass for the element in the species.
+
+        Returns:
+            Element mass in the gas species reservoirs
+        """
+        output: dict[str, float] = self.gas_species_reservoir_masses(species)
+
+        # Note that reservoirs must have an _mass suffix
         mass: dict[str, float] = {
-            "atmosphere": mass_in_atmosphere,
-            "melt": mass_in_melt,
-            "solid": mass_in_solid,  # trapped in the solid mantle, not condensed per se
+            "atmosphere_mass": output["atmosphere_mass"],
+            "melt_mass": output["melt_mass"],
+            "solid_mass": output["solid_mass"],
         }
 
-        if element is not None:
-            try:
-                mass_scale_factor: float = (
-                    UnitConversion.g_to_kg(species.composition()[element].mass)
-                    / species.molar_mass
-                )
-            except KeyError:  # Element not in formula so mass is zero.
-                mass_scale_factor = 0
-            for key in mass:
-                mass[key] *= mass_scale_factor
-
-        logger.debug("species_gas_mass for %s (element = %s) = %s", species, element, mass)
+        try:
+            mass_scale_factor: float = (
+                UnitConversion.g_to_kg(species.composition()[element].mass) / species.molar_mass
+            )
+        except KeyError:  # Element not in formula so mass is zero.
+            mass_scale_factor = 0
+        for key in mass:
+            mass[key] *= mass_scale_factor
 
         return mass
 
@@ -677,10 +688,12 @@ class InteriorAtmosphereSystem:
         Returns:
             Gas reservoir masses of the element
         """
-        mass: dict[str, float] = {"atmosphere": 0, "melt": 0, "solid": 0}
+        mass: dict[str, float] = {"atmosphere_mass": 0, "melt_mass": 0, "solid_mass": 0}
 
         for species in self.species.gas_species:
-            species_mass: dict[str, float] = self.species_gas_mass(species, element=element)
+            species_mass: dict[str, float] = self.element_mass_in_gas_species_reservoirs(
+                species, element
+            )
             for key, value in species_mass.items():
                 mass[key] += value
 
@@ -697,9 +710,9 @@ class InteriorAtmosphereSystem:
         Returns:
             Condensed mass of the element
         """
-        if element in self._solution.condensed_elements_to_solve:
+        if element in self.solution.condensed_elements_to_solve:
             mass = sum(self.element_gas_mass(element).values())
-            mass *= 10 ** self._solution._beta_solution[element]
+            mass *= 10 ** self.solution._beta_solution[element]
         else:
             mass = 0
 
@@ -753,12 +766,12 @@ class InteriorAtmosphereSystem:
     @property
     def total_pressure(self) -> float:
         """Total pressure"""
-        return self._solution.total_pressure
+        return self.solution.total_pressure
 
     @property
     def atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere"""
-        return self._solution.gas_mean_molar_mass
+        return self.solution.gas_mean_molar_mass
 
     def solve(
         self,
@@ -805,10 +818,10 @@ class InteriorAtmosphereSystem:
             constraints=self.constraints
         )
         activity_modifier: npt.NDArray = self._reaction_network.get_activity_modifier(
-            constraints=constraints, solution=self._solution
+            constraints=constraints, solution=self.solution
         )
         equilibrium_modifier: npt.NDArray = self._reaction_network.get_equilibrium_modifier(
-            constraints=constraints, solution=self._solution
+            constraints=constraints, solution=self.solution
         )
 
         # The only constraints that require pressure are the fugacity constraints, so for the
@@ -818,8 +831,8 @@ class InteriorAtmosphereSystem:
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
-            degree_of_condensation_number=self._solution.number_condensed_elements_to_solve,
-            number_of_condensed_species=self._solution.number_condensed_species_to_solve,
+            degree_of_condensation_number=self.solution.number_condensed_elements_to_solve,
+            number_of_condensed_species=self.solution.number_condensed_species_to_solve,
         )
 
         for attempt in range(max_attempts):
@@ -861,7 +874,7 @@ class InteriorAtmosphereSystem:
                 self._residual = sol.fun
                 self.output.add(self, extra_output)
                 initial_solution.update(self.output)
-                logger.info(pprint.pformat(self._solution.solution_dict()))
+                logger.info(pprint.pformat(self.solution.solution_dict()))
                 break
             else:
                 logger.warning("The solver failed.")
@@ -870,8 +883,8 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        degree_of_condensation_number=self._solution.number_condensed_elements_to_solve,
-                        number_of_condensed_species=self._solution.number_condensed_species_to_solve,
+                        degree_of_condensation_number=self.solution.number_condensed_elements_to_solve,
+                        number_of_condensed_species=self.solution.number_condensed_species_to_solve,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )
@@ -879,7 +892,7 @@ class InteriorAtmosphereSystem:
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
             self._failed_solves += 1
-            if self._solution.number_condensed_elements_to_solve > 0:
+            if self.solution.number_condensed_elements_to_solve > 0:
                 logger.info("Probably no solution for condensed species and imposed constraints")
                 logger.info("Remove some condensed species and try again")
 
@@ -922,7 +935,7 @@ class InteriorAtmosphereSystem:
             coefficient_matrix=coefficient_matrix,
             activity_modifier=activity_modifier,
             equilibrium_modifier=equilibrium_modifier,
-            solution=self._solution,
+            solution=self.solution,
         )
 
         # Compute residual for the mass balance.

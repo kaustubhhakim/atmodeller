@@ -229,10 +229,10 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
             extra_output: Extra data to write to the output. Defaults to None.
         """
-        species_moles: float = self._add_species(interior_atmosphere)
+        self._add_gas_species(interior_atmosphere)
         condensed_element_mass: dict[str, float] = self._add_condensed_species(interior_atmosphere)
-        element_moles: float = self._add_elements(interior_atmosphere, condensed_element_mass)
-        self._add_atmosphere(interior_atmosphere, species_moles, element_moles)
+        self._add_elements(interior_atmosphere, condensed_element_mass)
+        self._add_atmosphere(interior_atmosphere)
         self._add_constraints(interior_atmosphere)
         self._add_planet(interior_atmosphere)
         self._add_residual(interior_atmosphere)
@@ -244,22 +244,17 @@ class Output(UserDict):
     def _add_atmosphere(
         self,
         interior_atmosphere: InteriorAtmosphereSystem,
-        species_moles: float,
-        element_moles: float,
     ) -> None:
         """Adds atmosphere.
 
         Args:
             interior_atmosphere: Interior atmosphere system
-            species_moles: Total number of moles of species
             element_moles: Total number of moles of elements
         """
         atmosphere: dict[str, float] = {}
         atmosphere["pressure"] = interior_atmosphere.total_pressure
         atmosphere["mean_molar_mass"] = interior_atmosphere.atmospheric_mean_molar_mass
         atmosphere["mass"] = interior_atmosphere.total_mass
-        atmosphere["species_moles"] = species_moles
-        atmosphere["element_moles"] = element_moles
 
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere)
@@ -425,7 +420,7 @@ class Output(UserDict):
         for element, element_mass in mass.items():
             formula: Formula = Formula(element)
             molar_mass: float = UnitConversion.g_to_kg(formula.mass)
-            atmosphere_total_element_moles += element_mass["atmosphere"] / molar_mass
+            atmosphere_total_element_moles += element_mass["atmosphere_mass"] / molar_mass
 
         # Create and add the output
         for element, element_mass in mass.items():
@@ -434,19 +429,19 @@ class Output(UserDict):
             molar_mass: float = UnitConversion.g_to_kg(formula.mass)
             atmosphere: ReservoirOutput = ReservoirOutputMoleFraction(
                 molar_mass=molar_mass,
-                mass=element_mass["atmosphere"],
+                mass=element_mass["atmosphere_mass"],
                 reservoir_mass=interior_atmosphere.total_mass,
                 reservoir_moles=atmosphere_total_element_moles,
             )
             melt: ReservoirOutput = ReservoirOutput(
                 molar_mass=molar_mass,
-                mass=element_mass["melt"],
+                mass=element_mass["melt_mass"],
                 reservoir_mass=interior_atmosphere.planet.mantle_melt_mass,
             )
             # Trapped in the solid mantle
             solid: ReservoirOutput = ReservoirOutput(
                 molar_mass=molar_mass,
-                mass=element_mass["solid"],
+                mass=element_mass["solid_mass"],
                 reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
             )
             try:
@@ -476,59 +471,26 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("planet", [])
         data_list.append(planet_dict)
 
-    def _add_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> float:
-        """Adds species.
+    def _add_gas_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+        """Adds gas species.
 
         Args:
             interior_atmosphere: Interior atmosphere system
-
-        Returns:
-            Total number of moles of species in the atmosphere
         """
-        atmosphere_total_species_moles: float = 0
-
         for species in interior_atmosphere.species.gas_species:
-            species_masses: dict[str, float] = interior_atmosphere.species_gas_mass(
-                species=species
-            )
-            atmosphere_total_species_moles += species_masses["atmosphere"] / species.molar_mass
-
-        for species in interior_atmosphere.species.gas_species:
-            pressure: float = interior_atmosphere.solution.gas_pressures[species]
-            fugacity: float = interior_atmosphere.solution.gas_fugacities[species]
-            fugacity_coefficient: float = interior_atmosphere.solution.fugacity_coefficients[
+            output: dict[str, float] = interior_atmosphere.gas_species_reservoir_masses(species)
+            output["fugacity_coefficient"] = interior_atmosphere.solution.fugacity_coefficients[
                 species
             ]
-            volume_mixing_ratio: float = pressure / interior_atmosphere.total_pressure
-
-            species_masses: dict[str, float] = interior_atmosphere.species_gas_mass(
-                species=species
+            output["volume_mixing_ratio"] = interior_atmosphere.solution.volume_mixing_ratios[
+                species
+            ]
+            output["molar_mass"] = interior_atmosphere.species.get_species(species).molar_mass
+            output["total_mass"] = (
+                output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
             )
-            atmosphere: AtmosphereReservoirOutput = AtmosphereReservoirOutput(
-                molar_mass=species.molar_mass,
-                mass=species_masses["atmosphere"],
-                reservoir_mass=interior_atmosphere.total_mass,
-                reservoir_moles=atmosphere_total_species_moles,
-                fugacity=fugacity,
-                fugacity_coefficient=fugacity_coefficient,
-                pressure=pressure,
-                volume_mixing_ratio=volume_mixing_ratio,
-            )
-            melt: ReservoirOutput = ReservoirOutput(
-                molar_mass=species.molar_mass,
-                reservoir_mass=interior_atmosphere.planet.mantle_melt_mass,
-                mass=species_masses["melt"],
-            )
-            solid: ReservoirOutput = ReservoirOutput(
-                molar_mass=species.molar_mass,
-                reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
-                mass=species_masses["solid"],
-            )
-            output = SpeciesOutput(atmosphere=atmosphere, melt=melt, solid=solid)
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
-            data_list.append(output.asdict())
-
-        return atmosphere_total_species_moles
+            data_list.append(output)
 
     def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the residual.
@@ -559,19 +521,6 @@ class Output(UserDict):
         }
         return out
 
-    def to_pickle(self, file_prefix: Path | str = "atmodeller_out") -> None:
-        """Writes the output to a pickle file.
-
-        Args:
-            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
-        """
-        output_file: Path = Path(f"{file_prefix}.pkl")
-
-        with open(output_file, "wb") as handle:
-            pickle.dump(self.data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        logger.info("Output written to %s", output_file)
-
     def to_excel(self, file_prefix: Path | str = "atmodeller_out") -> None:
         """Writes the output to an Excel file.
 
@@ -584,6 +533,19 @@ class Output(UserDict):
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:  # pylint: disable=E0110
             for df_name, df in out.items():
                 df.to_excel(writer, sheet_name=df_name, index=True)
+
+        logger.info("Output written to %s", output_file)
+
+    def to_pickle(self, file_prefix: Path | str = "atmodeller_out") -> None:
+        """Writes the output to a pickle file.
+
+        Args:
+            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+        """
+        output_file: Path = Path(f"{file_prefix}.pkl")
+
+        with open(output_file, "wb") as handle:
+            pickle.dump(self.data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         logger.info("Output written to %s", output_file)
 

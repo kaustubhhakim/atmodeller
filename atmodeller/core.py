@@ -219,12 +219,27 @@ class Species(UserList):
         Raises:
             ValueError: The species is not in the species list
         """
-
         for index, species in enumerate(self):
             if species is find_species:
                 return index
 
         raise ValueError(f"{find_species.name} is not in the species list")
+
+    def get_species(self, find_species: ChemicalSpecies) -> ChemicalSpecies:
+        """Gets a species
+
+        Args:
+            find_species: Species to find
+
+        Returns:
+            The species
+
+        Raises:
+            ValueError: The species is not in the species list
+        """
+        index: int = self.find_species(find_species)
+
+        return self.data[index]
 
     def check_species_present(self, find_species: ChemicalSpecies) -> bool:
         """Checks if a species is present
@@ -447,6 +462,15 @@ class Solution:
         mass /= self.total_pressure
 
         return mass
+
+    @property
+    def volume_mixing_ratios(self) -> dict[GasSpecies, float]:
+        """Volume mixing ratios"""
+        vmr: dict[GasSpecies, float] = {}
+        for species in self._species.gas_species:
+            vmr[species] = self.gas_pressures[species] / self.total_pressure
+
+        return vmr
 
     @property
     def log10_fugacity_coefficients(self) -> dict[GasSpecies, float]:
