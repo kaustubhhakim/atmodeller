@@ -336,17 +336,17 @@ class Solution:
     def condensed_elements_to_solve(self) -> list[str]:
         """Elements in condensed species that should adhere to mass balance
 
-        The elements for which to calculate the degree of condensation depends on both which
-        elements are in condensed species and which mass constraints are applied.
+        The elements for which to calculate the degree of condensation requires both that they are
+        in a condensed phase and that mass constraints are applied.
         """
-        condensation: list[str] = []
+        condensed_elements_to_solve: list[str] = []
         for constraint in self._constraints.mass_constraints:
             if constraint.element in self._species.elements_in_condensed_species:
-                condensation.append(constraint.element)
+                condensed_elements_to_solve.append(constraint.element)
 
-        logger.debug("condensation = %s", condensation)
+        logger.debug("condensed_elements_to_solve = %s", condensed_elements_to_solve)
 
-        return condensation
+        return condensed_elements_to_solve
 
     @property
     def number_condensed_elements_to_solve(self) -> int:
@@ -356,16 +356,16 @@ class Solution:
     @property
     def condensed_species_to_solve(self) -> list[CondensedSpecies]:
         """Condensed species to solve for stability requires they participate in mass balance"""
-        condensed_species: list[CondensedSpecies] = []
+        condensed_species_to_solve: list[CondensedSpecies] = []
         for species in self._species.condensed_species:
             for constraint in self._constraints.mass_constraints:
                 if constraint.element in species.composition():
-                    condensed_species.append(species)
+                    condensed_species_to_solve.append(species)
                     break
 
-        logger.debug("condensed_species = %s", condensed_species)
+        logger.debug("condensed_species_to_solve = %s", condensed_species_to_solve)
 
-        return condensed_species
+        return condensed_species_to_solve
 
     @property
     def number_condensed_species_to_solve(self) -> int:
@@ -414,11 +414,6 @@ class Solution:
     def species_array(self) -> npt.NDArray:
         return np.array(list(self._species_solution.values()))
 
-    # Not used
-    # @property
-    # def beta_array(self) -> npt.NDArray:
-    #     return np.array(list(self._beta_solution.values()))
-
     @property
     def lambda_array(self) -> npt.NDArray:
         lambda_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
@@ -444,8 +439,8 @@ class Solution:
         return sum(self.gas_pressures.values())
 
     @property
-    def gas_molar_mass(self) -> float:
-        """Molar mass of the gas"""
+    def gas_mean_molar_mass(self) -> float:
+        """Mean molar mass of the gas"""
         mass: float = 0
         for species in self._species.gas_species:
             mass += species.molar_mass * self.gas_pressures[species]

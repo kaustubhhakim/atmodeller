@@ -650,7 +650,7 @@ class InteriorAtmosphereSystem:
         mass: dict[str, float] = {
             "atmosphere": mass_in_atmosphere,
             "melt": mass_in_melt,
-            "solid": mass_in_solid,  # trapped in the solid mantle
+            "solid": mass_in_solid,  # trapped in the solid mantle, not condensed per se
         }
 
         if element is not None:
@@ -758,7 +758,7 @@ class InteriorAtmosphereSystem:
     @property
     def atmospheric_mean_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere"""
-        return self._solution.gas_molar_mass
+        return self._solution.gas_mean_molar_mass
 
     def solve(
         self,

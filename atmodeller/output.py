@@ -194,11 +194,6 @@ class Output(UserDict):
     """
 
     @property
-    def species(self) -> list[str]:
-        """Species in the output"""
-        return list(self.data["solution"][0].keys())
-
-    @property
     def size(self) -> int:
         """Number of rows"""
         try:
@@ -454,11 +449,15 @@ class Output(UserDict):
                 mass=element_mass["solid"],
                 reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
             )
+            try:
+                condensed_element_mass_element = condensed_element_mass[element]
+            except KeyError:
+                condensed_element_mass_element = 0
             output = SpeciesOutput(
                 atmosphere=atmosphere,
                 melt=melt,
                 solid=solid,
-                condensed_mass=condensed_element_mass[element],
+                condensed_mass=condensed_element_mass_element,
             )
             # Create a unique key name to avoid a potential name conflict with atomic species
             key_name: str = f"{element}_totals"
