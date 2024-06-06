@@ -637,7 +637,7 @@ class Output(UserDict):
         to_dataframes: bool = False,
         to_pickle: bool = False,
         to_excel: bool = False,
-    ) -> dict | None:
+    ) -> dict:
         """Gets the output and/or optionally write it to a pickle or Excel file.
 
         Args:
@@ -664,3 +664,5 @@ class Output(UserDict):
 
         if to_dict:
             return self.data
+
+        raise ValueError("No output option(s) specified")
