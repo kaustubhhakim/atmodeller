@@ -39,9 +39,9 @@ def test_graphite_water_condensed_output(graphite_water_condensed) -> None:
 
     output = system.output(to_dict=True, to_excel=True)
 
-    assert 9.89452e18 == pytest.approx(output["C_total"][0]["atmosphere_mass"])
-    assert 9.81055e19 == pytest.approx(output["C_total"][0]["condensed_mass"])
-    assert 3.9873e19 == pytest.approx(output["O_total"][0]["atmosphere_mass"])
-    assert 2.4431158e21 == pytest.approx(output["O_total"][0]["condensed_mass"])
-    assert 2.17398e18 == pytest.approx(output["H_total"][0]["atmosphere_mass"])
-    assert 3.07826e20 == pytest.approx(output["H_total"][0]["condensed_mass"])
+    assert 9.89452e18 == pytest.approx(output["C_totals"][0]["atmosphere_mass"])
+    assert 9.81055e19 == pytest.approx(output["C_totals"][0]["condensed_mass"])
+    assert 3.9873e19 == pytest.approx(output["O_totals"][0]["atmosphere_mass"])
+    assert 2.4431158e21 == pytest.approx(output["O_totals"][0]["condensed_mass"])
+    assert 2.17398e18 == pytest.approx(output["H_totals"][0]["atmosphere_mass"])
+    assert 3.07826e20 == pytest.approx(output["H_totals"][0]["condensed_mass"])

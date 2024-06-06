@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from molmass import Formula
 from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
@@ -508,6 +509,16 @@ class InteriorAtmosphereSystem:
         return self.solution.gas_mean_molar_mass
 
     @property
+    def atmospheric_element_moles(self) -> float:
+        """Total number of moles of elements in the atmosphere"""
+        element_moles: float = 0
+        for element in self.species.elements():
+            molar_mass: float = UnitConversion.g_to_kg(Formula(element).mass)
+            element_moles += self.element_gas_mass(element)["atmosphere_mass"] / molar_mass
+
+        return element_moles
+
+    @property
     def constraints(self) -> SystemConstraints:
         """Constraints"""
         return self._constraints
@@ -582,11 +593,13 @@ class InteriorAtmosphereSystem:
         Returns:
             Dictionary of condensed species and their element masses
         """
+        condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = {}
         condensed_elements: list[str] = self.solution.condensed_elements_to_solve
         condensed_species: list[CondensedSpecies] = self.solution.condensed_species_to_solve
         mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
 
-        # FIXME: If mapping is all zero, return something sensible.
+        if mapping.size < 1:
+            return condensed_species_masses
 
         # Assemble matrices
         element_condensed_mass: list[float] = []
@@ -618,7 +631,6 @@ class InteriorAtmosphereSystem:
         # Necessary to back-compute some species that might not be constrained by mass balance,
         # for example oxygen is often constrained by fO2 and not by abundance, but we want to know
         # how much oxygen is in the system.
-        condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = {}
         for nn, species in enumerate(condensed_species):
             composition: pd.DataFrame = species.composition().dataframe()
             composition["Mass"] = condensed_masses[nn] * composition["Fraction"]
@@ -637,7 +649,7 @@ class InteriorAtmosphereSystem:
         """
         condensed_species_masses = self.condensed_species_masses()
         condensed_element_masses: dict[str, float] = {}
-        for species, element_masses in condensed_species_masses.items():
+        for element_masses in condensed_species_masses.values():
             for element, value in element_masses.items():
                 if element in condensed_element_masses:
                     condensed_element_masses[element] += value

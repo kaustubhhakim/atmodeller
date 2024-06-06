@@ -124,7 +124,10 @@ class Output(UserDict):
         for species in interior_atmosphere.species.condensed_species:
             output: dict[str, float] = {}
             output["activity"] = interior_atmosphere.solution.activities[species]
-            output["mass"] = sum(condensed_species_masses[species].values())
+            try:
+                output["mass"] = sum(condensed_species_masses[species].values())
+            except KeyError:
+                output["mass"] = 0
             output["moles"] = output["mass"] / species.molar_mass
             output["molar_mass"] = species.molar_mass
 
@@ -158,12 +161,6 @@ class Output(UserDict):
         for element in interior_atmosphere.species.elements():
             mass[element] = interior_atmosphere.element_gas_mass(element)
 
-        # Preprocess to get total number of moles of elements in the atmosphere
-        atmosphere_total_element_moles: float = 0
-        for element, element_mass in mass.items():
-            molar_mass: float = UnitConversion.g_to_kg(Formula(element).mass)
-            atmosphere_total_element_moles += element_mass["atmosphere_mass"] / molar_mass
-
         # Create and add the output
         for element, element_mass in mass.items():
             output: dict[str, float] = {}
@@ -184,6 +181,9 @@ class Output(UserDict):
             )
             output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
             output["atmosphere_moles"] = output["atmosphere_mass"] / output["molar_mass"]
+            output["volume_mixing_ratio"] = (
+                output["atmosphere_moles"] / interior_atmosphere.atmospheric_element_moles
+            )
             output["melt_moles"] = output["melt_mass"] / output["molar_mass"]
             output["solid_moles"] = output["solid_mass"] / output["molar_mass"]
             output["condensed_moles"] = output["condensed_mass"] / output["molar_mass"]
@@ -202,7 +202,7 @@ class Output(UserDict):
                 output["solid_ppmw"] = 0
 
             # Create a unique key name to avoid a potential name conflict with atomic species
-            key_name: str = f"{element}_total"
+            key_name: str = f"{element}_totals"
             data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
             data_list.append(output)
 
@@ -238,6 +238,7 @@ class Output(UserDict):
             output["melt_moles"] = output["melt_mass"] / output["molar_mass"]
             output["solid_moles"] = output["solid_mass"] / output["molar_mass"]
             output["total_moles"] = output["total_mass"] / output["molar_mass"]
+
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)
 
