@@ -363,28 +363,41 @@ class Output(UserDict):
         # sorted_mapping = mapping[sorted_indices]
         # logger.debug("sorted_mapping = %s", sorted_mapping)
 
-        condensed_moles: dict[str, float] = {
-            element: value / UnitConversion.g_to_kg(Formula(element).mass)
-            for element, value in condensed_mass.items()
-        }
-        logger.debug("condensed_moles = %s", condensed_moles)
-        condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values())).reshape(
+        # condensed_moles: dict[str, float] = {
+        #    element: value / UnitConversion.g_to_kg(Formula(element).mass)
+        #    for element, value in condensed_mass.items()
+        # }
+        # logger.debug("condensed_moles = %s", condensed_moles)
+        # condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values())).reshape(
+        #    len(condensed_elements), -1
+        # )
+        # logger.debug("condensed_moles_array = %s", condensed_moles_array)
+
+        condensed_mass_array: npt.NDArray = np.array(list(condensed_mass.values())).reshape(
             len(condensed_elements), -1
         )
-        logger.debug("condensed_moles_array = %s", condensed_moles_array)
 
         # This solves for the number of moles of the single element in each species
-        x = np.linalg.solve(mapping, condensed_moles_array)
+        x: npt.NDArray = np.linalg.solve(mapping, condensed_mass_array)
         logger.debug("x = %s", x)
+
+        condensed_moles: dict[str, float] = {
+            element: mass / UnitConversion.g_to_kg(Formula(element).mass)
+            for element, mass in zip(condensed_elements, x)
+        }
+        logger.debug("condensed_moles = %s", condensed_moles)
+        condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values()))
 
         # Now need to back-compute other elements in the species based on stoichiometry
         condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = {}
         for ii, species in enumerate(condensed_species):
-            moles: float = x[ii]
+            moles: float = condensed_moles_array[ii]
             dataframe: pd.DataFrame = species.composition().dataframe()
             dataframe["Moles"] = dataframe["Count"] * moles
-            dataframe["Mass"] = dataframe["Moles"] * UnitConversion.g_to_kg(
-                dataframe["Relative mass"]
+            dataframe["Mass"] = (
+                dataframe["Moles"]
+                * UnitConversion.g_to_kg(dataframe["Relative mass"])
+                / dataframe["Count"]
             )
             logger.debug("dataframe = %s", dataframe)
             condensed_species_mass[species] = dataframe.to_dict()["Mass"]
