@@ -310,15 +310,18 @@ class Output(UserDict):
         logger.debug("condensed_elements = %s", condensed_elements)
         logger.debug("condensed_species = %s", condensed_species)
 
-        # Rows
+        condensed_mass: dict[str, float] = {}
         for ii, condensed_element in enumerate(condensed_elements):
-            # Columns
+            condensed_mass[condensed_element] = interior_atmosphere.element_condensed_mass(
+                condensed_element
+            )
             for jj, species in enumerate(condensed_species):
                 logger.debug(species.composition())
                 if condensed_element in species.composition():
                     mapping[ii, jj] = species.composition()[condensed_element].count
 
         logger.debug("mapping = %s", mapping)
+        logger.debug("condensed_mass = %s", condensed_mass)
 
         # Find associations
         associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
@@ -334,16 +337,26 @@ class Output(UserDict):
         # sorted_mapping = mapping[sorted_indices]
         # logger.debug("sorted_mapping = %s", sorted_mapping)
 
-        # FIXME: Beta is not the same as condensed mass.
-        # Ordered the same as for condensed species
-        beta: dict[str, float] = interior_atmosphere._solution._beta_solution
-        logger.debug("beta = %s", beta)
+        condensed_moles: dict[str, float] = {
+            element: value / UnitConversion.g_to_kg(Formula(element).mass)
+            for element, value in condensed_mass.items()
+        }
+        logger.debug("condensed_moles = %s", condensed_moles)
+        condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values())).reshape(
+            len(condensed_elements), -1
+        )
+        logger.debug("condensed_moles_array = %s", condensed_moles_array)
 
-        beta_moles: list[float] = [
-            value / UnitConversion.g_to_kg(Formula(element).mass)
-            for element, value in beta.items()
-        ]
-        logger.debug("beta_moles = %s", beta_moles)
+        # This solves for the number of moles of the single element in each species
+        x = np.linalg.solve(mapping, condensed_moles_array)
+        logger.debug("x = %s", x)
+
+        # Now need to back-compute other elements in the species based on stoichiometry
+        for ii, species in enumerate(condensed_species):
+            moles: float = x[ii]
+            dataframe: pd.DataFrame = species.composition().dataframe()
+            dataframe["Moles"] = dataframe["Count"] * moles
+            logger.debug("dataframe = %s", dataframe)
 
     def _add_elements(self, interior_atmosphere: InteriorAtmosphereSystem) -> float:
         """Adds elements.
@@ -354,18 +367,10 @@ class Output(UserDict):
         Returns:
             Total number of moles of elements
         """
-        # Sum all the elements across the species.
         mass: dict[str, Any] = {}
 
         for element in interior_atmosphere.species.elements():
             mass[element] = interior_atmosphere.element_gas_mass(element)
-            # old below
-            # species_masses: dict[str, float] = interior_atmosphere.species_gas_mass(
-            #    species=species, element=element
-            # )
-            # mass[element]["atmosphere"] += species_masses["atmosphere"]
-            # mass[element]["melt"] += species_masses["melt"]
-            # mass[element]["solid"] += species_masses["solid"]
 
         # Preprocess to get total number of moles of elements in the atmosphere
         atmosphere_total_element_moles: float = 0

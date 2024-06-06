@@ -657,7 +657,7 @@ class InteriorAtmosphereSystem:
             self.planet.mantle_solid_mass * ppmw_in_solid * UnitConversion.ppm_to_fraction()
         )
 
-        output: dict[str, float] = {
+        mass: dict[str, float] = {
             "atmosphere": mass_in_atmosphere,
             "melt": mass_in_melt,
             "solid": mass_in_solid,  # trapped in the solid mantle
@@ -671,10 +671,12 @@ class InteriorAtmosphereSystem:
                 )
             except KeyError:  # Element not in formula so mass is zero.
                 mass_scale_factor = 0
-            for key in output:
-                output[key] *= mass_scale_factor
+            for key in mass:
+                mass[key] *= mass_scale_factor
 
-        return output
+        logger.debug("species_gas_mass for %s (element = %s) = %s", species, element, mass)
+
+        return mass
 
     def element_gas_mass(self, element: str) -> dict[str, float]:
         """Calculates the mass of an element in all gas species in each reservoir.
@@ -692,9 +694,11 @@ class InteriorAtmosphereSystem:
             for key, value in species_mass.items():
                 mass[key] += value
 
+        logger.debug("element_gas_mass for %s = %s", element, mass)
+
         return mass
 
-    def element_condensed_mass(self, element: str) -> dict[str, float]:
+    def element_condensed_mass(self, element: str) -> float:
         """Calculates the mass of an element in all condensed species.
 
         Args:
@@ -703,13 +707,13 @@ class InteriorAtmosphereSystem:
         Returns:
             Condensed mass of the element
         """
-        mass: dict[str, float] = {}
-
         if element in self._solution.condensed_elements_to_solve:
-            mass["condensed"] = sum(self.element_gas_mass(element).values())
-            mass["condensed"] *= 10 ** self._solution._beta_solution[element]
+            mass = sum(self.element_gas_mass(element).values())
+            mass *= 10 ** self._solution._beta_solution[element]
         else:
-            mass["condensed"] = 0
+            mass = 0
+
+        logger.debug("element_condensed_mass for %s = %s", element, mass)
 
         return mass
 
@@ -722,9 +726,8 @@ class InteriorAtmosphereSystem:
         Returns:
             Total mass of the element
         """
-        element_gas_mass: dict[str, float] = self.element_gas_mass(element)
-        element_condensed_mass: dict[str, float] = self.element_condensed_mass(element)
-        element_mass: dict[str, float] = element_gas_mass | element_condensed_mass
+        element_mass: dict[str, float] = self.element_gas_mass(element)
+        element_mass["condensed"] = self.element_condensed_mass(element)
 
         logger.debug("element_mass for %s = %s", element, element_mass)
 
@@ -754,6 +757,7 @@ class InteriorAtmosphereSystem:
         """Total mass"""
         mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
         mass *= self.planet.surface_area
+
         return mass
 
     @property
