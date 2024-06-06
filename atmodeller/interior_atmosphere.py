@@ -501,14 +501,9 @@ class InteriorAtmosphereSystem:
         self._reaction_network = ReactionNetworkWithCondensateStability(species=self.species)
 
     @property
-    def solution(self) -> Solution:
-        """The solution"""
-        return self._solution
-
-    @property
-    def number_of_solves(self) -> int:
-        """The total number of systems solved"""
-        return self.output.size
+    def atmospheric_mean_molar_mass(self) -> float:
+        """Mean molar mass of the atmosphere"""
+        return self.solution.gas_mean_molar_mass
 
     @property
     def constraints(self) -> SystemConstraints:
@@ -527,6 +522,11 @@ class InteriorAtmosphereSystem:
         )
 
         return self._failed_solves
+
+    @property
+    def number_of_solves(self) -> int:
+        """The total number of systems solved"""
+        return self.output.size
 
     @property
     def residual_dict(self) -> dict[str, float]:
@@ -551,6 +551,24 @@ class InteriorAtmosphereSystem:
             output[constraint.name] = self._residual[-1]  # Always last index if applied
 
         return output
+
+    @property
+    def solution(self) -> Solution:
+        """The solution"""
+        return self._solution
+
+    @property
+    def total_mass(self) -> float:
+        """Total mass"""
+        mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
+        mass *= self.planet.surface_area
+
+        return mass
+
+    @property
+    def total_pressure(self) -> float:
+        """Total pressure"""
+        return self.solution.total_pressure
 
     def gas_species_reservoir_masses(
         self,
@@ -702,24 +720,6 @@ class InteriorAtmosphereSystem:
         logger.debug("residual_mass = %s", residual_mass)
 
         return residual_mass
-
-    @property
-    def total_mass(self) -> float:
-        """Total mass"""
-        mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
-        mass *= self.planet.surface_area
-
-        return mass
-
-    @property
-    def total_pressure(self) -> float:
-        """Total pressure"""
-        return self.solution.total_pressure
-
-    @property
-    def atmospheric_mean_molar_mass(self) -> float:
-        """Mean molar mass of the atmosphere"""
-        return self.solution.gas_mean_molar_mass
 
     def solve(
         self,
