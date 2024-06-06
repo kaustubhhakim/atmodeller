@@ -661,7 +661,6 @@ class InteriorAtmosphereSystem:
         """
         output: dict[str, float] = self.gas_species_reservoir_masses(species)
 
-        # Note that reservoirs must have an _mass suffix
         mass: dict[str, float] = {
             "atmosphere_mass": output["atmosphere_mass"],
             "melt_mass": output["melt_mass"],
