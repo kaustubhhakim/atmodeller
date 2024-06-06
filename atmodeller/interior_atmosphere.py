@@ -27,7 +27,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from molmass import Formula
 from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
@@ -578,10 +577,10 @@ class InteriorAtmosphereSystem:
 
         This follows the approach outlined in :cite:t:`KSP24{Appendix B}, albeit simplified under
         the assumption of a handful of linearly independent condensates that can be solved for in
-        a single iteration.
+        a single solve, i.e. no iteration is required.
 
         Returns:
-            Dictionary of condensed species and their elemental masses
+            Dictionary of condensed species and their element masses
         """
         condensed_elements: list[str] = self.solution.condensed_elements_to_solve
         condensed_species: list[CondensedSpecies] = self.solution.condensed_species_to_solve
@@ -590,15 +589,12 @@ class InteriorAtmosphereSystem:
         # FIXME: If mapping is all zero, return something sensible.
 
         # Assemble matrices
-        condensed_element_moles: list[float] = []
+        element_condensed_mass: list[float] = []
         for ii, condensed_element in enumerate(condensed_elements):
-            condensed_element_moles.append(
-                self.element_condensed_mass(condensed_element)
-                / UnitConversion.g_to_kg(Formula(condensed_element).mass)
-            )
+            element_condensed_mass.append(self.element_condensed_mass(condensed_element))
             for jj, species in enumerate(condensed_species):
                 if condensed_element in species.composition():
-                    mapping[ii, jj] = species.composition()[condensed_element].count
+                    mapping[ii, jj] = species.composition()[condensed_element].fraction
 
         logger.debug("mapping = %s", mapping)
 
@@ -612,26 +608,45 @@ class InteriorAtmosphereSystem:
                 "Every element can only be associated with a single condensate"
             ) from exc
 
-        # Solve for the number of moles in one unit of the molecule formula
-        condensed_element_moles_ar: npt.NDArray = np.array(condensed_element_moles).reshape(-1, 1)
-        number_moles: npt.NDArray = np.linalg.solve(mapping, condensed_element_moles_ar)
-        logger.debug("number_moles = %s", number_moles)
+        element_condensed_mass_ar: npt.NDArray = np.array(
+            element_condensed_mass, dtype=np.float_
+        ).reshape(-1, 1)
+        condensed_masses: npt.NDArray = np.linalg.solve(
+            mapping, element_condensed_mass_ar
+        ).flatten()
 
-        # Finally compute the element masses in each condensed species based on the stoichiometry
-        # of the molecule.
-        # FIXME: How will this behave if all element masses are prescribed for all condensates?
-        condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = {}
+        # Necessary to back-compute some species that might not be constrained by mass balance,
+        # for example oxygen is often constrained by fO2 and not by abundance, but we want to know
+        # how much oxygen is in the system.
+        condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = {}
         for nn, species in enumerate(condensed_species):
             composition: pd.DataFrame = species.composition().dataframe()
-            composition["Mass"] = number_moles[nn] * UnitConversion.g_to_kg(
-                composition["Relative mass"]
-            )
+            composition["Mass"] = condensed_masses[nn] * composition["Fraction"]
             logger.debug("composition = %s", composition)
-            condensed_species_mass[species] = composition.to_dict()["Mass"]
+            condensed_species_masses[species] = composition.to_dict()["Mass"]
 
-        logger.debug("condensed_species_mass = %s", condensed_species_mass)
+        return condensed_species_masses
 
-        return condensed_species_mass
+    def condensed_element_masses(self) -> dict[str, float]:
+        """Calculates the computed and implied masses of elements in all condensed species.
+
+        TODO: Different to element_condensed_mass this computes the implied masses as well.
+
+        Returns:
+            Dictionary of elements and their masses in all condensed species
+        """
+        condensed_species_masses = self.condensed_species_masses()
+        condensed_element_masses: dict[str, float] = {}
+        for species, element_masses in condensed_species_masses.items():
+            for element, value in element_masses.items():
+                if element in condensed_element_masses:
+                    condensed_element_masses[element] += value
+                else:
+                    condensed_element_masses[element] = value
+
+        logger.debug("condensed_element_masses = %s", condensed_element_masses)
+
+        return condensed_element_masses
 
     def gas_species_reservoir_masses(
         self,
