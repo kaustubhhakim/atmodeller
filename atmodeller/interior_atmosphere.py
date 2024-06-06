@@ -23,7 +23,6 @@ import logging
 import pprint
 import sys
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -31,16 +30,16 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
-from atmodeller import GAS_CONSTANT, GRAVITATIONAL_CONSTANT
+from atmodeller import GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import GasSpecies, Solution, Species
+from atmodeller.core import GasSpecies, Planet, Solution, Species
 from atmodeller.initial_solution import InitialSolutionConstant
 from atmodeller.interfaces import (
     InitialSolutionProtocol,
     TotalPressureConstraintProtocol,
 )
 from atmodeller.output import Output
-from atmodeller.utilities import UnitConversion, dataclass_to_logger
+from atmodeller.utilities import UnitConversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -53,56 +52,6 @@ TAU: float = 1e-15
 """Tau factor for the calculation of the auxilliary equations for condensate stability"""
 log10_TAU: float = np.log10(TAU)
 """Log10 of Tau"""
-
-
-@dataclass(kw_only=True)
-class Planet:
-    """The properties of a planet
-
-    Defines the properties of a planet that are relevant for interior modeling. It provides default
-    values suitable for modelling a fully molten Earth-like planet.
-
-    Args:
-        planet_mass: Mass of the planet in kg. Defaults to Earth.
-        core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to Earth.
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
-        surface_radius: Radius of the planetary surface in m. Defaults to Earth.
-        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
-        melt_composition: Melt composition of the planet. Default is None.
-    """
-
-    planet_mass: float = 5.972e24
-    """Mass of the planet in kg"""
-    core_mass_fraction: float = 0.295334691460966
-    """Mass fraction of the core relative to the planetary mass (kg/kg)"""
-    mantle_melt_fraction: float = 1.0
-    """Mass fraction of the mantle that is molten"""
-    surface_radius: float = 6371000.0
-    """Radius of the surface in m"""
-    surface_temperature: float = 2000.0
-    """Temperature of the surface in K"""
-    melt_composition: str | None = None
-    """Melt composition"""
-    mantle_mass: float = field(init=False)
-    """Mass of the mantle"""
-    mantle_melt_mass: float = field(init=False)
-    """Mass of the mantle that is molten"""
-    mantle_solid_mass: float = field(init=False)
-    """Mass of the mantle that is solid"""
-    surface_area: float = field(init=False)
-    """Surface area"""
-    surface_gravity: float = field(init=False)
-    """Surface gravity"""
-
-    def __post_init__(self):
-        self.mantle_mass = self.planet_mass * (1 - self.core_mass_fraction)
-        self.mantle_melt_mass = self.mantle_mass * self.mantle_melt_fraction
-        self.mantle_solid_mass = self.mantle_mass * (1 - self.mantle_melt_fraction)
-        self.surface_area = 4.0 * np.pi * self.surface_radius**2
-        self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
-        logger.info("Creating a new planet")
-        dataclass_to_logger(self, logger)
 
 
 class ReactionNetwork:
