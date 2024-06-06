@@ -271,7 +271,7 @@ class Output(UserDict):
             Condensed element masses
         """
         condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = (
-            self.condensed_species_mass(interior_atmosphere)
+            interior_atmosphere.condensed_species_masses()
         )
         for species in interior_atmosphere.species.condensed_species:
             activity: float = interior_atmosphere.solution.activities[species]
@@ -306,95 +306,87 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
 
-    def condensed_species_mass(
-        self, interior_atmosphere: InteriorAtmosphereSystem
-    ) -> dict[CondensedSpecies, dict[str, float]]:
-        """Computes the element condensate mapping matrix
+    # def condensed_species_mass(
+    #     self, interior_atmosphere: InteriorAtmosphereSystem
+    # ) -> dict[CondensedSpecies, dict[str, float]]:
+    #     """Computes the element condensate mapping matrix
 
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        condensed_elements: list[str] = interior_atmosphere._solution.condensed_elements_to_solve
-        condensed_species: list[CondensedSpecies] = (
-            interior_atmosphere._solution.condensed_species_to_solve
-        )
+    #     Args:
+    #         interior_atmosphere: Interior atmosphere system
+    #     """
+    #     condensed_elements: list[str] = interior_atmosphere._solution.condensed_elements_to_solve
+    #     condensed_species: list[CondensedSpecies] = (
+    #         interior_atmosphere._solution.condensed_species_to_solve
+    #     )
 
-        mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
+    #     mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
 
-        logger.warning("Testing element-condensate mapping")
-        logger.debug("mapping empty = %s", mapping)
-        logger.debug("condensed_elements = %s", condensed_elements)
-        logger.debug("condensed_species = %s", condensed_species)
+    #     logger.warning("Testing element-condensate mapping")
+    #     logger.debug("mapping empty = %s", mapping)
+    #     logger.debug("condensed_elements = %s", condensed_elements)
+    #     logger.debug("condensed_species = %s", condensed_species)
 
-        condensed_mass: dict[str, float] = {}
-        for ii, condensed_element in enumerate(condensed_elements):
-            condensed_mass[condensed_element] = interior_atmosphere.element_condensed_mass(
-                condensed_element
-            )
-            for jj, species in enumerate(condensed_species):
-                logger.debug(species.composition())
-                if condensed_element in species.composition():
-                    mapping[ii, jj] = species.composition()[condensed_element].count
+    #     condensed_mass: dict[str, float] = {}
+    #     for ii, condensed_element in enumerate(condensed_elements):
+    #         condensed_mass[condensed_element] = interior_atmosphere.element_condensed_mass(
+    #             condensed_element
+    #         )
+    #         for jj, species in enumerate(condensed_species):
+    #             logger.debug(species.composition())
+    #             if condensed_element in species.composition():
+    #                 mapping[ii, jj] = species.composition()[condensed_element].count
 
-        logger.debug("mapping = %s", mapping)
-        logger.debug("condensed_mass = %s", condensed_mass)
+    #     logger.debug("mapping = %s", mapping)
+    #     logger.debug("condensed_mass = %s", condensed_mass)
 
-        # Find associations
-        associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
-        logger.debug("associations = %s", associations)
-        try:
-            assert np.all(associations == 1)
-        except AssertionError:
-            logger.error("Cannot map elements to condensate without an iteration")
+    #     # Required for iteration, but not when can be calculated in one
+    #     # sorted_indices = np.argsort(associations)
+    #     # logger.debug("sorted_indices = %s", sorted_indices)
+    #     # sorted_mapping = mapping[sorted_indices]
+    #     # logger.debug("sorted_mapping = %s", sorted_mapping)
 
-        # Required for iteration, but not when can be calculated in one
-        # sorted_indices = np.argsort(associations)
-        # logger.debug("sorted_indices = %s", sorted_indices)
-        # sorted_mapping = mapping[sorted_indices]
-        # logger.debug("sorted_mapping = %s", sorted_mapping)
+    #     # condensed_moles: dict[str, float] = {
+    #     #    element: value / UnitConversion.g_to_kg(Formula(element).mass)
+    #     #    for element, value in condensed_mass.items()
+    #     # }
+    #     # logger.debug("condensed_moles = %s", condensed_moles)
+    #     # condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values())).reshape(
+    #     #    len(condensed_elements), -1
+    #     # )
+    #     # logger.debug("condensed_moles_array = %s", condensed_moles_array)
 
-        # condensed_moles: dict[str, float] = {
-        #    element: value / UnitConversion.g_to_kg(Formula(element).mass)
-        #    for element, value in condensed_mass.items()
-        # }
-        # logger.debug("condensed_moles = %s", condensed_moles)
-        # condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values())).reshape(
-        #    len(condensed_elements), -1
-        # )
-        # logger.debug("condensed_moles_array = %s", condensed_moles_array)
+    #     condensed_mass_array: npt.NDArray = np.array(list(condensed_mass.values())).reshape(
+    #         len(condensed_elements), -1
+    #     )
 
-        condensed_mass_array: npt.NDArray = np.array(list(condensed_mass.values())).reshape(
-            len(condensed_elements), -1
-        )
+    #     # This solves for the number of moles of the single element in each species
+    #     x: npt.NDArray = np.linalg.solve(mapping, condensed_mass_array)
+    #     logger.debug("x = %s", x)
 
-        # This solves for the number of moles of the single element in each species
-        x: npt.NDArray = np.linalg.solve(mapping, condensed_mass_array)
-        logger.debug("x = %s", x)
+    #     condensed_moles: dict[str, float] = {
+    #         element: mass / UnitConversion.g_to_kg(Formula(element).mass)
+    #         for element, mass in zip(condensed_elements, x)
+    #     }
+    #     logger.debug("condensed_moles = %s", condensed_moles)
+    #     condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values()))
 
-        condensed_moles: dict[str, float] = {
-            element: mass / UnitConversion.g_to_kg(Formula(element).mass)
-            for element, mass in zip(condensed_elements, x)
-        }
-        logger.debug("condensed_moles = %s", condensed_moles)
-        condensed_moles_array: npt.NDArray = np.array(list(condensed_moles.values()))
+    #     # Now need to back-compute other elements in the species based on stoichiometry
+    #     condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = {}
+    #     for ii, species in enumerate(condensed_species):
+    #         moles: float = condensed_moles_array[ii]
+    #         dataframe: pd.DataFrame = species.composition().dataframe()
+    #         dataframe["Moles"] = dataframe["Count"] * moles
+    #         dataframe["Mass"] = (
+    #             dataframe["Moles"]
+    #             * UnitConversion.g_to_kg(dataframe["Relative mass"])
+    #             / dataframe["Count"]
+    #         )
+    #         logger.debug("dataframe = %s", dataframe)
+    #         condensed_species_mass[species] = dataframe.to_dict()["Mass"]
 
-        # Now need to back-compute other elements in the species based on stoichiometry
-        condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = {}
-        for ii, species in enumerate(condensed_species):
-            moles: float = condensed_moles_array[ii]
-            dataframe: pd.DataFrame = species.composition().dataframe()
-            dataframe["Moles"] = dataframe["Count"] * moles
-            dataframe["Mass"] = (
-                dataframe["Moles"]
-                * UnitConversion.g_to_kg(dataframe["Relative mass"])
-                / dataframe["Count"]
-            )
-            logger.debug("dataframe = %s", dataframe)
-            condensed_species_mass[species] = dataframe.to_dict()["Mass"]
+    #     logger.debug("condensed_species_mass = %s", condensed_species_mass)
 
-        logger.debug("condensed_species_mass = %s", condensed_species_mass)
-
-        return condensed_species_mass
+    #     return condensed_species_mass
 
     def _add_elements(
         self,

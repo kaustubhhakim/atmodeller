@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
+from molmass import Formula
 from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
@@ -35,6 +37,7 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.core import GasSpecies, Planet, Solution, Species
 from atmodeller.initial_solution import InitialSolutionConstant
 from atmodeller.interfaces import (
+    CondensedSpecies,
     InitialSolutionProtocol,
     TotalPressureConstraintProtocol,
 )
@@ -569,6 +572,66 @@ class InteriorAtmosphereSystem:
     def total_pressure(self) -> float:
         """Total pressure"""
         return self.solution.total_pressure
+
+    def condensed_species_masses(self) -> dict[CondensedSpecies, dict[str, float]]:
+        """Computes the masses of condensed species and their elements
+
+        This follows the approach outlined in :cite:t:`KSP24{Appendix B}, albeit simplified under
+        the assumption of a handful of linearly independent condensates that can be solved for in
+        a single iteration.
+
+        Returns:
+            Dictionary of condensed species and their elemental masses
+        """
+        condensed_elements: list[str] = self.solution.condensed_elements_to_solve
+        condensed_species: list[CondensedSpecies] = self.solution.condensed_species_to_solve
+        mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
+
+        # FIXME: If mapping is all zero, return something sensible.
+
+        # Assemble matrices
+        condensed_element_moles: list[float] = []
+        for ii, condensed_element in enumerate(condensed_elements):
+            condensed_element_moles.append(
+                self.element_condensed_mass(condensed_element)
+                / UnitConversion.g_to_kg(Formula(condensed_element).mass)
+            )
+            for jj, species in enumerate(condensed_species):
+                if condensed_element in species.composition():
+                    mapping[ii, jj] = species.composition()[condensed_element].count
+
+        logger.debug("mapping = %s", mapping)
+
+        # Count how many condensates can be associated with each element
+        associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
+        # Enforce conditions for a single solve, which avoids the complication of having to iterate
+        try:
+            assert np.all(associations == 1)
+        except AssertionError as exc:
+            raise AssertionError(
+                "Every element can only be associated with a single condensate"
+            ) from exc
+
+        # Solve for the number of moles in one unit of the molecule formula
+        condensed_element_moles_ar: npt.NDArray = np.array(condensed_element_moles).reshape(-1, 1)
+        number_moles: npt.NDArray = np.linalg.solve(mapping, condensed_element_moles_ar)
+        logger.debug("number_moles = %s", number_moles)
+
+        # Finally compute the element masses in each condensed species based on the stoichiometry
+        # of the molecule.
+        # FIXME: How will this behave if all element masses are prescribed for all condensates?
+        condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = {}
+        for nn, species in enumerate(condensed_species):
+            composition: pd.DataFrame = species.composition().dataframe()
+            composition["Mass"] = number_moles[nn] * UnitConversion.g_to_kg(
+                composition["Relative mass"]
+            )
+            logger.debug("composition = %s", composition)
+            condensed_species_mass[species] = composition.to_dict()["Mass"]
+
+        logger.debug("condensed_species_mass = %s", condensed_species_mass)
+
+        return condensed_species_mass
 
     def gas_species_reservoir_masses(
         self,
