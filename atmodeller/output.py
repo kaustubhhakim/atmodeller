@@ -121,10 +121,14 @@ class CondensedSpeciesOutput:
     """Output for a condensed species
 
     Args:
+        mass: Mass of the condensed species in kg
         activity: Activity
     """
 
     activity: float
+    """Activity"""
+    mass: float
+    """Mass in kg"""
 
     def asdict(self) -> dict[str, float]:
         """Data as a dictionary"""
@@ -140,22 +144,20 @@ class SpeciesOutput:
     atmosphere: ReservoirOutput
     melt: ReservoirOutput
     solid: ReservoirOutput
-    degree_of_condensation: float = 0
-    condensed_mass: float = field(init=False, default=0)
-    condensed_moles: float = field(init=False, default=0)
+    condensed_mass: float = 0
     total_mass: float = field(init=False)
+    degree_of_condensation: float = field(init=False)
+    condensed_moles: float = field(init=False)
     total_moles: float = field(init=False)
 
     def __post_init__(self):
-        doc_factor: float = self.degree_of_condensation / (1 - self.degree_of_condensation)
-        self.condensed_mass = doc_factor * (
-            self.atmosphere.mass + self.melt.mass + self.solid.mass
-        )
-        self.condensed_moles = doc_factor * (
-            self.atmosphere.moles + self.melt.moles + self.solid.moles
-        )
         self.total_mass = (
             self.atmosphere.mass + self.melt.mass + self.solid.mass + self.condensed_mass
+        )
+        self.degree_of_condensation = self.condensed_mass / self.total_mass
+        doc_factor: float = self.degree_of_condensation / (1 - self.degree_of_condensation)
+        self.condensed_moles = doc_factor * (
+            self.atmosphere.moles + self.melt.moles + self.solid.moles
         )
         self.total_moles = (
             self.atmosphere.moles + self.melt.moles + self.solid.moles + self.condensed_moles
@@ -175,6 +177,7 @@ class SpeciesOutput:
         output_dict["molar_mass"] = molar_mass
         output_dict = delete_entries_with_suffix(output_dict, "reservoir_mass")
         output_dict = delete_entries_with_suffix(output_dict, "reservoir_moles")
+        # TODO: A better approach would be to not calculate these for gas species at all
         if self.degree_of_condensation == 0:
             del output_dict["degree_of_condensation"]
             del output_dict["condensed_mass"]
@@ -232,9 +235,9 @@ class Output(UserDict):
             extra_output: Extra data to write to the output. Defaults to None.
         """
         species_moles: float = self._add_species(interior_atmosphere)
-        element_moles: float = self._add_elements(interior_atmosphere)
+        condensed_element_mass: dict[str, float] = self._add_condensed_species(interior_atmosphere)
+        element_moles: float = self._add_elements(interior_atmosphere, condensed_element_mass)
         self._add_atmosphere(interior_atmosphere, species_moles, element_moles)
-        self._add_condensed_species(interior_atmosphere)
         self._add_constraints(interior_atmosphere)
         self._add_planet(interior_atmosphere)
         self._add_residual(interior_atmosphere)
@@ -266,17 +269,40 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere)
 
-    def _add_condensed_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+    def _add_condensed_species(
+        self, interior_atmosphere: InteriorAtmosphereSystem
+    ) -> dict[str, float]:
         """Adds condensed species.
 
         Args:
             interior_atmosphere: Interior atmosphere system
+
+        Returns:
+            Condensed element masses
         """
+        condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = (
+            self.condensed_species_mass(interior_atmosphere)
+        )
         for species in interior_atmosphere.species.condensed_species:
             activity: float = interior_atmosphere.solution.activities[species]
-            output = CondensedSpeciesOutput(activity=activity)
+            mass: float = sum(condensed_species_mass[species].values())
+            output = CondensedSpeciesOutput(mass=mass, activity=activity)
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output.asdict())
+
+        # TODO: Probably move elsewhere, but need to compute the condensed elements for the
+        # later elemental output
+        condensed_element_mass: dict[str, float] = {}
+        for species, element_masses in condensed_species_mass.items():
+            for element, value in element_masses.items():
+                if element in condensed_element_mass:
+                    condensed_element_mass[element] += value
+                else:
+                    condensed_element_mass[element] = value
+
+        logger.debug("condensed_element_mass = %s", condensed_element_mass)
+
+        return condensed_element_mass
 
     def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds constraints.
@@ -290,15 +316,15 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
 
-    def element_condensate_mapping(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+    def condensed_species_mass(
+        self, interior_atmosphere: InteriorAtmosphereSystem
+    ) -> dict[CondensedSpecies, dict[str, float]]:
         """Computes the element condensate mapping matrix
 
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        # Should form the rows
         condensed_elements: list[str] = interior_atmosphere._solution.condensed_elements_to_solve
-        # Should form the columns
         condensed_species: list[CondensedSpecies] = (
             interior_atmosphere._solution.condensed_species_to_solve
         )
@@ -352,17 +378,31 @@ class Output(UserDict):
         logger.debug("x = %s", x)
 
         # Now need to back-compute other elements in the species based on stoichiometry
+        condensed_species_mass: dict[CondensedSpecies, dict[str, float]] = {}
         for ii, species in enumerate(condensed_species):
             moles: float = x[ii]
             dataframe: pd.DataFrame = species.composition().dataframe()
             dataframe["Moles"] = dataframe["Count"] * moles
+            dataframe["Mass"] = dataframe["Moles"] * UnitConversion.g_to_kg(
+                dataframe["Relative mass"]
+            )
             logger.debug("dataframe = %s", dataframe)
+            condensed_species_mass[species] = dataframe.to_dict()["Mass"]
 
-    def _add_elements(self, interior_atmosphere: InteriorAtmosphereSystem) -> float:
+        logger.debug("condensed_species_mass = %s", condensed_species_mass)
+
+        return condensed_species_mass
+
+    def _add_elements(
+        self,
+        interior_atmosphere: InteriorAtmosphereSystem,
+        condensed_element_mass: dict[str, float],
+    ) -> float:
         """Adds elements.
 
         Args:
             interior_atmosphere: Interior atmosphere system
+            condensed_element_mass: Condensed element masses
 
         Returns:
             Total number of moles of elements
@@ -401,52 +441,11 @@ class Output(UserDict):
                 mass=element_mass["solid"],
                 reservoir_mass=interior_atmosphere.planet.mantle_solid_mass,
             )
-            # Add contribution from condensation for the elements
-            if element in interior_atmosphere.solution.condensed_elements_to_solve:
-                degree_of_condensation: float = interior_atmosphere.solution.solution_dict()[
-                    f"degree_of_condensation_{element}"
-                ]
-
-            # TODO: Clean up this clunky exception logic for oxygen
-            elif (
-                element == "O"
-                # TODO: Add condition to check for H2O and only H2O with O?
-                and "O" not in interior_atmosphere.solution.condensed_elements_to_solve
-                and "H" in interior_atmosphere.solution.condensed_elements_to_solve
-                # Below assume only C and H2O can exist as condensed. Ugly.
-                and interior_atmosphere.species.number_condensed_species <= 2
-            ):
-                logger.warning("Back-computing oxygen in condensed phase (H2O)")
-                degree_of_condensation_H: float = interior_atmosphere.solution.solution_dict()[
-                    "degree_of_condensation_H"
-                ]
-                # Compute moles of condensed H. Repeats calculation done in SpeciesOutput
-                doc_factor = degree_of_condensation_H / (1 - degree_of_condensation_H)
-                mass_H: float = mass["H"]["atmosphere"] + mass["H"]["melt"] + mass["H"]["solid"]
-                moles_H: float = doc_factor * mass_H / UnitConversion.g_to_kg(Formula("H").mass)
-                logger.warning("condensed_moles_H = %s", moles_H)
-                # From stoichiometry of H2O. This assumes that H2O is the only condensed phase
-                # involving H and O. Can then directly determine the number of moles of O that
-                # must also be present in the condensed phase (H2O).
-                moles_O = moles_H / 2
-                logger.warning("condensed_moles_O = %s", moles_O)
-                condensed_mass_O = moles_O * UnitConversion.g_to_kg(Formula("O").mass)
-                logger.warning("condensed_mass_O = %s", condensed_mass_O)
-                degree_of_condensation = condensed_mass_O
-                degree_of_condensation /= (
-                    mass["O"]["atmosphere"]
-                    + mass["O"]["melt"]
-                    + mass["O"]["solid"]
-                    + condensed_mass_O
-                )
-            else:
-                degree_of_condensation = 0
-
             output = SpeciesOutput(
                 atmosphere=atmosphere,
                 melt=melt,
                 solid=solid,
-                degree_of_condensation=degree_of_condensation,
+                condensed_mass=condensed_element_mass[element],
             )
             # Create a unique key name to avoid a potential name conflict with atomic species
             key_name: str = f"{element}_totals"
