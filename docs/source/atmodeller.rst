@@ -70,6 +70,14 @@ atmodeller.plot module
    :undoc-members:
    :show-inheritance:
 
+atmodeller.reaction\_network module
+-----------------------------------
+
+.. automodule:: atmodeller.reaction_network
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.utilities module
 ---------------------------
 

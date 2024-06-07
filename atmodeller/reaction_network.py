@@ -305,7 +305,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
     """A reaction network with condensate stability
 
     This automatically determines condensate stability using the extended law of mass-action
-    (xLMA) equations :cite:p:`LKS17`. Also see :cite:p:`KSP42`.
+    (xLMA) equations :cite:p:`LKS17`. Also see :cite:p:`KSP24`.
 
     Args:
         species: Species

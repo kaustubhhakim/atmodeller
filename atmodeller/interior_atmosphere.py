@@ -176,7 +176,7 @@ class InteriorAtmosphereSystem:
     def condensed_species_masses(self) -> dict[CondensedSpecies, dict[str, float]]:
         """Computes the masses of condensed species and their elements
 
-        This follows the approach outlined in :cite:t:`KSP24{Appendix B}, albeit simplified under
+        This follows the approach outlined in :cite:t:`KSP24{Appendix B}`, albeit simplified under
         the assumption of a handful of linearly independent condensates that can be solved for in
         a single solve, i.e. no iteration is required.
 
