@@ -340,16 +340,6 @@ class Species(UserList):
                     logger.info("No solubility law for %s", species.hill_formula)
                     species.solubility = NoSolubility()
 
-    def transpose_formula_matrix(self) -> npt.NDArray[np.int_]:
-        """The transposed formula matrix for all elements and species
-
-        Returns:
-            The transposed formula matrix
-        """
-        matrix: npt.NDArray[np.int_] = self.formula_matrix(self.elements(), self.data)
-
-        return matrix.T
-
     @staticmethod
     def formula_matrix(
         elements: list[str], species: list[ChemicalSpecies]

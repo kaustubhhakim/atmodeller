@@ -80,9 +80,11 @@ class ReactionNetwork:
             logger.debug("Only one species therefore no reactions")
             return None
 
-        matrix: npt.NDArray = self.species.transpose_formula_matrix()
+        transpose_formula_matrix: npt.NDArray = self.species.formula_matrix(
+            self.species.elements(), self.species.data
+        ).T
 
-        return partial_rref(matrix)
+        return partial_rref(transpose_formula_matrix)
 
     def reactions(self) -> dict[int, str]:
         """The reactions as a dictionary"""
