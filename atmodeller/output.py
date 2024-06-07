@@ -201,8 +201,8 @@ class Output(UserDict):
             else:
                 output["solid_ppmw"] = 0
 
-            # Create a unique key name to avoid a potential name conflict with atomic species
-            key_name: str = f"{element}_totals"
+            # Create a unique key name
+            key_name: str = f"{element}_total"
             data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
             data_list.append(output)
 
