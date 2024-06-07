@@ -107,7 +107,8 @@ class Output(UserDict):
         atmosphere["pressure"] = interior_atmosphere.atmosphere_pressure
         atmosphere["mean_molar_mass"] = interior_atmosphere.atmosphere_molar_mass
         atmosphere["mass"] = interior_atmosphere.atmosphere_mass
-        atmosphere["element_moles"] = interior_atmosphere.atmospheric_element_moles
+        atmosphere["element_moles"] = interior_atmosphere.atmosphere_element_moles
+        atmosphere["species_moles"] = interior_atmosphere.atmosphere_species_moles
 
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere)
@@ -183,7 +184,7 @@ class Output(UserDict):
             output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
             output["atmosphere_moles"] = output["atmosphere_mass"] / output["molar_mass"]
             output["volume_mixing_ratio"] = (
-                output["atmosphere_moles"] / interior_atmosphere.atmospheric_element_moles
+                output["atmosphere_moles"] / interior_atmosphere.atmosphere_element_moles
             )
             output["melt_moles"] = output["melt_mass"] / output["molar_mass"]
             output["solid_moles"] = output["solid_mass"] / output["molar_mass"]

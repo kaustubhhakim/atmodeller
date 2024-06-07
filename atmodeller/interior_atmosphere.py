@@ -78,6 +78,16 @@ class InteriorAtmosphereSystem:
         self._reaction_network = ReactionNetworkWithCondensateStability(species=self.species)
 
     @property
+    def atmosphere_element_moles(self) -> float:
+        """Total number of moles of elements in the atmosphere"""
+        element_moles: float = 0
+        for element in self.species.elements():
+            molar_mass: float = UnitConversion.g_to_kg(Formula(element).mass)
+            element_moles += self.element_gas_mass(element)["atmosphere_mass"] / molar_mass
+
+        return element_moles
+
+    @property
     def atmosphere_mass(self) -> float:
         """Total mass of the atmosphere"""
         mass: float = (
@@ -98,14 +108,15 @@ class InteriorAtmosphereSystem:
         return self.solution.total_pressure
 
     @property
-    def atmospheric_element_moles(self) -> float:
-        """Total number of moles of elements in the atmosphere"""
-        element_moles: float = 0
-        for element in self.species.elements():
-            molar_mass: float = UnitConversion.g_to_kg(Formula(element).mass)
-            element_moles += self.element_gas_mass(element)["atmosphere_mass"] / molar_mass
+    def atmosphere_species_moles(self) -> float:
+        """Total number of moles of species in the atmosphere"""
+        species_moles: float = 0
+        for species in self.species.gas_species:
+            species_moles += (
+                self.gas_species_reservoir_masses(species)["atmosphere_mass"] / species.molar_mass
+            )
 
-        return element_moles
+        return species_moles
 
     @property
     def constraints(self) -> SystemConstraints:
@@ -192,6 +203,7 @@ class InteriorAtmosphereSystem:
 
         # Count how many condensates can be associated with each element
         associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
+        logger.debug("associations = %s", associations)
         # Enforce conditions for a single solve, which avoids the complication of having to iterate
         try:
             assert np.all(associations == 1)

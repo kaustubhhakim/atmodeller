@@ -25,7 +25,11 @@ import logging
 import pytest
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import ElementMassConstraint, SystemConstraints
+from atmodeller.constraints import (
+    ElementMassConstraint,
+    SystemConstraints,
+    TotalPressureConstraint,
+)
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 
@@ -80,6 +84,7 @@ def test_trappist_output() -> None:
             ElementMassConstraint("O", o_kg),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
+            TotalPressureConstraint(10),
         ]
     )
 
