@@ -78,9 +78,24 @@ class InteriorAtmosphereSystem:
         self._reaction_network = ReactionNetworkWithCondensateStability(species=self.species)
 
     @property
-    def atmospheric_mean_molar_mass(self) -> float:
+    def atmosphere_mass(self) -> float:
+        """Total mass of the atmosphere"""
+        mass: float = (
+            UnitConversion.bar_to_Pa(self.atmosphere_pressure) / self.planet.surface_gravity
+        )
+        mass *= self.planet.surface_area
+
+        return mass
+
+    @property
+    def atmosphere_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere"""
         return self.solution.gas_mean_molar_mass
+
+    @property
+    def atmosphere_pressure(self) -> float:
+        """Total pressure of the atmosphere"""
+        return self.solution.total_pressure
 
     @property
     def atmospheric_element_moles(self) -> float:
@@ -119,19 +134,6 @@ class InteriorAtmosphereSystem:
     def solution(self) -> Solution:
         """The solution"""
         return self._solution
-
-    @property
-    def total_mass(self) -> float:
-        """Total mass"""
-        mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
-        mass *= self.planet.surface_area
-
-        return mass
-
-    @property
-    def total_pressure(self) -> float:
-        """Total pressure"""
-        return self.solution.total_pressure
 
     def residual_dict(self) -> dict[str, float]:
         """Residual of the objective function
@@ -261,14 +263,14 @@ class InteriorAtmosphereSystem:
             UnitConversion.bar_to_Pa(output["pressure"]) / self.planet.surface_gravity
         )
         output["atmosphere_mass"] *= (
-            self.planet.surface_area * species.molar_mass / self.atmospheric_mean_molar_mass
+            self.planet.surface_area * species.molar_mass / self.atmosphere_molar_mass
         )
 
         # Melt
         output["melt_ppmw"] = species.solubility.concentration(
             fugacity=output["fugacity"],
             temperature=self.planet.surface_temperature,
-            pressure=self.total_pressure,
+            pressure=self.atmosphere_pressure,
             **self.solution.gas_fugacities_by_hill_formula,
         )
         output["melt_mass"] = (
@@ -545,7 +547,7 @@ class InteriorAtmosphereSystem:
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
             temperature=self.planet.surface_temperature,
-            pressure=self.total_pressure,
+            pressure=self.atmosphere_pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
             activity_modifier=activity_modifier,
@@ -565,9 +567,9 @@ class InteriorAtmosphereSystem:
                 self.constraints.total_pressure_constraint[0]
             )
             residual_total_pressure[0] += np.log10(
-                self.total_pressure
+                self.atmosphere_pressure
             ) - constraint.get_log10_value(
-                temperature=self.planet.surface_temperature, pressure=self.total_pressure
+                temperature=self.planet.surface_temperature, pressure=self.atmosphere_pressure
             )
 
         # Combined residual

@@ -104,9 +104,10 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         atmosphere: dict[str, float] = {}
-        atmosphere["pressure"] = interior_atmosphere.total_pressure
-        atmosphere["mean_molar_mass"] = interior_atmosphere.atmospheric_mean_molar_mass
-        atmosphere["mass"] = interior_atmosphere.total_mass
+        atmosphere["pressure"] = interior_atmosphere.atmosphere_pressure
+        atmosphere["mean_molar_mass"] = interior_atmosphere.atmosphere_molar_mass
+        atmosphere["mass"] = interior_atmosphere.atmosphere_mass
+        atmosphere["element_moles"] = interior_atmosphere.atmospheric_element_moles
 
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere)
@@ -141,7 +142,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
-            interior_atmosphere.planet.surface_temperature, interior_atmosphere.total_pressure
+            interior_atmosphere.planet.surface_temperature, interior_atmosphere.atmosphere_pressure
         )
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
