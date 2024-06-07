@@ -29,6 +29,7 @@ import numpy.typing as npt
 from atmodeller import GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Solution, Species
+from atmodeller.utilities import partial_rref
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -58,7 +59,7 @@ class ReactionNetwork:
         self.species: Species = species
         logger.info("Creating a reaction network")
         logger.info("Species = %s", self.species.names)
-        self.reaction_matrix: npt.NDArray | None = self._partial_gaussian_elimination()
+        self.reaction_matrix: npt.NDArray | None = self.get_reaction_matrix()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
     @property
@@ -69,59 +70,19 @@ class ReactionNetwork:
             assert self.reaction_matrix is not None
             return self.reaction_matrix.shape[0]
 
-    def _partial_gaussian_elimination(self) -> npt.NDArray | None:
-        """Performs a partial gaussian elimination to determine the required reactions.
-
-        The species composition matrix is first (partially) reduced to row echelon form by
-        forward elimination, and then subsequently (partially) reduced to reduced row echelon form
-        by backward substitution. Applying the same operations to the identity matrix (as part of
-        the augmented matrix) reveals r reactions, where r = number of species - number of
-        elements. These reactions are given in the last r rows of the reduced matrix.
+    def get_reaction_matrix(self) -> npt.NDArray | None:
+        """Gets the reaction matrix
 
         Returns:
-            A matrix of the reaction stoichiometry
+            A matrix of linearly independent reactions
         """
         if self.species.number_species() == 1:
             logger.debug("Only one species therefore no reactions")
             return None
 
-        matrix1: npt.NDArray = self.species.composition_matrix()
-        matrix2: npt.NDArray = np.eye(self.species.number_species())
-        augmented_matrix: npt.NDArray = np.hstack((matrix1, matrix2))
-        logger.debug("augmented_matrix = \n%s", augmented_matrix)
+        matrix: npt.NDArray = self.species.transpose_formula_matrix()
 
-        # Forward elimination
-        for i in range(self.species.number_elements()):  # Note only over the number of elements.
-            # Check if the pivot element is zero.
-            if augmented_matrix[i, i] == 0:
-                # Swap rows to get a non-zero pivot element.
-                nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
-                augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
-            # Perform row operations to eliminate values below the pivot.
-            for j in range(i + 1, self.species.number_species()):
-                ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
-                augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
-
-        # Backward substitution
-        for i in range(self.species.number_elements() - 1, -1, -1):
-            # Normalize the pivot row.
-            augmented_matrix[i] /= augmented_matrix[i, i]
-            # Eliminate values above the pivot.
-            for j in range(i - 1, -1, -1):
-                if augmented_matrix[j, i] != 0:
-                    ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-                    augmented_matrix[j] -= ratio * augmented_matrix[i]
-        logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
-
-        reduced_matrix1: npt.NDArray = augmented_matrix[:, : matrix1.shape[1]]
-        reaction_matrix: npt.NDArray = augmented_matrix[
-            self.species.number_elements() :, matrix1.shape[1] :
-        ]
-        logger.debug("reduced_matrix1 = \n%s", reduced_matrix1)
-        logger.debug("reaction_matrix = \n%s", reaction_matrix)
-
-        return reaction_matrix
+        return partial_rref(matrix)
 
     def reactions(self) -> dict[int, str]:
         """The reactions as a dictionary"""

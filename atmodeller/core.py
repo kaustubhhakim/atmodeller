@@ -340,22 +340,40 @@ class Species(UserList):
                     logger.info("No solubility law for %s", species.hill_formula)
                     species.solubility = NoSolubility()
 
-    def composition_matrix(self) -> npt.NDArray:
-        """Creates a matrix where species (rows) are split into their element counts (columns).
+    def transpose_formula_matrix(self) -> npt.NDArray[np.int_]:
+        """The transposed formula matrix for all elements and species
 
         Returns:
-            A matrix of element counts
+            The transposed formula matrix
         """
-        matrix: npt.NDArray[np.int_] = np.zeros(
-            (self.number_species(), self.number_elements()), dtype=np.int_
-        )
-        for species_index, species in enumerate(self.data):
-            for element_index, element in enumerate(self.elements()):
+        matrix: npt.NDArray[np.int_] = self.formula_matrix(self.elements(), self.data)
+
+        return matrix.T
+
+    @staticmethod
+    def formula_matrix(
+        elements: list[str], species: list[ChemicalSpecies]
+    ) -> npt.NDArray[np.int_]:
+        """Creates a formula matrix
+
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
+
+        Args:
+            elements: A list of elements
+            species: A list of species
+
+        Returns:
+            The formula matrix
+        """
+        matrix: npt.NDArray[np.int_] = np.zeros((len(elements), len(species)), dtype=np.int_)
+        for element_index, element in enumerate(elements):
+            for species_index, single_species in enumerate(species):
                 try:
-                    count: int = species.composition()[element].count
+                    count: int = single_species.composition()[element].count
                 except KeyError:
                     count = 0
-                matrix[species_index, element_index] = count
+                matrix[element_index, species_index] = count
 
         return matrix
 
