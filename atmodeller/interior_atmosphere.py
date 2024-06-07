@@ -471,6 +471,12 @@ class InteriorAtmosphereSystem:
                 logger.info(sol["message"])
                 logger.debug("sol = %s", sol)
 
+            except TypeError as exc:
+                msg: str = (
+                    f"{exc}\nAdditional context: Number of unknowns and constraints must be equal"
+                )
+                raise ValueError(msg) from exc
+
             except LinAlgError:
                 if errors == "raise":
                     raise

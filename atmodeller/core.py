@@ -258,8 +258,8 @@ class Species(UserList):
         """
         return len(self.elements(species_type))
 
-    def find_species(self, find_species: ChemicalSpecies) -> int:
-        """Finds a species and returns its index.
+    def species_index(self, find_species: ChemicalSpecies) -> int:
+        """Gets the index of a species
 
         Args:
             find_species: Species to find
@@ -288,7 +288,7 @@ class Species(UserList):
         Raises:
             ValueError: The species is not in the species list
         """
-        index: int = self.find_species(find_species)
+        index: int = self.species_index(find_species)
 
         return self.data[index]
 
@@ -477,14 +477,14 @@ class Solution:
             self._lambda_solution[species] = value[start_index + lambda_index]
 
     @property
-    def species_array(self) -> npt.NDArray:
+    def species_values(self) -> npt.NDArray:
         return np.array(list(self._species_solution.values()))
 
     @property
     def lambda_array(self) -> npt.NDArray:
         lambda_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
         for species in self.condensed_species_to_solve:
-            index: int = self._species.find_species(species)
+            index: int = self._species.species_index(species)
             lambda_array[index] = self._lambda_solution[species]
 
         return lambda_array

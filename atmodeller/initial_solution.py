@@ -163,7 +163,7 @@ class InitialSolution(ABC, Generic[T]):
 
         # Apply constraints from the reaction network (activities and fugacities)
         for constraint in constraints.reaction_network_constraints:
-            index: int = self.species.find_species(constraint.species)
+            index: int = self.species.species_index(constraint.species)
             logger.debug("Setting %s %d", constraint.species, index)
             log10_value[index] = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure

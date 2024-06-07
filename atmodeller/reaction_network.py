@@ -210,7 +210,7 @@ class ReactionNetwork:
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
-            species_index = self.species.find_species(constraint.species)
+            species_index = self.species.species_index(constraint.species)
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
@@ -289,7 +289,8 @@ class ReactionNetwork:
             fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
-            fugacity_coefficients[self.species.find_species(gas_species)] = fugacity_coefficient
+            index: int = self.species.species_index(gas_species)
+            fugacity_coefficients[index] = fugacity_coefficient
 
         log_fugacity_coefficients: npt.NDArray = np.log10(fugacity_coefficients)
         logger.debug("Log10 fugacity coefficient vector = %s", log_fugacity_coefficients)
@@ -328,7 +329,7 @@ class ReactionNetwork:
         )
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(solution.species_array)
+            + coefficient_matrix.dot(solution.species_values)
             - rhs
         )
 
@@ -366,7 +367,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         coefficient_matrix: npt.NDArray = self.get_coefficient_matrix(constraints=constraints)
         activity_modifier: npt.NDArray = np.zeros_like(coefficient_matrix)
         for species in solution.condensed_species_to_solve:
-            index: int = self.species.find_species(species)
+            index: int = self.species.species_index(species)
             activity_modifier[:, index] = coefficient_matrix[:, index]
 
         logger.debug("activity_modifier = %s", activity_modifier)

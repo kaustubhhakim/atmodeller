@@ -25,6 +25,9 @@ import logging
 import pytest
 
 from atmodeller import __version__, debug_logger
+from atmodeller.constraints import ElementMassConstraint, SystemConstraints
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 
 logger: logging.Logger = debug_logger()
 
@@ -45,3 +48,40 @@ def test_graphite_water_condensed_output(graphite_water_condensed) -> None:
     assert 2.4431158e21 == pytest.approx(output["O_total"][0]["condensed_mass"])
     assert 2.17398e18 == pytest.approx(output["H_total"][0]["atmosphere_mass"])
     assert 3.07826e20 == pytest.approx(output["H_total"][0]["condensed_mass"])
+
+
+def test_trappist_output() -> None:
+
+    surface_temperature = 400  # K
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O")
+    C_cr: SolidSpecies = SolidSpecies("C")
+
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, H2O_l, CH4_g, C_cr])
+
+    mantle_mass = 2.912e24
+    planet_mass = mantle_mass / (1 - 0.295334691460966)
+    trappist1e = Planet(
+        surface_temperature=surface_temperature, planet_mass=planet_mass, surface_radius=5.861e6
+    )
+
+    h_kg: float = 2.907214018995482e19
+    c_kg: float = 6.822441980162111e20
+    o_kg: float = 1.2751814985260409e21
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            ElementMassConstraint("O", o_kg),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
+        ]
+    )
+
+    system = InteriorAtmosphereSystem(species=species, planet=trappist1e)
+    system.solve(constraints)
