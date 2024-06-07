@@ -116,6 +116,23 @@ class InteriorAtmosphereSystem:
         return self.output.size
 
     @property
+    def solution(self) -> Solution:
+        """The solution"""
+        return self._solution
+
+    @property
+    def total_mass(self) -> float:
+        """Total mass"""
+        mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
+        mass *= self.planet.surface_area
+
+        return mass
+
+    @property
+    def total_pressure(self) -> float:
+        """Total pressure"""
+        return self.solution.total_pressure
+
     def residual_dict(self) -> dict[str, float]:
         """Residual of the objective function
 
@@ -139,23 +156,9 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    @property
-    def solution(self) -> Solution:
-        """The solution"""
-        return self._solution
-
-    @property
-    def total_mass(self) -> float:
-        """Total mass"""
-        mass: float = UnitConversion.bar_to_Pa(self.total_pressure) / self.planet.surface_gravity
-        mass *= self.planet.surface_area
-
-        return mass
-
-    @property
-    def total_pressure(self) -> float:
-        """Total pressure"""
-        return self.solution.total_pressure
+    def solution_dict(self) -> dict[str, float]:
+        """Solution in a dictionary"""
+        return self._solution.solution_dict()
 
     def condensed_species_masses(self) -> dict[CondensedSpecies, dict[str, float]]:
         """Computes the masses of condensed species and their elements

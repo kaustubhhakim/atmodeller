@@ -249,7 +249,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
-        data_list.append(interior_atmosphere.residual_dict)
+        data_list.append(interior_atmosphere.residual_dict())
 
     def _add_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the solution.
