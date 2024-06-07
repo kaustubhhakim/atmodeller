@@ -109,7 +109,7 @@ class CO_rhyolite_yoshioka(Solubility):
 class CO2_basalt_dixon(Solubility):
     """CO2 solubilities in MORB liquids :cite:p:`DSH95`
 
-    :cite:t:`DSH95{Equation 6}`for mole fraction of dissolved carbonate (CO3^2-) and then
+    :cite:t:`DSH95{Equation 6}` for mole fraction of dissolved carbonate (CO3^2-) and then
     converting to ppmw for CO2 experiments conducted at 1200 C, 210-980 bars with mixed H2O-CO2
     vapor phase (CO2 vapor mole fraction varied from 0.42-0.97).
     """
