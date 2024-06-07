@@ -27,11 +27,12 @@ from typing import TYPE_CHECKING, Mapping, Type
 import numpy as np
 import numpy.typing as npt
 
+from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.utilities import filter_by_type
+from atmodeller.utilities import dataclass_to_logger, filter_by_type
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -43,6 +44,56 @@ if TYPE_CHECKING:
 
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass(kw_only=True)
+class Planet:
+    """The properties of a planet
+
+    Defines the properties of a planet that are relevant for interior modeling. It provides default
+    values suitable for modelling a fully molten Earth-like planet.
+
+    Args:
+        planet_mass: Mass of the planet in kg. Defaults to Earth.
+        core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
+            to Earth.
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
+        surface_radius: Radius of the planetary surface in m. Defaults to Earth.
+        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
+        melt_composition: Melt composition of the planet. Default is None.
+    """
+
+    planet_mass: float = 5.972e24
+    """Mass of the planet in kg"""
+    core_mass_fraction: float = 0.295334691460966
+    """Mass fraction of the core relative to the planetary mass (kg/kg)"""
+    mantle_melt_fraction: float = 1.0
+    """Mass fraction of the molten mantle"""
+    surface_radius: float = 6371000.0
+    """Radius of the surface in m"""
+    surface_temperature: float = 2000.0
+    """Temperature of the surface in K"""
+    melt_composition: str | None = None
+    """Melt composition"""
+    mantle_mass: float = field(init=False)
+    """Mass of the mantle"""
+    mantle_melt_mass: float = field(init=False)
+    """Mass of the molten mantle"""
+    mantle_solid_mass: float = field(init=False)
+    """Mass of the solid mantle"""
+    surface_area: float = field(init=False)
+    """Surface area"""
+    surface_gravity: float = field(init=False)
+    """Surface gravity"""
+
+    def __post_init__(self):
+        self.mantle_mass = self.planet_mass * (1 - self.core_mass_fraction)
+        self.mantle_melt_mass = self.mantle_mass * self.mantle_melt_fraction
+        self.mantle_solid_mass = self.mantle_mass * (1 - self.mantle_melt_fraction)
+        self.surface_area = 4.0 * np.pi * self.surface_radius**2
+        self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
+        logger.info("Creating a new planet")
+        dataclass_to_logger(self, logger)
 
 
 class GasSpecies(ChemicalSpecies):
@@ -207,8 +258,8 @@ class Species(UserList):
         """
         return len(self.elements(species_type))
 
-    def find_species(self, find_species: ChemicalSpecies) -> int:
-        """Finds a species and returns its index.
+    def species_index(self, find_species: ChemicalSpecies) -> int:
+        """Gets the index of a species
 
         Args:
             find_species: Species to find
@@ -219,12 +270,27 @@ class Species(UserList):
         Raises:
             ValueError: The species is not in the species list
         """
-
         for index, species in enumerate(self):
             if species is find_species:
                 return index
 
         raise ValueError(f"{find_species.name} is not in the species list")
+
+    def get_species(self, find_species: ChemicalSpecies) -> ChemicalSpecies:
+        """Gets a species
+
+        Args:
+            find_species: Species to find
+
+        Returns:
+            The species
+
+        Raises:
+            ValueError: The species is not in the species list
+        """
+        index: int = self.species_index(find_species)
+
+        return self.data[index]
 
     def check_species_present(self, find_species: ChemicalSpecies) -> bool:
         """Checks if a species is present
@@ -274,22 +340,30 @@ class Species(UserList):
                     logger.info("No solubility law for %s", species.hill_formula)
                     species.solubility = NoSolubility()
 
-    def composition_matrix(self) -> npt.NDArray:
-        """Creates a matrix where species (rows) are split into their element counts (columns).
+    @staticmethod
+    def formula_matrix(
+        elements: list[str], species: list[ChemicalSpecies]
+    ) -> npt.NDArray[np.int_]:
+        """Creates a formula matrix
+
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
+
+        Args:
+            elements: A list of elements
+            species: A list of species
 
         Returns:
-            A matrix of element counts
+            The formula matrix
         """
-        matrix: npt.NDArray[np.int_] = np.zeros(
-            (self.number_species(), self.number_elements()), dtype=np.int_
-        )
-        for species_index, species in enumerate(self.data):
-            for element_index, element in enumerate(self.elements()):
+        matrix: npt.NDArray[np.int_] = np.zeros((len(elements), len(species)), dtype=np.int_)
+        for element_index, element in enumerate(elements):
+            for species_index, single_species in enumerate(species):
                 try:
-                    count: int = species.composition()[element].count
+                    count: int = single_species.composition()[element].count
                 except KeyError:
                     count = 0
-                matrix[species_index, element_index] = count
+                matrix[element_index, species_index] = count
 
         return matrix
 
@@ -336,15 +410,17 @@ class Solution:
     def condensed_elements_to_solve(self) -> list[str]:
         """Elements in condensed species that should adhere to mass balance
 
-        The elements for which to calculate the degree of condensation depends on both which
-        elements are in condensed species and which mass constraints are applied.
+        The elements for which to calculate the degree of condensation requires both that they are
+        in a condensed phase and that mass constraints are applied.
         """
-        condensation: list[str] = []
+        condensed_elements_to_solve: list[str] = []
         for constraint in self._constraints.mass_constraints:
             if constraint.element in self._species.elements_in_condensed_species:
-                condensation.append(constraint.element)
+                condensed_elements_to_solve.append(constraint.element)
 
-        return condensation
+        logger.debug("condensed_elements_to_solve = %s", condensed_elements_to_solve)
+
+        return condensed_elements_to_solve
 
     @property
     def number_condensed_elements_to_solve(self) -> int:
@@ -354,14 +430,16 @@ class Solution:
     @property
     def condensed_species_to_solve(self) -> list[CondensedSpecies]:
         """Condensed species to solve for stability requires they participate in mass balance"""
-        condensed_species: list[CondensedSpecies] = []
+        condensed_species_to_solve: list[CondensedSpecies] = []
         for species in self._species.condensed_species:
             for constraint in self._constraints.mass_constraints:
                 if constraint.element in species.composition():
-                    condensed_species.append(species)
+                    condensed_species_to_solve.append(species)
                     break
 
-        return condensed_species
+        logger.debug("condensed_species_to_solve = %s", condensed_species_to_solve)
+
+        return condensed_species_to_solve
 
     @property
     def number_condensed_species_to_solve(self) -> int:
@@ -407,22 +485,15 @@ class Solution:
             self._lambda_solution[species] = value[start_index + lambda_index]
 
     @property
-    def species_array(self) -> npt.NDArray:
+    def species_values(self) -> npt.NDArray:
         return np.array(list(self._species_solution.values()))
-
-    # Not used
-    # @property
-    # def beta_array(self) -> npt.NDArray:
-    #     return np.array(list(self._beta_solution.values()))
 
     @property
     def lambda_array(self) -> npt.NDArray:
         lambda_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
         for species in self.condensed_species_to_solve:
-            index: int = self._species.find_species(species)
+            index: int = self._species.species_index(species)
             lambda_array[index] = self._lambda_solution[species]
-
-        logger.debug("lambda_array = %s", lambda_array)
 
         return lambda_array
 
@@ -442,14 +513,23 @@ class Solution:
         return sum(self.gas_pressures.values())
 
     @property
-    def gas_molar_mass(self) -> float:
-        """Molar mass of the gas"""
+    def gas_mean_molar_mass(self) -> float:
+        """Mean molar mass of the gas"""
         mass: float = 0
         for species in self._species.gas_species:
             mass += species.molar_mass * self.gas_pressures[species]
         mass /= self.total_pressure
 
         return mass
+
+    @property
+    def volume_mixing_ratios(self) -> dict[GasSpecies, float]:
+        """Volume mixing ratios"""
+        vmr: dict[GasSpecies, float] = {}
+        for species in self._species.gas_species:
+            vmr[species] = self.gas_pressures[species] / self.total_pressure
+
+        return vmr
 
     @property
     def log10_fugacity_coefficients(self) -> dict[GasSpecies, float]:

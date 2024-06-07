@@ -16,13 +16,21 @@
 #
 """Utilities for tests"""
 
+# Want to use chemistry symbols so pylint: disable=invalid-name
+
 import logging
 
 import numpy as np
 import numpy.typing as npt
 import pytest
 
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.constraints import (
+    ElementMassConstraint,
+    SystemConstraints,
+    TotalPressureConstraint,
+)
+from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -58,6 +66,46 @@ class Helper:
         return isclose.all()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def helper():
     return Helper()
+
+
+@pytest.fixture
+def graphite_water_condensed() -> InteriorAtmosphereSystem:
+    """C and water in equilibrium at 430 K and 10 bar
+
+    This system is convenient for testing several parts of the code, so it is a fixture so it can
+    be accessed throughout the test suite.
+    """
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
+    H2O_l = LiquidSpecies("H2O")  # , thermodata_filename="H-066", thermodata_name="Water, 10 Bar")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+
+    planet = Planet()
+    planet.surface_temperature = 430
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    h_kg: float = 3.10e20
+    c_kg: float = 1.08e20
+
+    constraints = SystemConstraints(
+        [
+            TotalPressureConstraint(10),
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("C", c_kg),
+        ]
+    )
+
+    system.solve(constraints)
+
+    return system

@@ -29,7 +29,6 @@ from atmodeller.constraints import (
     FugacityConstraint,
     PressureConstraint,
     SystemConstraints,
-    TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
@@ -422,36 +421,10 @@ def test_water_condensed(helper) -> None:
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_graphite_water_condensed(helper) -> None:
+def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    O2_g: GasSpecies = GasSpecies("O2")
-    # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
-    H2O_l: LiquidSpecies = LiquidSpecies("H2O")  # , thermodata_filename="H-066",
-    # thermodata_name="Water, 10 Bar")
-    CO_g: GasSpecies = GasSpecies("CO")
-    CO2_g: GasSpecies = GasSpecies("CO2")
-    CH4_g: GasSpecies = GasSpecies("CH4")
-    C_cr: SolidSpecies = SolidSpecies("C")
-
-    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
-
-    planet: Planet = Planet()
-    planet.surface_temperature = 430
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
-
-    h_kg: float = 3.10e20
-    c_kg: float = 1.08e20
-
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            TotalPressureConstraint(10),
-            ElementMassConstraint("H", h_kg),
-            ElementMassConstraint("C", c_kg),
-        ]
-    )
+    system = graphite_water_condensed
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,
@@ -466,5 +439,4 @@ def test_graphite_water_condensed(helper) -> None:
         "degree_of_condensation_H": 0.992,
     }
 
-    system.solve(constraints)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
