@@ -192,6 +192,10 @@ class InteriorAtmosphereSystem:
             return condensed_species_masses
 
         # Assemble matrices
+        # TODO: If both H and O prescribed as constraints, then drop one based on the one that is
+        # the minimum stoichiometry bottleneck for H2O. So keep the minimum and drop the maximum.
+        # Then determine the amount of the other quantity and compare to the prescribed constraint
+        # Should correct original constraint to be self-consistent.
         element_condensed_mass: list[float] = []
         for ii, condensed_element in enumerate(condensed_elements):
             element_condensed_mass.append(self.element_condensed_mass(condensed_element))
