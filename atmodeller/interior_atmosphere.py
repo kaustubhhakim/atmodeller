@@ -197,13 +197,42 @@ class InteriorAtmosphereSystem:
         # Then determine the amount of the other quantity and compare to the prescribed constraint
         # Should correct original constraint to be self-consistent.
         element_condensed_mass: list[float] = []
+        element_condensed_moles: list[float] = []
         for ii, condensed_element in enumerate(condensed_elements):
-            element_condensed_mass.append(self.element_condensed_mass(condensed_element))
+            condensed_mass: float = self.element_condensed_mass(condensed_element)
+            element_condensed_mass.append(condensed_mass)
+            condensed_moles: float = condensed_mass / UnitConversion.g_to_kg(
+                Formula(condensed_element).mass
+            )
+            element_condensed_moles.append(condensed_moles)
             for jj, species in enumerate(condensed_species):
                 if condensed_element in species.composition():
                     mapping[ii, jj] = species.composition()[condensed_element].fraction
 
+        element_condensed_mass_dict: dict[str, float] = dict(
+            zip(condensed_elements, element_condensed_mass)
+        )
+        element_condensed_moles_dict: dict[str, float] = dict(
+            zip(condensed_elements, element_condensed_moles)
+        )
+
+        logger.debug("element_condensed_mass = %s", element_condensed_mass_dict)
+        logger.debug("element_condensed_moles = %s", element_condensed_moles_dict)
         logger.debug("mapping = %s", mapping)
+
+        # For debugging element partitioning in condensates.
+        if "H" in element_condensed_mass_dict and "O" in element_condensed_mass_dict:
+            logger.debug("Compute H/O ratio in condensed phase")
+            HO_ratio_mass: float = (  # pylint: disable=invalid-name
+                element_condensed_mass_dict["H"] / element_condensed_mass_dict["O"]
+            )
+            HO_ratio_moles: float = (  # pylint: disable=invalid-name
+                element_condensed_moles_dict["H"] / element_condensed_moles_dict["O"]
+            )
+            logger.debug("H/O (mass) = %f, H/O (moles) = %f", HO_ratio_mass, HO_ratio_moles)
+            logger.debug(
+                "O/H (mass) = %f, O/H (moles) = %f", 1 / HO_ratio_mass, 1 / HO_ratio_moles
+            )
 
         # Count how many condensates can be associated with each element
         associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
