@@ -265,3 +265,22 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     logger.debug("component_matrix = \n%s", component_matrix)
 
     return component_matrix
+
+
+def reorder_dict(original_dict: dict[Any, Any], key_to_move_first: Any) -> dict:
+    """Reorders a dictionary to put a particular key first
+
+    Args:
+        original_dict: Original dictionary
+        key_to_move_first: Key to move first in the returned dictionary
+
+    Returns:
+        The reordered dictionary and a bool, the later to indicate if reordering occurred
+    """
+    if key_to_move_first not in original_dict:
+        return original_dict
+
+    return {
+        key_to_move_first: original_dict[key_to_move_first],
+        **{k: v for k, v in original_dict.items() if k != key_to_move_first},
+    }

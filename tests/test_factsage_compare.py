@@ -109,6 +109,7 @@ def test_CHO_IW(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(0.5)),
+            # FugacityConstraint(O2_g, 1.01633868e-14),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
         ]

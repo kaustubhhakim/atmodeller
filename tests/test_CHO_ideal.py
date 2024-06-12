@@ -78,7 +78,17 @@ def test_H2O() -> None:
 
 
 def test_H_fO2() -> None:
-    """Tests H2-H2O at the IW buffer."""
+    """Tests H2-H2O at the IW buffer.
+
+    A comparable test has been run for FastChem, by tweaking the oxygen logarithmic abundance from
+    11.30516874 (this test) to 11.4025 to ensure that the oxygen fugacity (8.7E-8) is the same to
+    allow fair comparison. The FastChem element abundance file is (copy-paste):
+
+    # test_H_fO2 from atmodeller
+    e-  0.0
+    H   12.00
+    O   11.4025
+    """
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
     H2_g: GasSpecies = GasSpecies("H2")
@@ -184,7 +194,17 @@ def test_H_basalt_melt() -> None:
 
 
 def test_H_fO2_plus() -> None:
-    """Tests H2-H2O at the IW buffer+2."""
+    """Tests H2-H2O at the IW buffer+2.
+
+    A comparable test has been run for FastChem, by tweaking the oxygen logarithmic abundance from
+    11.3067 (this test) to 11.65854 to ensure that the oxygen fugacity (8.7E-6) is the same to
+    allow fair comparison. The FastChem element abundance file is (copy-paste):
+
+    # test_H_fO2_plus from atmodeller
+    e-  0.0
+    H   12.00
+    O   11.65854
+    """
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
     H2_g: GasSpecies = GasSpecies("H2")

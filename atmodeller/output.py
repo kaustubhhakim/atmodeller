@@ -26,11 +26,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import pandas as pd
 from molmass import Formula
 
 from atmodeller.interfaces import CondensedSpecies
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import UnitConversion, reorder_dict
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
@@ -163,8 +164,12 @@ class Output(UserDict):
         for element in interior_atmosphere.species.elements():
             mass[element] = interior_atmosphere.element_gas_mass(element)
 
+        # To compute astronomical logarithmic abundances we need to store H abundance, which is
+        # used to normalise all other elemental abundances
+        mass = reorder_dict(mass, "H")
+
         # Create and add the output
-        for element, element_mass in mass.items():
+        for nn, (element, element_mass) in enumerate(mass.items()):
             output: dict[str, float] = {}
             logger.info("Adding %s to output", element)
             output["molar_mass"] = UnitConversion.g_to_kg(Formula(element).mass)
@@ -207,6 +212,16 @@ class Output(UserDict):
             key_name: str = f"{element}_total"
             data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
             data_list.append(output)
+
+            # H, if present, is the first in the dictionary, so set as the normalising abundance
+            if nn == 0 and element == "H":
+                H_total_moles = output["total_moles"]  # pylint: disable=invalid-name
+
+            if H_total_moles is not None:
+                # Astronomical logarithmic abundance, used by FastChem
+                output["logarithmic_abundance"] = (
+                    np.log(output["total_moles"] / H_total_moles) + 12
+                )
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the planetary properties.
