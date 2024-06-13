@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
@@ -39,6 +40,101 @@ if TYPE_CHECKING:
     from atmodeller.output import Output
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ExperimentalCalibration:
+    """Experimental calibration range
+
+    Args:
+        pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
+        pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
+        temperature_min: Minimum temperature in K. Defaults to None (i.e. not specified).
+        temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
+    """
+
+    pressure_min: float | None = None
+    """Minimum pressure in bar"""
+    pressure_max: float | None = None
+    """Maximum pressure in bar"""
+    temperature_min: float | None = None
+    """Minimum temperature in K"""
+    temperature_max: float | None = None
+    """Maximum temperature in K"""
+
+    def check(self, temperature: float, pressure: float, name: str = "") -> bool | None:
+        """Checks if the temperature and pressure conditions are within the calibration.
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            name: Optional name for description in the logging output
+
+        Returns:
+            True if the temperature and pressure are within the calibration range, otherwise False.
+        """
+        flag: bool = True
+
+        if name:
+            prefix: str = f"{self.__class__.__name__} ({name}): "
+        else:
+            prefix = ""
+
+        if self.pressure_min is not None:
+            if self.pressure_min > pressure:
+                logger.info(
+                    "%sPressure (%0.1f) < Minimum calibration pressure (%0.1f)",
+                    prefix,
+                    pressure,
+                    self.pressure_min,
+                )
+                flag = False
+
+        if self.pressure_max is not None:
+            if self.pressure_max < pressure:
+                logger.info(
+                    "%sPressure (%0.1f) > Maximum calibration pressure (%0.1f)",
+                    prefix,
+                    pressure,
+                    self.pressure_max,
+                )
+                flag = False
+
+        if self.temperature_min is not None:
+            if self.temperature_min > temperature:
+                logger.info(
+                    "%sTemperature (%0.1f) < Minimum calibration temperature (%0.1f)",
+                    prefix,
+                    temperature,
+                    self.temperature_min,
+                )
+                flag = False
+
+        if self.temperature_max is not None:
+            if self.temperature_max < temperature:
+                logger.info(
+                    "%sTemperature (%0.1f) > Maximum calibration temperature (%0.1f)",
+                    prefix,
+                    temperature,
+                    self.temperature_max,
+                )
+                flag = False
+
+        if flag:
+            logger.debug(
+                "Temperature (%f) and pressure (%f) are within the calibration range",
+                temperature,
+                pressure,
+            )
+        else:
+            logger.debug(
+                "%sTemperature (%f) and pressure (%f) are outside the calibration range",
+                prefix,
+                temperature,
+                pressure,
+            )
+
+        return flag
 
 
 class ChemicalSpecies:
