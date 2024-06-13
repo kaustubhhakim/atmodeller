@@ -221,7 +221,7 @@ class Output(UserDict):
             if H_total_moles is not None:
                 # Astronomical logarithmic abundance, used by FastChem
                 output["logarithmic_abundance"] = (
-                    np.log(output["total_moles"] / H_total_moles) + 12
+                    np.log10(output["total_moles"] / H_total_moles) + 12
                 )
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
