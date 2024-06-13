@@ -167,6 +167,7 @@ class Output(UserDict):
         # To compute astronomical logarithmic abundances we need to store H abundance, which is
         # used to normalise all other elemental abundances
         mass = reorder_dict(mass, "H")
+        H_total_moles: float | None = None
 
         # Create and add the output
         for nn, (element, element_mass) in enumerate(mass.items()):

@@ -41,18 +41,28 @@ class _RedoxBuffer(ABC):
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
-        evaluation_pressure: Optional constant pressure in bar to always evaluate the redox buffer.
-            Defaults to None, meaning that the input pressure argument is used instead.
+        evaluation_pressure: Constant pressure in bar to always evaluate the redox buffer. Defaults
+            to None, meaning that the input pressure argument is used instead.
+        max_evaluation_pressure: Maximum pressure to evaluate the buffer at. Defaults to None,
+            meaning do not impose a maximum evaluation pressure.
 
     Attributes:
         log10_shift: Log10 shift relative to the buffer.
-        evaluation_pressure: Optional constant pressure in bar to always use to evaluate the redox
-            buffer. Defaults to None, meaning that the input pressure argument is used instead.
+        evaluation_pressure: Constant pressure in bar to always use to evaluate the redox
+            buffer.
+        max_evaluation_pressure: Maximum pressure to evaluate the buffer at.
     """
 
-    def __init__(self, log10_shift: float = 0, *, evaluation_pressure: float | None = None):
+    def __init__(
+        self,
+        log10_shift: float = 0,
+        *,
+        evaluation_pressure: float | None = None,
+        max_evaluation_pressure: float | None = None
+    ):
         self.log10_shift: float = log10_shift
         self.evaluation_pressure: float | None = evaluation_pressure
+        self.max_evaluation_pressure: float | None = max_evaluation_pressure
 
     @abstractmethod
     def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
@@ -83,6 +93,14 @@ class _RedoxBuffer(ABC):
             logger.debug(
                 "Evaluate %s at constant pressure = %f", self.__class__.__name__, pressure
             )
+        if self.max_evaluation_pressure is not None:
+            if pressure > self.max_evaluation_pressure:
+                pressure = self.max_evaluation_pressure
+                logger.debug(
+                    "Clipping pressure to max_evaluation_pressure = %f",
+                    self.max_evaluation_pressure,
+                )
+
         log10_value: float = self._get_buffer_log10_value(
             temperature=temperature, pressure=pressure, **kwargs
         )
