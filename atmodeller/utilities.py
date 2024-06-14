@@ -21,7 +21,10 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Collection, MutableMapping
+from cProfile import Profile
 from dataclasses import asdict
+from functools import wraps
+from pstats import SortKey, Stats
 from typing import Any, Callable, Type, TypeVar
 
 import numpy as np
@@ -35,6 +38,20 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 MultiplyT = TypeVar("MultiplyT", float, npt.NDArray, pd.Series, pd.DataFrame)
+
+
+def profile_decorator(func):
+    """Decorator to profile a function"""
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with Profile() as profile:
+            result = func(*args, **kwargs)
+        stats = Stats(profile).strip_dirs().sort_stats(SortKey.TIME)
+        stats.print_stats()
+        return result
+
+    return wrapper
 
 
 def debug_decorator(logger_in: logging.Logger) -> Callable:
