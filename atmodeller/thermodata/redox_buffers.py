@@ -152,7 +152,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
         self.a: list[float] = [6.844864, 1.175691e-1, 1.143873e-3, 0, 0]
         self.b: list[float] = [5.791364e-4, -2.891434e-4, -2.737171e-7, 0, 0]
         self.c: list[float] = [-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7]
-        self.d: list[float] = [-0.2769002e4, 5.285977e2, -2.919275, 0, 0]
+        self.d: list[float] = [-2.769002e4, 5.285977e2, -2.919275, 0, 0]
         self.e: list[float] = [8.463095, -3.000307e-3, 7.213445e-5, 0, 0]
         self.f: list[float] = [1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0]
         self.g: list[float] = [-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4]
