@@ -143,6 +143,117 @@ class IronWustiteBufferHirschmann(_RedoxBuffer):
         return fugacity
 
 
+class IronWustiteBufferHirschmann21(_RedoxBuffer):
+    """Iron-wustite buffer :cite:p:`H21`"""
+
+    @override
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.a: list[float] = [6.844864, 1.175691e-1, 1.143873e-3, 0, 0]
+        self.b: list[float] = [5.791364e-4, -2.891434e-4, -2.737171e-7, 0, 0]
+        self.c: list[float] = [-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7]
+        self.d: list[float] = [-0.2769002e4, 5.285977e2, -2.919275, 0, 0]
+        self.e: list[float] = [8.463095, -3.000307e-3, 7.213445e-5, 0, 0]
+        self.f: list[float] = [1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0]
+        self.g: list[float] = [-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4]
+        self.h: list[float] = [-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0]
+
+    def _evaluate_m(self, pressure: float, coefficients: list[float]) -> float:
+        """Evaluates an m parameter
+
+        Args:
+            pressure: Pressure in GPa
+            coefficients: Coefficients
+
+        Return:
+            m parameter
+        """
+        m: float = (
+            coefficients[0]
+            + coefficients[1] * pressure
+            + coefficients[2] * pressure**2
+            + coefficients[3] * pressure**3
+            + coefficients[4] * pressure ** (1 / 2)
+        )
+
+        return m
+
+    def _evaluate_fO2(
+        self, temperature: float, pressure: float, coefficients: list[list[float]]
+    ) -> float:
+        """Evaluates the fO2
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+            coefficients: Coefficients
+
+        Returns:
+            log10fO2
+        """
+        log10fO2: float = (
+            self._evaluate_m(pressure, coefficients[0])
+            + self._evaluate_m(pressure, coefficients[1]) * temperature
+            + self._evaluate_m(pressure, coefficients[2]) * temperature * np.log(temperature)
+            + self._evaluate_m(pressure, coefficients[3]) / temperature
+        )
+
+        return log10fO2
+
+    def _fcc_bcc_iron(self, temperature: float, pressure: float) -> float:
+        """log10fO2 for fcc and bcc iron
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+
+        Return:
+            log10fO2 for fcc and bcc iron
+        """
+        log10fO2: float = self._evaluate_fO2(
+            temperature, pressure, [self.a, self.b, self.c, self.d]
+        )
+
+        return log10fO2
+
+    def _hcp_iron(self, temperature: float, pressure: float) -> float:
+        """log10fO2 for hcp iron
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+
+        Return:
+            log10fO2 for hcp iron
+        """
+        log10fO2: float = self._evaluate_fO2(
+            temperature, pressure, [self.e, self.f, self.g, self.h]
+        )
+
+        return log10fO2
+
+    def _use_hcp(self, temperature: float, pressure: float) -> bool:
+        """Check to use hcp iron formulation for fO2
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+        """
+        x: list[float] = [-18.64, 0.04359, -5.069e-6]
+        threshold: float = x[0] + x[1] * temperature + x[2] * temperature**2
+
+        return pressure > threshold
+
+    @override
+    def _get_buffer_log10_value(self, temperature: float, pressure: float = 1, **kwargs) -> float:
+        del kwargs
+        pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
+        if self._use_hcp(temperature, pressure_GPa):
+            return self._hcp_iron(temperature, pressure_GPa)
+        else:
+            return self._fcc_bcc_iron(temperature, pressure_GPa)
+
+
 class IronWustiteBufferONeill(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`OE02`
 
