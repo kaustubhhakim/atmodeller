@@ -62,8 +62,10 @@ class ExperimentalCalibration:
     temperature_max: float | None = None
     """Maximum temperature in K"""
 
-    def check(self, temperature: float, pressure: float, name: str = "") -> bool | None:
-        """Checks if the temperature and pressure conditions are within the calibration.
+    def get_within_range(
+        self, temperature: float, pressure: float, name: str = ""
+    ) -> tuple[bool | None, float, float]:
+        """Gets temperature and pressure conditions within the calibration range.
 
         Args:
             temperature: Temperature in K
@@ -71,9 +73,14 @@ class ExperimentalCalibration:
             name: Optional name for description in the logging output
 
         Returns:
+            A tuple containing:
             True if the temperature and pressure are within the calibration range, otherwise False.
+            Temperature, if necessary clipped to be within the calibration range
+            Pressure, if necessary clipped to be within the calibration range
         """
         flag: bool = True
+        temperature_to_return: float = temperature
+        pressure_to_return: float = pressure
 
         if name:
             prefix: str = f"{self.__class__.__name__} ({name}): "
@@ -89,6 +96,7 @@ class ExperimentalCalibration:
                     self.pressure_min,
                 )
                 flag = False
+                pressure_to_return = self.pressure_min
 
         if self.pressure_max is not None:
             if self.pressure_max < pressure:
@@ -99,6 +107,7 @@ class ExperimentalCalibration:
                     self.pressure_max,
                 )
                 flag = False
+                pressure_to_return = self.pressure_max
 
         if self.temperature_min is not None:
             if self.temperature_min > temperature:
@@ -109,6 +118,7 @@ class ExperimentalCalibration:
                     self.temperature_min,
                 )
                 flag = False
+                temperature_to_return = self.temperature_min
 
         if self.temperature_max is not None:
             if self.temperature_max < temperature:
@@ -119,22 +129,23 @@ class ExperimentalCalibration:
                     self.temperature_max,
                 )
                 flag = False
+                temperature_to_return = self.temperature_max
 
-        if flag:
-            logger.debug(
-                "Temperature (%f) and pressure (%f) are within the calibration range",
-                temperature,
-                pressure,
-            )
-        else:
-            logger.debug(
-                "%sTemperature (%f) and pressure (%f) are outside the calibration range",
-                prefix,
-                temperature,
-                pressure,
-            )
+        # if flag:
+        #     logger.debug(
+        #         "Temperature (%f) and pressure (%f) are within the calibration range",
+        #         temperature,
+        #         pressure,
+        #     )
+        # else:
+        #     logger.debug(
+        #         "%sTemperature (%f) and pressure (%f) are outside the calibration range",
+        #         prefix,
+        #         temperature,
+        #         pressure,
+        #     )
 
-        return flag
+        return (flag, temperature_to_return, pressure_to_return)
 
 
 class ChemicalSpecies:
