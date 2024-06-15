@@ -125,12 +125,25 @@ class IronWustiteBufferHirschmann08(_RedoxBuffer):
         return fugacity
 
 
+# From :cite:t:`H21`: "It extrapolates smoothly to higher temperature, though not calibrated above
+# 3000 K. Extrapolation to lower temperatures (<1000 K) or higher pressures (>100 GPa) is not
+# recommended."
+IronWustiteBufferHirschmann21Calibration: ExperimentalCalibration = ExperimentalCalibration(
+    temperature_min=1000, pressure_max=UnitConversion.GPa_to_bar(100)
+)
+
+
 class IronWustiteBufferHirschmann21(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`H21`"""
 
     @override
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        log10_shift: float = 0,
+        *,
+        calibration: ExperimentalCalibration = IronWustiteBufferHirschmann21Calibration
+    ):
+        super().__init__(log10_shift, calibration=calibration)
         self.a: list[float] = [6.844864, 1.175691e-1, 1.143873e-3, 0, 0]
         self.b: list[float] = [5.791364e-4, -2.891434e-4, -2.737171e-7, 0, 0]
         self.c: list[float] = [-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7]

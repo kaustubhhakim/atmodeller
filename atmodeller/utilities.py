@@ -137,6 +137,13 @@ class UnitConversion:
         """Bar to GPa"""
         return cls.bar_to_Pa(value_bar) * 1.0e-9
 
+    @classmethod
+    def GPa_to_bar(  # Symbol name, so pylint: disable=C0103
+        cls, value_GPa: MultiplyT = 1
+    ) -> MultiplyT:
+        """GPa to bar"""
+        return value_GPa / cls.bar_to_GPa()
+
     @staticmethod
     def fraction_to_ppm(value_fraction: MultiplyT = 1) -> MultiplyT:
         """Mole or mass fraction to parts-per-million by mole or mass, respectively."""
