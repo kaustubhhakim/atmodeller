@@ -72,7 +72,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 # Common calibration parameters from Holland and Powell (1991)
-CALIBRATION_HP91: ExperimentalCalibration = ExperimentalCalibration(0, 50e3, 400, 1900)
+CALIBRATION_HP91: ExperimentalCalibration = ExperimentalCalibration(400, 1900, 0, 50e3)
 
 
 @dataclass(kw_only=True)
@@ -467,7 +467,7 @@ CO2_CORK_HP98: RealGas = CORK(
     mrk=CO2_MRK_HP98,
     a_virial=_a_conversion((5.40776e-3, -1.59046e-6)),
     b_virial=_b_conversion((-1.78198e-1, 2.45317e-5)),
-    calibration=ExperimentalCalibration(0, 120e3, 400, 1900),
+    calibration=ExperimentalCalibration(400, 1900, 0, 120e3),
 )
 """CO2 CORK :cite:p:`HP98`"""
 
@@ -476,7 +476,7 @@ H2O_CORK_HP91: RealGas = CORK(
     mrk=MRKH2OHP91(),
     a_virial=_a_conversion((-3.2297554e-3, 2.2215221e-6)),
     b_virial=_b_conversion((-3.025650e-2, -5.343144e-6)),
-    calibration=ExperimentalCalibration(0, 50e3, 400, 1700),
+    calibration=ExperimentalCalibration(400, 1700, 0, 50e3),
 )
 """H2O CORK :cite:p:`HP91`"""
 
@@ -486,7 +486,7 @@ H2O_CORK_HP98: RealGas = CORK(
     a_virial=_a_conversion((1.9853e-3, 0)),
     b_virial=_b_conversion((-8.9090e-2, 0)),
     c_virial=_c_conversion((8.0331e-2, 0)),
-    calibration=ExperimentalCalibration(0, 120e3, 400, 1700),
+    calibration=ExperimentalCalibration(400, 1700, 0, 120e3),
 )
 """H2O CORK :cite:p:`HP98`"""
 

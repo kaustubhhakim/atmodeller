@@ -21,8 +21,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Callable, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
@@ -47,105 +47,111 @@ class ExperimentalCalibration:
     """Experimental calibration range
 
     Args:
-        pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
-        pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
         temperature_min: Minimum temperature in K. Defaults to None (i.e. not specified).
         temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
+        pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
+        pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
     """
 
-    pressure_min: float | None = None
-    """Minimum pressure in bar"""
-    pressure_max: float | None = None
-    """Maximum pressure in bar"""
     temperature_min: float | None = None
     """Minimum temperature in K"""
     temperature_max: float | None = None
     """Maximum temperature in K"""
+    pressure_min: float | None = None
+    """Minimum pressure in bar"""
+    pressure_max: float | None = None
+    """Maximum pressure in bar"""
+    _clips_to_apply: list[Callable] = field(init=False, default_factory=list)
+    """Clips to apply"""
 
-    def get_within_range(
-        self, temperature: float, pressure: float, name: str = ""
-    ) -> tuple[bool | None, float, float]:
+    def __post_init__(self):
+        if self.temperature_min is not None:
+            logger.info(
+                "Set minimum evaluation temperature (temperature > %f)", self.temperature_min
+            )
+            self._clips_to_apply.append(self._clip_temperature_min)
+        if self.temperature_max is not None:
+            logger.info(
+                "Set maximum evaluation temperature (temperature < %f)", self.temperature_max
+            )
+            self._clips_to_apply.append(self._clip_temperature_max)
+        if self.pressure_min is not None:
+            logger.info("Set minimum evaluation pressure (pressure > %f)", self.pressure_min)
+            self._clips_to_apply.append(self._clip_pressure_min)
+        if self.pressure_max is not None:
+            logger.info("Set maximum evaluation pressure (pressure < %f)", self.pressure_max)
+            self._clips_to_apply.append(self._clip_pressure_max)
+
+    def _clip_pressure_max(self, temperature: float, pressure: float) -> tuple[float, float]:
+        """Clips maximum pressure
+
+        Args:
+            temperature: Temperature in K
+            pressure: pressure in bar
+
+        Returns:
+            Temperature, and clipped pressure
+        """
+        assert self.pressure_max is not None
+
+        return temperature, min(pressure, self.pressure_max)
+
+    def _clip_pressure_min(self, temperature: float, pressure: float) -> tuple[float, float]:
+        """Clips minimum pressure
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Temperature, and clipped pressure
+        """
+        assert self.pressure_min is not None
+
+        return temperature, max(pressure, self.pressure_min)
+
+    def _clip_temperature_max(self, temperature: float, pressure: float) -> tuple[float, float]:
+        """Clips maximum temperature
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Clipped temperature, and pressure
+        """
+        assert self.temperature_max is not None
+
+        return min(temperature, self.temperature_max), pressure
+
+    def _clip_temperature_min(self, temperature: float, pressure: float) -> tuple[float, float]:
+        """Clips minimum temperature
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Clipped temperature, and pressure
+        """
+        assert self.temperature_min is not None
+
+        return max(temperature, self.temperature_min), pressure
+
+    def get_within_range(self, temperature: float, pressure: float) -> tuple[float, float]:
         """Gets temperature and pressure conditions within the calibration range.
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
-            name: Optional name for description in the logging output
 
         Returns:
-            A tuple containing:
-            True if the temperature and pressure are within the calibration range, otherwise False.
-            Temperature, if necessary clipped to be within the calibration range
-            Pressure, if necessary clipped to be within the calibration range
+            temperature in K, pressure in bar, according to prescribed clips
         """
-        flag: bool = True
-        temperature_to_return: float = temperature
-        pressure_to_return: float = pressure
+        for clip_func in self._clips_to_apply:
+            temperature, pressure = clip_func(temperature, pressure)
 
-        if name:
-            prefix: str = f"{self.__class__.__name__} ({name}): "
-        else:
-            prefix = ""
-
-        if self.pressure_min is not None:
-            if self.pressure_min > pressure:
-                logger.info(
-                    "%sPressure (%0.1f) < Minimum calibration pressure (%0.1f)",
-                    prefix,
-                    pressure,
-                    self.pressure_min,
-                )
-                flag = False
-                pressure_to_return = self.pressure_min
-
-        if self.pressure_max is not None:
-            if self.pressure_max < pressure:
-                logger.info(
-                    "%sPressure (%0.1f) > Maximum calibration pressure (%0.1f)",
-                    prefix,
-                    pressure,
-                    self.pressure_max,
-                )
-                flag = False
-                pressure_to_return = self.pressure_max
-
-        if self.temperature_min is not None:
-            if self.temperature_min > temperature:
-                logger.info(
-                    "%sTemperature (%0.1f) < Minimum calibration temperature (%0.1f)",
-                    prefix,
-                    temperature,
-                    self.temperature_min,
-                )
-                flag = False
-                temperature_to_return = self.temperature_min
-
-        if self.temperature_max is not None:
-            if self.temperature_max < temperature:
-                logger.info(
-                    "%sTemperature (%0.1f) > Maximum calibration temperature (%0.1f)",
-                    prefix,
-                    temperature,
-                    self.temperature_max,
-                )
-                flag = False
-                temperature_to_return = self.temperature_max
-
-        # if flag:
-        #     logger.debug(
-        #         "Temperature (%f) and pressure (%f) are within the calibration range",
-        #         temperature,
-        #         pressure,
-        #     )
-        # else:
-        #     logger.debug(
-        #         "%sTemperature (%f) and pressure (%f) are outside the calibration range",
-        #         prefix,
-        #         temperature,
-        #         pressure,
-        #     )
-
-        return (flag, temperature_to_return, pressure_to_return)
+        return temperature, pressure
 
 
 class ChemicalSpecies:
