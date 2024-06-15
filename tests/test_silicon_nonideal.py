@@ -83,12 +83,12 @@ def test_SiHO_nomass_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 1397.1156389723287,
-        "H2_g": 3643.977131630905,
-        "H4Si_g": 0.0958295345668093,
+        "H2O_g": 1566.940828894344,
+        "H2_g": 3687.2119791568507,
+        "H4Si_g": 0.08137365652206581,
         "O2Si_l": 1.0,
-        "O2_g": 0.0029971781267887337,
-        "OSi_g": 48.76758291683035,
+        "O2_g": 0.0036478802315568536,
+        "OSi_g": 44.20457534094316,
     }
 
     system.solve(constraints)
@@ -124,13 +124,13 @@ def test_SiHO_nosolubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 406.55261533197273,
-        "H2_g": 3485.8564375186675,
-        "H4Si_g": 0.8767932402036847,
-        "O2Si_l": 0.999999999999997,
-        "O2_g": 0.0002883354577622591,
-        "OSi_g": 157.23111057330988,
-        "degree_of_condensation_Si": 0.4343385949490586,
+        "H2O_g": 441.4119909374954,
+        "H2_g": 3453.23970638334,
+        "H4Si_g": 0.7158268256935626,
+        "O2Si_l": 0.9999999999999976,
+        "O2_g": 0.00034647350668364326,
+        "OSi_g": 143.4341263480178,
+        "degree_of_condensation_Si": 0.48453008967072864,
     }
 
     system.solve(constraints)
@@ -166,13 +166,13 @@ def test_SiHO_solubility() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target_pressures: dict[str, float] = {
-        "H2O_g": 141.13618455767758,
-        "H2_g": 1255.7925740899989,
-        "H4Si_g": 0.12719190444189377,
-        "O2Si_l": 0.9999999999999986,
-        "O2_g": 0.0002628079674630808,
-        "OSi_g": 164.69038490843644,
-        "degree_of_condensation_Si": 0.6073159331100464,
+        "H2O_g": 147.9110778505931,
+        "H2_g": 1204.9127339913045,
+        "H4Si_g": 0.09907503881558258,
+        "O2Si_l": 0.9999999999999987,
+        "O2_g": 0.00031206744561192417,
+        "OSi_g": 151.13438225949093,
+        "degree_of_condensation_Si": 0.635903850843704,
     }
 
     system.solve(constraints)
@@ -209,12 +209,12 @@ def test_SiHO_fugacityH2O_nosolubility() -> None:
 
     target_pressures: dict[str, float] = {
         "H2O_g": 4999.9999999999945,
-        "H2_g": 3499.4281736809,
-        "H4Si_g": 0.009380971943974768,
-        "O2Si_l": 0.9999999999999999,
-        "O2_g": 0.034282775570128855,
-        "OSi_g": 14.41947739317697,
-        "degree_of_condensation_Si": 0.9763485181256836,
+        "H2_g": 3499.4281733735734,
+        "H4Si_g": 0.00938097194089631,
+        "O2Si_l": 1.0,
+        "O2_g": 0.03428277557575392,
+        "OSi_g": 14.419477391994004,
+        "degree_of_condensation_Si": 0.9763485181277762,
     }
 
     system.solve(constraints)

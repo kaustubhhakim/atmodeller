@@ -110,9 +110,9 @@ def test_H_fO2() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.25706483161845733,
-        "H2_g": 0.25161113771286514,
-        "O2_g": 8.699765393460875e-08,
+        "H2O_g": 0.2570770067190733,
+        "H2_g": 0.24964688044710354,
+        "O2_g": 8.838043080858959e-08,
     }
 
     system.solve(constraints)
@@ -152,9 +152,9 @@ def test_H_fO2_holland() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.25705058811429515,
-        "H2_g": 0.2539022472323053,
-        "O2_g": 8.699766647737794e-08,
+        "H2O_g": 0.25706291267455456,
+        "H2_g": 0.2519202361466346,
+        "O2_g": 8.838045400824612e-08,
     }
 
     system.solve(constraints)
@@ -184,9 +184,9 @@ def test_H_basalt_melt() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.09434603056360964,
-        "H2_g": 0.09234539760208682,
-        "O2_g": 8.699588020866791e-08,
+        "H2O_g": 0.09442361772602827,
+        "H2_g": 0.0916964417272344,
+        "O2_g": 8.837679290584522e-08,
     }
 
     system.solve(constraints)
@@ -226,9 +226,9 @@ def test_H_fO2_plus() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.25822551891794376,
-        "H2_g": 0.025274900256252293,
-        "O2_g": 8.699641354691526e-06,
+        "H2O_g": 0.25822630157632576,
+        "H2_g": 0.025076641442856793,
+        "O2_g": 8.837799444728465e-06,
     }
 
     system.solve(constraints)
@@ -258,9 +258,9 @@ def test_H_fO2_minus() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.234191482856985,
-        "H2_g": 2.292084107842916,
-        "O2_g": 8.700876916925329e-10,
+        "H2O_g": 0.23441348219541092,
+        "H2_g": 2.2761616637646966,
+        "O2_g": 8.839768586501877e-10,
     }
 
     system.solve(constraints)
@@ -290,9 +290,9 @@ def test_H_five_oceans() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 6.258071518665579,
-        "H2_g": 6.123002998015027,
-        "O2_g": 8.706308103092035e-08,
+        "H2O_g": 6.259516638093527,
+        "H2_g": 6.075604219756987,
+        "O2_g": 8.846766776792243e-08,
     }
 
     system.solve(constraints)
@@ -324,9 +324,9 @@ def test_H_1500K() -> None:
     planet.surface_temperature = 1500.0  # K
 
     target: dict[str, float] = {
-        "H2O_g": 0.25671119963042033,
-        "H2_g": 0.3065119897656826,
-        "O2_g": 2.5006714903237476e-12,
+        "H2O_g": 0.25666635568842355,
+        "H2_g": 0.31320683835217444,
+        "O2_g": 2.3940728554564946e-12,
     }
 
     system.solve(constraints)
@@ -361,11 +361,11 @@ def test_H_and_C() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.25824358142493425,
-        "H2_g": 0.2521806525810137,
-        "O2_g": 8.740121617121534e-08,
-        "CO_g": 59.6819921102523,
-        "CO2_g": 13.404792068284909,
+        "CO2_g": 13.500258901609417,
+        "CO_g": 59.61099658675477,
+        "H2O_g": 0.25824632142741644,
+        "H2_g": 0.2501021517329365,
+        "O2_g": 8.886185271201372e-08,
     }
 
     system.solve(constraints)
@@ -400,11 +400,11 @@ def test_H_and_C_hill_formula() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.25824358142493425,
-        "H2_g": 0.2521806525810137,
-        "O2_g": 8.740121617121534e-08,
-        "CO_g": 59.6819921102523,
-        "CO2_g": 13.404792068284909,
+        "CO2_g": 13.500258901580787,
+        "CO_g": 59.610996586631884,
+        "H2O_g": 0.2582463214273665,
+        "H2_g": 0.25010215173290296,
+        "O2_g": 8.8861852712003e-08,
     }
 
     system.solve(constraints)
@@ -437,11 +437,11 @@ def test_H_and_C_total_pressure() -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     target: dict[str, float] = {
-        "H2O_g": 0.25824457265720585,
-        "H2_g": 0.2519709032598433,
-        "O2_g": 8.754746041831307e-08,
-        "CO_g": 81.22997882092373,
-        "CO2_g": 18.259805583019286,
+        "CO2_g": 18.38547187555166,
+        "CO_g": 81.10641004993212,
+        "H2O_g": 0.25824733320813686,
+        "H2_g": 0.24987064773894369,
+        "O2_g": 8.90272867718254e-08,
     }
 
     system.solve(constraints, factor=1)

@@ -26,6 +26,7 @@ from typing import Type
 import numpy as np
 
 from atmodeller import GAS_CONSTANT
+from atmodeller.interfaces import ExperimentalCalibration
 from atmodeller.utilities import UnitConversion
 
 if sys.version_info < (3, 12):
@@ -41,28 +42,21 @@ class _RedoxBuffer(ABC):
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
-        evaluation_pressure: Constant pressure in bar to always evaluate the redox buffer. Defaults
-            to None, meaning that the input pressure argument is used instead.
-        max_evaluation_pressure: Maximum pressure to evaluate the buffer at. Defaults to None,
-            meaning do not impose a maximum evaluation pressure.
+        calibration: Calibration temperature and pressure range. Defaults to empty.
 
     Attributes:
         log10_shift: Log10 shift relative to the buffer.
-        evaluation_pressure: Constant pressure in bar to always use to evaluate the redox
-            buffer.
-        max_evaluation_pressure: Maximum pressure to evaluate the buffer at.
+        calibration: Calibration temperature and pressure range
     """
 
     def __init__(
         self,
         log10_shift: float = 0,
         *,
-        evaluation_pressure: float | None = None,
-        max_evaluation_pressure: float | None = None
+        calibration: ExperimentalCalibration = ExperimentalCalibration()
     ):
         self.log10_shift: float = log10_shift
-        self.evaluation_pressure: float | None = evaluation_pressure
-        self.max_evaluation_pressure: float | None = max_evaluation_pressure
+        self.calibration: ExperimentalCalibration = calibration
 
     @abstractmethod
     def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
@@ -82,25 +76,13 @@ class _RedoxBuffer(ABC):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure in bar. This is ignored if :attr:`pressure` is not None.
+            pressure: Pressure in bar
             **kwargs: Arbitrary keyword arguments
 
         Returns:
             Log10 of the fugacity including any shift
         """
-        if self.evaluation_pressure is not None:
-            pressure = self.evaluation_pressure
-            logger.debug(
-                "Evaluate %s at constant pressure = %f", self.__class__.__name__, pressure
-            )
-        if self.max_evaluation_pressure is not None:
-            if pressure > self.max_evaluation_pressure:
-                pressure = self.max_evaluation_pressure
-                logger.debug(
-                    "Clipping pressure to max_evaluation_pressure = %f",
-                    self.max_evaluation_pressure,
-                )
-
+        temperature, pressure = self.calibration.get_within_range(temperature, pressure)
         log10_value: float = self._get_buffer_log10_value(
             temperature=temperature, pressure=pressure, **kwargs
         )
@@ -113,7 +95,7 @@ class _RedoxBuffer(ABC):
 
         Args:
             temperature: Temperature in K
-            pressure: Pressure in bar. This is ignored if :attr:`pressure` is not None.
+            pressure: Pressure in bar
             **kwargs: Arbitrary keyword arguments
 
         Returns:
@@ -127,11 +109,11 @@ class _RedoxBuffer(ABC):
         return value
 
 
-class IronWustiteBufferHirschmann(_RedoxBuffer):
+class IronWustiteBufferHirschmann08(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`"""
 
     @override
-    def _get_buffer_log10_value(self, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
         del kwargs
         fugacity: float = (
             -28776.8 / temperature
@@ -245,7 +227,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
         return pressure > threshold
 
     @override
-    def _get_buffer_log10_value(self, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
         del kwargs
         pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
         if self._use_hcp(temperature, pressure_GPa):
@@ -261,7 +243,7 @@ class IronWustiteBufferONeill(_RedoxBuffer):
     """
 
     @override
-    def _get_buffer_log10_value(self, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
         del pressure
         del kwargs
         fugacity: float = (
@@ -277,7 +259,7 @@ class IronWustiteBufferBallhaus(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`BBG91`"""
 
     @override
-    def _get_buffer_log10_value(self, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
         del kwargs
         fugacity: float = (
             14.07
@@ -297,7 +279,7 @@ class IronWustiteBufferFischer(_RedoxBuffer):
     """
 
     @override
-    def _get_buffer_log10_value(self, temperature: float, pressure: float = 1, **kwargs) -> float:
+    def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
         del kwargs
         pressure_GPa: float = UnitConversion.bar_to_GPa(pressure)
         a_coeff: float = 6.44059 + 0.00463099 * pressure_GPa
@@ -314,4 +296,4 @@ class IronWustiteBufferFischer(_RedoxBuffer):
         return fugacity
 
 
-IronWustiteBuffer: Type[_RedoxBuffer] = IronWustiteBufferHirschmann
+IronWustiteBuffer: Type[_RedoxBuffer] = IronWustiteBufferHirschmann21
