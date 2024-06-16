@@ -27,6 +27,7 @@ import numpy as np
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.interfaces import ExperimentalCalibration
+from atmodeller.thermodata.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import UnitConversion
 
 if sys.version_info < (3, 12):
@@ -37,7 +38,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class _RedoxBuffer(ABC):
+class _RedoxBuffer(ABC, RedoxBufferProtocol):
     """A redox buffer
 
     Args:
@@ -57,6 +58,11 @@ class _RedoxBuffer(ABC):
     ):
         self.log10_shift: float = log10_shift
         self.calibration: ExperimentalCalibration = calibration
+        logger.info(
+            "%s: Temperature and pressure will be clipped when evaluating the buffer",
+            self.__class__.__name__,
+        )
+        logger.debug("Setting experimental calibration = %s", calibration)
 
     @abstractmethod
     def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
@@ -109,8 +115,23 @@ class _RedoxBuffer(ABC):
         return value
 
 
+# 27.5 GPa is given in the abstract of :cite:t:`HGD08`
+IronWustiteBufferHirschmann08Calibration: ExperimentalCalibration = ExperimentalCalibration(
+    pressure_max=UnitConversion.GPa_to_bar(27.5)
+)
+
+
 class IronWustiteBufferHirschmann08(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`"""
+
+    @override
+    def __init__(
+        self,
+        log10_shift: float = 0,
+        *,
+        calibration: ExperimentalCalibration = IronWustiteBufferHirschmann08Calibration
+    ):
+        super().__init__(log10_shift, calibration=calibration)
 
     @override
     def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
@@ -249,6 +270,61 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
             return self._fcc_bcc_iron(temperature, pressure_GPa)
 
 
+class IronWustiteBufferHirschmann(RedoxBufferProtocol):
+    """Composite iron-wustite buffer using :cite:t:`OP93,HGD08` and :cite:t:`H21`"""
+
+    @override
+    def __init__(
+        self,
+        log10_shift: float = 0,
+    ):
+        self.low_temperature_buffer: _RedoxBuffer = IronWustiteBufferHirschmann08(log10_shift)
+        self.high_temperature_buffer: _RedoxBuffer = IronWustiteBufferHirschmann21(log10_shift)
+
+    def get_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
+        """Log10 value including any shift
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            **kwargs: Arbitrary keyword arguments
+
+        Returns:
+            Log10 of the fugacity including any shift
+        """
+        try:
+            assert self.high_temperature_buffer.calibration.temperature_min is not None
+        except AssertionError as exc:
+            raise ValueError(
+                "temperature_min is not defined for the high temperature buffer"
+            ) from exc
+
+        if temperature < self.high_temperature_buffer.calibration.temperature_min:
+            return self.low_temperature_buffer.get_log10_value(temperature, pressure, **kwargs)
+        else:
+            return self.high_temperature_buffer.get_log10_value(
+                temperature=temperature, pressure=pressure, **kwargs
+            )
+
+    def get_value(self, temperature: float, pressure: float, **kwargs) -> float:
+        """Value including any shift
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            **kwargs: Arbitrary keyword arguments
+
+        Returns:
+            Fugacity including any shift
+        """
+        log10_value: float = self.get_log10_value(
+            temperature=temperature, pressure=pressure, **kwargs
+        )
+        value: float = 10**log10_value
+
+        return value
+
+
 class IronWustiteBufferONeill(_RedoxBuffer):
     """Iron-wustite buffer :cite:p:`OE02`
 
@@ -309,4 +385,4 @@ class IronWustiteBufferFischer(_RedoxBuffer):
         return fugacity
 
 
-IronWustiteBuffer: Type[_RedoxBuffer] = IronWustiteBufferHirschmann21
+IronWustiteBuffer: Type[RedoxBufferProtocol] = IronWustiteBufferHirschmann

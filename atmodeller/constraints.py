@@ -35,7 +35,7 @@ from atmodeller.interfaces import (
     ReactionNetworkConstraintProtocol,
     TotalPressureConstraintProtocol,
 )
-from atmodeller.thermodata.redox_buffers import _RedoxBuffer
+from atmodeller.thermodata.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import filter_by_type
 
 if sys.version_info < (3, 12):
@@ -282,9 +282,9 @@ class BufferedFugacityConstraint(_SpeciesConstraint[GasSpecies]):
     """
 
     @override
-    def __init__(self, species: GasSpecies, value: _RedoxBuffer):
+    def __init__(self, species: GasSpecies, value: RedoxBufferProtocol):
         super().__init__(species, "fugacity")
-        self._value: _RedoxBuffer = value
+        self._value: RedoxBufferProtocol = value
 
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Value of the fugacity constraint in bar
