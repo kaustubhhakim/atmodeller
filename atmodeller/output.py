@@ -219,7 +219,7 @@ class Output(UserDict):
                 H_total_moles = output["total_moles"]  # pylint: disable=invalid-name
 
             if H_total_moles is not None:
-                # Astronomical logarithmic abundance, used by FastChem
+                # Astronomical logarithmic abundance (dex), used by FastChem
                 output["logarithmic_abundance"] = (
                     np.log10(output["total_moles"] / H_total_moles) + 12
                 )

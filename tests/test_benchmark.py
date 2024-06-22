@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Comparisons with FactSage 8.2"""
+"""Comparisons with FactSage 8.2 and FastChem 3.1.1"""
 
 # Want to use chemistry symbols so pylint: disable=invalid-name
 
@@ -39,6 +39,47 @@ logger: logging.Logger = debug_logger()
 
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage"""
+
+
+def test_H_O(helper) -> None:
+    """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint.
+
+    The FastChem element abundance file is:
+
+    # test_H_O from atmodeller
+    e-  0.0
+    H   12.00
+    O   11.40541658
+    """
+
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2_g, H2O_g, O2_g])
+
+    oceans: float = 1
+    planet: Planet = Planet()
+    h_kg: float = earth_oceans_to_kg(oceans)
+    o_kg: float = 6.25774e20
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("O", o_kg),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    fastchem_result: dict[str, float] = {
+        "H2O_g": 76.45861543,
+        "H2_g": 73.84378192,
+        "O2_g": 8.91399329e-08,
+    }
+
+    system.solve(constraints)
+    assert helper.isclose(system, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_reduced(helper) -> None:
@@ -87,7 +128,15 @@ def test_CHO_reduced(helper) -> None:
 def test_CHO_IW(helper) -> None:
     """C-H-O system at IW+0.5
 
-    Similar to :cite:p:`BHS22{Table E, row 2}`
+    Similar to :cite:p:`BHS22{Table E, row 2}`.
+
+    The FastChem element abundance file is:
+
+    # test_CHO_IW from atmodeller
+    e-  0.0
+    H   12.00
+    O   11.54211516
+    C   10.92386535
     """
 
     H2_g: GasSpecies = GasSpecies("H2")
@@ -124,8 +173,19 @@ def test_CHO_IW(helper) -> None:
         "O2_g": 4.11e-13,
     }
 
+    fastchem_result: dict[str, float] = {
+        "CH4_g": 29.61919788,
+        "CO2_g": 29.82548282,
+        "CO_g": 45.94958264,
+        "H2O_g": 332.03616807,
+        "H2_g": 236.73845646,
+        "O2_g": 3.96475584e-13,
+    }
+
     system.solve(constraints)
+
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(system, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_oxidised(helper) -> None:
