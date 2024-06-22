@@ -88,11 +88,13 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
         Returns:
             Log10 of the fugacity including any shift
         """
-        temperature, pressure = self.calibration.get_within_range(temperature, pressure)
+        # FIXME: Probably remove clipping when penalty approach implemented
+        # temperature, pressure = self.calibration.get_within_range(temperature, pressure)
+        penalty: float = self.calibration.get_penalty(temperature, pressure)
         log10_value: float = self._get_buffer_log10_value(
             temperature=temperature, pressure=pressure, **kwargs
         )
-        log10_value += self.log10_shift
+        log10_value += self.log10_shift + penalty
 
         return log10_value
 

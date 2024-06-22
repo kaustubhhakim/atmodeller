@@ -153,6 +153,25 @@ class ExperimentalCalibration:
 
         return temperature, pressure
 
+    def get_penalty(self, temperature: float, pressure: float) -> float:
+        """Gets a penalty value if temperature and pressure are outside the calibration range
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            A penalty value
+        """
+        temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
+        factor: npt.NDArray = np.array([1, 1])
+        penalty = (
+            factor[0] * (temperature_clip - temperature) ** 2
+            + factor[1] * (pressure_clip - pressure) ** 2
+        )
+
+        return penalty
+
 
 class ChemicalSpecies:
     """A chemical species and its properties
