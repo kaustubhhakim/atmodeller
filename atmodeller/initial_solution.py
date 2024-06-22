@@ -48,12 +48,12 @@ logger: logging.Logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 MIN_LOG10: float = -12
-"""Minimum log10 of the initial solution
+"""Minimum log10 (bar) of the initial gas species solution
 
 Motivated by typical values of oxygen fugacity at the iron-wustite buffer
 """
 MAX_LOG10: float = 8
-"""Maximum log10 of the initial solution"""
+"""Maximum log10 (bar) of the initial gas species solution"""
 
 
 class InitialSolution(ABC, Generic[T]):
