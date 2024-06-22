@@ -52,7 +52,7 @@ MIN_LOG10: float = -12
 
 Motivated by typical values of oxygen fugacity at the iron-wustite buffer
 """
-MAX_LOG10: float = 5
+MAX_LOG10: float = 8
 """Maximum log10 of the initial solution"""
 
 
