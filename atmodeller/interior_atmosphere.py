@@ -441,7 +441,7 @@ class InteriorAtmosphereSystem:
         *,
         initial_solution: InitialSolutionProtocol | None = None,
         extra_output: dict[str, float] | None = None,
-        max_attempts: int = 50,
+        max_attempts: int = 10,
         perturb_log10: float = 2.0,
         errors: str = "ignore",
         method: str = "hybr",
@@ -455,12 +455,12 @@ class InteriorAtmosphereSystem:
             initial_solution: Initial condition for this solve only. Defaults to 'None', meaning
                 that the default (self.initial_solution) is used.
             extra_output: Extra data to write to the output
-            method: Type of solver. Defaults to 'hybr'.
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
-                solution if the initial guess fails.
+                solution if the initial guess fails. Defaults to 10.
             perturb_log10: Maximum log10 perturbation to apply to the initial condition on failure.
                 Defaults to 2.0.
             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
+            method: Type of solver. Defaults to 'hybr'.
             tol: Tolerance for termination. Defaults to None.
             **options: Keyword arguments for solver options. Available keywords depend on method.
         """
