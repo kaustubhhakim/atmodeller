@@ -29,6 +29,7 @@ from atmodeller.constraints import (
     FugacityConstraint,
     PressureConstraint,
     SystemConstraints,
+    TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
@@ -460,12 +461,10 @@ def test_water_condensed(helper) -> None:
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
     h_kg: float = earth_oceans_to_kg(1)
-    # o_kg: float = 1.14375e21
 
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(H2_g, value=7),
-            # ElementMassConstraint("O", o_kg),
             ElementMassConstraint("H", h_kg),
         ]
     )
@@ -479,6 +478,49 @@ def test_water_condensed(helper) -> None:
     }
 
     system.solve(constraints)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_water_condensed_O_abundance(helper) -> None:
+    """Condensed water at 10 bar
+
+    This is the same test as above, but this time constraining the total pressure and oxygen
+    abundance. This test reveals a discrepancy in the moles of H and O in condensed H2O, which
+    do not appear to agree with stoichiometry.
+    """
+
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, H2O_l])
+
+    planet: Planet = Planet()
+    planet.surface_temperature = 411.75
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    h_kg: float = earth_oceans_to_kg(1)
+    o_kg: float = 1.14375e21
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            ElementMassConstraint("O", o_kg),
+            ElementMassConstraint("H", h_kg),
+            TotalPressureConstraint(9.924344608),
+        ]
+    )
+
+    factsage_result: dict[str, float] = {
+        "H2O_g": 3.3596,
+        "H2_g": 6.5604,
+        "O2_g": 5.6433e-58,
+        "H2O_l": 1.0,
+        "degree_of_condensation_H": 0.893755,
+    }
+
+    system.solve(constraints)
+    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
