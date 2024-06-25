@@ -51,6 +51,8 @@ class ExperimentalCalibration:
         temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
         pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
         pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
+        temperature_penalty: Penalty coefficients for temperature. Defaults to 1000.
+        pressure_penalty: Penalty coefficient for pressure. Defaults to 1000.
     """
 
     temperature_min: float | None = None
@@ -61,6 +63,10 @@ class ExperimentalCalibration:
     """Minimum pressure in bar"""
     pressure_max: float | None = None
     """Maximum pressure in bar"""
+    temperature_penalty: float = 1e3
+    """Temperature penalty"""
+    pressure_penalty: float = 1e3
+    """Pressure penalty"""
     _clips_to_apply: list[Callable] = field(init=False, default_factory=list)
     """Clips to apply"""
 
@@ -156,6 +162,8 @@ class ExperimentalCalibration:
     def get_penalty(self, temperature: float, pressure: float) -> float:
         """Gets a penalty value if temperature and pressure are outside the calibration range
 
+        This is based on the quadratic penalty method.
+
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
@@ -164,13 +172,10 @@ class ExperimentalCalibration:
             A penalty value
         """
         temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
-        # factor: npt.NDArray = np.array([1, 1])
-        # penalty = (
-        #    factor[0] * (temperature_clip - temperature) ** 2
-        #    + factor[1] * (pressure_clip - pressure) ** 2
-        # )
-        penalty: float = -np.log(temperature - temperature_clip)
-        penalty -= np.log(pressure - pressure_clip)
+        penalty = (
+            self.temperature_penalty * (temperature_clip - temperature) ** 2
+            + self.pressure_penalty * (pressure_clip - pressure) ** 2
+        )
 
         return penalty
 
