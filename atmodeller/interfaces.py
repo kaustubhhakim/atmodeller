@@ -164,11 +164,13 @@ class ExperimentalCalibration:
             A penalty value
         """
         temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
-        factor: npt.NDArray = np.array([1, 1])
-        penalty = (
-            factor[0] * (temperature_clip - temperature) ** 2
-            + factor[1] * (pressure_clip - pressure) ** 2
-        )
+        # factor: npt.NDArray = np.array([1, 1])
+        # penalty = (
+        #    factor[0] * (temperature_clip - temperature) ** 2
+        #    + factor[1] * (pressure_clip - pressure) ** 2
+        # )
+        penalty: float = -np.log(temperature - temperature_clip)
+        penalty -= np.log(pressure - pressure_clip)
 
         return penalty
 
