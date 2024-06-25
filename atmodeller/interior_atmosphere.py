@@ -40,7 +40,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import UnitConversion, profile_decorator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -435,6 +435,7 @@ class InteriorAtmosphereSystem:
 
         return residual_mass
 
+    @profile_decorator
     def solve(
         self,
         constraints: SystemConstraints,
