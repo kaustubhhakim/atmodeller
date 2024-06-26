@@ -35,7 +35,7 @@ from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
-from atmodeller.interfaces import TypeChemicalSpecies_co
+from atmodeller.interfaces import ChemicalSpecies, TypeChemicalSpecies_co
 from atmodeller.output import Output
 
 if sys.version_info < (3, 12):
@@ -615,3 +615,39 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
             )
         else:
             self.value.update(output, *args, **kwargs)
+
+
+class InitialSolutionLast(InitialSolution[InitialSolution]):
+    """An initial solution that uses the previous output value as the next initial solution.
+
+    This is useful if you are incrementing sequentially through a grid of parameters.
+
+    Args:
+        value: An initial solution for the first solution only
+        species: Species
+        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
+        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
+
+    Attributes:
+        value: An object or value used to compute the initial solution
+    """
+
+    @override
+    def get_value(self, *args, **kwargs) -> npt.NDArray:
+        return self.value.get_value(*args, **kwargs)
+
+    @override
+    def update(self, output: Output, *args, **kwargs) -> None:
+        del args
+        del kwargs
+        last_output: dict[str, float] = output["solution"][-1]
+        next_values: dict[ChemicalSpecies, float] = {}
+        for species in self.species.data:
+            next_values[species] = last_output[species.name]
+
+        self.value = InitialSolutionDict(
+            next_values,
+            species=self.species,
+            min_log10=self.min_log10,
+            max_log10=self.max_log10,
+        )

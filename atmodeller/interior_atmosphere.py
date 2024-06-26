@@ -40,7 +40,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
-from atmodeller.utilities import UnitConversion, profile_decorator
+from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
