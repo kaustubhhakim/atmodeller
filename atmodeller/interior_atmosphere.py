@@ -435,14 +435,13 @@ class InteriorAtmosphereSystem:
 
         return residual_mass
 
-    @profile_decorator
     def solve(
         self,
         constraints: SystemConstraints,
         *,
         initial_solution: InitialSolutionProtocol | None = None,
         extra_output: dict[str, float] | None = None,
-        max_attempts: int = 10,
+        max_attempts: int = 20,
         perturb_log10: float = 2.0,
         errors: str = "ignore",
         method: str = "hybr",
