@@ -379,9 +379,9 @@ class Solution:
 
     1. Species fugacities and activities, ordered according to the input species list
 
-    2. Beta factors for elements in condensed species to keep track of condensed mass
+    2. Beta factors for condensed species to store condensed mass
 
-    3. Lambda factors for condensed species
+    3. Lambda factors for condensed species to store condensate stability
 
     Args:
         _species: Species
@@ -394,17 +394,13 @@ class Solution:
     _temperature: float
     # These are all log10
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
-    _beta_solution: dict[str, float] = field(init=False, default_factory=dict)
+    _beta_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
     _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
 
     @property
     def number(self) -> int:
         """Number of solution quantities"""
-        return (
-            self._species.number_species()
-            + self.number_condensed_elements_to_solve
-            + self.number_condensed_species_to_solve
-        )
+        return self._species.number_species() + 2 * self.number_condensed_species_to_solve
 
     @property
     def condensed_elements_to_solve(self) -> list[str]:
@@ -455,8 +451,8 @@ class Solution:
         for species_index, species in enumerate(self._species):
             data[start_index + species_index] = self._species_solution[species]
         start_index += species_index + 1
-        for beta_index, element in enumerate(self.condensed_elements_to_solve):
-            data[start_index + beta_index] = self._beta_solution[element]
+        for beta_index, species in enumerate(self.condensed_species_to_solve):
+            data[start_index + beta_index] = self._beta_solution[species]
         start_index += beta_index + 1
         for lambda_index, species in enumerate(self.condensed_species_to_solve):
             data[start_index + lambda_index] = self._lambda_solution[species]
@@ -478,8 +474,8 @@ class Solution:
         for species_index, species in enumerate(self._species):
             self._species_solution[species] = value[start_index + species_index]
         start_index += species_index + 1
-        for beta_index, element in enumerate(self.condensed_elements_to_solve):
-            self._beta_solution[element] = value[start_index + beta_index]
+        for beta_index, species in enumerate(self.condensed_species_to_solve):
+            self._beta_solution[species] = value[start_index + beta_index]
         start_index += beta_index + 1
         for lambda_index, species in enumerate(self.condensed_species_to_solve):
             self._lambda_solution[species] = value[start_index + lambda_index]
@@ -584,10 +580,26 @@ class Solution:
 
     @property
     def degree_of_condensation(self) -> dict[str, float]:
-        """Degree of condensation for elements"""
-        return {
-            element: 10**value / (1 + 10**value) for element, value in self._beta_solution.items()
-        }
+        """Degree of condensation for elements in condensed species with mass balance"""
+        degree_of_condensation: dict[str, float] = {}
+        for element in self.condensed_elements_to_solve:
+            degree_of_condensation.setdefault(element, 0)
+            for species in self.condensed_species_to_solve:
+                if element in species.composition():
+                    degree_of_condensation[element] += (
+                        10 ** self._beta_solution[species]
+                        * species.composition()[element].fraction
+                    )
+
+        logger.debug("degree_of_condensation = %s", degree_of_condensation)
+
+        # TODO: Remove old below when new method implemented and tested
+        # return {
+        #    element: 10**value / (1 + 10**value) for element, value in self._beta_solution.items()
+        # }
+
+        # FIXME: Currently this is just the condensed mass
+        return degree_of_condensation
 
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""

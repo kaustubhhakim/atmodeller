@@ -318,7 +318,6 @@ class InitialSolutionProtocol(Protocol):
         *,
         temperature: float,
         pressure: float,
-        degree_of_condensation_number: int,
         number_of_condensed_species: int,
         perturb: bool = False,
         perturb_log10: float = 2,

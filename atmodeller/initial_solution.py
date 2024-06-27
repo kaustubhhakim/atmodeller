@@ -122,7 +122,6 @@ class InitialSolution(ABC, Generic[T]):
         *,
         temperature: float,
         pressure: float,
-        degree_of_condensation_number: int,
         number_of_condensed_species: int,
         perturb: bool = False,
         perturb_log10: float = 2,
@@ -133,10 +132,7 @@ class InitialSolution(ABC, Generic[T]):
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            degree_of_condensation_number: Number of elements to solve for the degree of
-                condensation
-            number_of_condensed_species: Number of condensed species to solve for the condensate
-                stability factors (lambda factors)
+            number_of_condensed_species: Number of condensed species to solve for
             perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
             perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
                 to 2.
@@ -170,12 +166,18 @@ class InitialSolution(ABC, Generic[T]):
             )
         logger.debug("Conform initial solution to constraints = %s", log10_value)
 
+        # TODO: This is previous.  Beta is no longer simply related to degree of condensation
         # When condensates and mass constraints are present, we assume an initial degree of
         # condensation of 0.5 for each element. Recall that the (log10) solution quantity is:
         # beta = log10(mu) = log10(d/(1-d)), where beta is the log10 mass of the condensed element,
         # and d is the degree of condensation. Hence d = 0.5 gives mu = 1 gives beta = 0
-        log_degree_of_condensation: npt.NDArray = np.zeros(degree_of_condensation_number)
-        log10_value = np.append(log10_value, log_degree_of_condensation)
+        # log_degree_of_condensation: npt.NDArray = np.zeros(degree_of_condensation_number)
+        # log10_value = np.append(log10_value, log_degree_of_condensation)
+
+        # In the new approach, a negative beta means no condensed mass. Could possibly be merged
+        # with the stability requirement below
+        log_condensed_mass: npt.NDArray = 12 * np.ones(number_of_condensed_species)
+        log10_value = np.append(log10_value, log_condensed_mass)
 
         # Small lambda factors assume the condensates are stable, which is probably a reasonable
         # assumption given that the user has chosen to include them in the species list.

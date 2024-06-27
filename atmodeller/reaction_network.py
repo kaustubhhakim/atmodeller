@@ -204,12 +204,12 @@ class ReactionNetwork:
 
         # Reactions
         for reaction_index in range(self.number_reactions):
-            logger.debug(
-                "Row %02d: Reaction %d: %s",
-                reaction_index,
-                reaction_index,
-                self.reactions()[reaction_index],
-            )
+            # logger.debug(
+            #     "Row %02d: Reaction %d: %s",
+            #     reaction_index,
+            #     reaction_index,
+            #     self.reactions()[reaction_index],
+            # )
             rhs[reaction_index] = self._get_reaction_log10_equilibrium_constant(
                 reaction_index=reaction_index,
                 temperature=temperature,
@@ -219,7 +219,7 @@ class ReactionNetwork:
         # Constraints
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
-            logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
+            # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
         logger.debug("RHS vector = %s", rhs)
@@ -373,14 +373,17 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         )
         for nn, species in enumerate(solution.condensed_species_to_solve):
             residual_stability[nn] = solution._lambda_solution[species] - log10_TAU
+            residual_stability[nn] += solution._beta_solution[species]
+
+            # TODO: Old below, remove
             # The xLMA usually uses the condensate number density or similar, but it's simpler to
             # satisfy the auxiliary equations using the condensed mass of elements in the
             # condensate, which we have direct access to.
-            for element in species.elements:
-                try:
-                    residual_stability += solution._beta_solution[element]
-                except KeyError:
-                    pass
+            # for element in species.elements:
+            #    try:
+            #        residual_stability += solution._beta_solution[element]
+            #    except KeyError:
+            #        pass
 
         logger.debug("residual_stability = %s", residual_stability)
 

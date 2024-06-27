@@ -394,7 +394,8 @@ def test_graphite_condensed(helper) -> None:
         "degree_of_condensation_C": 0.456983,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=0.1)
+    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -442,7 +443,7 @@ def test_graphite_unstable(helper) -> None:
         "degree_of_condensation_C": 1.1e-15,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=0.1)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -477,7 +478,8 @@ def test_water_condensed(helper) -> None:
         "degree_of_condensation_H": 0.893755,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=0.1)
+    system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -507,7 +509,7 @@ def test_water_condensed_O_abundance(helper) -> None:
         [
             ElementMassConstraint("O", o_kg),
             ElementMassConstraint("H", h_kg),
-            TotalPressureConstraint(9.924344608),
+            # TotalPressureConstraint(9.924344608),
         ]
     )
 
@@ -519,7 +521,7 @@ def test_water_condensed_O_abundance(helper) -> None:
         "degree_of_condensation_H": 0.893755,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=0.1)
     system.output(to_excel=True)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
@@ -528,6 +530,7 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     system = graphite_water_condensed
+    system.output(to_excel=True)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,
