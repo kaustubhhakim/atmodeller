@@ -377,11 +377,11 @@ class Solution:
     applied constraints. All quantities must be positive so log10 is used. The ordering of the
     solution vector must be maintained for consistency and is organised as follows:
 
-    1. Species fugacities and activities, ordered according to the input species list
+    1. Species fugacities and activities, ordered according to the `species` argument.
 
-    2. Beta factors for condensed species to store condensed mass
+    2. Mass of the condensed species
 
-    3. Lambda factors for condensed species to store condensate stability
+    3. Stability factors for condensed species
 
     Args:
         _species: Species
@@ -394,34 +394,16 @@ class Solution:
     _temperature: float
     # These are all log10
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
-    _beta_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
-    _lambda_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
+    _mass_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
+    _stability_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
 
     @property
     def number(self) -> int:
-        """Number of solution quantities"""
-        return self._species.number_species() + 2 * self.number_condensed_species_to_solve
+        """Number of solution quantities
 
-    @property
-    def condensed_elements_to_solve(self) -> list[str]:
-        """Elements in condensed species that should adhere to mass balance
-
-        The elements for which to calculate the degree of condensation requires both that they are
-        in a condensed phase and that mass constraints are applied.
+        The factor of two is because each (possibly stable) condensate has a stability factor.
         """
-        condensed_elements_to_solve: list[str] = []
-        for constraint in self._constraints.mass_constraints:
-            if constraint.element in self._species.elements_in_condensed_species:
-                condensed_elements_to_solve.append(constraint.element)
-
-        logger.debug("condensed_elements_to_solve = %s", condensed_elements_to_solve)
-
-        return condensed_elements_to_solve
-
-    @property
-    def number_condensed_elements_to_solve(self) -> int:
-        """Number of elements in condensed species to solve for mass balance"""
-        return len(self.condensed_elements_to_solve)
+        return self._species.number_species() + 2 * self.number_condensed_species_to_solve
 
     @property
     def condensed_species_to_solve(self) -> list[CondensedSpecies]:
@@ -443,19 +425,19 @@ class Solution:
         return len(self.condensed_species_to_solve)
 
     @property
-    def data(self) -> npt.NDArray:
+    def data(self) -> npt.NDArray[np.float_]:
         data: npt.NDArray = np.zeros(self.number, dtype=np.float_)
         species_index: int = 0
-        beta_index: int = 0
+        mass_index: int = 0
         start_index: int = 0
         for species_index, species in enumerate(self._species):
             data[start_index + species_index] = self._species_solution[species]
         start_index += species_index + 1
-        for beta_index, species in enumerate(self.condensed_species_to_solve):
-            data[start_index + beta_index] = self._beta_solution[species]
-        start_index += beta_index + 1
-        for lambda_index, species in enumerate(self.condensed_species_to_solve):
-            data[start_index + lambda_index] = self._lambda_solution[species]
+        for mass_index, species in enumerate(self.condensed_species_to_solve):
+            data[start_index + mass_index] = self._mass_solution[species]
+        start_index += mass_index + 1
+        for stability_index, species in enumerate(self.condensed_species_to_solve):
+            data[start_index + stability_index] = self._stability_solution[species]
 
         return data
 
@@ -464,34 +446,32 @@ class Solution:
         """Sets the solution dictionaries
 
         Args:
-            value: A vector, which is usually passed by the solver. Must be ordered by the
-                fugacities and activities of species, then the beta factors, then the lambda
-                factors.
+            value: A vector, which is usually passed by the solver.
         """
         species_index: int = 0
-        beta_index: int = 0
+        mass_index: int = 0
         start_index: int = 0
         for species_index, species in enumerate(self._species):
             self._species_solution[species] = value[start_index + species_index]
         start_index += species_index + 1
-        for beta_index, species in enumerate(self.condensed_species_to_solve):
-            self._beta_solution[species] = value[start_index + beta_index]
-        start_index += beta_index + 1
-        for lambda_index, species in enumerate(self.condensed_species_to_solve):
-            self._lambda_solution[species] = value[start_index + lambda_index]
+        for mass_index, species in enumerate(self.condensed_species_to_solve):
+            self._mass_solution[species] = value[start_index + mass_index]
+        start_index += mass_index + 1
+        for stability_index, species in enumerate(self.condensed_species_to_solve):
+            self._stability_solution[species] = value[start_index + stability_index]
 
     @property
     def species_values(self) -> npt.NDArray:
         return np.array(list(self._species_solution.values()))
 
     @property
-    def lambda_array(self) -> npt.NDArray:
-        lambda_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
+    def stability_array(self) -> npt.NDArray:
+        stability_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
         for species in self.condensed_species_to_solve:
             index: int = self._species.species_index(species)
-            lambda_array[index] = self._lambda_solution[species]
+            stability_array[index] = self._stability_solution[species]
 
-        return lambda_array
+        return stability_array
 
     @property
     def log10_gas_pressures(self) -> dict[GasSpecies, float]:
@@ -579,27 +559,13 @@ class Solution:
         return {species: 10**value for species, value in self.log10_activities.items()}
 
     @property
-    def degree_of_condensation(self) -> dict[str, float]:
-        """Degree of condensation for elements in condensed species with mass balance"""
-        degree_of_condensation: dict[str, float] = {}
-        for element in self.condensed_elements_to_solve:
-            degree_of_condensation.setdefault(element, 0)
-            for species in self.condensed_species_to_solve:
-                if element in species.composition():
-                    degree_of_condensation[element] += (
-                        10 ** self._beta_solution[species]
-                        * species.composition()[element].fraction
-                    )
+    def condensed_masses(self) -> dict[CondensedSpecies, float]:
+        """Masses of condensed species"""
+        condensed_masses: dict[CondensedSpecies, float] = {}
+        for condensed_species in self._species.condensed_species:
+            condensed_masses[condensed_species] = 10 ** self._mass_solution[condensed_species]
 
-        logger.debug("degree_of_condensation = %s", degree_of_condensation)
-
-        # TODO: Remove old below when new method implemented and tested
-        # return {
-        #    element: 10**value / (1 + 10**value) for element, value in self._beta_solution.items()
-        # }
-
-        # FIXME: Currently this is just the condensed mass
-        return degree_of_condensation
+        return condensed_masses
 
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""
@@ -608,8 +574,8 @@ class Solution:
             output[species.name] = pressure
         for species, activity in self.activities.items():
             output[species.name] = activity
-        for element, degree_of_condensation in self.degree_of_condensation.items():
-            output[f"degree_of_condensation_{element}"] = degree_of_condensation
+        for species, condensed_mass in self.condensed_masses.items():
+            output[f"mass_{species.name}"] = condensed_mass
 
         return output
 

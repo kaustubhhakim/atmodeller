@@ -372,8 +372,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             solution.number_condensed_species_to_solve, dtype=np.float_
         )
         for nn, species in enumerate(solution.condensed_species_to_solve):
-            residual_stability[nn] = solution._lambda_solution[species] - log10_TAU
-            residual_stability[nn] += solution._beta_solution[species]
+            residual_stability[nn] = solution._stability_solution[species] - log10_TAU
+            residual_stability[nn] += solution._mass_solution[species]
 
             # TODO: Old below, remove
             # The xLMA usually uses the condensate number density or similar, but it's simpler to
@@ -412,8 +412,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         )
 
         # Reaction network correction factors for condensate stability
-        residual_reaction += activity_modifier.dot(10**solution.lambda_array)
-        residual_reaction -= equilibrium_modifier.dot(10**solution.lambda_array)
+        residual_reaction += activity_modifier.dot(10**solution.stability_array)
+        residual_reaction -= equilibrium_modifier.dot(10**solution.stability_array)
 
         # Residual for the auxiliary stability equations
         residual_stability: npt.NDArray = self.get_stability_residual(solution)

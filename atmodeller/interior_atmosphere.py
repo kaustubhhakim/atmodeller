@@ -274,7 +274,7 @@ class InteriorAtmosphereSystem:
         }
         for species in self.species.condensed_species:
             # FIXME: Below can sometimes blow up, so be smarter with the scaling
-            species_mass: float = 10 ** self._solution._beta_solution[species]
+            species_mass: float = 10 ** self._solution._mass_solution[species]
             for element, value in species.composition().items():
                 # TODO: remove condensed_element_masses.setdefault(element, 0)
                 condensed_element_masses[element] += species_mass * value.fraction
@@ -440,15 +440,6 @@ class InteriorAtmosphereSystem:
         # Mass constraints are currently only ever specified in terms of elements. Hence
         # constraint.species is an element.
         for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
-            # New approach to try and keep scaling better
-            # log10_gas_mass: float = np.log10(
-            #     sum(self.element_gas_mass(mass_constraint.element).values())
-            # )
-
-            # d: float = self._solution._beta_solution
-            # residual_mass[constraint_index] = log10_gas_mass + np.log10(1 + 10 ** ())
-
-            # Previous scaling here
             residual_mass[constraint_index] = np.log10(
                 sum(self.element_mass(mass_constraint.element).values())
             )
@@ -581,10 +572,6 @@ class InteriorAtmosphereSystem:
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
             self._failed_solves += 1
-            if self.solution.number_condensed_elements_to_solve > 0:
-                logger.info("Probably no solution for condensed species and imposed constraints")
-                logger.info("Remove some condensed species and try again")
-
             if errors == "raise":
                 logger.error(msg)
                 logger.error("constraints = %s", self.constraints)
