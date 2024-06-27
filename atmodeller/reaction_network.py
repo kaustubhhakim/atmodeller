@@ -219,6 +219,7 @@ class ReactionNetwork:
         # Constraints
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
+            # pylint: disable=line-too-long
             # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
@@ -360,12 +361,12 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         Returns:
             The residual vector of condensate stability
         """
-        residual_stability: npt.NDArray = np.zeros_like(
-            self.species.condensed_species, dtype=np.float_
+        residual_stability: npt.NDArray = np.zeros(
+            self.species.number_condensed_species, dtype=np.float_
         )
         for nn, species in enumerate(self.species.condensed_species):
-            residual_stability[nn] = solution._stability_solution[species] - log10_TAU
-            residual_stability[nn] += solution._mass_solution[species]
+            residual_stability[nn] = solution.stability_solution[species] - log10_TAU
+            residual_stability[nn] += solution.mass_solution[species]
 
         logger.debug("residual_stability = %s", residual_stability)
 

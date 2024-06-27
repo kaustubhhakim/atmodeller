@@ -30,7 +30,6 @@ import numpy as np
 import pandas as pd
 from molmass import Formula
 
-from atmodeller.interfaces import CondensedSpecies
 from atmodeller.utilities import UnitConversion, reorder_dict
 
 if TYPE_CHECKING:
@@ -169,7 +168,7 @@ class Output(UserDict):
         # To compute astronomical logarithmic abundances we need to store H abundance, which is
         # used to normalise all other elemental abundances
         mass = reorder_dict(mass, "H")
-        H_total_moles: float | None = None
+        H_total_moles: float | None = None  # pylint: disable=invalid-name
 
         # Create and add the output
         for nn, (element, element_mass) in enumerate(mass.items()):

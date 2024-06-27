@@ -398,46 +398,41 @@ class Solution:
     _stability_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
 
     @property
+    def mass_solution(self) -> dict[CondensedSpecies, float]:
+        return self._mass_solution
+
+    @property
+    def species_solution(self) -> dict[ChemicalSpecies, float]:
+        return self._species_solution
+
+    @property
+    def stability_solution(self) -> dict[CondensedSpecies, float]:
+        return self._stability_solution
+
+    @property
     def number(self) -> int:
         """Number of solution quantities
 
         The factor of two is because each (possibly stable) condensate has a stability factor.
         """
-        return self._species.number_species() + 2 * self.number_condensed_species_to_solve
-
-    @property
-    def condensed_species_to_solve(self) -> list[CondensedSpecies]:
-        """Condensed species to solve for stability requires they participate in mass balance"""
-        condensed_species_to_solve: list[CondensedSpecies] = []
-        for species in self._species.condensed_species:
-            for constraint in self._constraints.mass_constraints:
-                if constraint.element in species.composition():
-                    condensed_species_to_solve.append(species)
-                    break
-
-        logger.debug("condensed_species_to_solve = %s", condensed_species_to_solve)
-
-        return condensed_species_to_solve
-
-    @property
-    def number_condensed_species_to_solve(self) -> int:
-        """Number of condensed species to solve for stability"""
-        return len(self.condensed_species_to_solve)
+        return self._species.number_species() + 2 * self._species.number_condensed_species
 
     @property
     def data(self) -> npt.NDArray[np.float_]:
-        data: npt.NDArray = np.zeros(self.number, dtype=np.float_)
-        species_index: int = 0
-        mass_index: int = 0
-        start_index: int = 0
-        for species_index, species in enumerate(self._species):
-            data[start_index + species_index] = self._species_solution[species]
-        start_index += species_index + 1
-        for mass_index, species in enumerate(self.condensed_species_to_solve):
-            data[start_index + mass_index] = self._mass_solution[species]
-        start_index += mass_index + 1
-        for stability_index, species in enumerate(self.condensed_species_to_solve):
-            data[start_index + stability_index] = self._stability_solution[species]
+        data: npt.NDArray[np.float_] = np.zeros(self.number, dtype=np.float_)
+        index = 0
+        # Fill data with species solutions
+        for species in self._species:
+            data[index] = self._species_solution[species]
+            index += 1
+        # Fill data with mass solutions
+        for species in self._species.condensed_species:
+            data[index] = self._mass_solution[species]
+            index += 1
+        # Fill data with stability solutions
+        for species in self._species.condensed_species:
+            data[index] = self._stability_solution[species]
+            index += 1
 
         return data
 
@@ -448,17 +443,17 @@ class Solution:
         Args:
             value: A vector, which is usually passed by the solver.
         """
-        species_index: int = 0
-        mass_index: int = 0
-        start_index: int = 0
-        for species_index, species in enumerate(self._species):
-            self._species_solution[species] = value[start_index + species_index]
-        start_index += species_index + 1
-        for mass_index, species in enumerate(self.condensed_species_to_solve):
-            self._mass_solution[species] = value[start_index + mass_index]
-        start_index += mass_index + 1
-        for stability_index, species in enumerate(self.condensed_species_to_solve):
-            self._stability_solution[species] = value[start_index + stability_index]
+        index = 0
+
+        for species in self._species:
+            self._species_solution[species] = value[index]
+            index += 1
+        for species in self._species.condensed_species:
+            self._mass_solution[species] = value[index]
+            index += 1
+        for species in self._species.condensed_species:
+            self._stability_solution[species] = value[index]
+            index += 1
 
     @property
     def species_values(self) -> npt.NDArray:
@@ -467,7 +462,7 @@ class Solution:
     @property
     def stability_array(self) -> npt.NDArray:
         stability_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
-        for species in self.condensed_species_to_solve:
+        for species in self._species.condensed_species:
             index: int = self._species.species_index(species)
             stability_array[index] = self._stability_solution[species]
 
@@ -561,11 +556,10 @@ class Solution:
     @property
     def condensed_masses(self) -> dict[CondensedSpecies, float]:
         """Masses of condensed species"""
-        condensed_masses: dict[CondensedSpecies, float] = {}
-        for condensed_species in self._species.condensed_species:
-            condensed_masses[condensed_species] = 10 ** self._mass_solution[condensed_species]
-
-        return condensed_masses
+        return {
+            condensed_species: 10 ** self._mass_solution[condensed_species]
+            for condensed_species in self._species.condensed_species
+        }
 
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""

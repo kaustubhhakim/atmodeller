@@ -171,100 +171,8 @@ class InteriorAtmosphereSystem:
         """Solution in a dictionary"""
         return self._solution.solution_dict()
 
-    # def condensed_species_masses(self) -> dict[CondensedSpecies, dict[str, float]]:
-    #     """Computes the masses of condensed species and their elements
-
-    #     This follows the approach outlined in :cite:t:`KSP24{Appendix B}`, albeit simplified under
-    #     the assumption of a handful of linearly independent condensates that can be solved for in
-    #     a single solve, i.e. no iteration is required.
-
-    #     Returns:
-    #         Dictionary of condensed species and their element masses
-    #     """
-    #     condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = {}
-    #     condensed_elements: list[str] = self.solution.condensed_elements_to_solve
-    #     condensed_species: list[CondensedSpecies] = self.solution.condensed_species_to_solve
-    #     mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
-
-    #     if mapping.size < 1:
-    #         return condensed_species_masses
-
-    #     # Assemble matrices
-    #     # TODO: If both H and O prescribed as constraints, then drop one based on the one that is
-    #     # the minimum stoichiometry bottleneck for H2O. So keep the minimum and drop the maximum.
-    #     # Then determine the amount of the other quantity and compare to the prescribed constraint
-    #     # Should correct original constraint to be self-consistent.
-    #     element_condensed_mass: list[float] = []
-    #     element_condensed_moles: list[float] = []
-    #     for ii, condensed_element in enumerate(condensed_elements):
-    #         condensed_mass: float = self.element_condensed_mass(condensed_element)
-    #         element_condensed_mass.append(condensed_mass)
-    #         condensed_moles: float = condensed_mass / UnitConversion.g_to_kg(
-    #             Formula(condensed_element).mass
-    #         )
-    #         element_condensed_moles.append(condensed_moles)
-    #         for jj, species in enumerate(condensed_species):
-    #             if condensed_element in species.composition():
-    #                 mapping[ii, jj] = species.composition()[condensed_element].fraction
-
-    #     element_condensed_mass_dict: dict[str, float] = dict(
-    #         zip(condensed_elements, element_condensed_mass)
-    #     )
-    #     element_condensed_moles_dict: dict[str, float] = dict(
-    #         zip(condensed_elements, element_condensed_moles)
-    #     )
-
-    #     logger.debug("element_condensed_mass = %s", element_condensed_mass_dict)
-    #     logger.debug("element_condensed_moles = %s", element_condensed_moles_dict)
-    #     logger.debug("mapping = %s", mapping)
-
-    #     # For debugging element partitioning in condensates.
-    #     if "H" in element_condensed_mass_dict and "O" in element_condensed_mass_dict:
-    #         logger.debug("Compute H/O ratio in condensed phase")
-    #         HO_ratio_mass: float = (  # pylint: disable=invalid-name
-    #             element_condensed_mass_dict["H"] / element_condensed_mass_dict["O"]
-    #         )
-    #         HO_ratio_moles: float = (  # pylint: disable=invalid-name
-    #             element_condensed_moles_dict["H"] / element_condensed_moles_dict["O"]
-    #         )
-    #         logger.debug("H/O (mass) = %f, H/O (moles) = %f", HO_ratio_mass, HO_ratio_moles)
-    #         logger.debug(
-    #             "O/H (mass) = %f, O/H (moles) = %f", 1 / HO_ratio_mass, 1 / HO_ratio_moles
-    #         )
-
-    #     # Count how many condensates can be associated with each element
-    #     associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
-    #     logger.debug("associations = %s", associations)
-    #     # Enforce conditions for a single solve, which avoids the complication of having to iterate
-    #     try:
-    #         assert np.all(associations == 1)
-    #     except AssertionError as exc:
-    #         raise AssertionError(
-    #             "Every element can only be associated with a single condensate"
-    #         ) from exc
-
-    #     element_condensed_mass_ar: npt.NDArray = np.array(
-    #         element_condensed_mass, dtype=np.float_
-    #     ).reshape(-1, 1)
-    #     condensed_masses: npt.NDArray = np.linalg.solve(
-    #         mapping, element_condensed_mass_ar
-    #     ).flatten()
-
-    #     # Necessary to back-compute some species that might not be constrained by mass balance,
-    #     # for example oxygen is often constrained by fO2 and not by abundance, but we want to know
-    #     # how much oxygen is in the system.
-    #     for nn, species in enumerate(condensed_species):
-    #         composition: pd.DataFrame = species.composition().dataframe()
-    #         composition["Mass"] = condensed_masses[nn] * composition["Fraction"]
-    #         logger.debug("composition = %s", composition)
-    #         condensed_species_masses[species] = composition.to_dict()["Mass"]
-
-    #     return condensed_species_masses
-
     def condensed_element_masses(self) -> dict[str, float]:
-        """Calculates the computed and implied masses of elements in all condensed species.
-
-        TODO: Different to element_condensed_mass this computes the implied masses as well.
+        """Calculates the masses of elements in all condensed species.
 
         Returns:
             Dictionary of elements and their masses in all condensed species
@@ -273,21 +181,11 @@ class InteriorAtmosphereSystem:
             element: 0 for element in self.species.elements()
         }
         for species in self.species.condensed_species:
-            # FIXME: Below can sometimes blow up, so be smarter with the scaling
-            species_mass: float = 10 ** self._solution._mass_solution[species]
+            # TODO: Below can sometimes blow up when the solver tries a large step, although this
+            # can be mitigated by setting the `factor` solver option.
+            species_mass: float = 10 ** self._solution.mass_solution[species]
             for element, value in species.composition().items():
-                # TODO: remove condensed_element_masses.setdefault(element, 0)
                 condensed_element_masses[element] += species_mass * value.fraction
-
-        # TODO: Previous below, remove when new approach implemented
-        # condensed_species_masses = self.condensed_species_masses()
-        # condensed_element_masses: dict[str, float] = {}
-        # for element_masses in condensed_species_masses.values():
-        #     for element, value in element_masses.items():
-        #         if element in condensed_element_masses:
-        #             condensed_element_masses[element] += value
-        #         else:
-        #             condensed_element_masses[element] = value
 
         logger.debug("condensed_element_masses = %s", condensed_element_masses)
 
@@ -390,30 +288,6 @@ class InteriorAtmosphereSystem:
 
         return mass
 
-    def element_condensed_mass(self, element: str) -> float:
-        """Calculates the mass of an element in all condensed species.
-
-        Args:
-            element: Element to compute the mass for.
-
-        Returns:
-            Condensed mass of the element
-        """
-
-        # TODO: Eventually just use of the functions and remove the by-pass
-        return self.condensed_element_masses()[element]
-
-        # TODO: Below is previous, to remove
-        # if element in self.solution.condensed_elements_to_solve:
-        #     mass = sum(self.element_gas_mass(element).values())
-        #     mass *= 10 ** self.solution._beta_solution[element]
-        # else:
-        #     mass = 0
-
-        # logger.debug("element_condensed_mass for %s = %s", element, mass)
-
-        # return mass
-
     def element_mass(self, element: str) -> dict[str, float]:
         """Calculates the mass of an element.
 
@@ -424,7 +298,7 @@ class InteriorAtmosphereSystem:
             Total mass of the element
         """
         element_mass: dict[str, float] = self.element_gas_mass(element)
-        element_mass["condensed"] = self.element_condensed_mass(element)
+        element_mass["condensed"] = self.condensed_element_masses()[element]
 
         logger.debug("element_mass for %s = %s", element, element_mass)
 
@@ -507,7 +381,7 @@ class InteriorAtmosphereSystem:
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
-            number_of_condensed_species=self.solution.number_condensed_species_to_solve,
+            number_of_condensed_species=self.species.number_condensed_species,
         )
 
         for attempt in range(max_attempts):
@@ -564,7 +438,7 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        number_of_condensed_species=self.solution.number_condensed_species_to_solve,
+                        number_of_condensed_species=self.species.number_condensed_species,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )

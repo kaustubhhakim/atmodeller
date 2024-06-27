@@ -166,17 +166,9 @@ class InitialSolution(ABC, Generic[T]):
             )
         logger.debug("Conform initial solution to constraints = %s", log10_value)
 
-        # TODO: This is previous.  Beta is no longer simply related to degree of condensation
-        # When condensates and mass constraints are present, we assume an initial degree of
-        # condensation of 0.5 for each element. Recall that the (log10) solution quantity is:
-        # beta = log10(mu) = log10(d/(1-d)), where beta is the log10 mass of the condensed element,
-        # and d is the degree of condensation. Hence d = 0.5 gives mu = 1 gives beta = 0
-        # log_degree_of_condensation: npt.NDArray = np.zeros(degree_of_condensation_number)
-        # log10_value = np.append(log10_value, log_degree_of_condensation)
-
-        # In the new approach, a negative beta means no condensed mass. Could possibly be merged
-        # with the stability requirement below
-        log_condensed_mass: npt.NDArray = 12 * np.ones(number_of_condensed_species)
+        # TODO: This assumes an initial condensed mass of 10^20 kg, but this selection is quite
+        # arbitrary and a smarter initial guess could probably be made.
+        log_condensed_mass: npt.NDArray = 20 * np.ones(number_of_condensed_species)
         log10_value = np.append(log10_value, log_condensed_mass)
 
         # Small lambda factors assume the condensates are stable, which is probably a reasonable

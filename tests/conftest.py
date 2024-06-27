@@ -97,12 +97,15 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
+    # Specify O, because otherwise a total pressure can give rise to different solutions (with
+    # different total O), making it more difficult to compare with a known benchmark.
+    o_kg: float = 2.48298883581636e21
 
     constraints = SystemConstraints(
         [
-            TotalPressureConstraint(10),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
+            ElementMassConstraint("O", o_kg),
         ]
     )
 
