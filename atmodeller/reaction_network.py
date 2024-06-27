@@ -154,7 +154,7 @@ class ReactionNetwork:
 
         return gibbs_energy
 
-    def get_coefficient_matrix(self, *, constraints: SystemConstraints) -> npt.NDArray:
+    def get_coefficient_matrix(self, constraints: SystemConstraints) -> npt.NDArray:
         """Gets the coefficient matrix.
 
         Args:
@@ -315,21 +315,18 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         reaction_matrix: The reaction stoichiometry matrix
     """
 
-    def get_activity_modifier(
-        self, *, constraints: SystemConstraints, solution: Solution
-    ) -> npt.NDArray:
+    def get_activity_modifier(self, constraints: SystemConstraints) -> npt.NDArray:
         """Gets the activity modifier matrix for condensate stability
 
         Args:
             constraints: Constraints
-            solution: Solution
 
         Returns:
             Activity modifier matrix
         """
         coefficient_matrix: npt.NDArray = self.get_coefficient_matrix(constraints=constraints)
         activity_modifier: npt.NDArray = np.zeros_like(coefficient_matrix)
-        for species in solution.condensed_species_to_solve:
+        for species in self.species.condensed_species:
             index: int = self.species.species_index(species)
             activity_modifier[:, index] = coefficient_matrix[:, index]
 
@@ -337,21 +334,16 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
 
         return activity_modifier
 
-    def get_equilibrium_modifier(
-        self, *, constraints: SystemConstraints, solution: Solution
-    ) -> npt.NDArray:
+    def get_equilibrium_modifier(self, constraints: SystemConstraints) -> npt.NDArray:
         """Gets the equilibrium constant modifier matrix for condensate stability
 
         Args:
             constraints: Constraints
-            solution: Solution
 
         Returns:
             Equilibrium constant modifier matrix
         """
-        activity_modifier: npt.NDArray = self.get_activity_modifier(
-            constraints=constraints, solution=solution
-        )
+        activity_modifier: npt.NDArray = self.get_activity_modifier(constraints=constraints)
         equilibrium_modifier: npt.NDArray = copy.deepcopy(activity_modifier)
         equilibrium_modifier[self.number_reactions :, :] = 0
 
@@ -368,22 +360,12 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         Returns:
             The residual vector of condensate stability
         """
-        residual_stability: npt.NDArray = np.zeros(
-            solution.number_condensed_species_to_solve, dtype=np.float_
+        residual_stability: npt.NDArray = np.zeros_like(
+            self.species.condensed_species, dtype=np.float_
         )
-        for nn, species in enumerate(solution.condensed_species_to_solve):
+        for nn, species in enumerate(self.species.condensed_species):
             residual_stability[nn] = solution._stability_solution[species] - log10_TAU
             residual_stability[nn] += solution._mass_solution[species]
-
-            # TODO: Old below, remove
-            # The xLMA usually uses the condensate number density or similar, but it's simpler to
-            # satisfy the auxiliary equations using the condensed mass of elements in the
-            # condensate, which we have direct access to.
-            # for element in species.elements:
-            #    try:
-            #        residual_stability += solution._beta_solution[element]
-            #    except KeyError:
-            #        pass
 
         logger.debug("residual_stability = %s", residual_stability)
 

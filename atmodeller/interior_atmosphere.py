@@ -491,13 +491,13 @@ class InteriorAtmosphereSystem:
 
         # These matrices depend on the constraints, but can be computed once for any given solve
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
-            constraints=self.constraints
+            self.constraints
         )
         activity_modifier: npt.NDArray = self._reaction_network.get_activity_modifier(
-            constraints=constraints, solution=self.solution
+            self.constraints
         )
         equilibrium_modifier: npt.NDArray = self._reaction_network.get_equilibrium_modifier(
-            constraints=constraints, solution=self.solution
+            self.constraints
         )
 
         # The only constraints that require pressure are the fugacity constraints, so for the
