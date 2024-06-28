@@ -525,6 +525,7 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     system = graphite_water_condensed
+    system.output(to_excel=True)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,
@@ -535,8 +536,7 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
         "H2O_l": 1.0,
         "H2_g": 0.0023,
         "O2_g": 4.74e-48,
-        # FIXME: FactSage value is commented out, and a dummy value used so the test passes
-        "mass_C_cr": 8.9e19,  # 8.75101e19,
+        "mass_C_cr": 8.75101e19,
         "mass_H2O_l": 2.74821e21,
     }
 

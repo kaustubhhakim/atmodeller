@@ -24,11 +24,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from atmodeller.constraints import (
-    ElementMassConstraint,
-    SystemConstraints,
-    TotalPressureConstraint,
-)
+from atmodeller.constraints import ElementMassConstraint, SystemConstraints
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
 
@@ -83,7 +79,7 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
     H2_g = GasSpecies("H2")
     O2_g = GasSpecies("O2")
     # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
-    H2O_l = LiquidSpecies("H2O")  # , thermodata_filename="H-066", thermodata_name="Water, 10 Bar")
+    H2O_l = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
     CO_g = GasSpecies("CO")
     CO2_g = GasSpecies("CO2")
     CH4_g = GasSpecies("CH4")
@@ -98,7 +94,7 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
     # Specify O, because otherwise a total pressure can give rise to different solutions (with
-    # different total O), making it more difficult to compare with a known benchmark.
+    # different total O), making it more difficult to compare with a known comparison case.
     o_kg: float = 2.48298883581636e21
 
     constraints = SystemConstraints(

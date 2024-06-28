@@ -381,7 +381,6 @@ class InteriorAtmosphereSystem:
             self.constraints,
             temperature=self.planet.surface_temperature,
             pressure=1,
-            number_of_condensed_species=self.species.number_condensed_species,
         )
 
         for attempt in range(max_attempts):
@@ -438,7 +437,6 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        number_of_condensed_species=self.species.number_condensed_species,
                         perturb=True,
                         perturb_log10=perturb_log10,
                     )

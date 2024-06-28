@@ -113,30 +113,21 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere)
 
-    # FIXME: Refresh with new output based on new appraoch
     def _add_condensed_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds condensed species.
 
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        # TODO: Remove, now known directly from the solution
-        # condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = (
-        #    interior_atmosphere.condensed_species_masses()
-        # )
+        for species in interior_atmosphere.species.condensed_species:
+            output: dict[str, float] = {}
+            output["activity"] = interior_atmosphere.solution.activities[species]
+            output["mass"] = interior_atmosphere.solution.condensed_masses[species]
+            output["moles"] = output["mass"] / species.molar_mass
+            output["molar_mass"] = species.molar_mass
 
-        # for species in interior_atmosphere.species.condensed_species:
-        #     output: dict[str, float] = {}
-        #     output["activity"] = interior_atmosphere.solution.activities[species]
-        #     try:
-        #         output["mass"] = sum(condensed_species_masses[species].values())
-        #     except KeyError:
-        #         output["mass"] = 0
-        #     output["moles"] = output["mass"] / species.molar_mass
-        #     output["molar_mass"] = species.molar_mass
-
-        #     data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
-        #     data_list.append(output)
+            data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
+            data_list.append(output)
 
     def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds constraints.
@@ -165,8 +156,8 @@ class Output(UserDict):
         for element in interior_atmosphere.species.elements():
             mass[element] = interior_atmosphere.element_gas_mass(element)
 
-        # To compute astronomical logarithmic abundances we need to store H abundance, which is
-        # used to normalise all other elemental abundances
+        # To compute astronomical logarithmic abundances (dex) we need to store H abundance, which
+        # is used to normalise all other elemental abundances
         mass = reorder_dict(mass, "H")
         H_total_moles: float | None = None  # pylint: disable=invalid-name
 
@@ -220,7 +211,7 @@ class Output(UserDict):
                 H_total_moles = output["total_moles"]  # pylint: disable=invalid-name
 
             if H_total_moles is not None:
-                # Astronomical logarithmic abundance (dex), used by FastChem
+                # Astronomical logarithmic abundance (dex), e.g. used by FastChem
                 output["logarithmic_abundance"] = (
                     np.log10(output["total_moles"] / H_total_moles) + 12
                 )

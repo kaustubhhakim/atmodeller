@@ -104,8 +104,8 @@ class InitialSolution(ABC, Generic[T]):
     ) -> npt.NDArray[np.float_]:
         """Computes the raw value of the initial solution for the reaction network
 
-        This does not deal with the degree of condensation, which is instead exclusively treated
-        by :meth:`~get_log10_value`.
+        This does not deal with condensates, which is instead exclusively treated by
+        :meth:`~get_log10_value`.
 
         Args:
             constraints: Constraints
@@ -113,7 +113,7 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
 
         Returns:
-            The raw initial solution excluding the degree of condensation (if relevant)
+            The raw initial solution excluding condensates (if relevant)
         """
 
     def get_log10_value(
@@ -122,7 +122,6 @@ class InitialSolution(ABC, Generic[T]):
         *,
         temperature: float,
         pressure: float,
-        number_of_condensed_species: int,
         perturb: bool = False,
         perturb_log10: float = 2,
     ) -> npt.NDArray[np.float_]:
@@ -132,7 +131,6 @@ class InitialSolution(ABC, Generic[T]):
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            number_of_condensed_species: Number of condensed species to solve for
             perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
             perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
                 to 2.
@@ -166,14 +164,14 @@ class InitialSolution(ABC, Generic[T]):
             )
         logger.debug("Conform initial solution to constraints = %s", log10_value)
 
-        # TODO: This assumes an initial condensed mass of 10^20 kg, but this selection is quite
+        # This assumes an initial condensed mass of 10^20 kg, but this selection is quite
         # arbitrary and a smarter initial guess could probably be made.
-        log_condensed_mass: npt.NDArray = 20 * np.ones(number_of_condensed_species)
+        log_condensed_mass: npt.NDArray = 20 * np.ones(self._species.number_condensed_species)
         log10_value = np.append(log10_value, log_condensed_mass)
 
         # Small lambda factors assume the condensates are stable, which is probably a reasonable
-        # assumption given that the user has chosen to include them in the species list.
-        log_lambda: npt.NDArray = -12 * np.ones(number_of_condensed_species)
+        # assumption given that the user has chosen to include them as species.
+        log_lambda: npt.NDArray = -12 * np.ones(self._species.number_condensed_species)
         log10_value = np.append(log10_value, log_lambda)
 
         return log10_value
