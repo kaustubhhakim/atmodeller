@@ -63,12 +63,20 @@ MAX_LOG10_PRESSURE: float = 8
 class InitialSolutionData(Solution):
     """TODO"""
 
-    def apply_log10_gas_constraints(self, constraints: SystemConstraints) -> None:
+    def apply_log10_gas_constraints(
+        self, constraints: SystemConstraints, *, temperature: float, pressure: float
+    ) -> None:
         """Applies constraints to the log10 gas pressures.
 
         Args:
             constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
         """
+        for constraint in constraints.activity_constraints:
+            self._species_solution[constraint.species] = constraint.get_log10_value(
+                temperature=temperature, pressure=pressure
+            )
 
     # pylint: disable=invalid-name
     def clip_log1O_gas_pressures(
@@ -199,55 +207,39 @@ class InitialSolution(ABC, Generic[T]):
             Log10 stabilities
         """
 
-    def set_gas_species_pressures(
+    def set_log10_gas_pressures(
         self,
         constraints: SystemConstraints,
         *,
         temperature: float,
         pressure: float,
-        perturb: bool,
-        perturb_log10: float,
+        perturb_log10: float = 0,
         apply_constraints: bool = True,
     ) -> None:
-        """Initial solution for gas pressures
+        """Sets the log10 gas pressures.
 
         Args:
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb: Randomly perturb the log10 value of the gas species pressures by
-                `perturb_log10`.
-            perturb_log10: Maximum log10 value to perturb the initial solution of the gas species
-                pressures.
-            apply_constraints: Apply species pressures constraints, if available. Defaults to True.
-
-        Returns:
-            Log10 gas species pressures with clipping applied
+            perturb_log10: Maximum log10 value to perturb the initial solution of the gas
+                pressures. Defaults to 0, i.e. not used.
+            apply_constraints: Apply pressure constraints, if any. Defaults to True.
         """
         log10_gas_pressures: dict[GasSpecies, float] = self._get_log10_gas_pressures(
             constraints, temperature, pressure
         )
-
         self.solution.set_log10_gas_pressures(log10_gas_pressures)
 
-        if perturb:
+        if perturb_log10:
             self.solution.perturb_log10_gas_pressures(perturb_log10)
 
         self.solution.clip_log1O_gas_pressures(self._min_log10_pressure, self._max_log10_pressure)
 
         if apply_constraints:
-            # Apply constraints from the reaction network
-            for constraint in constraints.reaction_network_constraints:
-                index: int = self._species.species_index(constraint.species)
-                logger.debug("Setting %s %d", constraint.species, index)
-                # FIXME: Add logic to ignore activity constraints. This will probably break.
-                log10_value[index] = constraint.get_log10_value(
-                    temperature=temperature, pressure=pressure
-                )
-
-        logger.debug("get_processed_log10_gas_species_pressures = %s", log10_value)
-
-        return log10_value
+            self.solution.apply_log10_gas_constraints(
+                constraints, temperature=temperature, pressure=pressure
+            )
 
     def get_processed_log10_condensed_species_activities(
         self,
