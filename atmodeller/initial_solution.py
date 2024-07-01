@@ -34,9 +34,14 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Species
-from atmodeller.interfaces import ChemicalSpecies, TypeChemicalSpecies_co
+from atmodeller.core import GasSpecies, Solution, Species
+from atmodeller.interfaces import (
+    ChemicalSpecies,
+    CondensedSpecies,
+    TypeChemicalSpecies_co,
+)
 from atmodeller.output import Output
+from atmodeller.reaction_network import log10_TAU
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -54,6 +59,38 @@ Motivated by typical values of oxygen fugacity at the iron-wustite buffer
 """
 MAX_LOG10_PRESSURE: float = 8
 """Maximum log10 (bar) of the initial gas species pressures"""
+
+
+class InitialSolutionData(Solution):
+    """TODO"""
+
+    # pylint: disable=invalid-name
+    def clip_log1O_activities(self) -> None:
+        """Clips the condensed species activities."""
+        for species, value in self._species_solution.items():
+            if isinstance(species, CondensedSpecies):
+                # TODO: Check clip bounds
+                self._species_solution[species] = np.clip(value, log10_TAU, 0)
+
+    # pylint: disable=invalid-name
+    def clip_log1O_gas_pressures(
+        self, minimum_value: float = MIN_LOG10_PRESSURE, maximum_value: float = MAX_LOG10_PRESSURE
+    ) -> None:
+        """Clips the gas pressures between `minimum_value` and `maximum_value`.
+
+        Args:
+            minimum_value: Minimum value. Defaults to :data:`MIN_LOG10_PRESSURE`.
+            maximum_value: Maximum value. Defaults to :data:`MAX_LOG10_PRESSURE`.
+        """
+        for species, value in self._species_solution.items():
+            if isinstance(species, GasSpecies):
+                self._species_solution[species] = np.clip(value, minimum_value, maximum_value)
+
+    def set_species_log10_activities(self, activities: dict[CondensedSpecies, float]) -> None:
+        self._species_solution |= activities
+
+    def set_species_log10_pressures(self, pressures: dict[GasSpecies, float]) -> None:
+        self._species_solution |= pressures
 
 
 class InitialSolution(ABC, Generic[T]):
@@ -80,26 +117,12 @@ class InitialSolution(ABC, Generic[T]):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
         self._species: Species = species
+        self.solution: InitialSolutionData = InitialSolutionData(species)
         self._min_log10_pressure: float = min_log10_pressure
         self._max_log10_pressure: float = max_log10_pressure
 
-    @property
-    def species(self) -> Species:
-        """Species"""
-        return self._species
-
-    @property
-    def min_log10_pressure(self) -> float:
-        """Minimum log10 value"""
-        return self._min_log10_pressure
-
-    @property
-    def max_log10_pressure(self) -> float:
-        """Maximum log10 value"""
-        return self._max_log10_pressure
-
     @abstractmethod
-    def get_gas_species_pressures(
+    def _get_gas_species_pressures(
         self, constraints: SystemConstraints, temperature: float, pressure: float
     ) -> npt.NDArray[np.float_]:
         """Initial solution for gas species pressures
@@ -114,7 +137,7 @@ class InitialSolution(ABC, Generic[T]):
         """
 
     @abstractmethod
-    def get_condensed_species_activities(
+    def _get_condensed_species_activities(
         self, constraints: SystemConstraints, temperature: float, pressure: float
     ) -> npt.NDArray[np.float_]:
         """Initial solution for condensed species activities
@@ -129,7 +152,7 @@ class InitialSolution(ABC, Generic[T]):
         """
 
     @abstractmethod
-    def get_condensed_species_masses(
+    def _get_condensed_species_masses(
         self, constraints: SystemConstraints, temperature: float, pressure: float
     ) -> npt.NDArray[np.float_]:
         """Initial solution for condensed species masses
@@ -143,7 +166,7 @@ class InitialSolution(ABC, Generic[T]):
             Condensed species masses, given in the same order as :attr:`species`
         """
 
-    def get_processed_log10_gas_species_pressures(
+    def set_gas_species_pressures(
         self,
         constraints: SystemConstraints,
         *,
@@ -168,7 +191,7 @@ class InitialSolution(ABC, Generic[T]):
         Returns:
             Log10 gas species pressures with clipping applied
         """
-        value: npt.NDArray[np.float_] = self.get_gas_species_pressures(
+        value: npt.NDArray[np.float_] = self._get_gas_species_pressures(
             constraints, temperature, pressure
         )
         log10_value: npt.NDArray[np.float_] = np.log10(value)
@@ -181,19 +204,19 @@ class InitialSolution(ABC, Generic[T]):
             log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
 
         if np.any(
-            (log10_value < self.min_log10_pressure) | (log10_value > self.max_log10_pressure)
+            (log10_value < self._min_log10_pressure) | (log10_value > self._max_log10_pressure)
         ):
             logger.warning(
                 "Clipping gas pressures between %f and %f",
-                self.min_log10_pressure,
-                self.max_log10_pressure,
+                self._min_log10_pressure,
+                self._max_log10_pressure,
             )
-            log10_value = np.clip(log10_value, self.min_log10_pressure, self.max_log10_pressure)
+            log10_value = np.clip(log10_value, self._min_log10_pressure, self._max_log10_pressure)
 
         if apply_constraints:
             # Apply constraints from the reaction network
             for constraint in constraints.reaction_network_constraints:
-                index: int = self.species.species_index(constraint.species)
+                index: int = self._species.species_index(constraint.species)
                 logger.debug("Setting %s %d", constraint.species, index)
                 # FIXME: Add logic to ignore activity constraints. This will probably break.
                 log10_value[index] = constraint.get_log10_value(
@@ -236,7 +259,7 @@ class InitialSolution(ABC, Generic[T]):
         if apply_constraints:
             # Apply constraints from the condensed species activities
             for constraint in constraints.activity_constraints:
-                index: int = self.species.species_index(constraint.species)
+                index: int = self._species.species_index(constraint.species)
                 logger.debug("Setting %s %d", constraint.species, index)
                 log10_value[index] = constraint.get_log10_value(
                     temperature=temperature, pressure=pressure

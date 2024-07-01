@@ -388,20 +388,18 @@ class Solution:
     """
 
     _species: Species
-    # _constraints: SystemConstraints
-    _temperature: float
     # These are all log10
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
     _mass_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
     _stability_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
 
     @property
-    def mass_solution(self) -> dict[CondensedSpecies, float]:
-        return self._mass_solution
-
-    @property
     def species_solution(self) -> dict[ChemicalSpecies, float]:
         return self._species_solution
+
+    @property
+    def mass_solution(self) -> dict[CondensedSpecies, float]:
+        return self._mass_solution
 
     @property
     def stability_solution(self) -> dict[CondensedSpecies, float]:
@@ -500,6 +498,28 @@ class Solution:
 
         return vmr
 
+    @property
+    def log10_activities(self) -> dict[CondensedSpecies, float]:
+        """Log10 activities"""
+        activities: dict[CondensedSpecies, float] = {}
+        for species in self._species.condensed_species:
+            activities[species] = self._species_solution[species]
+
+        return activities
+
+    @property
+    def activities(self) -> dict[CondensedSpecies, float]:
+        """Activities"""
+        return {species: 10**value for species, value in self.log10_activities.items()}
+
+    @property
+    def condensed_masses(self) -> dict[CondensedSpecies, float]:
+        """Masses of condensed species"""
+        return {
+            condensed_species: 10 ** self._mass_solution[condensed_species]
+            for condensed_species in self._species.condensed_species
+        }
+
     def log10_fugacity_coefficients(self, temperature: float) -> dict[GasSpecies, float]:
         """Log10 fugacity coefficients
 
@@ -570,27 +590,19 @@ class Solution:
         """
         return {key.hill_formula: value for key, value in self.gas_fugacities(temperature).items()}
 
-    @property
-    def log10_activities(self) -> dict[CondensedSpecies, float]:
-        """Log10 activities"""
-        activities: dict[CondensedSpecies, float] = {}
-        for species in self._species.condensed_species:
-            activities[species] = self._species_solution[species]
+    def raw_solution_dict(self) -> dict[str, float]:
+        """Raw solution in a dictionary"""
+        output: dict[str, float] = {}
+        for species, value in zip(self._species.data, self.species_solution.values()):
+            output[species.name] = value
+        for species, value in zip(self._species.condensed_species, self.mass_solution.values()):
+            output[f"mass_{species.name}"] = value
+        for species, value in zip(
+            self._species.condensed_species, self.stability_solution.values()
+        ):
+            output[f"stability_{species.name}"] = value
 
-        return activities
-
-    @property
-    def activities(self) -> dict[CondensedSpecies, float]:
-        """Activities"""
-        return {species: 10**value for species, value in self.log10_activities.items()}
-
-    @property
-    def condensed_masses(self) -> dict[CondensedSpecies, float]:
-        """Masses of condensed species"""
-        return {
-            condensed_species: 10 ** self._mass_solution[condensed_species]
-            for condensed_species in self._species.condensed_species
-        }
+        return output
 
     def raw_solution_dict(self) -> dict[str, float]:
         """Raw solution in a dictionary"""
