@@ -47,13 +47,13 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-MIN_LOG10: float = -12
-"""Minimum log10 (bar) of the initial gas species solution
+MIN_LOG10_PRESSURE: float = -12
+"""Minimum log10 (bar) of the initial gas pressures
 
 Motivated by typical values of oxygen fugacity at the iron-wustite buffer
 """
-MAX_LOG10: float = 8
-"""Maximum log10 (bar) of the initial gas species solution"""
+MAX_LOG10_PRESSURE: float = 8
+"""Maximum log10 (bar) of the initial gas pressures"""
 
 
 class InitialSolution(ABC, Generic[T]):
@@ -62,8 +62,8 @@ class InitialSolution(ABC, Generic[T]):
     Args:
         value: An object or value used to compute the initial solution
         species: Species
-        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
-        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
+        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
 
     Attributes:
         value: An object or value used to compute the initial solution
@@ -74,14 +74,14 @@ class InitialSolution(ABC, Generic[T]):
         value: T,
         *,
         species: Species,
-        min_log10: float = MIN_LOG10,
-        max_log10: float = MAX_LOG10,
+        min_log10_pressure: float = MIN_LOG10_PRESSURE,
+        max_log10_pressure: float = MAX_LOG10_PRESSURE,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
         self._species: Species = species
-        self._min_log10: float = min_log10
-        self._max_log10: float = max_log10
+        self._min_log10_pressure: float = min_log10_pressure
+        self._max_log10_pressure: float = max_log10_pressure
 
     @property
     def species(self) -> Species:
@@ -89,14 +89,14 @@ class InitialSolution(ABC, Generic[T]):
         return self._species
 
     @property
-    def min_log10(self) -> float:
+    def min_log10_pressure(self) -> float:
         """Minimum log10 value"""
-        return self._min_log10
+        return self._min_log10_pressure
 
     @property
-    def max_log10(self) -> float:
+    def max_log10_pressure(self) -> float:
         """Maximum log10 value"""
-        return self._max_log10
+        return self._max_log10_pressure
 
     @abstractmethod
     def get_value(
@@ -148,12 +148,16 @@ class InitialSolution(ABC, Generic[T]):
             )
             log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
 
-        if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
+        if np.any(
+            (log10_value < self.min_log10_pressure) | (log10_value > self.max_log10_pressure)
+        ):
             logger.warning("Initial solution has values outside the min and max thresholds")
             logger.warning(
-                "Clipping the initial solution between %f and %f", self.min_log10, self.max_log10
+                "Clipping the initial solution between %f and %f",
+                self.min_log10_pressure,
+                self.max_log10_pressure,
             )
-            log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
+            log10_value = np.clip(log10_value, self.min_log10_pressure, self.max_log10_pressure)
 
         # Apply constraints from the reaction network (activities and fugacities)
         for constraint in constraints.reaction_network_constraints:
@@ -196,8 +200,8 @@ class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
     Args:
         value: A constant pressure for the initial condition in bar. Defaults to 10.
         species: Species
-        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
-        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
+        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
 
     Attributes:
         value: A constant pressure for the initial condition in bar
@@ -209,11 +213,16 @@ class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
         value: float = 10,
         *,
         species: Species,
-        min_log10: float = MIN_LOG10,
-        max_log10: float = MAX_LOG10,
+        min_log10_pressure: float = MIN_LOG10_PRESSURE,
+        max_log10_pressure: float = MAX_LOG10_PRESSURE,
     ):
         value_array: npt.NDArray = value * np.ones(species.number_species())
-        super().__init__(value_array, species=species, min_log10=min_log10, max_log10=max_log10)
+        super().__init__(
+            value_array,
+            species=species,
+            min_log10_pressure=min_log10_pressure,
+            max_log10_pressure=max_log10_pressure,
+        )
         logger.debug("initial_solution = %s", self.asdict())
 
     def asdict(self) -> dict[str, float]:
@@ -236,8 +245,8 @@ class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
     Args:
         value: A dictionary of species and values
         species: Species
-        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
-        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
+        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
         fill_value: Initial value for species that are not specified in `value`. Defaults to 1.
 
     Attributes:
@@ -250,8 +259,8 @@ class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
         value: Mapping[TypeChemicalSpecies_co, float],
         *,
         species: Species,
-        min_log10: float = MIN_LOG10,
-        max_log10: float = MAX_LOG10,
+        min_log10_pressure: float = MIN_LOG10_PRESSURE,
+        max_log10_pressure: float = MAX_LOG10_PRESSURE,
         fill_value: float = 1,
     ):
         species_dict: dict[TypeChemicalSpecies_co, float] = {
@@ -259,7 +268,12 @@ class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
         }
         species_dict |= value
         species_ic: npt.NDArray[np.float_] = np.array(list(species_dict.values()))
-        super().__init__(species_ic, species=species, min_log10=min_log10, max_log10=max_log10)
+        super().__init__(
+            species_ic,
+            species=species,
+            min_log10_pressure=min_log10_pressure,
+            max_log10_pressure=max_log10_pressure,
+        )
         logger.debug("initial_solution = %s", self.asdict())
 
     def asdict(self) -> dict[str, float]:
@@ -281,8 +295,8 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     Args:
         value: Output for constructing the regressor
         species: Species
-        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
-        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
+        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
         species_fill: Dictionary of missing species and their initial values. Defaults to None.
         fill_value: Initial value for species that are not specified in `species_fill`. Defaults to
             1.
@@ -315,8 +329,8 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         value: Output,
         *,
         species: Species,
-        min_log10: float = MIN_LOG10,
-        max_log10: float = MAX_LOG10,
+        min_log10_pressure: float = MIN_LOG10_PRESSURE,
+        max_log10_pressure: float = MAX_LOG10_PRESSURE,
         species_fill: dict[TypeChemicalSpecies_co, float] | None = None,
         fill_value: float = 1,
         fit: bool = True,
@@ -333,7 +347,12 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self._conform_solution(
             value, species=species, species_fill=species_fill, fill_value=fill_value
         )
-        super().__init__(value, species=species, min_log10=min_log10, max_log10=max_log10)
+        super().__init__(
+            value,
+            species=species,
+            min_log10_pressure=min_log10_pressure,
+            max_log10_pressure=max_log10_pressure,
+        )
         self._fit(self.value)
 
     @classmethod
@@ -561,8 +580,8 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
     Args:
         value: An initial solution
         species: Species
-        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
-        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
+        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
         fit_batch_size: Number of simulations to generate before fitting the regressor. Defaults
             to 100.
         **kwargs: Keyword arguments that are specific to :class:`InitialSolutionRegressor`
@@ -578,12 +597,17 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
         value: InitialSolution,
         *,
         species: Species,
-        min_log10: float = MIN_LOG10,
-        max_log10: float = MAX_LOG10,
+        min_log10_pressure: float = MIN_LOG10_PRESSURE,
+        max_log10_pressure: float = MAX_LOG10_PRESSURE,
         fit_batch_size: int = 100,
         **kwargs,
     ):
-        super().__init__(value, species=species, min_log10=min_log10, max_log10=max_log10)
+        super().__init__(
+            value,
+            species=species,
+            min_log10_pressure=min_log10_pressure,
+            max_log10_pressure=max_log10_pressure,
+        )
         self._fit_batch_size: int = fit_batch_size
         # Store to instantiate regressor once the switch occurs.
         self._kwargs: dict[str, Any] = kwargs
@@ -601,8 +625,8 @@ class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
             self.value = InitialSolutionRegressor(
                 output,
                 species=self.species,
-                min_log10=self.min_log10,
-                max_log10=self.max_log10,
+                min_log10_pressure=self.min_log10_pressure,
+                max_log10_pressure=self.max_log10_pressure,
                 **self._kwargs,
             )
         else:
@@ -617,8 +641,8 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
     Args:
         value: An initial solution for the first solution only
         species: Species
-        min_log10: Minimum log10 value. Defaults to :data:`MIN_LOG10`.
-        max_log10: Maximum log10 value. Defaults to :data:`MAX_LOG10`.
+        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
 
     Attributes:
         value: An object or value used to compute the initial solution
@@ -640,6 +664,6 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
         self.value = InitialSolutionDict(
             next_values,
             species=self.species,
-            min_log10=self.min_log10,
-            max_log10=self.max_log10,
+            min_log10_pressure=self.min_log10_pressure,
+            max_log10_pressure=self.max_log10_pressure,
         )
