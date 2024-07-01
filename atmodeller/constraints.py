@@ -28,10 +28,12 @@ import numpy as np
 
 from atmodeller.core import GasSpecies, Species
 from atmodeller.interfaces import (
+    ActivityConstraintProtocol,
     ChemicalSpecies,
     CondensedSpecies,
     ConstraintProtocol,
     ElementConstraintProtocol,
+    GasConstraintProtocol,
     ReactionNetworkConstraintProtocol,
     TotalPressureConstraintProtocol,
 )
@@ -216,21 +218,6 @@ class ActivityConstraint(_SpeciesConstantConstraint[CondensedSpecies]):
             Activity
         """
         return self.get_value(temperature, pressure)
-
-    def fugacity(self, temperature: float, pressure: float) -> float:
-        """Alias for the value of the activity constraint, which is anyhow related to fugacity
-
-        This allows this constraint to satisfy
-        :class:`atmodeller.interfaces.FugacityConstraintProtocol`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Fugacity (activity)
-        """
-        return self.activity(temperature, pressure)
 
 
 class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
@@ -461,7 +448,12 @@ class SystemConstraints(UserList):
     @property
     def reaction_network_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
         """Constraints related to the reaction network"""
-        return list(filter_by_type(self, ReactionNetworkConstraintProtocol).values())
+        constraints: list[ReactionNetworkConstraintProtocol] = list(
+            filter_by_type(self, ActivityConstraintProtocol).values()
+        )
+        constraints.extend(list(filter_by_type(self, GasConstraintProtocol).values()))
+
+        return constraints
 
     @property
     def number_reaction_network_constraints(self) -> int:

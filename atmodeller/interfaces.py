@@ -303,8 +303,15 @@ class MassConstraintProtocol(ConstraintProtocol, Protocol):
     def mass(self, temperature: float, pressure: float) -> float: ...
 
 
-class ReactionNetworkConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+class ActivityConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+    def activity(self, temperature: float, pressure: float) -> float: ...
+
+
+class GasConstraintProtocol(SpeciesConstraintProtocol, Protocol):
     def fugacity(self, temperature: float, pressure: float) -> float: ...
+
+
+ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
 
 
 class TotalPressureConstraintProtocol(ConstraintProtocol, Protocol):
