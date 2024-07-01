@@ -22,7 +22,7 @@ import logging
 import sys
 from collections import UserList
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Mapping, Type
+from typing import TYPE_CHECKING, Generic, Mapping, Type, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -42,6 +42,7 @@ else:
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
 
+T = TypeVar("T")
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -368,9 +369,49 @@ class Species(UserList):
         return matrix
 
 
-@dataclass
+class SolutionComponent(Generic[T]):
+    """A component of the solution"""
+
+    def __init__(self, species: list[T]):
+        self._species: list[T] = species
+        self.data: dict[T, float] = {}
+
+    @property
+    def number(self) -> int:
+        """Number of solution quantities"""
+        return len(self._species)
+
+    @property
+    def raise_ten_to_values(self) -> dict[T, float]:
+        """Raises 10 to the power of each value
+
+        Returns:
+            A new dictionary with values being 10 raised to the power of the original values.
+        """
+        return {key: 10**value for key, value in self.data.items()}
+
+    def clip_values(
+        self, minimum_value: float | None = None, maximum_value: float | None = None
+    ) -> None:
+        for key, value in self.data.items():
+            self.data[key] = np.clip(value, minimum_value, maximum_value)
+
+    def perturb_values(self, perturb: float = 0) -> None:
+        """Perturbs the values
+
+        Args:
+            perturb: Maximum log10 value to perturb the values.
+        """
+        for key in self.data:
+            self.data[key] += perturb * (2 * np.random.rand() - 1)
+
+    def __contains__(self, item: T) -> bool:
+        """Check if item is in the solution component."""
+        return item in self._species
+
+
 class Solution:
-    """The solution
+    """The solution # TODO: Refresh once improvements complete
 
     Stores and updates the solution and assembles the appropriate vectors to solve the coupled
     reaction network and mass balance system. Importantly, the solution quantities depend on the
@@ -384,34 +425,49 @@ class Solution:
     3. Stability factors for condensed species
 
     Args:
-        _species: Species
+        species: Species
     """
 
-    _species: Species
-    # These are all log10
-    _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
-    _mass_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
-    _stability_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
+    def __init__(self, species: Species):
+        self._species: Species = species
+        self._pressure_solution: SolutionComponent[GasSpecies] = SolutionComponent[GasSpecies](
+            species.gas_species
+        )
+        self._activity_solution: SolutionComponent[CondensedSpecies] = SolutionComponent[
+            CondensedSpecies
+        ](species.condensed_species)
+        self._mass_solution: SolutionComponent[CondensedSpecies] = SolutionComponent[
+            CondensedSpecies
+        ](species.condensed_species)
+        self._stability_solution: SolutionComponent[CondensedSpecies] = SolutionComponent[
+            CondensedSpecies
+        ](species.condensed_species)
 
     @property
-    def species_solution(self) -> dict[ChemicalSpecies, float]:
-        return self._species_solution
+    def pressure_solution(self) -> SolutionComponent[GasSpecies]:
+        return self._pressure_solution
 
     @property
-    def mass_solution(self) -> dict[CondensedSpecies, float]:
+    def activity_solution(self) -> SolutionComponent[CondensedSpecies]:
+        return self._activity_solution
+
+    @property
+    def mass_solution(self) -> SolutionComponent[CondensedSpecies]:
         return self._mass_solution
 
     @property
-    def stability_solution(self) -> dict[CondensedSpecies, float]:
+    def stability_solution(self) -> SolutionComponent[CondensedSpecies]:
         return self._stability_solution
 
     @property
     def number(self) -> int:
-        """Number of solution quantities
-
-        The factor of two is because each (possibly stable) condensate has a stability factor.
-        """
-        return self._species.number_species() + 2 * self._species.number_condensed_species
+        """Total number of solution quantities"""
+        return (
+            self.pressure_solution.number
+            + self.activity_solution.number
+            + self.mass_solution.number
+            + self.stability_solution.number
+        )
 
     @property
     def data(self) -> npt.NDArray[np.float_]:
@@ -419,15 +475,18 @@ class Solution:
         index = 0
         # Fill data with species solutions
         for species in self._species:
-            data[index] = self._species_solution[species]
+            if species in self.pressure_solution:
+                data[index] = self.pressure_solution.data[species]
+            else:
+                data[index] = self.activity_solution.data[species]
             index += 1
         # Fill data with mass solutions
         for species in self._species.condensed_species:
-            data[index] = self._mass_solution[species]
+            data[index] = self.mass_solution.data[species]
             index += 1
         # Fill data with stability solutions
         for species in self._species.condensed_species:
-            data[index] = self._stability_solution[species]
+            data[index] = self.stability_solution.data[species]
             index += 1
 
         return data
@@ -442,32 +501,44 @@ class Solution:
         index = 0
 
         for species in self._species:
-            self._species_solution[species] = value[index]
+            if species in self.pressure_solution:
+                logger.warning("SETTING PRESSURE")
+                self.pressure_solution.data[species] = value[index]
+            else:
+                logger.warning("SETTING ACTIVITY")
+                self.activity_solution.data[species] = value[index]
             index += 1
         for species in self._species.condensed_species:
-            self._mass_solution[species] = value[index]
+            self.mass_solution.data[species] = value[index]
             index += 1
         for species in self._species.condensed_species:
-            self._stability_solution[species] = value[index]
+            self.stability_solution.data[species] = value[index]
             index += 1
 
     @property
-    def species_values(self) -> npt.NDArray:
-        return np.array(list(self._species_solution.values()))
+    def species_values(self) -> npt.NDArray[np.float_]:
+        values: list[float] = []
+        for species in self._species:
+            if species in self.pressure_solution:
+                values.append(self.pressure_solution.data[species])
+            else:
+                values.append(self.activity_solution.data[species])
+
+        return np.array(values)
 
     @property
     def stability_array(self) -> npt.NDArray:
         stability_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
         for species in self._species.condensed_species:
             index: int = self._species.species_index(species)
-            stability_array[index] = self._stability_solution[species]
+            stability_array[index] = self.stability_solution.data[species]
 
         return stability_array
 
     @property
     def log10_gas_pressures(self) -> dict[GasSpecies, float]:
         """Log10 gas pressures"""
-        return {species: self._species_solution[species] for species in self._species.gas_species}
+        return self.pressure_solution.data
 
     @property
     def gas_pressures(self) -> dict[GasSpecies, float]:
@@ -501,11 +572,7 @@ class Solution:
     @property
     def log10_activities(self) -> dict[CondensedSpecies, float]:
         """Log10 activities"""
-        activities: dict[CondensedSpecies, float] = {}
-        for species in self._species.condensed_species:
-            activities[species] = self._species_solution[species]
-
-        return activities
+        return self.activity_solution.data
 
     @property
     def activities(self) -> dict[CondensedSpecies, float]:
@@ -516,7 +583,7 @@ class Solution:
     def condensed_masses(self) -> dict[CondensedSpecies, float]:
         """Masses of condensed species"""
         return {
-            condensed_species: 10 ** self._mass_solution[condensed_species]
+            condensed_species: 10 ** self.mass_solution.data[condensed_species]
             for condensed_species in self._species.condensed_species
         }
 
@@ -593,12 +660,14 @@ class Solution:
     def raw_solution_dict(self) -> dict[str, float]:
         """Raw solution in a dictionary"""
         output: dict[str, float] = {}
-        for species, value in zip(self._species.data, self.species_solution.values()):
+        for species, value in zip(self._species.data, self.species_values):
             output[species.name] = value
-        for species, value in zip(self._species.condensed_species, self.mass_solution.values()):
+        for species, value in zip(
+            self._species.condensed_species, self.mass_solution.data.values()
+        ):
             output[f"mass_{species.name}"] = value
         for species, value in zip(
-            self._species.condensed_species, self.stability_solution.values()
+            self._species.condensed_species, self.stability_solution.data.values()
         ):
             output[f"stability_{species.name}"] = value
 

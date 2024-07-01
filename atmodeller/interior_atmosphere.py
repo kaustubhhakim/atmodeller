@@ -184,7 +184,7 @@ class InteriorAtmosphereSystem:
         for species in self.species.condensed_species:
             # TODO: Below can sometimes blow up when the solver tries a large step, although this
             # can be mitigated by setting the `factor` solver option.
-            species_mass: float = 10 ** self._solution.mass_solution[species]
+            species_mass: float = 10 ** self._solution.mass_solution.data[species]
             for element, value in species.composition().items():
                 condensed_element_masses[element] += species_mass * value.fraction
 
