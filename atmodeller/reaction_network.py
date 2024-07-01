@@ -56,15 +56,15 @@ class ReactionNetwork:
     """
 
     def __init__(self, species: Species):
-        self.species: Species = species
+        self._species: Species = species
         logger.info("Creating a reaction network")
-        logger.info("Species = %s", self.species.names)
+        logger.info("Species = %s", self._species.names)
         self.reaction_matrix: npt.NDArray | None = self.get_reaction_matrix()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
     @property
     def number_reactions(self) -> int:
-        if self.species.number_species() == 1:
+        if self._species.number_species() == 1:
             return 0
         else:
             assert self.reaction_matrix is not None
@@ -76,12 +76,12 @@ class ReactionNetwork:
         Returns:
             A matrix of linearly independent reactions
         """
-        if self.species.number_species() == 1:
+        if self._species.number_species() == 1:
             logger.debug("Only one species therefore no reactions")
             return None
 
-        transpose_formula_matrix: npt.NDArray = self.species.formula_matrix(
-            self.species.elements(), self.species.data
+        transpose_formula_matrix: npt.NDArray = self._species.formula_matrix(
+            self._species.elements(), self._species.data
         ).T
 
         return partial_rref(transpose_formula_matrix)
@@ -93,7 +93,7 @@ class ReactionNetwork:
             for reaction_index in range(self.number_reactions):
                 reactants: str = ""
                 products: str = ""
-                for species_index, species in enumerate(self.species.data):
+                for species_index, species in enumerate(self._species.data):
                     coeff: float = self.reaction_matrix[reaction_index, species_index]
                     if coeff != 0:
                         if coeff < 0:
@@ -146,7 +146,7 @@ class ReactionNetwork:
         """
         gibbs_energy: float = 0
         assert self.reaction_matrix is not None
-        for species_index, species in enumerate(self.species.data):
+        for species_index, species in enumerate(self._species.data):
             assert species.thermodata is not None
             gibbs_energy += self.reaction_matrix[
                 reaction_index, species_index
@@ -166,18 +166,18 @@ class ReactionNetwork:
 
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
-        coeff: npt.NDArray = np.zeros((nrows, self.species.number_species()))
+        coeff: npt.NDArray = np.zeros((nrows, self._species.number_species()))
         if self.reaction_matrix is not None:
             coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
-            species_index = self.species.species_index(constraint.species)
+            species_index = self._species.species_index(constraint.species)
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
-        logger.debug("species = %s", self.species.names)
+        logger.debug("species = %s", self._species.names)
         logger.debug("coefficient matrix = \n%s", coeff)
 
         return coeff
@@ -244,16 +244,16 @@ class ReactionNetwork:
         """
 
         # Initialise to ideal behaviour.
-        fugacity_coefficients: npt.NDArray = np.ones_like(self.species, dtype=float)
+        fugacity_coefficients: npt.NDArray = np.ones_like(self._species, dtype=float)
 
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
-        for gas_species in self.species.gas_species:
+        for gas_species in self._species.gas_species:
             fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
-            index: int = self.species.species_index(gas_species)
+            index: int = self._species.species_index(gas_species)
             fugacity_coefficients[index] = fugacity_coefficient
 
         log_fugacity_coefficients: npt.NDArray = np.log10(fugacity_coefficients)
@@ -327,8 +327,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         """
         coefficient_matrix: npt.NDArray = self.get_coefficient_matrix(constraints=constraints)
         activity_modifier: npt.NDArray = np.zeros_like(coefficient_matrix)
-        for species in self.species.condensed_species:
-            index: int = self.species.species_index(species)
+        for species in self._species.condensed_species:
+            index: int = self._species.species_index(species)
             activity_modifier[:, index] = coefficient_matrix[:, index]
 
         logger.debug("activity_modifier = %s", activity_modifier)
@@ -362,9 +362,9 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             The residual vector of condensate stability
         """
         residual_stability: npt.NDArray = np.zeros(
-            self.species.number_condensed_species, dtype=np.float_
+            self._species.number_condensed_species, dtype=np.float_
         )
-        for nn, species in enumerate(self.species.condensed_species):
+        for nn, species in enumerate(self._species.condensed_species):
             residual_stability[nn] = solution.stability_solution[species] - log10_TAU
             residual_stability[nn] += solution.mass_solution[species]
 
