@@ -446,12 +446,20 @@ class SystemConstraints(UserList):
         return total_pressure
 
     @property
+    def activity_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
+        """Constraints related to condensed species activities"""
+        return list(filter_by_type(self, ActivityConstraintProtocol).values())
+
+    @property
+    def gas_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
+        """Constraints related to gas species fugacities and pressures"""
+        return list(filter_by_type(self, GasConstraintProtocol).values())
+
+    @property
     def reaction_network_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
         """Constraints related to the reaction network"""
-        constraints: list[ReactionNetworkConstraintProtocol] = list(
-            filter_by_type(self, ActivityConstraintProtocol).values()
-        )
-        constraints.extend(list(filter_by_type(self, GasConstraintProtocol).values()))
+        constraints: list[ReactionNetworkConstraintProtocol] = self.activity_constraints
+        constraints.extend(self.gas_constraints)
 
         return constraints
 
