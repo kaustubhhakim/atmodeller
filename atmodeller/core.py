@@ -604,20 +604,6 @@ class Solution:
 
         return output
 
-    def raw_solution_dict(self) -> dict[str, float]:
-        """Raw solution in a dictionary"""
-        output: dict[str, float] = {}
-        for species, value in zip(self._species.data, self.species_solution.values()):
-            output[species.name] = value
-        for species, value in zip(self._species.condensed_species, self.mass_solution.values()):
-            output[f"mass_{species.name}"] = value
-        for species, value in zip(
-            self._species.condensed_species, self.stability_solution.values()
-        ):
-            output[f"stability_{species.name}"] = value
-
-        return output
-
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""
         output: dict[str, float] = {}
