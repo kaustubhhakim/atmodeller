@@ -164,7 +164,7 @@ class Output(UserDict):
         # Create and add the output
         for nn, (element, element_mass) in enumerate(mass.items()):
             output: dict[str, float] = {}
-            logger.info("Adding %s to output", element)
+            logger.debug("Adding %s to output", element)
             output["molar_mass"] = UnitConversion.g_to_kg(Formula(element).mass)
             output["atmosphere_mass"] = element_mass["atmosphere_mass"]
             output["melt_mass"] = element_mass["melt_mass"]
