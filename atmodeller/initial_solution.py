@@ -48,25 +48,25 @@ logger: logging.Logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 MIN_LOG10_PRESSURE: float = -12
-"""Minimum log10 (bar) of the initial gas pressures
+"""Minimum log10 (bar) of the initial gas species pressures
 
 Motivated by typical values of oxygen fugacity at the iron-wustite buffer
 """
 MAX_LOG10_PRESSURE: float = 8
-"""Maximum log10 (bar) of the initial gas pressures"""
+"""Maximum log10 (bar) of the initial gas species pressures"""
 
 
 class InitialSolution(ABC, Generic[T]):
     """Initial solution
 
     Args:
-        value: An object or value used to compute the initial solution
+        value: An object used to compute the initial solution
         species: Species
-        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
-        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
+        min_log10_pressure: Minimum log10 gas pressure. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 gas pressure. Defaults to :data:`MAX_LOG10_PRESSURE`.
 
     Attributes:
-        value: An object or value used to compute the initial solution
+        value: An object used to compute the initial solution
     """
 
     def __init__(
@@ -99,13 +99,10 @@ class InitialSolution(ABC, Generic[T]):
         return self._max_log10_pressure
 
     @abstractmethod
-    def get_value(
+    def get_gas_species_pressures(
         self, constraints: SystemConstraints, temperature: float, pressure: float
     ) -> npt.NDArray[np.float_]:
-        """Computes the raw value of the initial solution for the reaction network
-
-        This does not deal with condensates, which is instead exclusively treated by
-        :meth:`~get_log10_value`.
+        """Initial solution for gas species pressures
 
         Args:
             constraints: Constraints
@@ -113,8 +110,137 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
 
         Returns:
-            The raw initial solution excluding condensates (if relevant)
+            Gas species pressures, given in the same order as :attr:`species`
         """
+
+    @abstractmethod
+    def get_condensed_species_activities(
+        self, constraints: SystemConstraints, temperature: float, pressure: float
+    ) -> npt.NDArray[np.float_]:
+        """Initial solution for condensed species activities
+
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Condensed species activities, given in the same order as :attr:`species`
+        """
+
+    @abstractmethod
+    def get_condensed_species_masses(
+        self, constraints: SystemConstraints, temperature: float, pressure: float
+    ) -> npt.NDArray[np.float_]:
+        """Initial solution for condensed species masses
+
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Condensed species masses, given in the same order as :attr:`species`
+        """
+
+    def get_processed_log10_gas_species_pressures(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        perturb: bool,
+        perturb_log10: float,
+        apply_constraints: bool = True,
+    ) -> npt.NDArray[np.float_]:
+        """Initial solution for gas species pressures
+
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            perturb: Randomly perturb the log10 value of the gas species pressures by
+                `perturb_log10`.
+            perturb_log10: Maximum log10 value to perturb the initial solution of the gas species
+                pressures.
+            apply_constraints: Apply species pressures constraints, if available. Defaults to True.
+
+        Returns:
+            Log10 gas species pressures with clipping applied
+        """
+        value: npt.NDArray[np.float_] = self.get_gas_species_pressures(
+            constraints, temperature, pressure
+        )
+        log10_value: npt.NDArray[np.float_] = np.log10(value)
+
+        if perturb:
+            logger.info(
+                "Randomly perturbing the gas pressures by a maximum of %f log10 units",
+                perturb_log10,
+            )
+            log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
+
+        if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
+            logger.warning(
+                "Clipping gas pressures between %f and %f", self.min_log10, self.max_log10
+            )
+            log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
+
+        if apply_constraints:
+            # Apply constraints from the reaction network
+            for constraint in constraints.reaction_network_constraints:
+                index: int = self.species.species_index(constraint.species)
+                logger.debug("Setting %s %d", constraint.species, index)
+                # FIXME: Add logic to ignore activity constraints. This will probably break.
+                log10_value[index] = constraint.get_log10_value(
+                    temperature=temperature, pressure=pressure
+                )
+
+        logger.debug("get_processed_log10_gas_species_pressures = %s", log10_value)
+
+        return log10_value
+
+    def get_processed_log10_condensed_species_activities(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        apply_constraints: bool = True,
+    ) -> npt.NDArray[np.float_]:
+        """Initial solution for condensed species activities
+
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            apply_constraints: Apply species activity constraints, if available. Defaults to True.
+
+        Returns:
+            Log10 condensed species activities with clipping applied
+        """
+        value: npt.NDArray[np.float_] = self.get_condensed_species_activities(
+            constraints, temperature, pressure
+        )
+
+        if np.any((value < 0) | (value > 1)):
+            logger.warning("Clipping activities between 0 and 1")
+            value = np.clip(value, 0, 1)
+
+        log10_value: npt.NDArray[np.float_] = np.log10(value)
+
+        if apply_constraints:
+            # Apply constraints from the condensed species activities
+            for constraint in constraints.activity_constraints:
+                index: int = self.species.species_index(constraint.species)
+                logger.debug("Setting %s %d", constraint.species, index)
+                log10_value[index] = constraint.get_log10_value(
+                    temperature=temperature, pressure=pressure
+                )
+
+        logger.debug("get_processed_log10_condensed_species_activities = %s", log10_value)
+
+        return log10_value
 
     def get_log10_value(
         self,
@@ -131,52 +257,42 @@ class InitialSolution(ABC, Generic[T]):
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
-            perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
-                to 2.
+            perturb: Randomly perturb the log10 value of the gas species pressures by
+                `perturb_log10`. Defaults to False.
+            perturb_log10: Maximum absolute log10 value to perturb the initial solution of the gas
+                species pressures. Defaults to 2.
 
         Returns
             The log10 initial solution adhering to bounds and the constraints
         """
-        value: npt.NDArray[np.float_] = self.get_value(constraints, temperature, pressure)
-        log10_value: npt.NDArray[np.float_] = np.log10(value)
-
-        if perturb:
-            logger.info(
-                "Randomly perturbing the initial solution by a maximum of %f log10 units",
-                perturb_log10,
-            )
-            log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
-
-        if np.any(
-            (log10_value < self.min_log10_pressure) | (log10_value > self.max_log10_pressure)
-        ):
-            logger.warning("Initial solution has values outside the min and max thresholds")
-            logger.warning(
-                "Clipping the initial solution between %f and %f",
-                self.min_log10_pressure,
-                self.max_log10_pressure,
-            )
-            log10_value = np.clip(log10_value, self.min_log10_pressure, self.max_log10_pressure)
-
-        # Apply constraints from the reaction network (activities and fugacities)
-        for constraint in constraints.reaction_network_constraints:
-            index: int = self.species.species_index(constraint.species)
-            logger.debug("Setting %s %d", constraint.species, index)
-            log10_value[index] = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
-            )
-        logger.debug("Conform initial solution to constraints = %s", log10_value)
+        log10_gas_values: npt.NDArray[np.float_] = self.get_processed_log10_gas_species_pressures(
+            constraints,
+            temperature=temperature,
+            pressure=pressure,
+            perturb=perturb,
+            perturb_log10=perturb_log10,
+        )
 
         # This assumes an initial condensed mass of 10^20 kg, but this selection is quite
         # arbitrary and a smarter initial guess could probably be made.
         log_condensed_mass: npt.NDArray = 20 * np.ones(self._species.number_condensed_species)
-        log10_value = np.append(log10_value, log_condensed_mass)
+        log10_value = np.append(log10_gas_values, log_condensed_mass)
 
+        # TODO: Remove if new approach works below
         # Small lambda factors assume the condensates are stable, which is probably a reasonable
         # assumption given that the user has chosen to include them as species.
-        log_lambda: npt.NDArray = -12 * np.ones(self._species.number_condensed_species)
-        log10_value = np.append(log10_value, log_lambda)
+        # log_lambda: npt.NDArray = -12 * np.ones(self._species.number_condensed_species)
+        # log10_value = np.append(log10_value, log_lambda)
+
+        log10_activities_values: npt.NDArray[np.float_] = (
+            self.get_processed_log10_condensed_species_activities(
+                constraints,
+                temperature=temperature,
+                pressure=pressure,
+            )
+        )
+
+        log10_value = np.append(log10_value, log10_activities_values)
 
         return log10_value
 
@@ -191,54 +307,6 @@ class InitialSolution(ABC, Generic[T]):
         del output
 
 
-class InitialSolutionConstant(InitialSolution[npt.NDArray[np.float_]]):
-    """A constant value for the initial solution
-
-    The default value, which is applied to each species individually, is chosen to be within an
-    order of magnitude of the solar system rocky planets, i.e. 10 bar.
-
-    Args:
-        value: A constant pressure for the initial condition in bar. Defaults to 10.
-        species: Species
-        min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
-        max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
-
-    Attributes:
-        value: A constant pressure for the initial condition in bar
-    """
-
-    @override
-    def __init__(
-        self,
-        value: float = 10,
-        *,
-        species: Species,
-        min_log10_pressure: float = MIN_LOG10_PRESSURE,
-        max_log10_pressure: float = MAX_LOG10_PRESSURE,
-    ):
-        value_array: npt.NDArray = value * np.ones(species.number_species())
-        super().__init__(
-            value_array,
-            species=species,
-            min_log10_pressure=min_log10_pressure,
-            max_log10_pressure=max_log10_pressure,
-        )
-        logger.debug("initial_solution = %s", self.asdict())
-
-    def asdict(self) -> dict[str, float]:
-        """Dictionary of the initial solution"""
-        return dict(zip(self.species.names, self.value))
-
-    @override
-    def get_value(self, *args, **kwargs) -> npt.NDArray[np.float_]:
-        del args
-        del kwargs
-        logger.debug("%s: value = %s", self.__class__.__name__, self.value)
-
-        # TODO: Treat activities and fugacities differently in terms of numerical value?
-        return self.value
-
-
 class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
     """A dictionary of species and their values for the initial solution
 
@@ -247,7 +315,10 @@ class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
         species: Species
         min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
         max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
-        fill_value: Initial value for species that are not specified in `value`. Defaults to 1.
+        fill_pressure: Initial value for pressures that are not specified in `value`. Defaults to
+            1 bar.
+        fill_activity: Initial value for activities that are not specified in `value`. Defaults to
+            1.
 
     Attributes:
         value: A dictionary of species and values for all the gas species
@@ -261,10 +332,14 @@ class InitialSolutionDict(InitialSolution[npt.NDArray[np.float_]]):
         species: Species,
         min_log10_pressure: float = MIN_LOG10_PRESSURE,
         max_log10_pressure: float = MAX_LOG10_PRESSURE,
-        fill_value: float = 1,
+        fill_pressure: float = 1,
+        fill_activity: float = 1,
     ):
-        species_dict: dict[TypeChemicalSpecies_co, float] = {
-            unique_species: fill_value for unique_species in species
+        pressures_dict: Mapping[TypeChemicalSpecies_co, float] = {
+            unique_species: fill_pressure for unique_species in species.gas_species
+        }
+        activities_dict: Mapping[TypeChemicalSpecies_co, float] = {
+            unique_species: fill_activity for unique_species in species.condensed_species
         }
         species_dict |= value
         species_ic: npt.NDArray[np.float_] = np.array(list(species_dict.values()))
@@ -523,6 +598,68 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         logger.debug("%s: value = %s", self.__class__.__name__, value)
 
         return value
+
+    # TODO: Dan testing improving the regressor when condensates are present
+    @override
+    def get_log10_value(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        perturb: bool = False,
+        perturb_log10: float = 2,
+    ) -> npt.NDArray[np.float_]:
+        """Computes the log10 value of the initial solution with additional processing.
+
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
+            perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
+                to 2.
+
+        Returns
+            The log10 initial solution adhering to bounds and the constraints
+        """
+        value: npt.NDArray[np.float_] = self.get_value(constraints, temperature, pressure)
+        log10_value: npt.NDArray[np.float_] = np.log10(value)
+
+        if perturb:
+            logger.info(
+                "Randomly perturbing the initial solution by a maximum of %f log10 units",
+                perturb_log10,
+            )
+            log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
+
+        if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
+            logger.warning("Initial solution has values outside the min and max thresholds")
+            logger.warning(
+                "Clipping the initial solution between %f and %f", self.min_log10, self.max_log10
+            )
+            log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
+
+        # Apply constraints from the reaction network (activities and fugacities)
+        # for constraint in constraints.reaction_network_constraints:
+        #    index: int = self.species.species_index(constraint.species)
+        #    logger.debug("Setting %s %d", constraint.species, index)
+        #    log10_value[index] = constraint.get_log10_value(
+        #        temperature=temperature, pressure=pressure
+        #    )
+        logger.debug("Conform initial solution to constraints = %s", log10_value)
+
+        # This assumes an initial condensed mass of 10^20 kg, but this selection is quite
+        # arbitrary and a smarter initial guess could probably be made.
+        log_condensed_mass: npt.NDArray = 20 * np.ones(self._species.number_condensed_species)
+        log10_value = np.append(log10_value, log_condensed_mass)
+
+        # Small lambda factors assume the condensates are stable, which is probably a reasonable
+        # assumption given that the user has chosen to include them as species.
+        log_lambda: npt.NDArray = -12 * np.ones(self._species.number_condensed_species)
+        log10_value = np.append(log10_value, log_lambda)
+
+        return log10_value
 
     def action_fit(self, output: Output) -> tuple[int, int] | None:
         """Checks if a fit is necessary.

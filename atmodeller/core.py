@@ -388,6 +388,8 @@ class Solution:
     """
 
     _species: Species
+    # _constraints: SystemConstraints
+    _temperature: float
     # These are all log10
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
     _mass_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
