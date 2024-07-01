@@ -41,7 +41,6 @@ from atmodeller.interfaces import (
     TypeChemicalSpecies_co,
 )
 from atmodeller.output import Output
-from atmodeller.reaction_network import log10_TAU
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -64,13 +63,12 @@ MAX_LOG10_PRESSURE: float = 8
 class InitialSolutionData(Solution):
     """TODO"""
 
-    # pylint: disable=invalid-name
-    def clip_log1O_activities(self) -> None:
-        """Clips the condensed species activities."""
-        for species, value in self._species_solution.items():
-            if isinstance(species, CondensedSpecies):
-                # TODO: Check clip bounds
-                self._species_solution[species] = np.clip(value, log10_TAU, 0)
+    def apply_log10_gas_constraints(self, constraints: SystemConstraints) -> None:
+        """Applies constraints to the log10 gas pressures.
+
+        Args:
+            constraints: Constraints
+        """
 
     # pylint: disable=invalid-name
     def clip_log1O_gas_pressures(
@@ -86,11 +84,31 @@ class InitialSolutionData(Solution):
             if isinstance(species, GasSpecies):
                 self._species_solution[species] = np.clip(value, minimum_value, maximum_value)
 
-    def set_species_log10_activities(self, activities: dict[CondensedSpecies, float]) -> None:
+    def perturb_log10_gas_pressures(self, perturb_log10: float = 0) -> None:
+        """Perturbs the gas pressures
+
+        Args:
+            perturb_log10: Maximum log10 value to perturb the gas pressures.
+        """
+        logger.info(
+            "Randomly perturbing the gas pressures by a maximum of %f log10 units",
+            perturb_log10,
+        )
+        for species in self._species_solution:
+            if isinstance(species, GasSpecies):
+                self._species_solution[species] += perturb_log10 * (2 * np.random.rand() - 1)
+
+    def set_log10_gas_pressures(self, pressures: dict[GasSpecies, float]) -> None:
+        self._species_solution |= pressures
+
+    def set_log10_activities(self, activities: dict[CondensedSpecies, float]) -> None:
         self._species_solution |= activities
 
-    def set_species_log10_pressures(self, pressures: dict[GasSpecies, float]) -> None:
-        self._species_solution |= pressures
+    def set_log10_masses(self, masses: dict[CondensedSpecies, float]) -> None:
+        self._mass_solution |= masses
+
+    def set_log10_stabilities(self, stabilities: dict[CondensedSpecies, float]) -> None:
+        self._stability_solution |= stabilities
 
 
 class InitialSolution(ABC, Generic[T]):
@@ -122,10 +140,10 @@ class InitialSolution(ABC, Generic[T]):
         self._max_log10_pressure: float = max_log10_pressure
 
     @abstractmethod
-    def _get_gas_species_pressures(
+    def _get_log10_gas_pressures(
         self, constraints: SystemConstraints, temperature: float, pressure: float
-    ) -> npt.NDArray[np.float_]:
-        """Initial solution for gas species pressures
+    ) -> dict[GasSpecies, float]:
+        """Initial solution for log10 gas pressures
 
         Args:
             constraints: Constraints
@@ -133,14 +151,14 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
 
         Returns:
-            Gas species pressures, given in the same order as :attr:`species`
+            Log10 gas pressures
         """
 
     @abstractmethod
-    def _get_condensed_species_activities(
+    def _get_log10_activities(
         self, constraints: SystemConstraints, temperature: float, pressure: float
-    ) -> npt.NDArray[np.float_]:
-        """Initial solution for condensed species activities
+    ) -> dict[CondensedSpecies, float]:
+        """Initial solution for log10 activities
 
         Args:
             constraints: Constraints
@@ -148,14 +166,14 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
 
         Returns:
-            Condensed species activities, given in the same order as :attr:`species`
+            Log10 activities
         """
 
     @abstractmethod
-    def _get_condensed_species_masses(
+    def _get_log10_masses(
         self, constraints: SystemConstraints, temperature: float, pressure: float
-    ) -> npt.NDArray[np.float_]:
-        """Initial solution for condensed species masses
+    ) -> dict[CondensedSpecies, float]:
+        """Initial solution for log10 condensed masses
 
         Args:
             constraints: Constraints
@@ -163,7 +181,22 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
 
         Returns:
-            Condensed species masses, given in the same order as :attr:`species`
+            Log10 condensed masses
+        """
+
+    @abstractmethod
+    def _get_log10_stabilities(
+        self, constraints: SystemConstraints, temperature: float, pressure: float
+    ) -> dict[CondensedSpecies, float]:
+        """Initial solution for log10 stabilities
+
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log10 stabilities
         """
 
     def set_gas_species_pressures(
@@ -175,8 +208,8 @@ class InitialSolution(ABC, Generic[T]):
         perturb: bool,
         perturb_log10: float,
         apply_constraints: bool = True,
-    ) -> npt.NDArray[np.float_]:
-        """Initial solution for gas species pressures
+    ) -> None:
+        """Initial solution for gas pressures
 
         Args:
             constraints: Constraints
@@ -191,27 +224,16 @@ class InitialSolution(ABC, Generic[T]):
         Returns:
             Log10 gas species pressures with clipping applied
         """
-        value: npt.NDArray[np.float_] = self._get_gas_species_pressures(
+        log10_gas_pressures: dict[GasSpecies, float] = self._get_log10_gas_pressures(
             constraints, temperature, pressure
         )
-        log10_value: npt.NDArray[np.float_] = np.log10(value)
+
+        self.solution.set_log10_gas_pressures(log10_gas_pressures)
 
         if perturb:
-            logger.info(
-                "Randomly perturbing the gas pressures by a maximum of %f log10 units",
-                perturb_log10,
-            )
-            log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
+            self.solution.perturb_log10_gas_pressures(perturb_log10)
 
-        if np.any(
-            (log10_value < self._min_log10_pressure) | (log10_value > self._max_log10_pressure)
-        ):
-            logger.warning(
-                "Clipping gas pressures between %f and %f",
-                self._min_log10_pressure,
-                self._max_log10_pressure,
-            )
-            log10_value = np.clip(log10_value, self._min_log10_pressure, self._max_log10_pressure)
+        self.solution.clip_log1O_gas_pressures(self._min_log10_pressure, self._max_log10_pressure)
 
         if apply_constraints:
             # Apply constraints from the reaction network
