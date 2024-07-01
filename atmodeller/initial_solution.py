@@ -180,11 +180,15 @@ class InitialSolution(ABC, Generic[T]):
             )
             log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
 
-        if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
+        if np.any(
+            (log10_value < self.min_log10_pressure) | (log10_value > self.max_log10_pressure)
+        ):
             logger.warning(
-                "Clipping gas pressures between %f and %f", self.min_log10, self.max_log10
+                "Clipping gas pressures between %f and %f",
+                self.min_log10_pressure,
+                self.max_log10_pressure,
             )
-            log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
+            log10_value = np.clip(log10_value, self.min_log10_pressure, self.max_log10_pressure)
 
         if apply_constraints:
             # Apply constraints from the reaction network
