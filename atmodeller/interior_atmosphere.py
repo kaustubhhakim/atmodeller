@@ -73,7 +73,8 @@ class InteriorAtmosphereSystem:
         self.species.conform_solubilities_to_composition(self.planet.melt_composition)
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionConstant(species=self.species)
-        self._reaction_network = ReactionNetworkWithCondensateStability(species=self.species)
+        self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
+        self._solution = Solution(self.species)
 
     @property
     def atmosphere_element_moles(self) -> float:
@@ -208,7 +209,7 @@ class InteriorAtmosphereSystem:
         """
         output: dict[str, float] = {}
         output["pressure"] = self.solution.gas_pressures[species]
-        output["fugacity"] = self.solution.gas_fugacities[species]
+        output["fugacity"] = self.solution.gas_fugacities(self.planet.surface_temperature)[species]
 
         # Atmosphere
         output["atmosphere_mass"] = (
@@ -223,7 +224,7 @@ class InteriorAtmosphereSystem:
             fugacity=output["fugacity"],
             temperature=self.planet.surface_temperature,
             pressure=self.atmosphere_pressure,
-            **self.solution.gas_fugacities_by_hill_formula,
+            **self.solution.gas_fugacities_by_hill_formula(self.planet.surface_temperature),
         )
         output["melt_mass"] = (
             self.planet.mantle_melt_mass * output["melt_ppmw"] * UnitConversion.ppm_to_fraction()
@@ -356,8 +357,6 @@ class InteriorAtmosphereSystem:
 
         self._constraints = constraints
         self._constraints.add_activity_constraints(self.species)
-
-        self._solution = Solution(self.species, self.constraints, self.planet.surface_temperature)
 
         if initial_solution is None:
             initial_solution = self.initial_solution

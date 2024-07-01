@@ -234,9 +234,9 @@ class Output(UserDict):
         """
         for species in interior_atmosphere.species.gas_species:
             output: dict[str, float] = interior_atmosphere.gas_species_reservoir_masses(species)
-            output["fugacity_coefficient"] = interior_atmosphere.solution.fugacity_coefficients[
-                species
-            ]
+            output["fugacity_coefficient"] = interior_atmosphere.solution.fugacity_coefficients(
+                interior_atmosphere.planet.surface_temperature
+            )[species]
             output["volume_mixing_ratio"] = interior_atmosphere.solution.volume_mixing_ratios[
                 species
             ]

@@ -385,13 +385,9 @@ class Solution:
 
     Args:
         _species: Species
-        _constraints: Constraints
-        _temperature: Temperature
     """
 
     _species: Species
-    _constraints: SystemConstraints
-    _temperature: float
     # These are all log10
     _species_solution: dict[ChemicalSpecies, float] = field(init=False, default_factory=dict)
     _mass_solution: dict[CondensedSpecies, float] = field(init=False, default_factory=dict)
@@ -502,42 +498,75 @@ class Solution:
 
         return vmr
 
-    @property
-    def log10_fugacity_coefficients(self) -> dict[GasSpecies, float]:
-        """Log10 fugacity coefficients"""
+    def log10_fugacity_coefficients(self, temperature: float) -> dict[GasSpecies, float]:
+        """Log10 fugacity coefficients
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Log10 fugacity coefficients
+        """
         log10_coefficients: dict[GasSpecies, float] = {}
         for species in self._species.gas_species:
             log10_coefficients[species] = np.log10(
-                species.eos.fugacity_coefficient(self._temperature, self.total_pressure)
+                species.eos.fugacity_coefficient(temperature, self.total_pressure)
             )
 
         return log10_coefficients
 
-    @property
-    def fugacity_coefficients(self) -> dict[GasSpecies, float]:
-        """Fugacity coefficients"""
-        return {key: 10**value for key, value in self.log10_fugacity_coefficients.items()}
+    def fugacity_coefficients(self, temperature: float) -> dict[GasSpecies, float]:
+        """Fugacity coefficients
 
-    @property
-    def log10_gas_fugacities(self) -> dict[GasSpecies, float]:
-        """Log10 gas fugacities"""
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Fugacity coefficients
+        """
+        return {
+            key: 10**value for key, value in self.log10_fugacity_coefficients(temperature).items()
+        }
+
+    def log10_gas_fugacities(self, temperature: float) -> dict[GasSpecies, float]:
+        """Log10 gas fugacities
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Log10 gas fugacities
+        """
         log10_fugacities: dict[GasSpecies, float] = {}
         for species in self._species.gas_species:
             log10_fugacities[species] = (
-                self.log10_gas_pressures[species] + self.log10_fugacity_coefficients[species]
+                self.log10_gas_pressures[species]
+                + self.log10_fugacity_coefficients(temperature)[species]
             )
 
         return log10_fugacities
 
-    @property
-    def gas_fugacities(self) -> dict[GasSpecies, float]:
-        """Gas fugacities"""
-        return {key: 10**value for key, value in self.log10_gas_fugacities.items()}
+    def gas_fugacities(self, temperature: float) -> dict[GasSpecies, float]:
+        """Gas fugacities
 
-    @property
-    def gas_fugacities_by_hill_formula(self) -> dict[str, float]:
-        """Gas fugacities by hill formula"""
-        return {key.hill_formula: value for key, value in self.gas_fugacities.items()}
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Gas fugacities
+        """
+        return {key: 10**value for key, value in self.log10_gas_fugacities(temperature).items()}
+
+    def gas_fugacities_by_hill_formula(self, temperature: float) -> dict[str, float]:
+        """Gas fugacities by hill formula
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Gas fugacities by hill formula
+        """
+        return {key.hill_formula: value for key, value in self.gas_fugacities(temperature).items()}
 
     @property
     def log10_activities(self) -> dict[CondensedSpecies, float]:
