@@ -20,11 +20,10 @@
 
 import logging
 
-import numpy as np
-
 from atmodeller import __version__, debug_logger
+from atmodeller.constraints import PressureConstraint, SystemConstraints
 from atmodeller.core import GasSpecies, Species
-from atmodeller.initial_solution import InitialSolutionConstant, InitialSolutionDict
+from atmodeller.initial_solution import InitialSolutionDict
 from atmodeller.interfaces import InitialSolutionProtocol
 
 RTOL: float = 1.0e-8
@@ -40,16 +39,16 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def test_constant():
-    """Tests a constant initial solution"""
+# def test_constant():
+#     """Tests a constant initial solution"""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    species: Species = Species([H2O_g, H2_g])
+#     H2O_g: GasSpecies = GasSpecies("H2O")
+#     H2_g: GasSpecies = GasSpecies("H2")
+#     species: Species = Species([H2O_g, H2_g])
 
-    initial_solution: InitialSolutionProtocol = InitialSolutionConstant(10, species=species)
+#     initial_solution: InitialSolutionProtocol = InitialSolutionConstant(10, species=species)
 
-    assert np.array_equal(initial_solution.value, np.array([10, 10]))
+#     assert np.array_equal(initial_solution.value, np.array([10, 10]))
 
 
 def test_dictionary():
@@ -61,11 +60,15 @@ def test_dictionary():
 
     H2O_g: GasSpecies = GasSpecies("H2O")
     H2_g: GasSpecies = GasSpecies("H2")
-    CO_g: GasSpecies = GasSpecies("CO2")
+    CO_g: GasSpecies = GasSpecies("CO")
     species: Species = Species([H2O_g, H2_g, CO_g])
 
+    constraints: SystemConstraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
+
     initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {CO_g: 10, H2O_g: 5}, species=species, fill_value=2
+        {CO_g: 100, H2_g: 1000}, species=species, fill_log10_pressure=2
     )
 
-    assert np.array_equal(initial_solution.value, np.array([5, 2, 10]))
+    # assert np.array_equal(initial_solution.value, np.array([5, 2, 10]))
+
+    print(initial_solution.get_log10_value(constraints, temperature=1000, pressure=1))

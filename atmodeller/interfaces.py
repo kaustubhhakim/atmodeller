@@ -325,8 +325,7 @@ class InitialSolutionProtocol(Protocol):
         *,
         temperature: float,
         pressure: float,
-        perturb: bool = False,
-        perturb_log10: float = 2,
+        perturb_log10: float = 0,
     ) -> npt.NDArray[np.float_]: ...
 
     def update(self, output: Output) -> None: ...

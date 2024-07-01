@@ -31,7 +31,7 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import GasSpecies, Planet, Solution, Species
-from atmodeller.initial_solution import InitialSolutionConstant
+from atmodeller.initial_solution import InitialSolutionDict
 from atmodeller.interfaces import (
     InitialSolutionProtocol,
     TotalPressureConstraintProtocol,
@@ -72,7 +72,7 @@ class InteriorAtmosphereSystem:
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_composition(self.planet.melt_composition)
         if self.initial_solution is None:
-            self.initial_solution = InitialSolutionConstant(species=self.species)
+            self.initial_solution = InitialSolutionDict(species=self.species)
         self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
         self._solution = Solution(self.species)
 
@@ -436,7 +436,6 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        perturb=True,
                         perturb_log10=perturb_log10,
                     )
 
