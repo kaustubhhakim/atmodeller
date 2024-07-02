@@ -372,13 +372,9 @@ class GasSolution(SolutionComponent[GasSpecies]):
         Returns:
             Log10 fugacity coefficients
         """
-        log10_coefficients: dict[GasSpecies, float] = {}
-        for species in self.data:
-            log10_coefficients[species] = np.log10(
-                species.eos.fugacity_coefficient(temperature, self.total_pressure)
-            )
-
-        return log10_coefficients
+        return {
+            key: np.log10(value) for key, value in self.fugacity_coefficients(temperature).items()
+        }
 
     def fugacity_coefficients(self, temperature: float) -> dict[GasSpecies, float]:
         """Fugacity coefficients
@@ -389,9 +385,13 @@ class GasSolution(SolutionComponent[GasSpecies]):
         Returns:
             Fugacity coefficients
         """
-        return {
-            key: 10**value for key, value in self.log10_fugacity_coefficients(temperature).items()
-        }
+        fugacity_coefficients: dict[GasSpecies, float] = {}
+        for species in self.data:
+            fugacity_coefficients[species] = species.eos.fugacity_coefficient(
+                temperature, self.total_pressure
+            )
+
+        return fugacity_coefficients
 
     def log10_fugacities(self, temperature: float) -> dict[GasSpecies, float]:
         """Log10 fugacities
