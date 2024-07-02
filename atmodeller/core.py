@@ -22,7 +22,7 @@ import logging
 import sys
 from collections import UserList
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generic, Mapping, Type, TypeVar
+from typing import Generic, Mapping, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -38,9 +38,6 @@ if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
-
-if TYPE_CHECKING:
-    from atmodeller.constraints import SystemConstraints
 
 T = TypeVar("T")
 
@@ -172,16 +169,22 @@ class LiquidSpecies(CondensedSpecies):
         super().__init__(formula, "l", **kwargs)
 
 
-class Species(UserList):
+class Species(UserList[ChemicalSpecies]):
     """A list of species
 
     Args:
         initlist: Initial list of species. Defaults to None.
     """
 
-    # UserList itself is not a generic class, so this is for typing:
-    data: list[ChemicalSpecies]
-    """List of species"""
+    @property
+    def names(self) -> list[str]:
+        """Unique names of the species"""
+        return [species.name for species in self.data]
+
+    @property
+    def number(self) -> int:
+        """Number of species"""
+        return self.number_gas_species + self.number_condensed_species
 
     @property
     def gas_species(self) -> list[GasSpecies]:
@@ -191,12 +194,7 @@ class Species(UserList):
     @property
     def number_gas_species(self) -> int:
         """Number of gas species"""
-        return self.number_species(GasSpecies)
-
-    @property
-    def elements_in_gas_species(self) -> list[str]:
-        """Elements in gas species"""
-        return self.elements(GasSpecies)
+        return len(self.gas_species)
 
     @property
     def condensed_species(self) -> list[CondensedSpecies]:
@@ -206,58 +204,20 @@ class Species(UserList):
     @property
     def number_condensed_species(self) -> int:
         """Number of condensed species"""
-        return self.number_species(CondensedSpecies)
+        return len(self.condensed_species)
 
-    @property
-    def elements_in_condensed_species(self) -> list[str]:
-        """Elements in condensed species"""
-        return self.elements(CondensedSpecies)
-
-    @property
-    def names(self) -> list[str]:
-        """Unique names of the species"""
-        return [species.name for species in self.data]
-
-    def number_species(self, species_type: Type[ChemicalSpecies] = ChemicalSpecies) -> int:
-        """Number of species
-
-        Args:
-            species_type: Filter by species type. Defaults to ChemicalSpecies (i.e. return all).
-
-        Returns:
-            Number of species
-        """
-        filtered_species: dict[int, ChemicalSpecies] = filter_by_type(self, species_type)
-
-        return len(filtered_species)
-
-    def elements(self, species_type: Type[ChemicalSpecies] = ChemicalSpecies) -> list[str]:
-        """Unique elements in the species.
-
-        Args:
-            species_type: Filter by species type. Defaults to ChemicalSpecies (i.e. return all).
+    def elements(self) -> list[str]:
+        """Unique elements in the species
 
         Returns:
             A list of unique elements
         """
         elements: list[str] = []
-        filtered_species: dict[int, ChemicalSpecies] = filter_by_type(self, species_type)
-        for species in filtered_species.values():
+        for species in self.data:
             elements.extend(species.elements)
         unique_elements: list[str] = list(set(elements))
 
         return unique_elements
-
-    def number_elements(self, species_type: Type[ChemicalSpecies] = ChemicalSpecies) -> int:
-        """Number of elements
-
-        Args:
-            species_type: Filter by species type. Defaults to ChemicalSpecies (i.e. return all).
-
-        Returns:
-            Number of elements in species
-        """
-        return len(self.elements(species_type))
 
     def species_index(self, find_species: ChemicalSpecies) -> int:
         """Gets the index of a species
@@ -316,12 +276,12 @@ class Species(UserList):
 
         Args:
             melt_composition: Composition of the melt. Defaults to None.
+
+        Raises:
+            ValueError if the melt composition does not exist.
         """
         if melt_composition is not None:
-            logger.info(
-                "Setting solubilities to be consistent with the melt composition (%s)",
-                melt_composition,
-            )
+            logger.info("Setting solubilities for %s melt composition", melt_composition)
             try:
                 solubilities: Mapping[str, SolubilityProtocol] = composition_solubilities[
                     melt_composition.casefold()
@@ -341,27 +301,22 @@ class Species(UserList):
                     logger.info("No solubility law for %s", species.hill_formula)
                     species.solubility = NoSolubility()
 
-    @staticmethod
-    def formula_matrix(
-        elements: list[str], species: list[ChemicalSpecies]
-    ) -> npt.NDArray[np.int_]:
-        """Creates a formula matrix
+    def formula_matrix(self) -> npt.NDArray[np.int_]:
+        """Gets the formula matrix
 
         Elements are given in rows and species in columns following the convention in
         :cite:t:`LKS17`.
 
-        Args:
-            elements: A list of elements
-            species: A list of species
-
         Returns:
             The formula matrix
         """
-        matrix: npt.NDArray[np.int_] = np.zeros((len(elements), len(species)), dtype=np.int_)
-        for element_index, element in enumerate(elements):
-            for species_index, single_species in enumerate(species):
+        matrix: npt.NDArray[np.int_] = np.zeros(
+            (len(self.elements()), len(self.data)), dtype=np.int_
+        )
+        for element_index, element in enumerate(self.elements()):
+            for species_index, species in enumerate(self.data):
                 try:
-                    count: int = single_species.composition()[element].count
+                    count: int = species.composition()[element].count
                 except KeyError:
                     count = 0
                 matrix[element_index, species_index] = count
@@ -502,10 +457,8 @@ class Solution:
 
         for species in self._species:
             if species in self.pressure_solution:
-                logger.warning("SETTING PRESSURE")
                 self.pressure_solution.data[species] = value[index]
             else:
-                logger.warning("SETTING ACTIVITY")
                 self.activity_solution.data[species] = value[index]
             index += 1
         for species in self._species.condensed_species:
@@ -528,7 +481,7 @@ class Solution:
 
     @property
     def stability_array(self) -> npt.NDArray:
-        stability_array: npt.NDArray = np.zeros(self._species.number_species(), dtype=float)
+        stability_array: npt.NDArray = np.zeros(self._species.number, dtype=float)
         for species in self._species.condensed_species:
             index: int = self._species.species_index(species)
             stability_array[index] = self.stability_solution.data[species]

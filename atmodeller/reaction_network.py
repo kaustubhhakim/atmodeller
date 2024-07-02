@@ -64,7 +64,7 @@ class ReactionNetwork:
 
     @property
     def number_reactions(self) -> int:
-        if self._species.number_species() == 1:
+        if self._species.number == 1:
             return 0
         else:
             assert self.reaction_matrix is not None
@@ -76,13 +76,11 @@ class ReactionNetwork:
         Returns:
             A matrix of linearly independent reactions
         """
-        if self._species.number_species() == 1:
+        if self._species.number == 1:
             logger.debug("Only one species therefore no reactions")
             return None
 
-        transpose_formula_matrix: npt.NDArray = self._species.formula_matrix(
-            self._species.elements(), self._species.data
-        ).T
+        transpose_formula_matrix: npt.NDArray = self._species.formula_matrix().T
 
         return partial_rref(transpose_formula_matrix)
 
@@ -166,7 +164,7 @@ class ReactionNetwork:
 
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
-        coeff: npt.NDArray = np.zeros((nrows, self._species.number_species()))
+        coeff: npt.NDArray = np.zeros((nrows, self._species.number))
         if self.reaction_matrix is not None:
             coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
