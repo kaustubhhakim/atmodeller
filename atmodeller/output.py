@@ -89,6 +89,7 @@ class Output(UserDict):
         self._add_planet(interior_atmosphere)
         self._add_residual(interior_atmosphere)
         self._add_solution(interior_atmosphere)
+        self._add_raw_solution(interior_atmosphere)
 
         if extra_output is not None:
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
@@ -263,6 +264,15 @@ class Output(UserDict):
         data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
         data_list.append(interior_atmosphere.residual_dict())
 
+    def _add_raw_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+        """Adds the raw solution.
+
+        Args:
+            interior_atmosphere: Interior atmosphere system
+        """
+        data_list: list[dict[str, float]] = self.data.setdefault("raw_solution", [])
+        data_list.append(interior_atmosphere.solution.raw_solution_dict())
+
     def _add_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the solution.
 
@@ -365,7 +375,7 @@ class Output(UserDict):
 
         Args:
             file_prefix: Prefix of the output file if writing to a pickle or Excel. Defaults to
-                'atmodeller_out'
+                atmodeller_out
             to_dict: Returns the output data in a dictionary. Defaults to True.
             to_dataframes: Returns the output data in a dictionary of dataframes. Defaults to
                 False.
