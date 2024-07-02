@@ -336,6 +336,9 @@ class SolutionComponent(Generic[T]):
             self.data[key] += perturb * (2 * np.random.rand() - 1)
 
 
+CondensedSolution = SolutionComponent[CondensedSpecies]
+
+
 class GasSolution(SolutionComponent[GasSpecies]):
     """The gas solution"""
 
@@ -448,15 +451,9 @@ class Solution:
     def __init__(self, species: Species):
         self._species: Species = species
         self._gas: GasSolution = GasSolution(species.gas_species)
-        self._activity: SolutionComponent[CondensedSpecies] = SolutionComponent[CondensedSpecies](
-            species.condensed_species
-        )
-        self._mass: SolutionComponent[CondensedSpecies] = SolutionComponent[CondensedSpecies](
-            species.condensed_species
-        )
-        self._stability: SolutionComponent[CondensedSpecies] = SolutionComponent[CondensedSpecies](
-            species.condensed_species
-        )
+        self._activity: CondensedSolution = CondensedSolution(species.condensed_species)
+        self._mass: CondensedSolution = CondensedSolution(species.condensed_species)
+        self._stability: CondensedSolution = CondensedSolution(species.condensed_species)
 
     @property
     def number(self) -> int:
@@ -469,17 +466,17 @@ class Solution:
         return self._gas
 
     @property
-    def activity(self) -> SolutionComponent[CondensedSpecies]:
+    def activity(self) -> CondensedSolution:
         """Activity solution"""
         return self._activity
 
     @property
-    def mass(self) -> SolutionComponent[CondensedSpecies]:
+    def mass(self) -> CondensedSolution:
         """Mass solution"""
         return self._mass
 
     @property
-    def stability(self) -> SolutionComponent[CondensedSpecies]:
+    def stability(self) -> CondensedSolution:
         """Stability solution"""
         return self._stability
 
