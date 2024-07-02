@@ -39,7 +39,12 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
-T = TypeVar("T")
+T = TypeVar("T", bound=ChemicalSpecies)
+
+MASS_PREFIX: str = "mass_"
+"""Prefix for the dictionary key for the masses of condensed species"""
+STABILITY_PREFIX: str = "stability_"
+"""Prefix for the dictionary key for the stabilities of condensed species"""
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -532,9 +537,9 @@ class Solution:
         for species, value in zip(self._species.data, self.data[: self._species.number]):
             output[species.name] = value
         for species, value in zip(self._species.condensed_species, self.mass.data.values()):
-            output[f"mass_{species.name}"] = value
+            output[f"{MASS_PREFIX}{species.name}"] = value
         for species, value in zip(self._species.condensed_species, self.stability.data.values()):
-            output[f"stability_{species.name}"] = value
+            output[f"{STABILITY_PREFIX}{species.name}"] = value
 
         return output
 
@@ -546,7 +551,7 @@ class Solution:
         for species, activity in self.activity.physical.items():
             output[species.name] = activity
         for species, condensed_mass in self.mass.physical.items():
-            output[f"mass_{species.name}"] = condensed_mass
+            output[f"{MASS_PREFIX}{species.name}"] = condensed_mass
 
         return output
 
@@ -557,8 +562,8 @@ class Solution:
 
         Args:
             target_dict: Dictionary of the target values
-            rtol: Relative tolerance
-            atol: Absolute tolerance
+            rtol: Relative tolerance. Defaults to 1.0E-5.
+            atol: Absolute tolerance. Defaults to 1.0E-8.
 
         Returns:
             True if the solution is close to the target, otherwise False
@@ -578,7 +583,8 @@ class Solution:
 
         Args:
             target_dict: Dictionary of the target values
-            message: Message prefix to write to the logger when a tolerance is satisfied
+            message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
+                to an empty string.
 
         Returns:
             The tightest tolerance satisfied
