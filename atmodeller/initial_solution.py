@@ -22,7 +22,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, Mapping, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -315,22 +315,28 @@ class InitialSolution(ABC, Generic[T]):
 
 
 class InitialSolutionDict(InitialSolution[dict]):
-    """A dictionary for the initial solution"""
+    """A dictionary for the initial solution
+
+    Args:
+        value: Dictionary of the initial solution. Defaults to None, meaning to use default
+            values.
+        **kwargs: Keyword arguments to pass through to the base class.
+    """
 
     @override
-    def __init__(self, value: dict[TypeChemicalSpecies_co, float] | None = None, **kwargs):
+    def __init__(self, value: dict | None = None, **kwargs):
         if value is None:
-            value_dict: dict[TypeChemicalSpecies_co, float] = {}
+            value_dict: dict = {}
         else:
             value_dict = value
         super().__init__(value_dict, **kwargs)
 
     @override
     def _get_log10_pressures(self, *args, **kwargs) -> dict[GasSpecies, float]:
-        """Initial solution for log10 gas pressures
+        """Initial solution for log10 pressures
 
         Returns:
-            Log10 gas pressures
+            Log10 pressures
         """
         del args
         del kwargs
@@ -400,47 +406,6 @@ class InitialSolutionDict(InitialSolution[dict]):
                 output[species] = self._fill_log10_stability
 
         return output
-
-    # @override
-    # def __init__(
-    #     self,
-    #     value: Mapping[TypeChemicalSpecies_co, float],
-    #     *,
-    #     species: Species,
-    #     min_log10_pressure: float = MIN_LOG10_PRESSURE,
-    #     max_log10_pressure: float = MAX_LOG10_PRESSURE,
-    #     fill_pressure: float = 1,
-    #     fill_activity: float = 1,
-    # ):
-    #     pressures_dict: Mapping[TypeChemicalSpecies_co, float] = {
-    #         unique_species: fill_pressure for unique_species in species.gas_species
-    #     }
-    #     activities_dict: Mapping[TypeChemicalSpecies_co, float] = {
-    #         unique_species: fill_activity for unique_species in species.condensed_species
-    #     }
-    #     species_dict |= value
-    #     species_ic: npt.NDArray[np.float_] = np.array(list(species_dict.values()))
-    #     super().__init__(
-    #         species_ic,
-    #         species=species,
-    #         min_log10_pressure=min_log10_pressure,
-    #         max_log10_pressure=max_log10_pressure,
-    #     )
-    #     logger.debug("initial_solution = %s", self.asdict())
-
-    # def asdict(self) -> dict[str, float]:
-    #     """Dictionary of the initial solution"""
-    #     return dict(zip(self.species.names, self.value))
-
-    # @override
-    # def get_value(
-    #     self, constraints: SystemConstraints, *, temperature: float, pressure: float
-    # ) -> npt.NDArray:
-    #     del args
-    #     del kwargs
-    #     logger.debug("%s: value = %s", self.__class__.__name__, self.value)
-
-    #     return self.value
 
 
 # class InitialSolutionRegressor(InitialSolution[Output]):
