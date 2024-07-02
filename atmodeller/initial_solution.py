@@ -59,40 +59,6 @@ MAX_LOG10_PRESSURE: float = 8
 """Maximum log10 (bar) of the initial gas species pressures"""
 
 
-class InitialSolutionData(Solution):
-    """TODO"""
-
-    def apply_log10_gas_constraints(
-        self, constraints: SystemConstraints, *, temperature: float, pressure: float
-    ) -> None:
-        """Applies constraints to the log10 gas pressures.
-
-        Args:
-            constraints: Constraints
-            temperature: Temperature in K
-            pressure: Pressure in bar
-        """
-        for constraint in constraints.gas_constraints:
-            self.gas.data[constraint.species] = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
-            )
-
-    def apply_log10_activity_constraints(
-        self, constraints: SystemConstraints, *, temperature: float, pressure: float
-    ) -> None:
-        """Applies constraints to the log10 activities.
-
-        Args:
-            constraints: Constraints
-            temperature: Temperature in K
-            pressure: Pressure in bar
-        """
-        for constraint in constraints.activity_constraints:
-            self.activity.data[constraint.species] = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
-            )
-
-
 class InitialSolution(ABC, Generic[T]):
     """Initial solution
 
@@ -103,8 +69,8 @@ class InitialSolution(ABC, Generic[T]):
         max_log10_pressure: Maximum log10 gas pressure. Defaults to :data:`MAX_LOG10_PRESSURE`.
         fill_log10_pressure: Fill value for pressure in bar. Defaults to 1.
         fill_log10_activity: Fill value for activity. Defaults to 1.
-        fill_log10_mass: Fill value for mass. Defaults to 10.
-        fill_log10_stability: Fill value for stability. Defaults to -15.
+        fill_log10_mass: Fill value for mass. Defaults to 20.
+        fill_log10_stability: Fill value for stability. Defaults to -35.
 
     Attributes:
         value: An object used to compute the initial solution
@@ -120,12 +86,12 @@ class InitialSolution(ABC, Generic[T]):
         fill_log10_pressure: float = 1,
         fill_log10_activity: float = 1,
         fill_log10_mass: float = 20,
-        fill_log10_stability: float = -15,
+        fill_log10_stability: float = -35,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
         self._species: Species = species
-        self.solution: InitialSolutionData = InitialSolutionData(species)
+        self.solution: Solution = Solution(species)
         self._min_log10_pressure: float = min_log10_pressure
         self._max_log10_pressure: float = max_log10_pressure
         self._fill_log10_pressure: float = fill_log10_pressure
@@ -223,9 +189,10 @@ class InitialSolution(ABC, Generic[T]):
         self.solution.gas.clip_values(self._min_log10_pressure, self._max_log10_pressure)
 
         if apply_constraints:
-            self.solution.apply_log10_gas_constraints(
-                constraints, temperature=temperature, pressure=pressure
-            )
+            for constraint in constraints.gas_constraints:
+                self.solution.gas.data[constraint.species] = constraint.get_log10_value(
+                    temperature=temperature, pressure=pressure
+                )
 
     def _set_log10_activities(
         self,
@@ -250,9 +217,10 @@ class InitialSolution(ABC, Generic[T]):
         self.solution.activity.clip_values(maximum_value=1)
 
         if apply_constraints:
-            self.solution.apply_log10_activity_constraints(
-                constraints, temperature=temperature, pressure=pressure
-            )
+            for constraint in constraints.activity_constraints:
+                self.solution.activity.data[constraint.species] = constraint.get_log10_value(
+                    temperature=temperature, pressure=pressure
+                )
 
     def set_log10_value(
         self,

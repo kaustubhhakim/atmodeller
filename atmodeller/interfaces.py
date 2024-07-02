@@ -37,6 +37,7 @@ from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
     from atmodeller.constraints import SystemConstraints
+    from atmodeller.core import GasSpecies
     from atmodeller.output import Output
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -287,35 +288,32 @@ class ConstraintProtocol(Protocol):
     def get_log10_value(self, temperature: float, pressure: float) -> float: ...
 
 
-class SpeciesConstraintProtocol(ConstraintProtocol, Protocol):
-
-    @property
-    def species(self) -> ChemicalSpecies: ...
-
-
-class ElementConstraintProtocol(ConstraintProtocol, Protocol):
+class MassConstraintProtocol(ConstraintProtocol, Protocol):
 
     @property
     def element(self) -> str: ...
 
+    @property
+    def mass(self) -> float: ...
 
-class MassConstraintProtocol(ConstraintProtocol, Protocol):
-    def mass(self, temperature: float, pressure: float) -> float: ...
 
+class ActivityConstraintProtocol(ConstraintProtocol, Protocol):
 
-class ActivityConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+    @property
+    def species(self) -> CondensedSpecies: ...
+
     def activity(self, temperature: float, pressure: float) -> float: ...
 
 
-class GasConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+class GasConstraintProtocol(ConstraintProtocol, Protocol):
+
+    @property
+    def species(self) -> GasSpecies: ...
+
     def fugacity(self, temperature: float, pressure: float) -> float: ...
 
 
 ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
-
-
-class TotalPressureConstraintProtocol(ConstraintProtocol, Protocol):
-    def total_pressure(self, temperature: float, pressure: float) -> float: ...
 
 
 class InitialSolutionProtocol(Protocol):

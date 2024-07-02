@@ -29,13 +29,10 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
-from atmodeller.constraints import SystemConstraints
+from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
 from atmodeller.core import GasSpecies, Planet, Solution, Species
 from atmodeller.initial_solution import InitialSolutionDict
-from atmodeller.interfaces import (
-    InitialSolutionProtocol,
-    TotalPressureConstraintProtocol,
-)
+from atmodeller.interfaces import InitialSolutionProtocol
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
 from atmodeller.utilities import UnitConversion
@@ -305,15 +302,12 @@ class InteriorAtmosphereSystem:
 
         return element_mass
 
-    def get_mass_residual(self):
+    def get_mass_residual(self) -> npt.NDArray[np.float_]:
         """Returns the residual vector of the mass balance."""
 
-        residual_mass: npt.NDArray = np.zeros(
+        residual_mass: npt.NDArray[np.float_] = np.zeros(
             len(self.constraints.mass_constraints), dtype=np.float_
         )
-
-        # Mass constraints are currently only ever specified in terms of elements. Hence
-        # constraint.species is an element.
         for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
             residual_mass[constraint_index] = np.log10(
                 sum(self.element_mass(mass_constraint.element).values())
@@ -457,7 +451,7 @@ class InteriorAtmosphereSystem:
         coefficient_matrix: npt.NDArray,
         activity_modifier: npt.NDArray,
         equilibrium_modifier: npt.NDArray,
-    ) -> npt.NDArray:
+    ) -> npt.NDArray[np.float_]:
         """Objective function for the non-linear system.
 
         Args:
@@ -487,16 +481,14 @@ class InteriorAtmosphereSystem:
         )
 
         # Compute residual for the mass balance.
-        residual_mass: npt.NDArray = self.get_mass_residual()
+        residual_mass: npt.NDArray[np.float_] = self.get_mass_residual()
 
         # Compute residual for the total pressure (if relevant).
         residual_total_pressure: npt.NDArray = np.zeros(
             len(self.constraints.total_pressure_constraint), dtype=np.float_
         )
         if len(self.constraints.total_pressure_constraint) > 0:
-            constraint: TotalPressureConstraintProtocol = (
-                self.constraints.total_pressure_constraint[0]
-            )
+            constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
                 self.atmosphere_pressure
             ) - constraint.get_log10_value(

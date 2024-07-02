@@ -32,10 +32,9 @@ from atmodeller.interfaces import (
     ChemicalSpecies,
     CondensedSpecies,
     ConstraintProtocol,
-    ElementConstraintProtocol,
     GasConstraintProtocol,
+    MassConstraintProtocol,
     ReactionNetworkConstraintProtocol,
-    TotalPressureConstraintProtocol,
 )
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import filter_by_type
@@ -51,7 +50,7 @@ T = TypeVar("T", bound=ConstraintProtocol)
 U = TypeVar("U", bound=ChemicalSpecies)
 
 
-class ElementMassConstraint(ElementConstraintProtocol):
+class ElementMassConstraint(MassConstraintProtocol):
     """An element mass constraint
 
     Args:
@@ -218,6 +217,21 @@ class ActivityConstraint(_SpeciesConstantConstraint[CondensedSpecies]):
             Activity
         """
         return self.get_value(temperature, pressure)
+
+    # def fugacity(self, temperature: float, pressure: float) -> float:
+    #     """Alias for the value of the activity constraint, which is anyhow related to fugacity
+
+    #     This allows this constraint to satisfy
+    #     :class:`atmodeller.interfaces.FugacityConstraintProtocol`
+
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
+
+    #     Returns:
+    #         Fugacity (activity)
+    #     """
+    #     return self.activity(temperature, pressure)
 
 
 class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
@@ -435,10 +449,10 @@ class SystemConstraints(UserList):
         return list(filter_by_type(self, ElementMassConstraint).values())
 
     @property
-    def total_pressure_constraint(self) -> list[TotalPressureConstraintProtocol]:
+    def total_pressure_constraint(self) -> list[TotalPressureConstraint]:
         """Total pressure constraint"""
-        total_pressure: list[TotalPressureConstraintProtocol] = list(
-            filter_by_type(self, TotalPressureConstraintProtocol).values()
+        total_pressure: list[TotalPressureConstraint] = list(
+            filter_by_type(self, TotalPressureConstraint).values()
         )
         if len(total_pressure) > 1:
             raise ValueError("More than one total pressure constraint prescribed")
@@ -446,19 +460,20 @@ class SystemConstraints(UserList):
         return total_pressure
 
     @property
-    def activity_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
+    def activity_constraints(self) -> list[ActivityConstraintProtocol]:
         """Constraints related to condensed species activities"""
         return list(filter_by_type(self, ActivityConstraintProtocol).values())
 
     @property
-    def gas_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
+    def gas_constraints(self) -> list[GasConstraintProtocol]:
         """Constraints related to gas species fugacities and pressures"""
         return list(filter_by_type(self, GasConstraintProtocol).values())
 
     @property
     def reaction_network_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
         """Constraints related to the reaction network"""
-        constraints: list[ReactionNetworkConstraintProtocol] = self.activity_constraints
+        constraints: list[ReactionNetworkConstraintProtocol] = []
+        constraints.extend(self.activity_constraints)
         constraints.extend(self.gas_constraints)
 
         return constraints
