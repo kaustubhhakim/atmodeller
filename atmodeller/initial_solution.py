@@ -33,7 +33,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import GasSpecies, Solution, Species
+from atmodeller.core import MASS_PREFIX, STABILITY_PREFIX, GasSpecies, Solution, Species
 from atmodeller.interfaces import (
     ChemicalSpecies,
     CondensedSpecies,
@@ -68,7 +68,7 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_pressure: Minimum log10 gas pressure. Defaults to :data:`MIN_LOG10_PRESSURE`.
         max_log10_pressure: Maximum log10 gas pressure. Defaults to :data:`MAX_LOG10_PRESSURE`.
         fill_log10_pressure: Fill value for pressure in bar. Defaults to 1.
-        fill_log10_activity: Fill value for activity. Defaults to 1.
+        fill_log10_activity: Fill value for activity. Defaults to 0.
         fill_log10_mass: Fill value for mass. Defaults to 20.
         fill_log10_stability: Fill value for stability. Defaults to -35.
 
@@ -84,7 +84,7 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_pressure: float = MIN_LOG10_PRESSURE,
         max_log10_pressure: float = MAX_LOG10_PRESSURE,
         fill_log10_pressure: float = 1,
-        fill_log10_activity: float = 1,
+        fill_log10_activity: float = 0,
         fill_log10_mass: float = 20,
         fill_log10_stability: float = -35,
     ):
@@ -100,10 +100,10 @@ class InitialSolution(ABC, Generic[T]):
         self._fill_log10_stability: float = fill_log10_stability
 
     @abstractmethod
-    def _get_log10_gas_pressures(
+    def _get_log10_pressures(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> dict[GasSpecies, float]:
-        """Initial solution for log10 gas pressures
+        """Initial solution for log10 pressures
 
         Args:
             constraints: Constraints
@@ -159,7 +159,7 @@ class InitialSolution(ABC, Generic[T]):
             Log10 stabilities
         """
 
-    def _set_log10_gas_pressures(
+    def _set_log10_pressures(
         self,
         constraints: SystemConstraints,
         *,
@@ -168,20 +168,20 @@ class InitialSolution(ABC, Generic[T]):
         perturb_log10: float = 0,
         apply_constraints: bool = True,
     ) -> None:
-        """Sets the log10 gas pressures.
+        """Sets the log10 pressures.
 
         Args:
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb_log10: Maximum log10 value to perturb the initial solution of the gas
-                pressures. Defaults to 0, i.e. not used.
+            perturb_log10: Maximum log10 value to perturb the initial solution of the pressures.
+                Defaults to 0, i.e. not used.
             apply_constraints: Apply pressure constraints, if any. Defaults to True.
         """
-        log10_gas_pressures: dict[GasSpecies, float] = self._get_log10_gas_pressures(
+        log10_pressures: dict[GasSpecies, float] = self._get_log10_pressures(
             constraints, temperature=temperature, pressure=pressure
         )
-        self.solution.gas.data = log10_gas_pressures
+        self.solution.gas.data = log10_pressures
 
         if perturb_log10:
             self.solution.gas.perturb_values(perturb_log10)
@@ -243,7 +243,7 @@ class InitialSolution(ABC, Generic[T]):
             apply_gas_constraints: Apply gas constraints, if any. Defaults to True.
             apply_constraints: Apply activity constraints, if any. Defaults to True.
         """
-        self._set_log10_gas_pressures(
+        self._set_log10_pressures(
             constraints,
             temperature=temperature,
             pressure=pressure,
@@ -315,18 +315,18 @@ class InitialSolution(ABC, Generic[T]):
 
 
 class InitialSolutionDict(InitialSolution[dict]):
-    """A dictionary of species and their values for the initial solution"""
+    """A dictionary for the initial solution"""
 
     @override
-    def __init__(self, value=None, **kwargs):
+    def __init__(self, value: dict[TypeChemicalSpecies_co, float] | None = None, **kwargs):
         if value is None:
-            value_dict = {}
+            value_dict: dict[TypeChemicalSpecies_co, float] = {}
         else:
             value_dict = value
         super().__init__(value_dict, **kwargs)
 
     @override
-    def _get_log10_gas_pressures(self, *args, **kwargs) -> dict[GasSpecies, float]:
+    def _get_log10_pressures(self, *args, **kwargs) -> dict[GasSpecies, float]:
         """Initial solution for log10 gas pressures
 
         Returns:
@@ -376,7 +376,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         output: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
             try:
-                output[species] = np.log10(self.value[f"mass_{species}"])
+                output[species] = np.log10(self.value[f"{MASS_PREFIX}{species}"])
             except KeyError:
                 output[species] = self._fill_log10_mass
 
@@ -395,7 +395,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         output: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
             try:
-                output[species] = np.log10(self.value[f"stability_{species}"])
+                output[species] = np.log10(self.value[f"{STABILITY_PREFIX}{species}"])
             except KeyError:
                 output[species] = self._fill_log10_stability
 
