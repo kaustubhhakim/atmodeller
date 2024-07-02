@@ -24,8 +24,12 @@ import numpy as np
 import numpy.typing as npt
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import PressureConstraint, SystemConstraints
-from atmodeller.core import GasSpecies, Species
+from atmodeller.constraints import (
+    ActivityConstraint,
+    PressureConstraint,
+    SystemConstraints,
+)
+from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.initial_solution import InitialSolutionDict
 from atmodeller.interfaces import InitialSolutionProtocol
 
@@ -48,15 +52,15 @@ def test_version():
 def test_no_args_no_constraints_dict():
     """Tests a dict with no arguments and no constraints"""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    CO_g: GasSpecies = GasSpecies("CO")
-    species: Species = Species([H2O_g, H2_g, CO_g])
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    CO_g = GasSpecies("CO")
+    species = Species([H2O_g, H2_g, CO_g])
 
     constraints: SystemConstraints = SystemConstraints([])
 
-    initial_solution: InitialSolutionProtocol = InitialSolutionDict(species=species)
-    result: npt.NDArray[np.float_] = initial_solution.get_log10_value(
+    initial_solution = InitialSolutionDict(species=species)
+    result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
 
@@ -66,20 +70,18 @@ def test_no_args_no_constraints_dict():
 def test_no_args_with_constraints_dict():
     """Tests a dict with no arguments, but with constraints and a pressure fill value."""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    CO_g: GasSpecies = GasSpecies("CO")
-    species: Species = Species([H2O_g, H2_g, CO_g])
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    CO_g = GasSpecies("CO")
+    species = Species([H2O_g, H2_g, CO_g])
 
-    constraints: SystemConstraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
+    constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
-    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        species=species, fill_log10_pressure=2
-    )
-    result: npt.NDArray[np.float_] = initial_solution.get_log10_value(
+    initial_solution = InitialSolutionDict(species=species, fill_log10_pressure=2)
+    result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target: npt.NDArray[np.float_] = np.array([0.6989700043360189, 2, 2])
+    target = np.array([0.6989700043360189, 2, 2])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -90,21 +92,122 @@ def test_no_args_with_constraints_dict():
 def test_with_args_with_constraints_dict():
     """Tests a dict with arguments, constraints, and a pressure fill value."""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    CO_g: GasSpecies = GasSpecies("CO")
-    CO2_g: GasSpecies = GasSpecies("CO2")
-    species: Species = Species([H2O_g, H2_g, CO_g, CO2_g])
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    species = Species([H2O_g, H2_g, CO_g, CO2_g])
 
-    constraints: SystemConstraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
+    constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
-    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+    initial_solution = InitialSolutionDict(
         {CO_g: 100, H2_g: 1000}, species=species, fill_log10_pressure=4
     )
-    result: npt.NDArray[np.float_] = initial_solution.get_log10_value(
+    result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target: npt.NDArray[np.float_] = np.array([0.6989700043360189, 3, 2, 4])
+    target = np.array([0.6989700043360189, 3, 2, 4])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_with_args_cond_dict():
+    """Tests a dict with arguments, no constraints, for condensed phases
+
+    In particular, this tests that activity arguments (and fill values) are applied correctly.
+    """
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    H2O_l = LiquidSpecies("H2O")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+
+    constraints = SystemConstraints([])
+
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000, C_cr: 0.9}, species=species, fill_log10_activity=0.8
+    )
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 3, 1, 2, 1, 1, 0.8, -0.04575749, 20, 20, -35, -35])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_with_args_constraints_cond_dict():
+    """Tests a dict with arguments, constraints, for condensed phases
+
+    In particular, this tests that activity constraints are applied correctly.
+    """
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    H2O_l = LiquidSpecies("H2O")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+
+    constraints = SystemConstraints([ActivityConstraint(C_cr, 0.7)])
+
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000}, species=species, fill_log10_activity=0.8
+    )
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 3, 1, 2, 1, 1, 0.8, -0.15490196, 20, 20, -35, -35])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_with_stability_constraints_cond_dict():
+    """Tests a dict with arguments, constraints, for condensed phases
+
+    In particular, this tests that activity constraints are applied correctly.
+    """
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    H2O_l = LiquidSpecies("H2O")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+
+    constraints = SystemConstraints([ActivityConstraint(C_cr, 0.7)])
+
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000, "stability_C_cr": 2, "mass_H2O_l": 1e22},
+        species=species,
+        fill_log10_activity=0.8,
+    )
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 3, 1, 2, 1, 1, 0.8, -0.15490196, 22, 20, -35, 0.30103])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)

@@ -382,7 +382,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         output: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
             try:
-                output[species] = np.log10(self.value[f"{MASS_PREFIX}{species}"])
+                output[species] = np.log10(self.value[f"{MASS_PREFIX}{species.name}"])
             except KeyError:
                 output[species] = self._fill_log10_mass
 
@@ -401,7 +401,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         output: dict[CondensedSpecies, float] = {}
         for species in self._species.condensed_species:
             try:
-                output[species] = np.log10(self.value[f"{STABILITY_PREFIX}{species}"])
+                output[species] = np.log10(self.value[f"{STABILITY_PREFIX}{species.name}"])
             except KeyError:
                 output[species] = self._fill_log10_stability
 
