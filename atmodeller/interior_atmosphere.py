@@ -99,12 +99,12 @@ class InteriorAtmosphereSystem:
     @property
     def atmosphere_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere"""
-        return self.solution.gas_mean_molar_mass
+        return self.solution.gas.mean_molar_mass
 
     @property
     def atmosphere_pressure(self) -> float:
         """Total pressure of the atmosphere"""
-        return self.solution.total_pressure
+        return self.solution.gas.total_pressure
 
     @property
     def atmosphere_species_moles(self) -> float:
@@ -184,7 +184,7 @@ class InteriorAtmosphereSystem:
         for species in self.species.condensed_species:
             # TODO: Below can sometimes blow up when the solver tries a large step, although this
             # can be mitigated by setting the `factor` solver option.
-            species_mass: float = 10 ** self._solution.mass_solution.data[species]
+            species_mass: float = 10 ** self._solution.mass.data[species]
             for element, value in species.composition().items():
                 condensed_element_masses[element] += species_mass * value.fraction
 
@@ -208,8 +208,8 @@ class InteriorAtmosphereSystem:
             A dictionary that includes the reservoir masses of the species
         """
         output: dict[str, float] = {}
-        output["pressure"] = self.solution.gas_pressures[species]
-        output["fugacity"] = self.solution.gas_fugacities(self.planet.surface_temperature)[species]
+        output["pressure"] = self.solution.gas.physical[species]
+        output["fugacity"] = self.solution.gas.fugacities(self.planet.surface_temperature)[species]
 
         # Atmosphere
         output["atmosphere_mass"] = (
@@ -224,7 +224,7 @@ class InteriorAtmosphereSystem:
             fugacity=output["fugacity"],
             temperature=self.planet.surface_temperature,
             pressure=self.atmosphere_pressure,
-            **self.solution.gas_fugacities_by_hill_formula(self.planet.surface_temperature),
+            **self.solution.gas.fugacities_by_hill_formula(self.planet.surface_temperature),
         )
         output["melt_mass"] = (
             self.planet.mantle_melt_mass * output["melt_ppmw"] * UnitConversion.ppm_to_fraction()

@@ -121,8 +121,8 @@ class Output(UserDict):
         """
         for species in interior_atmosphere.species.condensed_species:
             output: dict[str, float] = {}
-            output["activity"] = interior_atmosphere.solution.activities[species]
-            output["mass"] = interior_atmosphere.solution.condensed_masses[species]
+            output["activity"] = interior_atmosphere.solution.activity.physical[species]
+            output["mass"] = interior_atmosphere.solution.mass.physical[species]
             output["moles"] = output["mass"] / species.molar_mass
             output["molar_mass"] = species.molar_mass
 
@@ -232,12 +232,14 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        for species in interior_atmosphere.species.gas_species:
+        for species in interior_atmosphere.solution.gas.data:
             output: dict[str, float] = interior_atmosphere.gas_species_reservoir_masses(species)
-            output["fugacity_coefficient"] = interior_atmosphere.solution.fugacity_coefficients(
-                interior_atmosphere.planet.surface_temperature
-            )[species]
-            output["volume_mixing_ratio"] = interior_atmosphere.solution.volume_mixing_ratios[
+            output["fugacity_coefficient"] = (
+                interior_atmosphere.solution.gas.fugacity_coefficients(
+                    interior_atmosphere.planet.surface_temperature
+                )[species]
+            )
+            output["volume_mixing_ratio"] = interior_atmosphere.solution.gas.volume_mixing_ratios[
                 species
             ]
             output["molar_mass"] = interior_atmosphere.species.get_species(species).molar_mass

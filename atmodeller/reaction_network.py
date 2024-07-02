@@ -70,6 +70,28 @@ class ReactionNetwork:
             assert self.reaction_matrix is not None
             return self.reaction_matrix.shape[0]
 
+    def formula_matrix(self) -> npt.NDArray[np.int_]:
+        """Gets the formula matrix
+
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
+
+        Returns:
+            The formula matrix
+        """
+        matrix: npt.NDArray[np.int_] = np.zeros(
+            (len(self._species.elements()), len(self._species.data)), dtype=np.int_
+        )
+        for element_index, element in enumerate(self._species.elements()):
+            for species_index, species in enumerate(self._species.data):
+                try:
+                    count: int = species.composition()[element].count
+                except KeyError:
+                    count = 0
+                matrix[element_index, species_index] = count
+
+        return matrix
+
     def get_reaction_matrix(self) -> npt.NDArray | None:
         """Gets the reaction matrix
 
@@ -80,7 +102,7 @@ class ReactionNetwork:
             logger.debug("Only one species therefore no reactions")
             return None
 
-        transpose_formula_matrix: npt.NDArray = self._species.formula_matrix().T
+        transpose_formula_matrix: npt.NDArray = self.formula_matrix().T
 
         return partial_rref(transpose_formula_matrix)
 
@@ -291,7 +313,7 @@ class ReactionNetwork:
         )
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(solution.species_values)
+            + coefficient_matrix.dot(solution.data[: self._species.number])
             - rhs
         )
 
@@ -363,8 +385,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             self._species.number_condensed_species, dtype=np.float_
         )
         for nn, species in enumerate(self._species.condensed_species):
-            residual_stability[nn] = solution.stability_solution.data[species] - log10_TAU
-            residual_stability[nn] += solution.mass_solution.data[species]
+            residual_stability[nn] = solution.stability.data[species] - log10_TAU
+            residual_stability[nn] += solution.mass.data[species]
 
         logger.debug("residual_stability = %s", residual_stability)
 
@@ -393,8 +415,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         )
 
         # Reaction network correction factors for condensate stability
-        residual_reaction += activity_modifier.dot(10**solution.stability_array)
-        residual_reaction -= equilibrium_modifier.dot(10**solution.stability_array)
+        residual_reaction += activity_modifier.dot(10 ** solution.stability_array())
+        residual_reaction -= equilibrium_modifier.dot(10 ** solution.stability_array())
 
         # Residual for the auxiliary stability equations
         residual_stability: npt.NDArray = self.get_stability_residual(solution)

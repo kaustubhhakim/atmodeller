@@ -73,37 +73,9 @@ class InitialSolutionData(Solution):
             pressure: Pressure in bar
         """
         for constraint in constraints.gas_constraints:
-            self.pressure_solution.data[constraint.species] = constraint.get_log10_value(
+            self.gas.data[constraint.species] = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
-
-    # # pylint: disable=invalid-name
-    # def clip_log1O_gas_pressures(
-    #     self, minimum_value: float = MIN_LOG10_PRESSURE, maximum_value: float = MAX_LOG10_PRESSURE
-    # ) -> None:
-    #     """Clips the gas pressures between `minimum_value` and `maximum_value`.
-
-    #     Args:
-    #         minimum_value: Minimum value. Defaults to :data:`MIN_LOG10_PRESSURE`.
-    #         maximum_value: Maximum value. Defaults to :data:`MAX_LOG10_PRESSURE`.
-    #     """
-    #     for species, value in self._species_solution.items():
-    #         if isinstance(species, GasSpecies):
-    #             self._species_solution[species] = np.clip(value, minimum_value, maximum_value)
-
-    # def perturb_log10_gas_pressures(self, perturb_log10: float = 0) -> None:
-    #     """Perturbs the gas pressures
-
-    #     Args:
-    #         perturb_log10: Maximum log10 value to perturb the gas pressures.
-    #     """
-    #     logger.info(
-    #         "Randomly perturbing the gas pressures by a maximum of %f log10 units",
-    #         perturb_log10,
-    #     )
-    #     for species in self._species_solution:
-    #         if isinstance(species, GasSpecies):
-    #             self._species_solution[species] += perturb_log10 * (2 * np.random.rand() - 1)
 
     def apply_log10_activity_constraints(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
@@ -116,28 +88,9 @@ class InitialSolutionData(Solution):
             pressure: Pressure in bar
         """
         for constraint in constraints.activity_constraints:
-            self.activity_solution.data[constraint.species] = constraint.get_log10_value(
+            self.activity.data[constraint.species] = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
-
-    # # pylint: disable=invalid-name
-    # def clip_log1O_activities(self) -> None:
-    #     """Clips the activities."""
-    #     for species, value in self._species_solution.items():
-    #         if isinstance(species, CondensedSpecies):
-    #             self._species_solution[species] = np.clip(value, None, 0)
-
-    # def set_log10_gas_pressures(self, pressures: dict[GasSpecies, float]) -> None:
-    #     self._species_solution |= pressures
-
-    # def set_log10_activities(self, activities: dict[CondensedSpecies, float]) -> None:
-    #     self._species_solution |= activities
-
-    # def set_log10_masses(self, masses: dict[CondensedSpecies, float]) -> None:
-    #     self._mass_solution |= masses
-
-    # def set_log10_stabilities(self, stabilities: dict[CondensedSpecies, float]) -> None:
-    #     self._stability_solution |= stabilities
 
 
 class InitialSolution(ABC, Generic[T]):
@@ -262,14 +215,12 @@ class InitialSolution(ABC, Generic[T]):
         log10_gas_pressures: dict[GasSpecies, float] = self._get_log10_gas_pressures(
             constraints, temperature=temperature, pressure=pressure
         )
-        self.solution.pressure_solution.data = log10_gas_pressures
+        self.solution.gas.data = log10_gas_pressures
 
         if perturb_log10:
-            self.solution.pressure_solution.perturb_values(perturb_log10)
+            self.solution.gas.perturb_values(perturb_log10)
 
-        self.solution.pressure_solution.clip_values(
-            self._min_log10_pressure, self._max_log10_pressure
-        )
+        self.solution.gas.clip_values(self._min_log10_pressure, self._max_log10_pressure)
 
         if apply_constraints:
             self.solution.apply_log10_gas_constraints(
@@ -295,8 +246,8 @@ class InitialSolution(ABC, Generic[T]):
         log10_activities: dict[CondensedSpecies, float] = self._get_log10_activities(
             constraints, temperature=temperature, pressure=pressure
         )
-        self.solution.activity_solution.data = log10_activities
-        self.solution.activity_solution.clip_values(maximum_value=1)
+        self.solution.activity.data = log10_activities
+        self.solution.activity.clip_values(maximum_value=1)
 
         if apply_constraints:
             self.solution.apply_log10_activity_constraints(
@@ -339,11 +290,11 @@ class InitialSolution(ABC, Generic[T]):
             apply_constraints=apply_activity_constraints,
         )
 
-        self.solution.mass_solution.data = self._get_log10_masses(
+        self.solution.mass.data = self._get_log10_masses(
             constraints, temperature=temperature, pressure=pressure
         )
 
-        self.solution.stability_solution.data = self._get_log10_stabilities(
+        self.solution.stability.data = self._get_log10_stabilities(
             constraints, temperature=temperature, pressure=pressure
         )
 
