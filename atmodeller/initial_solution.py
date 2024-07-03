@@ -100,7 +100,7 @@ class InitialSolution(ABC, Generic[T]):
         self._fill_log10_stability: float = fill_log10_stability
 
     @abstractmethod
-    def _get_log10_pressures(
+    def get_log10_pressures(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> dict[GasSpecies, float]:
         """Initial solution for log10 pressures
@@ -115,7 +115,7 @@ class InitialSolution(ABC, Generic[T]):
         """
 
     @abstractmethod
-    def _get_log10_activities(
+    def get_log10_activities(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> dict[CondensedSpecies, float]:
         """Initial solution for log10 activities
@@ -130,7 +130,7 @@ class InitialSolution(ABC, Generic[T]):
         """
 
     @abstractmethod
-    def _get_log10_masses(
+    def get_log10_masses(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> dict[CondensedSpecies, float]:
         """Initial solution for log10 condensed masses
@@ -145,7 +145,7 @@ class InitialSolution(ABC, Generic[T]):
         """
 
     @abstractmethod
-    def _get_log10_stabilities(
+    def get_log10_stabilities(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> dict[CondensedSpecies, float]:
         """Initial solution for log10 stabilities
@@ -178,7 +178,7 @@ class InitialSolution(ABC, Generic[T]):
                 Defaults to 0, i.e. not used.
             apply_constraints: Apply pressure constraints, if any. Defaults to True.
         """
-        log10_pressures: dict[GasSpecies, float] = self._get_log10_pressures(
+        log10_pressures: dict[GasSpecies, float] = self.get_log10_pressures(
             constraints, temperature=temperature, pressure=pressure
         )
         self.solution.gas.data = log10_pressures
@@ -210,7 +210,7 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
             apply_constraints: Apply activity constraints, if any. Defaults to True.
         """
-        log10_activities: dict[CondensedSpecies, float] = self._get_log10_activities(
+        log10_activities: dict[CondensedSpecies, float] = self.get_log10_activities(
             constraints, temperature=temperature, pressure=pressure
         )
         self.solution.activity.data = log10_activities
@@ -258,11 +258,11 @@ class InitialSolution(ABC, Generic[T]):
             apply_constraints=apply_activity_constraints,
         )
 
-        self.solution.mass.data = self._get_log10_masses(
+        self.solution.mass.data = self.get_log10_masses(
             constraints, temperature=temperature, pressure=pressure
         )
 
-        self.solution.stability.data = self._get_log10_stabilities(
+        self.solution.stability.data = self.get_log10_stabilities(
             constraints, temperature=temperature, pressure=pressure
         )
 
@@ -321,6 +321,9 @@ class InitialSolutionDict(InitialSolution[dict]):
         value: Dictionary of the initial solution. Defaults to None, meaning to use default
             values.
         **kwargs: Keyword arguments to pass through to the base class.
+
+    Attributes:
+        value: An object used to compute the initial solution
     """
 
     @override
@@ -332,7 +335,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         super().__init__(value_dict, **kwargs)
 
     @override
-    def _get_log10_pressures(self, *args, **kwargs) -> dict[GasSpecies, float]:
+    def get_log10_pressures(self, *args, **kwargs) -> dict[GasSpecies, float]:
         """Initial solution for log10 pressures
 
         Returns:
@@ -351,7 +354,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         return output
 
     @override
-    def _get_log10_activities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
+    def get_log10_activities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
         """Initial solution for log10 activities
 
         Returns:
@@ -370,7 +373,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         return output
 
     @override
-    def _get_log10_masses(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
+    def get_log10_masses(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
         """Initial solution for log10 condensed masses
 
         Returns:
@@ -389,7 +392,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         return output
 
     @override
-    def _get_log10_stabilities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
+    def get_log10_stabilities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
         """Initial solution for log10 stabilities
 
         Returns:
@@ -406,6 +409,66 @@ class InitialSolutionDict(InitialSolution[dict]):
                 output[species] = self._fill_log10_stability
 
         return output
+
+
+class InitialSolutionLast(InitialSolution[InitialSolution]):
+    """An initial solution that uses the previous output value as the next initial solution.
+
+    This is useful if you are incrementing sequentially through a grid of parameters.
+
+    Args:
+        value: An initial solution for the first solution only
+        **kwargs: Keyword arguments to pass through to the base class.
+
+    Attributes:
+        value: An object used to compute the initial solution
+    """
+
+    @override
+    def __init__(self, value: InitialSolution | None = None, **kwargs):
+        if value is None:
+            value_initial: InitialSolution = InitialSolutionDict(**kwargs)
+        else:
+            value_initial = value
+        super().__init__(value_initial, **kwargs)
+
+    @override
+    def get_log10_pressures(self, *args, **kwargs) -> dict[GasSpecies, float]:
+        return self.value.get_log10_pressures(*args, **kwargs)
+
+    @override
+    def get_log10_activities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
+        return self.value.get_log10_activities(*args, **kwargs)
+
+    @override
+    def get_log10_masses(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
+        return self.value.get_log10_masses(*args, **kwargs)
+
+    @override
+    def get_log10_stabilities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
+        return self.value.get_log10_stabilities(*args, **kwargs)
+
+    @override
+    def update(self, output: Output, *args, **kwargs) -> None:
+        del args
+        del kwargs
+        value_dict: dict[ChemicalSpecies | str, float] = output["raw_solution"][-1]
+        # Need to convert species from strings to objects:
+        for species in self._species.data:
+            value_dict[species] = 10 ** value_dict.pop(species.name)
+
+        self.value = InitialSolutionDict(value_dict, species=self._species)
+
+        # Old is below
+        # next_values: dict[ChemicalSpecies, float] = {}
+        # for species in self.species.data:
+        #    next_values[species] = last_output[species.name]
+
+        # self.value = InitialSolutionDict(
+        #    next_values,
+        #    species=self.species,
+        #    min_log10_pressure=self.min_log10_pressure,
+        # )
 
 
 # class InitialSolutionRegressor(InitialSolution[Output]):
@@ -812,39 +875,3 @@ class InitialSolutionDict(InitialSolution[dict]):
 #             )
 #         else:
 #             self.value.update(output, *args, **kwargs)
-
-
-# class InitialSolutionLast(InitialSolution[InitialSolution]):
-#     """An initial solution that uses the previous output value as the next initial solution.
-
-#     This is useful if you are incrementing sequentially through a grid of parameters.
-
-#     Args:
-#         value: An initial solution for the first solution only
-#         species: Species
-#         min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
-#         max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
-
-#     Attributes:
-#         value: An object or value used to compute the initial solution
-#     """
-
-#     @override
-#     def get_value(self, *args, **kwargs) -> npt.NDArray:
-#         return self.value.get_value(*args, **kwargs)
-
-#     @override
-#     def update(self, output: Output, *args, **kwargs) -> None:
-#         del args
-#         del kwargs
-#         last_output: dict[str, float] = output["solution"][-1]
-#         next_values: dict[ChemicalSpecies, float] = {}
-#         for species in self.species.data:
-#             next_values[species] = last_output[species.name]
-
-#         self.value = InitialSolutionDict(
-#             next_values,
-#             species=self.species,
-#             min_log10_pressure=self.min_log10_pressure,
-#             max_log10_pressure=self.max_log10_pressure,
-#         )

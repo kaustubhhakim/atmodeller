@@ -26,12 +26,15 @@ import numpy.typing as npt
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     ActivityConstraint,
+    ElementMassConstraint,
     PressureConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
-from atmodeller.initial_solution import InitialSolutionDict
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionLast
 from atmodeller.interfaces import InitialSolutionProtocol
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.utilities import earth_oceans_to_kg
 
 logger: logging.Logger = debug_logger()
 
@@ -208,6 +211,58 @@ def test_with_stability_constraints_cond_dict():
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
     target = np.array([1, 3, 1, 2, 1, 1, 0.8, -0.15490196, 22, 20, -35, 0.30103])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_last_solution():
+    """Tests an initial solution based on the last solution"""
+
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    species: Species = Species([H2_g, H2O_g, O2_g])
+
+    constraints = SystemConstraints([])
+
+    initial_solution = InitialSolutionLast(species=species)
+
+    # The first initial condition will return the fill value for the pressure
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 1, 1])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+    # This is the same as test_H_O in test_benchmark.py
+    oceans: float = 1
+    planet: Planet = Planet()
+    h_kg: float = earth_oceans_to_kg(oceans)
+    o_kg: float = 6.25774e20
+
+    constraints = SystemConstraints(
+        [
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("O", o_kg),
+        ]
+    )
+
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    # Following the solve we test that the initial condition returns the previous solution
+    system.solve(constraints, initial_solution=initial_solution)
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1.86837304, 1.88345733, -7.0489495])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
