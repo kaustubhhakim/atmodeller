@@ -334,6 +334,29 @@ class InitialSolutionDict(InitialSolution[dict]):
             value_dict = value
         super().__init__(value_dict, **kwargs)
 
+    def _get_log10_values(
+        self, species_list: list[TypeChemicalSpecies_co], prefix: str, fill_value: float
+    ):
+        """Gets log10 values.
+
+        Args:
+            species_list: List of species
+            prefix: Key prefix
+            fill_value: Fill value
+
+        Returns:
+            Log10 values
+        """
+        output: dict[TypeChemicalSpecies_co, float] = {}
+        for species in species_list:
+            key: TypeChemicalSpecies_co | str = f"{prefix}{species.name}" if prefix else species
+            try:
+                output[species] = np.log10(self.value[key])
+            except KeyError:
+                output[species] = fill_value
+
+        return output
+
     @override
     def get_log10_pressures(self, *args, **kwargs) -> dict[GasSpecies, float]:
         """Initial solution for log10 pressures
@@ -343,15 +366,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         """
         del args
         del kwargs
-
-        output: dict[GasSpecies, float] = {}
-        for species in self._species.gas_species:
-            try:
-                output[species] = np.log10(self.value[species])
-            except KeyError:
-                output[species] = self._fill_log10_pressure
-
-        return output
+        return self._get_log10_values(self._species.gas_species, "", self._fill_log10_pressure)
 
     @override
     def get_log10_activities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
@@ -362,15 +377,9 @@ class InitialSolutionDict(InitialSolution[dict]):
         """
         del args
         del kwargs
-
-        output: dict[CondensedSpecies, float] = {}
-        for species in self._species.condensed_species:
-            try:
-                output[species] = np.log10(self.value[species])
-            except KeyError:
-                output[species] = self._fill_log10_activity
-
-        return output
+        return self._get_log10_values(
+            self._species.condensed_species, "", self._fill_log10_activity
+        )
 
     @override
     def get_log10_masses(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
@@ -381,15 +390,9 @@ class InitialSolutionDict(InitialSolution[dict]):
         """
         del args
         del kwargs
-
-        output: dict[CondensedSpecies, float] = {}
-        for species in self._species.condensed_species:
-            try:
-                output[species] = np.log10(self.value[f"{MASS_PREFIX}{species.name}"])
-            except KeyError:
-                output[species] = self._fill_log10_mass
-
-        return output
+        return self._get_log10_values(
+            self._species.condensed_species, MASS_PREFIX, self._fill_log10_mass
+        )
 
     @override
     def get_log10_stabilities(self, *args, **kwargs) -> dict[CondensedSpecies, float]:
@@ -400,15 +403,9 @@ class InitialSolutionDict(InitialSolution[dict]):
         """
         del args
         del kwargs
-
-        output: dict[CondensedSpecies, float] = {}
-        for species in self._species.condensed_species:
-            try:
-                output[species] = np.log10(self.value[f"{STABILITY_PREFIX}{species.name}"])
-            except KeyError:
-                output[species] = self._fill_log10_stability
-
-        return output
+        return self._get_log10_values(
+            self._species.condensed_species, STABILITY_PREFIX, self._fill_log10_stability
+        )
 
 
 class InitialSolutionLast(InitialSolution[InitialSolution]):
