@@ -422,7 +422,7 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
         value_dict: dict[ChemicalSpecies | str, float] = output["raw_solution"][-1]
         # InitialSolutionDict takes the log10, so we must raise 10 to the values.
         value_dict = {key: 10**value for key, value in value_dict.items()}
-        # Need to convert species from strings to objects
+        # Convert species from strings to objects
         for species in self._species.data:
             value_dict[species] = value_dict.pop(species.name)
 
@@ -431,6 +431,9 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
 
 class InitialSolutionRegressor(InitialSolution[Output]):
     """A regressor to compute the initial solution
+
+    Importantly, the type and order of constraints must be the same in the new model as the
+    previous model, but the values of the constraints can be different.
 
     Args:
         value: Output for constructing the regressor
