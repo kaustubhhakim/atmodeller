@@ -456,17 +456,6 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
 
         self.value = InitialSolutionDict(value_dict, species=self._species)
 
-        # Old is below
-        # next_values: dict[ChemicalSpecies, float] = {}
-        # for species in self.species.data:
-        #    next_values[species] = last_output[species.name]
-
-        # self.value = InitialSolutionDict(
-        #    next_values,
-        #    species=self.species,
-        #    min_log10_pressure=self.min_log10_pressure,
-        # )
-
 
 # class InitialSolutionRegressor(InitialSolution[Output]):
 #     """A regressor to compute the initial solution
