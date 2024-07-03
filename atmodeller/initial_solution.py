@@ -450,9 +450,11 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
         del args
         del kwargs
         value_dict: dict[ChemicalSpecies | str, float] = output["raw_solution"][-1]
-        # Need to convert species from strings to objects:
+        # InitialSolutionDict takes the log10, so we must raise 10 to the values.
+        value_dict = {key: 10**value for key, value in value_dict.items()}
+        # Need to convert species from strings to objects
         for species in self._species.data:
-            value_dict[species] = 10 ** value_dict.pop(species.name)
+            value_dict[species] = value_dict.pop(species.name)
 
         self.value = InitialSolutionDict(value_dict, species=self._species)
 
