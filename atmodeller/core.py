@@ -258,6 +258,24 @@ class Species(UserList[ChemicalSpecies]):
 
         return self.data[index]
 
+    def get_species_from_name(self, species_name: str) -> ChemicalSpecies:
+        """Gets a species from its name
+
+        Args:
+            species_name: Unique name of the species
+
+        Returns:
+            The species
+
+        Raises:
+            ValueError: The species is not in the species list
+        """
+        for species in self.data:
+            if species.name == species_name:
+                return species
+
+        raise ValueError(f"{species_name} is not in the species list")
+
     def conform_solubilities_to_composition(self, melt_composition: str | None = None) -> None:
         """Conforms the solubilities of the gas species to the planet composition.
 

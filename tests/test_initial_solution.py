@@ -21,18 +21,21 @@
 import logging
 
 import numpy as np
-import numpy.typing as npt
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     ActivityConstraint,
     ElementMassConstraint,
+    FugacityConstraint,
     PressureConstraint,
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
-from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionLast
-from atmodeller.interfaces import InitialSolutionProtocol
+from atmodeller.initial_solution import (
+    InitialSolutionDict,
+    InitialSolutionLast,
+    InitialSolutionRegressor,
+)
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.utilities import earth_oceans_to_kg
 
@@ -42,6 +45,8 @@ RTOL: float = 1.0e-8
 """Relative tolerance"""
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
+REGRESSORTOL: float = 5e-3
+"""Tolerance for testing the regressor output"""
 
 dummy_variable: float = 1
 """Dummy variable used for temperature and pressure arguments when they are not used internally"""
@@ -242,8 +247,8 @@ def test_last_solution():
     assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
 
     # This is the same as test_H_O in test_benchmark.py
-    oceans: float = 1
-    planet: Planet = Planet()
+    oceans = 1
+    planet = Planet()
     h_kg: float = earth_oceans_to_kg(oceans)
     o_kg: float = 6.25774e20
 
@@ -254,7 +259,7 @@ def test_last_solution():
         ]
     )
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
 
     # Following the solve we test that the initial condition returns the previous solution
     system.solve(constraints, initial_solution=initial_solution)
@@ -268,3 +273,42 @@ def test_last_solution():
     logger.debug("target = %s", target)
 
     assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_regressor(generate_regressor_data):
+    """Tests the basic functionality of the initial solution regressor"""
+
+    interior_atmosphere, filename = generate_regressor_data
+
+    species = interior_atmosphere.species
+    O2_g = species.get_species_from_name("O2_g")
+    H2O_g = species.get_species_from_name("H2O_g")
+
+    dataframes = interior_atmosphere.output(to_dataframes=True)
+    raw_solution = dataframes["raw_solution"]
+    solution = dataframes["solution"]
+
+    initial_solution = InitialSolutionRegressor.from_pickle(filename, species=species)
+
+    for index in [0, 5, 10, 15, 20, 25, 30, 35]:
+
+        test_constraints = SystemConstraints(
+            [
+                FugacityConstraint(O2_g, solution.iloc[index]["O2_g"]),
+                PressureConstraint(H2O_g, solution.iloc[index]["H2O_g"]),
+            ]
+        )
+
+        result = initial_solution.get_log10_value(
+            test_constraints, temperature=dummy_variable, pressure=dummy_variable
+        )
+
+        assert np.isclose(
+            raw_solution.iloc[index]["H2O_g"], result[0], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )
+        assert np.isclose(
+            raw_solution.iloc[index]["H2_g"], result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )
+        assert np.isclose(
+            raw_solution.iloc[index]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )

@@ -222,7 +222,7 @@ class InitialSolution(ABC, Generic[T]):
                     temperature=temperature, pressure=pressure
                 )
 
-    def set_log10_value(
+    def get_log10_value(
         self,
         constraints: SystemConstraints,
         *,
@@ -231,8 +231,8 @@ class InitialSolution(ABC, Generic[T]):
         perturb_log10: float = 0,
         apply_gas_constraints: bool = True,
         apply_activity_constraints: bool = True,
-    ) -> None:
-        """Sets the log10 value of the initial solution.
+    ) -> npt.NDArray[np.float_]:
+        """Gets the log10 value of the initial solution.
 
         Args:
             constraints: Constraints
@@ -242,6 +242,9 @@ class InitialSolution(ABC, Generic[T]):
                 pressures. Defaults to 0, i.e. not used.
             apply_gas_constraints: Apply gas constraints, if any. Defaults to True.
             apply_constraints: Apply activity constraints, if any. Defaults to True.
+
+        Returns:
+            The initial solution
         """
         self._set_log10_pressures(
             constraints,
@@ -264,39 +267,6 @@ class InitialSolution(ABC, Generic[T]):
 
         self.solution.stability.data = self.get_log10_stabilities(
             constraints, temperature=temperature, pressure=pressure
-        )
-
-    def get_log10_value(
-        self,
-        constraints: SystemConstraints,
-        *,
-        temperature: float,
-        pressure: float,
-        perturb_log10: float = 0,
-        apply_gas_constraints: bool = True,
-        apply_activity_constraints: bool = True,
-    ) -> npt.NDArray[np.float_]:
-        """Gets the log10 value of the initial solution
-
-        Args:
-            constraints: Constraints
-            temperature: Temperature in K
-            pressure: Pressure in bar
-            perturb_log10: Maximum log10 value to perturb the initial solution of the gas
-                pressures. Defaults to 0, i.e. not used.
-            apply_gas_constraints: Apply gas constraints, if any. Defaults to True.
-            apply_constraints: Apply activity constraints, if any. Defaults to True.
-
-        Returns:
-            The initial solution
-        """
-        self.set_log10_value(
-            constraints,
-            temperature=temperature,
-            pressure=pressure,
-            perturb_log10=perturb_log10,
-            apply_gas_constraints=apply_gas_constraints,
-            apply_activity_constraints=apply_activity_constraints,
         )
 
         logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
@@ -459,351 +429,421 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
         self.value = InitialSolutionDict(value_dict, species=self._species)
 
 
-# class InitialSolutionRegressor(InitialSolution[Output]):
-#     """A regressor to compute the initial solution
+class InitialSolutionRegressor(InitialSolution[Output]):
+    """A regressor to compute the initial solution
 
-#     Args:
-#         value: Output for constructing the regressor
-#         species: Species
-#         min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
-#         max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
-#         species_fill: Dictionary of missing species and their initial values. Defaults to None.
-#         fill_value: Initial value for species that are not specified in `species_fill`. Defaults to
-#             1.
-#         fit: Fit the regressor during the model run. This will replace the original regressor by a
-#             regressor trained only on the data from the current model. Defaults to True.
-#         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
-#             Defaults to 100.
-#         partial_fit: Partial fit the regressor during the model run. Defaults to True.
-#         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
-#             regressor. Defaults to 500.
+    Args:
+        value: Output for constructing the regressor
+        species: Species
+        min_log10_pressure: Minimum log10 gas pressure. Defaults to :data:`MIN_LOG10_PRESSURE`.
+        max_log10_pressure: Maximum log10 gas pressure. Defaults to :data:`MAX_LOG10_PRESSURE`.
+        fill_log10_pressure: Fill value for pressure in bar. Defaults to 1.
+        fill_log10_activity: Fill value for activity. Defaults to 0.
+        fill_log10_mass: Fill value for mass. Defaults to 20.
+        fill_log10_stability: Fill value for stability. Defaults to -35.
+        species_fill: Dictionary of missing species and their initial values. Defaults to None.
+        fill_value: Initial value for species that are not specified in `species_fill`. Defaults to
+            1.
+        fit: Fit the regressor during the model run. This will replace the original regressor by a
+            regressor trained only on the data from the current model. Defaults to True.
+        fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
+            Defaults to 100.
+        partial_fit: Partial fit the regressor during the model run. Defaults to True.
+        partial_fit_batch_size: Number of solutions to calculate before partial refit of the
+            regressor. Defaults to 500.
 
-#     Attributes:
-#         value: Output for constructing the regressor
-#         fit: Fit the regressor during the model run, which replaces the data used to initialise
-#             the regressor.
-#         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True
-#         partial_fit: Partial fit the regressor during the model run
-#         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
-#             regressor
-#     """
+    Attributes:
+        value: Output for constructing the regressor
+        fit: Fit the regressor during the model run, which replaces the data used to initialise
+            the regressor.
+        fit_batch_size: Number of solutions to calculate before fitting model data if fit is True
+        partial_fit: Partial fit the regressor during the model run
+        partial_fit_batch_size: Number of solutions to calculate before partial refit of the
+            regressor
+    """
 
-#     # For typing
-#     _reg: MultiOutputRegressor
-#     _solution_scalar: StandardScaler
-#     _constraints_scalar: StandardScaler
+    # For typing
+    _reg: MultiOutputRegressor
+    _solution_scalar: StandardScaler
+    _constraints_scalar: StandardScaler
 
-#     @override
-#     def __init__(
-#         self,
-#         value: Output,
-#         *,
-#         species: Species,
-#         min_log10_pressure: float = MIN_LOG10_PRESSURE,
-#         max_log10_pressure: float = MAX_LOG10_PRESSURE,
-#         species_fill: dict[TypeChemicalSpecies_co, float] | None = None,
-#         fill_value: float = 1,
-#         fit: bool = True,
-#         fit_batch_size: int = 100,
-#         partial_fit: bool = True,
-#         partial_fit_batch_size: int = 500,
-#     ):
-#         self.fit: bool = fit
-#         # Ensure consistency of arguments and correct handling of fit versus partial refit.
-#         self.fit_batch_size: int = fit_batch_size if self.fit else 0
-#         self.partial_fit: bool = partial_fit
-#         self.partial_fit_batch_size: int = partial_fit_batch_size
+    @override
+    def __init__(
+        self,
+        value: Output,
+        *,
+        species: Species,
+        min_log10_pressure: float = MIN_LOG10_PRESSURE,
+        max_log10_pressure: float = MAX_LOG10_PRESSURE,
+        # TODO: Add from base class?
+        # fill_log10_pressure: float = 1,
+        # fill_log10_activity: float = 0,
+        # fill_log10_mass: float = 20,
+        # fill_log10_stability: float = -35,
+        # TODO: Remove
+        species_fill: dict[TypeChemicalSpecies_co, float] | None = None,
+        fill_value: float = 1,
+        fit: bool = True,
+        fit_batch_size: int = 100,
+        partial_fit: bool = True,
+        partial_fit_batch_size: int = 500,
+    ):
+        self.fit: bool = fit
+        # Ensure consistency of arguments and correct handling of fit versus partial refit.
+        self.fit_batch_size: int = fit_batch_size if self.fit else 0
+        self.partial_fit: bool = partial_fit
+        self.partial_fit_batch_size: int = partial_fit_batch_size
 
-#         self._conform_solution(
-#             value, species=species, species_fill=species_fill, fill_value=fill_value
-#         )
-#         super().__init__(
-#             value,
-#             species=species,
-#             min_log10_pressure=min_log10_pressure,
-#             max_log10_pressure=max_log10_pressure,
-#         )
-#         self._fit(self.value)
+        # self._conform_solution(
+        #    value, species=species, species_fill=species_fill, fill_value=fill_value
+        # )
+        super().__init__(
+            value,
+            species=species,
+            min_log10_pressure=min_log10_pressure,
+            max_log10_pressure=max_log10_pressure,
+        )
+        self._fit(self.value)
 
-#     @classmethod
-#     def from_pickle(cls, pickle_file: Path | str, **kwargs) -> InitialSolutionRegressor:
-#         """Creates a regressor from output read from a pickle file.
+    @classmethod
+    def from_pickle(cls, pickle_file: Path | str, **kwargs) -> InitialSolutionRegressor:
+        """Creates a regressor from output read from a pickle file.
 
-#         Args:
-#             pickle_file: Pickle file of the output from a previous (or similar) model run. The
-#                 constraints must be the same as the new model and in the same order.
-#             **kwargs: Arbitrary keyword arguments to pass through to the constructor
+        Args:
+            pickle_file: Pickle file of the output from a previous (or similar) model run. The
+                constraints must be the same as the new model and in the same order.
+            **kwargs: Arbitrary keyword arguments to pass through to the constructor
 
-#         Returns:
-#             A regressor
-#         """
-#         output: Output = Output.read_pickle(pickle_file)
+        Returns:
+            A regressor
+        """
+        try:
+            output: Output = Output.read_pickle(pickle_file)
+        except FileNotFoundError:
+            output = Output.read_pickle(Path(pickle_file).with_suffix(".pkl"))
 
-#         return cls(output, **kwargs)
+        return cls(output, **kwargs)
 
-#     def _conform_solution(
-#         self,
-#         output: Output,
-#         *,
-#         species: Species,
-#         species_fill: dict[TypeChemicalSpecies_co, float] | None,
-#         fill_value: float,
-#     ) -> None:
-#         """Conforms the solution in output to the species and their fill values
+    # TODO: fix
+    # def _conform_solution(
+    #     self,
+    #     output: Output,
+    #     *,
+    #     species: Species,
+    #     species_fill: dict[TypeChemicalSpecies_co, float] | None,
+    #     fill_value: float,
+    # ) -> None:
+    #     """Conforms the solution in output to the species and their fill values
 
-#         Args:
-#             output: Output
-#             species: Species
-#             species_fill: Dictionary of missing species and their initial values. Defaults to None.
-#             fill_value: Initial value for species that are not specified in `species_fill`.
-#         """
-#         solution: pd.DataFrame = output.to_dataframes()["solution"].copy()
-#         logger.debug("solution = %s", solution)
+    #     Args:
+    #         output: Output
+    #         species: Species
+    #         species_fill: Dictionary of missing species and their initial values. Defaults to None.
+    #         fill_value: Initial value for species that are not specified in `species_fill`.
+    #     """
+    #     solution: pd.DataFrame = output.to_dataframes()["raw_solution"].copy()
+    #     logger.debug("solution = %s", solution)
 
-#         species_fill_: dict[TypeChemicalSpecies_co, float] = (
-#             species_fill if species_fill is not None else {}
-#         )
-#         initial_solution_dict: InitialSolutionDict = InitialSolutionDict(
-#             species_fill_,
-#             species=species,
-#             fill_value=fill_value,
-#         )
-#         fill_df: pd.DataFrame = pd.DataFrame(initial_solution_dict.asdict(), index=[0])
-#         fill_df = fill_df.loc[fill_df.index.repeat(len(solution))].reset_index(drop=True)
-#         logger.debug("fill_df = %s", fill_df)
+    #     species_fill_: dict[TypeChemicalSpecies_co, float] = (
+    #         species_fill if species_fill is not None else {}
+    #     )
+    #     initial_solution_dict: InitialSolutionDict = InitialSolutionDict(
+    #         species_fill_,
+    #         species=species,
+    #         fill_value=fill_value,
+    #     )
+    #     fill_df: pd.DataFrame = pd.DataFrame(
+    #         initial_solution_dict.solution.raw_solution_dict(), index=[0]
+    #     )
+    #     fill_df = fill_df.loc[fill_df.index.repeat(len(solution))].reset_index(drop=True)
+    #     logger.debug("fill_df = %s", fill_df)
 
-#         # Preference the values in the solution and fill missing species
-#         conformed_solution: pd.DataFrame = solution.combine_first(fill_df)[species.names]
-#         logger.debug("conformed_solution = %s", conformed_solution)
-#         output["solution"] = conformed_solution.to_dict(orient="records")
+    #     # Preference the values in the solution and fill missing species
+    #     conformed_solution: pd.DataFrame = solution.combine_first(fill_df)[species.names]
+    #     logger.debug("conformed_solution = %s", conformed_solution)
+    #     output["solution"] = conformed_solution.to_dict(orient="records")
 
-#     def _get_log10_values(
-#         self,
-#         output: Output,
-#         name: str,
-#         start_index: int | None,
-#         end_index: int | None,
-#     ) -> npt.NDArray[np.float_]:
-#         """Gets log10 values of either the constraints or the solution from `output`
+    def _get_values(
+        self,
+        output: Output,
+        name: str,
+        start_index: int | None,
+        end_index: int | None,
+    ) -> npt.NDArray[np.float_]:
+        """FIXME: Now using raw_solution directly
 
-#         Args:
-#             output: Output
-#             name: solution or constraints
-#             start_index: Start index for fit. Defaults to None, meaning use all available data.
-#             end_index: End index for fit. Defaults to None, meaning use all available data.
+        Gets values of either the constraints or the solution from `output`
 
-#         Returns:
-#             Log10 values of either the solution or constraints depending on `name`
-#         """
-#         output_dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
-#         data: pd.DataFrame = output_dataframes[name]
-#         if start_index is not None and end_index is not None:
-#             data = data.iloc[start_index:end_index]
-#         data_log10_values: npt.NDArray = np.log10(data.values)
+        Args:
+            output: Output
+            name: solution or constraints
+            start_index: Start index for fit. Defaults to None, meaning use all available data.
+            end_index: End index for fit. Defaults to None, meaning use all available data.
 
-#         return data_log10_values
+        Returns:
+            Values of either the solution or constraints depending on `name`
+        """
+        output_dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
+        data: pd.DataFrame = output_dataframes[name]
+        if start_index is not None and end_index is not None:
+            data = data.iloc[start_index:end_index]
 
-#     def _fit(
-#         self,
-#         output: Output,
-#         start_index: int | None = None,
-#         end_index: int | None = None,
-#     ) -> None:
-#         """Fits and sets the regressor.
+        return data.values
 
-#         Args:
-#             output: Output
-#             start_index: Start index for fit. Defaults to None, meaning use all available data.
-#             end_index: End index for fit. Defaults to None, meaning use all available data.
-#         """
-#         logger.info("%s: Fit (%s, %s)", self.__class__.__name__, start_index, end_index)
+    def _fit(
+        self,
+        output: Output,
+        start_index: int | None = None,
+        end_index: int | None = None,
+    ) -> None:
+        """Fits and sets the regressor.
 
-#         constraints_log10_values: npt.NDArray = self._get_log10_values(
-#             output, "constraints", start_index, end_index
-#         )
-#         self._constraints_scalar = StandardScaler().fit(constraints_log10_values)
-#         constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
-#             constraints_log10_values
-#         )
+        Args:
+            output: Output
+            start_index: Start index for fit. Defaults to None, meaning use all available data.
+            end_index: End index for fit. Defaults to None, meaning use all available data.
+        """
+        logger.info("%s: Fit (%s, %s)", self.__class__.__name__, start_index, end_index)
 
-#         solution_log10_values: npt.NDArray = self._get_log10_values(
-#             output, "solution", start_index, end_index
-#         )
-#         self._solution_scalar = StandardScaler().fit(solution_log10_values)
-#         solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
-#             solution_log10_values
-#         )
+        constraints_log10_values: npt.NDArray = np.log10(
+            self._get_values(output, "constraints", start_index, end_index)
+        )
+        self._constraints_scalar = StandardScaler().fit(constraints_log10_values)
+        constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
+            constraints_log10_values
+        )
 
-#         base_regressor: SGDRegressor = SGDRegressor()
-#         multi_output_regressor: MultiOutputRegressor = MultiOutputRegressor(base_regressor)
-#         multi_output_regressor.fit(constraints_scaled, solution_scaled)
+        raw_solution_log10_values: npt.NDArray = self._get_values(
+            output, "raw_solution", start_index, end_index
+        )
+        self._solution_scalar = StandardScaler().fit(raw_solution_log10_values)
+        solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
+            raw_solution_log10_values
+        )
 
-#         self._reg = multi_output_regressor
+        base_regressor: SGDRegressor = SGDRegressor(tol=1e-6)
+        multi_output_regressor: MultiOutputRegressor = MultiOutputRegressor(base_regressor)
+        multi_output_regressor.fit(constraints_scaled, solution_scaled)
 
-#     def _partial_fit(
-#         self,
-#         output: Output,
-#         start_index: int,
-#         end_index: int,
-#     ) -> None:
-#         """Partial fits the regressor.
+        self._reg = multi_output_regressor
 
-#         Args:
-#             output: Output
-#             start_index: Start index for partial fit
-#             end_index: End index for partial fit
-#         """
-#         logger.info("%s: Partial fit (%d, %d)", self.__class__.__name__, start_index, end_index)
+    def _partial_fit(
+        self,
+        output: Output,
+        start_index: int,
+        end_index: int,
+    ) -> None:
+        """Partial fits the regressor.
 
-#         constraints_log10_values: npt.NDArray = self._get_log10_values(
-#             output, "constraints", start_index, end_index
-#         )
-#         constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
-#             constraints_log10_values
-#         )
-#         solution_log10_values: npt.NDArray = self._get_log10_values(
-#             output, "solution", start_index, end_index
-#         )
-#         solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
-#             solution_log10_values
-#         )
+        Args:
+            output: Output
+            start_index: Start index for partial fit
+            end_index: End index for partial fit
+        """
+        logger.info("%s: Partial fit (%d, %d)", self.__class__.__name__, start_index, end_index)
 
-#         self._reg.partial_fit(constraints_scaled, solution_scaled)
+        constraints_log10_values: npt.NDArray = np.log10(
+            self._get_values(output, "constraints", start_index, end_index)
+        )
+        constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
+            constraints_log10_values
+        )
+        solution_log10_values: npt.NDArray = self._get_values(
+            output, "raw_solution", start_index, end_index
+        )
+        solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
+            solution_log10_values
+        )
 
-#     @override
-#     def get_value(
-#         self, constraints: SystemConstraints, temperature: float, pressure: float
-#     ) -> npt.NDArray:
-#         evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
-#             temperature=temperature, pressure=pressure
-#         )
-#         values_constraints_log10: npt.NDArray = np.array(
-#             list(evaluated_constraints_log10.values())
-#         )
-#         values_constraints_log10 = values_constraints_log10.reshape(1, -1)
-#         constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
-#             values_constraints_log10
-#         )
-#         solution_scaled: npt.NDArray | spmatrix = self._reg.predict(constraints_scaled)
-#         solution_original: npt.NDArray = cast(
-#             npt.NDArray, self._solution_scalar.inverse_transform(solution_scaled)
-#         )
+        self._reg.partial_fit(constraints_scaled, solution_scaled)
 
-#         value: npt.NDArray = 10 ** solution_original.flatten()
-#         logger.debug("%s: value = %s", self.__class__.__name__, value)
+    # TODO: These are not required. Clean up base class to avoid them from being necessarily
+    # specified.
+    @override
+    def get_log10_pressures(
+        self, constraints: SystemConstraints, *, temperature: float, pressure: float
+    ) -> dict[GasSpecies, float]:
+        return super().get_log10_pressures(constraints, temperature=temperature, pressure=pressure)
 
-#         return value
+    @override
+    def get_log10_activities(
+        self, constraints: SystemConstraints, *, temperature: float, pressure: float
+    ) -> dict[CondensedSpecies, float]:
+        return super().get_log10_activities(
+            constraints, temperature=temperature, pressure=pressure
+        )
 
-#     # TODO: Dan testing improving the regressor when condensates are present
-#     @override
-#     def get_log10_value(
-#         self,
-#         constraints: SystemConstraints,
-#         *,
-#         temperature: float,
-#         pressure: float,
-#         perturb: bool = False,
-#         perturb_log10: float = 2,
-#     ) -> npt.NDArray[np.float_]:
-#         """Computes the log10 value of the initial solution with additional processing.
+    @override
+    def get_log10_masses(
+        self, constraints: SystemConstraints, *, temperature: float, pressure: float
+    ) -> dict[CondensedSpecies, float]:
+        return super().get_log10_masses(constraints, temperature=temperature, pressure=pressure)
 
-#         Args:
-#             constraints: Constraints
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-#             perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
-#             perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
-#                 to 2.
+    @override
+    def get_log10_stabilities(
+        self, constraints: SystemConstraints, *, temperature: float, pressure: float
+    ) -> dict[CondensedSpecies, float]:
+        return super().get_log10_stabilities(
+            constraints, temperature=temperature, pressure=pressure
+        )
 
-#         Returns
-#             The log10 initial solution adhering to bounds and the constraints
-#         """
-#         value: npt.NDArray[np.float_] = self.get_value(constraints, temperature, pressure)
-#         log10_value: npt.NDArray[np.float_] = np.log10(value)
+    @override
+    def get_log10_value(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        perturb_log10: float = 0,
+        apply_gas_constraints: bool = True,
+        apply_activity_constraints: bool = True,
+    ) -> npt.NDArray[np.float_]:
+        """Gets the log10 value of the initial solution.
 
-#         if perturb:
-#             logger.info(
-#                 "Randomly perturbing the initial solution by a maximum of %f log10 units",
-#                 perturb_log10,
-#             )
-#             log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            perturb_log10: Maximum log10 value to perturb the initial solution of the gas
+                pressures. Defaults to 0, i.e. not used.
+            apply_gas_constraints: Apply gas constraints, if any. Defaults to True.
+            apply_constraints: Apply activity constraints, if any. Defaults to True.
 
-#         if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
-#             logger.warning("Initial solution has values outside the min and max thresholds")
-#             logger.warning(
-#                 "Clipping the initial solution between %f and %f", self.min_log10, self.max_log10
-#             )
-#             log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
+        Returns:
+            The initial solution
+        """
+        evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
+            temperature=temperature, pressure=pressure
+        )
+        logger.warning("evaluated_constraints_log10 = %s", evaluated_constraints_log10)
+        values_constraints_log10: npt.NDArray = np.array(
+            list(evaluated_constraints_log10.values())
+        )
+        values_constraints_log10 = values_constraints_log10.reshape(1, -1)
+        constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
+            values_constraints_log10
+        )
+        solution_scaled: npt.NDArray | spmatrix = self._reg.predict(constraints_scaled)
+        solution_original: npt.NDArray = cast(
+            npt.NDArray, self._solution_scalar.inverse_transform(solution_scaled)
+        )
 
-#         # Apply constraints from the reaction network (activities and fugacities)
-#         # for constraint in constraints.reaction_network_constraints:
-#         #    index: int = self.species.species_index(constraint.species)
-#         #    logger.debug("Setting %s %d", constraint.species, index)
-#         #    log10_value[index] = constraint.get_log10_value(
-#         #        temperature=temperature, pressure=pressure
-#         #    )
-#         logger.debug("Conform initial solution to constraints = %s", log10_value)
+        self.solution.data = solution_original.flatten()
 
-#         # This assumes an initial condensed mass of 10^20 kg, but this selection is quite
-#         # arbitrary and a smarter initial guess could probably be made.
-#         log_condensed_mass: npt.NDArray = 20 * np.ones(self._species.number_condensed_species)
-#         log10_value = np.append(log10_value, log_condensed_mass)
+        logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
 
-#         # Small lambda factors assume the condensates are stable, which is probably a reasonable
-#         # assumption given that the user has chosen to include them as species.
-#         log_lambda: npt.NDArray = -12 * np.ones(self._species.number_condensed_species)
-#         log10_value = np.append(log10_value, log_lambda)
+        return self.solution.data
 
-#         return log10_value
+    # # TODO: Dan testing improving the regressor when condensates are present
+    # @override
+    # def get_log10_value(
+    #     self,
+    #     constraints: SystemConstraints,
+    #     *,
+    #     temperature: float,
+    #     pressure: float,
+    #     perturb: bool = False,
+    #     perturb_log10: float = 2,
+    # ) -> npt.NDArray[np.float_]:
+    #     """Computes the log10 value of the initial solution with additional processing.
 
-#     def action_fit(self, output: Output) -> tuple[int, int] | None:
-#         """Checks if a fit is necessary.
+    #     Args:
+    #         constraints: Constraints
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
+    #         perturb: Randomly perturb the log10 value by `perturb_log10`. Defaults to False.
+    #         perturb_log10: Maximum absolute log10 value to perturb the initial solution. Defaults
+    #             to 2.
 
-#         Args:
-#             output: Output
+    #     Returns
+    #         The log10 initial solution adhering to bounds and the constraints
+    #     """
+    #     value: npt.NDArray[np.float_] = self.get_value(constraints, temperature, pressure)
+    #     log10_value: npt.NDArray[np.float_] = np.log10(value)
 
-#         Returns:
-#             The start and end index of the data to fit, or None (meaning no fit necessary)
-#         """
-#         trigger_fit: bool = self.fit_batch_size == output.size
+    #     if perturb:
+    #         logger.info(
+    #             "Randomly perturbing the initial solution by a maximum of %f log10 units",
+    #             perturb_log10,
+    #         )
+    #         log10_value += perturb_log10 * (2 * np.random.rand(log10_value.size) - 1)
 
-#         if self.fit and trigger_fit:
-#             return (0, output.size)
+    #     if np.any((log10_value < self.min_log10) | (log10_value > self.max_log10)):
+    #         logger.warning("Initial solution has values outside the min and max thresholds")
+    #         logger.warning(
+    #             "Clipping the initial solution between %f and %f", self.min_log10, self.max_log10
+    #         )
+    #         log10_value = np.clip(log10_value, self.min_log10, self.max_log10)
 
-#     def action_partial_fit(self, output: Output) -> tuple[int, int] | None:
-#         """Checks if a partial refit is necessary.
+    #     # Apply constraints from the reaction network (activities and fugacities)
+    #     # for constraint in constraints.reaction_network_constraints:
+    #     #    index: int = self.species.species_index(constraint.species)
+    #     #    logger.debug("Setting %s %d", constraint.species, index)
+    #     #    log10_value[index] = constraint.get_log10_value(
+    #     #        temperature=temperature, pressure=pressure
+    #     #    )
+    #     logger.debug("Conform initial solution to constraints = %s", log10_value)
 
-#         Args:
-#             output: Output
+    #     # This assumes an initial condensed mass of 10^20 kg, but this selection is quite
+    #     # arbitrary and a smarter initial guess could probably be made.
+    #     log_condensed_mass: npt.NDArray = 20 * np.ones(self._species.number_condensed_species)
+    #     log10_value = np.append(log10_value, log_condensed_mass)
 
-#         Returns:
-#             The start and end index of the data to fit, or None (meaning no fit necessary)
-#         """
-#         trigger_partial_fit: bool = (
-#             not (output.size - self.fit_batch_size) % self.partial_fit_batch_size
-#             and (output.size - self.fit_batch_size) > 0
-#         )
-#         if self.partial_fit and trigger_partial_fit:
-#             batch_number: int = (output.size - self.fit_batch_size) // self.partial_fit_batch_size
-#             start_index: int = (
-#                 self.fit_batch_size + (batch_number - 1) * self.partial_fit_batch_size
-#             )
-#             end_index: int = start_index + self.partial_fit_batch_size
+    #     # Small lambda factors assume the condensates are stable, which is probably a reasonable
+    #     # assumption given that the user has chosen to include them as species.
+    #     log_lambda: npt.NDArray = -12 * np.ones(self._species.number_condensed_species)
+    #     log10_value = np.append(log10_value, log_lambda)
 
-#             return (start_index, end_index)
+    #     return log10_value
 
-#     @override
-#     def update(self, output: Output) -> None:
-#         action_fit: tuple[int, int] | None = self.action_fit(output)
-#         action_partial_fit: tuple[int, int] | None = self.action_partial_fit(output)
+    def action_fit(self, output: Output) -> tuple[int, int] | None:
+        """Checks if a fit is necessary.
 
-#         if action_fit is not None:
-#             self._fit(output, start_index=action_fit[0], end_index=action_fit[1])
+        Args:
+            output: Output
 
-#         if action_partial_fit is not None:
-#             self._partial_fit(
-#                 output, start_index=action_partial_fit[0], end_index=action_partial_fit[1]
-#             )
+        Returns:
+            The start and end index of the data to fit, or None (meaning no fit necessary)
+        """
+        trigger_fit: bool = self.fit_batch_size == output.size
+
+        if self.fit and trigger_fit:
+            return (0, output.size)
+
+    def action_partial_fit(self, output: Output) -> tuple[int, int] | None:
+        """Checks if a partial refit is necessary.
+
+        Args:
+            output: Output
+
+        Returns:
+            The start and end index of the data to fit, or None (meaning no fit necessary)
+        """
+        trigger_partial_fit: bool = (
+            not (output.size - self.fit_batch_size) % self.partial_fit_batch_size
+            and (output.size - self.fit_batch_size) > 0
+        )
+        if self.partial_fit and trigger_partial_fit:
+            batch_number: int = (output.size - self.fit_batch_size) // self.partial_fit_batch_size
+            start_index: int = (
+                self.fit_batch_size + (batch_number - 1) * self.partial_fit_batch_size
+            )
+            end_index: int = start_index + self.partial_fit_batch_size
+
+            return (start_index, end_index)
+
+    @override
+    def update(self, output: Output) -> None:
+        action_fit: tuple[int, int] | None = self.action_fit(output)
+        action_partial_fit: tuple[int, int] | None = self.action_partial_fit(output)
+
+        if action_fit is not None:
+            self._fit(output, start_index=action_fit[0], end_index=action_fit[1])
+
+        if action_partial_fit is not None:
+            self._partial_fit(
+                output, start_index=action_partial_fit[0], end_index=action_partial_fit[1]
+            )
 
 
 # class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):

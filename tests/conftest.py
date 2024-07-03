@@ -19,14 +19,21 @@
 # Want to use chemistry symbols so pylint: disable=invalid-name
 
 import logging
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 import pytest
 
-from atmodeller.constraints import ElementMassConstraint, SystemConstraints
+from atmodeller.constraints import (
+    BufferedFugacityConstraint,
+    ElementMassConstraint,
+    PressureConstraint,
+    SystemConstraints,
+)
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -108,3 +115,37 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
     system.solve(constraints, factor=10)
 
     return system
+
+
+@pytest.fixture
+def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
+    """Generates data for testing the initial solution regressor"""
+
+    # H2O pressures in bar
+    H2O_pressures = [1, 4, 7, 10]
+    # fO2 shifts relative to the IW buffer
+    delta_IWs = range(-4, 5)
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    species = Species([H2O_g, H2_g, O2_g])
+
+    planet = Planet()
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    # Generate some data
+    for H2O_pressure in H2O_pressures:
+        for delta_IW in delta_IWs:
+            constraints = SystemConstraints(
+                [
+                    BufferedFugacityConstraint(O2_g, IronWustiteBuffer(delta_IW)),
+                    PressureConstraint(H2O_g, H2O_pressure),
+                ]
+            )
+            system.solve(constraints)
+
+    filename = Path("ic_regressor_test_data")
+    system.output(filename, to_excel=True, to_pickle=True)
+
+    return system, filename
