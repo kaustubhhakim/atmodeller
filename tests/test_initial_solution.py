@@ -246,33 +246,33 @@ def test_last_solution():
 
     assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
 
-    # # This is the same as test_H_O in test_benchmark.py
-    # oceans = 1
-    # planet = Planet()
-    # h_kg: float = earth_oceans_to_kg(oceans)
-    # o_kg: float = 6.25774e20
+    # This is the same as test_H_O in test_benchmark.py
+    oceans = 1
+    planet = Planet()
+    h_kg: float = earth_oceans_to_kg(oceans)
+    o_kg: float = 6.25774e20
 
-    # constraints = SystemConstraints(
-    #     [
-    #         ElementMassConstraint("H", h_kg),
-    #         ElementMassConstraint("O", o_kg),
-    #     ]
-    # )
+    constraints = SystemConstraints(
+        [
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("O", o_kg),
+        ]
+    )
 
-    # system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    # # Following the solve we test that the initial condition returns the previous solution
-    # system.solve(constraints, initial_solution=initial_solution)
+    # Following the solve we test that the initial condition returns the previous solution
+    system.solve(constraints, initial_solution=initial_solution)
 
-    # result = initial_solution.get_log10_value(
-    #     constraints, temperature=dummy_variable, pressure=dummy_variable
-    # )
-    # target = np.array([1.86837304, 1.88345733, -7.0489495])
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1.86837304, 1.88345733, -7.0489495])
 
-    # logger.debug("result = %s", result)
-    # logger.debug("target = %s", target)
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
 
-    # assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
 
 
 def test_regressor(generate_regressor_data):
@@ -312,3 +312,73 @@ def test_regressor(generate_regressor_data):
         assert np.isclose(
             raw_solution.iloc[index]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
         )
+
+
+def test_override_dict():
+    """Tests a dict with an override option"""
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    species = Species([H2O_g, H2_g, CO_g, CO2_g, CH4_g])
+
+    constraints = SystemConstraints([PressureConstraint(H2_g, 5)])
+
+    solution_override = InitialSolutionDict({CH4_g: 100000}, species=species)
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000},
+        species=species,
+        fill_log10_pressure=4,
+        solution_override=solution_override,
+    )
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([4, 0.69897, 2, 4, 5])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_regressor_override(generate_regressor_data):
+    """Tests the regressor with an override option"""
+
+    interior_atmosphere, filename = generate_regressor_data
+
+    species = interior_atmosphere.species
+    O2_g = species.get_species_from_name("O2_g")
+    H2O_g = species.get_species_from_name("H2O_g")
+    H2_g = species.get_species_from_name("H2_g")
+
+    dataframes = interior_atmosphere.output(to_dataframes=True)
+    raw_solution = dataframes["raw_solution"]
+    solution = dataframes["solution"]
+
+    solution_override = InitialSolutionDict({H2_g: 100000}, species=species)
+    initial_solution = InitialSolutionRegressor.from_pickle(
+        filename, species=species, solution_override=solution_override
+    )
+
+    test_constraints = SystemConstraints(
+        [
+            FugacityConstraint(O2_g, solution.iloc[0]["O2_g"]),
+            PressureConstraint(H2O_g, solution.iloc[0]["H2O_g"]),
+        ]
+    )
+
+    result = initial_solution.get_log10_value(
+        test_constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+
+    assert np.isclose(
+        raw_solution.iloc[0]["H2O_g"], result[0], atol=REGRESSORTOL, rtol=REGRESSORTOL
+    )
+    assert np.isclose(5, result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL)
+    assert np.isclose(
+        raw_solution.iloc[0]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
+    )

@@ -67,7 +67,7 @@ class InitialSolution(ABC, Generic[T]):
         fill_log10_activity: Fill value for activity. Defaults to 0.
         fill_log10_mass: Fill value for mass. Defaults to 20.
         fill_log10_stability: Fill value for stability. Defaults to -35.
-        solution_override: Dictionary to override the solution values. Defaults to None.
+        solution_override: Dictionary to override the initial solution values. Defaults to None.
 
     Attributes:
         value: An object used to compute the initial solution
@@ -85,7 +85,7 @@ class InitialSolution(ABC, Generic[T]):
         fill_log10_activity: float = 0,
         fill_log10_mass: float = 20,
         fill_log10_stability: float = -35,
-        # solution_override: dict[TypeChemicalSpecies_co | str, float] | None = None,
+        solution_override: InitialSolutionDict | None = None,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -97,18 +97,18 @@ class InitialSolution(ABC, Generic[T]):
         self._fill_log10_activity: float = fill_log10_activity
         self._fill_log10_mass: float = fill_log10_mass
         self._fill_log10_stability: float = fill_log10_stability
-        # if solution_override is None:
-        #     self._solution_override = None
-        # else:
-        #     self._solution_override = InitialSolutionDict(solution_override, species=species)
+        if solution_override is None:
+            self._solution_override: InitialSolutionDict | None = None
+        else:
+            self._solution_override = solution_override
 
     @abstractmethod
-    def set_data(
+    def set_data_preprocessing(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> None:
-        """Sets the data for the initial solution.
+        """Sets the raw data for the initial solution.
 
-        This sets the raw values without additional processing such as clipping or perturbing.
+        This sets the raw data without additional processing such as clipping or perturbing.
 
         Args:
             constraints: Constraints
@@ -116,53 +116,62 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
         """
 
-    # def apply_override(
-    #     self,
-    #     constraints: SystemConstraints,
-    #     *,
-    #     temperature: float,
-    #     pressure: float,
-    # ) -> None:
-    #     """Applies a user-specified override to the initial solution
+    def set_data_postprocessing(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+    ) -> None:
+        """Applies a user-specified override to the initial solution
 
-    #     Args:
-    #         constraints: Constraints
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
-    #     """
-    #     if self._solution_override is not None:
-    #         self._solution_override.get_log10_value(
-    #             constraints, temperature=temperature, pressure=pressure
-    #         )
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+        """
+        if self._solution_override is not None:
+            self._solution_override.set_data(
+                constraints,
+                temperature=temperature,
+                pressure=pressure,
+                fill_missing_values=False,
+                apply_gas_constraints=False,
+                apply_activity_constraints=False,
+            )
+            self.solution.merge(self._solution_override.solution)
 
-    def get_log10_value(
+    def set_data(
         self,
         constraints: SystemConstraints,
         *,
         temperature: float,
         pressure: float,
         perturb_gas_log10: float = 0,
+        fill_missing_values: bool = True,
         apply_gas_constraints: bool = True,
         apply_activity_constraints: bool = True,
-    ) -> npt.NDArray[np.float_]:
-        """Gets the log10 value of the initial solution.
+    ) -> None:
+        """Sets the initial solution data.
 
         Args:
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0,
-                i.e. not used.
+            perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
             apply_gas_constraints: Apply gas constraints, if any. Defaults to True.
             apply_activity_constraints: Apply activity constraints, if any. Defaults to True.
-
-        Returns:
-            The initial solution
         """
-        self.set_data(constraints, temperature=temperature, pressure=pressure)
+
+        self.set_data_preprocessing(constraints, temperature=temperature, pressure=pressure)
+
+        if fill_missing_values:
+            self.solution.gas.fill_missing_values(self._fill_log10_pressure)
+            self.solution.activity.fill_missing_values(self._fill_log10_activity)
+            self.solution.mass.fill_missing_values(self._fill_log10_mass)
+            self.solution.stability.fill_missing_values(self._fill_log10_stability)
 
         # Gas pressures
-        self.solution.gas.fill_missing_values(self._fill_log10_pressure)
         if perturb_gas_log10:
             self.solution.gas.perturb_values(perturb_gas_log10)
 
@@ -175,7 +184,6 @@ class InitialSolution(ABC, Generic[T]):
                 )
 
         # Activities
-        self.solution.activity.fill_missing_values(self._fill_log10_activity)
         self.solution.activity.clip_values(maximum_value=0)
         if apply_activity_constraints:
             for constraint in constraints.activity_constraints:
@@ -183,9 +191,33 @@ class InitialSolution(ABC, Generic[T]):
                     temperature=temperature, pressure=pressure
                 )
 
-        # Mass and stability
-        self.solution.mass.fill_missing_values(self._fill_log10_mass)
-        self.solution.stability.fill_missing_values(self._fill_log10_stability)
+        self.set_data_postprocessing(constraints, temperature=temperature, pressure=pressure)
+
+    def get_log10_value(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        perturb_gas_log10: float = 0,
+    ) -> npt.NDArray[np.float_]:
+        """Gets the log10 value of the initial solution.
+
+        Args:
+            constraints: Constraints
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
+
+        Returns:
+            The initial solution
+        """
+        self.set_data(
+            constraints,
+            temperature=temperature,
+            pressure=pressure,
+            perturb_gas_log10=perturb_gas_log10,
+        )
 
         logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
 
@@ -248,7 +280,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         return output
 
     @override
-    def set_data(self, *args, **kwargs) -> None:
+    def set_data_preprocessing(self, *args, **kwargs) -> None:
         del args
         del kwargs
         self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
@@ -286,8 +318,8 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
         self.solution = self.value.solution
 
     @override
-    def set_data(self, *args, **kwargs) -> None:
-        return self.value.set_data(*args, **kwargs)
+    def set_data_preprocessing(self, *args, **kwargs) -> None:
+        return self.value.set_data_preprocessing(*args, **kwargs)
 
     @override
     def update(self, output: Output, *args, **kwargs) -> None:
@@ -301,6 +333,8 @@ class InitialSolutionLast(InitialSolution[InitialSolution]):
             value_dict[species] = value_dict.pop(species.name)
 
         self.value = InitialSolutionDict(value_dict, species=self._species)
+        # Must re-route solution
+        self.solution = self.value.solution
 
 
 class InitialSolutionRegressor(InitialSolution[Output]):
@@ -352,9 +386,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self.partial_fit: bool = partial_fit
         self.partial_fit_batch_size: int = partial_fit_batch_size
 
-        # self._conform_solution(
-        #    value, species=species, species_fill=species_fill, fill_value=fill_value
-        # )
         super().__init__(value, **kwargs)
         self._fit(self.value)
 
@@ -376,45 +407,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             output = Output.read_pickle(Path(pickle_file).with_suffix(".pkl"))
 
         return cls(output, **kwargs)
-
-    # TODO: fix
-    # def _conform_solution(
-    #     self,
-    #     output: Output,
-    #     *,
-    #     species: Species,
-    #     species_fill: dict[TypeChemicalSpecies_co, float] | None,
-    #     fill_value: float,
-    # ) -> None:
-    #     """Conforms the solution in output to the species and their fill values
-
-    #     Args:
-    #         output: Output
-    #         species: Species
-    #         species_fill: Dictionary of missing species and their initial values. Defaults to None.
-    #         fill_value: Initial value for species that are not specified in `species_fill`.
-    #     """
-    #     solution: pd.DataFrame = output.to_dataframes()["raw_solution"].copy()
-    #     logger.debug("solution = %s", solution)
-
-    #     species_fill_: dict[TypeChemicalSpecies_co, float] = (
-    #         species_fill if species_fill is not None else {}
-    #     )
-    #     initial_solution_dict: InitialSolutionDict = InitialSolutionDict(
-    #         species_fill_,
-    #         species=species,
-    #         fill_value=fill_value,
-    #     )
-    #     fill_df: pd.DataFrame = pd.DataFrame(
-    #         initial_solution_dict.solution.raw_solution_dict(), index=[0]
-    #     )
-    #     fill_df = fill_df.loc[fill_df.index.repeat(len(solution))].reset_index(drop=True)
-    #     logger.debug("fill_df = %s", fill_df)
-
-    #     # Preference the values in the solution and fill missing species
-    #     conformed_solution: pd.DataFrame = solution.combine_first(fill_df)[species.names]
-    #     logger.debug("conformed_solution = %s", conformed_solution)
-    #     output["solution"] = conformed_solution.to_dict(orient="records")
 
     def _get_select_values(
         self,
@@ -509,7 +501,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self._reg.partial_fit(constraints_scaled, solution_scaled)
 
     @override
-    def set_data(
+    def set_data_preprocessing(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> None:
         evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(

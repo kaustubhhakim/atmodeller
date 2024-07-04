@@ -566,6 +566,17 @@ class Solution:
             index += self._species.number_condensed_species
             self.stability.data[species] = value[index]
 
+    def merge(self, other: Solution) -> None:
+        """Merges the data from another solution
+
+        Args:
+            other: The other solution to merge data from
+        """
+        self.gas.data |= other.gas.data
+        self.activity.data |= other.activity.data
+        self.mass.data |= other.mass.data
+        self.stability.data |= other.stability.data
+
     def stability_array(self) -> npt.NDArray:
         """The condensate stability array"""
         stability_array: npt.NDArray = np.zeros(self._species.number, dtype=np.float_)
