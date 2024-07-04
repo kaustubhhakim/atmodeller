@@ -24,8 +24,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Protocol, TypeVar, runtime_checkable
 
-import numpy as np
-import numpy.typing as npt
 from molmass import Composition, Formula
 
 from atmodeller.thermodata.interfaces import (
@@ -36,9 +34,7 @@ from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
-    from atmodeller.constraints import SystemConstraints
     from atmodeller.core import GasSpecies
-    from atmodeller.output import Output
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -315,19 +311,4 @@ class GasConstraintProtocol(ConstraintProtocol, Protocol):
 
 ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
 
-
-class InitialSolutionProtocol(Protocol):
-    def get_log10_value(
-        self,
-        constraints: SystemConstraints,
-        *,
-        temperature: float,
-        pressure: float,
-        perturb_log10: float = 0,
-    ) -> npt.NDArray[np.float_]: ...
-
-    def update(self, output: Output) -> None: ...
-
-
-# Type hint indicating covariance using type comments
 TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies, covariant=True)

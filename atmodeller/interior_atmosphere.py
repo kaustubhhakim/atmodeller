@@ -31,8 +31,7 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
 from atmodeller.core import GasSpecies, Planet, Solution, Species
-from atmodeller.initial_solution import InitialSolutionDict
-from atmodeller.interfaces import InitialSolutionProtocol
+from atmodeller.initial_solution import InitialSolution, InitialSolutionDict
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
 from atmodeller.utilities import UnitConversion
@@ -54,7 +53,7 @@ class InteriorAtmosphereSystem:
     """A list of species"""
     planet: Planet = field(default_factory=Planet)
     """A planet"""
-    initial_solution: InitialSolutionProtocol | None = None
+    initial_solution: InitialSolution | None = None
     """Initial solution"""
     output: Output = field(init=False, default_factory=Output)
     """Output data"""
@@ -322,10 +321,10 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
-        initial_solution: InitialSolutionProtocol | None = None,
+        initial_solution: InitialSolution | None = None,
         extra_output: dict[str, float] | None = None,
         max_attempts: int = 20,
-        perturb_log10: float = 2.0,
+        perturb_gas_log10: float = 2.0,
         errors: str = "ignore",
         method: str = "hybr",
         tol: float | None = None,
@@ -340,7 +339,7 @@ class InteriorAtmosphereSystem:
             extra_output: Extra data to write to the output
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails. Defaults to 10.
-            perturb_log10: Maximum log10 perturbation to apply to the initial condition on failure.
+            perturb_gas_log10: Maximum log10 perturbation to apply to the pressures on failure.
                 Defaults to 2.0.
             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
             method: Type of solver. Defaults to 'hybr'.
@@ -430,7 +429,7 @@ class InteriorAtmosphereSystem:
                         self.constraints,
                         temperature=self.planet.surface_temperature,
                         pressure=1,
-                        perturb_log10=perturb_log10,
+                        perturb_gas_log10=perturb_gas_log10,
                     )
 
         if not sol.success:
