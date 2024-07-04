@@ -22,7 +22,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Generic, TypeVar, cast
+from typing import Any, Generic, Protocol, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -53,6 +53,24 @@ Motivated by typical values of oxygen fugacity at the iron-wustite buffer
 """
 MAX_LOG10_PRESSURE: float = 8
 """Maximum log10 (bar) of the initial gas species pressures"""
+
+
+class InitialSolutionProtocol(Protocol):
+    """Initial solution protocol"""
+
+    @property
+    def species(self) -> Species: ...
+
+    def get_log10_value(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: float,
+        perturb_gas_log10: float = 0,
+    ) -> npt.NDArray[np.float_]: ...
+
+    def update(self, output: Output) -> None: ...
 
 
 class InitialSolution(ABC, Generic[T]):
@@ -101,6 +119,11 @@ class InitialSolution(ABC, Generic[T]):
             self._solution_override: InitialSolutionDict | None = None
         else:
             self._solution_override = solution_override
+
+    @property
+    def species(self) -> Species:
+        """Species"""
+        return self._species
 
     @abstractmethod
     def set_data_preprocessing(
@@ -159,8 +182,8 @@ class InitialSolution(ABC, Generic[T]):
             temperature: Temperature in K
             pressure: Pressure in bar
             perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
-            apply_gas_constraints: Apply gas constraints, if any. Defaults to True.
-            apply_activity_constraints: Apply activity constraints, if any. Defaults to True.
+            apply_gas_constraints: Apply any gas constraints. Defaults to True.
+            apply_activity_constraints: Apply any activity constraints. Defaults to True.
         """
 
         self.set_data_preprocessing(constraints, temperature=temperature, pressure=pressure)
@@ -239,19 +262,20 @@ class InitialSolutionDict(InitialSolution[dict]):
 
     Args:
         value: Dictionary of the initial solution. Defaults to None, meaning to use default values.
-        **kwargs: Keyword arguments to pass through to the base class.
+        **kwargs: Optional keyword arguments to pass through to the base class.
 
     Attributes:
-        value: An object used to compute the initial solution
+        value: A dictionary used to compute the initial solution
+        solution: The initial solution
     """
 
     @override
-    def __init__(self, value: dict | None = None, **kwargs):
+    def __init__(self, value: dict | None = None, *, species: Species, **kwargs):
         if value is None:
             value_dict: dict = {}
         else:
             value_dict = value
-        super().__init__(value_dict, **kwargs)
+        super().__init__(value_dict, species=species, **kwargs)
 
     def _get_log10_values(
         self,
@@ -293,50 +317,6 @@ class InitialSolutionDict(InitialSolution[dict]):
         )
 
 
-class InitialSolutionLast(InitialSolution[InitialSolution]):
-    """An initial solution that uses the previous output value as the current solution guess.
-
-    This is useful if you are incrementing through a grid of parameters, such that the previous
-    solution is a reasonable initial estimate for the current solution.
-
-    Args:
-        value: An initial solution for the first solution only
-        **kwargs: Keyword arguments to pass through to the base class.
-
-    Attributes:
-        value: An initial solution for the first solution only
-    """
-
-    @override
-    def __init__(self, value: InitialSolution | None = None, **kwargs):
-        if value is None:
-            value_initial: InitialSolution = InitialSolutionDict(**kwargs)
-        else:
-            value_initial = value
-        super().__init__(value_initial, **kwargs)
-        # Must re-route solution
-        self.solution = self.value.solution
-
-    @override
-    def set_data_preprocessing(self, *args, **kwargs) -> None:
-        return self.value.set_data_preprocessing(*args, **kwargs)
-
-    @override
-    def update(self, output: Output, *args, **kwargs) -> None:
-        del args
-        del kwargs
-        value_dict: dict[ChemicalSpecies | str, float] = output["raw_solution"][-1]
-        # InitialSolutionDict takes the log10, so we must raise 10 to the values.
-        value_dict = {key: 10**value for key, value in value_dict.items()}
-        # Convert species from strings to objects
-        for species in self._species.data:
-            value_dict[species] = value_dict.pop(species.name)
-
-        self.value = InitialSolutionDict(value_dict, species=self._species)
-        # Must re-route solution
-        self.solution = self.value.solution
-
-
 class InitialSolutionRegressor(InitialSolution[Output]):
     """A regressor to compute the initial solution
 
@@ -345,6 +325,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
     Args:
         value: Output for constructing the regressor
+        species: Species
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
@@ -352,10 +333,11 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         partial_fit: Partial fit the regressor during the model run. Defaults to True.
         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
             regressor. Defaults to 500.
-        **kwargs: Keyword arguments to pass through to the base class.
+        **kwargs: Optional keyword arguments to pass through to the base class.
 
     Attributes:
         value: Output for constructing the regressor
+        solution: The initial solution
         fit: Fit the regressor during the model run, which replaces the data used to initialise
             the regressor.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True
@@ -374,6 +356,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self,
         value: Output,
         *,
+        species: Species,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
@@ -386,7 +369,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self.partial_fit: bool = partial_fit
         self.partial_fit_batch_size: int = partial_fit_batch_size
 
-        super().__init__(value, **kwargs)
+        super().__init__(value, species=species, **kwargs)
         self._fit(self.value)
 
     @classmethod
@@ -399,7 +382,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             **kwargs: Arbitrary keyword arguments to pass through to the constructor
 
         Returns:
-            A regressor
+            An initial solution regressor
         """
         try:
             output: Output = Output.read_pickle(pickle_file)
@@ -571,60 +554,130 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             )
 
 
-# class InitialSolutionSwitchRegressor(InitialSolution[InitialSolution]):
-#     """An initial solution that uses an initial solution before switching to a regressor.
+class InitialSolutionLast(InitialSolutionProtocol):
+    """An initial solution that uses the previous solution as the current solution guess.
 
-#     Args:
-#         value: An initial solution
-#         species: Species
-#         min_log10_pressure: Minimum log10 value. Defaults to :data:`MIN_LOG10_PRESSURE`.
-#         max_log10_pressure: Maximum log10 value. Defaults to :data:`MAX_LOG10_PRESSURE`.
-#         fit_batch_size: Number of simulations to generate before fitting the regressor. Defaults
-#             to 100.
-#         **kwargs: Keyword arguments that are specific to :class:`InitialSolutionRegressor`
+    This is useful for incrementing through a grid of parameters, where the previous solution is
+    probably a reasonable initial estimate for the current solution.
 
-#     Attributes:
-#         value: An initial solution
-#         fit_batch_size: Number of simulations to generate before fitting the regressor
-#     """
+    Args:
+        value: An initial solution until `switch_iteration` is reached. Defaults to None.
+        species: Species
+        switch_iteration: Iteration number to switch the initial solution to the previous solution.
+            Defaults to 1.
+        **kwargs: Keyword arguments to instantiate :class:`InitialSolutionDict`
 
-#     @override
-#     def __init__(
-#         self,
-#         value: InitialSolution,
-#         *,
-#         species: Species,
-#         min_log10_pressure: float = MIN_LOG10_PRESSURE,
-#         max_log10_pressure: float = MAX_LOG10_PRESSURE,
-#         fit_batch_size: int = 100,
-#         **kwargs,
-#     ):
-#         super().__init__(
-#             value,
-#             species=species,
-#             min_log10_pressure=min_log10_pressure,
-#             max_log10_pressure=max_log10_pressure,
-#         )
-#         self._fit_batch_size: int = fit_batch_size
-#         # Store to instantiate regressor once the switch occurs.
-#         self._kwargs: dict[str, Any] = kwargs
+    Attributes:
+        value: An initial solution for the first solution only
+        solution: The initial solution
+    """
 
-#     @override
-#     def get_value(self, *args, **kwargs) -> npt.NDArray:
-#         return self.value.get_value(*args, **kwargs)
+    def __init__(
+        self,
+        value: InitialSolutionProtocol | None = None,
+        *,
+        species: Species,
+        switch_iteration: int = 1,
+        **kwargs,
+    ):
+        if value is None:
+            value_start: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+        else:
+            value_start = value
+        self.value: InitialSolutionProtocol = value_start
+        self._species: Species = species
+        self._switch_iteration: int = switch_iteration
 
-#     @override
-#     def update(self, output: Output, *args, **kwargs) -> None:
-#         if output.size == self._fit_batch_size:
-#             # The fit keyword argument of InitialSolutionRegressor is effectively ignored because
-#             # the fit is done once when InitialSolutionRegressor is instantiated and action_fit
-#             # cannot be triggered regardless of the value of fit.
-#             self.value = InitialSolutionRegressor(
-#                 output,
-#                 species=self.species,
-#                 min_log10_pressure=self.min_log10_pressure,
-#                 max_log10_pressure=self.max_log10_pressure,
-#                 **self._kwargs,
-#             )
-#         else:
-#             self.value.update(output, *args, **kwargs)
+    @property
+    def species(self) -> Species:
+        return self.value.species
+
+    @override
+    def get_log10_value(self, *args, **kwargs) -> npt.NDArray[np.float_]:
+        return self.value.get_log10_value(*args, **kwargs)
+
+    @override
+    def update(self, output: Output) -> None:
+        if output.size == self._switch_iteration:
+            value_dict: dict[ChemicalSpecies | str, float] = output["raw_solution"][-1]
+            # InitialSolutionDict takes the log10, so we must raise 10 to the values.
+            value_dict = {key: 10**value for key, value in value_dict.items()}
+            # Convert species from strings to objects
+            for species in self.species.data:
+                value_dict[species] = value_dict.pop(species.name)
+
+            self.value = InitialSolutionDict(value_dict, species=self.species)
+
+
+class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
+    """An initial solution that uses an initial solution before switching to a regressor.
+
+    Args:
+        value: An initial solution until `switch_iteration` is reached. Defaults to None.
+        species: Species
+        fit: Fit the regressor during the model run. This will replace the original regressor by a
+            regressor trained only on the data from the current model. Defaults to True.
+        fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
+            Defaults to 100.
+        partial_fit: Partial fit the regressor during the model run. Defaults to True.
+        partial_fit_batch_size: Number of solutions to calculate before partial refit of the
+            regressor. Defaults to 500.
+        switch_iteration: Iteration number to switch the initial solution to the regressor.
+            Defaults to 50.
+        **kwargs: Keyword arguments to instantiate :class:`InitialSolutionDict`
+
+    Attributes:
+        value: An initial solution
+        solution: The initial solution
+    """
+
+    def __init__(
+        self,
+        value: InitialSolution | None = None,
+        *,
+        species: Species,
+        fit: bool = True,
+        fit_batch_size: int = 100,
+        partial_fit: bool = True,
+        partial_fit_batch_size: int = 500,
+        switch_iteration: int = 50,
+        **kwargs,
+    ):
+        if value is None:
+            value_start: InitialSolution = InitialSolutionDict(species=species, **kwargs)
+        else:
+            value_start = value
+        self.value: InitialSolutionProtocol = value_start
+        self._species: Species = species
+        self._switch_iteration: int = switch_iteration
+        self._fit: bool = fit
+        self._fit_batch_size: int = fit_batch_size
+        self._partial_fit: bool = partial_fit
+        self._partial_fit_batch_size: int = partial_fit_batch_size
+        self._kwargs: dict[str, Any] = kwargs
+
+    @property
+    def species(self) -> Species:
+        return self.value.species
+
+    @override
+    def get_log10_value(self, *args, **kwargs) -> npt.NDArray[np.float_]:
+        return self.value.get_log10_value(*args, **kwargs)
+
+    @override
+    def update(self, output: Output) -> None:
+        if output.size == self._switch_iteration:
+            # The fit keyword argument of InitialSolutionRegressor is effectively ignored because
+            # the fit is done once when InitialSolutionRegressor is instantiated and action_fit
+            # cannot be triggered regardless of the value of fit.
+            self.value = InitialSolutionRegressor(
+                output,
+                species=self._species,
+                fit=self._fit,
+                fit_batch_size=self._fit_batch_size,
+                partial_fit=self._partial_fit,
+                partial_fit_batch_size=self._partial_fit_batch_size,
+                **self._kwargs,
+            )
+        else:
+            self.value.update(output)

@@ -31,7 +31,7 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
 from atmodeller.core import GasSpecies, Planet, Solution, Species
-from atmodeller.initial_solution import InitialSolution, InitialSolutionDict
+from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
 from atmodeller.utilities import UnitConversion
@@ -53,7 +53,7 @@ class InteriorAtmosphereSystem:
     """A list of species"""
     planet: Planet = field(default_factory=Planet)
     """A planet"""
-    initial_solution: InitialSolution | None = None
+    initial_solution: InitialSolutionProtocol | None = None
     """Initial solution"""
     output: Output = field(init=False, default_factory=Output)
     """Output data"""
@@ -321,7 +321,7 @@ class InteriorAtmosphereSystem:
         self,
         constraints: SystemConstraints,
         *,
-        initial_solution: InitialSolution | None = None,
+        initial_solution: InitialSolutionProtocol | None = None,
         extra_output: dict[str, float] | None = None,
         max_attempts: int = 20,
         perturb_gas_log10: float = 2.0,
