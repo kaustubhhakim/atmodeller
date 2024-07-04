@@ -313,14 +313,16 @@ class SolutionComponent(Generic[T]):
     Args:
         species: Species relevant to this solution component, which is usually a sublist derived
             from :class:`Species`.
+        prefix: Optional string prefix for output dictionary keys. Defaults to an empty string.
 
     Attributes:
         data: Dictionary of the solution values, which are usually log10 of the physical values.
     """
 
-    def __init__(self, species: list[T]):
+    def __init__(self, species: list[T], prefix: str = ""):
         self._species: list[T] = species
         self.data: dict[T, float] = {}
+        self._prefix: str = prefix
 
     @property
     def number(self) -> int:
@@ -335,7 +337,7 @@ class SolutionComponent(Generic[T]):
     @property
     def physical(self) -> dict[T, float]:
         """Physical values"""
-        return {key: 10**value for key, value in self.data.items()}
+        return {species: 10**value for species, value in self.data.items()}
 
     def clip_values(
         self, minimum_value: float | None = None, maximum_value: float | None = None
@@ -349,14 +351,36 @@ class SolutionComponent(Generic[T]):
         for key, value in self.data.items():
             self.data[key] = np.clip(value, minimum_value, maximum_value)
 
+    def fill_missing_values(self, fill_value: float) -> None:
+        """Fills missing values.
+
+        Args:
+            fill_value: The fill value
+        """
+        for species in self._species:
+            if species not in self.data:
+                self.data[species] = fill_value
+
     def perturb_values(self, perturb: float = 0) -> None:
         """Perturbs the values.
 
         Args:
             perturb: Maximum log10 value to perturb the values. Defaults to 0.
         """
-        for key in self.data:
-            self.data[key] += perturb * (2 * np.random.rand() - 1)
+        for species in self.data:
+            self.data[species] += perturb * (2 * np.random.rand() - 1)
+
+    def raw_solution_dict(self) -> dict[str, float]:
+        """Raw solution in a dictionary"""
+        output: dict[str, float] = {}
+        for species, value in self.data.items():
+            output[f"{self._prefix}{species.name}"] = value
+
+        return output
+
+    def solution_dict(self) -> dict[str, float]:
+        """Solution in a dictionary"""
+        return {key: 10**value for key, value in self.raw_solution_dict().items()}
 
 
 CondensedSolution = SolutionComponent[CondensedSpecies]
@@ -475,8 +499,10 @@ class Solution:
         self._species: Species = species
         self._gas: GasSolution = GasSolution(species.gas_species)
         self._activity: CondensedSolution = CondensedSolution(species.condensed_species)
-        self._mass: CondensedSolution = CondensedSolution(species.condensed_species)
-        self._stability: CondensedSolution = CondensedSolution(species.condensed_species)
+        self._mass: CondensedSolution = CondensedSolution(species.condensed_species, MASS_PREFIX)
+        self._stability: CondensedSolution = CondensedSolution(
+            species.condensed_species, STABILITY_PREFIX
+        )
 
     @property
     def number(self) -> int:
@@ -551,25 +577,20 @@ class Solution:
 
     def raw_solution_dict(self) -> dict[str, float]:
         """Raw solution in a dictionary"""
-        output: dict[str, float] = {}
-        for species, value in zip(self._species.data, self.data[: self._species.number]):
-            output[species.name] = value
-        for species, value in zip(self._species.condensed_species, self.mass.data.values()):
-            output[f"{MASS_PREFIX}{species.name}"] = value
-        for species, value in zip(self._species.condensed_species, self.stability.data.values()):
-            output[f"{STABILITY_PREFIX}{species.name}"] = value
+        output: dict[str, float] = (
+            self.gas.raw_solution_dict()
+            | self.activity.raw_solution_dict()
+            | self.mass.raw_solution_dict()
+            | self.stability.raw_solution_dict()
+        )
 
         return output
 
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""
-        output: dict[str, float] = {}
-        for species, pressure in self.gas.physical.items():
-            output[species.name] = pressure
-        for species, activity in self.activity.physical.items():
-            output[species.name] = activity
-        for species, condensed_mass in self.mass.physical.items():
-            output[f"{MASS_PREFIX}{species.name}"] = condensed_mass
+        output: dict[str, float] = (
+            self.gas.solution_dict() | self.activity.solution_dict() | self.mass.solution_dict()
+        )
 
         return output
 

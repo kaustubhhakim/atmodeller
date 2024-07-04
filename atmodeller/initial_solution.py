@@ -33,12 +33,8 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import MASS_PREFIX, STABILITY_PREFIX, GasSpecies, Solution, Species
-from atmodeller.interfaces import (
-    ChemicalSpecies,
-    CondensedSpecies,
-    TypeChemicalSpecies_co,
-)
+from atmodeller.core import MASS_PREFIX, STABILITY_PREFIX, Solution, Species
+from atmodeller.interfaces import ChemicalSpecies, TypeChemicalSpecies_co
 from atmodeller.output import Output
 
 if sys.version_info < (3, 12):
@@ -71,6 +67,7 @@ class InitialSolution(ABC, Generic[T]):
         fill_log10_activity: Fill value for activity. Defaults to 0.
         fill_log10_mass: Fill value for mass. Defaults to 20.
         fill_log10_stability: Fill value for stability. Defaults to -35.
+        solution_override: Dictionary to override the solution values. Defaults to None.
 
     Attributes:
         value: An object used to compute the initial solution
@@ -88,6 +85,7 @@ class InitialSolution(ABC, Generic[T]):
         fill_log10_activity: float = 0,
         fill_log10_mass: float = 20,
         fill_log10_stability: float = -35,
+        # solution_override: dict[TypeChemicalSpecies_co | str, float] | None = None,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -99,6 +97,10 @@ class InitialSolution(ABC, Generic[T]):
         self._fill_log10_activity: float = fill_log10_activity
         self._fill_log10_mass: float = fill_log10_mass
         self._fill_log10_stability: float = fill_log10_stability
+        # if solution_override is None:
+        #     self._solution_override = None
+        # else:
+        #     self._solution_override = InitialSolutionDict(solution_override, species=species)
 
     @abstractmethod
     def set_data(
@@ -113,6 +115,25 @@ class InitialSolution(ABC, Generic[T]):
             temperature: Temperature in K
             pressure: Pressure in bar
         """
+
+    # def apply_override(
+    #     self,
+    #     constraints: SystemConstraints,
+    #     *,
+    #     temperature: float,
+    #     pressure: float,
+    # ) -> None:
+    #     """Applies a user-specified override to the initial solution
+
+    #     Args:
+    #         constraints: Constraints
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
+    #     """
+    #     if self._solution_override is not None:
+    #         self._solution_override.get_log10_value(
+    #             constraints, temperature=temperature, pressure=pressure
+    #         )
 
     def get_log10_value(
         self,
@@ -141,6 +162,7 @@ class InitialSolution(ABC, Generic[T]):
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
         # Gas pressures
+        self.solution.gas.fill_missing_values(self._fill_log10_pressure)
         if perturb_gas_log10:
             self.solution.gas.perturb_values(perturb_gas_log10)
 
@@ -153,12 +175,17 @@ class InitialSolution(ABC, Generic[T]):
                 )
 
         # Activities
+        self.solution.activity.fill_missing_values(self._fill_log10_activity)
         self.solution.activity.clip_values(maximum_value=0)
         if apply_activity_constraints:
             for constraint in constraints.activity_constraints:
                 self.solution.activity.data[constraint.species] = constraint.get_log10_value(
                     temperature=temperature, pressure=pressure
                 )
+
+        # Mass and stability
+        self.solution.mass.fill_missing_values(self._fill_log10_mass)
+        self.solution.stability.fill_missing_values(self._fill_log10_stability)
 
         logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
 
@@ -179,8 +206,7 @@ class InitialSolutionDict(InitialSolution[dict]):
     """A dictionary for the initial solution
 
     Args:
-        value: Dictionary of the initial solution. Defaults to None, meaning to use default
-            values.
+        value: Dictionary of the initial solution. Defaults to None, meaning to use default values.
         **kwargs: Keyword arguments to pass through to the base class.
 
     Attributes:
@@ -196,8 +222,10 @@ class InitialSolutionDict(InitialSolution[dict]):
         super().__init__(value_dict, **kwargs)
 
     def _get_log10_values(
-        self, species_list: list[TypeChemicalSpecies_co], prefix: str, fill_value: float
-    ):
+        self,
+        species_list: list[TypeChemicalSpecies_co],
+        prefix: str,
+    ) -> dict[TypeChemicalSpecies_co, float]:
         """Gets log10 values.
 
         Args:
@@ -213,8 +241,9 @@ class InitialSolutionDict(InitialSolution[dict]):
             key: TypeChemicalSpecies_co | str = f"{prefix}{species.name}" if prefix else species
             try:
                 output[species] = np.log10(self.value[key])
+            # TODO: Clean up or add explaining comment
             except KeyError:
-                output[species] = fill_value
+                continue
 
         return output
 
@@ -222,17 +251,13 @@ class InitialSolutionDict(InitialSolution[dict]):
     def set_data(self, *args, **kwargs) -> None:
         del args
         del kwargs
-        self.solution.gas.data = self._get_log10_values(
-            self._species.gas_species, "", self._fill_log10_pressure
-        )
-        self.solution.activity.data = self._get_log10_values(
-            self._species.condensed_species, "", self._fill_log10_activity
-        )
+        self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
+        self.solution.activity.data = self._get_log10_values(self._species.condensed_species, "")
         self.solution.mass.data = self._get_log10_values(
-            self._species.condensed_species, MASS_PREFIX, self._fill_log10_mass
+            self._species.condensed_species, MASS_PREFIX
         )
         self.solution.stability.data = self._get_log10_values(
-            self._species.condensed_species, STABILITY_PREFIX, self._fill_log10_stability
+            self._species.condensed_species, STABILITY_PREFIX
         )
 
 
@@ -286,16 +311,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
     Args:
         value: Output for constructing the regressor
-        species: Species
-        min_log10_pressure: Minimum log10 gas pressure. Defaults to :data:`MIN_LOG10_PRESSURE`.
-        max_log10_pressure: Maximum log10 gas pressure. Defaults to :data:`MAX_LOG10_PRESSURE`.
-        fill_log10_pressure: Fill value for pressure in bar. Defaults to 1.
-        fill_log10_activity: Fill value for activity. Defaults to 0.
-        fill_log10_mass: Fill value for mass. Defaults to 20.
-        fill_log10_stability: Fill value for stability. Defaults to -35.
-        species_fill: Dictionary of missing species and their initial values. Defaults to None.
-        fill_value: Initial value for species that are not specified in `species_fill`. Defaults to
-            1.
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
@@ -303,6 +318,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         partial_fit: Partial fit the regressor during the model run. Defaults to True.
         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
             regressor. Defaults to 500.
+        **kwargs: Keyword arguments to pass through to the base class.
 
     Attributes:
         value: Output for constructing the regressor
@@ -324,21 +340,11 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self,
         value: Output,
         *,
-        species: Species,
-        min_log10_pressure: float = MIN_LOG10_PRESSURE,
-        max_log10_pressure: float = MAX_LOG10_PRESSURE,
-        # TODO: Add from base class?
-        # fill_log10_pressure: float = 1,
-        # fill_log10_activity: float = 0,
-        # fill_log10_mass: float = 20,
-        # fill_log10_stability: float = -35,
-        # TODO: Remove
-        species_fill: dict[TypeChemicalSpecies_co, float] | None = None,
-        fill_value: float = 1,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
         partial_fit_batch_size: int = 500,
+        **kwargs,
     ):
         self.fit: bool = fit
         # Ensure consistency of arguments and correct handling of fit versus partial refit.
@@ -349,12 +355,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         # self._conform_solution(
         #    value, species=species, species_fill=species_fill, fill_value=fill_value
         # )
-        super().__init__(
-            value,
-            species=species,
-            min_log10_pressure=min_log10_pressure,
-            max_log10_pressure=max_log10_pressure,
-        )
+        super().__init__(value, **kwargs)
         self._fit(self.value)
 
     @classmethod
@@ -415,28 +416,22 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     #     logger.debug("conformed_solution = %s", conformed_solution)
     #     output["solution"] = conformed_solution.to_dict(orient="records")
 
-    def _get_values(
+    def _get_select_values(
         self,
-        output: Output,
-        name: str,
+        data: pd.DataFrame,
         start_index: int | None,
         end_index: int | None,
     ) -> npt.NDArray[np.float_]:
-        """FIXME: Now using raw_solution directly
-
-        Gets values of either the constraints or the solution from `output`
+        """Gets select values from a dataframe
 
         Args:
-            output: Output
-            name: solution or constraints
-            start_index: Start index for fit. Defaults to None, meaning use all available data.
-            end_index: End index for fit. Defaults to None, meaning use all available data.
+            data: A dataframe
+            start_index: Start index. Defaults to None, meaning use all available data.
+            end_index: End index. Defaults to None, meaning use all available data.
 
         Returns:
-            Values of either the solution or constraints depending on `name`
+            Select values from the dataframe
         """
-        output_dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
-        data: pd.DataFrame = output_dataframes[name]
         if start_index is not None and end_index is not None:
             data = data.iloc[start_index:end_index]
 
@@ -457,16 +452,18 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         """
         logger.info("%s: Fit (%s, %s)", self.__class__.__name__, start_index, end_index)
 
+        dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
+
         constraints_log10_values: npt.NDArray = np.log10(
-            self._get_values(output, "constraints", start_index, end_index)
+            self._get_select_values(dataframes["constraints"], start_index, end_index)
         )
         self._constraints_scalar = StandardScaler().fit(constraints_log10_values)
         constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
             constraints_log10_values
         )
 
-        raw_solution_log10_values: npt.NDArray = self._get_values(
-            output, "raw_solution", start_index, end_index
+        raw_solution_log10_values: npt.NDArray = self._get_select_values(
+            dataframes["raw_solution"], start_index, end_index
         )
         self._solution_scalar = StandardScaler().fit(raw_solution_log10_values)
         solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
@@ -494,14 +491,16 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         """
         logger.info("%s: Partial fit (%d, %d)", self.__class__.__name__, start_index, end_index)
 
+        dataframes: dict[str, pd.DataFrame] = output.to_dataframes()
+
         constraints_log10_values: npt.NDArray = np.log10(
-            self._get_values(output, "constraints", start_index, end_index)
+            self._get_select_values(dataframes["constraints"], start_index, end_index)
         )
         constraints_scaled: npt.NDArray | spmatrix = self._constraints_scalar.transform(
             constraints_log10_values
         )
-        solution_log10_values: npt.NDArray = self._get_values(
-            output, "raw_solution", start_index, end_index
+        solution_log10_values: npt.NDArray = self._get_select_values(
+            dataframes["raw_solution"], start_index, end_index
         )
         solution_scaled: npt.NDArray | spmatrix = self._solution_scalar.transform(
             solution_log10_values
