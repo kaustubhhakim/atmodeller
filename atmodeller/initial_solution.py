@@ -103,7 +103,6 @@ class InitialSolution(ABC, Generic[T]):
         fill_log10_activity: float = 0,
         fill_log10_mass: float = 20,
         fill_log10_stability: float = -35,
-        solution_override: InitialSolutionDict | None = None,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -115,10 +114,6 @@ class InitialSolution(ABC, Generic[T]):
         self._fill_log10_activity: float = fill_log10_activity
         self._fill_log10_mass: float = fill_log10_mass
         self._fill_log10_stability: float = fill_log10_stability
-        if solution_override is None:
-            self._solution_override: InitialSolutionDict | None = None
-        else:
-            self._solution_override = solution_override
 
     @property
     def species(self) -> Species:
@@ -126,7 +121,7 @@ class InitialSolution(ABC, Generic[T]):
         return self._species
 
     @abstractmethod
-    def set_data_preprocessing(
+    def set_data(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> None:
         """Sets the raw data for the initial solution.
@@ -139,32 +134,7 @@ class InitialSolution(ABC, Generic[T]):
             pressure: Pressure in bar
         """
 
-    def set_data_postprocessing(
-        self,
-        constraints: SystemConstraints,
-        *,
-        temperature: float,
-        pressure: float,
-    ) -> None:
-        """Applies a user-specified override to the initial solution
-
-        Args:
-            constraints: Constraints
-            temperature: Temperature in K
-            pressure: Pressure in bar
-        """
-        if self._solution_override is not None:
-            self._solution_override.set_data(
-                constraints,
-                temperature=temperature,
-                pressure=pressure,
-                fill_missing_values=False,
-                apply_gas_constraints=False,
-                apply_activity_constraints=False,
-            )
-            self.solution.merge(self._solution_override.solution)
-
-    def set_data(
+    def process_data(
         self,
         constraints: SystemConstraints,
         *,
@@ -186,7 +156,7 @@ class InitialSolution(ABC, Generic[T]):
             apply_activity_constraints: Apply any activity constraints. Defaults to True.
         """
 
-        self.set_data_preprocessing(constraints, temperature=temperature, pressure=pressure)
+        self.set_data(constraints, temperature=temperature, pressure=pressure)
 
         if fill_missing_values:
             self.solution.gas.fill_missing_values(self._fill_log10_pressure)
@@ -214,8 +184,6 @@ class InitialSolution(ABC, Generic[T]):
                     temperature=temperature, pressure=pressure
                 )
 
-        self.set_data_postprocessing(constraints, temperature=temperature, pressure=pressure)
-
     def get_log10_value(
         self,
         constraints: SystemConstraints,
@@ -235,7 +203,7 @@ class InitialSolution(ABC, Generic[T]):
         Returns:
             The initial solution
         """
-        self.set_data(
+        self.process_data(
             constraints,
             temperature=temperature,
             pressure=pressure,
@@ -304,7 +272,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         return output
 
     @override
-    def set_data_preprocessing(self, *args, **kwargs) -> None:
+    def set_data(self, *args, **kwargs) -> None:
         del args
         del kwargs
         self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
@@ -361,6 +329,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         fit_batch_size: int = 100,
         partial_fit: bool = True,
         partial_fit_batch_size: int = 500,
+        solution_override: InitialSolutionDict | None = None,
         **kwargs,
     ):
         self.fit: bool = fit
@@ -370,6 +339,10 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self.partial_fit_batch_size: int = partial_fit_batch_size
 
         super().__init__(value, species=species, **kwargs)
+        if solution_override is None:
+            self._solution_override: InitialSolutionDict | None = None
+        else:
+            self._solution_override = solution_override
         self._fit(self.value)
 
     @classmethod
@@ -484,7 +457,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self._reg.partial_fit(constraints_scaled, solution_scaled)
 
     @override
-    def set_data_preprocessing(
+    def set_data(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
     ) -> None:
         evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
@@ -503,6 +476,23 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         )
 
         self.solution.data = solution_original.flatten()
+
+    def process_data(
+        self, constraints: SystemConstraints, *, temperature: float, pressure: float, **kwargs
+    ) -> None:
+        """Adds a user-specified override to the initial solution"""
+        super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
+
+        if self._solution_override is not None:
+            self._solution_override.set_data(
+                constraints,
+                temperature=temperature,
+                pressure=pressure,
+                fill_missing_values=False,
+                apply_gas_constraints=False,
+                apply_activity_constraints=False,
+            )
+            self.solution.merge(self._solution_override.solution)
 
     def action_fit(self, output: Output) -> tuple[int, int] | None:
         """Checks if a fit is necessary.

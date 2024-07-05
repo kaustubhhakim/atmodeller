@@ -314,37 +314,6 @@ def test_regressor(generate_regressor_data):
         )
 
 
-def test_override_dict():
-    """Tests a dict with an override option"""
-
-    H2O_g = GasSpecies("H2O")
-    H2_g = GasSpecies("H2")
-    CO_g = GasSpecies("CO")
-    CO2_g = GasSpecies("CO2")
-    CH4_g = GasSpecies("CH4")
-    species = Species([H2O_g, H2_g, CO_g, CO2_g, CH4_g])
-
-    constraints = SystemConstraints([PressureConstraint(H2_g, 5)])
-
-    solution_override = InitialSolutionDict({CH4_g: 100000}, species=species)
-    initial_solution = InitialSolutionDict(
-        {CO_g: 100, H2_g: 1000},
-        species=species,
-        fill_log10_pressure=4,
-        solution_override=solution_override,
-    )
-
-    result = initial_solution.get_log10_value(
-        constraints, temperature=dummy_variable, pressure=dummy_variable
-    )
-    target = np.array([4, 0.69897, 2, 4, 5])
-
-    logger.debug("result = %s", result)
-    logger.debug("target = %s", target)
-
-    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
-
-
 def test_regressor_override(generate_regressor_data):
     """Tests the regressor with an override option"""
 
