@@ -99,9 +99,9 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_pressure: float = MIN_LOG10_PRESSURE,
         max_log10_pressure: float = MAX_LOG10_PRESSURE,
         fill_log10_pressure: float = 1,
-        fill_log10_activity: float = 0,
-        fill_log10_mass: float = 20,
-        fill_log10_stability: float = -35,
+        fill_log10_activity: float = -0.3010299956639812,
+        fill_log10_mass: float = 18,
+        fill_log10_stability: float = -34,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -172,7 +172,13 @@ class InitialSolution(ABC, Generic[T]):
             )
 
         self.solution.mass.fill_missing_values(self._fill_log10_mass)
+        # TODO: Based on Trappist cases perturbing by 5 log units
+        if perturb_gas_log10:
+            self.solution.mass.perturb_values(5)
+
         self.solution.stability.fill_missing_values(self._fill_log10_stability)
+        if perturb_gas_log10:
+            self.solution.stability.perturb_values(5)
 
     def get_log10_value(
         self,
@@ -407,7 +413,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             raw_solution_log10_values
         )
 
-        base_regressor: SGDRegressor = SGDRegressor(tol=1e-6)
+        base_regressor: SGDRegressor = SGDRegressor()
         multi_output_regressor: MultiOutputRegressor = MultiOutputRegressor(base_regressor)
         multi_output_regressor.fit(constraints_scaled, solution_scaled)
 
@@ -584,6 +590,8 @@ class InitialSolutionLast(InitialSolutionProtocol):
                 value_dict[species] = value_dict.pop(species.name)
 
             self.value = InitialSolutionDict(value_dict, species=self.species)
+        else:
+            self.value.update(output)
 
 
 class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
