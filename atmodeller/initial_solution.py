@@ -85,7 +85,6 @@ class InitialSolution(ABC, Generic[T]):
         fill_log10_activity: Fill value for activity. Defaults to 0.
         fill_log10_mass: Fill value for mass. Defaults to 20.
         fill_log10_stability: Fill value for stability. Defaults to -35.
-        solution_override: Dictionary to override the initial solution values. Defaults to None.
 
     Attributes:
         value: An object used to compute the initial solution
@@ -141,48 +140,39 @@ class InitialSolution(ABC, Generic[T]):
         temperature: float,
         pressure: float,
         perturb_gas_log10: float = 0,
-        fill_missing_values: bool = True,
-        apply_gas_constraints: bool = True,
-        apply_activity_constraints: bool = True,
     ) -> None:
-        """Sets the initial solution data.
+        """Processes the initial solution data.
 
         Args:
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
             perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
-            apply_gas_constraints: Apply any gas constraints. Defaults to True.
-            apply_activity_constraints: Apply any activity constraints. Defaults to True.
         """
 
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
-        if fill_missing_values:
-            self.solution.gas.fill_missing_values(self._fill_log10_pressure)
-            self.solution.activity.fill_missing_values(self._fill_log10_activity)
-            self.solution.mass.fill_missing_values(self._fill_log10_mass)
-            self.solution.stability.fill_missing_values(self._fill_log10_stability)
-
         # Gas pressures
+        self.solution.gas.fill_missing_values(self._fill_log10_pressure)
         if perturb_gas_log10:
             self.solution.gas.perturb_values(perturb_gas_log10)
 
         self.solution.gas.clip_values(self._min_log10_pressure, self._max_log10_pressure)
-
-        if apply_gas_constraints:
-            for constraint in constraints.gas_constraints:
-                self.solution.gas.data[constraint.species] = constraint.get_log10_value(
-                    temperature=temperature, pressure=pressure
-                )
+        for constraint in constraints.gas_constraints:
+            self.solution.gas.data[constraint.species] = constraint.get_log10_value(
+                temperature=temperature, pressure=pressure
+            )
 
         # Activities
+        self.solution.activity.fill_missing_values(self._fill_log10_activity)
         self.solution.activity.clip_values(maximum_value=0)
-        if apply_activity_constraints:
-            for constraint in constraints.activity_constraints:
-                self.solution.activity.data[constraint.species] = constraint.get_log10_value(
-                    temperature=temperature, pressure=pressure
-                )
+        for constraint in constraints.activity_constraints:
+            self.solution.activity.data[constraint.species] = constraint.get_log10_value(
+                temperature=temperature, pressure=pressure
+            )
+
+        self.solution.mass.fill_missing_values(self._fill_log10_mass)
+        self.solution.stability.fill_missing_values(self._fill_log10_stability)
 
     def get_log10_value(
         self,
@@ -265,8 +255,8 @@ class InitialSolutionDict(InitialSolution[dict]):
             key: TypeChemicalSpecies_co | str = f"{prefix}{species.name}" if prefix else species
             try:
                 output[species] = np.log10(self.value[key])
-            # TODO: Clean up or add explaining comment
             except KeyError:
+                # Ignore missing keys. These are later filled with fill values.
                 continue
 
         return output
@@ -332,13 +322,12 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         solution_override: InitialSolutionDict | None = None,
         **kwargs,
     ):
+        super().__init__(value, species=species, **kwargs)
         self.fit: bool = fit
         # Ensure consistency of arguments and correct handling of fit versus partial refit.
         self.fit_batch_size: int = fit_batch_size if self.fit else 0
         self.partial_fit: bool = partial_fit
         self.partial_fit_batch_size: int = partial_fit_batch_size
-
-        super().__init__(value, species=species, **kwargs)
         if solution_override is None:
             self._solution_override: InitialSolutionDict | None = None
         else:
@@ -477,10 +466,11 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
         self.solution.data = solution_original.flatten()
 
+    @override
     def process_data(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float, **kwargs
     ) -> None:
-        """Adds a user-specified override to the initial solution"""
+        """Includes a user-specified override to the initial solution"""
         super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
 
         if self._solution_override is not None:
@@ -488,9 +478,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
                 constraints,
                 temperature=temperature,
                 pressure=pressure,
-                fill_missing_values=False,
-                apply_gas_constraints=False,
-                apply_activity_constraints=False,
             )
             self.solution.merge(self._solution_override.solution)
 
@@ -657,6 +644,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
     @override
     def update(self, output: Output) -> None:
         if output.size == self._switch_iteration:
+            # FIXME: Not true now with switch_iteration
             # The fit keyword argument of InitialSolutionRegressor is effectively ignored because
             # the fit is done once when InitialSolutionRegressor is instantiated and action_fit
             # cannot be triggered regardless of the value of fit.
