@@ -36,6 +36,7 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.core import MASS_PREFIX, STABILITY_PREFIX, Solution, Species
 from atmodeller.interfaces import ChemicalSpecies, TypeChemicalSpecies_co
 from atmodeller.output import Output
+from atmodeller.reaction_network import log10_TAU
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -172,13 +173,17 @@ class InitialSolution(ABC, Generic[T]):
             )
 
         self.solution.mass.fill_missing_values(self._fill_log10_mass)
-        # TODO: Based on Trappist cases perturbing by 5 log units
+        # Based on Trappist cases perturbing by 5 log units
         if perturb_gas_log10:
             self.solution.mass.perturb_values(5)
 
         self.solution.stability.fill_missing_values(self._fill_log10_stability)
+        # Satisfy auxilliary equation by construction
         if perturb_gas_log10:
-            self.solution.stability.perturb_values(5)
+            for species in self.solution.stability.data:
+                self.solution.stability.data[species] = (
+                    log10_TAU - self.solution.mass.data[species]
+                )
 
     def get_log10_value(
         self,
