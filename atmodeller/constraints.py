@@ -218,21 +218,6 @@ class ActivityConstraint(_SpeciesConstantConstraint[CondensedSpecies]):
         """
         return self.get_value(temperature, pressure)
 
-    # def fugacity(self, temperature: float, pressure: float) -> float:
-    #     """Alias for the value of the activity constraint, which is anyhow related to fugacity
-
-    #     This allows this constraint to satisfy
-    #     :class:`atmodeller.interfaces.FugacityConstraintProtocol`
-
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
-
-    #     Returns:
-    #         Fugacity (activity)
-    #     """
-    #     return self.activity(temperature, pressure)
-
 
 class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
     """A constant fugacity constraint
