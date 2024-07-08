@@ -62,7 +62,8 @@ class InteriorAtmosphereSystem:
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
     _solution: Solution = field(init=False)
     _residual: npt.NDArray = field(init=False)
-    _failed_solves: int = 0
+    _attempted_solves: int = field(init=False, default=0)
+    _failed_solves: int = field(init=False, default=0)
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
@@ -121,15 +122,20 @@ class InteriorAtmosphereSystem:
     @property
     def failed_solves(self) -> int:
         """Number of failed solves"""
-        fraction: float = self._failed_solves / self.number_of_solves
+        percentage_failed: float = self._failed_solves * 100 / self.number_of_attempted_solves
         logger.info(
-            "%d failed solves from a total of %d (%f %%)",
+            "%d failed solves from a total attempted of %d (%.1f %%)",
             self._failed_solves,
-            self.number_of_solves,
-            fraction,
+            self.number_of_attempted_solves,
+            percentage_failed,
         )
 
         return self._failed_solves
+
+    @property
+    def number_of_attempted_solves(self) -> int:
+        """The total number of systems with attempted solves"""
+        return self._attempted_solves
 
     @property
     def number_of_solves(self) -> int:
@@ -162,6 +168,8 @@ class InteriorAtmosphereSystem:
         for index, constraint in enumerate(self.constraints.total_pressure_constraint):
             output[constraint.name] = self._residual[-1]  # Always last index if applied
 
+        output["rms"] = np.sqrt(np.mean(np.array(list(output.values())) ** 2))
+
         return output
 
     def solution_dict(self) -> dict[str, float]:
@@ -178,8 +186,8 @@ class InteriorAtmosphereSystem:
             element: 0 for element in self.species.elements()
         }
         for species in self.species.condensed_species:
-            # TODO: Below can sometimes blow up when the solver tries a large step, although this
-            # can be mitigated by setting the `factor` solver option.
+            # Below can sometimes blow up when the solver tries a large step, although this can be
+            # mitigated by setting the solver keyword argument `factor`.
             species_mass: float = 10 ** self._solution.mass.data[species]
             for element, value in species.composition().items():
                 condensed_element_masses[element] += species_mass * value.fraction
@@ -303,7 +311,6 @@ class InteriorAtmosphereSystem:
 
     def get_mass_residual(self) -> npt.NDArray[np.float_]:
         """Returns the residual vector of the mass balance."""
-
         residual_mass: npt.NDArray[np.float_] = np.zeros(
             len(self.constraints.mass_constraints), dtype=np.float_
         )
@@ -347,6 +354,7 @@ class InteriorAtmosphereSystem:
             **options: Keyword arguments for solver options. Available keywords depend on method.
         """
         logger.info("Solving system number %d", self.number_of_solves)
+        self._attempted_solves += 1
 
         self._constraints = constraints
         self._constraints.add_activity_constraints(self.species)
@@ -462,7 +470,6 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
         """
-
         # This must be set here.
         self._solution.data = log_solution
 
