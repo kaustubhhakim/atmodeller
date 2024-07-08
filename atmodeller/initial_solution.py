@@ -50,7 +50,7 @@ T = TypeVar("T")
 MIN_LOG10_PRESSURE: float = -12
 """Minimum log10 (bar) of the initial gas species pressures
 
-Motivated by typical values of oxygen fugacity at the iron-wustite buffer
+Motivated by typical values of oxygen fugacity at the iron-wustite buffer at high temperature.
 """
 MAX_LOG10_PRESSURE: float = 8
 """Maximum log10 (bar) of the initial gas species pressures"""
@@ -549,11 +549,12 @@ class InitialSolutionLast(InitialSolutionProtocol):
     probably a reasonable initial estimate for the current solution.
 
     Args:
-        value: An initial solution until `switch_iteration` is reached. Defaults to None.
+        value: An initial solution until `switch_iteration` is reached. Defaults to None, meaning
+            that :class:`InitialSolutionDict` is used with default arguments.
         species: Species
         switch_iteration: Iteration number to switch the initial solution to the previous solution.
             Defaults to 1.
-        **kwargs: Keyword arguments to instantiate :class:`InitialSolutionDict`
+        **kwargs: Optional keyword arguments to instantiate :class:`InitialSolutionDict`
 
     Attributes:
         value: An initial solution for the first solution only
@@ -575,6 +576,7 @@ class InitialSolutionLast(InitialSolutionProtocol):
         self.value: InitialSolutionProtocol = value_start
         self._species: Species = species
         self._switch_iteration: int = switch_iteration
+        self._kwargs = kwargs
 
     @property
     def species(self) -> Species:
@@ -594,7 +596,7 @@ class InitialSolutionLast(InitialSolutionProtocol):
             for species in self.species.data:
                 value_dict[species] = value_dict.pop(species.name)
 
-            self.value = InitialSolutionDict(value_dict, species=self.species)
+            self.value = InitialSolutionDict(value_dict, species=self.species, **self._kwargs)
         else:
             self.value.update(output)
 
@@ -614,7 +616,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
             regressor. Defaults to 500.
         switch_iteration: Iteration number to switch the initial solution to the regressor.
             Defaults to 50.
-        **kwargs: Keyword arguments to instantiate :class:`InitialSolutionDict`
+        **kwargs: Optional keyword arguments to instantiate :class:`InitialSolutionDict`
 
     Attributes:
         value: An initial solution
@@ -657,10 +659,6 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
     @override
     def update(self, output: Output) -> None:
         if output.size == self._switch_iteration:
-            # FIXME: Not true now with switch_iteration
-            # The fit keyword argument of InitialSolutionRegressor is effectively ignored because
-            # the fit is done once when InitialSolutionRegressor is instantiated and action_fit
-            # cannot be triggered regardless of the value of fit.
             self.value = InitialSolutionRegressor(
                 output,
                 species=self._species,
