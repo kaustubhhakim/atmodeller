@@ -24,7 +24,7 @@ import pickle
 from collections import UserDict
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Hashable
 
 import numpy as np
 import pandas as pd
@@ -69,6 +69,22 @@ class Output(UserDict):
             output_data: dict[str, list[dict[str, float]]] = pickle.load(handle)
 
         logger.info("%s: Reading data from %s", cls.__name__, pickle_file)
+
+        return cls(output_data)
+
+    @classmethod
+    def from_dataframes(cls, dataframes: dict[str, pd.DataFrame]) -> Output:
+        """Reads a dictionary of dataframes and creates an Output instance.
+
+        Args:
+            dataframes: A dictionary of dataframes.
+
+        Returns:
+            Output
+        """
+        output_data: dict[str, list[dict[Hashable, float]]] = {}
+        for key, dataframe in dataframes.items():
+            output_data[key] = dataframe.to_dict(orient="records")
 
         return cls(output_data)
 
@@ -362,6 +378,26 @@ class Output(UserDict):
             self[key].extend(other[key])
 
         return self
+
+    def reorder(self, other: Output, index_key: str, index_name: str) -> Output:
+        """Reorder all the entries according to an index in `other`
+
+        Args:
+            other: Other output with the reordering index
+            index_key: Key of the index
+            index_name: Name of the index
+
+        Returns:
+            The reordered output
+        """
+        self_dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
+        other_dataframes: dict[str, pd.DataFrame] = other.to_dataframes()
+        index: pd.Index = pd.Index(other_dataframes[index_key][index_name])
+
+        for key, dataframe in self_dataframes.items():
+            self_dataframes[key] = dataframe.reindex(index)
+
+        return self.from_dataframes(self_dataframes)
 
     def __call__(
         self,
