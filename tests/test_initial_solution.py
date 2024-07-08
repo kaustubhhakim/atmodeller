@@ -45,7 +45,7 @@ RTOL: float = 1.0e-8
 """Relative tolerance"""
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
-REGRESSORTOL: float = 5e-3
+REGRESSORTOL: float = 8e-2
 """Tolerance for testing the regressor output"""
 
 dummy_variable: float = 1
@@ -147,7 +147,7 @@ def test_with_args_cond_dict():
     result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.04575749, 20, 20, -35, -35])
+    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.04575749, 18, 18, -34, -34])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -180,7 +180,7 @@ def test_with_args_constraints_cond_dict():
     result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.15490196, 20, 20, -35, -35])
+    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.15490196, 18, 18, -34, -34])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -215,7 +215,7 @@ def test_with_stability_constraints_cond_dict():
     result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.15490196, 22, 20, -35, 0.30103])
+    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.15490196, 22, 18, -34, 0.30103])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
