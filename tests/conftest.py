@@ -112,7 +112,7 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
         ]
     )
 
-    system.solve(constraints, factor=10)
+    system.solve(constraints, factor=1)
 
     return system
 
