@@ -379,8 +379,28 @@ class Output(UserDict):
 
         return self
 
+    def filter_by_index_notin(self, other: Output, index_key: str, index_name: str) -> Output:
+        """Filters out the entries in `self` that are not present in the index of `other`
+
+        Args:
+            other: Other output with the filtering index
+            index_key: Key of the index
+            index_name: Name of the index
+
+        Returns:
+            The filtered output
+        """
+        self_dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
+        other_dataframes: dict[str, pd.DataFrame] = other.to_dataframes()
+        index: pd.Index = pd.Index(other_dataframes[index_key][index_name])
+
+        for key, dataframe in self_dataframes.items():
+            self_dataframes[key] = dataframe[~dataframe.index.isin(index)]
+
+        return self.from_dataframes(self_dataframes)
+
     def reorder(self, other: Output, index_key: str, index_name: str) -> Output:
-        """Reorder all the entries according to an index in `other`
+        """Reorders all the entries according to an index in `other`
 
         Args:
             other: Other output with the reordering index
