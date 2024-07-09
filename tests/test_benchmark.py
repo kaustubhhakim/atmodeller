@@ -525,7 +525,7 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     system = graphite_water_condensed
-    system.output(to_excel=True)
+    # system.output(to_excel=True)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,
