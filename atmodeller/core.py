@@ -27,12 +27,12 @@ from typing import Generic, Mapping, TypeVar
 import numpy as np
 import numpy.typing as npt
 
-from atmodeller import GRAVITATIONAL_CONSTANT
+from atmodeller import BOLTZMANN_CONSTANT, GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.utilities import dataclass_to_logger, filter_by_type
+from atmodeller.utilities import UnitConversion, dataclass_to_logger, filter_by_type
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -135,6 +135,30 @@ class GasSpecies(ChemicalSpecies):
     def eos(self) -> RealGasProtocol:
         """A gas equation of state"""
         return self._eos
+
+    def number_density(self, temperature: float, pressure: float) -> float:
+        r"""Number density in molecules m\ :sup:`-3`
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Number density in molecules m\ :sup:`-3`
+        """
+        return UnitConversion.bar_to_Pa(pressure) / (BOLTZMANN_CONSTANT * temperature)
+
+    def pressure(self, temperature: float, number_density: float) -> float:
+        r"""Pressure
+
+        Args:
+            temperature: Temperature in K
+            number_density: Number density in molecules m\ :sup:`-3`
+
+        Returns:
+            Pressure in bar
+        """
+        return UnitConversion.Pa_to_bar(number_density * BOLTZMANN_CONSTANT * temperature)
 
     @property
     def solid_melt_distribution_coefficient(self) -> float:
@@ -403,6 +427,22 @@ class GasSolution(SolutionComponent[GasSpecies]):
         mass /= self.total_pressure
 
         return mass
+
+    def number_densities(self, temperature: float) -> dict[GasSpecies, float]:
+        """Number densities
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Number densities
+
+        """
+        number_densities: dict[GasSpecies, float] = {}
+        for species, pressure in self.physical.items():
+            number_densities[species] = species.number_density(temperature, pressure)
+
+        return number_densities
 
     @property
     def volume_mixing_ratios(self) -> dict[GasSpecies, float]:

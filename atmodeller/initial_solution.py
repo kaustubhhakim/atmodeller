@@ -71,6 +71,7 @@ class InitialSolutionProtocol(Protocol):
         temperature: float,
         pressure: float,
         perturb_gas_log10: float = 0,
+        attempt: int = 0,
     ) -> npt.NDArray[np.float_]: ...
 
     def update(self, output: Output) -> None: ...
@@ -206,6 +207,7 @@ class InitialSolution(ABC, Generic[T]):
         temperature: float,
         pressure: float,
         perturb_gas_log10: float = 0,
+        attempt: int = 0,
     ) -> npt.NDArray[np.float_]:
         """Gets the log10 value of the initial solution.
 
@@ -214,15 +216,22 @@ class InitialSolution(ABC, Generic[T]):
             temperature: Temperature in K
             pressure: Pressure in bar
             perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
+            attempt: Solution attempt number
 
         Returns:
             The initial solution
         """
+        # Only perturb the value after the first attempt
+        if attempt == 0:
+            perturb_value = 0
+        else:
+            perturb_value = perturb_gas_log10
+
         self.process_data(
             constraints,
             temperature=temperature,
             pressure=pressure,
-            perturb_gas_log10=perturb_gas_log10,
+            perturb_gas_log10=perturb_value,
         )
 
         logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
@@ -647,7 +656,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
 
     def __init__(
         self,
-        value: InitialSolution | None = None,
+        value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
         fit: bool = True,
@@ -658,10 +667,10 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         **kwargs,
     ):
         if value is None:
-            value_start: InitialSolution = InitialSolutionDict(species=species, **kwargs)
+            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
         else:
-            value_start = value
-        self.value: InitialSolutionProtocol = value_start
+            value_init = value
+        self.value: InitialSolutionProtocol = value_init
         self._species: Species = species
         self._switch_iteration: int = switch_iteration
         self._fit: bool = fit

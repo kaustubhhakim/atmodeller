@@ -214,6 +214,9 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = {}
         output["pressure"] = self.solution.gas.physical[species]
         output["fugacity"] = self.solution.gas.fugacities(self.planet.surface_temperature)[species]
+        output["number_density"] = self.solution.gas.number_densities(
+            self.planet.surface_temperature
+        )[species]
 
         # Atmosphere
         output["atmosphere_mass"] = (
@@ -363,7 +366,6 @@ class InteriorAtmosphereSystem:
             initial_solution = self.initial_solution
         assert initial_solution is not None
 
-        # These matrices depend on the constraints, but can be computed once for any given solve
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
             self.constraints
         )
@@ -374,17 +376,19 @@ class InteriorAtmosphereSystem:
             self.constraints
         )
 
-        # The only constraints that require pressure are the fugacity constraints, so for the
-        # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
-        # ensure the initial solution is bounded.
-        log_solution: npt.NDArray = initial_solution.get_log10_value(
-            self.constraints,
-            temperature=self.planet.surface_temperature,
-            pressure=1,
-        )
-
         for attempt in range(max_attempts):
             logger.info("Attempt %d/%d", attempt + 1, max_attempts)
+
+            # The only constraints that require pressure are the fugacity constraints, so for the
+            # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
+            # ensure the initial solution is bounded.
+            log_solution: npt.NDArray = initial_solution.get_log10_value(
+                self.constraints,
+                temperature=self.planet.surface_temperature,
+                pressure=1,
+                perturb_gas_log10=perturb_gas_log10,
+                attempt=attempt,
+            )
             logger.info("Initial solution = %s", log_solution)
             try:
                 sol = root(
@@ -417,7 +421,7 @@ class InteriorAtmosphereSystem:
                     sol.success = False
 
             if sol.success:
-                logger.debug("Actual solution = %s", sol.x)
+                logger.info("Actual solution = %s", sol.x)
                 error: npt.NDArray = np.sqrt(mean_squared_error(sol.x, log_solution))
                 logger.info(
                     "%s: RMSE (actual vs initial) = %s",
@@ -432,13 +436,6 @@ class InteriorAtmosphereSystem:
                 break
             else:
                 logger.warning("The solver failed.")
-                if attempt < max_attempts - 1:
-                    log_solution = initial_solution.get_log10_value(
-                        self.constraints,
-                        temperature=self.planet.surface_temperature,
-                        pressure=1,
-                        perturb_gas_log10=perturb_gas_log10,
-                    )
 
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
@@ -485,9 +482,6 @@ class InteriorAtmosphereSystem:
             equilibrium_modifier=equilibrium_modifier,
             solution=self.solution,
         )
-
-        # FIXME: Hacking the reaction residual to see if I can get failed condensate cases to solve
-        # residual_reaction *= 1e-1
 
         # Compute residual for the mass balance.
         residual_mass: npt.NDArray[np.float_] = self.get_mass_residual()
