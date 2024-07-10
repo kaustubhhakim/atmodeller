@@ -214,6 +214,9 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = {}
         output["pressure"] = self.solution.gas.physical[species]
         output["fugacity"] = self.solution.gas.fugacities(self.planet.surface_temperature)[species]
+        output["number_density"] = self.solution.gas.number_densities(
+            self.planet.surface_temperature
+        )[species]
 
         # Atmosphere
         output["atmosphere_mass"] = (

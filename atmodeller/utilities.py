@@ -131,6 +131,14 @@ class UnitConversion:
         return value_bar * 1e5
 
     @classmethod
+    def Pa_to_bar(  # Symbol name, so pylint: disable=C0103
+        cls,
+        value_Pa: MultiplyT = 1,
+    ) -> MultiplyT:
+        """Pa to bar"""
+        return value_Pa / cls.bar_to_Pa()
+
+    @classmethod
     def bar_to_GPa(  # Symbol name, so pylint: disable=C0103
         cls, value_bar: MultiplyT = 1
     ) -> MultiplyT:

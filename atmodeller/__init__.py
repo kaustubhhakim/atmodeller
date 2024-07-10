@@ -26,13 +26,15 @@ from molmass import Formula
 from scipy import constants
 
 GAS_CONSTANT: float = constants.gas_constant
-"""Gas constant in units of J/K/mol"""
+"""Gas constant in J/K/mol"""
 GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5
-"""Gas constant in units of m^3 bar/K/mol"""
+"""Gas constant in m^3 bar/K/mol"""
 GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant
-"""Gravitational constant in units of m^3/kg/s^2"""
+"""Gravitational constant in m^3/kg/s^2"""
 ATMOSPHERE: float = constants.atmosphere / constants.bar
-"""Atmospheres in one bar"""
+"""Atmospheres in 1 bar"""
+BOLTZMANN_CONSTANT: float = constants.Boltzmann
+"""Boltzmann constant in J/K"""
 # Used to determine the JANAF reference state
 NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
 """Noble gases"""
