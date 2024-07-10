@@ -418,7 +418,7 @@ class InteriorAtmosphereSystem:
                     sol.success = False
 
             if sol.success:
-                logger.debug("Actual solution = %s", sol.x)
+                logger.info("Actual solution = %s", sol.x)
                 error: npt.NDArray = np.sqrt(mean_squared_error(sol.x, log_solution))
                 logger.info(
                     "%s: RMSE (actual vs initial) = %s",
@@ -479,9 +479,6 @@ class InteriorAtmosphereSystem:
             equilibrium_modifier=equilibrium_modifier,
             solution=self.solution,
         )
-
-        # FIXME: Hacking the reaction residual to see if I can get failed condensate cases to solve
-        # residual_reaction *= 1e-1
 
         # Compute residual for the mass balance.
         residual_mass: npt.NDArray[np.float_] = self.get_mass_residual()
