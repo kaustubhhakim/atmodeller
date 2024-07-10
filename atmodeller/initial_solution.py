@@ -19,7 +19,8 @@
 from __future__ import annotations
 
 import logging
-import random
+
+# import random
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -167,20 +168,28 @@ class InitialSolution(ABC, Generic[T]):
 
         # Activities
         self.solution.activity.fill_missing_values(self._fill_log10_activity)
-        self.solution.activity.clip_values(maximum_value=0)
-        for constraint in constraints.activity_constraints:
-            self.solution.activity.data[constraint.species] = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
-            )
+        # FIXME: Testing not imposing constraints
+        # FIXME: This imposes the activity value if stable.
+        # self.solution.activity.clip_values(maximum_value=0)
+        # for constraint in constraints.activity_constraints:
+        #    self.solution.activity.data[constraint.species] = constraint.get_log10_value(
+        #        temperature=temperature, pressure=pressure
+        #    )
 
         self.solution.mass.fill_missing_values(self._fill_log10_mass)
 
         # TODO: Testing. If the solver fails it could be because one or several of the condensed
         # species are unstable. Just randomly guess here.
         if perturb_gas_log10:
-            for species in self.solution.mass.data:
-                self.solution.mass.data[species] = random.choice([-15, 20])
-            # self.solution.mass.perturb_values(10)
+            # for species in self.solution.activity.data:
+            #     stability: str = random.choice(["stable", "unstable"])
+            #     if stability == "stable":
+            #         self.solution.activity.data[species] = 0
+            #         self.solution.mass.data[species] = 19
+            #     else:
+            #         self.solution.activity.data[species] = -24
+            #         self.solution.mass.data[species] = -16
+            self.solution.mass.perturb_values(10)
 
         self.solution.stability.fill_missing_values(self._fill_log10_stability)
         # Satisfy auxilliary equation by construction
@@ -423,7 +432,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             raw_solution_log10_values
         )
 
-        base_regressor: SGDRegressor = SGDRegressor()
+        base_regressor: SGDRegressor = SGDRegressor(tol=1e-6)
         multi_output_regressor: MultiOutputRegressor = MultiOutputRegressor(base_regressor)
         multi_output_regressor.fit(constraints_scaled, solution_scaled)
 
@@ -481,6 +490,14 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         )
 
         self.solution.data = solution_original.flatten()
+
+        # FIXME: Regressor doesn't return a low enough log10 value
+        # if abs(self.solution.data[13]) < 1e-2:
+        #     logger.warning("Implementing hack")
+        #     self.solution.activity.data[self.species.get_species_from_name("H2O_l")] = -24
+        # if abs(self.solution.data[14]) < 1e-2:
+        #     logger.warning("Implementing hack")
+        #     self.solution.activity.data[self.species.get_species_from_name("C_cr")] = -24
 
     @override
     def process_data(
@@ -675,3 +692,63 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
             )
         else:
             self.value.update(output)
+
+
+class InitialSolutionSwitchOnFail(InitialSolutionProtocol):
+    """An initial solution that switches to a different initial solution after too many fails.
+
+    Args:
+        value: An initial solution until `switch_fails` is reached. Defaults to None.
+        species: Species
+        value_on_fail: An initial solution after `switch_fails` is reached. Defaults to None.
+        switch_fails: Number of fails before switching the initial solution. Defaults to 1.
+        **kwargs: Optional keyword arguments to instantiate :class:`InitialSolutionDict`
+
+    Attributes:
+        value: An initial solution before too many fails are reached
+        value_on_fail: An initial solution after too many fails are reached
+        solution: The initial solution
+    """
+
+    def __init__(
+        self,
+        value: InitialSolutionProtocol | None = None,
+        *,
+        species: Species,
+        value_on_fail: InitialSolutionProtocol | None = None,
+        switch_fails: int = 1,
+        **kwargs,
+    ):
+        if value is None:
+            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+        else:
+            value_init = value
+        self.value: InitialSolutionProtocol = value_init
+        if value_on_fail is None:
+            value_on_fail_init: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, **kwargs
+            )
+        else:
+            value_on_fail_init = value_on_fail
+        self.value_on_fail: InitialSolutionProtocol = value_on_fail_init
+        self._switch_fails: int = switch_fails
+        self._kwargs: dict[str, Any] = kwargs
+
+    @property
+    def species(self) -> Species:
+        return self.value.species
+
+    @override
+    def get_log10_value(self, *args, attempt: int, **kwargs) -> npt.NDArray[np.float_]:
+        if attempt < self._switch_fails:
+            logger.warning("Before switch on fail, attempt = %d", attempt)
+            return self.value.get_log10_value(*args, attempt=attempt, **kwargs)
+        else:
+            attempt = attempt - self._switch_fails
+            logger.warning("After switch on fail, attempt = %d", attempt)
+            return self.value_on_fail.get_log10_value(*args, attempt=attempt, **kwargs)
+
+    @override
+    def update(self, output: Output) -> None:
+        self.value.update(output)
+        self.value_on_fail.update(output)
