@@ -486,6 +486,9 @@ class InteriorAtmosphereSystem:
             solution=self.solution,
         )
 
+        # FIXME: Hacking the reaction residual to see if I can get failed condensate cases to solve
+        # residual_reaction *= 1e-1
+
         # Compute residual for the mass balance.
         residual_mass: npt.NDArray[np.float_] = self.get_mass_residual()
 

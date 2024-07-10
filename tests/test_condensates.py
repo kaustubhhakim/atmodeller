@@ -43,7 +43,17 @@ def test_tricky1(helper) -> None:
         surface_temperature=equilibrium_temperature,
         planet_mass=planet_mass,
         surface_radius=5.861e6,
+        mantle_melt_fraction=0,
     )
+
+    # Remove CH4 to avoid C-H coupling.  Remove H2O to have one condensed phase only. Even with
+    # just C as a condensed phase the O and H mass balance is thrown off.
+
+    # For a pure gas network, removing CH4 prevents a solution, giving rise to residuals for C, H,
+    # O masses > 0.01. Including CH4 allows a solution.
+
+    # For some of these cases SO2 is large so must include SO2 and SO as additional oxygen carriers
+    # otherwise the stoichiometry doesn't work out.
 
     H2O_g = GasSpecies("H2O")
     H2_g = GasSpecies("H2")
@@ -55,8 +65,13 @@ def test_tricky1(helper) -> None:
     # NH3_g = GasSpecies("NH3")
     H2O_l = LiquidSpecies("H2O")
     C_cr = SolidSpecies("C")
+    O2S_g = GasSpecies("O2S")
+    OS_g = GasSpecies("OS")
 
-    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, C_cr, H2O_l])  # N2_g, NH3_g
+    species = Species(
+        [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, O2S_g, OS_g, C_cr, H2O_l]
+    )  # , CH4_g])  # , C_cr]
+    # )  # , C_cr])  # , H2O_l])  # N2_g, NH3_g
 
     system = InteriorAtmosphereSystem(species=species, planet=trappist1e)
 
@@ -65,10 +80,11 @@ def test_tricky1(helper) -> None:
     h_kg = 1.23636e20
     o_kg = 2.3257e21
     # n_kg = 4.57934e18
+    s_kg = 6.55159e20
 
     # Tweak o mass to try and get convergence. Larger values don't improve the residual, but
     # reducing O content finds a solution
-    o_kg = o_kg * 0.75
+    # o_kg = o_kg * 0.8
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -76,8 +92,9 @@ def test_tricky1(helper) -> None:
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("O", o_kg),
             # ElementMassConstraint("N", n_kg),
+            ElementMassConstraint("S", s_kg),
         ]
     )
 
-    system.solve(constraints, factor=10, attempts=10)  # , method="lm")
+    system.solve(constraints, factor=10, attempts=10, method="lm")
     system.output("test_tricky1", to_excel=True)

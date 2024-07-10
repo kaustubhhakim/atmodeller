@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -173,9 +174,13 @@ class InitialSolution(ABC, Generic[T]):
             )
 
         self.solution.mass.fill_missing_values(self._fill_log10_mass)
-        # Based on Trappist cases perturbing by 5 log units
+
+        # TODO: Testing. If the solver fails it could be because one or several of the condensed
+        # species are unstable. Just randomly guess here.
         if perturb_gas_log10:
-            self.solution.mass.perturb_values(5)
+            for species in self.solution.mass.data:
+                self.solution.mass.data[species] = random.choice([-15, 20])
+            # self.solution.mass.perturb_values(10)
 
         self.solution.stability.fill_missing_values(self._fill_log10_stability)
         # Satisfy auxilliary equation by construction
