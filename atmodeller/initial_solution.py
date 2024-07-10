@@ -169,13 +169,13 @@ class InitialSolution(ABC, Generic[T]):
 
         # Activities
         self.solution.activity.fill_missing_values(self._fill_log10_activity)
-        # FIXME: Testing not imposing constraints
-        # FIXME: This imposes the activity value if stable.
-        # self.solution.activity.clip_values(maximum_value=0)
-        # for constraint in constraints.activity_constraints:
-        #    self.solution.activity.data[constraint.species] = constraint.get_log10_value(
-        #        temperature=temperature, pressure=pressure
-        #    )
+        # TODO: This imposes the activity value if stable, but might be in conflict with stability
+        # criteria for unstable condensates
+        self.solution.activity.clip_values(maximum_value=0)
+        for constraint in constraints.activity_constraints:
+            self.solution.activity.data[constraint.species] = constraint.get_log10_value(
+                temperature=temperature, pressure=pressure
+            )
 
         self.solution.mass.fill_missing_values(self._fill_log10_mass)
 
