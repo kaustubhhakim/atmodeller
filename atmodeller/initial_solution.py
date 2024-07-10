@@ -70,6 +70,7 @@ class InitialSolutionProtocol(Protocol):
         temperature: float,
         pressure: float,
         perturb_gas_log10: float = 0,
+        attempt: int = 0,
     ) -> npt.NDArray[np.float_]: ...
 
     def update(self, output: Output) -> None: ...
@@ -197,6 +198,7 @@ class InitialSolution(ABC, Generic[T]):
         temperature: float,
         pressure: float,
         perturb_gas_log10: float = 0,
+        attempt: int = 0,
     ) -> npt.NDArray[np.float_]:
         """Gets the log10 value of the initial solution.
 
@@ -205,15 +207,22 @@ class InitialSolution(ABC, Generic[T]):
             temperature: Temperature in K
             pressure: Pressure in bar
             perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
+            attempt: Solution attempt number
 
         Returns:
             The initial solution
         """
+        # Only perturb the value after the first attempt
+        if attempt == 0:
+            perturb_value = 0
+        else:
+            perturb_value = perturb_gas_log10
+
         self.process_data(
             constraints,
             temperature=temperature,
             pressure=pressure,
-            perturb_gas_log10=perturb_gas_log10,
+            perturb_gas_log10=perturb_value,
         )
 
         logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
@@ -630,7 +639,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
 
     def __init__(
         self,
-        value: InitialSolution | None = None,
+        value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
         fit: bool = True,
@@ -641,10 +650,10 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         **kwargs,
     ):
         if value is None:
-            value_start: InitialSolution = InitialSolutionDict(species=species, **kwargs)
+            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
         else:
-            value_start = value
-        self.value: InitialSolutionProtocol = value_start
+            value_init = value
+        self.value: InitialSolutionProtocol = value_init
         self._species: Species = species
         self._switch_iteration: int = switch_iteration
         self._fit: bool = fit
@@ -675,3 +684,60 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
             )
         else:
             self.value.update(output)
+
+
+class InitialSolutionSwitchOnFail(InitialSolutionProtocol):
+    """An initial solution that switches to a different initial solution after too many fails.
+
+    Args:
+        value: An initial solution until `switch_fails` is reached. Defaults to None.
+        species: Species
+        value_on_fail: An initial solution after `switch_fails` is reached. Defaults to None.
+        switch_fails: Number of fails before switching the initial solution. Defaults to 1.
+        **kwargs: Optional keyword arguments to instantiate :class:`InitialSolutionDict`
+
+    Attributes:
+        value: An initial solution before too many fails are reached
+        value_on_fail: An initial solution after too many fails are reached
+        solution: The initial solution
+    """
+
+    def __init__(
+        self,
+        value: InitialSolutionProtocol | None = None,
+        *,
+        species: Species,
+        value_on_fail: InitialSolutionProtocol | None = None,
+        switch_fails: int = 1,
+        **kwargs,
+    ):
+        if value is None:
+            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+        else:
+            value_init = value
+        self.value: InitialSolutionProtocol = value_init
+        if value_on_fail is None:
+            value_on_fail_init: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, **kwargs
+            )
+        else:
+            value_on_fail_init = value_on_fail
+        self.value_on_fail: InitialSolutionProtocol = value_on_fail_init
+        self._switch_fails: int = switch_fails
+        self._kwargs: dict[str, Any] = kwargs
+
+    @property
+    def species(self) -> Species:
+        return self.value.species
+
+    @override
+    def get_log10_value(self, *args, attempt: int, **kwargs) -> npt.NDArray[np.float_]:
+        if attempt < self._switch_fails:
+            return self.value.get_log10_value(*args, attempt=attempt, **kwargs)
+        else:
+            return self.value_on_fail.get_log10_value(*args, attempt=attempt, **kwargs)
+
+    @override
+    def update(self, output: Output) -> None:
+        self.value.update(output)
+        self.value_on_fail.update(output)
