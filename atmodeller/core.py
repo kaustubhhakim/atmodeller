@@ -136,30 +136,6 @@ class GasSpecies(ChemicalSpecies):
         """A gas equation of state"""
         return self._eos
 
-    def number_density(self, temperature: float, pressure: float) -> float:
-        r"""Number density in molecules m\ :sup:`-3`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Number density in molecules m\ :sup:`-3`
-        """
-        return UnitConversion.bar_to_Pa(pressure) / (BOLTZMANN_CONSTANT * temperature)
-
-    def pressure(self, temperature: float, number_density: float) -> float:
-        r"""Pressure
-
-        Args:
-            temperature: Temperature in K
-            number_density: Number density in molecules m\ :sup:`-3`
-
-        Returns:
-            Pressure in bar
-        """
-        return UnitConversion.Pa_to_bar(number_density * BOLTZMANN_CONSTANT * temperature)
-
     @property
     def solid_melt_distribution_coefficient(self) -> float:
         """Distribution coefficient between the gas trapped in solids and melt"""
@@ -402,8 +378,18 @@ class SolutionComponent(Generic[T]):
 
         return output
 
-    def solution_dict(self) -> dict[str, float]:
-        """Solution in a dictionary"""
+    def solution_dict(self, *args, **kwargs) -> dict[str, float]:
+        """Solution in a dictionary
+
+        Args:
+            *args: Unused positional arguments
+            **kwargs: Unused keyword arguments
+
+        Returns:
+            Solution dictionary
+        """
+        del args
+        del kwargs
         return {key: 10**value for key, value in self.raw_solution_dict().items()}
 
 
@@ -413,43 +399,77 @@ CondensedSolution = SolutionComponent[CondensedSpecies]
 class GasSolution(SolutionComponent[GasSpecies]):
     """The gas solution"""
 
-    @property
-    def total_pressure(self) -> float:
-        """Total pressure"""
-        return sum(self.physical.values())
-
-    @property
-    def mean_molar_mass(self) -> float:
-        """Mean molar mass"""
-        mass: float = 0
-        for species, pressure in self.physical.items():
-            mass += species.molar_mass * pressure
-        mass /= self.total_pressure
-
-        return mass
-
-    def number_densities(self, temperature: float) -> dict[GasSpecies, float]:
-        """Number densities
+    def pressures(self, temperature: float) -> dict[GasSpecies, float]:
+        """Pressures
 
         Args:
             temperature: Temperature in K
 
         Returns:
-            Number densities
-
+            Pressures in bar
         """
-        number_densities: dict[GasSpecies, float] = {}
-        for species, pressure in self.physical.items():
-            number_densities[species] = species.number_density(temperature, pressure)
+        pressures: dict[GasSpecies, float] = {}
+        for species, number_density in self.physical.items():
+            pressures[species] = UnitConversion.Pa_to_bar(
+                number_density * BOLTZMANN_CONSTANT * temperature
+            )
 
-        return number_densities
+        return pressures
 
-    @property
-    def volume_mixing_ratios(self) -> dict[GasSpecies, float]:
-        """Volume mixing ratios"""
+    def log10_pressures(self, temperature: float) -> dict[GasSpecies, float]:
+        """Log10 pressures
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Log10 pressures
+        """
+        log10_pressures: dict[GasSpecies, float] = {}
+        for species, pressure in self.pressures(temperature).items():
+            log10_pressures[species] = np.log10(pressure)
+
+        return log10_pressures
+
+    def total_pressure(self, temperature: float) -> float:
+        """Total pressure
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Total pressure in bar
+        """
+        return sum(self.pressures(temperature).values())
+
+    def mean_molar_mass(self, temperature: float) -> float:
+        """Mean molar mass
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Mean molar mass
+        """
+        mass: float = 0
+        for species, pressure in self.pressures(temperature).items():
+            mass += species.molar_mass * pressure
+        mass /= self.total_pressure(temperature)
+
+        return mass
+
+    def volume_mixing_ratios(self, temperature: float) -> dict[GasSpecies, float]:
+        """Volume mixing ratios
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Volume mixing ratios
+        """
         vmr: dict[GasSpecies, float] = {}
-        for species, pressure in self.physical.items():
-            vmr[species] = pressure / self.total_pressure
+        for species, pressure in self.pressures(temperature).items():
+            vmr[species] = pressure / self.total_pressure(temperature)
 
         return vmr
 
@@ -478,7 +498,7 @@ class GasSolution(SolutionComponent[GasSpecies]):
         fugacity_coefficients: dict[GasSpecies, float] = {}
         for species in self.data:
             fugacity_coefficients[species] = species.eos.fugacity_coefficient(
-                temperature, self.total_pressure
+                temperature, self.total_pressure(temperature)
             )
 
         return fugacity_coefficients
@@ -493,7 +513,7 @@ class GasSolution(SolutionComponent[GasSpecies]):
             Log10 gas fugacities
         """
         log10_fugacities: dict[GasSpecies, float] = {}
-        for species, log10_pressure in self.data.items():
+        for species, log10_pressure in self.log10_pressures(temperature).items():
             log10_fugacities[species] = (
                 log10_pressure + self.log10_fugacity_coefficients(temperature)[species]
             )
@@ -521,6 +541,18 @@ class GasSolution(SolutionComponent[GasSpecies]):
             Gas fugacities by hill formula
         """
         return {key.hill_formula: value for key, value in self.fugacities(temperature).items()}
+
+    @override
+    def solution_dict(self, temperature: float) -> dict[str, float]:
+        """Solution in a dictionary
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Solution dictionary
+        """
+        return {str(key): value for key, value in self.pressures(temperature).items()}
 
 
 class Solution:
@@ -636,53 +668,3 @@ class Solution:
         )
 
         return output
-
-    def solution_dict(self) -> dict[str, float]:
-        """Solution in a dictionary"""
-        output: dict[str, float] = (
-            self.gas.solution_dict() | self.activity.solution_dict() | self.mass.solution_dict()
-        )
-
-        return output
-
-    def isclose(
-        self, target_dict: dict[str, float], rtol: float = 1.0e-5, atol: float = 1.0e-8
-    ) -> np.bool_:
-        """Determines if the solution pressures are close to target values within a tolerance.
-
-        Args:
-            target_dict: Dictionary of the target values
-            rtol: Relative tolerance. Defaults to 1.0E-5.
-            atol: Absolute tolerance. Defaults to 1.0E-8.
-
-        Returns:
-            True if the solution is close to the target, otherwise False
-        """
-
-        if len((self.solution_dict())) != len(target_dict):
-            return np.bool_(False)
-
-        target_values: list = list(dict(sorted(target_dict.items())).values())
-        solution_values: list = list(dict(sorted(self.solution_dict().items())).values())
-        isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
-
-        return isclose
-
-    def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
-        """Writes a log message with the tightest tolerance that is satisfied.
-
-        Args:
-            target_dict: Dictionary of the target values
-            message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
-                to an empty string.
-
-        Returns:
-            The tightest tolerance satisfied
-        """
-        for log_tolerance in (-6, -5, -4, -3, -2, -1):
-            tol: float = 10**log_tolerance
-            if self.isclose(target_dict, rtol=tol, atol=tol):
-                logger.info("%s (tol = %f)".lstrip(), message, tol)
-                return tol
-
-        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)

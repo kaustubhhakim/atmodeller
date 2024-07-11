@@ -96,12 +96,12 @@ class InteriorAtmosphereSystem:
     @property
     def atmosphere_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere"""
-        return self.solution.gas.mean_molar_mass
+        return self.solution.gas.mean_molar_mass(self.planet.surface_temperature)
 
     @property
     def atmosphere_pressure(self) -> float:
         """Total pressure of the atmosphere"""
-        return self.solution.gas.total_pressure
+        return self.solution.gas.total_pressure(self.planet.surface_temperature)
 
     @property
     def atmosphere_species_moles(self) -> float:
@@ -172,10 +172,6 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    def solution_dict(self) -> dict[str, float]:
-        """Solution in a dictionary"""
-        return self._solution.solution_dict()
-
     def condensed_element_masses(self) -> dict[str, float]:
         """Calculates the masses of elements in all condensed species.
 
@@ -212,11 +208,9 @@ class InteriorAtmosphereSystem:
             A dictionary that includes the reservoir masses of the species
         """
         output: dict[str, float] = {}
-        output["pressure"] = self.solution.gas.physical[species]
+        output["number_density"] = self.solution.gas.physical[species]
+        output["pressure"] = self.solution.gas.pressures(self.planet.surface_temperature)[species]
         output["fugacity"] = self.solution.gas.fugacities(self.planet.surface_temperature)[species]
-        output["number_density"] = self.solution.gas.number_densities(
-            self.planet.surface_temperature
-        )[species]
 
         # Atmosphere
         output["atmosphere_mass"] = (
@@ -432,7 +426,7 @@ class InteriorAtmosphereSystem:
                 self._residual = sol.fun
                 self.output.add(self, extra_output)
                 initial_solution.update(self.output)
-                logger.info(pprint.pformat(self.solution.solution_dict()))
+                logger.info(pprint.pformat(self.solution_dict()))
                 break
             else:
                 logger.warning("The solver failed.")
@@ -505,3 +499,57 @@ class InteriorAtmosphereSystem:
         logger.debug("residual = %s", residual)
 
         return residual
+
+    def solution_dict(self) -> dict[str, float]:
+        """Solution in a dictionary"""
+        output: dict[str, float] = (
+            self.solution.gas.solution_dict(self.planet.surface_temperature)
+            | self.solution.activity.solution_dict()
+            | self.solution.mass.solution_dict()
+        )
+
+        return output
+
+    def isclose(
+        self,
+        target_dict: dict[str, float],
+        rtol: float = 1.0e-5,
+        atol: float = 1.0e-8,
+    ) -> np.bool_:
+        """Determines if the solution pressures are close to target values within a tolerance.
+
+        Args:
+            target_dict: Dictionary of the target values
+            rtol: Relative tolerance. Defaults to 1.0E-5.
+            atol: Absolute tolerance. Defaults to 1.0E-8.
+
+        Returns:
+            True if the solution is close to the target, otherwise False
+        """
+        if len((self.solution_dict())) != len(target_dict):
+            return np.bool_(False)
+
+        target_values: list = list(dict(sorted(target_dict.items())).values())
+        solution_values: list = list(dict(sorted(self.solution_dict().items())).values())
+        isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
+
+        return isclose
+
+    def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
+        """Writes a log message with the tightest tolerance that is satisfied.
+
+        Args:
+            target_dict: Dictionary of the target values
+            message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
+                to an empty string.
+
+        Returns:
+            The tightest tolerance satisfied
+        """
+        for log_tolerance in (-6, -5, -4, -3, -2, -1):
+            tol: float = 10**log_tolerance
+            if self.isclose(target_dict, rtol=tol, atol=tol):
+                logger.info("%s (tol = %f)".lstrip(), message, tol)
+                return tol
+
+        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)

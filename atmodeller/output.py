@@ -256,9 +256,9 @@ class Output(UserDict):
                     interior_atmosphere.planet.surface_temperature
                 )[species]
             )
-            output["volume_mixing_ratio"] = interior_atmosphere.solution.gas.volume_mixing_ratios[
-                species
-            ]
+            output["volume_mixing_ratio"] = interior_atmosphere.solution.gas.volume_mixing_ratios(
+                interior_atmosphere.planet.surface_temperature
+            )[species]
             output["molar_mass"] = interior_atmosphere.species.get_species(species).molar_mass
             output["total_mass"] = (
                 output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
@@ -296,7 +296,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         data_list: list[dict[str, float]] = self.data.setdefault("solution", [])
-        data_list.append(interior_atmosphere.solution.solution_dict())
+        data_list.append(interior_atmosphere.solution_dict())
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Output as a dictionary of dataframes
