@@ -619,6 +619,25 @@ class Solution:
 
         return data
 
+    @data.setter
+    def data(self, value: npt.NDArray[np.float_]) -> None:
+        """Sets the solution from an array.
+
+        Args:
+            value: An array, which is usually passed by the solver.
+        """
+        index: int = 0
+        for species in self._species.gas_species:
+            index = self._species.species_index(species)
+            self.gas.data[species] = value[index]
+        for counter, species in enumerate(self._species.condensed_species):
+            index = self._species.species_index(species)
+            self.activity.data[species] = value[index]
+            index = self._species.number + counter
+            self.mass.data[species] = value[index]
+            index += self._species.number_condensed_species
+            self.stability.data[species] = value[index]
+
     def reaction_array(self, temperature: float) -> npt.NDArray[np.float_]:
         """The reaction array for the solver
 
@@ -638,25 +657,6 @@ class Solution:
             data[index] = self.activity.data[species]
 
         return data
-
-    @data.setter
-    def data(self, value: npt.NDArray[np.float_]) -> None:
-        """Sets the solution from an array.
-
-        Args:
-            value: An array, which is usually passed by the solver.
-        """
-        index: int = 0
-        for species in self._species.gas_species:
-            index = self._species.species_index(species)
-            self.gas.data[species] = value[index]
-        for counter, species in enumerate(self._species.condensed_species):
-            index = self._species.species_index(species)
-            self.activity.data[species] = value[index]
-            index = self._species.number + counter
-            self.mass.data[species] = value[index]
-            index += self._species.number_condensed_species
-            self.stability.data[species] = value[index]
 
     def merge(self, other: Solution) -> None:
         """Merges the data from another solution
