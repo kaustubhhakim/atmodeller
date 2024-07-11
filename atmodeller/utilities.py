@@ -32,7 +32,7 @@ import numpy.typing as npt
 import pandas as pd
 from scipy.constants import kilo, mega
 
-from atmodeller import ATMOSPHERE, OCEAN_MASS_H2
+from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -316,3 +316,16 @@ def reorder_dict(original_dict: dict[Any, Any], key_to_move_first: Any) -> dict:
         key_to_move_first: original_dict[key_to_move_first],
         **{k: v for k, v in original_dict.items() if k != key_to_move_first},
     }
+
+
+def get_number_density(temperature: float, pressure: float) -> float:
+    r"""Pressure to number density
+
+    Args:
+        temperature: Temperature in K
+        pressure: Pressure in bar
+
+    Returns:
+        Number density in molecules m\ :sup:`-3`
+    """
+    return UnitConversion.bar_to_Pa(pressure) / (BOLTZMANN_CONSTANT * temperature)

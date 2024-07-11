@@ -619,6 +619,26 @@ class Solution:
 
         return data
 
+    def reaction_array(self, temperature: float) -> npt.NDArray[np.float_]:
+        """The reaction array for the solver
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            log10 activities and pressures
+        """
+        data: npt.NDArray[np.float_] = np.zeros(self._species.number, dtype=np.float_)
+        index: int = 0
+        for species in self._species.gas_species:
+            index = self._species.species_index(species)
+            data[index] = self.gas.log10_pressures(temperature)[species]
+        for species in self._species.condensed_species:
+            index = self._species.species_index(species)
+            data[index] = self.activity.data[species]
+
+        return data
+
     @data.setter
     def data(self, value: npt.NDArray[np.float_]) -> None:
         """Sets the solution from an array.
