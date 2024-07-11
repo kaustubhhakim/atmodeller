@@ -669,7 +669,7 @@ class Solution:
         self.mass.data |= other.mass.data
         self.stability.data |= other.stability.data
 
-    def stability_array(self) -> npt.NDArray:
+    def stability_array(self) -> npt.NDArray[np.float_]:
         """The condensate stability array"""
         stability_array: npt.NDArray = np.zeros(self._species.number, dtype=np.float_)
         for species, value in self.stability.data.items():
