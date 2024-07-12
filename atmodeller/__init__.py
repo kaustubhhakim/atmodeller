@@ -35,6 +35,8 @@ ATMOSPHERE: float = constants.atmosphere / constants.bar
 """Atmospheres in 1 bar"""
 BOLTZMANN_CONSTANT: float = constants.Boltzmann
 """Boltzmann constant in J/K"""
+BOLTZMANN_CONSTANT_BAR: float = BOLTZMANN_CONSTANT * 1e-5
+"""Boltzmann constant in bar m^3/K"""
 # Used to determine the JANAF reference state
 NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
 """Noble gases"""

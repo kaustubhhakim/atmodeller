@@ -32,7 +32,7 @@ import numpy.typing as npt
 import pandas as pd
 from scipy.constants import kilo, mega
 
-from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT, OCEAN_MASS_H2
+from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -328,7 +328,7 @@ def get_number_density(temperature: float, pressure: float) -> float:
     Returns:
         Number density in molecules m\ :sup:`-3`
     """
-    return UnitConversion.bar_to_Pa(pressure) / (BOLTZMANN_CONSTANT * temperature)
+    return pressure / (BOLTZMANN_CONSTANT_BAR * temperature)
 
 
 def get_log10_number_density(*args, **kwargs) -> float:

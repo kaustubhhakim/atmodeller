@@ -27,12 +27,12 @@ from typing import Generic, Mapping, TypeVar
 import numpy as np
 import numpy.typing as npt
 
-from atmodeller import BOLTZMANN_CONSTANT, GRAVITATIONAL_CONSTANT
+from atmodeller import BOLTZMANN_CONSTANT_BAR, GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.utilities import UnitConversion, dataclass_to_logger, filter_by_type
+from atmodeller.utilities import dataclass_to_logger, filter_by_type
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -410,9 +410,7 @@ class GasSolution(SolutionComponent[GasSpecies]):
         """
         pressures: dict[GasSpecies, float] = {}
         for species, number_density in self.physical.items():
-            pressures[species] = UnitConversion.Pa_to_bar(
-                number_density * BOLTZMANN_CONSTANT * temperature
-            )
+            pressures[species] = number_density * BOLTZMANN_CONSTANT_BAR * temperature
 
         return pressures
 
@@ -637,26 +635,6 @@ class Solution:
             self.mass.data[species] = value[index]
             index += self._species.number_condensed_species
             self.stability.data[species] = value[index]
-
-    def reaction_array(self, temperature: float) -> npt.NDArray[np.float_]:
-        """The reaction array for the solver
-
-        Args:
-            temperature: Temperature in K
-
-        Returns:
-            log10 activities and pressures
-        """
-        data: npt.NDArray[np.float_] = np.zeros(self._species.number, dtype=np.float_)
-        index: int = 0
-        for species in self._species.gas_species:
-            index = self._species.species_index(species)
-            data[index] = self.gas.log10_pressures(temperature)[species]
-        for species in self._species.condensed_species:
-            index = self._species.species_index(species)
-            data[index] = self.activity.data[species]
-
-        return data
 
     def merge(self, other: Solution) -> None:
         """Merges the data from another solution

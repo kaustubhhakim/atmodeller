@@ -28,7 +28,7 @@ import sys
 import numpy as np
 import numpy.typing as npt
 
-from atmodeller import BOLTZMANN_CONSTANT, GAS_CONSTANT
+from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Solution, Species
 from atmodeller.utilities import partial_rref
@@ -135,7 +135,7 @@ class ReactionNetwork:
         """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            reaction_index: Row index of the reaction in :attr:`reaction_matrix`
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -153,7 +153,7 @@ class ReactionNetwork:
         """Gets the log10 of the equilibrium constant in terms of partial pressures.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            reaction_index: Row index of the reaction in :attr:`reaction_matrix`
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -169,7 +169,7 @@ class ReactionNetwork:
         """Gets the difference in the moles of products compared to the moles of reactants.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            reaction_index: Row index of the reaction in :attr:`reaction_matrix`
 
         Returns:
             The difference in the moles of products compared to the moles of reactants
@@ -181,7 +181,7 @@ class ReactionNetwork:
         """Gets the natural log of the equilibrium constant in terms of number densities.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            reaction_index: Row index of the reaction in :attr:`reaction_matrix`
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -190,7 +190,7 @@ class ReactionNetwork:
         """
         lnKp: float = self._get_lnKp(reaction_index, temperature=temperature, pressure=pressure)
         delta_n: float = self._get_delta_n(reaction_index)
-        lnKc: float = lnKp - delta_n * np.log(BOLTZMANN_CONSTANT * temperature)
+        lnKc: float = lnKp - delta_n * (np.log(BOLTZMANN_CONSTANT_BAR) + np.log(temperature))
 
         return lnKc
 
@@ -282,29 +282,26 @@ class ReactionNetwork:
 
         # Reactions
         for reaction_index in range(self.number_reactions):
-            # logger.debug(
-            #     "Row %02d: Reaction %d: %s",
-            #     reaction_index,
-            #     reaction_index,
-            #     self.reactions()[reaction_index],
-            # )
-            rhs[reaction_index] = self._get_log10Kp(
+            log10Kc: float = self._get_log10Kc(
                 reaction_index,
                 temperature=temperature,
                 pressure=pressure,
             )
+            rhs[reaction_index] = log10Kc
 
         # Constraints
         for index, constraint in enumerate(constraints.gas_constraints):
             row_index: int = self.number_reactions + index
             # pylint: disable=line-too-long
-            logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
-            rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
+            # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
+            rhs[row_index] = constraint.log10_number_density(
+                temperature=temperature, pressure=pressure
+            )
 
         for index, constraint in enumerate(constraints.activity_constraints):
             row_index: int = self.number_reactions + index
             # pylint: disable=line-too-long
-            logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
+            # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
         logger.debug("RHS vector = %s", rhs)
@@ -350,7 +347,7 @@ class ReactionNetwork:
         temperature: float,
         pressure: float,
         constraints: SystemConstraints,
-        coefficient_matrix: npt.NDArray,
+        coefficient_matrix: npt.NDArray[np.float_],
         solution: Solution,
         **kwargs,
     ) -> npt.NDArray[np.float_]:
@@ -376,7 +373,7 @@ class ReactionNetwork:
         )
         residual_reaction: npt.NDArray[np.float_] = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(solution.reaction_array(temperature))
+            + coefficient_matrix.dot(solution.data[: self._species.number])
             - rhs
         )
 
