@@ -464,7 +464,7 @@ def test_water_condensed(helper) -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(H2_g, value=7),
+            FugacityConstraint(H2_g, 7),
             ElementMassConstraint("H", h_kg),
         ]
     )
