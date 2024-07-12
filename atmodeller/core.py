@@ -150,7 +150,6 @@ class SolidSpecies(CondensedSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-        activity: Activity model. Defaults to unity for a pure component.
     """
 
     @override
@@ -166,7 +165,6 @@ class LiquidSpecies(CondensedSpecies):
         thermodata_dataset: The thermodynamic dataset. Defaults to JANAF
         thermodata_name: Name in the thermodynamic dataset. Defaults to None.
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
-        activity: Activity model. Defaults to unity for a pure component.
     """
 
     @override

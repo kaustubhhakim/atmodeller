@@ -425,6 +425,7 @@ class SystemConstraints(UserList):
         """
         for condensed_species in species.condensed_species:
             if condensed_species not in self.constrained_species:
+                # FIXME: Maybe don't set by default?
                 logger.debug("Automatically adding activity constraint for %s", condensed_species)
                 self.append(ActivityConstraint(condensed_species, 1))
             else:

@@ -95,7 +95,7 @@ class ReactionNetwork:
         """Gets the reaction matrix
 
         Returns:
-            A matrix of linearly independent reactions
+            A matrix of linearly independent reactions or None
         """
         if self._species.number == 1:
             logger.debug("Only one species therefore no reactions")
@@ -166,16 +166,22 @@ class ReactionNetwork:
         return log10Kp
 
     def _get_delta_n(self, reaction_index: int) -> float:
-        """Gets the difference in the moles of products compared to the moles of reactants.
+        """Gets the difference in the moles of gas products compared to the moles of gas reactants.
 
         Args:
             reaction_index: Row index of the reaction in :attr:`reaction_matrix`
 
         Returns:
-            The difference in the moles of products compared to the moles of reactants
+            The difference in the moles of gas products compared to the moles of gas reactants
         """
         assert self.reaction_matrix is not None
-        return np.sum(self.reaction_matrix[reaction_index, :])
+
+        delta_n: float = 0
+        for species in self._species.gas_species:
+            species_index: int = self._species.species_index(species)
+            delta_n += self.reaction_matrix[reaction_index, species_index]
+
+        return delta_n
 
     def _get_lnKc(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
         """Gets the natural log of the equilibrium constant in terms of number densities.
