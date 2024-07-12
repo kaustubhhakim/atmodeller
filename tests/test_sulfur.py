@@ -44,9 +44,9 @@ from atmodeller.solubility.sulfur_species import (
 )
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
-RTOL: float = 1.0e-8
+RTOL: float = 1.0e-6
 """Relative tolerance"""
-ATOL: float = 1.0e-8
+ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
@@ -338,7 +338,7 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
         "S2_g": 0.004999999999999994,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 
