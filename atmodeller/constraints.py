@@ -37,7 +37,7 @@ from atmodeller.interfaces import (
     ReactionNetworkConstraintProtocol,
 )
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
-from atmodeller.utilities import filter_by_type, get_log10_number_density
+from atmodeller.utilities import filter_by_type, get_number_density
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -48,6 +48,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=ConstraintProtocol)
 U = TypeVar("U", bound=ChemicalSpecies)
+V = TypeVar("V")
 
 
 class ElementMassConstraint(MassConstraintProtocol):
@@ -111,18 +112,20 @@ class ElementMassConstraint(MassConstraintProtocol):
         return np.log10(self.get_value(*args, **kwargs))
 
 
-class _SpeciesConstraint(ABC, Generic[U]):
+class _SpeciesConstraint(ABC, Generic[U, V]):
     """A species constraint
 
     Args:
         species: The species to constrain
-        constraint: The type of constraint, which should be activity, fugacity, pressure or mass,
-            depending on the phase of the species.
+        value: Object to compute the value of the constraint
     """
 
-    def __init__(self, species: U, constraint: str):
+    constraint_type: str = "default"
+
+    def __init__(self, species: U, value: V):
         self._species: U = species
-        self._constraint: str = constraint
+        self._value: V = value
+        self._constraint: str = self.constraint_type
 
     @property
     def constraint(self) -> str:
@@ -150,7 +153,6 @@ class _SpeciesConstraint(ABC, Generic[U]):
             The evaluated value
         """
 
-    @abstractmethod
     def get_log10_value(self, temperature: float, pressure: float) -> float:
         """Computes the log10 value for given input arguments.
 
@@ -161,50 +163,18 @@ class _SpeciesConstraint(ABC, Generic[U]):
         Returns:
             The log10 evaluated value
         """
-
-
-class _SpeciesConstantConstraint(_SpeciesConstraint[U]):
-    """A species constraint of a constant value
-
-    Args:
-        species: The species to constrain
-        constraint: The type of constraint, which should be activity, fugacity, pressure or mass,
-            depending on the phase of the species.
-        value: The constant value
-    """
-
-    @override
-    def __init__(self, species: U, value: float, constraint: str):
-        super().__init__(species, constraint)
-        self._value: float = value
-
-    @override
-    def get_value(self, temperature: float, pressure: float) -> float:
-        del temperature
-        del pressure
-
-        return self._value
-
-    @override
-    def get_log10_value(self, temperature: float, pressure: float) -> float:
         return np.log10(self.get_value(temperature, pressure))
 
 
-class ActivityConstraint(_SpeciesConstantConstraint[CondensedSpecies]):
-    """A constant activity
+class ActivityConstraint(_SpeciesConstraint[CondensedSpecies, float]):
+    """An activity
 
     Args:
         species: The species to constrain
         value: The activity. Defaults to unity for ideal behaviour.
     """
 
-    @override
-    def __init__(
-        self,
-        species: CondensedSpecies,
-        value: float = 1,
-    ):
-        super().__init__(species, value, "activity")
+    constraint_type: str = "activity"
 
     def activity(self, temperature: float, pressure: float) -> float:
         """Value of the activity constraint
@@ -216,24 +186,27 @@ class ActivityConstraint(_SpeciesConstantConstraint[CondensedSpecies]):
         Returns:
             Activity
         """
-        return self.get_value(temperature, pressure)
+        del temperature
+        del pressure
+
+        return self._value
+
+    @override
+    def get_value(self, temperature: float, pressure: float) -> float:
+        return self.activity(temperature, pressure)
 
 
-class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
-    """A constant fugacity constraint
+class _FugacityConstraint(_SpeciesConstraint[GasSpecies, V]):
+    """A fugacity constraint
 
     Args:
         species: The species to constrain
-        value: The fugacity in bar
+        value: Object to compute the fugacity
     """
 
-    @override
-    def __init__(self, species: GasSpecies, value: float):
-        super().__init__(species, value, "fugacity")
+    constraint_type: str = "fugacity"
 
-    def log10_number_density(self, temperature: float, pressure: float) -> float:
-        return get_log10_number_density(temperature, self.fugacity(temperature, pressure))
-
+    @abstractmethod
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Value of the fugacity constraint in bar
 
@@ -244,7 +217,6 @@ class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
         Returns:
             Fugacity in bar
         """
-        return self.get_value(temperature, pressure)
 
     def pressure(self, temperature: float, pressure: float) -> float:
         """Value of the pressure constraint in bar
@@ -261,8 +233,28 @@ class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
 
         return fugacity
 
+    @override
+    def get_value(self, temperature: float, pressure: float) -> float:
+        return get_number_density(temperature, self.fugacity(temperature, pressure))
 
-class BufferedFugacityConstraint(_SpeciesConstraint[GasSpecies]):
+
+class FugacityConstraint(_FugacityConstraint[float]):
+    """A constant fugacity constraint
+
+    Args:
+        species: The species to constrain
+        value: The fugacity in bar
+    """
+
+    @override
+    def fugacity(self, temperature: float, pressure: float) -> float:
+        del temperature
+        del pressure
+
+        return self._value
+
+
+class BufferedFugacityConstraint(_FugacityConstraint[RedoxBufferProtocol]):
     """A buffered fugacity constraint
 
     Args:
@@ -271,62 +263,34 @@ class BufferedFugacityConstraint(_SpeciesConstraint[GasSpecies]):
     """
 
     @override
-    def __init__(self, species: GasSpecies, value: RedoxBufferProtocol):
-        super().__init__(species, "fugacity")
-        self._value: RedoxBufferProtocol = value
-
     def fugacity(self, temperature: float, pressure: float) -> float:
-        """Value of the fugacity constraint in bar
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Fugacity in bar
-        """
-        return self.get_value(temperature, pressure)
-
-    def log10_number_density(self, temperature: float, pressure: float) -> float:
-        return get_log10_number_density(temperature, self.fugacity(temperature, pressure))
-
-    @override
-    def get_value(self, temperature: float, pressure: float) -> float:
         return self._value.get_value(temperature, pressure)
 
-    @override
-    def get_log10_value(self, temperature: float, pressure: float) -> float:
-        return np.log10(self.get_value(temperature, pressure))
 
-
-class MassConstraint(_SpeciesConstantConstraint):
-    """A constant mass constraint
+class MassConstraint(_SpeciesConstraint[ChemicalSpecies, float]):
+    """A mass constraint
 
     Args:
         species: The species to constrain
         value: The mass in kg
     """
 
-    @override
-    def __init__(self, species: ChemicalSpecies, value: float):
-        super().__init__(species, value, "mass")
+    constraint_type: str = "mass"
 
     def mass(self, *args, **kwargs) -> float:
         """Value of the mass constraint in kg"""
         return self.get_value(*args, **kwargs)
 
 
-class PressureConstraint(_SpeciesConstantConstraint[GasSpecies]):
-    """A constant pressure constraint
+class PressureConstraint(_SpeciesConstraint[GasSpecies, float]):
+    """A pressure constraint
 
     Args:
         species: The species to constrain
         value: The pressure in bar
     """
 
-    @override
-    def __init__(self, species: GasSpecies, value: float):
-        super().__init__(species, value, "pressure")
+    constraint_type: str = "pressure"
 
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Value of the fugacity constraint in bar
@@ -358,12 +322,8 @@ class PressureConstraint(_SpeciesConstantConstraint[GasSpecies]):
 
         return self._value
 
-    @override
     def get_value(self, temperature: float, pressure: float) -> float:
-        return self.fugacity(temperature, pressure)
-
-    def log10_number_density(self, temperature: float, pressure: float) -> float:
-        return get_log10_number_density(temperature, self.fugacity(temperature, pressure))
+        return get_number_density(temperature, self.fugacity(temperature, pressure))
 
 
 # FIXME: Update to number densities

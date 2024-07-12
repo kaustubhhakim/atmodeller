@@ -296,15 +296,7 @@ class ReactionNetwork:
             rhs[reaction_index] = log10Kc
 
         # Constraints
-        for index, constraint in enumerate(constraints.gas_constraints):
-            row_index: int = self.number_reactions + index
-            # pylint: disable=line-too-long
-            # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
-            rhs[row_index] = constraint.log10_number_density(
-                temperature=temperature, pressure=pressure
-            )
-
-        for index, constraint in enumerate(constraints.activity_constraints):
+        for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
             # pylint: disable=line-too-long
             # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)

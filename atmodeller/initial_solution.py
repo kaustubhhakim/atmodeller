@@ -164,7 +164,7 @@ class InitialSolution(ABC, Generic[T]):
             self._min_log10_number_density, self._max_log10_number_density
         )
         for constraint in constraints.gas_constraints:
-            self.solution.gas.data[constraint.species] = constraint.log10_number_density(
+            self.solution.gas.data[constraint.species] = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
 
