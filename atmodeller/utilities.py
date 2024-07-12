@@ -329,3 +329,16 @@ def get_number_density(temperature: float, pressure: float) -> float:
         Number density in molecules m\ :sup:`-3`
     """
     return UnitConversion.bar_to_Pa(pressure) / (BOLTZMANN_CONSTANT * temperature)
+
+
+def get_log10_number_density(*args, **kwargs) -> float:
+    r"""Pressure to log10 number density
+
+    Args:
+        temperature: Temperature in K
+        pressure: Pressure in bar
+
+    Returns:
+        Log10 number density
+    """
+    return np.log10(get_number_density(*args, **kwargs))
