@@ -28,7 +28,7 @@ import sys
 import numpy as np
 import numpy.typing as npt
 
-from atmodeller import GAS_CONSTANT
+from atmodeller import BOLTZMANN_CONSTANT, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Solution, Species
 from atmodeller.utilities import partial_rref
@@ -106,7 +106,11 @@ class ReactionNetwork:
         return partial_rref(transpose_formula_matrix)
 
     def reactions(self) -> dict[int, str]:
-        """The reactions as a dictionary"""
+        """The reactions as a dictionary
+
+        Returns:
+            Reactions as a dictionary
+        """
         reactions: dict[int, str] = {}
         if self.reaction_matrix is not None:
             for reaction_index in range(self.number_reactions):
@@ -131,7 +135,7 @@ class ReactionNetwork:
         """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`.
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -149,7 +153,7 @@ class ReactionNetwork:
         """Gets the log10 of the equilibrium constant in terms of partial pressures.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`.
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
             temperature: Temperature in K
             pressure: Pressure in bar
 
@@ -160,6 +164,51 @@ class ReactionNetwork:
         log10Kp: float = lnKp / np.log(10)
 
         return log10Kp
+
+    def _get_delta_n(self, reaction_index: int) -> float:
+        """Gets the difference in the moles of products compared to the moles of reactants.
+
+        Args:
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+
+        Returns:
+            The difference in the moles of products compared to the moles of reactants
+        """
+        assert self.reaction_matrix is not None
+        return np.sum(self.reaction_matrix[reaction_index, :])
+
+    def _get_lnKc(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+        """Gets the natural log of the equilibrium constant in terms of number densities.
+
+        Args:
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Natural log of the equilibrium constant in terms of number densities.
+        """
+        lnKp: float = self._get_lnKp(reaction_index, temperature=temperature, pressure=pressure)
+        delta_n: float = self._get_delta_n(reaction_index)
+        lnKc: float = lnKp - delta_n * np.log(BOLTZMANN_CONSTANT * temperature)
+
+        return lnKc
+
+    def _get_log10Kc(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+        """Gets the log10 of the equilibrium constant in terms of number densities.
+
+        Args:
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            log10 of the equilibrium constant in terms of number densities.
+        """
+        lnKc: float = self._get_lnKc(reaction_index, temperature=temperature, pressure=pressure)
+        log10Kc: float = lnKc / np.log(10)
+
+        return log10Kc
 
     def _get_reaction_gibbs_energy_of_formation(
         self, reaction_index: int, *, temperature: float, pressure: float
@@ -193,7 +242,6 @@ class ReactionNetwork:
         Returns:
             The coefficient matrix with the stoichiometry and constraints
         """
-
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
         coeff: npt.NDArray[np.float_] = np.zeros((nrows, self._species.number))
@@ -272,7 +320,6 @@ class ReactionNetwork:
         Returns:
             The log10(fugacity coefficient) vector
         """
-
         # Initialise to ideal behaviour.
         fugacity_coefficients: npt.NDArray[np.float_] = np.ones_like(self._species, dtype=float)
 
@@ -418,7 +465,6 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         activity_modifier: npt.NDArray[np.float_],
         equilibrium_modifier: npt.NDArray[np.float_],
     ) -> npt.NDArray[np.float_]:
-
         # Residual of the reaction network without a stability consideration
         residual_reaction: npt.NDArray[np.float_] = super().get_residual(
             temperature=temperature,
