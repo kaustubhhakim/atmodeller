@@ -49,13 +49,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-MIN_LOG10_PRESSURE: float = -12
-"""Minimum log10 (bar) of the initial gas species pressures
-
-Motivated by typical values of oxygen fugacity at the iron-wustite buffer at high temperature.
-"""
-MAX_LOG10_PRESSURE: float = 8
-"""Maximum log10 (bar) of the initial gas species pressures"""
+MIN_LOG10_NUMBER_DENSITY: float = 10
+"""Minimum log10 of the initial number density"""
+MAX_LOG10_NUMBER_DENSITY: float = 30
+"""Maximum log10 of the initial number density"""
 
 
 class InitialSolutionProtocol(Protocol):
@@ -83,9 +80,11 @@ class InitialSolution(ABC, Generic[T]):
     Args:
         value: An object used to compute the initial solution
         species: Species
-        min_log10_pressure: Minimum log10 gas pressure. Defaults to :data:`MIN_LOG10_PRESSURE`.
-        max_log10_pressure: Maximum log10 gas pressure. Defaults to :data:`MAX_LOG10_PRESSURE`.
-        fill_log10_pressure: Fill value for pressure in bar. Defaults to 1.
+        min_log10_number_density: Minimum log10 number density. Defaults to
+            :data:`MIN_LOG10_NUMBER_DENSITY`.
+        max_log10_number_density: Maximum log10 number density. Defaults to
+            :data:`MAX_LOG10_NUMBER_DENSITY`.
+        fill_log10_number_density: Fill value for number density. Defaults to 22.
         fill_log10_activity: Fill value for activity. Defaults to 0.
         fill_log10_mass: Fill value for mass. Defaults to 20.
         fill_log10_stability: Fill value for stability. Defaults to -35.
@@ -100,9 +99,9 @@ class InitialSolution(ABC, Generic[T]):
         value: T,
         *,
         species: Species,
-        min_log10_pressure: float = MIN_LOG10_PRESSURE,
-        max_log10_pressure: float = MAX_LOG10_PRESSURE,
-        fill_log10_pressure: float = 1,
+        min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
+        max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
+        fill_log10_number_density: float = 22,
         fill_log10_activity: float = -0.3010299956639812,
         fill_log10_mass: float = 18,
         fill_log10_stability: float = -34,
@@ -111,9 +110,9 @@ class InitialSolution(ABC, Generic[T]):
         self.value: T = value
         self.solution: Solution = Solution(species)
         self._species: Species = species
-        self._min_log10_pressure: float = min_log10_pressure
-        self._max_log10_pressure: float = max_log10_pressure
-        self._fill_log10_pressure: float = fill_log10_pressure
+        self._min_log10_number_density: float = min_log10_number_density
+        self._max_log10_number_density: float = max_log10_number_density
+        self._fill_log10_number_density: float = fill_log10_number_density
         self._fill_log10_activity: float = fill_log10_activity
         self._fill_log10_mass: float = fill_log10_mass
         self._fill_log10_stability: float = fill_log10_stability
@@ -151,19 +150,21 @@ class InitialSolution(ABC, Generic[T]):
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
+            perturb_gas_log10: Maximum log10 value to perturb the gas number densities. Defaults to
+                0.
         """
-
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
-        # Gas pressures
-        self.solution.gas.fill_missing_values(self._fill_log10_pressure)
+        # Gas number densities
+        self.solution.gas.fill_missing_values(self._fill_log10_number_density)
         if perturb_gas_log10:
             self.solution.gas.perturb_values(perturb_gas_log10)
 
-        self.solution.gas.clip_values(self._min_log10_pressure, self._max_log10_pressure)
+        self.solution.gas.clip_values(
+            self._min_log10_number_density, self._max_log10_number_density
+        )
         for constraint in constraints.gas_constraints:
-            self.solution.gas.data[constraint.species] = constraint.get_log10_value(
+            self.solution.gas.data[constraint.species] = constraint.log10_number_density(
                 temperature=temperature, pressure=pressure
             )
 
@@ -171,7 +172,7 @@ class InitialSolution(ABC, Generic[T]):
         self.solution.activity.fill_missing_values(self._fill_log10_activity)
         # TODO: This imposes the activity value if stable, but might be in conflict with stability
         # criteria for unstable condensates
-        self.solution.activity.clip_values(maximum_value=0)
+        # self.solution.activity.clip_values(maximum_value=0)
         for constraint in constraints.activity_constraints:
             self.solution.activity.data[constraint.species] = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
@@ -215,7 +216,8 @@ class InitialSolution(ABC, Generic[T]):
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb_gas_log10: Maximum log10 value to perturb the gas pressures. Defaults to 0.
+            perturb_gas_log10: Maximum log10 value to perturb the gas number densities. Defaults to
+                0.
             attempt: Solution attempt number
 
         Returns:
