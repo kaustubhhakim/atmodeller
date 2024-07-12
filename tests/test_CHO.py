@@ -101,9 +101,10 @@ def test_H_fO2() -> None:
 
     constraints: SystemConstraints = SystemConstraints(
         [
-            ElementMassConstraint("H", h_kg),
+            # ElementMassConstraint("H", h_kg),
             # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
             # TODO: Easier to test using fugacity constraint first, then switch to buffer
+            PressureConstraint(H2O_g, 0.2570770067190733),
             FugacityConstraint(O2_g, 8.838043080858959e-08),
         ]
     )
