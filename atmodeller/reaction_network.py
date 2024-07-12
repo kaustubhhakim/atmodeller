@@ -16,6 +16,8 @@
 #
 """Reaction network"""
 
+# Convenient to use chemical formulas so pylint: disable=C0103
+
 from __future__ import annotations
 
 import copy
@@ -49,10 +51,6 @@ class ReactionNetwork:
 
     Args:
         species: Species
-
-    Attributes:
-        species: Species
-        reaction_matrix: The reaction stoichiometry matrix
     """
 
     def __init__(self, species: Species):
@@ -64,6 +62,7 @@ class ReactionNetwork:
 
     @property
     def number_reactions(self) -> int:
+        """Number of reactions"""
         if self._species.number == 1:
             return 0
         else:
@@ -128,41 +127,52 @@ class ReactionNetwork:
 
         return reactions
 
-    def _get_reaction_log10_equilibrium_constant(
-        self, *, reaction_index: int, temperature: float, pressure: float
-    ) -> float:
-        """Gets the log10 of the reaction equilibrium constant.
-
-        From the Gibbs free energy, we can calculate logKf as:
-        logKf = - G/(ln(10)*R*T)
+    def _get_lnKp(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+        """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`.
-            temperature: Temperature
-            pressure: Pressure
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`.
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            log10 of the reaction equilibrium constant
+            Natural log of the equilibrium constant in terms of partial pressures.
         """
         gibbs_energy: float = self._get_reaction_gibbs_energy_of_formation(
-            reaction_index=reaction_index, temperature=temperature, pressure=pressure
+            reaction_index, temperature=temperature, pressure=pressure
         )
-        equilibrium_constant: float = -gibbs_energy / (np.log(10) * GAS_CONSTANT * temperature)
+        lnKp: float = -gibbs_energy / (GAS_CONSTANT * temperature)
 
-        return equilibrium_constant
+        return lnKp
 
-    def _get_reaction_gibbs_energy_of_formation(
-        self, *, reaction_index: int, temperature: float, pressure: float
-    ) -> float:
-        """Gets the Gibb's free energy of formation for a reaction.
+    def _get_log10Kp(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+        """Gets the log10 of the equilibrium constant in terms of partial pressures.
 
         Args:
-            reaction_index: Row index of the reaction as it appears in `self.reaction_matrix`
-            temperature: Temperature
-            pressure: Pressure
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`.
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            The Gibb's free energy of the reaction
+            log10 of the equilibrium constant in terms of partial pressures.
+        """
+        lnKp: float = self._get_lnKp(reaction_index, temperature=temperature, pressure=pressure)
+        log10Kp: float = lnKp / np.log(10)
+
+        return log10Kp
+
+    def _get_reaction_gibbs_energy_of_formation(
+        self, reaction_index: int, *, temperature: float, pressure: float
+    ) -> float:
+        r"""Gets the Gibb's free energy of formation for a reaction.
+
+        Args:
+            reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            The Gibb's free energy of the reaction in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
         gibbs_energy: float = 0
         assert self.reaction_matrix is not None
@@ -220,7 +230,7 @@ class ReactionNetwork:
             The right-hand side vector of values
         """
         nrows: int = self.number_reactions + constraints.number_reaction_network_constraints
-        rhs: npt.NDArray = np.zeros(nrows, dtype=float)
+        rhs: npt.NDArray[np.float_] = np.zeros(nrows, dtype=float)
 
         # Reactions
         for reaction_index in range(self.number_reactions):
@@ -230,8 +240,8 @@ class ReactionNetwork:
             #     reaction_index,
             #     self.reactions()[reaction_index],
             # )
-            rhs[reaction_index] = self._get_reaction_log10_equilibrium_constant(
-                reaction_index=reaction_index,
+            rhs[reaction_index] = self._get_log10Kp(
+                reaction_index,
                 temperature=temperature,
                 pressure=pressure,
             )
