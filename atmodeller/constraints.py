@@ -37,7 +37,7 @@ from atmodeller.interfaces import (
     ReactionNetworkConstraintProtocol,
 )
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
-from atmodeller.utilities import filter_by_type
+from atmodeller.utilities import filter_by_type, get_log10_number_density
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -231,6 +231,9 @@ class FugacityConstraint(_SpeciesConstantConstraint[GasSpecies]):
     def __init__(self, species: GasSpecies, value: float):
         super().__init__(species, value, "fugacity")
 
+    def log10_number_density(self, temperature: float, pressure: float) -> float:
+        return get_log10_number_density(temperature, self.fugacity(temperature, pressure))
+
     def fugacity(self, temperature: float, pressure: float) -> float:
         """Value of the fugacity constraint in bar
 
@@ -283,6 +286,9 @@ class BufferedFugacityConstraint(_SpeciesConstraint[GasSpecies]):
             Fugacity in bar
         """
         return self.get_value(temperature, pressure)
+
+    def log10_number_density(self, temperature: float, pressure: float) -> float:
+        return get_log10_number_density(temperature, self.fugacity(temperature, pressure))
 
     @override
     def get_value(self, temperature: float, pressure: float) -> float:
@@ -356,7 +362,11 @@ class PressureConstraint(_SpeciesConstantConstraint[GasSpecies]):
     def get_value(self, temperature: float, pressure: float) -> float:
         return self.fugacity(temperature, pressure)
 
+    def log10_number_density(self, temperature: float, pressure: float) -> float:
+        return get_log10_number_density(temperature, self.fugacity(temperature, pressure))
 
+
+# FIXME: Update to number densities
 class TotalPressureConstraint(ConstraintProtocol):
     """A total pressure constraint
 

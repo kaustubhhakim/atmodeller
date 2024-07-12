@@ -140,7 +140,7 @@ class ReactionNetwork:
             pressure: Pressure in bar
 
         Returns:
-            Natural log of the equilibrium constant in terms of partial pressures.
+            Natural log of the equilibrium constant in terms of partial pressures
         """
         gibbs_energy: float = self._get_reaction_gibbs_energy_of_formation(
             reaction_index, temperature=temperature, pressure=pressure
@@ -158,7 +158,7 @@ class ReactionNetwork:
             pressure: Pressure in bar
 
         Returns:
-            log10 of the equilibrium constant in terms of partial pressures.
+            log10 of the equilibrium constant in terms of partial pressures
         """
         lnKp: float = self._get_lnKp(reaction_index, temperature=temperature, pressure=pressure)
         log10Kp: float = lnKp / np.log(10)
@@ -186,7 +186,7 @@ class ReactionNetwork:
             pressure: Pressure in bar
 
         Returns:
-            Natural log of the equilibrium constant in terms of number densities.
+            Natural log of the equilibrium constant in terms of number densities
         """
         lnKp: float = self._get_lnKp(reaction_index, temperature=temperature, pressure=pressure)
         delta_n: float = self._get_delta_n(reaction_index)
@@ -203,7 +203,7 @@ class ReactionNetwork:
             pressure: Pressure in bar
 
         Returns:
-            log10 of the equilibrium constant in terms of number densities.
+            log10 of the equilibrium constant in terms of number densities
         """
         lnKc: float = self._get_lnKc(reaction_index, temperature=temperature, pressure=pressure)
         log10Kc: float = lnKc / np.log(10)
@@ -295,10 +295,16 @@ class ReactionNetwork:
             )
 
         # Constraints
-        for index, constraint in enumerate(constraints.reaction_network_constraints):
+        for index, constraint in enumerate(constraints.gas_constraints):
             row_index: int = self.number_reactions + index
             # pylint: disable=line-too-long
-            # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
+            logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
+            rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
+
+        for index, constraint in enumerate(constraints.activity_constraints):
+            row_index: int = self.number_reactions + index
+            # pylint: disable=line-too-long
+            logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
         logger.debug("RHS vector = %s", rhs)

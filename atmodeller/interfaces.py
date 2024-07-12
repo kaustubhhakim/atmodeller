@@ -308,6 +308,8 @@ class GasConstraintProtocol(ConstraintProtocol, Protocol):
 
     def fugacity(self, temperature: float, pressure: float) -> float: ...
 
+    def log10_number_density(self, temperature: float, pressure: float) -> float: ...
+
 
 ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
 

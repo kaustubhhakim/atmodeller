@@ -107,6 +107,7 @@ def test_CHO_reduced(helper) -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
+            # FugacityConstraint(O2_g, 1.25e-15),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
         ]
