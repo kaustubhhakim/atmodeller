@@ -337,6 +337,11 @@ class SolutionComponent(Generic[T]):
         """Physical values"""
         return {species: 10**value for species, value in self.data.items()}
 
+    @property
+    def sum(self) -> float:
+        """Sum of the physical values"""
+        return sum(self.physical.values())
+
     def clip_values(
         self, minimum_value: float | None = None, maximum_value: float | None = None
     ) -> None:
@@ -388,6 +393,7 @@ class SolutionComponent(Generic[T]):
         """
         del args
         del kwargs
+
         return {key: 10**value for key, value in self.raw_solution_dict().items()}
 
 
@@ -438,23 +444,22 @@ class GasSolution(SolutionComponent[GasSpecies]):
         """
         return sum(self.pressures(temperature).values())
 
-    def mean_molar_mass(self, temperature: float) -> float:
+    @property
+    def mean_molar_mass(self) -> float:
         """Mean molar mass
-
-        Args:
-            temperature: Temperature in K
 
         Returns:
             Mean molar mass
         """
         mass: float = 0
-        for species, pressure in self.pressures(temperature).items():
-            mass += species.molar_mass * pressure
-        mass /= self.total_pressure(temperature)
+        for species, number_density in self.physical.items():
+            mass += species.molar_mass * number_density
+        mass /= self.sum
 
         return mass
 
-    def volume_mixing_ratios(self, temperature: float) -> dict[GasSpecies, float]:
+    @property
+    def volume_mixing_ratios(self) -> dict[GasSpecies, float]:
         """Volume mixing ratios
 
         Args:
@@ -464,8 +469,8 @@ class GasSolution(SolutionComponent[GasSpecies]):
             Volume mixing ratios
         """
         vmr: dict[GasSpecies, float] = {}
-        for species, pressure in self.pressures(temperature).items():
-            vmr[species] = pressure / self.total_pressure(temperature)
+        for species, number_density in self.physical.items():
+            vmr[species] = number_density / self.sum
 
         return vmr
 

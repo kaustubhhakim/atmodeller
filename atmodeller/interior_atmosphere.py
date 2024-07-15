@@ -96,7 +96,7 @@ class InteriorAtmosphereSystem:
     @property
     def atmosphere_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere"""
-        return self.solution.gas.mean_molar_mass(self.planet.surface_temperature)
+        return self.solution.gas.mean_molar_mass
 
     @property
     def atmosphere_pressure(self) -> float:

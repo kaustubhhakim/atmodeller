@@ -256,9 +256,9 @@ class Output(UserDict):
                     interior_atmosphere.planet.surface_temperature
                 )[species]
             )
-            output["volume_mixing_ratio"] = interior_atmosphere.solution.gas.volume_mixing_ratios(
-                interior_atmosphere.planet.surface_temperature
-            )[species]
+            output["volume_mixing_ratio"] = interior_atmosphere.solution.gas.volume_mixing_ratios[
+                species
+            ]
             output["molar_mass"] = interior_atmosphere.species.get_species(species).molar_mass
             output["total_mass"] = (
                 output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
