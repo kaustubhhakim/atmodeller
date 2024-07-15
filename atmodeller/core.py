@@ -87,6 +87,12 @@ class Planet:
     """Mass of the molten mantle"""
     mantle_solid_mass: float = field(init=False)
     """Mass of the solid mantle"""
+    mantle_volume: float = field(init=False)
+    """Volume of the mantle"""
+    mantle_melt_volume: float = field(init=False)
+    """Volume of the molten mantle"""
+    mantle_solid_volume: float = field(init=False)
+    """Volume of the solid mantle"""
     surface_area: float = field(init=False)
     """Surface area"""
     surface_gravity: float = field(init=False)
@@ -96,6 +102,9 @@ class Planet:
         self.mantle_mass = self.planet_mass * (1 - self.core_mass_fraction)
         self.mantle_melt_mass = self.mantle_mass * self.mantle_melt_fraction
         self.mantle_solid_mass = self.mantle_mass * (1 - self.mantle_melt_fraction)
+        self.mantle_volume = self.mantle_mass / self.mantle_density
+        self.mantle_melt_volume = self.mantle_melt_mass / self.mantle_density
+        self.mantle_solid_volume = self.mantle_solid_mass / self.mantle_density
         self.surface_area = 4.0 * np.pi * self.surface_radius**2
         self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
         logger.info("Creating a planet")

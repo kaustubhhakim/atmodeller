@@ -165,6 +165,14 @@ class InteriorAtmosphereSystem:
         """The solution"""
         return self._solution
 
+    def number_density_to_molecules(self, number_density: float) -> float:
+        """Number density to number of molecules"""
+        return number_density * self.atmosphere_volume
+
+    def number_density_to_moles(self, number_density: float) -> float:
+        """Number density to number of moles"""
+        return self.number_density_to_molecules(number_density) / AVOGADRO
+
     def residual_dict(self) -> dict[str, float]:
         """Residual of the objective function
 
@@ -230,31 +238,29 @@ class InteriorAtmosphereSystem:
         output["pressure"] = self.solution.gas.pressures(self.planet.surface_temperature)[species]
         output["fugacity"] = self.solution.gas.fugacities(self.planet.surface_temperature)[species]
 
-        # TODO: Commented out to use number density
-        # # Atmosphere
-        # output["atmosphere_mass"] = (
-        #    UnitConversion.bar_to_Pa(output["pressure"]) / self.planet.surface_gravity
-        # )
-        # output["atmosphere_mass"] *= (
-        #    self.planet.surface_area * species.molar_mass / self.atmosphere_molar_mass
-        # )
+        output["melt_ppmw"] = species.solubility.concentration(
+            fugacity=output["fugacity"],
+            temperature=self.planet.surface_temperature,
+            pressure=self.atmosphere_pressure,
+            **self.solution.gas.fugacities_by_hill_formula(self.planet.surface_temperature),
+        )
+        # Numerator to molecules
+        output["melt_number_density"] = (
+            output["melt_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
+        )
+        # Denominator to m^3
+        output["melt_number_density"] *= self.planet.mantle_density
+        # Scale by volume to be relative to gas volume
+        output["melt_number_density"] *= self.planet.mantle_melt_volume / self.atmosphere_volume
 
-        # # Melt
-        # output["melt_ppmw"] = species.solubility.concentration(
-        #     fugacity=output["fugacity"],
-        #     temperature=self.planet.surface_temperature,
-        #     pressure=self.atmosphere_pressure,
-        #     **self.solution.gas.fugacities_by_hill_formula(self.planet.surface_temperature),
-        # )
-        # output["melt_mass"] = (
-        #     self.planet.mantle_melt_mass * output["melt_ppmw"] * UnitConversion.ppm_to_fraction()
-        # )
-
-        # # Trapped in the solid mantle
-        # output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
-        # output["solid_mass"] = (
-        #     self.planet.mantle_solid_mass * output["solid_ppmw"] * UnitConversion.ppm_to_fraction()
-        # )
+        output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
+        output["solid_number_density"] = (
+            output["solid_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
+        )
+        # Denominator to m^3
+        output["solid_number_density"] *= self.planet.mantle_density
+        # Scale by volume to be relative to gas volume
+        output["solid_number_density"] *= self.planet.mantle_solid_volume / self.atmosphere_volume
 
         return output
 
@@ -270,20 +276,16 @@ class InteriorAtmosphereSystem:
         """
         output: dict[str, float] = self.gas_species_reservoir_masses(species)
 
-        # TODO: Now use number densities
-        # mass: dict[str, float] = {
-        #     "atmosphere_mass": output["atmosphere_mass"],
-        #     "melt_mass": output["melt_mass"],
-        #     "solid_mass": output["solid_mass"],
-        # }
-
         number_density: dict[str, float] = {
-            "atmosphere_number_density": output["atmosphere_number_density"]
+            "atmosphere_number_density": output["atmosphere_number_density"],
+            "melt_number_density": output["melt_number_density"],
+            "solid_number_density": output["solid_number_density"],
         }
 
         try:
             element_count: int = species.composition()[element].count
-        except KeyError:  # Element not in formula so number density is zero.
+        except KeyError:
+            # Element not in formula so number density is zero.
             element_count = 0
 
         for key in number_density:
@@ -300,7 +302,11 @@ class InteriorAtmosphereSystem:
         Returns:
             Gas reservoir number densities of the element
         """
-        number_density: dict[str, float] = {"atmosphere_number_density": 0}
+        number_density: dict[str, float] = {
+            "atmosphere_number_density": 0,
+            "melt_number_density": 0,
+            "solid_number_density": 0,
+        }
 
         for species in self.species.gas_species:
             species_number_density: dict[str, float] = (
