@@ -76,11 +76,11 @@ class InteriorAtmosphereSystem:
     @property
     def atmosphere_element_moles(self) -> float:
         """Total number of moles of elements in the atmosphere"""
-        moles: float = 0
+        number_density: float = 0
         for element in self.species.elements():
-            moles += self.element_gas_number_density(element)["atmosphere_number_density"]
+            number_density += self.element_gas_number_density(element)["atmosphere_number_density"]
 
-        moles *= self.atmosphere_volume / AVOGADRO
+        moles = self.number_density_to_moles(number_density)
 
         return moles
 
@@ -124,11 +124,13 @@ class InteriorAtmosphereSystem:
     @property
     def atmosphere_species_moles(self) -> float:
         """Total number of moles of species in the atmosphere"""
-        moles: float = 0
+        number_density: float = 0
         for species in self.species.gas_species:
-            moles += self.gas_species_reservoir_masses(species)["atmosphere_number_density"]
+            number_density += self.gas_species_reservoir_masses(species)[
+                "atmosphere_number_density"
+            ]
 
-        moles *= self.atmosphere_volume / AVOGADRO
+        moles = self.number_density_to_moles(number_density)
 
         return moles
 
@@ -199,20 +201,18 @@ class InteriorAtmosphereSystem:
         return output
 
     def condensed_element_masses(self) -> dict[str, float]:
-        """Calculates the masses of elements in all condensed species.
+        """Calculates the number densities of elements in all condensed species.
 
         Returns:
-            Dictionary of elements and their masses in all condensed species
+            Dictionary of elements and their number densities in all condensed species
         """
         condensed_element_masses: dict[str, float] = {
             element: 0 for element in self.species.elements()
         }
         for species in self.species.condensed_species:
-            # Below can sometimes blow up when the solver tries a large step, although this can be
-            # mitigated by setting the solver keyword argument `factor`.
-            species_mass: float = 10 ** self._solution.mass.data[species]
+            number_density: float = self._solution.mass.physical[species]
             for element, value in species.composition().items():
-                condensed_element_masses[element] += species_mass * value.fraction
+                condensed_element_masses[element] += number_density * value.count
 
         logger.debug("condensed_element_masses = %s", condensed_element_masses)
 
@@ -329,9 +329,6 @@ class InteriorAtmosphereSystem:
             Total mass of the element
         """
         element_number_density: dict[str, float] = self.element_gas_number_density(element)
-
-        # FIXME: use number density for condensed. Kept for the time being to not break downstream
-        # code like the output routines
         element_number_density["condensed"] = self.condensed_element_masses()[element]
 
         logger.debug("element_number_density for %s = %s", element, element_number_density)
