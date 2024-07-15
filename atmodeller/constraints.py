@@ -334,11 +334,11 @@ class PressureConstraint(_SpeciesConstraint[GasSpecies, float]):
 
         return self._value
 
+    @override
     def get_value(self, temperature: float, pressure: float) -> float:
         return get_number_density(temperature, self.fugacity(temperature, pressure))
 
 
-# FIXME: Update to number densities
 class TotalPressureConstraint(ConstraintProtocol):
     """A total pressure constraint
 
@@ -360,19 +360,17 @@ class TotalPressureConstraint(ConstraintProtocol):
     def name(self) -> str:
         return self._name
 
-    @override
-    def get_value(self, *args, **kwargs) -> float:
-        del args
-        del kwargs
-
+    def total_pressure(self) -> float:
         return self._value
+
+    @override
+    def get_value(self, temperature: float, pressure: float) -> float:
+        del pressure
+        return get_number_density(temperature, self.total_pressure())
 
     @override
     def get_log10_value(self, *args, **kwargs) -> float:
         return np.log10(self.get_value(*args, **kwargs))
-
-    def total_pressure(self, *args, **kwargs) -> float:
-        return self.get_value(*args, **kwargs)
 
 
 class SystemConstraints(UserList[ConstraintProtocol]):

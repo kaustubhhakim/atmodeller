@@ -518,7 +518,7 @@ class InteriorAtmosphereSystem:
         if len(self.constraints.total_pressure_constraint) > 0:
             constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
-                self.atmosphere_pressure
+                self.solution.gas.sum
             ) - constraint.get_log10_value(
                 temperature=self.planet.surface_temperature, pressure=self.atmosphere_pressure
             )
