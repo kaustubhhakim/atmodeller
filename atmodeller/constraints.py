@@ -375,16 +375,12 @@ class TotalPressureConstraint(ConstraintProtocol):
         return self.get_value(*args, **kwargs)
 
 
-class SystemConstraints(UserList):
+class SystemConstraints(UserList[ConstraintProtocol]):
     """A collection of constraints
 
     Args:
         initlist: Initial list of constraints. Defaults to None.
     """
-
-    # UserList itself is not a generic class, so this is for typing:
-    data: list[ConstraintProtocol]
-    """List of constraints"""
 
     def add_activity_constraints(self, species: Species) -> None:
         """Adds activity constraints

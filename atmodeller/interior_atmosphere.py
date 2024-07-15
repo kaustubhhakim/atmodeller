@@ -536,7 +536,7 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = (
             self.solution.gas.solution_dict(self.planet.surface_temperature)
             | self.solution.activity.solution_dict()
-            | self.solution.mass.solution_dict()
+            | self.solution.mass.solution_dict(self.atmosphere_volume)
         )
 
         return output

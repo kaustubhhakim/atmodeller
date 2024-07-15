@@ -27,7 +27,7 @@ from typing import Generic, Mapping, TypeVar
 import numpy as np
 import numpy.typing as npt
 
-from atmodeller import BOLTZMANN_CONSTANT_BAR, GRAVITATIONAL_CONSTANT
+from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.solubility.compositions import composition_solubilities
@@ -412,6 +412,37 @@ class SolutionComponent(Generic[T]):
 CondensedSolution = SolutionComponent[CondensedSpecies]
 
 
+class CondensedSolutionMass(SolutionComponent[CondensedSpecies]):
+    """The condensed mass solution"""
+
+    def mass(self, gas_volume: float) -> dict[CondensedSpecies, float]:
+        """Masses of condensed species
+
+        Args:
+            gas_volume: Volume of the gas in m^3
+
+        Returns:
+            Masses in kg
+        """
+        masses: dict[CondensedSpecies, float] = {}
+        for species, number_density in self.physical.items():
+            masses[species] = number_density * gas_volume / AVOGADRO * species.molar_mass
+
+        return masses
+
+    @override
+    def solution_dict(self, gas_volume: float) -> dict[str, float]:
+        """Solution in a dictionary
+
+        Args:
+            gas_volume: Volume of the gas in m^3
+
+        Returns:
+            Mass of the condensed species in kg
+        """
+        return {f"{self._prefix}{key}": value for key, value in self.mass(gas_volume).items()}
+
+
 class GasSolution(SolutionComponent[GasSpecies]):
     """The gas solution"""
 
@@ -563,7 +594,7 @@ class GasSolution(SolutionComponent[GasSpecies]):
             temperature: Temperature in K
 
         Returns:
-            Solution dictionary
+            Pressure of the gas species in bar
         """
         return {str(key): value for key, value in self.pressures(temperature).items()}
 
@@ -584,7 +615,9 @@ class Solution:
         self._species: Species = species
         self._gas: GasSolution = GasSolution(species.gas_species)
         self._activity: CondensedSolution = CondensedSolution(species.condensed_species)
-        self._mass: CondensedSolution = CondensedSolution(species.condensed_species, MASS_PREFIX)
+        self._mass: CondensedSolutionMass = CondensedSolutionMass(
+            species.condensed_species, MASS_PREFIX
+        )
         self._stability: CondensedSolution = CondensedSolution(
             species.condensed_species, STABILITY_PREFIX
         )

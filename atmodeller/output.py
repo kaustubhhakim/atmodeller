@@ -141,9 +141,10 @@ class Output(UserDict):
         for species in interior_atmosphere.species.condensed_species:
             output: dict[str, float] = {}
             output["activity"] = interior_atmosphere.solution.activity.physical[species]
-            output["mass"] = interior_atmosphere.solution.mass.physical[species]
-            output["moles"] = output["mass"] / species.molar_mass
+            output["number_density"] = interior_atmosphere.solution.mass.physical[species]
+            output["moles"] = interior_atmosphere.number_density_to_moles(output["number_density"])
             output["molar_mass"] = species.molar_mass
+            output["mass"] = output["moles"] * output["molar_mass"]
 
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)
@@ -170,8 +171,9 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         number_density: dict[str, Any] = {}
-        # FIXME: Convert to number densities
-        # condensed_element_masses: dict[str, float] = interior_atmosphere.condensed_element_masses()
+        condensed_number_densities: dict[str, float] = (
+            interior_atmosphere.condensed_element_masses()
+        )
 
         for element in interior_atmosphere.species.elements():
             number_density[element] = interior_atmosphere.element_number_density(element)
@@ -210,29 +212,38 @@ class Output(UserDict):
             )
             output["solid_mass"] = output["solid_moles"] * output["molar_mass"]
 
-            # FIXME: Convert to number densities
-            # try:
-            #    output["condensed_mass"] = condensed_element_masses[element]
-            # except KeyError:
-            #    output["condensed_mass"] = 0
-            # FIXME: Need to condensed
+            try:
+                output["condensed_number_density"] = condensed_number_densities[element]
+                output["condensed_moles"] = interior_atmosphere.number_density_to_moles(
+                    output["condensed_number_density"]
+                )
+                output["condensed_mass"] = output["condensed_moles"] * output["molar_mass"]
+            except KeyError:
+                output["condensed_number_density"] = 0
+                output["condensed_moles"] = 0
+                output["condensed_mass"] = 0
+
             # Totals
             output["total_number_density"] = (
                 output["atmosphere_number_density"]
                 + output["melt_number_density"]
                 + output["solid_number_density"]
+                + output["condensed_number_density"]
             )
             output["total_moles"] = (
-                output["atmosphere_moles"] + output["melt_moles"] + output["solid_moles"]
+                output["atmosphere_moles"]
+                + output["melt_moles"]
+                + output["solid_moles"]
+                + output["condensed_moles"]
             )
             output["total_mass"] = (
-                output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
+                output["atmosphere_mass"]
+                + output["melt_mass"]
+                + output["solid_mass"]
+                + output["condensed_mass"]
             )
-            # FIXME: Convert to number density
-            # output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
+            output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
 
-            # FIXME: Convert to number density
-            # output["condensed_moles"] = output["condensed_mass"] / output["molar_mass"]
             if interior_atmosphere.planet.mantle_melt_mass:
                 output["melt_ppmw"] = (
                     output["melt_mass"] / interior_atmosphere.planet.mantle_melt_mass
