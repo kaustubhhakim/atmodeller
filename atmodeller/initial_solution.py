@@ -51,7 +51,7 @@ T = TypeVar("T")
 
 MIN_LOG10_NUMBER_DENSITY: float = 10
 """Minimum log10 of the initial number density"""
-MAX_LOG10_NUMBER_DENSITY: float = 30
+MAX_LOG10_NUMBER_DENSITY: float = 40
 """Maximum log10 of the initial number density"""
 
 
@@ -86,7 +86,6 @@ class InitialSolution(ABC, Generic[T]):
             :data:`MAX_LOG10_NUMBER_DENSITY`.
         fill_log10_number_density: Fill value for number density. Defaults to 22.
         fill_log10_activity: Fill value for activity. Defaults to 0.
-        fill_log10_mass: Fill value for mass. Defaults to 20.
         fill_log10_stability: Fill value for stability. Defaults to -35.
 
     Attributes:
@@ -103,7 +102,6 @@ class InitialSolution(ABC, Generic[T]):
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 22,
         fill_log10_activity: float = -0.3010299956639812,
-        fill_log10_mass: float = 18,
         fill_log10_stability: float = -34,
     ):
         logger.info("Creating %s", self.__class__.__name__)
@@ -114,7 +112,7 @@ class InitialSolution(ABC, Generic[T]):
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
         self._fill_log10_activity: float = fill_log10_activity
-        self._fill_log10_mass: float = fill_log10_mass
+        self._fill_log10_mass: float = fill_log10_number_density
         self._fill_log10_stability: float = fill_log10_stability
 
     @property
