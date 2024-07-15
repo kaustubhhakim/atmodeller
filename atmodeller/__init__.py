@@ -25,6 +25,8 @@ import logging
 from molmass import Formula
 from scipy import constants
 
+AVOGADRO: float = constants.Avogadro
+"""Avogadro constant in 1/mol"""
 GAS_CONSTANT: float = constants.gas_constant
 """Gas constant in J/K/mol"""
 GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5

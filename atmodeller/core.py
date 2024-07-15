@@ -63,6 +63,7 @@ class Planet:
         mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
         surface_radius: Radius of the planetary surface in m. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
+        mantle_density: Average density of the mantle. Defaults to 4660 kg/m^3 based on Earth.
         melt_composition: Melt composition of the planet. Default is None.
     """
 
@@ -76,6 +77,8 @@ class Planet:
     """Radius of the surface in m"""
     surface_temperature: float = 2000.0
     """Temperature of the surface in K"""
+    mantle_density: float = 4660.0
+    """Average density of the mantle in kg/m^3"""
     melt_composition: str | None = None
     """Melt composition"""
     mantle_mass: float = field(init=False)

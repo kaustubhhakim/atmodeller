@@ -25,7 +25,9 @@ from collections import UserList
 from typing import Generic, TypeVar
 
 import numpy as np
+from molmass import Formula
 
+from atmodeller import AVOGADRO
 from atmodeller.core import GasSpecies, Species
 from atmodeller.interfaces import (
     ActivityConstraintProtocol,
@@ -37,7 +39,7 @@ from atmodeller.interfaces import (
     ReactionNetworkConstraintProtocol,
 )
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
-from atmodeller.utilities import filter_by_type, get_number_density
+from atmodeller.utilities import UnitConversion, filter_by_type, get_number_density
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -60,7 +62,7 @@ class ElementMassConstraint(MassConstraintProtocol):
     """
 
     def __init__(self, element: str, value: float):
-        self._element: str = element
+        self._formula: Formula = Formula(element)
         self._value: float = value
         self._constraint: str = "mass"
 
@@ -72,7 +74,7 @@ class ElementMassConstraint(MassConstraintProtocol):
     @property
     def element(self) -> str:
         """Element whose mass to constrain"""
-        return self._element
+        return str(self._formula)
 
     @property
     def mass(self) -> float:
@@ -80,9 +82,19 @@ class ElementMassConstraint(MassConstraintProtocol):
         return self._value
 
     @property
+    def molar_mass(self) -> float:
+        r"""Molar mass in :math:\mathrm{kg}\mathrm{mol}^{-1}"""
+        return UnitConversion.g_to_kg(self._formula.mass)
+
+    @property
     def name(self) -> str:
         """Unique name of the constraint"""
         return f"{self.element}_{self.constraint}"
+
+    @property
+    def log10_number_of_molecules(self) -> float:
+        """Log10 number of molecules"""
+        return np.log10(self.mass) + np.log10(AVOGADRO) - np.log10(self.molar_mass)
 
     def get_value(self, *args, **kwargs) -> float:
         """Computes the value for given input arguments.
