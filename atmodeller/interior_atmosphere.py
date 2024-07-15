@@ -29,6 +29,7 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
+from atmodeller import GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
 from atmodeller.core import GasSpecies, Planet, Solution, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
@@ -102,6 +103,23 @@ class InteriorAtmosphereSystem:
     def atmosphere_pressure(self) -> float:
         """Total pressure of the atmosphere"""
         return self.solution.gas.total_pressure(self.planet.surface_temperature)
+
+    @property
+    def atmosphere_volume(self) -> float:
+        """Total volume of the atmosphere
+
+        Derived using the mechanical pressure balance due to the weight of the atmosphere and the
+        ideal gas equation of state.
+        """
+        volume: float = self.planet.surface_area / self.planet.surface_gravity
+        volume *= GAS_CONSTANT * self.planet.surface_temperature / self.atmosphere_molar_mass
+
+        return volume
+
+    @property
+    def atmosphere_density(self) -> float:
+        """Mean density of the atmosphere"""
+        return self.atmosphere_mass / self.atmosphere_volume
 
     @property
     def atmosphere_species_moles(self) -> float:

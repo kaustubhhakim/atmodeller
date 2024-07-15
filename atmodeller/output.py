@@ -124,6 +124,8 @@ class Output(UserDict):
         atmosphere["pressure"] = interior_atmosphere.atmosphere_pressure
         atmosphere["mean_molar_mass"] = interior_atmosphere.atmosphere_molar_mass
         atmosphere["mass"] = interior_atmosphere.atmosphere_mass
+        atmosphere["volume"] = interior_atmosphere.atmosphere_volume
+        atmosphere["density"] = interior_atmosphere.atmosphere_density
         atmosphere["element_moles"] = interior_atmosphere.atmosphere_element_moles
         atmosphere["species_moles"] = interior_atmosphere.atmosphere_species_moles
 
