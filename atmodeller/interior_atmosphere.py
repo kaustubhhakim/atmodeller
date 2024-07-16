@@ -40,6 +40,79 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass(kw_only=True)
+class Atmosphere:
+    """Atmosphere"""
+
+    species: Species
+    """A list of species"""
+    solution: Solution
+    """Solution"""
+    planet: Planet = field(default_factory=Planet)
+    """A planet"""
+
+    @property
+    def density(self) -> float:
+        """Mean density of the atmosphere"""
+        return self.mass / self.volume
+
+    @property
+    def mass(self) -> float:
+        """Total mass of the atmosphere"""
+        mass: float = UnitConversion.bar_to_Pa(self.pressure) / self.planet.surface_gravity
+        mass *= self.planet.surface_area
+
+        return mass
+
+    @property
+    def molar_mass(self) -> float:
+        """Mean molar mass of the atmosphere"""
+        return self.solution.gas.mean_molar_mass
+
+    # TODO: Renamed, was element_moles
+    @property
+    def moles_of_elements(self) -> float:
+        """Total number of moles of elements in the atmosphere"""
+        number_density: float = 0
+        for element in self.species.elements():
+            number_density += self.element_gas_number_density(element)["atmosphere_number_density"]
+
+        moles = self.number_density_to_moles(number_density)
+
+        return moles
+
+    # TODO: Renamed, was species_moles
+    @property
+    def moles_of_species(self) -> float:
+        """Total number of moles of species in the atmosphere"""
+        number_density: float = 0
+        for species in self.species.gas_species:
+            number_density += self.gas_species_reservoir_masses(species)[
+                "atmosphere_number_density"
+            ]
+
+        moles = self.number_density_to_moles(number_density)
+
+        return moles
+
+    @property
+    def pressure(self) -> float:
+        """Total pressure of the atmosphere"""
+        return self.solution.gas.total_pressure(self.planet.surface_temperature)
+
+    @property
+    def volume(self) -> float:
+        """Total volume of the atmosphere
+
+        Derived using the mechanical pressure balance due to the weight of the atmosphere and the
+        ideal gas equation of state.
+        """
+        volume: float = self.planet.surface_area / self.planet.surface_gravity
+        volume *= GAS_CONSTANT * self.planet.surface_temperature / self.molar_mass
+
+        return volume
+
+
+@dataclass(kw_only=True)
 class InteriorAtmosphereSystem:
     """An interior-atmosphere system
 
@@ -60,6 +133,7 @@ class InteriorAtmosphereSystem:
     _reaction_network: ReactionNetworkWithCondensateStability = field(init=False)
     # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
+    _atmosphere: Atmosphere = field(init=False)
     _solution: Solution = field(init=False)
     _residual: npt.NDArray = field(init=False)
     _attempted_solves: int = field(init=False, default=0)
@@ -72,67 +146,14 @@ class InteriorAtmosphereSystem:
             self.initial_solution = InitialSolutionDict(species=self.species)
         self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
         self._solution = Solution(self.species)
-
-    @property
-    def atmosphere_element_moles(self) -> float:
-        """Total number of moles of elements in the atmosphere"""
-        number_density: float = 0
-        for element in self.species.elements():
-            number_density += self.element_gas_number_density(element)["atmosphere_number_density"]
-
-        moles = self.number_density_to_moles(number_density)
-
-        return moles
-
-    @property
-    def atmosphere_mass(self) -> float:
-        """Total mass of the atmosphere"""
-        mass: float = (
-            UnitConversion.bar_to_Pa(self.atmosphere_pressure) / self.planet.surface_gravity
+        self._atmosphere = Atmosphere(
+            species=self.species, solution=self._solution, planet=self.planet
         )
-        mass *= self.planet.surface_area
-
-        return mass
 
     @property
-    def atmosphere_molar_mass(self) -> float:
-        """Mean molar mass of the atmosphere"""
-        return self.solution.gas.mean_molar_mass
-
-    @property
-    def atmosphere_pressure(self) -> float:
-        """Total pressure of the atmosphere"""
-        return self.solution.gas.total_pressure(self.planet.surface_temperature)
-
-    @property
-    def atmosphere_volume(self) -> float:
-        """Total volume of the atmosphere
-
-        Derived using the mechanical pressure balance due to the weight of the atmosphere and the
-        ideal gas equation of state.
-        """
-        volume: float = self.planet.surface_area / self.planet.surface_gravity
-        volume *= GAS_CONSTANT * self.planet.surface_temperature / self.atmosphere_molar_mass
-
-        return volume
-
-    @property
-    def atmosphere_density(self) -> float:
-        """Mean density of the atmosphere"""
-        return self.atmosphere_mass / self.atmosphere_volume
-
-    @property
-    def atmosphere_species_moles(self) -> float:
-        """Total number of moles of species in the atmosphere"""
-        number_density: float = 0
-        for species in self.species.gas_species:
-            number_density += self.gas_species_reservoir_masses(species)[
-                "atmosphere_number_density"
-            ]
-
-        moles = self.number_density_to_moles(number_density)
-
-        return moles
+    def atmosphere(self) -> Atmosphere:
+        """Atmosphere"""
+        return self._atmosphere
 
     @property
     def constraints(self) -> SystemConstraints:
@@ -167,10 +188,12 @@ class InteriorAtmosphereSystem:
         """The solution"""
         return self._solution
 
+    # TODO: Move to another helper/output class
     def number_density_to_molecules(self, number_density: float) -> float:
         """Number density to number of molecules"""
-        return number_density * self.atmosphere_volume
+        return number_density * self.atmosphere.volume
 
+    # TODO: Move to another helper/output class
     def number_density_to_moles(self, number_density: float) -> float:
         """Number density to number of moles"""
         return self.number_density_to_molecules(number_density) / AVOGADRO
@@ -210,7 +233,7 @@ class InteriorAtmosphereSystem:
             element: 0 for element in self.species.elements()
         }
         for species in self.species.condensed_species:
-            number_density: float = self._solution.mass.physical[species]
+            number_density: float = self._solution.condensed.physical[species]
             for element, value in species.composition().items():
                 condensed_element_masses[element] += number_density * value.count
 
@@ -241,26 +264,20 @@ class InteriorAtmosphereSystem:
         output["melt_ppmw"] = species.solubility.concentration(
             fugacity=output["fugacity"],
             temperature=self.planet.surface_temperature,
-            pressure=self.atmosphere_pressure,
+            pressure=self.atmosphere.pressure,
             **self.solution.gas.fugacities_by_hill_formula(self.planet.surface_temperature),
         )
         # Numerator to molecules
         output["melt_number_density"] = (
             output["melt_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
         )
-        # Denominator to m^3
-        output["melt_number_density"] *= self.planet.mantle_density
-        # Scale by volume to be relative to gas volume
-        output["melt_number_density"] *= self.planet.mantle_melt_volume / self.atmosphere_volume
+        output["melt_number_density"] *= self.planet.mantle_melt_mass / self.atmosphere.volume
 
         output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
         output["solid_number_density"] = (
             output["solid_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
         )
-        # Denominator to m^3
-        output["solid_number_density"] *= self.planet.mantle_density
-        # Scale by volume to be relative to gas volume
-        output["solid_number_density"] *= self.planet.mantle_solid_volume / self.atmosphere_volume
+        output["solid_number_density"] *= self.planet.mantle_solid_mass / self.atmosphere.volume
 
         return output
 
@@ -345,7 +362,7 @@ class InteriorAtmosphereSystem:
                 sum(self.element_number_density(constraint.element).values())
             )
             residual_number_density[index] -= constraint.log10_number_of_molecules - np.log10(
-                self.atmosphere_volume
+                self.atmosphere.volume
             )
 
         logger.debug("residual_number_density = %s", residual_number_density)
@@ -500,7 +517,7 @@ class InteriorAtmosphereSystem:
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
             temperature=self.planet.surface_temperature,
-            pressure=self.atmosphere_pressure,
+            pressure=self.atmosphere.pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
             activity_modifier=activity_modifier,
@@ -518,9 +535,9 @@ class InteriorAtmosphereSystem:
         if len(self.constraints.total_pressure_constraint) > 0:
             constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
-                self.solution.gas.sum
+                self.solution.gas.total_pressure(self.planet.surface_temperature)
             ) - constraint.get_log10_value(
-                temperature=self.planet.surface_temperature, pressure=self.atmosphere_pressure
+                temperature=self.planet.surface_temperature, pressure=self.atmosphere.pressure
             )
 
         # Combined residual
@@ -536,7 +553,7 @@ class InteriorAtmosphereSystem:
         output: dict[str, float] = (
             self.solution.gas.solution_dict(self.planet.surface_temperature)
             | self.solution.activity.solution_dict()
-            | self.solution.mass.solution_dict(self.atmosphere_volume)
+            | self.solution.condensed.solution_dict(self.atmosphere.volume)
         )
 
         return output

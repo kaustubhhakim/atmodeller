@@ -176,7 +176,7 @@ class InitialSolution(ABC, Generic[T]):
                 temperature=temperature, pressure=pressure
             )
 
-        self.solution.mass.fill_missing_values(self._fill_log10_mass)
+        self.solution.condensed.fill_missing_values(self._fill_log10_mass)
 
         # TODO: Testing. If the solver fails it could be because one or several of the condensed
         # species are unstable. Just randomly guess here.
@@ -189,14 +189,14 @@ class InitialSolution(ABC, Generic[T]):
             #     else:
             #         self.solution.activity.data[species] = -24
             #         self.solution.mass.data[species] = -16
-            self.solution.mass.perturb_values(10)
+            self.solution.condensed.perturb_values(10)
 
         self.solution.stability.fill_missing_values(self._fill_log10_stability)
         # Satisfy auxilliary equation by construction
         if perturb_gas_log10:
             for species in self.solution.stability.data:
                 self.solution.stability.data[species] = (
-                    log10_TAU - self.solution.mass.data[species]
+                    log10_TAU - self.solution.condensed.data[species]
                 )
 
     def get_log10_value(
@@ -301,7 +301,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         del kwargs
         self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
         self.solution.activity.data = self._get_log10_values(self._species.condensed_species, "")
-        self.solution.mass.data = self._get_log10_values(
+        self.solution.condensed.data = self._get_log10_values(
             self._species.condensed_species, MASS_PREFIX
         )
         self.solution.stability.data = self._get_log10_values(

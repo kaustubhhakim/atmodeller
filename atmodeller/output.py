@@ -141,7 +141,7 @@ class Output(UserDict):
         for species in interior_atmosphere.species.condensed_species:
             output: dict[str, float] = {}
             output["activity"] = interior_atmosphere.solution.activity.physical[species]
-            output["number_density"] = interior_atmosphere.solution.mass.physical[species]
+            output["number_density"] = interior_atmosphere.solution.condensed.physical[species]
             output["moles"] = interior_atmosphere.number_density_to_moles(output["number_density"])
             output["molar_mass"] = species.molar_mass
             output["mass"] = output["moles"] * output["molar_mass"]

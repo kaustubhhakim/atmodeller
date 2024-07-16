@@ -448,7 +448,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         )
         for nn, species in enumerate(self._species.condensed_species):
             residual_stability[nn] = solution.stability.data[species] - log10_TAU
-            residual_stability[nn] += solution.mass.data[species]
+            residual_stability[nn] += solution.condensed.data[species]
 
         logger.debug("residual_stability = %s", residual_stability)
 
