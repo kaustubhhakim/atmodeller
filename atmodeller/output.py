@@ -24,13 +24,12 @@ import pickle
 from collections import UserDict
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Hashable
 
 import numpy as np
 import pandas as pd
 from molmass import Formula
 
-from atmodeller.interfaces import CondensedSpecies
 from atmodeller.utilities import UnitConversion, reorder_dict
 
 if TYPE_CHECKING:
@@ -73,6 +72,22 @@ class Output(UserDict):
 
         return cls(output_data)
 
+    @classmethod
+    def from_dataframes(cls, dataframes: dict[str, pd.DataFrame]) -> Output:
+        """Reads a dictionary of dataframes and creates an Output instance.
+
+        Args:
+            dataframes: A dictionary of dataframes.
+
+        Returns:
+            Output
+        """
+        output_data: dict[str, list[dict[Hashable, float]]] = {}
+        for key, dataframe in dataframes.items():
+            output_data[key] = dataframe.to_dict(orient="records")
+
+        return cls(output_data)
+
     def add(
         self, interior_atmosphere: InteriorAtmosphereSystem, extra_output: dict[str, float] | None
     ) -> None:
@@ -90,6 +105,7 @@ class Output(UserDict):
         self._add_planet(interior_atmosphere)
         self._add_residual(interior_atmosphere)
         self._add_solution(interior_atmosphere)
+        self._add_raw_solution(interior_atmosphere)
 
         if extra_output is not None:
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
@@ -120,17 +136,10 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = (
-            interior_atmosphere.condensed_species_masses()
-        )
-
         for species in interior_atmosphere.species.condensed_species:
             output: dict[str, float] = {}
-            output["activity"] = interior_atmosphere.solution.activities[species]
-            try:
-                output["mass"] = sum(condensed_species_masses[species].values())
-            except KeyError:
-                output["mass"] = 0
+            output["activity"] = interior_atmosphere.solution.activity.physical[species]
+            output["mass"] = interior_atmosphere.solution.mass.physical[species]
             output["moles"] = output["mass"] / species.molar_mass
             output["molar_mass"] = species.molar_mass
 
@@ -164,15 +173,15 @@ class Output(UserDict):
         for element in interior_atmosphere.species.elements():
             mass[element] = interior_atmosphere.element_gas_mass(element)
 
-        # To compute astronomical logarithmic abundances we need to store H abundance, which is
-        # used to normalise all other elemental abundances
+        # To compute astronomical logarithmic abundances (dex) we need to store H abundance, which
+        # is used to normalise all other elemental abundances
         mass = reorder_dict(mass, "H")
-        H_total_moles: float | None = None
+        H_total_moles: float | None = None  # pylint: disable=invalid-name
 
         # Create and add the output
         for nn, (element, element_mass) in enumerate(mass.items()):
             output: dict[str, float] = {}
-            logger.info("Adding %s to output", element)
+            logger.debug("Adding %s to output", element)
             output["molar_mass"] = UnitConversion.g_to_kg(Formula(element).mass)
             output["atmosphere_mass"] = element_mass["atmosphere_mass"]
             output["melt_mass"] = element_mass["melt_mass"]
@@ -219,7 +228,7 @@ class Output(UserDict):
                 H_total_moles = output["total_moles"]  # pylint: disable=invalid-name
 
             if H_total_moles is not None:
-                # Astronomical logarithmic abundance (dex), used by FastChem
+                # Astronomical logarithmic abundance (dex), e.g. used by FastChem
                 output["logarithmic_abundance"] = (
                     np.log10(output["total_moles"] / H_total_moles) + 12
                 )
@@ -240,12 +249,14 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        for species in interior_atmosphere.species.gas_species:
+        for species in interior_atmosphere.solution.gas.data:
             output: dict[str, float] = interior_atmosphere.gas_species_reservoir_masses(species)
-            output["fugacity_coefficient"] = interior_atmosphere.solution.fugacity_coefficients[
-                species
-            ]
-            output["volume_mixing_ratio"] = interior_atmosphere.solution.volume_mixing_ratios[
+            output["fugacity_coefficient"] = (
+                interior_atmosphere.solution.gas.fugacity_coefficients(
+                    interior_atmosphere.planet.surface_temperature
+                )[species]
+            )
+            output["volume_mixing_ratio"] = interior_atmosphere.solution.gas.volume_mixing_ratios[
                 species
             ]
             output["molar_mass"] = interior_atmosphere.species.get_species(species).molar_mass
@@ -268,6 +279,15 @@ class Output(UserDict):
         """
         data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
         data_list.append(interior_atmosphere.residual_dict())
+
+    def _add_raw_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+        """Adds the raw solution.
+
+        Args:
+            interior_atmosphere: Interior atmosphere system
+        """
+        data_list: list[dict[str, float]] = self.data.setdefault("raw_solution", [])
+        data_list.append(interior_atmosphere.solution.raw_solution_dict())
 
     def _add_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the solution.
@@ -359,6 +379,46 @@ class Output(UserDict):
 
         return self
 
+    def filter_by_index_notin(self, other: Output, index_key: str, index_name: str) -> Output:
+        """Filters out the entries in `self` that are not present in the index of `other`
+
+        Args:
+            other: Other output with the filtering index
+            index_key: Key of the index
+            index_name: Name of the index
+
+        Returns:
+            The filtered output
+        """
+        self_dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
+        other_dataframes: dict[str, pd.DataFrame] = other.to_dataframes()
+        index: pd.Index = pd.Index(other_dataframes[index_key][index_name])
+
+        for key, dataframe in self_dataframes.items():
+            self_dataframes[key] = dataframe[~dataframe.index.isin(index)]
+
+        return self.from_dataframes(self_dataframes)
+
+    def reorder(self, other: Output, index_key: str, index_name: str) -> Output:
+        """Reorders all the entries according to an index in `other`
+
+        Args:
+            other: Other output with the reordering index
+            index_key: Key of the index
+            index_name: Name of the index
+
+        Returns:
+            The reordered output
+        """
+        self_dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
+        other_dataframes: dict[str, pd.DataFrame] = other.to_dataframes()
+        index: pd.Index = pd.Index(other_dataframes[index_key][index_name])
+
+        for key, dataframe in self_dataframes.items():
+            self_dataframes[key] = dataframe.reindex(index)
+
+        return self.from_dataframes(self_dataframes)
+
     def __call__(
         self,
         file_prefix: Path | str = "atmodeller_out",
@@ -371,7 +431,7 @@ class Output(UserDict):
 
         Args:
             file_prefix: Prefix of the output file if writing to a pickle or Excel. Defaults to
-                'atmodeller_out'
+                atmodeller_out
             to_dict: Returns the output data in a dictionary. Defaults to True.
             to_dataframes: Returns the output data in a dictionary of dataframes. Defaults to
                 False.

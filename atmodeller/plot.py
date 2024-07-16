@@ -890,13 +890,13 @@ class Plotter:
                 series_data: pd.Series = self.get_element_ratio_in_reservoir(
                     "C", element, reservoir=reservoir, mass_or_moles=mass_or_moles
                 )
-                series_data = np.log10(series_data)
+                series_data = np.log10(series_data)  # type: ignore
                 output.append(series_data)
 
         for element in ("C", "H"):
             element_data: pd.DataFrame = self.dataframes[f"{element}_totals"]
             interior: pd.Series = element_data["melt_mass"] * 100 / element_data["total_mass"]
-            interior = np.log10(interior)
+            interior = np.log10(interior)  # type: ignore
             interior.name = f"{element} melt (log10(wt.%))"
             output.append(interior)
 
@@ -969,7 +969,7 @@ class Plotter:
         sns.move_legend(grid, "center left", bbox_to_anchor=sns_bbox_to_anchor)
 
         # These axes are all tuned for ratios in moles and interior storage in wt.%
-        axes = self.get_axes(grid, column_index=0)
+        # axes = self.get_axes(grid, column_index=0)
         # specs: AxesSpec = AxesSpec(xylim=(0, 1500), ticks=[0, 500, 1000, 1500])
         # axes.set_xlim(specs.xylim)
         # axes.set_ylim(specs.xylim)

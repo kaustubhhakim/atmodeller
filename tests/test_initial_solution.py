@@ -23,16 +23,33 @@ import logging
 import numpy as np
 
 from atmodeller import __version__, debug_logger
-from atmodeller.core import GasSpecies, Species
-from atmodeller.initial_solution import InitialSolutionConstant, InitialSolutionDict
-from atmodeller.interfaces import InitialSolutionProtocol
+from atmodeller.constraints import (
+    ActivityConstraint,
+    ElementMassConstraint,
+    FugacityConstraint,
+    PressureConstraint,
+    SystemConstraints,
+)
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.initial_solution import (
+    InitialSolutionDict,
+    InitialSolutionLast,
+    InitialSolutionRegressor,
+)
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.utilities import earth_oceans_to_kg
+
+logger: logging.Logger = debug_logger()
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
+REGRESSORTOL: float = 8e-2
+"""Tolerance for testing the regressor output"""
 
-logger: logging.Logger = debug_logger()
+dummy_variable: float = 1
+"""Dummy variable used for temperature and pressure arguments when they are not used internally"""
 
 
 def test_version():
@@ -40,76 +57,297 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def test_constant():
-    """Tests a constant initial solution"""
+def test_no_args_no_constraints_dict():
+    """Tests a dict with no arguments and no constraints"""
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    species: Species = Species([H2O_g, H2_g])
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("CO")
+    species = Species([H2O_g, H2_g, O2_g])
 
-    initial_solution: InitialSolutionProtocol = InitialSolutionConstant(10, species=species)
+    constraints: SystemConstraints = SystemConstraints([])
 
-    assert np.array_equal(initial_solution.value, np.array([10, 10]))
-
-
-def test_dictionary():
-    """Tests a dictionary initial solution
-
-    Tests that dictionary fill values are preferred to `fill_value`, as well as that the initial
-    solution is aligned with the species order.
-    """
-
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    CO_g: GasSpecies = GasSpecies("CO2")
-    species: Species = Species([H2O_g, H2_g, CO_g])
-
-    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {CO_g: 10, H2O_g: 5}, species=species, fill_value=2
+    initial_solution = InitialSolutionDict(species=species)
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
     )
 
-    assert np.array_equal(initial_solution.value, np.array([5, 2, 10]))
+    assert np.all(result == 1)
 
 
-# TODO: Work in progress, but will need to generate some data to test the regressor.
-# def test_regressor():
-#     """Tests a regressor initial condition"""
+def test_no_args_with_constraints_dict():
+    """Tests a dict with no arguments, but with constraints and a pressure fill value."""
 
-#     H2O_g: GasSpecies = GasSpecies("H2O")
-#     H2_g: GasSpecies = GasSpecies("H2")
-#     CO_g: GasSpecies = GasSpecies("CO")
-#     CO2_g: GasSpecies = GasSpecies("CO2")
-#     species: Species = Species([H2O_g, H2_g, CO_g, CO2_g])
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    CO_g = GasSpecies("CO")
+    species = Species([H2O_g, H2_g, CO_g])
 
-#     output: Output = synthetic_output()
+    constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
-#     initial_solution: InitialSolutionProtocol = InitialSolutionRegressor(
-#         output, species=species, species_fill={H2_g: 6}, fill_value=2
-#     )
+    initial_solution = InitialSolutionDict(species=species, fill_log10_pressure=2)
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([0.6989700043360189, 2, 2])
 
-#     expected_value: dict[str, list[float]] = {
-#         "H2O_g": [1, 2, 3, 4],
-#         "H2_g": [6, 6, 6, 6],
-#         "CO_g": [5, 6, 7, 8],
-#         "CO2_g": [2, 2, 2, 2],
-#     }
-#     expected_value_df = pd.DataFrame(expected_value)
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
 
 
-# def synthetic_output() -> Output:
-#     """Generates synthetic output for testing the initial solution
+def test_with_args_with_constraints_dict():
+    """Tests a dict with arguments, constraints, and a pressure fill value."""
 
-#     Returns:
-#         Synthetic output
-#     """
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    species = Species([H2O_g, H2_g, CO_g, CO2_g])
 
-#     output: Output = Output()
+    constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
-#     output["solution"] = [
-#         {"H2O_g": 1, "CO_g": 5},
-#         {"H2O_g": 2, "CO_g": 6},
-#         {"H2O_g": 3, "CO_g": 7},
-#         {"H2O_g": 4, "CO_g": 8},
-#     ]
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000}, species=species, fill_log10_pressure=4
+    )
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([0.6989700043360189, 3, 2, 4])
 
-#     return output
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_with_args_cond_dict():
+    """Tests a dict with arguments, no constraints, for condensed phases
+
+    In particular, this tests that activity arguments (and fill values) are applied correctly.
+    """
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    H2O_l = LiquidSpecies("H2O")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+
+    constraints = SystemConstraints([])
+
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000, C_cr: 0.9}, species=species, fill_log10_activity=np.log10(0.8)
+    )
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.04575749, 18, 18, -34, -34])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_with_args_constraints_cond_dict():
+    """Tests a dict with arguments, constraints, for condensed phases
+
+    In particular, this tests that activity constraints are applied correctly.
+    """
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    H2O_l = LiquidSpecies("H2O")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+
+    constraints = SystemConstraints([ActivityConstraint(C_cr, 0.7)])
+
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000}, species=species, fill_log10_activity=np.log10(0.8)
+    )
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.15490196, 18, 18, -34, -34])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_with_stability_constraints_cond_dict():
+    """Tests a dict with arguments, constraints, for condensed phases
+
+    In particular, this tests that activity constraints are applied correctly.
+    """
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    H2O_l = LiquidSpecies("H2O")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+
+    constraints = SystemConstraints([ActivityConstraint(C_cr, 0.7)])
+
+    initial_solution = InitialSolutionDict(
+        {CO_g: 100, H2_g: 1000, "stability_C_cr": 2, "mass_H2O_l": 1e22},
+        species=species,
+        fill_log10_activity=np.log10(0.8),
+    )
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 3, 1, 2, 1, 1, -0.09691001, -0.15490196, 22, 18, -34, 0.30103])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_last_solution():
+    """Tests an initial solution based on the last solution"""
+
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    species: Species = Species([H2_g, H2O_g, O2_g])
+
+    constraints = SystemConstraints([])
+
+    initial_solution = InitialSolutionLast(species=species)
+
+    # The first initial condition will return the fill value for the pressure
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1, 1, 1])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+    # This is the same as test_H_O in test_benchmark.py
+    oceans = 1
+    planet = Planet()
+    h_kg: float = earth_oceans_to_kg(oceans)
+    o_kg: float = 6.25774e20
+
+    constraints = SystemConstraints(
+        [
+            ElementMassConstraint("H", h_kg),
+            ElementMassConstraint("O", o_kg),
+        ]
+    )
+
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    # Following the solve we test that the initial condition returns the previous solution
+    system.solve(constraints, initial_solution=initial_solution)
+
+    result = initial_solution.get_log10_value(
+        constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+    target = np.array([1.86837304, 1.88345733, -7.0489495])
+
+    logger.debug("result = %s", result)
+    logger.debug("target = %s", target)
+
+    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+
+
+def test_regressor(generate_regressor_data):
+    """Tests the basic functionality of the initial solution regressor"""
+
+    interior_atmosphere, filename = generate_regressor_data
+
+    species = interior_atmosphere.species
+    O2_g = species.get_species_from_name("O2_g")
+    H2O_g = species.get_species_from_name("H2O_g")
+
+    dataframes = interior_atmosphere.output(to_dataframes=True)
+    raw_solution = dataframes["raw_solution"]
+    solution = dataframes["solution"]
+
+    initial_solution = InitialSolutionRegressor.from_pickle(filename, species=species)
+
+    for index in [0, 5, 10, 15, 20, 25, 30, 35]:
+
+        test_constraints = SystemConstraints(
+            [
+                FugacityConstraint(O2_g, solution.iloc[index]["O2_g"]),
+                PressureConstraint(H2O_g, solution.iloc[index]["H2O_g"]),
+            ]
+        )
+
+        result = initial_solution.get_log10_value(
+            test_constraints, temperature=dummy_variable, pressure=dummy_variable
+        )
+
+        assert np.isclose(
+            raw_solution.iloc[index]["H2O_g"], result[0], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )
+        assert np.isclose(
+            raw_solution.iloc[index]["H2_g"], result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )
+        assert np.isclose(
+            raw_solution.iloc[index]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )
+
+
+def test_regressor_override(generate_regressor_data):
+    """Tests the regressor with an override option"""
+
+    interior_atmosphere, filename = generate_regressor_data
+
+    species = interior_atmosphere.species
+    O2_g = species.get_species_from_name("O2_g")
+    H2O_g = species.get_species_from_name("H2O_g")
+    H2_g = species.get_species_from_name("H2_g")
+
+    dataframes = interior_atmosphere.output(to_dataframes=True)
+    raw_solution = dataframes["raw_solution"]
+    solution = dataframes["solution"]
+
+    solution_override = InitialSolutionDict({H2_g: 100000}, species=species)
+    initial_solution = InitialSolutionRegressor.from_pickle(
+        filename, species=species, solution_override=solution_override
+    )
+
+    test_constraints = SystemConstraints(
+        [
+            FugacityConstraint(O2_g, solution.iloc[0]["O2_g"]),
+            PressureConstraint(H2O_g, solution.iloc[0]["H2O_g"]),
+        ]
+    )
+
+    result = initial_solution.get_log10_value(
+        test_constraints, temperature=dummy_variable, pressure=dummy_variable
+    )
+
+    assert np.isclose(
+        raw_solution.iloc[0]["H2O_g"], result[0], atol=REGRESSORTOL, rtol=REGRESSORTOL
+    )
+    assert np.isclose(5, result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL)
+    assert np.isclose(
+        raw_solution.iloc[0]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
+    )

@@ -166,7 +166,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
             logger.warning("Thermodynamic data not found")
             return None
         else:
-            logger.info("Thermodynamic data found = %s", phase_data)
+            logger.debug("Thermodynamic data found = %s", phase_data)
             return self.ThermodynamicDataForSpecies(species, self.data_source, phase_data)
 
     class ThermodynamicDataForSpecies(ThermodynamicDataForSpeciesABC):
@@ -195,10 +195,10 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
             del pressure
             gibbs: float = self.data.DeltaG(temperature) * kilo
 
-            logger.debug(
-                "Species = %s, standard Gibbs energy of formation = %f",
-                self.species.hill_formula,
-                gibbs,
-            )
+            # logger.debug(
+            #     "Species = %s, standard Gibbs energy of formation = %f",
+            #     self.species.hill_formula,
+            #     gibbs,
+            # )
 
             return gibbs

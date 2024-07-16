@@ -391,10 +391,10 @@ def test_graphite_condensed(helper) -> None:
         "CO2_g": 0.061195,
         "CH4_g": 96.74,
         "C_cr": 1.0,
-        "degree_of_condensation_C": 0.456983,
+        "mass_C_cr": 3.54162e20,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=10)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -439,10 +439,10 @@ def test_graphite_unstable(helper) -> None:
         "C_cr": 0.12202,
         # FactSage also predicts no C, so these values are set close to the atmodeller output so
         # the test knows to pass.
-        "degree_of_condensation_C": 1.1e-15,
+        "mass_C_cr": 1.1e-15,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -474,10 +474,51 @@ def test_water_condensed(helper) -> None:
         "H2_g": 6.5604,
         "O2_g": 5.6433e-58,
         "H2O_l": 1.0,
-        "degree_of_condensation_H": 0.893755,
+        "mass_H2O_l": 1.23802e21,
     }
 
-    system.solve(constraints)
+    system.solve(constraints, factor=10)
+    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_water_condensed_O_abundance(helper) -> None:
+    """Condensed water at 10 bar
+
+    This is the same test as above, but this time constraining the total pressure and oxygen
+    abundance. This test reveals a discrepancy in the moles of H and O in condensed H2O, which
+    do not appear to agree with stoichiometry.
+    """
+
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    O2_g: GasSpecies = GasSpecies("O2")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
+
+    species: Species = Species([H2_g, H2O_g, O2_g, H2O_l])
+
+    planet: Planet = Planet()
+    planet.surface_temperature = 411.75
+    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    h_kg: float = earth_oceans_to_kg(1)
+    o_kg: float = 1.14375e21
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            ElementMassConstraint("O", o_kg),
+            ElementMassConstraint("H", h_kg),
+        ]
+    )
+
+    factsage_result: dict[str, float] = {
+        "H2O_g": 3.3596,
+        "H2_g": 6.5604,
+        "O2_g": 5.6433e-58,
+        "H2O_l": 1.0,
+        "mass_H2O_l": 1.247201e21,
+    }
+
+    system.solve(constraints, factor=10)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -528,6 +569,7 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     system = graphite_water_condensed
+    # system.output(to_excel=True)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,
@@ -538,8 +580,8 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
         "H2O_l": 1.0,
         "H2_g": 0.0023,
         "O2_g": 4.74e-48,
-        "degree_of_condensation_C": 0.892,
-        "degree_of_condensation_H": 0.992,
+        "mass_C_cr": 8.75101e19,
+        "mass_H2O_l": 2.74821e21,
     }
 
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)

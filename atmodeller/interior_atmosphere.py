@@ -24,20 +24,14 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 from molmass import Formula
 from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
-from atmodeller.constraints import SystemConstraints
+from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
 from atmodeller.core import GasSpecies, Planet, Solution, Species
-from atmodeller.initial_solution import InitialSolutionConstant
-from atmodeller.interfaces import (
-    CondensedSpecies,
-    InitialSolutionProtocol,
-    TotalPressureConstraintProtocol,
-)
+from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
 from atmodeller.utilities import UnitConversion
@@ -68,14 +62,16 @@ class InteriorAtmosphereSystem:
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
     _solution: Solution = field(init=False)
     _residual: npt.NDArray = field(init=False)
-    _failed_solves: int = 0
+    _attempted_solves: int = field(init=False, default=0)
+    _failed_solves: int = field(init=False, default=0)
 
     def __post_init__(self):
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_composition(self.planet.melt_composition)
         if self.initial_solution is None:
-            self.initial_solution = InitialSolutionConstant(species=self.species)
-        self._reaction_network = ReactionNetworkWithCondensateStability(species=self.species)
+            self.initial_solution = InitialSolutionDict(species=self.species)
+        self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
+        self._solution = Solution(self.species)
 
     @property
     def atmosphere_element_moles(self) -> float:
@@ -100,12 +96,12 @@ class InteriorAtmosphereSystem:
     @property
     def atmosphere_molar_mass(self) -> float:
         """Mean molar mass of the atmosphere"""
-        return self.solution.gas_mean_molar_mass
+        return self.solution.gas.mean_molar_mass
 
     @property
     def atmosphere_pressure(self) -> float:
         """Total pressure of the atmosphere"""
-        return self.solution.total_pressure
+        return self.solution.gas.total_pressure
 
     @property
     def atmosphere_species_moles(self) -> float:
@@ -126,15 +122,20 @@ class InteriorAtmosphereSystem:
     @property
     def failed_solves(self) -> int:
         """Number of failed solves"""
-        fraction: float = self._failed_solves / self.number_of_solves
+        percentage_failed: float = self._failed_solves * 100 / self.number_of_attempted_solves
         logger.info(
-            "%d failed solves from a total of %d (%f %%)",
+            "%d failed solves from a total attempted of %d (%.1f %%)",
             self._failed_solves,
-            self.number_of_solves,
-            fraction,
+            self.number_of_attempted_solves,
+            percentage_failed,
         )
 
         return self._failed_solves
+
+    @property
+    def number_of_attempted_solves(self) -> int:
+        """The total number of systems with attempted solves"""
+        return self._attempted_solves
 
     @property
     def number_of_solves(self) -> int:
@@ -167,118 +168,29 @@ class InteriorAtmosphereSystem:
         for index, constraint in enumerate(self.constraints.total_pressure_constraint):
             output[constraint.name] = self._residual[-1]  # Always last index if applied
 
+        output["rms"] = np.sqrt(np.mean(np.array(list(output.values())) ** 2))
+
         return output
 
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""
         return self._solution.solution_dict()
 
-    def condensed_species_masses(self) -> dict[CondensedSpecies, dict[str, float]]:
-        """Computes the masses of condensed species and their elements
-
-        This follows the approach outlined in :cite:t:`KSP24{Appendix B}`, albeit simplified under
-        the assumption of a handful of linearly independent condensates that can be solved for in
-        a single solve, i.e. no iteration is required.
-
-        Returns:
-            Dictionary of condensed species and their element masses
-        """
-        condensed_species_masses: dict[CondensedSpecies, dict[str, float]] = {}
-        condensed_elements: list[str] = self.solution.condensed_elements_to_solve
-        condensed_species: list[CondensedSpecies] = self.solution.condensed_species_to_solve
-        mapping: npt.NDArray = np.zeros((len(condensed_elements), len(condensed_species)))
-
-        if mapping.size < 1:
-            return condensed_species_masses
-
-        # Assemble matrices
-        # TODO: If both H and O prescribed as constraints, then drop one based on the one that is
-        # the minimum stoichiometry bottleneck for H2O. So keep the minimum and drop the maximum.
-        # Then determine the amount of the other quantity and compare to the prescribed constraint
-        # Should correct original constraint to be self-consistent.
-        element_condensed_mass: list[float] = []
-        element_condensed_moles: list[float] = []
-        for ii, condensed_element in enumerate(condensed_elements):
-            condensed_mass: float = self.element_condensed_mass(condensed_element)
-            element_condensed_mass.append(condensed_mass)
-            condensed_moles: float = condensed_mass / UnitConversion.g_to_kg(
-                Formula(condensed_element).mass
-            )
-            element_condensed_moles.append(condensed_moles)
-            for jj, species in enumerate(condensed_species):
-                if condensed_element in species.composition():
-                    mapping[ii, jj] = species.composition()[condensed_element].fraction
-
-        element_condensed_mass_dict: dict[str, float] = dict(
-            zip(condensed_elements, element_condensed_mass)
-        )
-        element_condensed_moles_dict: dict[str, float] = dict(
-            zip(condensed_elements, element_condensed_moles)
-        )
-
-        logger.debug("element_condensed_mass = %s", element_condensed_mass_dict)
-        logger.debug("element_condensed_moles = %s", element_condensed_moles_dict)
-        logger.debug("mapping = %s", mapping)
-
-        # For debugging element partitioning in condensates.
-        if "H" in element_condensed_mass_dict and "O" in element_condensed_mass_dict:
-            logger.debug("Compute H/O ratio in condensed phase")
-            HO_ratio_mass: float = (  # pylint: disable=invalid-name
-                element_condensed_mass_dict["H"] / element_condensed_mass_dict["O"]
-            )
-            HO_ratio_moles: float = (  # pylint: disable=invalid-name
-                element_condensed_moles_dict["H"] / element_condensed_moles_dict["O"]
-            )
-            logger.debug("H/O (mass) = %f, H/O (moles) = %f", HO_ratio_mass, HO_ratio_moles)
-            logger.debug(
-                "O/H (mass) = %f, O/H (moles) = %f", 1 / HO_ratio_mass, 1 / HO_ratio_moles
-            )
-
-        # Count how many condensates can be associated with each element
-        associations: npt.NDArray = np.count_nonzero(mapping, axis=1)
-        logger.debug("associations = %s", associations)
-        # Enforce conditions for a single solve, which avoids the complication of having to iterate
-        try:
-            assert np.all(associations == 1)
-        except AssertionError as exc:
-            raise AssertionError(
-                "Every element can only be associated with a single condensate"
-            ) from exc
-
-        element_condensed_mass_ar: npt.NDArray = np.array(
-            element_condensed_mass, dtype=np.float_
-        ).reshape(-1, 1)
-        condensed_masses: npt.NDArray = np.linalg.solve(
-            mapping, element_condensed_mass_ar
-        ).flatten()
-
-        # Necessary to back-compute some species that might not be constrained by mass balance,
-        # for example oxygen is often constrained by fO2 and not by abundance, but we want to know
-        # how much oxygen is in the system.
-        for nn, species in enumerate(condensed_species):
-            composition: pd.DataFrame = species.composition().dataframe()
-            composition["Mass"] = condensed_masses[nn] * composition["Fraction"]
-            logger.debug("composition = %s", composition)
-            condensed_species_masses[species] = composition.to_dict()["Mass"]
-
-        return condensed_species_masses
-
     def condensed_element_masses(self) -> dict[str, float]:
-        """Calculates the computed and implied masses of elements in all condensed species.
-
-        TODO: Different to element_condensed_mass this computes the implied masses as well.
+        """Calculates the masses of elements in all condensed species.
 
         Returns:
             Dictionary of elements and their masses in all condensed species
         """
-        condensed_species_masses = self.condensed_species_masses()
-        condensed_element_masses: dict[str, float] = {}
-        for element_masses in condensed_species_masses.values():
-            for element, value in element_masses.items():
-                if element in condensed_element_masses:
-                    condensed_element_masses[element] += value
-                else:
-                    condensed_element_masses[element] = value
+        condensed_element_masses: dict[str, float] = {
+            element: 0 for element in self.species.elements()
+        }
+        for species in self.species.condensed_species:
+            # Below can sometimes blow up when the solver tries a large step, although this can be
+            # mitigated by setting the solver keyword argument `factor`.
+            species_mass: float = 10 ** self._solution.mass.data[species]
+            for element, value in species.composition().items():
+                condensed_element_masses[element] += species_mass * value.fraction
 
         logger.debug("condensed_element_masses = %s", condensed_element_masses)
 
@@ -300,8 +212,11 @@ class InteriorAtmosphereSystem:
             A dictionary that includes the reservoir masses of the species
         """
         output: dict[str, float] = {}
-        output["pressure"] = self.solution.gas_pressures[species]
-        output["fugacity"] = self.solution.gas_fugacities[species]
+        output["pressure"] = self.solution.gas.physical[species]
+        output["fugacity"] = self.solution.gas.fugacities(self.planet.surface_temperature)[species]
+        output["number_density"] = self.solution.gas.number_densities(
+            self.planet.surface_temperature
+        )[species]
 
         # Atmosphere
         output["atmosphere_mass"] = (
@@ -316,7 +231,7 @@ class InteriorAtmosphereSystem:
             fugacity=output["fugacity"],
             temperature=self.planet.surface_temperature,
             pressure=self.atmosphere_pressure,
-            **self.solution.gas_fugacities_by_hill_formula,
+            **self.solution.gas.fugacities_by_hill_formula(self.planet.surface_temperature),
         )
         output["melt_mass"] = (
             self.planet.mantle_melt_mass * output["melt_ppmw"] * UnitConversion.ppm_to_fraction()
@@ -381,25 +296,6 @@ class InteriorAtmosphereSystem:
 
         return mass
 
-    def element_condensed_mass(self, element: str) -> float:
-        """Calculates the mass of an element in all condensed species.
-
-        Args:
-            element: Element to compute the mass for.
-
-        Returns:
-            Condensed mass of the element
-        """
-        if element in self.solution.condensed_elements_to_solve:
-            mass = sum(self.element_gas_mass(element).values())
-            mass *= 10 ** self.solution._beta_solution[element]
-        else:
-            mass = 0
-
-        logger.debug("element_condensed_mass for %s = %s", element, mass)
-
-        return mass
-
     def element_mass(self, element: str) -> dict[str, float]:
         """Calculates the mass of an element.
 
@@ -410,21 +306,17 @@ class InteriorAtmosphereSystem:
             Total mass of the element
         """
         element_mass: dict[str, float] = self.element_gas_mass(element)
-        element_mass["condensed"] = self.element_condensed_mass(element)
+        element_mass["condensed"] = self.condensed_element_masses()[element]
 
         logger.debug("element_mass for %s = %s", element, element_mass)
 
         return element_mass
 
-    def get_mass_residual(self):
+    def get_mass_residual(self) -> npt.NDArray[np.float_]:
         """Returns the residual vector of the mass balance."""
-
-        residual_mass: npt.NDArray = np.zeros(
+        residual_mass: npt.NDArray[np.float_] = np.zeros(
             len(self.constraints.mass_constraints), dtype=np.float_
         )
-
-        # Mass constraints are currently only ever specified in terms of elements. Hence
-        # constraint.species is an element.
         for constraint_index, mass_constraint in enumerate(self.constraints.mass_constraints):
             residual_mass[constraint_index] = np.log10(
                 sum(self.element_mass(mass_constraint.element).values())
@@ -441,8 +333,8 @@ class InteriorAtmosphereSystem:
         *,
         initial_solution: InitialSolutionProtocol | None = None,
         extra_output: dict[str, float] | None = None,
-        max_attempts: int = 10,
-        perturb_log10: float = 2.0,
+        max_attempts: int = 20,
+        perturb_gas_log10: float = 2.0,
         errors: str = "ignore",
         method: str = "hybr",
         tol: float | None = None,
@@ -457,7 +349,7 @@ class InteriorAtmosphereSystem:
             extra_output: Extra data to write to the output
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails. Defaults to 10.
-            perturb_log10: Maximum log10 perturbation to apply to the initial condition on failure.
+            perturb_gas_log10: Maximum log10 perturbation to apply to the pressures on failure.
                 Defaults to 2.0.
             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
             method: Type of solver. Defaults to 'hybr'.
@@ -465,40 +357,38 @@ class InteriorAtmosphereSystem:
             **options: Keyword arguments for solver options. Available keywords depend on method.
         """
         logger.info("Solving system number %d", self.number_of_solves)
+        self._attempted_solves += 1
 
         self._constraints = constraints
         self._constraints.add_activity_constraints(self.species)
-
-        self._solution = Solution(self.species, self.constraints, self.planet.surface_temperature)
 
         if initial_solution is None:
             initial_solution = self.initial_solution
         assert initial_solution is not None
 
-        # These matrices depend on the constraints, but can be computed once for any given solve
         coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
-            constraints=self.constraints
+            self.constraints
         )
         activity_modifier: npt.NDArray = self._reaction_network.get_activity_modifier(
-            constraints=constraints, solution=self.solution
+            self.constraints
         )
         equilibrium_modifier: npt.NDArray = self._reaction_network.get_equilibrium_modifier(
-            constraints=constraints, solution=self.solution
-        )
-
-        # The only constraints that require pressure are the fugacity constraints, so for the
-        # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
-        # ensure the initial solution is bounded.
-        log_solution: npt.NDArray = initial_solution.get_log10_value(
-            self.constraints,
-            temperature=self.planet.surface_temperature,
-            pressure=1,
-            degree_of_condensation_number=self.solution.number_condensed_elements_to_solve,
-            number_of_condensed_species=self.solution.number_condensed_species_to_solve,
+            self.constraints
         )
 
         for attempt in range(max_attempts):
             logger.info("Attempt %d/%d", attempt + 1, max_attempts)
+
+            # The only constraints that require pressure are the fugacity constraints, so for the
+            # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
+            # ensure the initial solution is bounded.
+            log_solution: npt.NDArray = initial_solution.get_log10_value(
+                self.constraints,
+                temperature=self.planet.surface_temperature,
+                pressure=1,
+                perturb_gas_log10=perturb_gas_log10,
+                attempt=attempt,
+            )
             logger.info("Initial solution = %s", log_solution)
             try:
                 sol = root(
@@ -531,7 +421,7 @@ class InteriorAtmosphereSystem:
                     sol.success = False
 
             if sol.success:
-                logger.debug("Actual solution = %s", sol.x)
+                logger.info("Actual solution = %s", sol.x)
                 error: npt.NDArray = np.sqrt(mean_squared_error(sol.x, log_solution))
                 logger.info(
                     "%s: RMSE (actual vs initial) = %s",
@@ -546,24 +436,10 @@ class InteriorAtmosphereSystem:
                 break
             else:
                 logger.warning("The solver failed.")
-                if attempt < max_attempts - 1:
-                    log_solution = initial_solution.get_log10_value(
-                        self.constraints,
-                        temperature=self.planet.surface_temperature,
-                        pressure=1,
-                        degree_of_condensation_number=self.solution.number_condensed_elements_to_solve,
-                        number_of_condensed_species=self.solution.number_condensed_species_to_solve,
-                        perturb=True,
-                        perturb_log10=perturb_log10,
-                    )
 
         if not sol.success:
             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
             self._failed_solves += 1
-            if self.solution.number_condensed_elements_to_solve > 0:
-                logger.info("Probably no solution for condensed species and imposed constraints")
-                logger.info("Remove some condensed species and try again")
-
             if errors == "raise":
                 logger.error(msg)
                 logger.error("constraints = %s", self.constraints)
@@ -579,7 +455,7 @@ class InteriorAtmosphereSystem:
         coefficient_matrix: npt.NDArray,
         activity_modifier: npt.NDArray,
         equilibrium_modifier: npt.NDArray,
-    ) -> npt.NDArray:
+    ) -> npt.NDArray[np.float_]:
         """Objective function for the non-linear system.
 
         Args:
@@ -591,9 +467,10 @@ class InteriorAtmosphereSystem:
         Returns:
             The solution, which is the log10 of the activities and pressures for each species
         """
-
         # This must be set here.
         self._solution.data = log_solution
+
+        logger.debug("log_solution passed into _objective_func = %s", log_solution)
 
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
@@ -607,16 +484,14 @@ class InteriorAtmosphereSystem:
         )
 
         # Compute residual for the mass balance.
-        residual_mass: npt.NDArray = self.get_mass_residual()
+        residual_mass: npt.NDArray[np.float_] = self.get_mass_residual()
 
         # Compute residual for the total pressure (if relevant).
         residual_total_pressure: npt.NDArray = np.zeros(
             len(self.constraints.total_pressure_constraint), dtype=np.float_
         )
         if len(self.constraints.total_pressure_constraint) > 0:
-            constraint: TotalPressureConstraintProtocol = (
-                self.constraints.total_pressure_constraint[0]
-            )
+            constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
                 self.atmosphere_pressure
             ) - constraint.get_log10_value(

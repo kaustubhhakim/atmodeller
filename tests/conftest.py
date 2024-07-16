@@ -19,18 +19,21 @@
 # Want to use chemistry symbols so pylint: disable=invalid-name
 
 import logging
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 import pytest
 
 from atmodeller.constraints import (
+    BufferedFugacityConstraint,
     ElementMassConstraint,
+    PressureConstraint,
     SystemConstraints,
-    TotalPressureConstraint,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -83,7 +86,7 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
     H2_g = GasSpecies("H2")
     O2_g = GasSpecies("O2")
     # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
-    H2O_l = LiquidSpecies("H2O")  # , thermodata_filename="H-066", thermodata_name="Water, 10 Bar")
+    H2O_l = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
     CO_g = GasSpecies("CO")
     CO2_g = GasSpecies("CO2")
     CH4_g = GasSpecies("CH4")
@@ -97,15 +100,52 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
+    # Specify O, because otherwise a total pressure can give rise to different solutions (with
+    # different total O), making it more difficult to compare with a known comparison case.
+    o_kg: float = 2.48298883581636e21
 
     constraints = SystemConstraints(
         [
-            TotalPressureConstraint(10),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
+            ElementMassConstraint("O", o_kg),
         ]
     )
 
-    system.solve(constraints)
+    system.solve(constraints, factor=1)
 
     return system
+
+
+@pytest.fixture
+def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
+    """Generates data for testing the initial solution regressor"""
+
+    # H2O pressures in bar
+    H2O_pressures = [1, 4, 7, 10]
+    # fO2 shifts relative to the IW buffer
+    delta_IWs = range(-4, 5)
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    species = Species([H2O_g, H2_g, O2_g])
+
+    planet = Planet()
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+
+    # Generate some data
+    for H2O_pressure in H2O_pressures:
+        for delta_IW in delta_IWs:
+            constraints = SystemConstraints(
+                [
+                    BufferedFugacityConstraint(O2_g, IronWustiteBuffer(delta_IW)),
+                    PressureConstraint(H2O_g, H2O_pressure),
+                ]
+            )
+            system.solve(constraints)
+
+    filename = Path("ic_regressor_test_data")
+    system.output(filename, to_excel=True, to_pickle=True)
+
+    return system, filename

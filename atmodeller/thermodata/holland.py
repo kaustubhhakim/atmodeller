@@ -110,7 +110,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
                 self.data_source,
             )
             phase_data: pd.Series = cast(pd.Series, self.data.loc[search_name])
-            logger.info("Thermodynamic data found = %s", phase_data)
+            logger.debug("Thermodynamic data found = %s", phase_data)
 
             return self.ThermodynamicDataForSpecies(
                 species, self.data_source, phase_data, self.enthalpy_reference_temperature
@@ -160,11 +160,11 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
             if self.species.phase == "cr" or self.species.phase == "l":
                 gibbs += self._get_volume_pressure_integral(temperature, pressure)
 
-            logger.debug(
-                "Species = %s, standard Gibbs energy of formation = %f",
-                self.species.hill_formula,
-                gibbs,
-            )
+            # logger.debug(
+            #     "Species = %s, standard Gibbs energy of formation = %f",
+            #     self.species.hill_formula,
+            #     gibbs,
+            # )
 
             return gibbs
 

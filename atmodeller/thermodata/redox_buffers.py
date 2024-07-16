@@ -46,7 +46,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
         calibration: Calibration temperature and pressure range. Defaults to empty.
 
     Attributes:
-        log10_shift: Log10 shift relative to the buffer.
+        log10_shift: Log10 shift relative to the buffer
         calibration: Calibration temperature and pressure range
     """
 
@@ -58,11 +58,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
     ):
         self.log10_shift: float = log10_shift
         self.calibration: ExperimentalCalibration = calibration
-        logger.info(
-            "%s: Temperature and pressure will be clipped when evaluating the buffer",
-            self.__class__.__name__,
-        )
-        logger.debug("Setting experimental calibration = %s", calibration)
+        logger.info("Setting experimental calibration = %s", calibration)
 
     @abstractmethod
     def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
@@ -77,38 +73,47 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
             log10 of the fugacity at the buffer
         """
 
-    def get_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:
+    def get_log10_value(
+        self, temperature: float, pressure: float, penalty: bool = True, **kwargs
+    ) -> float:
         """Log10 value including any shift
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
+            penalty: Apply penalty function. Defaults to True.
             **kwargs: Arbitrary keyword arguments
 
         Returns:
             Log10 of the fugacity including any shift
         """
-        temperature, pressure = self.calibration.get_within_range(temperature, pressure)
+
         log10_value: float = self._get_buffer_log10_value(
             temperature=temperature, pressure=pressure, **kwargs
         )
         log10_value += self.log10_shift
 
+        if penalty:
+            log10_value += self.calibration.get_penalty(temperature, pressure)
+
         return log10_value
 
-    def get_value(self, temperature: float, pressure: float, **kwargs) -> float:
+    def get_value(
+        self, temperature: float, pressure: float, penalty: bool = True, **kwargs
+    ) -> float:
         """Value including any shift
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
+            penalty: Apply penalty function. Defaults to True.
             **kwargs: Arbitrary keyword arguments
 
         Returns:
             Fugacity including any shift
         """
         log10_value: float = self.get_log10_value(
-            temperature=temperature, pressure=pressure, **kwargs
+            temperature=temperature, pressure=pressure, penalty=penalty, **kwargs
         )
         value: float = 10**log10_value
 

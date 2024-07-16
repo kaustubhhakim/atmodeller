@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   atmodeller.activity
    atmodeller.eos
    atmodeller.solubility
    atmodeller.thermodata

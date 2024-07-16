@@ -56,19 +56,41 @@ class ReactionNetwork:
     """
 
     def __init__(self, species: Species):
-        self.species: Species = species
+        self._species: Species = species
         logger.info("Creating a reaction network")
-        logger.info("Species = %s", self.species.names)
+        logger.info("Species = %s", self._species.names)
         self.reaction_matrix: npt.NDArray | None = self.get_reaction_matrix()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
     @property
     def number_reactions(self) -> int:
-        if self.species.number_species() == 1:
+        if self._species.number == 1:
             return 0
         else:
             assert self.reaction_matrix is not None
             return self.reaction_matrix.shape[0]
+
+    def formula_matrix(self) -> npt.NDArray[np.int_]:
+        """Gets the formula matrix
+
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
+
+        Returns:
+            The formula matrix
+        """
+        matrix: npt.NDArray[np.int_] = np.zeros(
+            (len(self._species.elements()), len(self._species.data)), dtype=np.int_
+        )
+        for element_index, element in enumerate(self._species.elements()):
+            for species_index, species in enumerate(self._species.data):
+                try:
+                    count: int = species.composition()[element].count
+                except KeyError:
+                    count = 0
+                matrix[element_index, species_index] = count
+
+        return matrix
 
     def get_reaction_matrix(self) -> npt.NDArray | None:
         """Gets the reaction matrix
@@ -76,13 +98,11 @@ class ReactionNetwork:
         Returns:
             A matrix of linearly independent reactions
         """
-        if self.species.number_species() == 1:
+        if self._species.number == 1:
             logger.debug("Only one species therefore no reactions")
             return None
 
-        transpose_formula_matrix: npt.NDArray = self.species.formula_matrix(
-            self.species.elements(), self.species.data
-        ).T
+        transpose_formula_matrix: npt.NDArray = self.formula_matrix().T
 
         return partial_rref(transpose_formula_matrix)
 
@@ -93,7 +113,7 @@ class ReactionNetwork:
             for reaction_index in range(self.number_reactions):
                 reactants: str = ""
                 products: str = ""
-                for species_index, species in enumerate(self.species.data):
+                for species_index, species in enumerate(self._species.data):
                     coeff: float = self.reaction_matrix[reaction_index, species_index]
                     if coeff != 0:
                         if coeff < 0:
@@ -146,7 +166,7 @@ class ReactionNetwork:
         """
         gibbs_energy: float = 0
         assert self.reaction_matrix is not None
-        for species_index, species in enumerate(self.species.data):
+        for species_index, species in enumerate(self._species.data):
             assert species.thermodata is not None
             gibbs_energy += self.reaction_matrix[
                 reaction_index, species_index
@@ -154,7 +174,7 @@ class ReactionNetwork:
 
         return gibbs_energy
 
-    def get_coefficient_matrix(self, *, constraints: SystemConstraints) -> npt.NDArray:
+    def get_coefficient_matrix(self, constraints: SystemConstraints) -> npt.NDArray:
         """Gets the coefficient matrix.
 
         Args:
@@ -166,18 +186,18 @@ class ReactionNetwork:
 
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
-        coeff: npt.NDArray = np.zeros((nrows, self.species.number_species()))
+        coeff: npt.NDArray = np.zeros((nrows, self._species.number))
         if self.reaction_matrix is not None:
             coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
 
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
-            species_index = self.species.species_index(constraint.species)
+            species_index = self._species.species_index(constraint.species)
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
-        logger.debug("species = %s", self.species.names)
+        logger.debug("species = %s", self._species.names)
         logger.debug("coefficient matrix = \n%s", coeff)
 
         return coeff
@@ -204,12 +224,12 @@ class ReactionNetwork:
 
         # Reactions
         for reaction_index in range(self.number_reactions):
-            logger.debug(
-                "Row %02d: Reaction %d: %s",
-                reaction_index,
-                reaction_index,
-                self.reactions()[reaction_index],
-            )
+            # logger.debug(
+            #     "Row %02d: Reaction %d: %s",
+            #     reaction_index,
+            #     reaction_index,
+            #     self.reactions()[reaction_index],
+            # )
             rhs[reaction_index] = self._get_reaction_log10_equilibrium_constant(
                 reaction_index=reaction_index,
                 temperature=temperature,
@@ -219,7 +239,8 @@ class ReactionNetwork:
         # Constraints
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
-            logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
+            # pylint: disable=line-too-long
+            # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
         logger.debug("RHS vector = %s", rhs)
@@ -243,16 +264,16 @@ class ReactionNetwork:
         """
 
         # Initialise to ideal behaviour.
-        fugacity_coefficients: npt.NDArray = np.ones_like(self.species, dtype=float)
+        fugacity_coefficients: npt.NDArray = np.ones_like(self._species, dtype=float)
 
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
-        for gas_species in self.species.gas_species:
+        for gas_species in self._species.gas_species:
             fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
-            index: int = self.species.species_index(gas_species)
+            index: int = self._species.species_index(gas_species)
             fugacity_coefficients[index] = fugacity_coefficient
 
         log_fugacity_coefficients: npt.NDArray = np.log10(fugacity_coefficients)
@@ -292,7 +313,7 @@ class ReactionNetwork:
         )
         residual_reaction: npt.NDArray = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(solution.species_values)
+            + coefficient_matrix.dot(solution.data[: self._species.number])
             - rhs
         )
 
@@ -315,43 +336,35 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         reaction_matrix: The reaction stoichiometry matrix
     """
 
-    def get_activity_modifier(
-        self, *, constraints: SystemConstraints, solution: Solution
-    ) -> npt.NDArray:
+    def get_activity_modifier(self, constraints: SystemConstraints) -> npt.NDArray:
         """Gets the activity modifier matrix for condensate stability
 
         Args:
             constraints: Constraints
-            solution: Solution
 
         Returns:
             Activity modifier matrix
         """
         coefficient_matrix: npt.NDArray = self.get_coefficient_matrix(constraints=constraints)
         activity_modifier: npt.NDArray = np.zeros_like(coefficient_matrix)
-        for species in solution.condensed_species_to_solve:
-            index: int = self.species.species_index(species)
+        for species in self._species.condensed_species:
+            index: int = self._species.species_index(species)
             activity_modifier[:, index] = coefficient_matrix[:, index]
 
         logger.debug("activity_modifier = %s", activity_modifier)
 
         return activity_modifier
 
-    def get_equilibrium_modifier(
-        self, *, constraints: SystemConstraints, solution: Solution
-    ) -> npt.NDArray:
+    def get_equilibrium_modifier(self, constraints: SystemConstraints) -> npt.NDArray:
         """Gets the equilibrium constant modifier matrix for condensate stability
 
         Args:
             constraints: Constraints
-            solution: Solution
 
         Returns:
             Equilibrium constant modifier matrix
         """
-        activity_modifier: npt.NDArray = self.get_activity_modifier(
-            constraints=constraints, solution=solution
-        )
+        activity_modifier: npt.NDArray = self.get_activity_modifier(constraints=constraints)
         equilibrium_modifier: npt.NDArray = copy.deepcopy(activity_modifier)
         equilibrium_modifier[self.number_reactions :, :] = 0
 
@@ -369,18 +382,11 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             The residual vector of condensate stability
         """
         residual_stability: npt.NDArray = np.zeros(
-            solution.number_condensed_species_to_solve, dtype=np.float_
+            self._species.number_condensed_species, dtype=np.float_
         )
-        for nn, species in enumerate(solution.condensed_species_to_solve):
-            residual_stability[nn] = solution._lambda_solution[species] - log10_TAU
-            # The xLMA usually uses the condensate number density or similar, but it's simpler to
-            # satisfy the auxiliary equations using the condensed mass of elements in the
-            # condensate, which we have direct access to.
-            for element in species.elements:
-                try:
-                    residual_stability += solution._beta_solution[element]
-                except KeyError:
-                    pass
+        for nn, species in enumerate(self._species.condensed_species):
+            residual_stability[nn] = solution.stability.data[species] - log10_TAU
+            residual_stability[nn] += solution.mass.data[species]
 
         logger.debug("residual_stability = %s", residual_stability)
 
@@ -409,8 +415,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         )
 
         # Reaction network correction factors for condensate stability
-        residual_reaction += activity_modifier.dot(10**solution.lambda_array)
-        residual_reaction -= equilibrium_modifier.dot(10**solution.lambda_array)
+        residual_reaction += activity_modifier.dot(10 ** solution.stability_array())
+        residual_reaction -= equilibrium_modifier.dot(10 ** solution.stability_array())
 
         # Residual for the auxiliary stability equations
         residual_stability: npt.NDArray = self.get_stability_residual(solution)

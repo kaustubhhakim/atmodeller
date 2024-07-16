@@ -24,8 +24,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Protocol, TypeVar, runtime_checkable
 
-import numpy as np
-import numpy.typing as npt
 from molmass import Composition, Formula
 
 from atmodeller.thermodata.interfaces import (
@@ -36,8 +34,7 @@ from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.utilities import UnitConversion
 
 if TYPE_CHECKING:
-    from atmodeller.constraints import SystemConstraints
-    from atmodeller.output import Output
+    from atmodeller.core import GasSpecies
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -51,6 +48,8 @@ class ExperimentalCalibration:
         temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
         pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
         pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
+        temperature_penalty: Penalty coefficients for temperature. Defaults to 1000.
+        pressure_penalty: Penalty coefficient for pressure. Defaults to 1000.
     """
 
     temperature_min: float | None = None
@@ -61,6 +60,10 @@ class ExperimentalCalibration:
     """Minimum pressure in bar"""
     pressure_max: float | None = None
     """Maximum pressure in bar"""
+    temperature_penalty: float = 1e3
+    """Temperature penalty"""
+    pressure_penalty: float = 1e3
+    """Pressure penalty"""
     _clips_to_apply: list[Callable] = field(init=False, default_factory=list)
     """Clips to apply"""
 
@@ -152,6 +155,26 @@ class ExperimentalCalibration:
             temperature, pressure = clip_func(temperature, pressure)
 
         return temperature, pressure
+
+    def get_penalty(self, temperature: float, pressure: float) -> float:
+        """Gets a penalty value if temperature and pressure are outside the calibration range
+
+        This is based on the quadratic penalty method.
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            A penalty value
+        """
+        temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
+        penalty = (
+            self.temperature_penalty * (temperature_clip - temperature) ** 2
+            + self.pressure_penalty * (pressure_clip - pressure) ** 2
+        )
+
+        return penalty
 
 
 class ChemicalSpecies:
@@ -261,45 +284,31 @@ class ConstraintProtocol(Protocol):
     def get_log10_value(self, temperature: float, pressure: float) -> float: ...
 
 
-class SpeciesConstraintProtocol(ConstraintProtocol, Protocol):
-
-    @property
-    def species(self) -> ChemicalSpecies: ...
-
-
-class ElementConstraintProtocol(ConstraintProtocol, Protocol):
+class MassConstraintProtocol(ConstraintProtocol, Protocol):
 
     @property
     def element(self) -> str: ...
 
+    @property
+    def mass(self) -> float: ...
 
-class MassConstraintProtocol(ConstraintProtocol, Protocol):
-    def mass(self, temperature: float, pressure: float) -> float: ...
+
+class ActivityConstraintProtocol(ConstraintProtocol, Protocol):
+
+    @property
+    def species(self) -> CondensedSpecies: ...
+
+    def activity(self, temperature: float, pressure: float) -> float: ...
 
 
-class ReactionNetworkConstraintProtocol(SpeciesConstraintProtocol, Protocol):
+class GasConstraintProtocol(ConstraintProtocol, Protocol):
+
+    @property
+    def species(self) -> GasSpecies: ...
+
     def fugacity(self, temperature: float, pressure: float) -> float: ...
 
 
-class TotalPressureConstraintProtocol(ConstraintProtocol, Protocol):
-    def total_pressure(self, temperature: float, pressure: float) -> float: ...
+ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
 
-
-class InitialSolutionProtocol(Protocol):
-    def get_log10_value(
-        self,
-        constraints: SystemConstraints,
-        *,
-        temperature: float,
-        pressure: float,
-        degree_of_condensation_number: int,
-        number_of_condensed_species: int,
-        perturb: bool = False,
-        perturb_log10: float = 2,
-    ) -> npt.NDArray[np.float_]: ...
-
-    def update(self, output: Output) -> None: ...
-
-
-# Type hint indicating covariance using type comments
 TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies, covariant=True)
