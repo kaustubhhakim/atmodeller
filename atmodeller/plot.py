@@ -346,7 +346,7 @@ class Plotter:
         for sheet_name in self.dataframes:
             output[sheet_name][temp_sort_column_name] = output[sort_sheet_name][sort_column_name]
             output[sheet_name].sort_values(by=[temp_sort_column_name], inplace=True)
-            output[sheet_name].drop(temp_sort_column_name, inplace=True)
+            output[sheet_name].drop(columns=temp_sort_column_name, inplace=True)
 
         return output
 
