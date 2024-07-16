@@ -331,7 +331,7 @@ class Plotter:
 
         return axes[axis_index]
 
-    def _sort(self, sort_sheet_name: str, sort_column_name: str) -> dict[str, pd.DataFrame]:
+    def sort(self, sort_sheet_name: str, sort_column_name: str) -> dict[str, pd.DataFrame]:
         """Sorts the dataframes in ascending order according to a column.
 
         Args:
@@ -342,9 +342,11 @@ class Plotter:
             The sorted dataframes
         """
         output: dict[str, pd.DataFrame] = copy.deepcopy(self.dataframes)
+        temp_sort_column_name: str = f"_{sort_column_name}"
         for sheet_name in self.dataframes:
-            output[sheet_name][sort_column_name] = output[sort_sheet_name][sort_column_name]
-            output[sheet_name].sort_values(by=[sort_column_name], inplace=True)
+            output[sheet_name][temp_sort_column_name] = output[sort_sheet_name][sort_column_name]
+            output[sheet_name].sort_values(by=[temp_sort_column_name], inplace=True)
+            output[sheet_name].drop(temp_sort_column_name, inplace=True)
 
         return output
 
