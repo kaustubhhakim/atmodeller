@@ -167,3 +167,4 @@ poetry.lock
 *.pdf
 *.pkl
 *.xlsx
+*.jpg
