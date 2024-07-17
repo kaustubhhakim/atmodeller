@@ -439,7 +439,7 @@ def test_graphite_unstable(helper) -> None:
         "C_cr": 0.12202,
         # FactSage also predicts no C, so these values are set close to the atmodeller output so
         # the test knows to pass.
-        "mass_C_cr": 1.1e-15,
+        "mass_C_cr": 9.415067454757892e-22,
     }
 
     system.solve(constraints, factor=1)

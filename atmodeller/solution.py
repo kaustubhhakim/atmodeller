@@ -83,16 +83,14 @@ class SolutionComponent(Generic[T]):
         """
         self.value = np.clip(self.value, minimum_value, maximum_value)
 
-    # TODO: Refresh
-    # def fill_missing_values(self, fill_value: float) -> None:
-    #     """Fills missing values.
+    def fill(self, fill_value: float) -> None:
+        """Fills missing value.
 
-    #     Args:
-    #         fill_value: The fill value
-    #     """
-    #     for species in self._species:
-    #         if species not in self.data:
-    #             self.data[species] = fill_value
+        Args:
+            fill_value: The fill value
+        """
+        if not hasattr(self, "_value"):
+            self.value = fill_value
 
     def perturb(self, perturb: float = 0) -> None:
         """Perturbs the value.

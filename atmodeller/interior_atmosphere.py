@@ -414,7 +414,8 @@ class InteriorAtmosphereSystem:
                 )
                 self._log_solution = sol.x
                 self._residual = sol.fun
-                self.output.add(self, extra_output)
+                # FIXME: Need to add back in
+                # self.output.add(self, extra_output)
                 initial_solution.update(self.output)
                 logger.info(pprint.pformat(self.solution_dict()))
                 break

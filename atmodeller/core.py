@@ -40,11 +40,6 @@ else:
 
 T = TypeVar("T", bound=ChemicalSpecies)
 
-MASS_PREFIX: str = "mass_"
-"""Prefix for the dictionary key for the masses of condensed species"""
-STABILITY_PREFIX: str = "stability_"
-"""Prefix for the dictionary key for the stabilities of condensed species"""
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 

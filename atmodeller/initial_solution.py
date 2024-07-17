@@ -35,11 +35,11 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import MASS_PREFIX, STABILITY_PREFIX, Species
-from atmodeller.interfaces import ChemicalSpecies, TypeChemicalSpecies_co
+from atmodeller.core import Species
+from atmodeller.interfaces import ChemicalSpecies
 from atmodeller.output import Output
 from atmodeller.reaction_network import log10_TAU
-from atmodeller.solution import Solution
+from atmodeller.solution import ACTIVITY_PREFIX, STABILITY_PREFIX, Solution
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -154,51 +154,67 @@ class InitialSolution(ABC, Generic[T]):
         """
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
-        # Gas number densities
-        self.solution.gas.fill_missing_values(self._fill_log10_number_density)
-        if perturb_gas_log10:
-            self.solution.gas.perturb_values(perturb_gas_log10)
+        for solution in self.solution.gas.values():
+            solution.fill(self._fill_log10_number_density)
+            if perturb_gas_log10:
+                solution.perturb(perturb_gas_log10)
+            solution.clip(self._min_log10_number_density, self._max_log10_number_density)
 
-        self.solution.gas.clip_values(
-            self._min_log10_number_density, self._max_log10_number_density
-        )
+        # TODO: Old below
+        # Gas number densities
+        # self.solution.gas.fill_missing_values(self._fill_log10_number_density)
+        # if perturb_gas_log10:
+        #    self.solution.gas.perturb_values(perturb_gas_log10)
+
+        # self.solution.gas.clip_values(
+        #    self._min_log10_number_density, self._max_log10_number_density
+        # )
         for constraint in constraints.gas_constraints:
-            self.solution.gas.data[constraint.species] = constraint.get_log10_value(
+            self.solution.gas[constraint.species].value = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
 
+        for solution in self.solution.condensed.values():
+            solution.activity.fill(self._fill_log10_activity)
+            solution.mass.fill(self._fill_log10_number_density)
+            solution.stability.fill(self._fill_log10_stability)
+            if perturb_gas_log10:
+                solution.mass.perturb(10)
+                # Satisfy auxilliary equation by construction
+                solution.stability.value = log10_TAU - solution.mass.value
+
         # Activities
-        self.solution.activity.fill_missing_values(self._fill_log10_activity)
+        # self.solution.activity.fill_missing_values(self._fill_log10_activity)
         # TODO: This imposes the activity value if stable, but might be in conflict with stability
         # criteria for unstable condensates
         # self.solution.activity.clip_values(maximum_value=0)
         for constraint in constraints.activity_constraints:
-            self.solution.activity.data[constraint.species] = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
+            self.solution.condensed[constraint.species].activity.value = (
+                constraint.get_log10_value(temperature=temperature, pressure=pressure)
             )
 
-        self.solution.condensed.fill_missing_values(self._fill_log10_mass)
+        # self.solution.condensed.fill_missing_values(self._fill_log10_mass)
 
         # TODO: Testing. If the solver fails it could be because one or several of the condensed
         # species are unstable. Just randomly guess here.
-        if perturb_gas_log10:
-            # for species in self.solution.activity.data:
-            #     stability: str = random.choice(["stable", "unstable"])
-            #     if stability == "stable":
-            #         self.solution.activity.data[species] = 0
-            #         self.solution.mass.data[species] = 19
-            #     else:
-            #         self.solution.activity.data[species] = -24
-            #         self.solution.mass.data[species] = -16
-            self.solution.condensed.perturb_values(10)
+        # if perturb_gas_log10:
+        # for species in self.solution.activity.data:
+        #     stability: str = random.choice(["stable", "unstable"])
+        #     if stability == "stable":
+        #         self.solution.activity.data[species] = 0
+        #         self.solution.mass.data[species] = 19
+        #     else:
+        #         self.solution.activity.data[species] = -24
+        #         self.solution.mass.data[species] = -16
+        # self.solution.condensed.perturb_values(10)
 
-        self.solution.stability.fill_missing_values(self._fill_log10_stability)
+        # self.solution.stability.fill_missing_values(self._fill_log10_stability)
         # Satisfy auxilliary equation by construction
-        if perturb_gas_log10:
-            for species in self.solution.stability.data:
-                self.solution.stability.data[species] = (
-                    log10_TAU - self.solution.condensed.data[species]
-                )
+        # if perturb_gas_log10:
+        #    for species in self.solution.stability.data:
+        #        self.solution.stability.data[species] = (
+        #            log10_TAU - self.solution.condensed.data[species]
+        #        )
 
     def get_log10_value(
         self,
@@ -272,27 +288,26 @@ class InitialSolutionDict(InitialSolution[dict]):
 
     def _get_log10_values(
         self,
-        species_list: list[TypeChemicalSpecies_co],
+        species: ChemicalSpecies,
         prefix: str,
-    ) -> dict[TypeChemicalSpecies_co, float]:
+    ) -> float | None:
         """Gets log10 values.
 
         Args:
             species_list: List of species
             prefix: Key prefix
-            fill_value: Fill value
 
         Returns:
-            Log10 values
+            Log10 values or None
         """
-        output: dict[TypeChemicalSpecies_co, float] = {}
-        for species in species_list:
-            key: TypeChemicalSpecies_co | str = f"{prefix}{species.name}" if prefix else species
-            try:
-                output[species] = np.log10(self.value[key])
-            except KeyError:
-                # Ignore missing keys. These are later filled with fill values.
-                continue
+
+        key: ChemicalSpecies | str = f"{prefix}{species.name}" if prefix else species
+
+        try:
+            output: float | None = np.log10(self.value[key])
+        except KeyError:
+            # Ignore missing keys. These are later filled with fill values.
+            output = None
 
         return output
 
@@ -300,14 +315,34 @@ class InitialSolutionDict(InitialSolution[dict]):
     def set_data(self, *args, **kwargs) -> None:
         del args
         del kwargs
-        self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
-        self.solution.activity.data = self._get_log10_values(self._species.condensed_species, "")
-        self.solution.condensed.data = self._get_log10_values(
-            self._species.condensed_species, MASS_PREFIX
-        )
-        self.solution.stability.data = self._get_log10_values(
-            self._species.condensed_species, STABILITY_PREFIX
-        )
+
+        for species, solution in self.solution.gas.items():
+            value: float | None = self._get_log10_values(species, "")
+            if value is not None:
+                solution.value = value
+
+        for species, solution in self.solution.condensed.items():
+            value: float | None = self._get_log10_values(species, ACTIVITY_PREFIX)
+            if value is not None:
+                solution.activity.value = value
+            value: float | None = self._get_log10_values(species, "")
+            if value is not None:
+                solution.mass.value = value
+            value: float | None = self._get_log10_values(species, STABILITY_PREFIX)
+            if value is not None:
+                solution.stability.value = value
+
+        # self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
+
+        # self.solution.condensed.activity.data = self._get_log10_values(
+        #     self._species.condensed_species, ""
+        # )
+        # self.solution.condensed.data = self._get_log10_values(
+        #     self._species.condensed_species, MASS_PREFIX
+        # )
+        # self.solution.stability.data = self._get_log10_values(
+        #     self._species.condensed_species, STABILITY_PREFIX
+        # )
 
 
 class InitialSolutionRegressor(InitialSolution[Output]):
