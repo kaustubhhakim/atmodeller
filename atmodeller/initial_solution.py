@@ -35,10 +35,11 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import MASS_PREFIX, STABILITY_PREFIX, Solution, Species
+from atmodeller.core import MASS_PREFIX, STABILITY_PREFIX, Species
 from atmodeller.interfaces import ChemicalSpecies, TypeChemicalSpecies_co
 from atmodeller.output import Output
 from atmodeller.reaction_network import log10_TAU
+from atmodeller.solution import Solution
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -515,13 +516,14 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         """Includes a user-specified override to the initial solution"""
         super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
 
-        if self._solution_override is not None:
-            self._solution_override.set_data(
-                constraints,
-                temperature=temperature,
-                pressure=pressure,
-            )
-            self.solution.merge(self._solution_override.solution)
+        # FIXME:
+        # if self._solution_override is not None:
+        #     self._solution_override.set_data(
+        #         constraints,
+        #         temperature=temperature,
+        #         pressure=pressure,
+        #     )
+        #     self.solution.merge(self._solution_override.solution)
 
     def action_fit(self, output: Output) -> tuple[int, int] | None:
         """Checks if a fit is necessary.

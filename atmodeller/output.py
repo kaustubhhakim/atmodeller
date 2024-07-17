@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 from molmass import Formula
 
-from atmodeller.core import GasNumberDensity
+# from atmodeller.core import GasNumberDensity
 from atmodeller.utilities import UnitConversion, reorder_dict
 
 if TYPE_CHECKING:

@@ -30,7 +30,8 @@ import numpy.typing as npt
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Solution, Species
+from atmodeller.core import Species
+from atmodeller.solution import Solution
 from atmodeller.utilities import partial_rref
 
 if sys.version_info < (3, 12):
@@ -447,8 +448,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             self._species.number_condensed_species, dtype=np.float_
         )
         for nn, species in enumerate(self._species.condensed_species):
-            residual_stability[nn] = solution.stability.data[species] - log10_TAU
-            residual_stability[nn] += solution.condensed.data[species]
+            residual_stability[nn] = solution.condensed[species].stability.value - log10_TAU
+            residual_stability[nn] += solution.condensed[species].mass.value
 
         logger.debug("residual_stability = %s", residual_stability)
 

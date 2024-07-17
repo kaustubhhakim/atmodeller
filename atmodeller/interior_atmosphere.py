@@ -30,25 +30,15 @@ from sklearn.metrics import mean_squared_error
 
 from atmodeller import AVOGADRO, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
-from atmodeller.core import GasSpecies, Planet, Solution, Species
+from atmodeller.core import GasSpecies, Planet, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
+from atmodeller.solution import Solution
 from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-
-# @dataclass(kw_only=True)
-# class Atmosphere:
-#     """Atmosphere"""
-
-#     species: Species
-#     """A list of species"""
-#     solution: Solution
-#     """Solution"""
-#     planet: Planet = field(default_factory=Planet)
-#     """A planet"""
 
 # TODO: Renamed, was element_moles
 # @property
@@ -179,7 +169,7 @@ class InteriorAtmosphereSystem:
             element: 0 for element in self.species.elements()
         }
         for species in self.species.condensed_species:
-            number_density: float = self._solution.condensed.physical[species]
+            number_density: float = self.solution.condensed[species].mass.physical
             for element, value in species.composition().items():
                 condensed_element_masses[element] += number_density * value.count
 
@@ -202,16 +192,22 @@ class InteriorAtmosphereSystem:
         Returns:
             A dictionary that includes the reservoir masses of the species
         """
+        temperature: float = self.planet.surface_temperature
+        pressure: float = self.solution.gas.gas_pressure(temperature)
+
         output: dict[str, float] = {}
-        output["atmosphere_number_density"] = self.solution.gas.physical[species]
-        output["pressure"] = self.solution.gas.pressures(self.planet.surface_temperature)[species]
-        output["fugacity"] = self.solution.gas.fugacities(self.planet.surface_temperature)[species]
+        output["atmosphere_number_density"] = self.solution.gas[species].physical
+        output["pressure"] = self.solution.gas[species].pressure(temperature)
+        output["fugacity"] = self.solution.gas[species].fugacity(
+            temperature,
+            pressure,
+        )
 
         output["melt_ppmw"] = species.solubility.concentration(
             fugacity=output["fugacity"],
-            temperature=self.planet.surface_temperature,
-            pressure=self.solution.gas.total_pressure(self.planet.surface_temperature),
-            **self.solution.gas.fugacities_by_hill_formula(self.planet.surface_temperature),
+            temperature=temperature,
+            pressure=self.solution.gas.gas_pressure(temperature),
+            **self.solution.gas.fugacities_by_hill_formula(temperature, pressure),
         )
         # Numerator to molecules
         output["melt_number_density"] = (
@@ -461,7 +457,7 @@ class InteriorAtmosphereSystem:
         logger.debug("log_solution passed into _objective_func = %s", log_solution)
 
         temperature: float = self.planet.surface_temperature
-        pressure: float = self.solution.gas.total_pressure(temperature)
+        pressure: float = self.solution.gas.gas_pressure(temperature)
 
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
@@ -484,7 +480,7 @@ class InteriorAtmosphereSystem:
         if len(self.constraints.total_pressure_constraint) > 0:
             constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
-                self.solution.gas.total_number_density
+                self.solution.gas.gas_number_density
             ) - constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
         # Combined residual
@@ -497,13 +493,7 @@ class InteriorAtmosphereSystem:
 
     def solution_dict(self) -> dict[str, float]:
         """Solution in a dictionary"""
-        output: dict[str, float] = (
-            self.solution.gas.solution_dict(self.planet.surface_temperature)
-            | self.solution.activity.solution_dict()
-            | self.solution.condensed.solution_dict(self.gas_volume)
-        )
-
-        return output
+        return self.solution.solution_dict(self.planet.surface_temperature, self.gas_volume)
 
     def isclose(
         self,
