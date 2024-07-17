@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core"""
+"""Solution"""
 
 from __future__ import annotations
 
@@ -42,6 +42,8 @@ ACTIVITY_PREFIX: str = "activity_"
 """Prefix for the dictionary key for the activity of condensed species"""
 STABILITY_PREFIX: str = "stability_"
 """Prefix for the dictionary key for the stability of condensed species"""
+CONDENSED_MASS_PREFIX: str = "mass_"
+"""Prefix for the dictionary key for the mass of condensed species"""
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -84,7 +86,7 @@ class SolutionComponent(Generic[T]):
         self.value = np.clip(self.value, minimum_value, maximum_value)
 
     def fill(self, fill_value: float) -> None:
-        """Fills missing value.
+        """Fills value if it is missing.
 
         Args:
             fill_value: The fill value
@@ -242,7 +244,7 @@ class GasNumberDensity(NumberDensitySolution[GasSpecies]):
         """Log10 fugacity
 
         Args:
-            gas_temperature: Temperature in K
+            gas_temperature: Gas temperature in K
             gas_pressure: Gas pressure in bar
 
         Returns:
@@ -256,7 +258,7 @@ class GasNumberDensity(NumberDensitySolution[GasSpecies]):
         """Fugacity
 
         Args:
-            gas_temperature: Temperature in K
+            gas_temperature: Gas temperature in K
             gas_pressure: Gas pressure in bar
 
         Returns:
@@ -270,7 +272,7 @@ class GasNumberDensity(NumberDensitySolution[GasSpecies]):
         """Fugacity by hill formula
 
         Args:
-            gas_temperature: Temperature in K
+            gas_temperature: Gas temperature in K
             gas_pressure: Gas pressure in bar
 
         Returns:
@@ -304,7 +306,15 @@ class CondensedCollection:
 
     @classmethod
     def initialise_with_species(cls, species: CondensedSpecies) -> CondensedCollection:
-        mass: CondensedNumberDensity = CondensedNumberDensity(species)
+        """Initialise the condensed collection with a species.
+
+        Args:
+            species: Species to initialise the collection
+
+        Returns:
+            An instance of CondensedCollection initialised with the given species
+        """
+        mass: CondensedNumberDensity = CondensedNumberDensity(species, CONDENSED_MASS_PREFIX)
         activity: CondensedSolutionComponent = CondensedSolutionComponent(species, ACTIVITY_PREFIX)
         stability: CondensedSolutionComponent = CondensedSolutionComponent(
             species, STABILITY_PREFIX
@@ -313,6 +323,7 @@ class CondensedCollection:
         return cls(mass, activity, stability)
 
     def raw_solution_dict(self) -> dict[str, float]:
+        """Raw solution in a dictionary"""
         return (
             self.mass.raw_solution_dict()
             | self.activity.raw_solution_dict()
@@ -320,6 +331,7 @@ class CondensedCollection:
         )
 
     def solution_dict(self, gas_volume: float) -> dict[str, float]:
+        """Solution in a dictionary"""
         return self.mass.solution_dict(gas_volume) | self.activity.solution_dict()
 
 
@@ -338,10 +350,10 @@ class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection]):
         """Initialise the condensed solution with a list of condensed species.
 
         Args:
-            condensed_species: List of condensed species to initialise the solution.
+            condensed_species: List of condensed species to initialise the solution
 
         Returns:
-            An instance of CondensedSolution initialised with the given species.
+            An instance of CondensedSolution initialised with the given species
         """
         init_dict: dict[CondensedSpecies, CondensedCollection] = {}
         for species in condensed_species:
@@ -350,6 +362,7 @@ class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection]):
         return cls(init_dict)
 
     def raw_solution_dict(self):
+        """Raw solution in a dictionary"""
         raw_solution_dict: dict[str, float] = {}
         for condensed_collection in self.data.values():
             raw_solution_dict |= condensed_collection.raw_solution_dict()
@@ -357,6 +370,7 @@ class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection]):
         return raw_solution_dict
 
     def solution_dict(self, gas_volume: float):
+        """Solution in a dictionary"""
         solution_dict: dict[str, float] = {}
         for condensed_collection in self.data.values():
             solution_dict |= condensed_collection.solution_dict(gas_volume)
@@ -374,6 +388,7 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
 
     @property
     def mean_molar_mass(self) -> float:
+        """Mean molar mass"""
         return sum(
             [
                 solution.species.molar_mass * solution.number_density / self.gas_number_density
@@ -386,10 +401,10 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
         """Initialise the gas solution with a list of gas species.
 
         Args:
-            gas_species: List of gas species to initialise the solution.
+            gas_species: List of gas species to initialise the solution
 
         Returns:
-            An instance of GasSolution initialised with the given species.
+            An instance of GasSolution initialised with the given species
         """
         init_dict: dict[GasSpecies, GasNumberDensity] = {}
         for species in gas_species:
@@ -400,14 +415,14 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
     def fugacities_by_hill_formula(
         self, gas_temperature: float, gas_pressure: float
     ) -> dict[str, float]:
-        """Fugacities by hill formula
+        """Fugacities by Hill formula
 
         Args:
             gas_temperature: Temperature in K
             gas_pressure: Gas pressure in bar
 
         Returns:
-            Fugacity by hill formula
+            Fugacities by Hill formula
         """
         fugacities: dict[str, float] = {}
         for solution in self.data.values():
@@ -417,12 +432,15 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
 
     @property
     def gas_number_density(self) -> float:
+        """Number density"""
         return sum(solution.number_density for solution in self.data.values())
 
     def gas_pressure(self, gas_temperature: float) -> float:
+        """Pressure"""
         return sum(gas.pressure(gas_temperature) for gas in self.data.values())
 
     def raw_solution_dict(self):
+        """Raw solution in a dictionary"""
         raw_solution_dict: dict[str, float] = {}
         for gas_solution in self.data.values():
             raw_solution_dict |= gas_solution.raw_solution_dict()
@@ -430,6 +448,7 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
         return raw_solution_dict
 
     def solution_dict(self, gas_temperature: float):
+        """Solution in a dictionary"""
         solution_dict: dict[str, float] = {}
         for gas_solution in self.data.values():
             solution_dict |= gas_solution.solution_dict(gas_temperature)
@@ -439,11 +458,6 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
 
 class Solution:
     """The solution
-
-    Stores and updates the solution and assembles the appropriate vectors to solve the coupled
-    reaction network and mass balance system. The solution is separated into four components:
-    number densities for the gas and condensed species, and the activities and stability criteria
-    of condensed species. All solution quantities are log10.
 
     Args:
         species: Species
@@ -455,11 +469,6 @@ class Solution:
         self.condensed: CondensedSolution = CondensedSolution.initialise_with_species(
             species.condensed_species
         )
-
-    # TODO: Maybe not needed?
-    # @property
-    # def species(self) -> Species:
-    #     return self._species
 
     @property
     def number(self) -> int:
@@ -503,18 +512,6 @@ class Solution:
             solution.stability.value = value[index]
             index += 1
 
-        # TODO: Original below. To remove when testing complete
-        # for species in self._species.gas_species:
-        #     index = self._species.species_index(species)
-        #     self.gas.data[species] = value[index]
-        # for counter, species in enumerate(self._species.condensed_species):
-        #     index = self._species.species_index(species)
-        #     self.activity.data[species] = value[index]
-        #     index = self._species.number + counter
-        #     self.condensed.data[species] = value[index]
-        #     index += self._species.number_condensed_species
-        #     self.stability.data[species] = value[index]
-
     # FIXME: To refresh
     # def merge(self, other: Solution) -> None:
     #     """Merges the data from another solution
@@ -528,7 +525,11 @@ class Solution:
     #     self.stability.data |= other.stability.data
 
     def stability_array(self) -> npt.NDArray[np.float_]:
-        """The condensate stability array"""
+        """The condensate stability array
+
+        Returns:
+            The condensate stability array
+        """
         stability_array: npt.NDArray = np.zeros(self._species.number, dtype=np.float_)
         for species, solution in self.condensed.items():
             index: int = self._species.species_index(species)
@@ -541,7 +542,15 @@ class Solution:
         return self.gas.raw_solution_dict() | self.condensed.raw_solution_dict()
 
     def solution_dict(self, gas_temperature: float, gas_volume: float) -> dict[str, float]:
-        """Solution as a dictionary"""
+        """Solution as a dictionary
+
+        Args:
+            gas_temperature: Gas temperature in K
+            gas_volume: Gas volume in m :sup:`3`
+
+        Returns:
+            Solution in a dictionary
+        """
         output: dict[str, float] = self.gas.solution_dict(
             gas_temperature
         ) | self.condensed.solution_dict(gas_volume)

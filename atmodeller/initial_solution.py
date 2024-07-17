@@ -39,7 +39,12 @@ from atmodeller.core import Species
 from atmodeller.interfaces import ChemicalSpecies
 from atmodeller.output import Output
 from atmodeller.reaction_network import log10_TAU
-from atmodeller.solution import ACTIVITY_PREFIX, STABILITY_PREFIX, Solution
+from atmodeller.solution import (
+    ACTIVITY_PREFIX,
+    CONDENSED_MASS_PREFIX,
+    STABILITY_PREFIX,
+    Solution,
+)
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -103,7 +108,7 @@ class InitialSolution(ABC, Generic[T]):
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 22,
         fill_log10_activity: float = -0.3010299956639812,
-        fill_log10_stability: float = -34,
+        fill_log10_stability: float = -37,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -113,7 +118,6 @@ class InitialSolution(ABC, Generic[T]):
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
         self._fill_log10_activity: float = fill_log10_activity
-        self._fill_log10_mass: float = fill_log10_number_density
         self._fill_log10_stability: float = fill_log10_stability
 
     @property
@@ -160,15 +164,6 @@ class InitialSolution(ABC, Generic[T]):
                 solution.perturb(perturb_gas_log10)
             solution.clip(self._min_log10_number_density, self._max_log10_number_density)
 
-        # TODO: Old below
-        # Gas number densities
-        # self.solution.gas.fill_missing_values(self._fill_log10_number_density)
-        # if perturb_gas_log10:
-        #    self.solution.gas.perturb_values(perturb_gas_log10)
-
-        # self.solution.gas.clip_values(
-        #    self._min_log10_number_density, self._max_log10_number_density
-        # )
         for constraint in constraints.gas_constraints:
             self.solution.gas[constraint.species].value = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
@@ -183,17 +178,14 @@ class InitialSolution(ABC, Generic[T]):
                 # Satisfy auxilliary equation by construction
                 solution.stability.value = log10_TAU - solution.mass.value
 
-        # Activities
-        # self.solution.activity.fill_missing_values(self._fill_log10_activity)
-        # TODO: This imposes the activity value if stable, but might be in conflict with stability
-        # criteria for unstable condensates
-        # self.solution.activity.clip_values(maximum_value=0)
+            # TODO: This imposes the activity value if stable, but might be in conflict with
+            # stability criteria for unstable condensates?
+            # solution.activity.clip(maximum_value=0)
+
         for constraint in constraints.activity_constraints:
             self.solution.condensed[constraint.species].activity.value = (
                 constraint.get_log10_value(temperature=temperature, pressure=pressure)
             )
-
-        # self.solution.condensed.fill_missing_values(self._fill_log10_mass)
 
         # TODO: Testing. If the solver fails it could be because one or several of the condensed
         # species are unstable. Just randomly guess here.
@@ -207,14 +199,6 @@ class InitialSolution(ABC, Generic[T]):
         #         self.solution.activity.data[species] = -24
         #         self.solution.mass.data[species] = -16
         # self.solution.condensed.perturb_values(10)
-
-        # self.solution.stability.fill_missing_values(self._fill_log10_stability)
-        # Satisfy auxilliary equation by construction
-        # if perturb_gas_log10:
-        #    for species in self.solution.stability.data:
-        #        self.solution.stability.data[species] = (
-        #            log10_TAU - self.solution.condensed.data[species]
-        #        )
 
     def get_log10_value(
         self,
@@ -325,7 +309,7 @@ class InitialSolutionDict(InitialSolution[dict]):
             value: float | None = self._get_log10_values(species, ACTIVITY_PREFIX)
             if value is not None:
                 solution.activity.value = value
-            value: float | None = self._get_log10_values(species, "")
+            value: float | None = self._get_log10_values(species, CONDENSED_MASS_PREFIX)
             if value is not None:
                 solution.mass.value = value
             value: float | None = self._get_log10_values(species, STABILITY_PREFIX)
