@@ -390,7 +390,7 @@ def test_graphite_condensed(helper) -> None:
         "H2O_g": 4.527,
         "CO2_g": 0.061195,
         "CH4_g": 96.74,
-        "C_cr": 1.0,
+        "activity_C_cr": 1.0,
         "mass_C_cr": 3.54162e20,
     }
 
@@ -436,7 +436,7 @@ def test_graphite_unstable(helper) -> None:
         "H2O_g": 337.16,
         "CO2_g": 30.88,
         "CH4_g": 28.66,
-        "C_cr": 0.12202,
+        "activity_C_cr": 0.12202,
         # FactSage also predicts no C, so these values are set close to the atmodeller output so
         # the test knows to pass.
         "mass_C_cr": 9.415067454757892e-22,
@@ -473,7 +473,7 @@ def test_water_condensed(helper) -> None:
         "H2O_g": 3.3596,
         "H2_g": 6.5604,
         "O2_g": 5.6433e-58,
-        "H2O_l": 1.0,
+        "activity_H2O_l": 1.0,
         "mass_H2O_l": 1.23802e21,
     }
 
@@ -514,7 +514,7 @@ def test_water_condensed_O_abundance(helper) -> None:
         "H2O_g": 3.3596,
         "H2_g": 6.5604,
         "O2_g": 5.6433e-58,
-        "H2O_l": 1.0,
+        "activity_H2O_l": 1.0,
         "mass_H2O_l": 1.247201e21,
     }
 
