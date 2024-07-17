@@ -414,6 +414,17 @@ class NumberDensitySolution(SolutionComponent[T]):
             for species, moles in self.moles(gas_volume).items()
         }
 
+    def total_mass(self, gas_volume: float) -> float:
+        """Total mass
+
+        Args:
+            gas_volume: Gas volume in m :sup:`3`
+
+        Returns:
+            Total mass in kg
+        """
+        return sum(self.masses(gas_volume).values())
+
     def molecules(self, gas_volume: float) -> dict[T, float]:
         """Number of molecules
 
@@ -522,6 +533,17 @@ class GasNumberDensity(NumberDensitySolution[GasSpecies]):
             Total pressure in bar
         """
         return sum(self.pressures(temperature).values())
+
+    def mean_density(self, gas_volume: float) -> float:
+        """Mean density
+
+        Args:
+            gas_volume: Gas volume in m :sup:`3`
+
+        Returns:
+            Mean density
+        """
+        return self.total_mass(gas_volume) / gas_volume
 
     @property
     def mean_molar_mass(self) -> float:
@@ -678,7 +700,7 @@ class Solution:
         return self._activity
 
     @property
-    def condensed(self) -> CondensedSolution:
+    def condensed(self) -> CondensedNumberDensity:
         """Condensed number density solution"""
         return self._condensed
 

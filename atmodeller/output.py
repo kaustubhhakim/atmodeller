@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 from molmass import Formula
 
+from atmodeller.core import GasNumberDensity
 from atmodeller.utilities import UnitConversion, reorder_dict
 
 if TYPE_CHECKING:
@@ -121,13 +122,18 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         atmosphere: dict[str, float] = {}
-        atmosphere["pressure"] = interior_atmosphere.atmosphere_pressure
-        atmosphere["mean_molar_mass"] = interior_atmosphere.atmosphere_molar_mass
-        atmosphere["mass"] = interior_atmosphere.atmosphere_mass
-        atmosphere["volume"] = interior_atmosphere.atmosphere_volume
-        atmosphere["density"] = interior_atmosphere.atmosphere_density
-        atmosphere["element_moles"] = interior_atmosphere.atmosphere_element_moles
-        atmosphere["species_moles"] = interior_atmosphere.atmosphere_species_moles
+        gas: GasNumberDensity = interior_atmosphere.solution.gas
+        temperature: float = interior_atmosphere.planet.surface_temperature
+        gas_volume: float = interior_atmosphere.gas_volume
+        atmosphere["pressure"] = gas.total_pressure(temperature)
+        atmosphere["mean_molar_mass"] = gas.mean_molar_mass
+        atmosphere["volume"] = gas_volume
+        atmosphere["density"] = gas.mean_density(gas_volume)
+        atmosphere["mass"] = gas.total_mass(gas_volume)
+        # FIXME
+        # atmosphere["element_moles"] = interior_atmosphere.atmosphere_element_moles
+        atmosphere["species_moles"] = gas.total_moles(gas_volume)
+        atmosphere["molecules"] = gas.total_molecules(gas_volume)
 
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
         data_list.append(atmosphere)
@@ -138,13 +144,15 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
+        gas_volume: float = interior_atmosphere.gas_volume
+
         for species in interior_atmosphere.species.condensed_species:
             output: dict[str, float] = {}
             output["activity"] = interior_atmosphere.solution.activity.physical[species]
             output["number_density"] = interior_atmosphere.solution.condensed.physical[species]
-            output["moles"] = interior_atmosphere.number_density_to_moles(output["number_density"])
+            output["moles"] = interior_atmosphere.solution.condensed.moles(gas_volume)[species]
             output["molar_mass"] = species.molar_mass
-            output["mass"] = output["moles"] * output["molar_mass"]
+            output["mass"] = interior_atmosphere.solution.condensed.masses(gas_volume)[species]
 
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)
@@ -155,8 +163,10 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
+        temperature: float = interior_atmosphere.planet.surface_temperature
+        pressure: float = interior_atmosphere.solution.gas.total_pressure(temperature)
         evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
-            interior_atmosphere.planet.surface_temperature, interior_atmosphere.atmosphere_pressure
+            temperature, pressure
         )
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
@@ -174,6 +184,8 @@ class Output(UserDict):
         condensed_number_densities: dict[str, float] = (
             interior_atmosphere.condensed_element_masses()
         )
+        # FIXME: Currently unused
+        # gas_volume:float =  interior_atmosphere.gas_volume
 
         for element in interior_atmosphere.species.elements():
             number_density[element] = interior_atmosphere.element_number_density(element)
@@ -192,36 +204,41 @@ class Output(UserDict):
             output["atmosphere_number_density"] = element_number_density[
                 "atmosphere_number_density"
             ]
-            output["atmosphere_moles"] = interior_atmosphere.number_density_to_moles(
-                output["atmosphere_number_density"]
-            )
-            output["atmosphere_mass"] = output["atmosphere_moles"] * output["molar_mass"]
-            output["volume_mixing_ratio"] = (
-                output["atmosphere_moles"] / interior_atmosphere.atmosphere_element_moles
-            )
+            # FIXME
+            # output["atmosphere_moles"] = interior_atmosphere.number_density_to_moles(
+            #    output["atmosphere_number_density"]
+            # )
+            # output["atmosphere_mass"] = output["atmosphere_moles"] * output["molar_mass"]
+            # FIXME
+            # output["volume_mixing_ratio"] = (
+            #    output["atmosphere_moles"] / interior_atmosphere.atmosphere_element_moles
+            # )
             # Melt
             output["melt_number_density"] = element_number_density["melt_number_density"]
-            output["melt_moles"] = interior_atmosphere.number_density_to_moles(
-                output["melt_number_density"]
-            )
-            output["melt_mass"] = output["melt_moles"] * output["molar_mass"]
+            # FIXME
+            # output["melt_moles"] = interior_atmosphere.number_density_to_moles(
+            #    output["melt_number_density"]
+            # )
+            # output["melt_mass"] = output["melt_moles"] * output["molar_mass"]
             # Solid
             output["solid_number_density"] = element_number_density["solid_number_density"]
-            output["solid_moles"] = interior_atmosphere.number_density_to_moles(
-                output["solid_number_density"]
-            )
-            output["solid_mass"] = output["solid_moles"] * output["molar_mass"]
+            # FIXME
+            # output["solid_moles"] = interior_atmosphere.number_density_to_moles(
+            #    output["solid_number_density"]
+            # )
+            # output["solid_mass"] = output["solid_moles"] * output["molar_mass"]
 
             try:
                 output["condensed_number_density"] = condensed_number_densities[element]
-                output["condensed_moles"] = interior_atmosphere.number_density_to_moles(
-                    output["condensed_number_density"]
-                )
-                output["condensed_mass"] = output["condensed_moles"] * output["molar_mass"]
+                # FIXME
+                # output["condensed_moles"] = interior_atmosphere.number_density_to_moles(
+                #    output["condensed_number_density"]
+                # )
+                # output["condensed_mass"] = output["condensed_moles"] * output["molar_mass"]
             except KeyError:
                 output["condensed_number_density"] = 0
-                output["condensed_moles"] = 0
-                output["condensed_mass"] = 0
+                # output["condensed_moles"] = 0
+                # output["condensed_mass"] = 0
 
             # Totals
             output["total_number_density"] = (
@@ -230,47 +247,47 @@ class Output(UserDict):
                 + output["solid_number_density"]
                 + output["condensed_number_density"]
             )
-            output["total_moles"] = (
-                output["atmosphere_moles"]
-                + output["melt_moles"]
-                + output["solid_moles"]
-                + output["condensed_moles"]
-            )
-            output["total_mass"] = (
-                output["atmosphere_mass"]
-                + output["melt_mass"]
-                + output["solid_mass"]
-                + output["condensed_mass"]
-            )
-            output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
+            # output["total_moles"] = (
+            #     output["atmosphere_moles"]
+            #     + output["melt_moles"]
+            #     + output["solid_moles"]
+            #     + output["condensed_moles"]
+            # )
+            # output["total_mass"] = (
+            #     output["atmosphere_mass"]
+            #     + output["melt_mass"]
+            #     + output["solid_mass"]
+            #     + output["condensed_mass"]
+            # )
+            # output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
 
-            if interior_atmosphere.planet.mantle_melt_mass:
-                output["melt_ppmw"] = (
-                    output["melt_mass"] / interior_atmosphere.planet.mantle_melt_mass
-                )
-            else:
-                output["melt_ppmw"] = 0
-            if interior_atmosphere.planet.mantle_solid_mass:
-                output["solid_ppmw"] = (
-                    output["solid_mass"] / interior_atmosphere.planet.mantle_solid_mass
-                )
-            else:
-                output["solid_ppmw"] = 0
+            # if interior_atmosphere.planet.mantle_melt_mass:
+            #     output["melt_ppmw"] = (
+            #         output["melt_mass"] / interior_atmosphere.planet.mantle_melt_mass
+            #     )
+            # else:
+            #     output["melt_ppmw"] = 0
+            # if interior_atmosphere.planet.mantle_solid_mass:
+            #     output["solid_ppmw"] = (
+            #         output["solid_mass"] / interior_atmosphere.planet.mantle_solid_mass
+            #     )
+            # else:
+            #     output["solid_ppmw"] = 0
 
             # Create a unique key name
-            key_name: str = f"{element}_total"
-            data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
-            data_list.append(output)
+            # key_name: str = f"{element}_total"
+            # data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
+            # data_list.append(output)
 
-            # H, if present, is the first in the dictionary, so set as the normalising abundance
-            if nn == 0 and element == "H":
-                H_total_moles = output["total_moles"]  # pylint: disable=invalid-name
+            # # H, if present, is the first in the dictionary, so set as the normalising abundance
+            # if nn == 0 and element == "H":
+            #     H_total_moles = output["total_moles"]  # pylint: disable=invalid-name
 
-            if H_total_moles is not None:
-                # Astronomical logarithmic abundance (dex), e.g. used by FastChem
-                output["logarithmic_abundance"] = (
-                    np.log10(output["total_moles"] / H_total_moles) + 12
-                )
+            # if H_total_moles is not None:
+            #     # Astronomical logarithmic abundance (dex), e.g. used by FastChem
+            #     output["logarithmic_abundance"] = (
+            #         np.log10(output["total_moles"] / H_total_moles) + 12
+            #     )
 
     def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the planetary properties.
@@ -288,6 +305,8 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
+        gas_volume: float = interior_atmosphere.gas_volume
+
         for species in interior_atmosphere.solution.gas.data:
             # Below adds number_density outputs
             output: dict[str, float] = interior_atmosphere.gas_species_reservoir_masses(species)
@@ -301,32 +320,36 @@ class Output(UserDict):
                 species
             ]
             # Atmosphere
-            output["atmosphere_moles"] = interior_atmosphere.number_density_to_moles(
-                output["atmosphere_number_density"]
-            )
-            output["atmosphere_mass"] = output["atmosphere_moles"] * output["molar_mass"]
+            output["atmosphere_moles"] = interior_atmosphere.solution.gas.moles(gas_volume)[
+                species
+            ]
+            output["atmosphere_mass"] = interior_atmosphere.solution.gas.masses(gas_volume)[
+                species
+            ]
             # Melt
-            output["melt_moles"] = interior_atmosphere.number_density_to_moles(
-                output["melt_number_density"]
-            )
-            output["melt_mass"] = output["melt_moles"] * output["molar_mass"]
+            # FIXME
+            # output["melt_moles"] = interior_atmosphere.number_density_to_moles(
+            #    output["melt_number_density"]
+            # )
+            # output["melt_mass"] = output["melt_moles"] * output["molar_mass"]
             # Solid
-            output["solid_moles"] = interior_atmosphere.number_density_to_moles(
-                output["solid_number_density"]
-            )
-            output["solid_mass"] = output["solid_moles"] * output["molar_mass"]
+            # FIXME
+            # output["solid_moles"] = interior_atmosphere.number_density_to_moles(
+            #    output["solid_number_density"]
+            # )
+            # output["solid_mass"] = output["solid_moles"] * output["molar_mass"]
             # Totals
-            output["total_number_density"] = (
-                output["atmosphere_number_density"]
-                + output["melt_number_density"]
-                + output["solid_number_density"]
-            )
-            output["total_moles"] = (
-                output["atmosphere_moles"] + output["melt_moles"] + output["solid_moles"]
-            )
-            output["total_mass"] = (
-                output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
-            )
+            # output["total_number_density"] = (
+            #     output["atmosphere_number_density"]
+            #     + output["melt_number_density"]
+            #     + output["solid_number_density"]
+            # )
+            # output["total_moles"] = (
+            #     output["atmosphere_moles"] + output["melt_moles"] + output["solid_moles"]
+            # )
+            # output["total_mass"] = (
+            #     output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
+            # )
 
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)
