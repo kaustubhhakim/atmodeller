@@ -372,7 +372,7 @@ class ReactionNetwork:
         )
         residual_reaction: npt.NDArray[np.float_] = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(solution.data[: self._species.number])
+            + coefficient_matrix.dot(solution.reaction_array())
             - rhs
         )
 
@@ -476,14 +476,16 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             solution=solution,
         )
 
+        logger.debug("residual_reaction before correction = %s", residual_reaction)
         # Reaction network correction factors for condensate stability
         residual_reaction += activity_modifier.dot(10 ** solution.stability_array())
         residual_reaction -= equilibrium_modifier.dot(10 ** solution.stability_array())
+        logger.debug("residual_reaction after correction = %s", residual_reaction)
 
         # Residual for the auxiliary stability equations
         residual_stability: npt.NDArray[np.float_] = self.get_stability_residual(solution)
 
         residual: npt.NDArray[np.float_] = np.concatenate((residual_reaction, residual_stability))
-        logger.debug("residual_reaction = %s", residual_reaction)
+        logger.debug("residual_reaction including stability = %s", residual)
 
         return residual

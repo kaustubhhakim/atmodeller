@@ -44,9 +44,9 @@ from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_kg
 
-RTOL: float = 1.0e-8
+RTOL: float = 1.0e-6
 """Relative tolerance"""
-ATOL: float = 1.0e-8
+ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()

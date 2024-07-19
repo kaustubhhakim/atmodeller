@@ -55,7 +55,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-MIN_LOG10_NUMBER_DENSITY: float = 10
+MIN_LOG10_NUMBER_DENSITY: float = -40
 """Minimum log10 of the initial number density"""
 MAX_LOG10_NUMBER_DENSITY: float = 40
 """Maximum log10 of the initial number density"""
@@ -106,9 +106,9 @@ class InitialSolution(ABC, Generic[T]):
         species: Species,
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
-        fill_log10_number_density: float = 22,
-        fill_log10_activity: float = -0.3010299956639812,
-        fill_log10_stability: float = -37,
+        fill_log10_number_density: float = 26,
+        fill_log10_activity: float = 0,
+        fill_log10_stability: float = -20,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -174,13 +174,15 @@ class InitialSolution(ABC, Generic[T]):
             solution.mass.fill(self._fill_log10_number_density)
             solution.stability.fill(self._fill_log10_stability)
             if perturb_gas_log10:
-                solution.mass.perturb(10)
-                # Satisfy auxilliary equation by construction
-                solution.stability.value = log10_TAU - solution.mass.value
+                solution.mass.perturb(perturb_gas_log10)
+                # solution.stability.perturb(perturb_gas_log10)
 
             # TODO: This imposes the activity value if stable, but might be in conflict with
             # stability criteria for unstable condensates?
             # solution.activity.clip(maximum_value=0)
+
+            # Satisfy auxilliary equation by construction
+            # solution.stability.value = log10_TAU - solution.mass.value
 
         for constraint in constraints.activity_constraints:
             self.solution.condensed[constraint.species].activity.value = (

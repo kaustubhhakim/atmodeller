@@ -518,7 +518,7 @@ def test_water_condensed_O_abundance(helper) -> None:
         "mass_H2O_l": 1.247201e21,
     }
 
-    system.solve(constraints, factor=10)
+    system.solve(constraints, factor=1)
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -532,9 +532,9 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
         "CH4_g": 0.3241,
         "CO2_g": 4.3064,
         "CO_g": 2.77e-6,
-        "C_cr": 1.0,
+        "activity_C_cr": 1.0,
         "H2O_g": 5.3672,
-        "H2O_l": 1.0,
+        "activity_H2O_l": 1.0,
         "H2_g": 0.0023,
         "O2_g": 4.74e-48,
         "mass_C_cr": 8.75101e19,

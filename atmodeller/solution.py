@@ -524,6 +524,23 @@ class Solution:
     #     self.condensed.data |= other.condensed.data
     #     self.stability.data |= other.stability.data
 
+    def reaction_array(self) -> npt.NDArray[np.float_]:
+        """The reaction array
+
+        Returns:
+            The reaction array
+        """
+        reaction_array: npt.NDArray = np.zeros(self._species.number, dtype=np.float_)
+        index: int = 0
+        for solution in self.gas.values():
+            reaction_array[index] = solution.value
+            index += 1
+        for solution in self.condensed.values():
+            reaction_array[index] = solution.activity.value
+            index += 1
+
+        return reaction_array
+
     def stability_array(self) -> npt.NDArray[np.float_]:
         """The condensate stability array
 
