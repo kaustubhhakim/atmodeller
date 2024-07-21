@@ -148,11 +148,15 @@ class Output(UserDict):
 
         for species in interior_atmosphere.species.condensed_species:
             output: dict[str, float] = {}
-            output["activity"] = interior_atmosphere.solution.activity.physical[species]
-            output["number_density"] = interior_atmosphere.solution.condensed.physical[species]
-            output["moles"] = interior_atmosphere.solution.condensed.moles(gas_volume)[species]
+            output["activity"] = interior_atmosphere.solution.condensed[species].activity.physical
+            output["number_density"] = interior_atmosphere.solution.condensed[
+                species
+            ].mass.physical
+            output["moles"] = interior_atmosphere.solution.condensed[species].mass.moles(
+                gas_volume
+            )
             output["molar_mass"] = species.molar_mass
-            output["mass"] = interior_atmosphere.solution.condensed.masses(gas_volume)[species]
+            output["mass"] = interior_atmosphere.solution.condensed[species].mass.mass(gas_volume)
 
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)
@@ -164,7 +168,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
         """
         temperature: float = interior_atmosphere.planet.surface_temperature
-        pressure: float = interior_atmosphere.solution.gas.total_pressure(temperature)
+        pressure: float = interior_atmosphere.solution.gas.gas_pressure(temperature)
         evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
             temperature, pressure
         )

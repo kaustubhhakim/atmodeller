@@ -195,7 +195,7 @@ class InteriorAtmosphereSystem:
         pressure: float = self.solution.gas.gas_pressure(temperature)
 
         output: dict[str, float] = {}
-        output["atmosphere_number_density"] = self.solution.gas[species].physical
+        output["atmosphere_number_density"] = self.solution.gas[species].number_density()
         output["pressure"] = self.solution.gas[species].pressure(temperature)
         output["fugacity"] = self.solution.gas[species].fugacity(
             temperature,
@@ -205,7 +205,7 @@ class InteriorAtmosphereSystem:
         output["melt_ppmw"] = species.solubility.concentration(
             fugacity=output["fugacity"],
             temperature=temperature,
-            pressure=self.solution.gas.gas_pressure(temperature),
+            pressure=pressure,
             **self.solution.gas.fugacities_by_hill_formula(temperature, pressure),
         )
         # Numerator to molecules
