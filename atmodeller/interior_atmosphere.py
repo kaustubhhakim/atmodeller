@@ -168,10 +168,9 @@ class InteriorAtmosphereSystem:
         condensed_element_masses: dict[str, float] = {
             element: 0 for element in self.species.elements()
         }
-        for species in self.species.condensed_species:
-            number_density: float = self.solution.condensed[species].mass.physical
-            for element, value in species.composition().items():
-                condensed_element_masses[element] += number_density * value.count
+        for element in condensed_element_masses:
+            for solution in self.solution.condensed.values():
+                condensed_element_masses[element] += solution.mass.number_density(element)
 
         logger.debug("condensed_element_masses = %s", condensed_element_masses)
 

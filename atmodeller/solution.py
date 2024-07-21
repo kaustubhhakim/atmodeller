@@ -26,10 +26,12 @@ from typing import Generic, TypeVar
 
 import numpy as np
 import numpy.typing as npt
+from molmass import Formula
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR
 from atmodeller.core import GasSpecies, Species
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
+from atmodeller.utilities import UnitConversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -125,43 +127,70 @@ class SolutionComponent(Generic[T]):
 class NumberDensitySolution(SolutionComponent[T]):
     """A number density solution component"""
 
-    @property
-    def number_density(self) -> float:
-        """Number density"""
-        return self.physical
+    def number_density(self, element: str | None = None) -> float:
+        """Number density of the species or element.
 
-    def mass(self, gas_volume: float) -> float:
+        Args:
+            element: Element to compute the number density for, or None to compute for the species.
+                Defaults to None.
+
+        Returns:
+            Number density for the species or `element` if not None.
+        """
+        if element is not None:
+            try:
+                count: int = self.species.composition()[element].count
+            except KeyError:
+                # Element not in formula
+                count = 0
+        else:
+            count = 1
+
+        return count * self.physical
+
+    def mass(self, gas_volume: float, element: str | None = None) -> float:
         """Mass
 
         Args:
             gas_volume: Gas volume in m :sup:`3`
+            element: Element to compute the mass for, or None to compute for the species. Defaults
+                to None.
 
         Returns:
-            Mass in kg
+            Mass in kg for the species or `element` if not None.
         """
-        return self.moles(gas_volume) * self.species.molar_mass
+        if element is not None:
+            molar_mass: float = UnitConversion().g_to_kg(Formula(element).mass)
+        else:
+            molar_mass = self.species.molar_mass
 
-    def molecules(self, gas_volume: float) -> float:
+        return self.moles(gas_volume, element) * molar_mass
+
+    def molecules(self, gas_volume: float, element: str | None = None) -> float:
         """Number of molecules
 
         Args:
             gas_volume: Gas volume in m :sup:`3`
+            element: Element to compute the number of molecules for, or None to compute for the
+                species. Defaults to None.
 
         Returns:
-            Number of molecules
+            Number of molecules for the species or `element` if not None.
         """
-        return self.number_density * gas_volume
+        return self.number_density(element) * gas_volume
 
-    def moles(self, gas_volume: float) -> float:
+    def moles(self, gas_volume: float, element: str | None = None) -> float:
         """Number of moles
 
         Args:
             gas_volume: Gas volume in m :sup:`3`
+            element: Element to compute the number of moles for, or None to compute for the
+                species. Defaults to None.
 
         Returns:
-            Number of moles
+            Number of moles for the species or `element` if not None.
         """
-        return self.molecules(gas_volume) / AVOGADRO
+        return self.molecules(gas_volume, element) / AVOGADRO
 
 
 class CondensedNumberDensity(NumberDensitySolution[CondensedSpecies]):
@@ -192,7 +221,7 @@ class GasNumberDensity(NumberDensitySolution[GasSpecies]):
         Returns:
             Pressure in bar
         """
-        return self.number_density * BOLTZMANN_CONSTANT_BAR * gas_temperature
+        return self.number_density() * BOLTZMANN_CONSTANT_BAR * gas_temperature
 
     def log10_pressure(self, gas_temperature: float) -> float:
         """Log10 pressures
@@ -293,6 +322,9 @@ class GasNumberDensity(NumberDensitySolution[GasSpecies]):
         return {self.name: self.pressure(gas_temperature)}
 
 
+class MeltNumberDensity(NumberDensitySolution[GasSpecies]): ...
+
+
 CondensedSolutionComponent = SolutionComponent[CondensedSpecies]
 
 
@@ -391,7 +423,7 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
         """Mean molar mass"""
         return sum(
             [
-                solution.species.molar_mass * solution.number_density / self.gas_number_density
+                solution.species.molar_mass * solution.number_density() / self.gas_number_density
                 for solution in self.data.values()
             ]
         )
@@ -433,7 +465,7 @@ class GasSolution(UserDict[GasSpecies, GasNumberDensity]):
     @property
     def gas_number_density(self) -> float:
         """Number density"""
-        return sum(solution.number_density for solution in self.data.values())
+        return sum(solution.number_density() for solution in self.data.values())
 
     def gas_pressure(self, gas_temperature: float) -> float:
         """Pressure"""
