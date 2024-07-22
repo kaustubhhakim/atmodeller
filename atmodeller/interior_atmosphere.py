@@ -195,9 +195,9 @@ class InteriorAtmosphereSystem:
         pressure: float = self.solution.gas.gas_pressure(temperature)
 
         output: dict[str, float] = {}
-        output["atmosphere_number_density"] = self.solution.gas[species].number_density()
-        output["pressure"] = self.solution.gas[species].pressure(temperature)
-        output["fugacity"] = self.solution.gas[species].fugacity(
+        output["atmosphere_number_density"] = self.solution.gas[species].gas.number_density()
+        output["pressure"] = self.solution.gas[species].gas.pressure(temperature)
+        output["fugacity"] = self.solution.gas[species].gas.fugacity(
             temperature,
             pressure,
         )
@@ -214,11 +214,21 @@ class InteriorAtmosphereSystem:
         )
         output["melt_number_density"] *= self.planet.mantle_melt_mass / self.gas_volume
 
+        # TODO: New
+        self.solution.gas[species].melt.update_all(
+            output["melt_ppmw"], self.planet.mantle_melt_mass, self.gas_volume
+        )
+
         output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
         output["solid_number_density"] = (
             output["solid_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
         )
         output["solid_number_density"] *= self.planet.mantle_solid_mass / self.gas_volume
+
+        # TODO: New
+        self.solution.gas[species].solid.update_all(
+            output["solid_ppmw"], self.planet.mantle_solid_mass, self.gas_volume
+        )
 
         return output
 

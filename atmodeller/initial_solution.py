@@ -159,13 +159,13 @@ class InitialSolution(ABC, Generic[T]):
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
         for solution in self.solution.gas.values():
-            solution.fill(self._fill_log10_number_density)
+            solution.gas.fill(self._fill_log10_number_density)
             if perturb_gas_log10:
-                solution.perturb(perturb_gas_log10)
-            solution.clip(self._min_log10_number_density, self._max_log10_number_density)
+                solution.gas.perturb(perturb_gas_log10)
+            solution.gas.clip(self._min_log10_number_density, self._max_log10_number_density)
 
         for constraint in constraints.gas_constraints:
-            self.solution.gas[constraint.species].value = constraint.get_log10_value(
+            self.solution.gas[constraint.species].gas.value = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
 
@@ -305,7 +305,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         for species, solution in self.solution.gas.items():
             value: float | None = self._get_log10_values(species, "")
             if value is not None:
-                solution.value = value
+                solution.gas.value = value
 
         for species, solution in self.solution.condensed.items():
             value: float | None = self._get_log10_values(species, ACTIVITY_PREFIX)
