@@ -41,7 +41,7 @@ from atmodeller.output import Output
 from atmodeller.reaction_network import log10_TAU
 from atmodeller.solution import (
     ACTIVITY_PREFIX,
-    CONDENSED_MASS_PREFIX,
+    CONDENSED_PREFIX,
     STABILITY_PREFIX,
     Solution,
 )
@@ -171,10 +171,10 @@ class InitialSolution(ABC, Generic[T]):
 
         for solution in self.solution.condensed.values():
             solution.activity.fill(self._fill_log10_activity)
-            solution.mass.fill(self._fill_log10_number_density)
+            solution.number_density.fill(self._fill_log10_number_density)
             solution.stability.fill(self._fill_log10_stability)
             if perturb_gas_log10:
-                solution.mass.perturb(perturb_gas_log10)
+                solution.number_density.perturb(perturb_gas_log10)
                 # solution.stability.perturb(perturb_gas_log10)
 
             # TODO: This imposes the activity value if stable, but might be in conflict with
@@ -311,9 +311,9 @@ class InitialSolutionDict(InitialSolution[dict]):
             value: float | None = self._get_log10_values(species, ACTIVITY_PREFIX)
             if value is not None:
                 solution.activity.value = value
-            value: float | None = self._get_log10_values(species, CONDENSED_MASS_PREFIX)
+            value: float | None = self._get_log10_values(species, CONDENSED_PREFIX)
             if value is not None:
-                solution.mass.value = value
+                solution.number_density.value = value
             value: float | None = self._get_log10_values(species, STABILITY_PREFIX)
             if value is not None:
                 solution.stability.value = value

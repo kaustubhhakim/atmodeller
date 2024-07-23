@@ -170,7 +170,9 @@ class InteriorAtmosphereSystem:
         }
         for element in condensed_element_masses:
             for solution in self.solution.condensed.values():
-                condensed_element_masses[element] += solution.mass.number_density(element)
+                condensed_element_masses[element] += solution.number_density.number_density(
+                    element
+                )
 
         logger.debug("condensed_element_masses = %s", condensed_element_masses)
 
@@ -215,7 +217,7 @@ class InteriorAtmosphereSystem:
         output["melt_number_density"] *= self.planet.mantle_melt_mass / self.gas_volume
 
         # TODO: New
-        self.solution.gas[species].melt.update_all(
+        self.solution.gas[species].dissolved.update_all(
             output["melt_ppmw"], self.planet.mantle_melt_mass, self.gas_volume
         )
 
@@ -226,7 +228,7 @@ class InteriorAtmosphereSystem:
         output["solid_number_density"] *= self.planet.mantle_solid_mass / self.gas_volume
 
         # TODO: New
-        self.solution.gas[species].solid.update_all(
+        self.solution.gas[species].trapped.update_all(
             output["solid_ppmw"], self.planet.mantle_solid_mass, self.gas_volume
         )
 
