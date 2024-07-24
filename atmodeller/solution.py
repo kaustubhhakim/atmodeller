@@ -39,19 +39,10 @@ else:
 
 T = TypeVar("T", bound=ChemicalSpecies)
 
-# TODO: Clarify if prefixes are for raw solution, solution, or other.
 ACTIVITY_PREFIX: str = "activity_"
 """Name prefix for the activity of condensed species"""
 STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
-CONDENSED_PREFIX: str = "condensed_"
-"""Name prefix for the number density of condensed species"""
-GAS_PREFIX: str = ""
-"""Name prefix for the number density of gas species"""
-DISSOLVED_PREFIX: str = "dissolved_"
-"""Name prefix for the number density of gas species dissolved in melt"""
-TRAPPED_PREFIX: str = "trapped_"
-"""Name prefix for the number density of gas species trapped in solids"""
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -64,9 +55,8 @@ class SolutionComponent(Generic[T]):
         prefix: Prefix for the name
     """
 
-    def __init__(self, species: T, prefix: str = ""):
+    def __init__(self, species: T):
         self._species: T = species
-        self._name: str = f"{prefix}{species.name}"
         self._value: float
 
     @property
@@ -80,10 +70,6 @@ class SolutionComponent(Generic[T]):
     @property
     def physical(self) -> float:
         return 10**self.value
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def clip(self, minimum_value: float | None = None, maximum_value: float | None = None) -> None:
         """clips the value.
@@ -280,8 +266,8 @@ class InteriorNumberDensity(NumberDensitySolution[GasSpecies]):
     """
 
     @override
-    def __init__(self, species: GasSpecies, prefix: str = ""):
-        super().__init__(species, prefix)
+    def __init__(self, species: GasSpecies):
+        super().__init__(species)
         self._ppmw: float
 
     @property
@@ -319,9 +305,9 @@ class GasCollection:
 
     def __init__(self, species: GasSpecies):
         self.species: GasSpecies = species
-        self.gas: GasNumberDensity = GasNumberDensity(species, GAS_PREFIX)
-        self.dissolved: InteriorNumberDensity = InteriorNumberDensity(species, DISSOLVED_PREFIX)
-        self.trapped: InteriorNumberDensity = InteriorNumberDensity(species, TRAPPED_PREFIX)
+        self.gas: GasNumberDensity = GasNumberDensity(species)
+        self.dissolved: InteriorNumberDensity = InteriorNumberDensity(species)
+        self.trapped: InteriorNumberDensity = InteriorNumberDensity(species)
 
 
 CondensedSolutionComponent = SolutionComponent[CondensedSpecies]
@@ -339,15 +325,9 @@ class CondensedCollection:
 
     def __init__(self, species: CondensedSpecies):
         self.species: CondensedSpecies = species
-        self.number_density: CondensedNumberDensity = CondensedNumberDensity(
-            species, CONDENSED_PREFIX
-        )
-        self.activity: CondensedSolutionComponent = CondensedSolutionComponent(
-            species, ACTIVITY_PREFIX
-        )
-        self.stability: CondensedSolutionComponent = CondensedSolutionComponent(
-            species, STABILITY_PREFIX
-        )
+        self.number_density: CondensedNumberDensity = CondensedNumberDensity(species)
+        self.activity: CondensedSolutionComponent = CondensedSolutionComponent(species)
+        self.stability: CondensedSolutionComponent = CondensedSolutionComponent(species)
 
 
 class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection]):
@@ -549,9 +529,9 @@ class Solution:
             output[species_name] = solution.gas.value
         for solution in self.condensed.values():
             species_name: str = solution.species.name
-            output[f"activity_{species_name}"] = solution.activity.value
-            output[f"{species_name}"] = solution.number_density.value
-            output[f"stability_{species_name}"] = solution.stability.value
+            output[f"{ACTIVITY_PREFIX}{species_name}"] = solution.activity.value
+            output[species_name] = solution.number_density.value
+            output[f"{STABILITY_PREFIX}{species_name}"] = solution.stability.value
 
         return output
 
@@ -571,7 +551,7 @@ class Solution:
             output[species_name] = solution.gas.pressure(gas_temperature)
         for solution in self.condensed.values():
             species_name: str = solution.species.name
-            output[f"activity_{species_name}"] = solution.activity.physical
+            output[f"{ACTIVITY_PREFIX}{species_name}"] = solution.activity.physical
             output[f"mass_{species_name}"] = solution.number_density.mass(gas_volume)
 
         return output

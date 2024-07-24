@@ -39,12 +39,7 @@ from atmodeller.core import Species
 from atmodeller.interfaces import ChemicalSpecies
 from atmodeller.output import Output
 from atmodeller.reaction_network import log10_TAU
-from atmodeller.solution import (
-    ACTIVITY_PREFIX,
-    CONDENSED_PREFIX,
-    STABILITY_PREFIX,
-    Solution,
-)
+from atmodeller.solution import ACTIVITY_PREFIX, STABILITY_PREFIX, Solution
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -311,7 +306,7 @@ class InitialSolutionDict(InitialSolution[dict]):
             value: float | None = self._get_log10_values(species, ACTIVITY_PREFIX)
             if value is not None:
                 solution.activity.value = value
-            value: float | None = self._get_log10_values(species, CONDENSED_PREFIX)
+            value: float | None = self._get_log10_values(species, "")
             if value is not None:
                 solution.number_density.value = value
             value: float | None = self._get_log10_values(species, STABILITY_PREFIX)
