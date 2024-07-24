@@ -545,11 +545,13 @@ class Solution:
         """Raw solution in a dictionary"""
         output: dict[str, float] = {}
         for solution in self.gas.values():
-            output[solution.gas.name] = solution.gas.value
+            species_name: str = solution.species.name
+            output[species_name] = solution.gas.value
         for solution in self.condensed.values():
-            output[solution.activity.name] = solution.activity.value
-            output[solution.number_density.name] = solution.number_density.value
-            output[solution.stability.name] = solution.stability.value
+            species_name: str = solution.species.name
+            output[f"activity_{species_name}"] = solution.activity.value
+            output[f"{species_name}"] = solution.number_density.value
+            output[f"stability_{species_name}"] = solution.stability.value
 
         return output
 
@@ -565,9 +567,11 @@ class Solution:
         """
         output: dict[str, float] = {}
         for solution in self.gas.values():
-            output[solution.gas.name] = solution.gas.pressure(gas_temperature)
+            species_name: str = solution.species.name
+            output[species_name] = solution.gas.pressure(gas_temperature)
         for solution in self.condensed.values():
-            output[solution.activity.name] = solution.activity.physical
-            output[solution.number_density.name] = solution.number_density.mass(gas_volume)
+            species_name: str = solution.species.name
+            output[f"activity_{species_name}"] = solution.activity.physical
+            output[f"mass_{species_name}"] = solution.number_density.mass(gas_volume)
 
         return output
