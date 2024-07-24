@@ -300,7 +300,9 @@ class GasCollection:
         species: A gas species
 
     Attributes:
-        TODO
+        gas: Solution for the species in the gas phase
+        dissolved: Solution for the species dissolved in melt
+        trapped: Solution for the species trapped in solids
     """
 
     def __init__(self, species: GasSpecies):
@@ -308,6 +310,64 @@ class GasCollection:
         self.gas: GasNumberDensity = GasNumberDensity(species)
         self.dissolved: InteriorNumberDensity = InteriorNumberDensity(species)
         self.trapped: InteriorNumberDensity = InteriorNumberDensity(species)
+
+    def _aggregate_property(self, method_name: str, *args, **kwargs) -> float:
+        """Helper method to aggregate results from gas, dissolved, and trapped phases."""
+        return sum(
+            getattr(phase, method_name)(*args, **kwargs)
+            for phase in (self.gas, self.dissolved, self.trapped)
+        )
+
+    def number_density(self, element: str | None = None) -> float:
+        """Number density of the species or element.
+
+        Args:
+            element: Element to compute the number density for, or None to compute for the species.
+                Defaults to None.
+
+        Returns:
+            Number density for the species or `element` if not None.
+        """
+        return self._aggregate_property("number_density", element)
+
+    def mass(self, gas_volume: float, element: str | None = None) -> float:
+        """Mass
+
+        Args:
+            gas_volume: Gas volume in m :sup:`3`
+            element: Element to compute the mass for, or None to compute for the species. Defaults
+                to None.
+
+        Returns:
+            Mass in kg for the species or `element` if not None.
+        """
+        return self._aggregate_property("mass", gas_volume, element)
+
+    def molecules(self, gas_volume: float, element: str | None = None) -> float:
+        """Number of molecules
+
+        Args:
+            gas_volume: Gas volume in m :sup:`3`
+            element: Element to compute the number of molecules for, or None to compute for the
+                species. Defaults to None.
+
+        Returns:
+            Number of molecules for the species or `element` if not None.
+        """
+        return self._aggregate_property("molecules", gas_volume, element)
+
+    def moles(self, gas_volume: float, element: str | None = None) -> float:
+        """Number of moles
+
+        Args:
+            gas_volume: Gas volume in m :sup:`3`
+            element: Element to compute the number of moles for, or None to compute for the
+                species. Defaults to None.
+
+        Returns:
+            Number of moles for the species or `element` if not None.
+        """
+        return self._aggregate_property("moles", gas_volume, element)
 
 
 CondensedSolutionComponent = SolutionComponent[CondensedSpecies]
@@ -317,10 +377,12 @@ class CondensedCollection:
     """Condensed collection
 
     Args:
-        species: A gas species
+        species: A condensed species
 
     Attributes:
-        TODO
+        number_density: Solution for the fictitous number density of the condensate
+        activity: Solution for the activity of the condensate
+        stability: Solution for the stability of the condensate
     """
 
     def __init__(self, species: CondensedSpecies):
