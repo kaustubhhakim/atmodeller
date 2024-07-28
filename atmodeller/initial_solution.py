@@ -35,7 +35,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Species
+from atmodeller.core import Planet, Species
 from atmodeller.interfaces import ChemicalSpecies
 from atmodeller.output import Output
 from atmodeller.reaction_network import log10_TAU
@@ -81,6 +81,7 @@ class InitialSolution(ABC, Generic[T]):
     Args:
         value: An object used to compute the initial solution
         species: Species
+        planet: Planet
         min_log10_number_density: Minimum log10 number density. Defaults to
             :data:`MIN_LOG10_NUMBER_DENSITY`.
         max_log10_number_density: Maximum log10 number density. Defaults to
@@ -99,6 +100,7 @@ class InitialSolution(ABC, Generic[T]):
         value: T,
         *,
         species: Species,
+        planet: Planet,
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26,
@@ -107,8 +109,9 @@ class InitialSolution(ABC, Generic[T]):
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
-        self.solution: Solution = Solution(species)
         self._species: Species = species
+        self._planet: Planet = planet
+        self.solution: Solution = Solution(species, planet)
         self._min_log10_number_density: float = min_log10_number_density
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
@@ -287,6 +290,8 @@ class InitialSolutionDict(InitialSolution[dict]):
 
     Args:
         value: Dictionary of the initial solution. Defaults to None, meaning to use default values.
+        species: Species
+        planet: Planet
         **kwargs: Optional keyword arguments to pass through to the base class.
 
     Attributes:
@@ -295,12 +300,12 @@ class InitialSolutionDict(InitialSolution[dict]):
     """
 
     @override
-    def __init__(self, value: dict | None = None, *, species: Species, **kwargs):
+    def __init__(self, value: dict | None = None, *, species: Species, planet: Planet, **kwargs):
         if value is None:
             value_dict: dict = {}
         else:
             value_dict = value
-        super().__init__(value_dict, species=species, **kwargs)
+        super().__init__(value_dict, species=species, planet=planet, **kwargs)
 
     def _get_log10_values(
         self,
@@ -401,6 +406,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         value: Output,
         *,
         species: Species,
+        planet: Planet,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
@@ -408,7 +414,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         solution_override: InitialSolutionDict | None = None,
         **kwargs,
     ):
-        super().__init__(value, species=species, **kwargs)
+        super().__init__(value, species=species, planet=planet, **kwargs)
         self.fit: bool = fit
         # Ensure consistency of arguments and correct handling of fit versus partial refit.
         self.fit_batch_size: int = fit_batch_size if self.fit else 0
@@ -636,6 +642,7 @@ class InitialSolutionLast(InitialSolutionProtocol):
         value: An initial solution until `switch_iteration` is reached. Defaults to None, meaning
             that :class:`InitialSolutionDict` is used with default arguments.
         species: Species
+        planet: Planet
         switch_iteration: Iteration number to switch the initial solution to the previous solution.
             Defaults to 1.
         **kwargs: Optional keyword arguments to instantiate :class:`InitialSolutionDict`
@@ -650,15 +657,19 @@ class InitialSolutionLast(InitialSolutionProtocol):
         value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
+        planet: Planet,
         switch_iteration: int = 1,
         **kwargs,
     ):
         if value is None:
-            value_start: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+            value_start: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, planet=planet, **kwargs
+            )
         else:
             value_start = value
         self.value: InitialSolutionProtocol = value_start
         self._species: Species = species
+        self._planet: Planet = planet
         self._switch_iteration: int = switch_iteration
         self._kwargs = kwargs
 
@@ -680,7 +691,9 @@ class InitialSolutionLast(InitialSolutionProtocol):
             for species in self.species.data:
                 value_dict[species] = value_dict.pop(species.name)
 
-            self.value = InitialSolutionDict(value_dict, species=self.species, **self._kwargs)
+            self.value = InitialSolutionDict(
+                value_dict, species=self.species, planet=self._planet, **self._kwargs
+            )
         else:
             self.value.update(output)
 
@@ -691,6 +704,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
     Args:
         value: An initial solution until `switch_iteration` is reached. Defaults to None.
         species: Species
+        planet: Planet
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
@@ -712,6 +726,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
+        planet: Planet,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
@@ -720,11 +735,14 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         **kwargs,
     ):
         if value is None:
-            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+            value_init: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, planet=planet, **kwargs
+            )
         else:
             value_init = value
         self.value: InitialSolutionProtocol = value_init
         self._species: Species = species
+        self._planet: Planet = planet
         self._switch_iteration: int = switch_iteration
         self._fit: bool = fit
         self._fit_batch_size: int = fit_batch_size
@@ -746,6 +764,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
             self.value = InitialSolutionRegressor(
                 output,
                 species=self._species,
+                planet=self._planet,
                 fit=self._fit,
                 fit_batch_size=self._fit_batch_size,
                 partial_fit=self._partial_fit,
@@ -777,18 +796,21 @@ class InitialSolutionSwitchOnFail(InitialSolutionProtocol):
         value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
+        planet: Planet,
         value_on_fail: InitialSolutionProtocol | None = None,
         switch_fails: int = 1,
         **kwargs,
     ):
         if value is None:
-            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+            value_init: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, planet=planet, **kwargs
+            )
         else:
             value_init = value
         self.value: InitialSolutionProtocol = value_init
         if value_on_fail is None:
             value_on_fail_init: InitialSolutionProtocol = InitialSolutionDict(
-                species=species, **kwargs
+                species=species, planet=planet, **kwargs
             )
         else:
             value_on_fail_init = value_on_fail
