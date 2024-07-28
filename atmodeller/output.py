@@ -151,12 +151,14 @@ class Output(UserDict):
             output["activity"] = interior_atmosphere.solution.condensed[species].activity.physical
             output["number_density"] = interior_atmosphere.solution.condensed[
                 species
-            ].mass.physical
-            output["moles"] = interior_atmosphere.solution.condensed[species].mass.moles(
+            ].number_density.physical
+            output["moles"] = interior_atmosphere.solution.condensed[species].number_density.moles(
                 gas_volume
             )
             output["molar_mass"] = species.molar_mass
-            output["mass"] = interior_atmosphere.solution.condensed[species].mass.mass(gas_volume)
+            output["mass"] = interior_atmosphere.solution.condensed[species].number_density.mass(
+                gas_volume
+            )
 
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(output)

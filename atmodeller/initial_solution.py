@@ -120,6 +120,32 @@ class InitialSolution(ABC, Generic[T]):
         """Species"""
         return self._species
 
+    # def clip(self, minimum_value: float | None = None, maximum_value: float | None = None) -> None:
+    #     """clips the value.
+
+    #     Args:
+    #         minimum_value: Minimum value. Defaults to None, meaning do not clip.
+    #         maximum_value: Maximum value. Defaults to None, meaning do not clip.
+    #     """
+    #     self.value = np.clip(self.value, minimum_value, maximum_value)
+
+    # def fill(self, fill_value: float) -> None:
+    #     """Fills value if it is missing.
+
+    #     Args:
+    #         fill_value: The fill value
+    #     """
+    #     if not hasattr(self, "_value"):
+    #         self.value = fill_value
+
+    # def perturb(self, perturb: float = 0) -> None:
+    #     """Perturbs the value.
+
+    #     Args:
+    #         perturb: Maximum log10 value to perturb the values. Defaults to 0.
+    #     """
+    #     self.value += perturb * (2 * np.random.rand() - 1)
+
     @abstractmethod
     def set_data(
         self, constraints: SystemConstraints, *, temperature: float, pressure: float
@@ -154,10 +180,13 @@ class InitialSolution(ABC, Generic[T]):
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
         for solution in self.solution.gas.values():
-            solution.gas.fill(self._fill_log10_number_density)
-            if perturb_gas_log10:
-                solution.gas.perturb(perturb_gas_log10)
-            solution.gas.clip(self._min_log10_number_density, self._max_log10_number_density)
+            if not hasattr(solution.gas, "_value"):
+                solution.gas.value = self._fill_log10_number_density
+
+        # solution.gas.fill(self._fill_log10_number_density)
+        # if perturb_gas_log10:
+        #    solution.gas.perturb(perturb_gas_log10)
+        # solution.gas.clip(self._min_log10_number_density, self._max_log10_number_density)
 
         for constraint in constraints.gas_constraints:
             self.solution.gas[constraint.species].gas.value = constraint.get_log10_value(
@@ -165,19 +194,25 @@ class InitialSolution(ABC, Generic[T]):
             )
 
         for solution in self.solution.condensed.values():
-            solution.activity.fill(self._fill_log10_activity)
-            solution.number_density.fill(self._fill_log10_number_density)
-            solution.stability.fill(self._fill_log10_stability)
-            if perturb_gas_log10:
-                solution.number_density.perturb(perturb_gas_log10)
-                # solution.stability.perturb(perturb_gas_log10)
+            if not hasattr(solution.activity, "_value"):
+                solution.activity.value = self._fill_log10_activity
+            if not hasattr(solution.number_density, "_value"):
+                solution.number_density.value = self._fill_log10_number_density
+            if not hasattr(solution.stability, "_value"):
+                solution.stability.value = self._fill_log10_stability
+        # solution.activity.fill(self._fill_log10_activity)
+        # solution.number_density.fill(self._fill_log10_number_density)
+        # solution.stability.fill(self._fill_log10_stability)
+        # if perturb_gas_log10:
+        #    solution.number_density.perturb(perturb_gas_log10)
+        # solution.stability.perturb(perturb_gas_log10)
 
-            # TODO: This imposes the activity value if stable, but might be in conflict with
-            # stability criteria for unstable condensates?
-            # solution.activity.clip(maximum_value=0)
+        # TODO: This imposes the activity value if stable, but might be in conflict with
+        # stability criteria for unstable condensates?
+        # solution.activity.clip(maximum_value=0)
 
-            # Satisfy auxilliary equation by construction
-            # solution.stability.value = log10_TAU - solution.mass.value
+        # Satisfy auxilliary equation by construction
+        # solution.stability.value = log10_TAU - solution.mass.value
 
         for constraint in constraints.activity_constraints:
             self.solution.condensed[constraint.species].activity.value = (

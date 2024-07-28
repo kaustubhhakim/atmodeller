@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections import UserDict
-from typing import Generic, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -37,7 +37,7 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
-T = TypeVar("T", bound=ChemicalSpecies)
+T_co = TypeVar("T_co", bound=ChemicalSpecies, covariant=True)
 
 ACTIVITY_PREFIX: str = "activity_"
 """Name prefix for the activity of condensed species"""
@@ -47,61 +47,32 @@ STABILITY_PREFIX: str = "stability_"
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class SolutionComponent(Generic[T]):
-    """A solution component
+class SolutionComponentProtocol(Protocol[T_co]):
+    """Solution protocol"""
+
+    @property
+    def species(self) -> T_co: ...
+
+    @property
+    def value(self) -> float: ...
+
+
+class NumberDensitySolution(SolutionComponentProtocol, Generic[T_co]):
+    """A number density solution component
 
     Args:
-        species: Species
-        prefix: Prefix for the name
+        species: A Chemical species
     """
 
-    def __init__(self, species: T):
-        self._species: T = species
-        self._value: float
+    def __init__(self, species: T_co):
+        self._species: T_co = species
 
     @property
-    def value(self) -> float:
-        return self._value
+    def species(self) -> T_co:
+        """Species"""
+        return self._species
 
-    @value.setter
-    def value(self, value: float) -> None:
-        self._value = value
-
-    @property
-    def physical(self) -> float:
-        return 10**self.value
-
-    def clip(self, minimum_value: float | None = None, maximum_value: float | None = None) -> None:
-        """clips the value.
-
-        Args:
-            minimum_value: Minimum value. Defaults to None, meaning do not clip.
-            maximum_value: Maximum value. Defaults to None, meaning do not clip.
-        """
-        self.value = np.clip(self.value, minimum_value, maximum_value)
-
-    def fill(self, fill_value: float) -> None:
-        """Fills value if it is missing.
-
-        Args:
-            fill_value: The fill value
-        """
-        if not hasattr(self, "_value"):
-            self.value = fill_value
-
-    def perturb(self, perturb: float = 0) -> None:
-        """Perturbs the value.
-
-        Args:
-            perturb: Maximum log10 value to perturb the values. Defaults to 0.
-        """
-        self.value += perturb * (2 * np.random.rand() - 1)
-
-
-class NumberDensitySolution(SolutionComponent[T]):
-    """A number density solution component"""
-
-    def number_density(self, element: str | None = None) -> float:
+    def number_density(self, *, element: str | None = None) -> float:
         """Number density of the species or element.
 
         Args:
@@ -113,17 +84,17 @@ class NumberDensitySolution(SolutionComponent[T]):
         """
         if element is not None:
             try:
-                count: int = self._species.composition()[element].count
+                count: int = self.species.composition()[element].count
             except KeyError:
                 # Element not in formula
                 count = 0
         else:
             count = 1
 
-        return count * self.physical
+        return count * 10**self.value
 
-    def mass(self, gas_volume: float, element: str | None = None) -> float:
-        """Mass
+    def mass(self, gas_volume: float, *, element: str | None = None) -> float:
+        """Mass of the species or element.
 
         Args:
             gas_volume: Gas volume in m :sup:`3`
@@ -136,12 +107,12 @@ class NumberDensitySolution(SolutionComponent[T]):
         if element is not None:
             molar_mass: float = UnitConversion().g_to_kg(Formula(element).mass)
         else:
-            molar_mass = self._species.molar_mass
+            molar_mass = self.species.molar_mass
 
-        return self.moles(gas_volume, element) * molar_mass
+        return self.moles(gas_volume, element=element) * molar_mass
 
-    def molecules(self, gas_volume: float, element: str | None = None) -> float:
-        """Number of molecules
+    def molecules(self, gas_volume: float, *, element: str | None = None) -> float:
+        """Number of molecules of the species or element.
 
         Args:
             gas_volume: Gas volume in m :sup:`3`
@@ -151,10 +122,10 @@ class NumberDensitySolution(SolutionComponent[T]):
         Returns:
             Number of molecules for the species or `element` if not None.
         """
-        return self.number_density(element) * gas_volume
+        return self.number_density(element=element) * gas_volume
 
-    def moles(self, gas_volume: float, element: str | None = None) -> float:
-        """Number of moles
+    def moles(self, gas_volume: float, *, element: str | None = None) -> float:
+        """Number of moles of the species or element.
 
         Args:
             gas_volume: Gas volume in m :sup:`3`
@@ -164,14 +135,39 @@ class NumberDensitySolution(SolutionComponent[T]):
         Returns:
             Number of moles for the species or `element` if not None.
         """
-        return self.molecules(gas_volume, element) / AVOGADRO
+        return self.molecules(gas_volume, element=element) / AVOGADRO
 
 
-CondensedNumberDensity = NumberDensitySolution[CondensedSpecies]
+class ValueSetterMixin:
+    """Mixin to set the value"""
+
+    _value: float
+
+    @property
+    def value(self) -> float:
+        """Gets the value."""
+        return self._value
+
+    @value.setter
+    def value(self, value: float) -> None:
+        """Sets the value.
+
+        Args:
+            value: Value to set
+        """
+        self._value = value
 
 
-class GasNumberDensity(NumberDensitySolution[GasSpecies]):
-    """The gas number density solution"""
+class NumberDensitySolutionWithSetter(ValueSetterMixin, NumberDensitySolution[T_co]):
+    """A number density solution component with a setter"""
+
+
+class CondensedNumberDensity(NumberDensitySolutionWithSetter[CondensedSpecies]):
+    """A number density solution component with a setter for a condensed species"""
+
+
+class GasNumberDensity(NumberDensitySolutionWithSetter[GasSpecies]):
+    """A number density solution for a gas"""
 
     def pressure(self, gas_temperature: float) -> float:
         """Pressure in bar
@@ -257,12 +253,11 @@ class GasNumberDensity(NumberDensitySolution[GasSpecies]):
         return 10 ** self.log10_fugacity(gas_temperature, gas_pressure)
 
 
-class InteriorNumberDensity(NumberDensitySolution[GasSpecies]):
+class InteriorNumberDensity(NumberDensitySolutionWithSetter[GasSpecies]):
     """An interior reservoir number density
 
     Args:
         species: Species
-        prefix: Prefix for the name
     """
 
     @override
@@ -274,122 +269,83 @@ class InteriorNumberDensity(NumberDensitySolution[GasSpecies]):
     def ppmw(self) -> float:
         return self._ppmw
 
-    def update_all(self, ppmw: float, reservoir_mass: float, gas_volume: float) -> None:
-        """Updates the state
+    @ppmw.setter
+    def ppmw(self, value: float) -> None:
+        self._ppmw = value
+
+    def set_all(self, ppmw: float, reservoir_mass: float, gas_volume: float) -> None:
+        """Sets the state
 
         Args:
             ppmw: Parts-per-million by weight
             reservoir_mass: Mass of the reservoir in kg
             gas_volume: Gas volume in m :sup:`3`
         """
-        self._ppmw = ppmw
+        self.ppmw = ppmw
         number_density: float = (
             UnitConversion.ppm_to_fraction(self.ppmw)
             * AVOGADRO
-            / self._species.molar_mass
+            / self.species.molar_mass
             * reservoir_mass
             / gas_volume
         )
         self.value = np.log10(number_density)
 
 
-class GasCollection:
+class GasCollection(NumberDensitySolution[GasSpecies]):
     """Gas collection
 
     Args:
         species: A gas species
 
     Attributes:
+        species: The gas species
         gas: Solution for the species in the gas phase
         dissolved: Solution for the species dissolved in melt
         trapped: Solution for the species trapped in solids
     """
 
+    @override
     def __init__(self, species: GasSpecies):
-        self.species: GasSpecies = species
+        super().__init__(species)
         self.gas: GasNumberDensity = GasNumberDensity(species)
         self.dissolved: InteriorNumberDensity = InteriorNumberDensity(species)
         self.trapped: InteriorNumberDensity = InteriorNumberDensity(species)
 
-    def _aggregate_property(self, method_name: str, *args, **kwargs) -> float:
-        """Helper method to aggregate results from gas, dissolved, and trapped phases."""
-        return sum(
-            getattr(phase, method_name)(*args, **kwargs)
-            for phase in (self.gas, self.dissolved, self.trapped)
-        )
-
-    def number_density(self, element: str | None = None) -> float:
-        """Number density of the species or element.
-
-        Args:
-            element: Element to compute the number density for, or None to compute for the species.
-                Defaults to None.
-
-        Returns:
-            Number density for the species or `element` if not None.
-        """
-        return self._aggregate_property("number_density", element)
-
-    def mass(self, gas_volume: float, element: str | None = None) -> float:
-        """Mass
-
-        Args:
-            gas_volume: Gas volume in m :sup:`3`
-            element: Element to compute the mass for, or None to compute for the species. Defaults
-                to None.
-
-        Returns:
-            Mass in kg for the species or `element` if not None.
-        """
-        return self._aggregate_property("mass", gas_volume, element)
-
-    def molecules(self, gas_volume: float, element: str | None = None) -> float:
-        """Number of molecules
-
-        Args:
-            gas_volume: Gas volume in m :sup:`3`
-            element: Element to compute the number of molecules for, or None to compute for the
-                species. Defaults to None.
-
-        Returns:
-            Number of molecules for the species or `element` if not None.
-        """
-        return self._aggregate_property("molecules", gas_volume, element)
-
-    def moles(self, gas_volume: float, element: str | None = None) -> float:
-        """Number of moles
-
-        Args:
-            gas_volume: Gas volume in m :sup:`3`
-            element: Element to compute the number of moles for, or None to compute for the
-                species. Defaults to None.
-
-        Returns:
-            Number of moles for the species or `element` if not None.
-        """
-        return self._aggregate_property("moles", gas_volume, element)
+    @property
+    def value(self) -> float:
+        return np.log10(10**self.gas.value + 10**self.dissolved.value + 10**self.trapped.value)
 
 
-CondensedSolutionComponent = SolutionComponent[CondensedSpecies]
+class CondensedSolutionComponent(ValueSetterMixin):
+
+    def __init__(self, species: CondensedSpecies):
+        self._species: CondensedSpecies = species
 
 
-class CondensedCollection:
+class CondensedCollection(NumberDensitySolution[CondensedSpecies]):
     """Condensed collection
 
     Args:
         species: A condensed species
 
     Attributes:
+        species: The condensed species
         number_density: Solution for the fictitous number density of the condensate
         activity: Solution for the activity of the condensate
         stability: Solution for the stability of the condensate
     """
 
+    @override
     def __init__(self, species: CondensedSpecies):
-        self.species: CondensedSpecies = species
+        super().__init__(species)
         self.number_density: CondensedNumberDensity = CondensedNumberDensity(species)
         self.activity: CondensedSolutionComponent = CondensedSolutionComponent(species)
         self.stability: CondensedSolutionComponent = CondensedSolutionComponent(species)
+
+    @property
+    def value(self) -> float:
+        return self.number_density.value
 
 
 class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection]):
@@ -398,7 +354,7 @@ class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection]):
     @property
     def number(self) -> int:
         """Number of solution quantities"""
-        return 3 * len(self.data)
+        return 3 * len(self)
 
     @classmethod
     def initialise_with_species(
@@ -419,13 +375,17 @@ class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection]):
         return cls(init_dict)
 
 
-class GasSolution(UserDict[GasSpecies, GasCollection]):
+class GasSolution(UserDict[GasSpecies, GasCollection], NumberDensitySolution):
     """Gas solution"""
+
+    @property
+    def value(self) -> float:
+        return np.log10(sum(10**collection.value for collection in self.values()))
 
     @property
     def number(self) -> int:
         """Number of solution quantities"""
-        return len(self.data)
+        return len(self)
 
     @property
     def mean_molar_mass(self) -> float:
@@ -434,8 +394,8 @@ class GasSolution(UserDict[GasSpecies, GasCollection]):
             [
                 collection.species.molar_mass
                 * collection.gas.number_density()
-                / self.gas_number_density
-                for collection in self.data.values()
+                / self.gas_number_density()
+                for collection in self.values()
             ]
         )
 
@@ -468,21 +428,20 @@ class GasSolution(UserDict[GasSpecies, GasCollection]):
             Fugacities by Hill formula
         """
         fugacities: dict[str, float] = {}
-        for collection in self.data.values():
+        for collection in self.values():
             fugacities[collection.species.hill_formula] = collection.gas.fugacity(
                 gas_temperature, gas_pressure
             )
 
         return fugacities
 
-    @property
     def gas_number_density(self) -> float:
-        """Number density"""
-        return sum(collection.gas.number_density() for collection in self.data.values())
+        """Gas number density"""
+        return sum(collection.gas.number_density() for collection in self.values())
 
     def gas_pressure(self, gas_temperature: float) -> float:
-        """Pressure"""
-        return sum(collection.gas.pressure(gas_temperature) for collection in self.data.values())
+        """Gas pressure"""
+        return sum(collection.gas.pressure(gas_temperature) for collection in self.values())
 
 
 class Solution:
@@ -613,7 +572,7 @@ class Solution:
             output[species_name] = solution.gas.pressure(gas_temperature)
         for solution in self.condensed.values():
             species_name: str = solution.species.name
-            output[f"{ACTIVITY_PREFIX}{species_name}"] = solution.activity.physical
+            output[f"{ACTIVITY_PREFIX}{species_name}"] = 10**solution.activity.value
             output[f"mass_{species_name}"] = solution.number_density.mass(gas_volume)
 
         return output

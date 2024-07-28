@@ -171,7 +171,7 @@ class InteriorAtmosphereSystem:
         for element in condensed_element_masses:
             for solution in self.solution.condensed.values():
                 condensed_element_masses[element] += solution.number_density.number_density(
-                    element
+                    element=element
                 )
 
         logger.debug("condensed_element_masses = %s", condensed_element_masses)
@@ -217,7 +217,7 @@ class InteriorAtmosphereSystem:
         output["melt_number_density"] *= self.planet.mantle_melt_mass / self.gas_volume
 
         # TODO: New
-        self.solution.gas[species].dissolved.update_all(
+        self.solution.gas[species].dissolved.set_all(
             output["melt_ppmw"], self.planet.mantle_melt_mass, self.gas_volume
         )
 
@@ -228,7 +228,7 @@ class InteriorAtmosphereSystem:
         output["solid_number_density"] *= self.planet.mantle_solid_mass / self.gas_volume
 
         # TODO: New
-        self.solution.gas[species].trapped.update_all(
+        self.solution.gas[species].trapped.set_all(
             output["solid_ppmw"], self.planet.mantle_solid_mass, self.gas_volume
         )
 
@@ -492,7 +492,7 @@ class InteriorAtmosphereSystem:
         if len(self.constraints.total_pressure_constraint) > 0:
             constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
-                self.solution.gas.gas_number_density
+                self.solution.gas.gas_number_density()
             ) - constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
         # Combined residual
