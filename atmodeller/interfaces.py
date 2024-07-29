@@ -257,15 +257,8 @@ class ChemicalSpecies:
         """Thermodynamic data for the species"""
         return self._thermodata
 
-    def __repr__(self):
-        return (
-            f"{self.__class__.__name__}("
-            f"formula={self._formula!r}, "
-            f"phase={self._phase!r}, "
-            f"thermodata_dataset={self._thermodata.data_source!r}, "
-            f"thermodata_name={self._thermodata_name!r}, "
-            f"thermodata_filename={self._thermodata_filename!r})"
-        )
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self._formula!s})"
 
     def __str__(self) -> str:
         return self.name

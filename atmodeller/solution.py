@@ -128,6 +128,9 @@ class NumberDensityMixin(SolutionComponentProtocol):
         """
         return self.molecules(element=element) / AVOGADRO
 
+    def __repr__(self) -> str:
+        return f"number_density={self.number_density()}"
+
 
 class ValueSetterMixin:
     """Mixin to set value"""
@@ -312,6 +315,12 @@ class GasCollection(NumberDensitySolution[GasSpecies]):
             + 10**self.trapped_abundance.value
         )
 
+    def __repr__(self) -> str:
+        repr_str: str = f"gas_{self.gas_abundance.__repr__()}, "
+        repr_str += f"dissolved_{self.dissolved_abundance.__repr__()}"
+
+        return repr_str
+
 
 class CondensedSolutionComponent(ValueSetterMixin):
     """A condensed solution component
@@ -360,6 +369,13 @@ class CondensedCollection(NumberDensitySolution[CondensedSpecies]):
     @property
     def value(self) -> float:
         return self.condensed_abundance.value
+
+    def __repr__(self) -> str:
+        base_repr: str = super().__repr__().rstrip(")")
+        repr_str: str = f"{base_repr}, activity={10**self.activity.value}, "
+        repr_str += f"stability={10**self.stability.value}"
+
+        return repr_str
 
 
 U = TypeVar("U", GasSpecies, CondensedSpecies)
@@ -585,17 +601,19 @@ class Solution:
             solution.stability.value = value[index]
             index += 1
 
-    # FIXME: To refresh
-    # def merge(self, other: Solution) -> None:
-    #     """Merges the data from another solution
+    def merge(self, other: Solution) -> None:
+        """Merges the data from another solution
 
-    #     Args:
-    #         other: The other solution to merge data from
-    #     """
-    #     self.gas.data |= other.gas.data
-    #     self.activity.data |= other.activity.data
-    #     self.condensed.data |= other.condensed.data
-    #     self.stability.data |= other.stability.data
+        Args:
+            other: The other solution to merge data from
+        """
+        if self.planet != other.planet:
+            raise ValueError("Planet properties in `self` and `other` must be the same")
+        if self.species != other.species:
+            raise ValueError("Species in `self` and `other` must be the same")
+
+        self.gas.data |= other.gas.data
+        self.condensed.data |= other.condensed.data
 
     def reaction_array(self) -> npt.NDArray[np.float_]:
         """The reaction array

@@ -64,7 +64,9 @@ class RealGas(ABC):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    calibration: ExperimentalCalibration = field(default_factory=ExperimentalCalibration)
+    calibration: ExperimentalCalibration = field(
+        default_factory=ExperimentalCalibration, repr=False
+    )
     """Calibration range of the temperature and pressure"""
 
     def compressibility_parameter(self, temperature: float, pressure: float) -> float:
@@ -195,6 +197,9 @@ class RealGas(ABC):
         Returns:
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
 
 
 @dataclass(kw_only=True)
