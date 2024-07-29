@@ -70,6 +70,9 @@ class Solubility(ABC):
         """
         raise NotImplementedError
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}()"
+
 
 class SolubilityPowerLaw(Solubility):
     """A solubility power law
@@ -88,6 +91,13 @@ class SolubilityPowerLaw(Solubility):
         del kwargs
 
         return self.constant * fugacity**self.exponent
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}("
+            f"constant={self.constant!r}, "
+            f"exponent={self.exponent!r})"
+        )
 
 
 class NoSolubility(Solubility):

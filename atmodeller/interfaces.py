@@ -64,7 +64,7 @@ class ExperimentalCalibration:
     """Temperature penalty"""
     pressure_penalty: float = 1e3
     """Pressure penalty"""
-    _clips_to_apply: list[Callable] = field(init=False, default_factory=list)
+    _clips_to_apply: list[Callable] = field(init=False, default_factory=list, repr=False)
     """Clips to apply"""
 
     def __post_init__(self):
@@ -199,6 +199,9 @@ class ChemicalSpecies:
     ):
         self._formula: Formula = Formula(formula)
         self._phase: str = phase
+        self._thermodynamic_dataset: ThermodynamicDataset = thermodata_dataset
+        self._thermodata_name: str | None = thermodata_name
+        self._thermodata_filename: str | None = thermodata_filename
         thermodata: ThermodynamicDataForSpeciesProtocol | None = (
             thermodata_dataset.get_species_data(
                 self, name=thermodata_name, filename=thermodata_filename
@@ -253,6 +256,16 @@ class ChemicalSpecies:
     def thermodata(self) -> ThermodynamicDataForSpeciesProtocol:
         """Thermodynamic data for the species"""
         return self._thermodata
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}("
+            f"formula={self._formula!r}, "
+            f"phase={self._phase!r}, "
+            f"thermodata_dataset={self._thermodata.data_source!r}, "
+            f"thermodata_name={self._thermodata_name!r}, "
+            f"thermodata_filename={self._thermodata_filename!r})"
+        )
 
     def __str__(self) -> str:
         return self.name

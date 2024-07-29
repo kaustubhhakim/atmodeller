@@ -135,6 +135,15 @@ class GasSpecies(ChemicalSpecies):
         """Distribution coefficient between the gas trapped in solids and melt"""
         return self._solid_melt_distribution_coefficient
 
+    def __repr__(self):
+        base_repr = super().__repr__()
+        return (
+            f"{base_repr}, "
+            f"solid_melt_distribution_coefficient={self._solid_melt_distribution_coefficient!r}, "
+            f"solubility={self.solubility!r}, "
+            f"eos={self._eos!r}"
+        )
+
 
 class SolidSpecies(CondensedSpecies):
     """A solid species
