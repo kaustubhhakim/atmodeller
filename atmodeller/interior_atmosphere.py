@@ -156,7 +156,7 @@ class InteriorAtmosphereSystem:
         }
         for element in condensed_element_masses:
             for solution in self.solution.condensed.values():
-                condensed_element_masses[element] += solution.number_density.number_density(
+                condensed_element_masses[element] += solution.condensed_abundance.number_density(
                     element=element
                 )
 
@@ -180,9 +180,11 @@ class InteriorAtmosphereSystem:
             A dictionary that includes the reservoir masses of the species
         """
         output: dict[str, float] = {}
-        output["atmosphere_number_density"] = self.solution.gas[species].gas.number_density()
-        output["pressure"] = self.solution.gas[species].gas.pressure()
-        output["fugacity"] = self.solution.gas[species].gas.fugacity()
+        output["atmosphere_number_density"] = self.solution.gas[
+            species
+        ].gas_abundance.number_density()
+        output["pressure"] = self.solution.gas[species].gas_abundance.pressure()
+        output["fugacity"] = self.solution.gas[species].gas_abundance.fugacity()
 
         output["melt_ppmw"] = species.solubility.concentration(
             fugacity=output["fugacity"],
@@ -199,9 +201,7 @@ class InteriorAtmosphereSystem:
         )
 
         # TODO: New
-        self.solution.gas[species].dissolved.set_all(
-            output["melt_ppmw"], self.planet.mantle_melt_mass
-        )
+        self.solution.gas[species].dissolved_abundance.set_all_from_ppmw(output["melt_ppmw"])
 
         output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
         output["solid_number_density"] = (
@@ -212,9 +212,7 @@ class InteriorAtmosphereSystem:
         )
 
         # TODO: New
-        self.solution.gas[species].trapped.set_all(
-            output["solid_ppmw"], self.planet.mantle_solid_mass
-        )
+        self.solution.gas[species].trapped_abundance.set_all_from_ppmw(output["solid_ppmw"])
 
         return output
 

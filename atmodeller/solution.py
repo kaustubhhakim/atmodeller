@@ -20,8 +20,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from abc import ABC, abstractmethod
 from collections import UserDict
-from typing import Generic, Protocol, TypeVar
+from typing import Any, Generic, Protocol, Type, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -47,32 +48,18 @@ STABILITY_PREFIX: str = "stability_"
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class SolutionComponentProtocol(Protocol[T_co]):
-    """Solution protocol"""
+class SolutionComponentProtocol(Protocol):
+    """Solution component protocol"""
 
-    @property
-    def species(self) -> T_co: ...
+    _species: ChemicalSpecies
+    _solution: Solution
 
     @property
     def value(self) -> float: ...
 
 
-class NumberDensitySolution(SolutionComponentProtocol, Generic[T_co]):
-    """A number density solution component
-
-    Args:
-        species: A Chemical species
-        solution: The solution
-    """
-
-    def __init__(self, species: T_co, solution: Solution):
-        self._species: T_co = species
-        self._solution: Solution = solution
-
-    @property
-    def species(self) -> T_co:
-        """Species"""
-        return self._species
+class NumberDensityMixin(SolutionComponentProtocol):
+    """Number density mixin"""
 
     def number_density(self, *, element: str | None = None) -> float:
         """Number density of the species or element
@@ -86,7 +73,7 @@ class NumberDensitySolution(SolutionComponentProtocol, Generic[T_co]):
         """
         if element is not None:
             try:
-                count: int = self.species.composition()[element].count
+                count: int = self._species.composition()[element].count
             except KeyError:
                 # Element not in formula
                 count = 0
@@ -108,7 +95,7 @@ class NumberDensitySolution(SolutionComponentProtocol, Generic[T_co]):
         if element is not None:
             molar_mass: float = UnitConversion().g_to_kg(Formula(element).mass)
         else:
-            molar_mass = self.species.molar_mass
+            molar_mass = self._species.molar_mass
 
         return self.moles(element=element) * molar_mass
 
@@ -138,7 +125,7 @@ class NumberDensitySolution(SolutionComponentProtocol, Generic[T_co]):
 
 
 class ValueSetterMixin:
-    """Mixin to set the value"""
+    """Mixin to set value"""
 
     _value: float
 
@@ -157,6 +144,20 @@ class ValueSetterMixin:
         self._value = value
 
 
+class NumberDensitySolution(NumberDensityMixin, Generic[T_co]):
+    """A number density solution component
+
+    Args:
+        species: A chemical species
+        solution: The solution
+    """
+
+    # pylint: disable=super-init-not-called
+    def __init__(self, species: T_co, solution: Solution):
+        self._species: T_co = species
+        self._solution: Solution = solution
+
+
 class NumberDensitySolutionWithSetter(ValueSetterMixin, NumberDensitySolution[T_co]):
     """A number density solution component with a setter"""
 
@@ -166,7 +167,7 @@ class CondensedNumberDensity(NumberDensitySolutionWithSetter[CondensedSpecies]):
 
 
 class GasNumberDensity(NumberDensitySolutionWithSetter[GasSpecies]):
-    """A number density solution for a gas"""
+    """A number density solution for a gas species"""
 
     def pressure(self) -> float:
         """Pressure in bar"""
@@ -201,43 +202,62 @@ class GasNumberDensity(NumberDensitySolutionWithSetter[GasSpecies]):
         return 10 ** self.log10_fugacity()
 
 
-class InteriorNumberDensity(NumberDensitySolutionWithSetter[GasSpecies]):
-    """An interior reservoir number density
+class InteriorNumberDensity(ABC, NumberDensitySolutionWithSetter[GasSpecies]):
+    """A number density of a species in an interior reservoir
 
     Args:
-        species: A GasSpecies
+        species: A gas species
         solution: The solution
     """
 
-    @override
-    def __init__(self, species: GasSpecies, solution: Solution):
-        super().__init__(species, solution)
-        self._ppmw: float
+    ppmw: float
 
     @property
-    def ppmw(self) -> float:
-        return self._ppmw
+    @abstractmethod
+    def reservoir_mass(self) -> float:
+        """Reservoir mass"""
 
-    @ppmw.setter
-    def ppmw(self, value: float) -> None:
-        self._ppmw = value
-
-    def set_all(self, ppmw: float, reservoir_mass: float) -> None:
-        """Sets the state
+    def set_all_from_ppmw(self, ppmw: float) -> None:
+        """Sets the state from the ppmw in the reservoir.
 
         Args:
             ppmw: Parts-per-million by weight
-            reservoir_mass: Mass of the reservoir in kg
         """
         self.ppmw = ppmw
         number_density: float = (
             UnitConversion.ppm_to_fraction(self.ppmw)
             * AVOGADRO
-            / self.species.molar_mass
-            * reservoir_mass
+            / self._species.molar_mass
+            * self.reservoir_mass
             / self._solution.gas.gas_volume()
         )
         self.value = np.log10(number_density)
+
+
+class DissolvedInteriorNumberDensity(InteriorNumberDensity):
+    """A number density of a species dissolved in melt
+
+    Args:
+        species: A gas species
+        solution: The solution
+    """
+
+    @property
+    def reservoir_mass(self) -> float:
+        return self._solution.planet.mantle_melt_mass
+
+
+class TrappedInteriorNumberDensity(InteriorNumberDensity):
+    """A number density of a species trapped in solids
+
+    Args:
+        species: A gas species
+        solution: The solution
+    """
+
+    @property
+    def reservoir_mass(self) -> float:
+        return self._solution.planet.mantle_solid_mass
 
 
 class GasCollection(NumberDensitySolution[GasSpecies]):
@@ -254,21 +274,47 @@ class GasCollection(NumberDensitySolution[GasSpecies]):
         trapped: Solution for the species trapped in solids
     """
 
+    NUMBER: int = 1
+    """Number of solution quantities
+
+    The number density of the species in the gas phase is the only true solution quantity,
+    since the number density in other reservoirs can be determined from the aforementioned
+    number density.
+    """
+
     @override
     def __init__(self, species: GasSpecies, solution: Solution):
         self._species: GasSpecies = species
         self._solution: Solution = solution
         super().__init__(species, solution)
-        self.gas: GasNumberDensity = GasNumberDensity(species, solution)
-        self.dissolved: InteriorNumberDensity = InteriorNumberDensity(species, solution)
-        self.trapped: InteriorNumberDensity = InteriorNumberDensity(species, solution)
+        self.gas_abundance: GasNumberDensity = GasNumberDensity(species, solution)
+        self.dissolved_abundance: InteriorNumberDensity = DissolvedInteriorNumberDensity(
+            species, solution
+        )
+        self.trapped_abundance: InteriorNumberDensity = TrappedInteriorNumberDensity(
+            species, solution
+        )
+
+    @property
+    def species(self) -> GasSpecies:
+        return self._species
 
     @property
     def value(self) -> float:
-        return np.log10(10**self.gas.value + 10**self.dissolved.value + 10**self.trapped.value)
+        return np.log10(
+            10**self.gas_abundance.value
+            + 10**self.dissolved_abundance.value
+            + 10**self.trapped_abundance.value
+        )
 
 
 class CondensedSolutionComponent(ValueSetterMixin):
+    """A condensed solution component
+
+    Args:
+        species: A condensed species
+        solution: The solution
+    """
 
     def __init__(self, species: CondensedSpecies, solution: Solution):
         self._species: CondensedSpecies = species
@@ -288,19 +334,109 @@ class CondensedCollection(NumberDensitySolution[CondensedSpecies]):
         stability: Solution for the stability of the condensate
     """
 
+    NUMBER: int = 3
+    """Number of solution quantities"""
+
     @override
     def __init__(self, species: CondensedSpecies, solution: Solution):
+        self._species: CondensedSpecies = species
+        self._solution: Solution = solution
         super().__init__(species, solution)
-        self.number_density: CondensedNumberDensity = CondensedNumberDensity(species, solution)
+        self.condensed_abundance: CondensedNumberDensity = CondensedNumberDensity(
+            species, solution
+        )
         self.activity: CondensedSolutionComponent = CondensedSolutionComponent(species, solution)
         self.stability: CondensedSolutionComponent = CondensedSolutionComponent(species, solution)
 
     @property
+    def species(self) -> CondensedSpecies:
+        return self._species
+
+    @property
     def value(self) -> float:
-        return self.number_density.value
+        return self.condensed_abundance.value
 
 
-class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection], NumberDensitySolution):
+U = TypeVar("U", GasSpecies, CondensedSpecies)
+V = TypeVar("V", GasCollection, CondensedCollection)
+
+
+class SolutionDict(ABC, UserDict[U, V]):
+    """Solution dictionary
+
+    Args:
+        species_list: A list of chemical species
+        solution: The solution
+        planet: The planet
+    """
+
+    def __init__(self, species_list: list[U], solution: Solution, planet: Planet):
+        init_dict: dict[U, V] = {}
+        for species in species_list:
+            init_dict[species] = self.collection_class(species, solution)
+        super().__init__(init_dict)
+        self._solution: Solution = solution
+        self._planet: Planet = planet
+
+    @property
+    @abstractmethod
+    def collection_class(self) -> Any: ...
+
+    @property
+    def number(self) -> int:
+        """Number of solution quantities"""
+        return sum(collection.NUMBER for collection in self.values())
+
+    def number_density(self, *, element: str | None = None) -> float:
+        """Total number density of the species or element
+
+        Args:
+            element: Element to compute the number density for, or None to compute for the species.
+                Defaults to None.
+
+        Returns:
+            Number density for the species or `element` if not None.
+        """
+        return sum(collection.number_density(element=element) for collection in self.values())
+
+    def mass(self, *, element: str | None = None) -> float:
+        """Total mass of the species or element
+
+        Args:
+            element: Element to compute the mass for, or None to compute for the species. Defaults
+                to None.
+
+        Returns:
+            Mass in kg for the species or `element` if not None.
+        """
+        return sum(collection.mass(element=element) for collection in self.values())
+
+    def molecules(self, *, element: str | None = None) -> float:
+        """Total number of molecules of the species or element
+
+        Args:
+            element: Element to compute the number of molecules for, or None to compute for the
+                species. Defaults to None.
+
+        Returns:
+            Number of molecules for the species or `element` if not None.
+        """
+        return sum(collection.molecules(element=element) for collection in self.values())
+
+    def moles(self, *, element: str | None = None) -> float:
+        """Total number of moles of the species or element
+
+        Args:
+            element: Element to compute the number of moles for, or None to compute for the
+                species. Defaults to None.
+
+        Returns:
+            Number of moles for the species or `element` if not None.
+        """
+        return sum(collection.moles(element=element) for collection in self.values())
+
+
+class CondensedSolutionDict(SolutionDict[CondensedSpecies, CondensedCollection]):
     """Condensed solution
 
     Args:
@@ -309,31 +445,12 @@ class CondensedSolution(UserDict[CondensedSpecies, CondensedCollection], NumberD
         solution: The solution
     """
 
-    def __init__(
-        self, condensed_species: list[CondensedSpecies], planet: Planet, solution: Solution
-    ):
-        init_dict: dict[CondensedSpecies, CondensedCollection] = {}
-        for species in condensed_species:
-            init_dict[species] = CondensedCollection(species, solution)
-        super().__init__(init_dict)
-        self._planet: Planet = planet
-
     @property
-    def value(self) -> float:
-        return np.log10(sum(10**collection.number_density.value for collection in self.values()))
-
-    @property
-    def number(self) -> int:
-        """Number of solution quantities"""
-        return 3 * len(self)
-
-    @property
-    def planet(self) -> Planet:
-        """Planet"""
-        return self._planet
+    def collection_class(self) -> Type[CondensedCollection]:
+        return CondensedCollection
 
 
-class GasSolution(UserDict[GasSpecies, GasCollection], NumberDensitySolution):
+class GasSolutionDict(SolutionDict[GasSpecies, GasCollection]):
     """Gas solution
 
     Args:
@@ -342,21 +459,9 @@ class GasSolution(UserDict[GasSpecies, GasCollection], NumberDensitySolution):
         solution: The solution
     """
 
-    def __init__(self, gas_species: list[GasSpecies], planet: Planet, solution: Solution):
-        init_dict: dict[GasSpecies, GasCollection] = {}
-        for species in gas_species:
-            init_dict[species] = GasCollection(species, solution)
-        super().__init__(init_dict)
-        self._planet: Planet = planet
-
     @property
-    def value(self) -> float:
-        return np.log10(sum(10**collection.value for collection in self.values()))
-
-    @property
-    def number(self) -> int:
-        """Number of solution quantities"""
-        return len(self)
+    def collection_class(self) -> Type[GasCollection]:
+        return GasCollection
 
     def fugacities_by_hill_formula(self) -> dict[str, float]:
         """Fugacities by Hill formula
@@ -366,7 +471,7 @@ class GasSolution(UserDict[GasSpecies, GasCollection], NumberDensitySolution):
         """
         fugacities: dict[str, float] = {}
         for collection in self.values():
-            fugacities[collection.species.hill_formula] = collection.gas.fugacity()
+            fugacities[collection.species.hill_formula] = collection.gas_abundance.fugacity()
 
         return fugacities
 
@@ -375,7 +480,7 @@ class GasSolution(UserDict[GasSpecies, GasCollection], NumberDensitySolution):
         return sum(
             [
                 collection.species.molar_mass
-                * collection.gas.number_density()
+                * collection.gas_abundance.number_density()
                 / self.gas_number_density()
                 for collection in self.values()
             ]
@@ -383,11 +488,11 @@ class GasSolution(UserDict[GasSpecies, GasCollection], NumberDensitySolution):
 
     def gas_number_density(self) -> float:
         """Gas number density"""
-        return sum(collection.gas.number_density() for collection in self.values())
+        return sum(collection.gas_abundance.number_density() for collection in self.values())
 
     def gas_pressure(self) -> float:
         """Gas pressure"""
-        return sum(collection.gas.pressure() for collection in self.values())
+        return sum(collection.gas_abundance.pressure() for collection in self.values())
 
     def gas_temperature(self) -> float:
         """Gas temperature"""
@@ -410,14 +515,15 @@ class Solution:
 
     Args:
         species: Species
+        planet: Planet
     """
 
     def __init__(self, species: Species, planet: Planet):
         self._species: Species = species
         self._planet: Planet = planet
-        self.gas: GasSolution = GasSolution(species.gas_species, planet, self)
-        self.condensed: CondensedSolution = CondensedSolution(
-            species.condensed_species, planet, self
+        self.gas: GasSolutionDict = GasSolutionDict(species.gas_species, self, planet)
+        self.condensed: CondensedSolutionDict = CondensedSolutionDict(
+            species.condensed_species, self, planet
         )
 
     @property
@@ -441,12 +547,12 @@ class Solution:
         data: npt.NDArray[np.float_] = np.zeros(self.number, dtype=np.float_)
         index: int = 0
         for solution in self.gas.values():
-            data[index] = solution.gas.value
+            data[index] = solution.gas_abundance.value
             index += 1
         for solution in self.condensed.values():
             data[index] = solution.activity.value
             index += 1
-            data[index] = solution.number_density.value
+            data[index] = solution.condensed_abundance.value
             index += 1
             data[index] = solution.stability.value
             index += 1
@@ -462,12 +568,12 @@ class Solution:
         """
         index: int = 0
         for solution in self.gas.values():
-            solution.gas.value = value[index]
+            solution.gas_abundance.value = value[index]
             index += 1
         for solution in self.condensed.values():
             solution.activity.value = value[index]
             index += 1
-            solution.number_density.value = value[index]
+            solution.condensed_abundance.value = value[index]
             index += 1
             solution.stability.value = value[index]
             index += 1
@@ -493,7 +599,7 @@ class Solution:
         reaction_array: npt.NDArray = np.zeros(self._species.number, dtype=np.float_)
         index: int = 0
         for solution in self.gas.values():
-            reaction_array[index] = solution.gas.value
+            reaction_array[index] = solution.gas_abundance.value
             index += 1
         for solution in self.condensed.values():
             reaction_array[index] = solution.activity.value
@@ -519,11 +625,11 @@ class Solution:
         output: dict[str, float] = {}
         for solution in self.gas.values():
             species_name: str = solution.species.name
-            output[species_name] = solution.gas.value
+            output[species_name] = solution.gas_abundance.value
         for solution in self.condensed.values():
             species_name: str = solution.species.name
             output[f"{ACTIVITY_PREFIX}{species_name}"] = solution.activity.value
-            output[species_name] = solution.number_density.value
+            output[species_name] = solution.condensed_abundance.value
             output[f"{STABILITY_PREFIX}{species_name}"] = solution.stability.value
 
         return output
@@ -533,10 +639,10 @@ class Solution:
         output: dict[str, float] = {}
         for solution in self.gas.values():
             species_name: str = solution.species.name
-            output[species_name] = solution.gas.pressure()
+            output[species_name] = solution.gas_abundance.pressure()
         for solution in self.condensed.values():
             species_name: str = solution.species.name
             output[f"{ACTIVITY_PREFIX}{species_name}"] = 10**solution.activity.value
-            output[f"mass_{species_name}"] = solution.number_density.mass()
+            output[f"mass_{species_name}"] = solution.condensed_abundance.mass()
 
         return output

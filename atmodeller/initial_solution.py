@@ -183,8 +183,8 @@ class InitialSolution(ABC, Generic[T]):
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
         for solution in self.solution.gas.values():
-            if not hasattr(solution.gas, "_value"):
-                solution.gas.value = self._fill_log10_number_density
+            if not hasattr(solution.gas_abundance, "_value"):
+                solution.gas_abundance.value = self._fill_log10_number_density
 
         # solution.gas.fill(self._fill_log10_number_density)
         # if perturb_gas_log10:
@@ -192,15 +192,15 @@ class InitialSolution(ABC, Generic[T]):
         # solution.gas.clip(self._min_log10_number_density, self._max_log10_number_density)
 
         for constraint in constraints.gas_constraints:
-            self.solution.gas[constraint.species].gas.value = constraint.get_log10_value(
+            self.solution.gas[constraint.species].gas_abundance.value = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
 
         for solution in self.solution.condensed.values():
             if not hasattr(solution.activity, "_value"):
                 solution.activity.value = self._fill_log10_activity
-            if not hasattr(solution.number_density, "_value"):
-                solution.number_density.value = self._fill_log10_number_density
+            if not hasattr(solution.condensed_abundance, "_value"):
+                solution.condensed_abundance.value = self._fill_log10_number_density
             if not hasattr(solution.stability, "_value"):
                 solution.stability.value = self._fill_log10_stability
         # solution.activity.fill(self._fill_log10_activity)
@@ -340,7 +340,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         for species, solution in self.solution.gas.items():
             value: float | None = self._get_log10_values(species, "")
             if value is not None:
-                solution.gas.value = value
+                solution.gas_abundance.value = value
 
         for species, solution in self.solution.condensed.items():
             value: float | None = self._get_log10_values(species, ACTIVITY_PREFIX)
