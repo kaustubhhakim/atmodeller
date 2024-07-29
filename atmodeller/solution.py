@@ -33,6 +33,11 @@ from atmodeller.core import GasSpecies, Planet, Species
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.utilities import UnitConversion
 
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
+
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
@@ -370,17 +375,23 @@ class SolutionDict(ABC, UserDict[U, V]):
         planet: The planet
     """
 
-    def __init__(self, species_list: list[U], solution: Solution, planet: Planet):
+    collection_class: Any
+
+    def __init__(self, init_dict=None, /, **kwargs):
+        super().__init__(init_dict, **kwargs)
+        self._solution: Solution
+        self._planet: Planet
+
+    @classmethod
+    def from_species(cls, species_list: list[U], solution: Solution, planet: Planet) -> Self:
         init_dict: dict[U, V] = {}
         for species in species_list:
-            init_dict[species] = self.collection_class(species, solution)
-        super().__init__(init_dict)
-        self._solution: Solution = solution
-        self._planet: Planet = planet
+            init_dict[species] = cls.collection_class(species, solution)
+        obj: Self = cls(init_dict)
+        obj._solution = solution
+        obj._planet = planet
 
-    @property
-    @abstractmethod
-    def collection_class(self) -> Any: ...
+        return obj
 
     @property
     def number(self) -> int:
@@ -445,9 +456,7 @@ class CondensedSolutionDict(SolutionDict[CondensedSpecies, CondensedCollection])
         solution: The solution
     """
 
-    @property
-    def collection_class(self) -> Type[CondensedCollection]:
-        return CondensedCollection
+    collection_class: Type[CondensedCollection] = CondensedCollection
 
 
 class GasSolutionDict(SolutionDict[GasSpecies, GasCollection]):
@@ -459,9 +468,7 @@ class GasSolutionDict(SolutionDict[GasSpecies, GasCollection]):
         solution: The solution
     """
 
-    @property
-    def collection_class(self) -> Type[GasCollection]:
-        return GasCollection
+    collection_class: Type[GasCollection] = GasCollection
 
     def fugacities_by_hill_formula(self) -> dict[str, float]:
         """Fugacities by Hill formula
@@ -521,8 +528,8 @@ class Solution:
     def __init__(self, species: Species, planet: Planet):
         self._species: Species = species
         self._planet: Planet = planet
-        self.gas: GasSolutionDict = GasSolutionDict(species.gas_species, self, planet)
-        self.condensed: CondensedSolutionDict = CondensedSolutionDict(
+        self.gas: GasSolutionDict = GasSolutionDict.from_species(species.gas_species, self, planet)
+        self.condensed: CondensedSolutionDict = CondensedSolutionDict.from_species(
             species.condensed_species, self, planet
         )
 
@@ -619,6 +626,9 @@ class Solution:
             stability_array[index] = solution.stability.value
 
         return stability_array
+
+    def to_dict(self):
+        return self.gas | self.condensed
 
     def raw_solution_dict(self) -> dict[str, float]:
         """Raw solution in a dictionary"""
