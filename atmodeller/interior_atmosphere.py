@@ -28,7 +28,7 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
-from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
+from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
@@ -138,147 +138,6 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    # def gas_species_reservoir_masses(
-    #     self,
-    #     species: GasSpecies,
-    # ) -> dict[str, float]:
-    #     """Calculates the masses of the gas species in the atmosphere-mantle system
-
-    #     Additional quantities are saved during the calculation for subsequent (and self-consistent)
-    #     output.
-
-    #     Args:
-    #         species: A gas species
-
-    #     Returns:
-    #         A dictionary that includes the reservoir masses of the species
-    #     """
-    #     output: dict[str, float] = {}
-    #     output["atmosphere_number_density"] = self.solution[species].gas_abundance.number_density()
-    #     output["pressure"] = self.solution[species].gas_abundance.pressure()
-    #     output["fugacity"] = self.solution[species].gas_abundance.fugacity()
-
-    #     output["melt_ppmw"] = species.solubility.concentration(
-    #         fugacity=output["fugacity"],
-    #         temperature=self.solution.gas_temperature(),
-    #         pressure=self.solution.gas_pressure(),
-    #         **self.solution.fugacities_by_hill_formula(),
-    #     )
-    #     #     # Numerator to molecules
-    #     #     output["melt_number_density"] = (
-    #     #         output["melt_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
-    #     #     )
-    #     #     output["melt_number_density"] *= self.planet.mantle_melt_mass / self.solution.gas_volume()
-
-    #     # TODO: New
-    #     self.solution[species].dissolved_abundance.set_all_from_ppmw(output["melt_ppmw"])
-
-    #     output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
-    #     #     output["solid_number_density"] = (
-    #     #         output["solid_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
-    #     #     )
-    #     #     output["solid_number_density"] *= (
-    #     #         self.planet.mantle_solid_mass / self.solution.gas_volume()
-    #     #     )
-
-    #     # TODO: New
-    #     self.solution[species].trapped_abundance.set_all_from_ppmw(output["solid_ppmw"])
-
-    #     return output
-
-    # def element_number_density_in_gas_species_reservoirs(self, species: GasSpecies, element: str):
-    #     """Calculates the number density of an element in the reservoirs of a gas species.
-
-    #     Args:
-    #         species: A gas species
-    #         element: Compute the number density for the element in the species.
-
-    #     Returns:
-    #         Element number density in the gas species reservoirs
-    #     """
-    #     output: dict[str, float] = self.gas_species_reservoir_masses(species)
-
-    #     number_density: dict[str, float] = {
-    #         "atmosphere_number_density": output["atmosphere_number_density"],
-    #         "melt_number_density": output["melt_number_density"],
-    #         "solid_number_density": output["solid_number_density"],
-    #     }
-
-    #     try:
-    #         element_count: int = species.composition()[element].count
-    #     except KeyError:
-    #         # Element not in formula so number density is zero.
-    #         element_count = 0
-
-    #     for key in number_density:
-    #         number_density[key] *= element_count
-
-    #     return number_density
-
-    # def element_gas_number_density(self, element: str) -> dict[str, float]:
-    #     """Calculates the number density of an element in all gas species in each reservoir.
-
-    #     Args:
-    #         element: Element to compute the number density for.
-
-    #     Returns:
-    #         Gas reservoir number densities of the element
-    #     """
-    #     number_density: dict[str, float] = {
-    #         "atmosphere_number_density": 0,
-    #         "melt_number_density": 0,
-    #         "solid_number_density": 0,
-    #     }
-
-    #     for species in self.species.gas_species:
-    #         species_number_density: dict[str, float] = (
-    #             self.element_number_density_in_gas_species_reservoirs(species, element)
-    #         )
-    #         for key, value in species_number_density.items():
-    #             number_density[key] += value
-
-    #     logger.debug("element_gas_number_density for %s = %s", element, number_density)
-
-    #     return number_density
-
-    # def element_number_density(self, element: str) -> dict[str, float]:
-    #     """Calculates the number density of an element.
-
-    #     Args:
-    #         element: Element to compute the number density for.
-
-    #     Returns:
-    #         Total mass of the element
-    #     """
-    #     element_number_density: dict[str, float] = self.element_gas_number_density(element)
-    #     element_number_density["condensed"] = self.condensed_element_masses()[element]
-
-    #     logger.debug("element_number_density for %s = %s", element, element_number_density)
-
-    #     return element_number_density
-
-    def get_number_density_residual(self) -> npt.NDArray[np.float_]:
-        """Returns the residual vector of the number density balance."""
-
-        # Update solubilities
-        # for gas_species in self.species.gas_species:
-        #    self.gas_species_reservoir_masses(gas_species)
-
-        residual_number_density: npt.NDArray[np.float_] = np.zeros(
-            len(self.constraints.mass_constraints), dtype=np.float_
-        )
-        for index, constraint in enumerate(self.constraints.mass_constraints):
-            residual_number_density[index] = np.log10(
-                self.solution.number_density(element=constraint.element)
-            )
-            residual_number_density[index] -= constraint.log10_number_of_molecules - np.log10(
-                self.solution.gas_volume()
-            )
-
-        logger.debug("residual_number_density = %s", residual_number_density)
-
-        return residual_number_density
-
     def solve(
         self,
         constraints: SystemConstraints,
@@ -336,7 +195,7 @@ class InteriorAtmosphereSystem:
             # ensure the initial solution is bounded.
             log_solution: npt.NDArray = initial_solution.get_log10_value(
                 self.constraints,
-                temperature=self.planet.surface_temperature,
+                temperature=self.solution.gas_temperature(),
                 pressure=1,
                 perturb_gas_log10=perturb_gas_log10,
                 attempt=attempt,
@@ -428,7 +287,6 @@ class InteriorAtmosphereSystem:
         temperature: float = self.solution.gas_temperature()
         pressure: float = self.solution.gas_pressure()
 
-        # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
             temperature=temperature,
             pressure=pressure,
@@ -439,20 +297,27 @@ class InteriorAtmosphereSystem:
             solution=self.solution,
         )
 
-        # Compute residual for the mass balance.
-        residual_number_density: npt.NDArray[np.float_] = self.get_number_density_residual()
+        residual_number_density: npt.NDArray[np.float_] = np.zeros(
+            len(self.constraints.mass_constraints), dtype=np.float_
+        )
+        for index, constraint in enumerate(self.constraints.mass_constraints):
+            residual_number_density[index] = np.log10(
+                self.solution.number_density(element=constraint.element)
+            )
+            residual_number_density[index] -= constraint.log10_number_of_molecules - np.log10(
+                self.solution.gas_volume()
+            )
 
-        # Compute residual for the total pressure (if relevant).
         residual_total_pressure: npt.NDArray = np.zeros(
             len(self.constraints.total_pressure_constraint), dtype=np.float_
         )
-        if len(self.constraints.total_pressure_constraint) > 0:
-            constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
+        if len(self.constraints.total_pressure_constraint) == 1:
+            constraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
                 self.solution.gas_number_density()
             ) - constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
-        # Combined residual
+        # Combine residual.
         residual: npt.NDArray = np.concatenate(
             (residual_reaction, residual_number_density, residual_total_pressure)
         )

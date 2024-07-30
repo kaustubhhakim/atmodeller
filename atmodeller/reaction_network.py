@@ -376,8 +376,6 @@ class ReactionNetwork:
             - rhs
         )
 
-        logger.debug("residual_reaction = %s", residual_reaction)
-
         return residual_reaction
 
 

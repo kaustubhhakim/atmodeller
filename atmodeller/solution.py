@@ -251,7 +251,7 @@ class DissolvedNumberDensity(NumberDensity[GasSpecies]):
     """
 
     def ppmw(self) -> float:
-        """Parts-per-million by weight"""
+        """Parts-per-million by weight of the volatile"""
         return self._species.solubility.concentration(
             fugacity=self._solution[self._species].gas_abundance.fugacity(),
             temperature=self._solution.gas_temperature(),
@@ -261,6 +261,7 @@ class DissolvedNumberDensity(NumberDensity[GasSpecies]):
 
     @property
     def reservoir_mass(self) -> float:
+        """Mass of the reservoir"""
         return self._solution.planet.mantle_melt_mass
 
     @property
@@ -274,35 +275,6 @@ class DissolvedNumberDensity(NumberDensity[GasSpecies]):
         )
 
         return np.log10(number_density)
-
-    # def set_all_from_ppmw(self, ppmw: float) -> None:
-    #     """Sets the state from the ppmw in the reservoir.
-
-    #     Args:
-    #         ppmw: Parts-per-million by weight
-    #     """
-    #     self.ppmw = ppmw
-    #     number_density: float = (
-    #         UnitConversion.ppm_to_fraction(self.ppmw)
-    #         * AVOGADRO
-    #         / self._species.molar_mass
-    #         * self.reservoir_mass
-    #         / self._solution.gas_volume()
-    #     )
-    #     self._value = np.log10(number_density)
-
-
-# class DissolvedInteriorNumberDensity(InteriorNumberDensity):
-#     """A number density of a species dissolved in melt
-
-#     Args:
-#         species: A gas species
-#         solution: The solution
-#     """
-
-#     @property
-#     def reservoir_mass(self) -> float:
-#         return self._solution.planet.mantle_melt_mass
 
 
 class TrappedNumberDensity(DissolvedNumberDensity):
@@ -392,16 +364,16 @@ class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
     @property
     def condensed_abundance(self) -> None:
         raise NotImplementedError(
-            f"condensed_abundance not implemented for {self.__class__.__name__}"
+            f"condensed_abundance not relevant for {self.__class__.__name__}"
         )
 
     @property
     def activity(self) -> Never:
-        raise NotImplementedError(f"activity not implemented for {self.__class__.__name__}")
+        raise NotImplementedError(f"activity not relevant for {self.__class__.__name__}")
 
     @property
     def stability(self) -> Never:
-        raise NotImplementedError(f"stability not implemented for {self.__class__.__name__}")
+        raise NotImplementedError(f"stability not relevant for {self.__class__.__name__}")
 
 
 class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
@@ -448,172 +420,17 @@ class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
 
     @property
     def gas_abundance(self) -> Never:
-        raise NotImplementedError(f"gas_abundance not implemented for {self.__class__.__name__}")
+        raise NotImplementedError(f"gas_abundance not relevant for {self.__class__.__name__}")
 
     @property
     def dissolved_abundance(self) -> Never:
         raise NotImplementedError(
-            f"dissolved_abundance not implemented for {self.__class__.__name__}"
+            f"dissolved_abundance not relevant for {self.__class__.__name__}"
         )
 
     @property
     def trapped_abundance(self) -> Never:
-        raise NotImplementedError(
-            f"trapped_abundance not implemented for {self.__class__.__name__}"
-        )
-
-
-# class SolutionDict(ABC, UserDict[U, V]):
-#     """Solution dictionary
-
-#     Args:
-#         species_list: A list of chemical species
-#         solution: The solution
-#         planet: The planet
-#     """
-
-#     collection_class: Any
-
-# def __init__(self, init_dict=None, /, **kwargs):
-#     super().__init__(init_dict, **kwargs)
-#     self._solution: Solution
-#     self._planet: Planet
-
-# @classmethod
-# def from_species(cls, species_list: list[U], solution: Solution, planet: Planet) -> Self:
-#     init_dict: dict[U, V] = {}
-#     for species in species_list:
-#         init_dict[species] = cls.collection_class(species, solution)
-#     obj: Self = cls(init_dict)
-#     obj._solution = solution
-#     obj._planet = planet
-
-#     return obj
-
-# @property
-# def number(self) -> int:
-#     """Number of solution quantities"""
-#     return sum(collection.NUMBER for collection in self.values())
-
-# def number_density(self, *, element: str | None = None) -> float:
-#     """Total number density of the species or element
-
-#     Args:
-#         element: Element to compute the number density for, or None to compute for the species.
-#             Defaults to None.
-
-#     Returns:
-#         Number density for the species or `element` if not None.
-#     """
-#     return sum(collection.number_density(element=element) for collection in self.values())
-
-# def mass(self, *, element: str | None = None) -> float:
-#     """Total mass of the species or element
-
-#     Args:
-#         element: Element to compute the mass for, or None to compute for the species. Defaults
-#             to None.
-
-#     Returns:
-#         Mass in kg for the species or `element` if not None.
-#     """
-#     return sum(collection.mass(element=element) for collection in self.values())
-
-# def molecules(self, *, element: str | None = None) -> float:
-#     """Total number of molecules of the species or element
-
-#     Args:
-#         element: Element to compute the number of molecules for, or None to compute for the
-#             species. Defaults to None.
-
-#     Returns:
-#         Number of molecules for the species or `element` if not None.
-#     """
-#     return sum(collection.molecules(element=element) for collection in self.values())
-
-# def moles(self, *, element: str | None = None) -> float:
-#     """Total number of moles of the species or element
-
-#     Args:
-#         element: Element to compute the number of moles for, or None to compute for the
-#             species. Defaults to None.
-
-#     Returns:
-#         Number of moles for the species or `element` if not None.
-#     """
-#     return sum(collection.moles(element=element) for collection in self.values())
-
-
-# class CondensedSolutionDict(SolutionDict[CondensedSpecies, CondensedCollection]):
-#     """Condensed solution
-
-#     Args:
-#         species: Species
-#         planet: Planet
-#         solution: The solution
-#     """
-
-#     collection_class: Type[CondensedCollection] = CondensedCollection
-
-
-# class GasSolutionDict(SolutionDict[GasSpecies, GasCollection]):
-#     """Gas solution
-
-#     Args:
-#         species: Species
-#         planet: Planet
-#         solution: The solution
-#     """
-
-#     collection_class: Type[GasCollection] = GasCollection
-
-#     def fugacities_by_hill_formula(self) -> dict[str, float]:
-#         """Fugacities by Hill formula
-
-#         Returns:
-#             Fugacities by Hill formula
-#         """
-#         fugacities: dict[str, float] = {}
-#         for collection in self.values():
-#             fugacities[collection.species.hill_formula] = collection.gas_abundance.fugacity()
-
-#         return fugacities
-
-#     def gas_mean_molar_mass(self) -> float:
-#         """Mean molar mass"""
-#         return sum(
-#             [
-#                 collection.species.molar_mass
-#                 * collection.gas_abundance.number_density()
-#                 / self.gas_number_density()
-#                 for collection in self.values()
-#             ]
-#         )
-
-#     def gas_number_density(self) -> float:
-#         """Gas number density"""
-#         return sum(collection.gas_abundance.number_density() for collection in self.values())
-
-#     def gas_pressure(self) -> float:
-#         """Gas pressure"""
-#         return sum(collection.gas_abundance.pressure() for collection in self.values())
-
-#     def gas_temperature(self) -> float:
-#         """Gas temperature"""
-#         return self._planet.surface_temperature
-
-#     def gas_volume(self) -> float:
-#         """Total volume of the atmosphere
-
-#         Derived using the mechanical pressure balance due to the weight of the atmosphere and the
-#         ideal gas equation of state.
-#         """
-#         volume: float = self._planet.surface_area / self._planet.surface_gravity
-#         volume *= GAS_CONSTANT * self.gas_temperature() / self.gas_mean_molar_mass()
-
-#         return volume
-
-V = TypeVar("V", GasCollection, CondensedCollection)
+        raise NotImplementedError(f"trapped_abundance not relevant for {self.__class__.__name__}")
 
 
 class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
@@ -625,10 +442,6 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
 
     Args:
         init_dict: Initial dictionary
-
-    Attributes:
-        species: Species
-        planet: Planet
     """
 
     def __init__(self, init_dict=None, /, **kwargs):
@@ -694,7 +507,7 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
             value_list.append(condensed_collection.condensed_abundance.value)
             value_list.append(condensed_collection.stability.value)
 
-        return np.array(value_list)
+        return np.array(value_list, dtype=np.float_)
 
     @value.setter
     def value(self, value: npt.NDArray[np.float_]) -> None:
@@ -811,7 +624,7 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
 
     def gas_temperature(self) -> float:
         """Gas temperature"""
-        return self._planet.surface_temperature
+        return self.planet.surface_temperature
 
     def gas_volume(self) -> float:
         """Total volume of the atmosphere
@@ -819,7 +632,7 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
         Derived using the mechanical pressure balance due to the weight of the atmosphere and the
         ideal gas equation of state.
         """
-        volume: float = self._planet.surface_area / self._planet.surface_gravity
+        volume: float = self.planet.surface_area / self.planet.surface_gravity
         volume *= GAS_CONSTANT * self.gas_temperature() / self.gas_mean_molar_mass()
 
         return volume
@@ -844,7 +657,7 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
         Returns:
             The condensate stability array
         """
-        stability_array: npt.NDArray = np.zeros(self._species.number, dtype=np.float_)
+        stability_array: npt.NDArray = np.zeros(self.species.number, dtype=np.float_)
         for condensed_species, collection in self.condensed_solution.items():
             index: int = self.species.species_index(condensed_species)
             stability_array[index] = collection.stability.value
