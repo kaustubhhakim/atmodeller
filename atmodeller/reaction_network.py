@@ -41,7 +41,7 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-TAU: float = 1e-15
+TAU: float = 1e-11
 """Tau factor for the calculation of the auxilliary equations for condensate stability"""
 log10_TAU: float = np.log10(TAU)
 """Log10 of Tau"""
@@ -446,7 +446,20 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             self._species.number_condensed_species, dtype=np.float_
         )
         for nn, species in enumerate(self._species.condensed_species):
-            residual_stability[nn] = solution[species].stability.value - log10_TAU
+            # TODO Below should be log10_TAU_C not log10_TAU
+            # Hack to get a prototype
+            output: list[float] = []
+            for element in species.elements:
+                output.append(solution.number_density(element=element))
+            logger.warning(output)
+            min_value: float = min(output)
+            logger.warning(min_value)
+            log10_min_value: float = np.log10(min_value)
+            logger.warning(log10_min_value)
+            log10_TAUC: float = log10_TAU + log10_min_value
+            logger.warning(log10_TAUC)
+
+            residual_stability[nn] = solution[species].stability.value - log10_TAUC
             residual_stability[nn] += solution[species].condensed_abundance.value
 
         logger.debug("residual_stability = %s", residual_stability)

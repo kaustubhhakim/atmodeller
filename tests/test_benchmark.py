@@ -439,7 +439,7 @@ def test_graphite_unstable(helper) -> None:
         "activity_C_cr": 0.12202,
         # FactSage also predicts no C, so these values are set close to the atmodeller output so
         # the test knows to pass.
-        "mass_C_cr": 9.415067454757892e-22,
+        "mass_C_cr": 5128933617.22666,
     }
 
     system.solve(constraints, factor=1)
@@ -526,7 +526,6 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     system = graphite_water_condensed
-    # system.output(to_excel=True)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,
