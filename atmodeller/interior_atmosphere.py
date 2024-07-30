@@ -85,7 +85,7 @@ class InteriorAtmosphereSystem:
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionDict(species=self.species, planet=self.planet)
         self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
-        self._solution = Solution(self.species, self.planet)
+        self._solution = Solution.from_species(self.species, self.planet)
 
     @property
     def constraints(self) -> SystemConstraints:
@@ -155,8 +155,10 @@ class InteriorAtmosphereSystem:
             element: 0 for element in self.species.elements()
         }
         for element in condensed_element_masses:
-            for solution in self.solution.condensed.values():
-                condensed_element_masses[element] += solution.condensed_abundance.number_density(
+            for collection in self.solution.condensed_solution.values():
+                # TODO: Remove when refactoring complete
+                # for solution in self.solution.condensed.values():
+                condensed_element_masses[element] += collection.condensed_abundance.number_density(
                     element=element
                 )
 
@@ -180,39 +182,35 @@ class InteriorAtmosphereSystem:
             A dictionary that includes the reservoir masses of the species
         """
         output: dict[str, float] = {}
-        output["atmosphere_number_density"] = self.solution.gas[
-            species
-        ].gas_abundance.number_density()
-        output["pressure"] = self.solution.gas[species].gas_abundance.pressure()
-        output["fugacity"] = self.solution.gas[species].gas_abundance.fugacity()
+        output["atmosphere_number_density"] = self.solution[species].gas_abundance.number_density()
+        output["pressure"] = self.solution[species].gas_abundance.pressure()
+        output["fugacity"] = self.solution[species].gas_abundance.fugacity()
 
         output["melt_ppmw"] = species.solubility.concentration(
             fugacity=output["fugacity"],
-            temperature=self.solution.gas.gas_temperature(),
-            pressure=self.solution.gas.gas_pressure(),
-            **self.solution.gas.fugacities_by_hill_formula(),
+            temperature=self.solution.gas_temperature(),
+            pressure=self.solution.gas_pressure(),
+            **self.solution.fugacities_by_hill_formula(),
         )
         # Numerator to molecules
         output["melt_number_density"] = (
             output["melt_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
         )
-        output["melt_number_density"] *= (
-            self.planet.mantle_melt_mass / self.solution.gas.gas_volume()
-        )
+        output["melt_number_density"] *= self.planet.mantle_melt_mass / self.solution.gas_volume()
 
         # TODO: New
-        self.solution.gas[species].dissolved_abundance.set_all_from_ppmw(output["melt_ppmw"])
+        self.solution[species].dissolved_abundance.set_all_from_ppmw(output["melt_ppmw"])
 
         output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
         output["solid_number_density"] = (
             output["solid_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
         )
         output["solid_number_density"] *= (
-            self.planet.mantle_solid_mass / self.solution.gas.gas_volume()
+            self.planet.mantle_solid_mass / self.solution.gas_volume()
         )
 
         # TODO: New
-        self.solution.gas[species].trapped_abundance.set_all_from_ppmw(output["solid_ppmw"])
+        self.solution[species].trapped_abundance.set_all_from_ppmw(output["solid_ppmw"])
 
         return output
 
@@ -297,7 +295,7 @@ class InteriorAtmosphereSystem:
                 sum(self.element_number_density(constraint.element).values())
             )
             residual_number_density[index] -= constraint.log10_number_of_molecules - np.log10(
-                self._solution.gas.gas_volume()
+                self._solution.gas_volume()
             )
 
         logger.debug("residual_number_density = %s", residual_number_density)
@@ -446,12 +444,12 @@ class InteriorAtmosphereSystem:
             The solution, which is the log10 of the activities and pressures for each species
         """
         # This must be set here.
-        self._solution.data = log_solution
+        self._solution.value = log_solution
 
         logger.debug("log_solution passed into _objective_func = %s", log_solution)
 
-        temperature: float = self.solution.gas.gas_temperature()
-        pressure: float = self.solution.gas.gas_pressure()
+        temperature: float = self.solution.gas_temperature()
+        pressure: float = self.solution.gas_pressure()
 
         # Compute residual for the reaction network.
         residual_reaction: npt.NDArray = self._reaction_network.get_residual(
@@ -474,7 +472,7 @@ class InteriorAtmosphereSystem:
         if len(self.constraints.total_pressure_constraint) > 0:
             constraint: TotalPressureConstraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure[0] += np.log10(
-                self.solution.gas.gas_number_density()
+                self.solution.gas_number_density()
             ) - constraint.get_log10_value(temperature=temperature, pressure=pressure)
 
         # Combined residual

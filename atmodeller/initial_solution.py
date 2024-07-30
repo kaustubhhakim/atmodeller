@@ -111,7 +111,7 @@ class InitialSolution(ABC, Generic[T]):
         self.value: T = value
         self._species: Species = species
         self._planet: Planet = planet
-        self.solution: Solution = Solution(species, planet)
+        self.solution: Solution = Solution.from_species(species, planet)
         self._min_log10_number_density: float = min_log10_number_density
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
@@ -182,9 +182,9 @@ class InitialSolution(ABC, Generic[T]):
         """
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
-        for solution in self.solution.gas.values():
-            if not hasattr(solution.gas_abundance, "_value"):
-                solution.gas_abundance.value = self._fill_log10_number_density
+        for collection in self.solution.gas_solution.values():
+            if not hasattr(collection.gas_abundance, "_value"):
+                collection.gas_abundance.value = self._fill_log10_number_density
 
         # solution.gas.fill(self._fill_log10_number_density)
         # if perturb_gas_log10:
@@ -192,17 +192,18 @@ class InitialSolution(ABC, Generic[T]):
         # solution.gas.clip(self._min_log10_number_density, self._max_log10_number_density)
 
         for constraint in constraints.gas_constraints:
-            self.solution.gas[constraint.species].gas_abundance.value = constraint.get_log10_value(
+            self.solution[constraint.species].gas_abundance.value = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
 
-        for solution in self.solution.condensed.values():
-            if not hasattr(solution.activity, "_value"):
-                solution.activity.value = self._fill_log10_activity
-            if not hasattr(solution.condensed_abundance, "_value"):
-                solution.condensed_abundance.value = self._fill_log10_number_density
-            if not hasattr(solution.stability, "_value"):
-                solution.stability.value = self._fill_log10_stability
+        for collection in self.solution.condensed_solution.values():
+            if not hasattr(collection.activity, "_value"):
+                collection.activity.value = self._fill_log10_activity
+            if not hasattr(collection.condensed_abundance, "_value"):
+                collection.condensed_abundance.value = self._fill_log10_number_density
+            if not hasattr(collection.stability, "_value"):
+                collection.stability.value = self._fill_log10_stability
+
         # solution.activity.fill(self._fill_log10_activity)
         # solution.number_density.fill(self._fill_log10_number_density)
         # solution.stability.fill(self._fill_log10_stability)
@@ -218,8 +219,8 @@ class InitialSolution(ABC, Generic[T]):
         # solution.stability.value = log10_TAU - solution.mass.value
 
         for constraint in constraints.activity_constraints:
-            self.solution.condensed[constraint.species].activity.value = (
-                constraint.get_log10_value(temperature=temperature, pressure=pressure)
+            self.solution[constraint.species].activity.value = constraint.get_log10_value(
+                temperature=temperature, pressure=pressure
             )
 
         # TODO: Testing. If the solver fails it could be because one or several of the condensed
@@ -272,7 +273,7 @@ class InitialSolution(ABC, Generic[T]):
 
         logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
 
-        return self.solution.data
+        return self.solution.value
 
     def update(self, output: Output) -> None:
         """Updates the initial solution.
@@ -337,21 +338,21 @@ class InitialSolutionDict(InitialSolution[dict]):
         del args
         del kwargs
 
-        for species, solution in self.solution.gas.items():
-            value: float | None = self._get_log10_values(species, "")
+        for gas_species, collection in self.solution.gas_solution.items():
+            value: float | None = self._get_log10_values(gas_species, "")
             if value is not None:
-                solution.gas_abundance.value = value
+                collection.gas_abundance.value = value
 
-        for species, solution in self.solution.condensed.items():
-            value: float | None = self._get_log10_values(species, ACTIVITY_PREFIX)
+        for condensed_species, collection in self.solution.condensed_solution.items():
+            value: float | None = self._get_log10_values(condensed_species, ACTIVITY_PREFIX)
             if value is not None:
-                solution.activity.value = value
-            value: float | None = self._get_log10_values(species, "")
+                collection.activity.value = value
+            value: float | None = self._get_log10_values(condensed_species, "")
             if value is not None:
-                solution.number_density.value = value
-            value: float | None = self._get_log10_values(species, STABILITY_PREFIX)
+                collection.number_density.value = value
+            value: float | None = self._get_log10_values(condensed_species, STABILITY_PREFIX)
             if value is not None:
-                solution.stability.value = value
+                collection.stability.value = value
 
         # self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
 
@@ -556,7 +557,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             npt.NDArray, self._solution_scalar.inverse_transform(solution_scaled)
         )
 
-        self.solution.data = solution_original.flatten()
+        self.solution.value = solution_original.flatten()
 
         # FIXME: Regressor doesn't return a low enough log10 value
         # if abs(self.solution.data[13]) < 1e-2:
