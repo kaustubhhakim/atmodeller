@@ -28,14 +28,12 @@ from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 from sklearn.metrics import mean_squared_error
 
-from atmodeller import AVOGADRO
 from atmodeller.constraints import SystemConstraints, TotalPressureConstraint
-from atmodeller.core import GasSpecies, Planet, Species
+from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
 from atmodeller.solution import Solution
-from atmodeller.utilities import UnitConversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -71,10 +69,10 @@ class InteriorAtmosphereSystem:
     """Initial solution"""
     output: Output = field(init=False, default_factory=Output)
     """Output data"""
+    solution: Solution = field(init=False)
+    """Solution"""
     _reaction_network: ReactionNetworkWithCondensateStability = field(init=False)
-    # Convenient to set and update on this instance.
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
-    _solution: Solution = field(init=False)
     _residual: npt.NDArray = field(init=False)
     _attempted_solves: int = field(init=False, default=0)
     _failed_solves: int = field(init=False, default=0)
@@ -85,7 +83,7 @@ class InteriorAtmosphereSystem:
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionDict(species=self.species, planet=self.planet)
         self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
-        self._solution = Solution.from_species(self.species, self.planet)
+        self.solution = Solution.from_species(self.species, self.planet)
 
     @property
     def constraints(self) -> SystemConstraints:
@@ -115,11 +113,6 @@ class InteriorAtmosphereSystem:
         """The total number of systems solved"""
         return self.output.size
 
-    @property
-    def solution(self) -> Solution:
-        """The solution"""
-        return self._solution
-
     def residual_dict(self) -> dict[str, float]:
         """Residual of the objective function
 
@@ -145,155 +138,141 @@ class InteriorAtmosphereSystem:
 
         return output
 
-    def condensed_element_masses(self) -> dict[str, float]:
-        """Calculates the number densities of elements in all condensed species.
+    # def gas_species_reservoir_masses(
+    #     self,
+    #     species: GasSpecies,
+    # ) -> dict[str, float]:
+    #     """Calculates the masses of the gas species in the atmosphere-mantle system
 
-        Returns:
-            Dictionary of elements and their number densities in all condensed species
-        """
-        condensed_element_masses: dict[str, float] = {
-            element: 0 for element in self.species.elements()
-        }
-        for element in condensed_element_masses:
-            for collection in self.solution.condensed_solution.values():
-                condensed_element_masses[element] += collection.condensed_abundance.number_density(
-                    element=element
-                )
+    #     Additional quantities are saved during the calculation for subsequent (and self-consistent)
+    #     output.
 
-        logger.debug("condensed_element_masses = %s", condensed_element_masses)
+    #     Args:
+    #         species: A gas species
 
-        return condensed_element_masses
+    #     Returns:
+    #         A dictionary that includes the reservoir masses of the species
+    #     """
+    #     output: dict[str, float] = {}
+    #     output["atmosphere_number_density"] = self.solution[species].gas_abundance.number_density()
+    #     output["pressure"] = self.solution[species].gas_abundance.pressure()
+    #     output["fugacity"] = self.solution[species].gas_abundance.fugacity()
 
-    def gas_species_reservoir_masses(
-        self,
-        species: GasSpecies,
-    ) -> dict[str, float]:
-        """Calculates the masses of the gas species in the atmosphere-mantle system
+    #     output["melt_ppmw"] = species.solubility.concentration(
+    #         fugacity=output["fugacity"],
+    #         temperature=self.solution.gas_temperature(),
+    #         pressure=self.solution.gas_pressure(),
+    #         **self.solution.fugacities_by_hill_formula(),
+    #     )
+    #     #     # Numerator to molecules
+    #     #     output["melt_number_density"] = (
+    #     #         output["melt_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
+    #     #     )
+    #     #     output["melt_number_density"] *= self.planet.mantle_melt_mass / self.solution.gas_volume()
 
-        Additional quantities are saved during the calculation for subsequent (and self-consistent)
-        output.
+    #     # TODO: New
+    #     self.solution[species].dissolved_abundance.set_all_from_ppmw(output["melt_ppmw"])
 
-        Args:
-            species: A gas species
+    #     output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
+    #     #     output["solid_number_density"] = (
+    #     #         output["solid_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
+    #     #     )
+    #     #     output["solid_number_density"] *= (
+    #     #         self.planet.mantle_solid_mass / self.solution.gas_volume()
+    #     #     )
 
-        Returns:
-            A dictionary that includes the reservoir masses of the species
-        """
-        output: dict[str, float] = {}
-        output["atmosphere_number_density"] = self.solution[species].gas_abundance.number_density()
-        output["pressure"] = self.solution[species].gas_abundance.pressure()
-        output["fugacity"] = self.solution[species].gas_abundance.fugacity()
+    #     # TODO: New
+    #     self.solution[species].trapped_abundance.set_all_from_ppmw(output["solid_ppmw"])
 
-        output["melt_ppmw"] = species.solubility.concentration(
-            fugacity=output["fugacity"],
-            temperature=self.solution.gas_temperature(),
-            pressure=self.solution.gas_pressure(),
-            **self.solution.fugacities_by_hill_formula(),
-        )
-        # Numerator to molecules
-        output["melt_number_density"] = (
-            output["melt_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
-        )
-        output["melt_number_density"] *= self.planet.mantle_melt_mass / self.solution.gas_volume()
+    #     return output
 
-        # TODO: New
-        self.solution[species].dissolved_abundance.set_all_from_ppmw(output["melt_ppmw"])
+    # def element_number_density_in_gas_species_reservoirs(self, species: GasSpecies, element: str):
+    #     """Calculates the number density of an element in the reservoirs of a gas species.
 
-        output["solid_ppmw"] = output["melt_ppmw"] * species.solid_melt_distribution_coefficient
-        output["solid_number_density"] = (
-            output["solid_ppmw"] * UnitConversion.ppm_to_fraction() * AVOGADRO / species.molar_mass
-        )
-        output["solid_number_density"] *= (
-            self.planet.mantle_solid_mass / self.solution.gas_volume()
-        )
+    #     Args:
+    #         species: A gas species
+    #         element: Compute the number density for the element in the species.
 
-        # TODO: New
-        self.solution[species].trapped_abundance.set_all_from_ppmw(output["solid_ppmw"])
+    #     Returns:
+    #         Element number density in the gas species reservoirs
+    #     """
+    #     output: dict[str, float] = self.gas_species_reservoir_masses(species)
 
-        return output
+    #     number_density: dict[str, float] = {
+    #         "atmosphere_number_density": output["atmosphere_number_density"],
+    #         "melt_number_density": output["melt_number_density"],
+    #         "solid_number_density": output["solid_number_density"],
+    #     }
 
-    def element_number_density_in_gas_species_reservoirs(self, species: GasSpecies, element: str):
-        """Calculates the number density of an element in the reservoirs of a gas species.
+    #     try:
+    #         element_count: int = species.composition()[element].count
+    #     except KeyError:
+    #         # Element not in formula so number density is zero.
+    #         element_count = 0
 
-        Args:
-            species: A gas species
-            element: Compute the number density for the element in the species.
+    #     for key in number_density:
+    #         number_density[key] *= element_count
 
-        Returns:
-            Element number density in the gas species reservoirs
-        """
-        output: dict[str, float] = self.gas_species_reservoir_masses(species)
+    #     return number_density
 
-        number_density: dict[str, float] = {
-            "atmosphere_number_density": output["atmosphere_number_density"],
-            "melt_number_density": output["melt_number_density"],
-            "solid_number_density": output["solid_number_density"],
-        }
+    # def element_gas_number_density(self, element: str) -> dict[str, float]:
+    #     """Calculates the number density of an element in all gas species in each reservoir.
 
-        try:
-            element_count: int = species.composition()[element].count
-        except KeyError:
-            # Element not in formula so number density is zero.
-            element_count = 0
+    #     Args:
+    #         element: Element to compute the number density for.
 
-        for key in number_density:
-            number_density[key] *= element_count
+    #     Returns:
+    #         Gas reservoir number densities of the element
+    #     """
+    #     number_density: dict[str, float] = {
+    #         "atmosphere_number_density": 0,
+    #         "melt_number_density": 0,
+    #         "solid_number_density": 0,
+    #     }
 
-        return number_density
+    #     for species in self.species.gas_species:
+    #         species_number_density: dict[str, float] = (
+    #             self.element_number_density_in_gas_species_reservoirs(species, element)
+    #         )
+    #         for key, value in species_number_density.items():
+    #             number_density[key] += value
 
-    def element_gas_number_density(self, element: str) -> dict[str, float]:
-        """Calculates the number density of an element in all gas species in each reservoir.
+    #     logger.debug("element_gas_number_density for %s = %s", element, number_density)
 
-        Args:
-            element: Element to compute the number density for.
+    #     return number_density
 
-        Returns:
-            Gas reservoir number densities of the element
-        """
-        number_density: dict[str, float] = {
-            "atmosphere_number_density": 0,
-            "melt_number_density": 0,
-            "solid_number_density": 0,
-        }
+    # def element_number_density(self, element: str) -> dict[str, float]:
+    #     """Calculates the number density of an element.
 
-        for species in self.species.gas_species:
-            species_number_density: dict[str, float] = (
-                self.element_number_density_in_gas_species_reservoirs(species, element)
-            )
-            for key, value in species_number_density.items():
-                number_density[key] += value
+    #     Args:
+    #         element: Element to compute the number density for.
 
-        logger.debug("element_gas_number_density for %s = %s", element, number_density)
+    #     Returns:
+    #         Total mass of the element
+    #     """
+    #     element_number_density: dict[str, float] = self.element_gas_number_density(element)
+    #     element_number_density["condensed"] = self.condensed_element_masses()[element]
 
-        return number_density
+    #     logger.debug("element_number_density for %s = %s", element, element_number_density)
 
-    def element_number_density(self, element: str) -> dict[str, float]:
-        """Calculates the number density of an element.
-
-        Args:
-            element: Element to compute the number density for.
-
-        Returns:
-            Total mass of the element
-        """
-        element_number_density: dict[str, float] = self.element_gas_number_density(element)
-        element_number_density["condensed"] = self.condensed_element_masses()[element]
-
-        logger.debug("element_number_density for %s = %s", element, element_number_density)
-
-        return element_number_density
+    #     return element_number_density
 
     def get_number_density_residual(self) -> npt.NDArray[np.float_]:
         """Returns the residual vector of the number density balance."""
+
+        # Update solubilities
+        # for gas_species in self.species.gas_species:
+        #    self.gas_species_reservoir_masses(gas_species)
+
         residual_number_density: npt.NDArray[np.float_] = np.zeros(
             len(self.constraints.mass_constraints), dtype=np.float_
         )
         for index, constraint in enumerate(self.constraints.mass_constraints):
             residual_number_density[index] = np.log10(
-                sum(self.element_number_density(constraint.element).values())
+                self.solution.number_density(element=constraint.element)
             )
             residual_number_density[index] -= constraint.log10_number_of_molecules - np.log10(
-                self._solution.gas_volume()
+                self.solution.gas_volume()
             )
 
         logger.debug("residual_number_density = %s", residual_number_density)
@@ -442,7 +421,7 @@ class InteriorAtmosphereSystem:
             The solution, which is the log10 of the activities and pressures for each species
         """
         # This must be set here.
-        self._solution.value = log_solution
+        self.solution.value = log_solution
 
         logger.debug("log_solution passed into _objective_func = %s", log_solution)
 

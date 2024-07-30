@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from abc import ABC, abstractmethod
 from collections import UserDict
 from typing import Generic, Protocol, TypeVar, cast
 
@@ -72,8 +71,8 @@ class CollectionProtocol(Protocol):
     NUMBER: int
     # Only for GasCollection
     gas_abundance: GasNumberDensity
-    dissolved_abundance: DissolvedInteriorNumberDensity
-    trapped_abundance: TrappedInteriorNumberDensity
+    dissolved_abundance: DissolvedNumberDensity
+    trapped_abundance: TrappedNumberDensity
     # Only for CondensedCollection
     condensed_abundance: CondensedNumberDensity
     activity: CondensedSolutionComponent
@@ -238,40 +237,12 @@ class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
         """Fugacity"""
         return 10 ** self.log10_fugacity()
 
-
-class InteriorNumberDensity(ABC, NumberDensityWithSetter[GasSpecies]):
-    """A number density of a species in an interior reservoir
-
-    Args:
-        species: A gas species
-        solution: The solution
-    """
-
-    ppmw: float
-
-    @property
-    @abstractmethod
-    def reservoir_mass(self) -> float:
-        """Reservoir mass"""
-
-    def set_all_from_ppmw(self, ppmw: float) -> None:
-        """Sets the state from the ppmw in the reservoir.
-
-        Args:
-            ppmw: Parts-per-million by weight
-        """
-        self.ppmw = ppmw
-        number_density: float = (
-            UnitConversion.ppm_to_fraction(self.ppmw)
-            * AVOGADRO
-            / self._species.molar_mass
-            * self.reservoir_mass
-            / self._solution.gas_volume()
-        )
-        self.value = np.log10(number_density)
+    def volume_mixing_ratio(self) -> float:
+        """Volume mixing ratio"""
+        return self.number_density() / self._solution.gas_number_density()
 
 
-class DissolvedInteriorNumberDensity(InteriorNumberDensity):
+class DissolvedNumberDensity(NumberDensity[GasSpecies]):
     """A number density of a species dissolved in melt
 
     Args:
@@ -279,18 +250,75 @@ class DissolvedInteriorNumberDensity(InteriorNumberDensity):
         solution: The solution
     """
 
+    def ppmw(self) -> float:
+        """Parts-per-million by weight"""
+        return self._species.solubility.concentration(
+            fugacity=self._solution[self._species].gas_abundance.fugacity(),
+            temperature=self._solution.gas_temperature(),
+            pressure=self._solution.gas_pressure(),
+            **self._solution.fugacities_by_hill_formula(),
+        )
+
     @property
     def reservoir_mass(self) -> float:
         return self._solution.planet.mantle_melt_mass
 
+    @property
+    def value(self) -> float:
+        number_density: float = (
+            UnitConversion.ppm_to_fraction(self.ppmw())
+            * AVOGADRO
+            / self._species.molar_mass
+            * self.reservoir_mass
+            / self._solution.gas_volume()
+        )
 
-class TrappedInteriorNumberDensity(InteriorNumberDensity):
+        return np.log10(number_density)
+
+    # def set_all_from_ppmw(self, ppmw: float) -> None:
+    #     """Sets the state from the ppmw in the reservoir.
+
+    #     Args:
+    #         ppmw: Parts-per-million by weight
+    #     """
+    #     self.ppmw = ppmw
+    #     number_density: float = (
+    #         UnitConversion.ppm_to_fraction(self.ppmw)
+    #         * AVOGADRO
+    #         / self._species.molar_mass
+    #         * self.reservoir_mass
+    #         / self._solution.gas_volume()
+    #     )
+    #     self._value = np.log10(number_density)
+
+
+# class DissolvedInteriorNumberDensity(InteriorNumberDensity):
+#     """A number density of a species dissolved in melt
+
+#     Args:
+#         species: A gas species
+#         solution: The solution
+#     """
+
+#     @property
+#     def reservoir_mass(self) -> float:
+#         return self._solution.planet.mantle_melt_mass
+
+
+class TrappedNumberDensity(DissolvedNumberDensity):
     """A number density of a species trapped in solids
 
     Args:
         species: A gas species
         solution: The solution
     """
+
+    @override
+    def ppmw(self) -> float:
+        dissolved_ppmw: float = super().ppmw()
+        trapped_ppmw: float = dissolved_ppmw * self._species.solid_melt_distribution_coefficient
+
+        return trapped_ppmw
 
     @property
     def reservoir_mass(self) -> float:
@@ -338,12 +366,10 @@ class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
         self._solution: Solution = solution
         super().__init__(species, solution)
         self.gas_abundance: GasNumberDensity = GasNumberDensity(species, solution)
-        self.dissolved_abundance: InteriorNumberDensity = DissolvedInteriorNumberDensity(
+        self.dissolved_abundance: DissolvedNumberDensity = DissolvedNumberDensity(
             species, solution
         )
-        self.trapped_abundance: InteriorNumberDensity = TrappedInteriorNumberDensity(
-            species, solution
-        )
+        self.trapped_abundance: TrappedNumberDensity = TrappedNumberDensity(species, solution)
 
     @property
     def species(self) -> GasSpecies:
@@ -590,7 +616,7 @@ class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
 V = TypeVar("V", GasCollection, CondensedCollection)
 
 
-class Solution(ABC, UserDict[ChemicalSpecies, CollectionProtocol]):
+class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
     """The solution
 
     It is convenient to have the gas species and condensed species and their respective solutions
