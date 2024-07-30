@@ -738,7 +738,7 @@ class Solution(ABC, UserDict[ChemicalSpecies, Any]):
         for collection in self.gas_solution.values():
             reaction_list.append(collection.gas_abundance.value)
         for collection in self.condensed_solution.values():
-            reaction_list.append(collection.condensed_abundance.value)
+            reaction_list.append(collection.activity.value)
 
         return np.array(reaction_list, dtype=np.float_)
 
