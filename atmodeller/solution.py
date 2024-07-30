@@ -22,7 +22,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from collections import UserDict
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -34,9 +34,9 @@ from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.utilities import UnitConversion
 
 if sys.version_info < (3, 11):
-    from typing_extensions import Self
+    from typing_extensions import Never, Self
 else:
-    from typing import Self
+    from typing import Never, Self
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -53,7 +53,7 @@ STABILITY_PREFIX: str = "stability_"
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class SolutionComponentProtocol(Protocol):
+class ComponentProtocol(Protocol):
     """Solution component protocol"""
 
     _species: ChemicalSpecies
@@ -64,11 +64,37 @@ class SolutionComponentProtocol(Protocol):
 
 
 class CollectionProtocol(Protocol):
+    """Solution collection protocol
+
+    This is used for the values in :class:`Solution`.
+    """
 
     NUMBER: int
+    # Only for GasCollection
+    gas_abundance: GasNumberDensity
+    dissolved_abundance: DissolvedInteriorNumberDensity
+    trapped_abundance: TrappedInteriorNumberDensity
+    # Only for CondensedCollection
+    condensed_abundance: CondensedNumberDensity
+    activity: CondensedSolutionComponent
+    stability: CondensedSolutionComponent
+
+    @property
+    def species(self) -> ChemicalSpecies: ...
+
+    @property
+    def value(self) -> float: ...
+
+    def number_density(self, *, element: str | None = None) -> float: ...
+
+    def mass(self, *, element: str | None = None) -> float: ...
+
+    def molecules(self, *, element: str | None = None) -> float: ...
+
+    def moles(self, *, element: str | None = None) -> float: ...
 
 
-class NumberDensityMixin(SolutionComponentProtocol):
+class NumberDensityMixin(ComponentProtocol):
     """Number density mixin"""
 
     def number_density(self, *, element: str | None = None) -> float:
@@ -157,7 +183,7 @@ class ValueSetterMixin:
         self._value = value
 
 
-class NumberDensitySolution(NumberDensityMixin, Generic[T_co]):
+class NumberDensity(NumberDensityMixin, Generic[T_co]):
     """A number density solution component
 
     Args:
@@ -171,15 +197,15 @@ class NumberDensitySolution(NumberDensityMixin, Generic[T_co]):
         self._solution: Solution = solution
 
 
-class NumberDensitySolutionWithSetter(ValueSetterMixin, NumberDensitySolution[T_co]):
+class NumberDensityWithSetter(ValueSetterMixin, NumberDensity[T_co]):
     """A number density solution component with a setter"""
 
 
-class CondensedNumberDensity(NumberDensitySolutionWithSetter[CondensedSpecies]):
+class CondensedNumberDensity(NumberDensityWithSetter[CondensedSpecies]):
     """A number density solution component with a setter for a condensed species"""
 
 
-class GasNumberDensity(NumberDensitySolutionWithSetter[GasSpecies]):
+class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
     """A number density solution for a gas species"""
 
     def pressure(self) -> float:
@@ -213,7 +239,7 @@ class GasNumberDensity(NumberDensitySolutionWithSetter[GasSpecies]):
         return 10 ** self.log10_fugacity()
 
 
-class InteriorNumberDensity(ABC, NumberDensitySolutionWithSetter[GasSpecies]):
+class InteriorNumberDensity(ABC, NumberDensityWithSetter[GasSpecies]):
     """A number density of a species in an interior reservoir
 
     Args:
@@ -271,7 +297,20 @@ class TrappedInteriorNumberDensity(InteriorNumberDensity):
         return self._solution.planet.mantle_solid_mass
 
 
-class GasCollection(NumberDensitySolution[GasSpecies]):
+class CondensedSolutionComponent(ValueSetterMixin):
+    """A condensed solution component
+
+    Args:
+        species: A condensed species
+        solution: The solution
+    """
+
+    def __init__(self, species: CondensedSpecies, solution: Solution):
+        self._species: CondensedSpecies = species
+        self._solution: Solution = solution
+
+
+class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
     """Gas collection
 
     Args:
@@ -324,21 +363,22 @@ class GasCollection(NumberDensitySolution[GasSpecies]):
 
         return repr_str
 
+    @property
+    def condensed_abundance(self) -> None:
+        raise NotImplementedError(
+            f"condensed_abundance not implemented for {self.__class__.__name__}"
+        )
 
-class CondensedSolutionComponent(ValueSetterMixin):
-    """A condensed solution component
+    @property
+    def activity(self) -> Never:
+        raise NotImplementedError(f"activity not implemented for {self.__class__.__name__}")
 
-    Args:
-        species: A condensed species
-        solution: The solution
-    """
-
-    def __init__(self, species: CondensedSpecies, solution: Solution):
-        self._species: CondensedSpecies = species
-        self._solution: Solution = solution
+    @property
+    def stability(self) -> Never:
+        raise NotImplementedError(f"stability not implemented for {self.__class__.__name__}")
 
 
-class CondensedCollection(NumberDensitySolution[CondensedSpecies]):
+class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
     """Condensed collection
 
     Args:
@@ -379,6 +419,22 @@ class CondensedCollection(NumberDensitySolution[CondensedSpecies]):
         repr_str += f"stability={10**self.stability.value}"
 
         return repr_str
+
+    @property
+    def gas_abundance(self) -> Never:
+        raise NotImplementedError(f"gas_abundance not implemented for {self.__class__.__name__}")
+
+    @property
+    def dissolved_abundance(self) -> Never:
+        raise NotImplementedError(
+            f"dissolved_abundance not implemented for {self.__class__.__name__}"
+        )
+
+    @property
+    def trapped_abundance(self) -> Never:
+        raise NotImplementedError(
+            f"trapped_abundance not implemented for {self.__class__.__name__}"
+        )
 
 
 # class SolutionDict(ABC, UserDict[U, V]):
@@ -534,11 +590,19 @@ class CondensedCollection(NumberDensitySolution[CondensedSpecies]):
 V = TypeVar("V", GasCollection, CondensedCollection)
 
 
-class Solution(ABC, UserDict[ChemicalSpecies, Any]):
+class Solution(ABC, UserDict[ChemicalSpecies, CollectionProtocol]):
     """The solution
+
+    It is convenient to have the gas species and condensed species and their respective solutions
+    in the same dictionary, but this requires some finessing with typing, which instead would
+    prefer keys of the same type.
 
     Args:
         init_dict: Initial dictionary
+
+    Attributes:
+        species: Species
+        planet: Planet
     """
 
     def __init__(self, init_dict=None, /, **kwargs):
@@ -566,11 +630,17 @@ class Solution(ABC, UserDict[ChemicalSpecies, Any]):
 
     @property
     def condensed_solution(self) -> dict[CondensedSpecies, CondensedCollection]:
-        return {key: value for key, value in self.items() if isinstance(key, CondensedSpecies)}
+        return cast(
+            dict[CondensedSpecies, CondensedCollection],
+            {key: value for key, value in self.items() if isinstance(key, CondensedSpecies)},
+        )
 
     @property
     def gas_solution(self) -> dict[GasSpecies, GasCollection]:
-        return {key: value for key, value in self.items() if isinstance(key, GasSpecies)}
+        return cast(
+            dict[GasSpecies, GasCollection],
+            {key: value for key, value in self.items() if isinstance(key, GasSpecies)},
+        )
 
     @property
     def number(self) -> int:
@@ -610,7 +680,7 @@ class Solution(ABC, UserDict[ChemicalSpecies, Any]):
         index: int = 0
         for gas_collection in self.gas_solution.values():
             gas_collection.gas_abundance.value = value[index]
-            index += 1  # Increment index after each assignment
+            index += 1
         for condensed_collection in self.condensed_solution.values():
             condensed_collection.activity.value = value[index]
             condensed_collection.condensed_abundance.value = value[index + 1]

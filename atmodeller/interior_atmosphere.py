@@ -156,8 +156,6 @@ class InteriorAtmosphereSystem:
         }
         for element in condensed_element_masses:
             for collection in self.solution.condensed_solution.values():
-                # TODO: Remove when refactoring complete
-                # for solution in self.solution.condensed.values():
                 condensed_element_masses[element] += collection.condensed_abundance.number_density(
                     element=element
                 )
