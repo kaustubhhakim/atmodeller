@@ -70,8 +70,8 @@ class Solubility(ABC):
         """
         raise NotImplementedError
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
+    # def __repr__(self) -> str:
+    #     return f"{self.__class__.__name__}()"
 
 
 class SolubilityPowerLaw(Solubility):
@@ -92,12 +92,12 @@ class SolubilityPowerLaw(Solubility):
 
         return self.constant * fugacity**self.exponent
 
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}("
-            f"constant={self.constant!r}, "
-            f"exponent={self.exponent!r})"
-        )
+    # def __repr__(self) -> str:
+    #     return (
+    #         f"{self.__class__.__name__}("
+    #         f"constant={self.constant!r}, "
+    #         f"exponent={self.exponent!r})"
+    #     )
 
 
 class NoSolubility(Solubility):

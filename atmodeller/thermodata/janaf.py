@@ -113,7 +113,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
                 Phase data if it exists in JANAF or None if not available
             """
             try:
-                logger.info(
+                logger.debug(
                     "Searching for %s (name = %s, phase = %s) in %s",
                     species.hill_formula,
                     name,
@@ -134,7 +134,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
 
         # First, check exclusively for a filename match if a filename has been specified.
         if filename is not None:
-            logger.info(
+            logger.debug(
                 "Searching for %s (filename = %s) in %s",
                 species.hill_formula,
                 filename,

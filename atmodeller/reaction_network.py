@@ -16,7 +16,7 @@
 #
 """Reaction network"""
 
-# Convenient to use chemical formulas so pylint: disable=C0103
+# Convenient to use chemical formulae so pylint: disable=C0103
 
 from __future__ import annotations
 
@@ -31,7 +31,6 @@ import numpy.typing as npt
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
-from atmodeller.solution import Solution
 from atmodeller.utilities import partial_rref
 
 if sys.version_info < (3, 12):
@@ -257,8 +256,7 @@ class ReactionNetwork:
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
             coeff[row_index, species_index] = 1
 
-        logger.debug("species = %s", self._species.names)
-        logger.debug("coefficient matrix = \n%s", coeff)
+        logger.debug("Coefficient matrix = \n%s", coeff)
 
         return coeff
 
@@ -342,7 +340,7 @@ class ReactionNetwork:
         pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray[np.float_],
-        solution: Solution,
+        reaction_array: npt.NDArray[np.float_],
         **kwargs,
     ) -> npt.NDArray[np.float_]:
         """The residual array of the reaction network
@@ -352,7 +350,7 @@ class ReactionNetwork:
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
             coefficient_matrix: Coefficient matrix
-            solution: Solution to compute the residual for
+            reaction_array: Reaction array
             **kwargs: Catches additional keyword arguments used by child classes
 
         Returns:
@@ -367,7 +365,7 @@ class ReactionNetwork:
         )
         residual_reaction: npt.NDArray[np.float_] = (
             coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(solution.reaction_array())
+            + coefficient_matrix.dot(reaction_array)
             - rhs
         )
 
@@ -436,33 +434,21 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         pressure: float,
         constraints: SystemConstraints,
         coefficient_matrix: npt.NDArray[np.float_],
-        solution: Solution,
         activity_modifier: npt.NDArray[np.float_],
         equilibrium_modifier: npt.NDArray[np.float_],
+        reaction_array: npt.NDArray[np.float_],
+        stability_array: npt.NDArray[np.float_],
     ) -> npt.NDArray[np.float_]:
-        # Residual of the reaction network without a stability consideration
+
         residual_reaction: npt.NDArray[np.float_] = super().get_residual(
             temperature=temperature,
             pressure=pressure,
             constraints=constraints,
             coefficient_matrix=coefficient_matrix,
-            solution=solution,
+            reaction_array=reaction_array,
         )
 
-        residual_reaction += activity_modifier.dot(10 ** solution.stability_array())
-        residual_reaction -= equilibrium_modifier.dot(10 ** solution.stability_array())
+        residual_reaction += activity_modifier.dot(10**stability_array)
+        residual_reaction -= equilibrium_modifier.dot(10**stability_array)
 
-        residual_stability: list[float] = []
-        for collection in solution.condensed_solution.values():
-            residual_stability.append(
-                collection.stability.value
-                - collection.tauc.value
-                + collection.condensed_abundance.value
-            )
-
-        # Presumably a bug in pylint/numpy? pylint: disable=unexpected-keyword-arg
-        residual: npt.NDArray[np.float_] = np.concatenate(
-            (residual_reaction, residual_stability), dtype=np.float_
-        )
-
-        return residual
+        return residual_reaction

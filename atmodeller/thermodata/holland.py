@@ -103,7 +103,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
         search_name: str = name if name is not None else species.hill_formula
 
         try:
-            logger.info(
+            logger.debug(
                 "Searching for %s (name = %s) in %s",
                 species.hill_formula,
                 search_name,

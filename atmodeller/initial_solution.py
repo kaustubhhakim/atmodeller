@@ -19,8 +19,6 @@
 from __future__ import annotations
 
 import logging
-
-# import random
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -38,7 +36,13 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.interfaces import ChemicalSpecies
 from atmodeller.output import Output
-from atmodeller.solution import ACTIVITY_PREFIX, LOG10_TAU, STABILITY_PREFIX, Solution
+from atmodeller.solution import (
+    ACTIVITY_PREFIX,
+    LOG10_TAU,
+    STABILITY_PREFIX,
+    ComponentWithSetterProtocol,
+    Solution,
+)
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -67,7 +71,7 @@ class InitialSolutionProtocol(Protocol):
         *,
         temperature: float,
         pressure: float,
-        perturb_gas_log10: float = 0,
+        perturb_log10_number_density: float = 0,
         attempt: int = 0,
     ) -> npt.NDArray[np.float_]: ...
 
@@ -103,10 +107,10 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26,
-        fill_log10_activity: float = -LOG10_TAU,
+        fill_log10_activity: float = LOG10_TAU,
         fill_log10_stability: float = -10,
     ):
-        logger.info("Creating %s", self.__class__.__name__)
+        logger.debug("Creating %s", self.__class__.__name__)
         self.value: T = value
         self._species: Species = species
         self._planet: Planet = planet
@@ -122,31 +126,41 @@ class InitialSolution(ABC, Generic[T]):
         """Species"""
         return self._species
 
-    # def clip(self, minimum_value: float | None = None, maximum_value: float | None = None) -> None:
-    #     """clips the value.
+    def clip(
+        self,
+        component: ComponentWithSetterProtocol,
+        minimum_value: float | None = None,
+        maximum_value: float | None = None,
+    ) -> None:
+        """clips the value.
 
-    #     Args:
-    #         minimum_value: Minimum value. Defaults to None, meaning do not clip.
-    #         maximum_value: Maximum value. Defaults to None, meaning do not clip.
-    #     """
-    #     self.value = np.clip(self.value, minimum_value, maximum_value)
+        Args:
+            component: Solution component
+            minimum_value: Minimum value. Defaults to None, meaning do not clip.
+            maximum_value: Maximum value. Defaults to None, meaning do not clip.
+        """
+        component.value = np.clip(component.value, minimum_value, maximum_value)
 
-    # def fill(self, fill_value: float) -> None:
-    #     """Fills value if it is missing.
+    def fill(self, component: ComponentWithSetterProtocol, fill_value: float) -> None:
+        """Fills value if it is missing.
 
-    #     Args:
-    #         fill_value: The fill value
-    #     """
-    #     if not hasattr(self, "_value"):
-    #         self.value = fill_value
+        Args:
+            component: Solution component
+            fill_value: The fill value
+        """
+        # Force float to prevent integer overflow when later performing exponentiation, which can
+        # occur with the np.int64 data type
+        if not hasattr(component, "_value"):
+            component.value = float(fill_value)
 
-    # def perturb(self, perturb: float = 0) -> None:
-    #     """Perturbs the value.
+    def perturb(self, component: ComponentWithSetterProtocol, perturb: float = 0) -> None:
+        """Perturbs value.
 
-    #     Args:
-    #         perturb: Maximum log10 value to perturb the values. Defaults to 0.
-    #     """
-    #     self.value += perturb * (2 * np.random.rand() - 1)
+        Args:
+            component: Solution component
+            perturb: Maximum log10 value to perturb the value. Defaults to 0.
+        """
+        component.value += perturb * (2 * np.random.rand() - 1)
 
     @abstractmethod
     def set_data(
@@ -154,7 +168,7 @@ class InitialSolution(ABC, Generic[T]):
     ) -> None:
         """Sets the raw data for the initial solution.
 
-        This sets the raw data without additional processing such as clipping or perturbing.
+        This sets the raw data without additional processing such as filling and clipping.
 
         Args:
             constraints: Constraints
@@ -168,7 +182,7 @@ class InitialSolution(ABC, Generic[T]):
         *,
         temperature: float,
         pressure: float,
-        perturb_gas_log10: float = 0,
+        perturb_log10_number_density: float = 0,
     ) -> None:
         """Processes the initial solution data.
 
@@ -176,60 +190,51 @@ class InitialSolution(ABC, Generic[T]):
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb_gas_log10: Maximum log10 value to perturb the gas number densities. Defaults to
-                0.
+            perturb_log10_number_density: Maximum log10 value to randomly perturb the number
+                density. Defaults to 0.
         """
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
         for collection in self.solution.gas_solution.values():
-            if not hasattr(collection.gas_abundance, "_value"):
-                collection.gas_abundance.value = self._fill_log10_number_density
+            self.fill(collection.gas_abundance, self._fill_log10_number_density)
+            if perturb_log10_number_density:
+                self.perturb(collection.gas_abundance, perturb_log10_number_density)
+            self.clip(
+                collection.gas_abundance,
+                self._min_log10_number_density,
+                self._max_log10_number_density,
+            )
 
-        # if perturb_gas_log10:
-        #    solution.gas.perturb(perturb_gas_log10)
-        # solution.gas.clip(self._min_log10_number_density, self._max_log10_number_density)
-
+        # Gas constraints
         for constraint in constraints.gas_constraints:
             self.solution[constraint.species].gas_abundance.value = constraint.get_log10_value(
                 temperature=temperature, pressure=pressure
             )
 
         for collection in self.solution.condensed_solution.values():
-            if not hasattr(collection.activity, "_value"):
-                collection.activity.value = self._fill_log10_activity
-            if not hasattr(collection.condensed_abundance, "_value"):
-                collection.condensed_abundance.value = self._fill_log10_number_density
-            if not hasattr(collection.stability, "_value"):
-                collection.stability.value = self._fill_log10_stability
-
-        # if perturb_gas_log10:
-        #    solution.number_density.perturb(perturb_gas_log10)
-        # solution.stability.perturb(perturb_gas_log10)
-
-        # TODO: This imposes the activity value if stable, but might be in conflict with
-        # stability criteria for unstable condensates?
-        # solution.activity.clip(maximum_value=0)
-
-        # Satisfy auxilliary equation by construction
-        # solution.stability.value = log10_TAU - solution.mass.value
-
-        for constraint in constraints.activity_constraints:
-            self.solution[constraint.species].activity.value = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
+            self.fill(collection.activity, self._fill_log10_activity)
+            self.clip(collection.activity, 0)
+            self.fill(collection.condensed_abundance, self._fill_log10_number_density)
+            if perturb_log10_number_density:
+                self.perturb(collection.condensed_abundance, perturb_log10_number_density)
+            self.clip(
+                collection.condensed_abundance,
+                self._min_log10_number_density,
+                self._max_log10_number_density,
             )
+            self.fill(collection.stability, self._fill_log10_stability)
 
-        # TODO: Testing. If the solver fails it could be because one or several of the condensed
-        # species are unstable. Just randomly guess here.
-        # if perturb_gas_log10:
-        # for species in self.solution.activity.data:
-        #     stability: str = random.choice(["stable", "unstable"])
-        #     if stability == "stable":
-        #         self.solution.activity.data[species] = 0
-        #         self.solution.mass.data[species] = 19
-        #     else:
-        #         self.solution.activity.data[species] = -24
-        #         self.solution.mass.data[species] = -16
-        # self.solution.condensed.perturb_values(10)
+        # Testing satisfying the condensate stability criteria by construction did not appear to
+        # yield improved performance of the solver.
+        # for collection in self.solution.condensed_solution.values():
+        #     collection.stability.value = (
+        #         collection.tauc.value - collection.condensed_abundance.value
+        #     )
+
+        # We do not apply activity constraints because they only define the activity of a stable
+        # condensate (i.e. unity for a pure component), but whether or not the condensate is
+        # stable must be simultaneously solved for, giving rise to activity less than the stable
+        # value for unstable condensates.
 
     def get_log10_value(
         self,
@@ -237,7 +242,7 @@ class InitialSolution(ABC, Generic[T]):
         *,
         temperature: float,
         pressure: float,
-        perturb_gas_log10: float = 0,
+        perturb_log10_number_density: float = 0,
         attempt: int = 0,
     ) -> npt.NDArray[np.float_]:
         """Gets the log10 value of the initial solution.
@@ -246,8 +251,8 @@ class InitialSolution(ABC, Generic[T]):
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb_gas_log10: Maximum log10 value to perturb the gas number densities. Defaults to
-                0.
+            perturb_log10_number_density: Maximum log10 value to perturb the gas number densities.
+                Defaults to 0.
             attempt: Solution attempt number
 
         Returns:
@@ -257,13 +262,13 @@ class InitialSolution(ABC, Generic[T]):
         if attempt == 0:
             perturb_value = 0
         else:
-            perturb_value = perturb_gas_log10
+            perturb_value = perturb_log10_number_density
 
         self.process_data(
             constraints,
             temperature=temperature,
             pressure=pressure,
-            perturb_gas_log10=perturb_value,
+            perturb_log10_number_density=perturb_value,
         )
 
         logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
@@ -321,7 +326,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         key: ChemicalSpecies | str = f"{prefix}{species.name}" if prefix else species
 
         try:
-            output: float | None = np.log10(self.value[key])
+            output: float | None = np.log10(self.value[key], dtype=np.float_)
         except KeyError:
             # Ignore missing keys. These are later filled with fill values.
             output = None
@@ -339,13 +344,13 @@ class InitialSolutionDict(InitialSolution[dict]):
                 collection.gas_abundance.value = value
 
         for condensed_species, collection in self.solution.condensed_solution.items():
-            value: float | None = self._get_log10_values(condensed_species, ACTIVITY_PREFIX)
+            value = self._get_log10_values(condensed_species, ACTIVITY_PREFIX)
             if value is not None:
                 collection.activity.value = value
-            value: float | None = self._get_log10_values(condensed_species, "")
+            value = self._get_log10_values(condensed_species, "")
             if value is not None:
                 collection.condensed_abundance.value = value
-            value: float | None = self._get_log10_values(condensed_species, STABILITY_PREFIX)
+            value = self._get_log10_values(condensed_species, STABILITY_PREFIX)
             if value is not None:
                 collection.stability.value = value
 

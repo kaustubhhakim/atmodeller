@@ -198,8 +198,8 @@ class RealGas(ABC):
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}"
+    # def __repr__(self) -> str:
+    #     return f"{self.__class__.__name__}"
 
 
 @dataclass(kw_only=True)

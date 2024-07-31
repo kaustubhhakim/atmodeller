@@ -145,7 +145,7 @@ class InteriorAtmosphereSystem:
         initial_solution: InitialSolutionProtocol | None = None,
         extra_output: dict[str, float] | None = None,
         max_attempts: int = 20,
-        perturb_gas_log10: float = 2.0,
+        perturb_log10_number_density: float = 2.0,
         errors: str = "ignore",
         method: str = "hybr",
         tol: float | None = None,
@@ -160,7 +160,7 @@ class InteriorAtmosphereSystem:
             extra_output: Extra data to write to the output
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails. Defaults to 10.
-            perturb_gas_log10: Maximum log10 perturbation to apply to the pressures on failure.
+            perturb_log10_number_density: Maximum log10 perturbation to apply to the pressures on failure.
                 Defaults to 2.0.
             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
             method: Type of solver. Defaults to 'hybr'.
@@ -177,14 +177,16 @@ class InteriorAtmosphereSystem:
             initial_solution = self.initial_solution
         assert initial_solution is not None
 
-        coefficient_matrix: npt.NDArray = self._reaction_network.get_coefficient_matrix(
+        # These can be determined once per solve because they depend on reaction stoichiometry and
+        # constraints, both of which are known and both of which are independent of the solution.
+        coefficient_matrix: npt.NDArray[np.float_] = self._reaction_network.get_coefficient_matrix(
             self.constraints
         )
-        activity_modifier: npt.NDArray = self._reaction_network.get_activity_modifier(
+        activity_modifier: npt.NDArray[np.float_] = self._reaction_network.get_activity_modifier(
             self.constraints
         )
-        equilibrium_modifier: npt.NDArray = self._reaction_network.get_equilibrium_modifier(
-            self.constraints
+        equilibrium_modifier: npt.NDArray[np.float_] = (
+            self._reaction_network.get_equilibrium_modifier(self.constraints)
         )
 
         for attempt in range(max_attempts):
@@ -197,7 +199,7 @@ class InteriorAtmosphereSystem:
                 self.constraints,
                 temperature=self.solution.gas_temperature(),
                 pressure=1,
-                perturb_gas_log10=perturb_gas_log10,
+                perturb_log10_number_density=perturb_log10_number_density,
                 attempt=attempt,
             )
             logger.info("Initial solution = %s", log_solution)
@@ -287,39 +289,49 @@ class InteriorAtmosphereSystem:
         temperature: float = self.solution.gas_temperature()
         pressure: float = self.solution.gas_pressure()
 
-        residual_reaction: npt.NDArray = self._reaction_network.get_residual(
+        reaction_array: npt.NDArray[np.float_] = self.solution.get_reaction_array()
+        stability_array: npt.NDArray[np.float_] = self.solution.get_stability_array()
+
+        residual_reaction: npt.NDArray[np.float_] = self._reaction_network.get_residual(
             temperature=temperature,
             pressure=pressure,
             constraints=self.constraints,
             coefficient_matrix=coefficient_matrix,
             activity_modifier=activity_modifier,
             equilibrium_modifier=equilibrium_modifier,
-            solution=self.solution,
+            reaction_array=reaction_array,
+            stability_array=stability_array,
         )
 
-        residual_number_density: npt.NDArray[np.float_] = np.zeros(
-            len(self.constraints.mass_constraints), dtype=np.float_
-        )
-        for index, constraint in enumerate(self.constraints.mass_constraints):
-            residual_number_density[index] = np.log10(
-                self.solution.number_density(element=constraint.element)
-            )
-            residual_number_density[index] -= constraint.log10_number_of_molecules - np.log10(
-                self.solution.gas_volume()
+        residual_stability: list[float] = []
+        for collection in self.solution.condensed_solution.values():
+            residual_stability.append(
+                collection.stability.value
+                - collection.tauc.value
+                + collection.condensed_abundance.value
             )
 
-        residual_total_pressure: npt.NDArray = np.zeros(
-            len(self.constraints.total_pressure_constraint), dtype=np.float_
-        )
+        residual_number_density: list[float] = []
+        for constraint in self.constraints.mass_constraints:
+            res: float = np.log10(self.solution.number_density(element=constraint.element))
+            res -= constraint.log10_number_of_molecules - np.log10(self.solution.gas_volume())
+            residual_number_density.append(res)
+
+        residual_total_pressure: list[float] = []
         if len(self.constraints.total_pressure_constraint) == 1:
             constraint = self.constraints.total_pressure_constraint[0]
-            residual_total_pressure[0] += np.log10(
-                self.solution.gas_number_density()
-            ) - constraint.get_log10_value(temperature=temperature, pressure=pressure)
+            residual_total_pressure.append(
+                np.log10(self.solution.gas_number_density())
+                - constraint.get_log10_value(temperature=temperature, pressure=pressure)
+            )
 
-        # Combine residual.
         residual: npt.NDArray = np.concatenate(
-            (residual_reaction, residual_number_density, residual_total_pressure)
+            (
+                residual_reaction,
+                residual_stability,
+                residual_number_density,
+                residual_total_pressure,
+            )
         )
         logger.debug("residual = %s", residual)
 

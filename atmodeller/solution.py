@@ -56,14 +56,24 @@ LOG10_TAU: float = np.log10(TAU)
 """Log10 of the tau factor"""
 
 
-class ComponentProtocol(Protocol):
+class ComponentProtocol(Protocol[T_co]):
     """Solution component protocol"""
 
-    _species: ChemicalSpecies
+    _species: T_co
     _solution: Solution
 
     @property
     def value(self) -> float: ...
+
+
+class ComponentWithSetterProtocol(ComponentProtocol[T_co], Protocol):
+    """Solution component with setter protocol"""
+
+    @property
+    def value(self) -> float: ...
+
+    @value.setter
+    def value(self, value: float) -> None: ...
 
 
 class CollectionProtocol(Protocol):
@@ -98,7 +108,7 @@ class CollectionProtocol(Protocol):
     def moles(self, *, element: str | None = None) -> float: ...
 
 
-class NumberDensityMixin(ComponentProtocol):
+class NumberDensityMixin(ComponentProtocol[ChemicalSpecies]):
     """Number density mixin"""
 
     def number_density(self, *, element: str | None = None) -> float:
@@ -119,6 +129,10 @@ class NumberDensityMixin(ComponentProtocol):
                 count = 0
         else:
             count = 1
+
+        # print("count = %s", type(count))
+        # print("self.value = %s", type(self.value))
+        # print("return = %s", type(count * 10**self.value))
 
         return count * 10**self.value
 
@@ -163,8 +177,8 @@ class NumberDensityMixin(ComponentProtocol):
         """
         return self.molecules(element=element) / AVOGADRO
 
-    def __repr__(self) -> str:
-        return f"number_density={self.number_density()}"
+    # def __repr__(self) -> str:
+    #     return f"number_density={self.number_density():.2e}"
 
 
 class ValueSetterMixin:
@@ -385,11 +399,11 @@ class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
             + 10**self.trapped_abundance.value
         )
 
-    def __repr__(self) -> str:
-        repr_str: str = f"gas_{self.gas_abundance.__repr__()}, "
-        repr_str += f"dissolved_{self.dissolved_abundance.__repr__()}"
+    # def __repr__(self) -> str:
+    #     repr_str: str = f"gas_{self.gas_abundance.__repr__()}, "
+    #     repr_str += f"dissolved_{self.dissolved_abundance.__repr__()}"
 
-        return repr_str
+    #     return repr_str
 
     @property
     def condensed_abundance(self) -> None:
@@ -447,12 +461,12 @@ class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
     def value(self) -> float:
         return self.condensed_abundance.value
 
-    def __repr__(self) -> str:
-        base_repr: str = super().__repr__().rstrip(")")
-        repr_str: str = f"{base_repr}, activity={10**self.activity.value}, "
-        repr_str += f"stability={10**self.stability.value}"
+    # def __repr__(self) -> str:
+    #     base_repr: str = super().__repr__().rstrip(")")
+    #     repr_str: str = f"{base_repr}, activity={10**self.activity.value}, "
+    #     repr_str += f"stability={10**self.stability.value}"
 
-        return repr_str
+    #     return repr_str
 
     @property
     def gas_abundance(self) -> Never:
@@ -673,8 +687,8 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
 
         return volume
 
-    def reaction_array(self) -> npt.NDArray[np.float_]:
-        """The reaction array
+    def get_reaction_array(self) -> npt.NDArray[np.float_]:
+        """Gets the reaction array
 
         Returns:
             The reaction array
@@ -687,8 +701,8 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
 
         return np.array(reaction_list, dtype=np.float_)
 
-    def stability_array(self) -> npt.NDArray[np.float_]:
-        """The condensate stability array
+    def get_stability_array(self) -> npt.NDArray[np.float_]:
+        """Gets the condensate stability array
 
         Returns:
             The condensate stability array

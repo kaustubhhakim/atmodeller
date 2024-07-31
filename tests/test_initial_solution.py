@@ -145,7 +145,7 @@ def test_with_args_cond_dict():
     constraints = SystemConstraints([])
 
     initial_solution = InitialSolutionDict(
-        {CO_g: 1e24, H2_g: 1e25, C_cr: 0.9},
+        {CO_g: 1e24, H2_g: 1e25, "activity_C_cr": 0.9},
         species=species,
         planet=planet,
         fill_log10_activity=np.log10(0.8),
@@ -154,7 +154,7 @@ def test_with_args_cond_dict():
     result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target = np.array([26, 25, 26, 24, 26, 26, -0.09691001, 26, -10, -0.04575749, 22, -37])
+    target = np.array([26, 25, 26, 24, 26, 26, -0.09691001, 26, -10, -0.04575749, 26, -10])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -187,7 +187,7 @@ def test_with_args_constraints_cond_dict():
     result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target = np.array([22, 25, 22, 24, 22, 22, -0.09691001, 22, -37, -0.15490196, 22, -37])
+    target = np.array([26, 25, 26, 24, 26, 26, -0.09691001, 26, -10, -0.15490196, 26, -10])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -214,7 +214,7 @@ def test_with_stability_constraints_cond_dict():
     constraints = SystemConstraints([ActivityConstraint(C_cr, 0.7)])
 
     initial_solution = InitialSolutionDict(
-        {CO_g: 1e24, H2_g: 1e25, "stability_C_cr": 2, "mass_H2O_l": 1e22},
+        {CO_g: 1e24, H2_g: 1e25, "stability_C_cr": 2, H2O_l: 1e22},
         species=species,
         planet=planet,
         fill_log10_activity=np.log10(0.8),
@@ -223,7 +223,7 @@ def test_with_stability_constraints_cond_dict():
     result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target = np.array([22, 25, 22, 24, 22, 22, -0.09691001, 22, -37, -0.15490196, 22, 0.30103])
+    target = np.array([26, 25, 26, 24, 26, 26, -0.09691001, 22, -10, -0.15490196, 26, 0.30103])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -247,7 +247,7 @@ def test_last_solution():
     result = initial_solution.get_log10_value(
         constraints, temperature=dummy_variable, pressure=dummy_variable
     )
-    target = np.array([22, 22, 22])
+    target = np.array([26, 26, 26])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
