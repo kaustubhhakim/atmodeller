@@ -50,7 +50,7 @@ ACTIVITY_PREFIX: str = "activity_"
 """Name prefix for the activity of condensed species"""
 STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
-TAU: float = 1e-11
+TAU: float = 1e-15
 """Tau factor for the stability of condensed species"""
 LOG10_TAU: float = np.log10(TAU)
 """Log10 of the tau factor"""
@@ -129,10 +129,6 @@ class NumberDensityMixin(ComponentProtocol[ChemicalSpecies]):
                 count = 0
         else:
             count = 1
-
-        # print("count = %s", type(count))
-        # print("self.value = %s", type(self.value))
-        # print("return = %s", type(count * 10**self.value))
 
         return count * 10**self.value
 

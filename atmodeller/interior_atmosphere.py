@@ -217,7 +217,7 @@ class InteriorAtmosphereSystem:
                     options=options,
                 )
                 logger.info(sol["message"])
-                logger.debug("sol = %s", sol)
+                logger.info("sol = %s", sol)
 
             except TypeError as exc:
                 msg: str = (
@@ -325,7 +325,7 @@ class InteriorAtmosphereSystem:
                 - constraint.get_log10_value(temperature=temperature, pressure=pressure)
             )
 
-        residual: npt.NDArray = np.concatenate(
+        residual: npt.NDArray[np.float_] = np.concatenate(
             (
                 residual_reaction,
                 residual_stability,
@@ -335,7 +335,7 @@ class InteriorAtmosphereSystem:
         )
         logger.debug("residual = %s", residual)
 
-        error: npt.NDArray = np.sqrt(np.sum(residual**2))
+        error: npt.NDArray[np.float_] = np.sqrt(np.sum(residual**2))
         logger.info("Residual RMS = %.2e", error)
 
         return residual

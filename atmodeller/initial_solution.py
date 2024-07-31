@@ -90,7 +90,7 @@ class InitialSolution(ABC, Generic[T]):
         max_log10_number_density: Maximum log10 number density. Defaults to
             :data:`MAX_LOG10_NUMBER_DENSITY`.
         fill_log10_number_density: Fill value for number density. Defaults to 26.
-        fill_log10_activity: Fill value for activity. Defaults to -log10_TAU.
+        fill_log10_activity: Fill value for activity. Defaults to -LOG10_TAU.
         fill_log10_stability: Fill value for stability. Defaults to -10.
 
     Attributes:
