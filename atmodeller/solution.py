@@ -44,12 +44,16 @@ else:
 
 T_co = TypeVar("T_co", bound=ChemicalSpecies, covariant=True)
 
+logger: logging.Logger = logging.getLogger(__name__)
+
 ACTIVITY_PREFIX: str = "activity_"
 """Name prefix for the activity of condensed species"""
 STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
-
-logger: logging.Logger = logging.getLogger(__name__)
+TAU: float = 1e-11
+"""Tau factor for the stability of condensed species"""
+LOG10_TAU: float = np.log10(TAU)
+"""Log10 of the tau factor"""
 
 
 class ComponentProtocol(Protocol):
@@ -77,6 +81,7 @@ class CollectionProtocol(Protocol):
     condensed_abundance: CondensedNumberDensity
     activity: CondensedSolutionComponent
     stability: CondensedSolutionComponent
+    tauc: CondensedSolutionComponent
 
     @property
     def species(self) -> ChemicalSpecies: ...
@@ -310,6 +315,31 @@ class CondensedSolutionComponent(ValueSetterMixin):
         self._solution: Solution = solution
 
 
+class TauC:
+    """Tauc factor for the calculation of condensate stability
+
+    :cite:`{See}KSP24{Equation 19}`
+
+    Args:
+        species: A condensed species
+        solution: The solution
+    """
+
+    def __init__(self, species: CondensedSpecies, solution: Solution):
+        self._species: CondensedSpecies = species
+        self._solution: Solution = solution
+
+    @property
+    def value(self) -> float:
+        element_number_densities: list[float] = [
+            self._solution.number_density(element=element) for element in self._species.elements
+        ]
+        log10_tauc: float = LOG10_TAU + np.log10(np.min(element_number_densities))
+        logger.debug("log10_tau (%s) = %f", self._species.name, log10_tauc)
+
+        return log10_tauc
+
+
 class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
     """Gas collection
 
@@ -375,6 +405,10 @@ class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
     def stability(self) -> Never:
         raise NotImplementedError(f"stability not relevant for {self.__class__.__name__}")
 
+    @property
+    def tauc(self) -> Never:
+        raise NotImplementedError(f"tauc not relevant for {self.__class__.__name__}")
+
 
 class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
     """Condensed collection
@@ -387,6 +421,7 @@ class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
         number_density: Solution for the fictitous number density of the condensate
         activity: Solution for the activity of the condensate
         stability: Solution for the stability of the condensate
+        tauc: Tauc for condensate stability
     """
 
     NUMBER: int = 3
@@ -402,6 +437,7 @@ class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
         )
         self.activity: CondensedSolutionComponent = CondensedSolutionComponent(species, solution)
         self.stability: CondensedSolutionComponent = CondensedSolutionComponent(species, solution)
+        self.tauc: TauC = TauC(species, solution)
 
     @property
     def species(self) -> CondensedSpecies:

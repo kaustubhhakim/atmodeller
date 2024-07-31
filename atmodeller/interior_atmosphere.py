@@ -323,6 +323,9 @@ class InteriorAtmosphereSystem:
         )
         logger.debug("residual = %s", residual)
 
+        error: npt.NDArray = np.sqrt(np.sum(residual**2))
+        logger.info("Residual RMS = %.2e", error)
+
         return residual
 
     def solution_dict(self) -> dict[str, float]:

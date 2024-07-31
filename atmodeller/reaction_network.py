@@ -41,11 +41,6 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-TAU: float = 1e-11
-"""Tau factor for the calculation of the auxilliary equations for condensate stability"""
-log10_TAU: float = np.log10(TAU)
-"""Log10 of Tau"""
-
 
 class ReactionNetwork:
     """Determines the reactions to solve a chemical network.
@@ -433,39 +428,6 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
 
         return equilibrium_modifier
 
-    def get_stability_residual(self, solution: Solution) -> npt.NDArray[np.float_]:
-        """Returns the residual vector of condensate stability
-
-        Args:
-            solution: Solution to compute the residual for
-
-        Returns:
-            The residual vector of condensate stability
-        """
-        residual_stability: npt.NDArray[np.float_] = np.zeros(
-            self._species.number_condensed_species, dtype=np.float_
-        )
-        for nn, species in enumerate(self._species.condensed_species):
-            # TODO Below should be log10_TAU_C not log10_TAU
-            # Hack to get a prototype
-            output: list[float] = []
-            for element in species.elements:
-                output.append(solution.number_density(element=element))
-            logger.warning(output)
-            min_value: float = min(output)
-            logger.warning(min_value)
-            log10_min_value: float = np.log10(min_value)
-            logger.warning(log10_min_value)
-            log10_TAUC: float = log10_TAU + log10_min_value
-            logger.warning(log10_TAUC)
-
-            residual_stability[nn] = solution[species].stability.value - log10_TAUC
-            residual_stability[nn] += solution[species].condensed_abundance.value
-
-        logger.debug("residual_stability = %s", residual_stability)
-
-        return residual_stability
-
     @override
     def get_residual(
         self,
@@ -487,16 +449,20 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             solution=solution,
         )
 
-        logger.debug("residual_reaction before correction = %s", residual_reaction)
-        # Reaction network correction factors for condensate stability
         residual_reaction += activity_modifier.dot(10 ** solution.stability_array())
         residual_reaction -= equilibrium_modifier.dot(10 ** solution.stability_array())
-        logger.debug("residual_reaction after correction = %s", residual_reaction)
 
-        # Residual for the auxiliary stability equations
-        residual_stability: npt.NDArray[np.float_] = self.get_stability_residual(solution)
+        residual_stability: list[float] = []
+        for collection in solution.condensed_solution.values():
+            residual_stability.append(
+                collection.stability.value
+                - collection.tauc.value
+                + collection.condensed_abundance.value
+            )
 
-        residual: npt.NDArray[np.float_] = np.concatenate((residual_reaction, residual_stability))
-        logger.debug("residual_reaction including stability = %s", residual)
+        # Presumably a bug in pylint/numpy? pylint: disable=unexpected-keyword-arg
+        residual: npt.NDArray[np.float_] = np.concatenate(
+            (residual_reaction, residual_stability), dtype=np.float_
+        )
 
         return residual

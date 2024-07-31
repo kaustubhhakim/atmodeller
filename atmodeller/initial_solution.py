@@ -38,8 +38,7 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.interfaces import ChemicalSpecies
 from atmodeller.output import Output
-from atmodeller.reaction_network import log10_TAU
-from atmodeller.solution import ACTIVITY_PREFIX, STABILITY_PREFIX, Solution
+from atmodeller.solution import ACTIVITY_PREFIX, LOG10_TAU, STABILITY_PREFIX, Solution
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -86,9 +85,9 @@ class InitialSolution(ABC, Generic[T]):
             :data:`MIN_LOG10_NUMBER_DENSITY`.
         max_log10_number_density: Maximum log10 number density. Defaults to
             :data:`MAX_LOG10_NUMBER_DENSITY`.
-        fill_log10_number_density: Fill value for number density. Defaults to 22.
-        fill_log10_activity: Fill value for activity. Defaults to 0.
-        fill_log10_stability: Fill value for stability. Defaults to -35.
+        fill_log10_number_density: Fill value for number density. Defaults to 26.
+        fill_log10_activity: Fill value for activity. Defaults to -log10_TAU.
+        fill_log10_stability: Fill value for stability. Defaults to -10.
 
     Attributes:
         value: An object used to compute the initial solution
@@ -104,8 +103,8 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26,
-        fill_log10_activity: float = 0,
-        fill_log10_stability: float = -20,
+        fill_log10_activity: float = -LOG10_TAU,
+        fill_log10_stability: float = -10,
     ):
         logger.info("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -186,7 +185,6 @@ class InitialSolution(ABC, Generic[T]):
             if not hasattr(collection.gas_abundance, "_value"):
                 collection.gas_abundance.value = self._fill_log10_number_density
 
-        # solution.gas.fill(self._fill_log10_number_density)
         # if perturb_gas_log10:
         #    solution.gas.perturb(perturb_gas_log10)
         # solution.gas.clip(self._min_log10_number_density, self._max_log10_number_density)
@@ -204,9 +202,6 @@ class InitialSolution(ABC, Generic[T]):
             if not hasattr(collection.stability, "_value"):
                 collection.stability.value = self._fill_log10_stability
 
-        # solution.activity.fill(self._fill_log10_activity)
-        # solution.number_density.fill(self._fill_log10_number_density)
-        # solution.stability.fill(self._fill_log10_stability)
         # if perturb_gas_log10:
         #    solution.number_density.perturb(perturb_gas_log10)
         # solution.stability.perturb(perturb_gas_log10)
@@ -349,22 +344,10 @@ class InitialSolutionDict(InitialSolution[dict]):
                 collection.activity.value = value
             value: float | None = self._get_log10_values(condensed_species, "")
             if value is not None:
-                collection.number_density.value = value
+                collection.condensed_abundance.value = value
             value: float | None = self._get_log10_values(condensed_species, STABILITY_PREFIX)
             if value is not None:
                 collection.stability.value = value
-
-        # self.solution.gas.data = self._get_log10_values(self._species.gas_species, "")
-
-        # self.solution.condensed.activity.data = self._get_log10_values(
-        #     self._species.condensed_species, ""
-        # )
-        # self.solution.condensed.data = self._get_log10_values(
-        #     self._species.condensed_species, MASS_PREFIX
-        # )
-        # self.solution.stability.data = self._get_log10_values(
-        #     self._species.condensed_species, STABILITY_PREFIX
-        # )
 
 
 class InitialSolutionRegressor(InitialSolution[Output]):
