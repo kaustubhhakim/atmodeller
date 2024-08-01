@@ -540,4 +540,6 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
         "mass_H2O_l": 2.74821e21,
     }
 
+    system.output(to_excel=True)
+
     assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)

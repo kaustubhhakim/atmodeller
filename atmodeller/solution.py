@@ -111,6 +111,9 @@ class CollectionProtocol(Protocol):
 class NumberDensityMixin(ComponentProtocol[ChemicalSpecies]):
     """Number density mixin"""
 
+    output_prefix: str = ""
+    """Prefix for the keys in the output dictionary"""
+
     def number_density(self, *, element: str | None = None) -> float:
         """Number density of the species or element
 
@@ -173,6 +176,16 @@ class NumberDensityMixin(ComponentProtocol[ChemicalSpecies]):
         """
         return self.molecules(element=element) / AVOGADRO
 
+    def output_dict(self) -> dict[str, float]:
+        """Output dictionary"""
+        output_dict: dict[str, float] = {}
+        output_dict[f"{self.output_prefix}number_density"] = self.number_density()
+        output_dict[f"{self.output_prefix}mass"] = self.mass()
+        output_dict[f"{self.output_prefix}molecules"] = self.molecules()
+        output_dict[f"{self.output_prefix}moles"] = self.moles()
+
+        return output_dict
+
     # def __repr__(self) -> str:
     #     return f"number_density={self.number_density():.2e}"
 
@@ -222,6 +235,9 @@ class CondensedNumberDensity(NumberDensityWithSetter[CondensedSpecies]):
 class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
     """A number density solution for a gas species"""
 
+    output_prefix: str = "atmosphere_"
+    """Prefix for the keys in the output dictionary"""
+
     def pressure(self) -> float:
         """Pressure in bar"""
         return self.number_density() * BOLTZMANN_CONSTANT_BAR * self._solution.gas_temperature()
@@ -256,6 +272,17 @@ class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
         """Volume mixing ratio"""
         return self.number_density() / self._solution.gas_number_density()
 
+    @override
+    def output_dict(self) -> dict[str, float]:
+        """Output dictionary"""
+        output_dict: dict[str, float] = super().output_dict()
+        output_dict["pressure"] = self.pressure()
+        output_dict["fugacity_coefficient"] = self.fugacity_coefficient()
+        output_dict["fugacity"] = self.fugacity()
+        output_dict["volume_mixing_ratio"] = self.volume_mixing_ratio()
+
+        return output_dict
+
 
 class DissolvedNumberDensity(NumberDensity[GasSpecies]):
     """A number density of a species dissolved in melt
@@ -264,6 +291,9 @@ class DissolvedNumberDensity(NumberDensity[GasSpecies]):
         species: A gas species
         solution: The solution
     """
+
+    output_prefix: str = "dissolved_"
+    """Prefix for the keys in the output dictionary"""
 
     def ppmw(self) -> float:
         """Parts-per-million by weight of the volatile"""
@@ -291,6 +321,14 @@ class DissolvedNumberDensity(NumberDensity[GasSpecies]):
 
         return np.log10(number_density)
 
+    @override
+    def output_dict(self):
+        """Output dictionary"""
+        output_dict: dict[str, float] = super().output_dict()
+        output_dict[f"{self.output_prefix}ppmw"] = self.ppmw()
+
+        return output_dict
+
 
 class TrappedNumberDensity(DissolvedNumberDensity):
     """A number density of a species trapped in solids
@@ -299,6 +337,9 @@ class TrappedNumberDensity(DissolvedNumberDensity):
         species: A gas species
         solution: The solution
     """
+
+    output_prefix: str = "trapped_"
+    """Prefix for the keys in the output dictionary"""
 
     @override
     def ppmw(self) -> float:
@@ -371,6 +412,8 @@ class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
     since the number density in other reservoirs can be determined from the aforementioned
     number density.
     """
+    output_prefix: str = "total_"
+    """Prefix for the keys in the output dictionary"""
 
     @override
     def __init__(self, species: GasSpecies, solution: Solution):
@@ -394,6 +437,19 @@ class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
             + 10**self.dissolved_abundance.value
             + 10**self.trapped_abundance.value
         )
+
+    @override
+    def output_dict(self) -> dict[str, float]:
+        """Output dictionary"""
+        output_dict: dict[str, float] = (
+            self.gas_abundance.output_dict()
+            | self.dissolved_abundance.output_dict()
+            | self.trapped_abundance.output_dict()
+            | self.output_dict()
+        )
+        output_dict["molar_mass"] = self.species.molar_mass
+
+        return output_dict
 
     # def __repr__(self) -> str:
     #     repr_str: str = f"gas_{self.gas_abundance.__repr__()}, "
@@ -463,6 +519,14 @@ class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
     #     repr_str += f"stability={10**self.stability.value}"
 
     #     return repr_str
+
+    def output_dict(self) -> dict[str, float]:
+        """Output dictionary"""
+        output_dict: dict[str, float] = super().output_dict()
+        output_dict["activity"] = 10**self.activity.value
+        output_dict["molar_mass"] = self.species.molar_mass
+
+        return output_dict
 
     @property
     def gas_abundance(self) -> Never:

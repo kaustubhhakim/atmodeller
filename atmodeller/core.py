@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections import UserList
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Mapping, TypeVar
 
 import numpy as np
@@ -91,6 +91,10 @@ class Planet:
         self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
         logger.info("Creating a planet")
         dataclass_to_logger(self, logger)
+
+    def output_dict(self) -> dict:
+        """Output dictionary"""
+        return asdict(self)
 
 
 class GasSpecies(ChemicalSpecies):
