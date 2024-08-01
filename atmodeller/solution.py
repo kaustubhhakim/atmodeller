@@ -445,7 +445,7 @@ class GasCollection(NumberDensity[GasSpecies], CollectionProtocol):
             self.gas_abundance.output_dict()
             | self.dissolved_abundance.output_dict()
             | self.trapped_abundance.output_dict()
-            | self.output_dict()
+            | super().output_dict()
         )
         output_dict["molar_mass"] = self.species.molar_mass
 

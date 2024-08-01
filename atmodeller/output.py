@@ -95,7 +95,7 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
             extra_output: Extra data to write to the output. Defaults to None.
         """
-        # self._add_gas_species(interior_atmosphere)
+        self._add_gas_species(interior_atmosphere)
         self._add_condensed_species(interior_atmosphere)
         # self._add_elements(interior_atmosphere)
         # self._add_atmosphere(interior_atmosphere)
@@ -141,22 +141,8 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        # gas_volume: float = interior_atmosphere.gas_volume
 
         for species, collection in interior_atmosphere.solution.condensed_solution.items():
-            # output: dict[str, float] = {}
-            # output["activity"] = interior_atmosphere.solution.condensed[species].activity.physical
-            # output["number_density"] = interior_atmosphere.solution.condensed[
-            #     species
-            # ].number_density.physical
-            # output["moles"] = interior_atmosphere.solution.condensed[species].number_density.moles(
-            #     gas_volume
-            # )
-            # output["molar_mass"] = species.molar_mass
-            # output["mass"] = interior_atmosphere.solution.condensed[species].number_density.mass(
-            #     gas_volume
-            # )
-
             data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
             data_list.append(collection.output_dict())
 
@@ -307,52 +293,7 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        # gas_volume: float = interior_atmosphere.gas_volume
-
         for gas_species, collection in interior_atmosphere.solution.gas_solution.items():
-            # # Below adds number_density outputs
-            # output: dict[str, float] = interior_atmosphere.gas_species_reservoir_masses(species)
-            # output["molar_mass"] = species.molar_mass
-            # output["fugacity_coefficient"] = (
-            #     interior_atmosphere.solution.gas.fugacity_coefficients(
-            #         interior_atmosphere.planet.surface_temperature
-            #     )[species]
-            # )
-            # output["volume_mixing_ratio"] = interior_atmosphere.solution.gas.volume_mixing_ratios[
-            #     species
-            # ]
-            # # Atmosphere
-            # output["atmosphere_moles"] = interior_atmosphere.solution.gas.moles(gas_volume)[
-            #     species
-            # ]
-            # output["atmosphere_mass"] = interior_atmosphere.solution.gas.masses(gas_volume)[
-            #     species
-            # ]
-            # Melt
-            # FIXME
-            # output["melt_moles"] = interior_atmosphere.number_density_to_moles(
-            #    output["melt_number_density"]
-            # )
-            # output["melt_mass"] = output["melt_moles"] * output["molar_mass"]
-            # Solid
-            # FIXME
-            # output["solid_moles"] = interior_atmosphere.number_density_to_moles(
-            #    output["solid_number_density"]
-            # )
-            # output["solid_mass"] = output["solid_moles"] * output["molar_mass"]
-            # Totals
-            # output["total_number_density"] = (
-            #     output["atmosphere_number_density"]
-            #     + output["melt_number_density"]
-            #     + output["solid_number_density"]
-            # )
-            # output["total_moles"] = (
-            #     output["atmosphere_moles"] + output["melt_moles"] + output["solid_moles"]
-            # )
-            # output["total_mass"] = (
-            #     output["atmosphere_mass"] + output["melt_mass"] + output["solid_mass"]
-            # )
-
             data_list: list[dict[str, float]] = self.data.setdefault(gas_species.name, [])
             data_list.append(collection.output_dict())
 
