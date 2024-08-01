@@ -23,7 +23,7 @@ cmcrameri = "^1.7"
 typing-extensions = "^4.12.2"
 
 [tool.poetry.group.test.dependencies]
-pytest = "^8.2.2"
+pytest = "^8.3.2"
 
 [tool.poetry.group.docs]
 optional = true
