@@ -139,6 +139,18 @@ class NumberDensity(ABC, Generic[T_co]):
     @abstractmethod
     def value(self) -> float: ...
 
+    def elements(self) -> float:
+        """Total number of elements"""
+        return self._species.atoms * self.molecules()
+
+    def element_moles(self) -> float:
+        """Total number of moles of elements"""
+        return self._species.atoms * self.moles()
+
+    def element_number_density(self) -> float:
+        """Number density of all elements"""
+        return self._species.atoms * self.number_density()
+
     def number_density(self, *, element: str | None = None) -> float:
         """Number density of the species or an individual element
 
@@ -159,10 +171,6 @@ class NumberDensity(ABC, Generic[T_co]):
             count = 1
 
         return count * 10**self.value
-
-    def element_number_density(self) -> float:
-        """Number density of all elements"""
-        return self._species.atoms * self.number_density()
 
     def mass(self, *, element: str | None = None) -> float:
         """Mass of the species or an individual element
@@ -193,10 +201,6 @@ class NumberDensity(ABC, Generic[T_co]):
         """
         return self.number_density(element=element) * self._solution.atmosphere.volume()
 
-    def elements(self) -> float:
-        """Total number of elements"""
-        return self._species.atoms * self.molecules()
-
     def moles(self, *, element: str | None = None) -> float:
         """Number of moles of the species or element
 
@@ -208,10 +212,6 @@ class NumberDensity(ABC, Generic[T_co]):
             Number of moles for the species or `element` if not None.
         """
         return self.molecules(element=element) / AVOGADRO
-
-    def element_moles(self) -> float:
-        """Total number of moles of elements"""
-        return self._species.atoms * self.moles()
 
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:
         """Output dictionary
