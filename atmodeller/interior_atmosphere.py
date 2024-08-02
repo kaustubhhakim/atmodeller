@@ -83,7 +83,7 @@ class InteriorAtmosphereSystem:
         if self.initial_solution is None:
             self.initial_solution = InitialSolutionDict(species=self.species, planet=self.planet)
         self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
-        self.solution = Solution.from_species(self.species, self.planet)
+        self.solution = Solution.create_from_species(self.planet, self.species)
 
     @property
     def constraints(self) -> SystemConstraints:

@@ -114,7 +114,7 @@ class InitialSolution(ABC, Generic[T]):
         self.value: T = value
         self._species: Species = species
         self._planet: Planet = planet
-        self.solution: Solution = Solution.from_species(species, planet)
+        self.solution: Solution = Solution.create_from_species(planet, species)
         self._min_log10_number_density: float = min_log10_number_density
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
