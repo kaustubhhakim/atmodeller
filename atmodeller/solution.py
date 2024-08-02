@@ -162,7 +162,7 @@ class NumberDensityMixin(ComponentProtocol[ChemicalSpecies]):
         Returns:
             Number of molecules for the species or `element` if not None.
         """
-        return self.number_density(element=element) * self._solution.gas_volume()
+        return self.number_density(element=element) * self._solution.atmosphere.volume()
 
     def moles(self, *, element: str | None = None) -> float:
         """Number of moles of the species or element
@@ -240,7 +240,11 @@ class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
 
     def pressure(self) -> float:
         """Pressure in bar"""
-        return self.number_density() * BOLTZMANN_CONSTANT_BAR * self._solution.gas_temperature()
+        return (
+            self.number_density()
+            * BOLTZMANN_CONSTANT_BAR
+            * self._solution.atmosphere.temperature()
+        )
 
     def log10_pressure(self) -> float:
         """Log10 pressure"""
@@ -248,7 +252,7 @@ class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
 
     def density(self) -> float:
         """Density"""
-        return self.mass() / self._solution.gas_volume()
+        return self.mass() / self._solution.atmosphere.volume()
 
     def log10_fugacity_coefficient(self) -> float:
         """Log10 fugacity coefficient"""
@@ -257,7 +261,7 @@ class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
     def fugacity_coefficient(self) -> float:
         """Fugacity coefficient"""
         return self._species.eos.fugacity_coefficient(
-            self._solution.gas_temperature(), self._solution.gas_pressure()
+            self._solution.atmosphere.temperature(), self._solution.atmosphere.pressure()
         )
 
     def log10_fugacity(self) -> float:
@@ -270,7 +274,7 @@ class GasNumberDensity(NumberDensityWithSetter[GasSpecies]):
 
     def volume_mixing_ratio(self) -> float:
         """Volume mixing ratio"""
-        return self.number_density() / self._solution.gas_number_density()
+        return self.number_density() / self._solution.atmosphere.number_density()
 
     @override
     def output_dict(self) -> dict[str, float]:
@@ -299,8 +303,8 @@ class DissolvedNumberDensity(NumberDensity[GasSpecies]):
         """Parts-per-million by weight of the volatile"""
         return self._species.solubility.concentration(
             fugacity=self._solution[self._species].gas_abundance.fugacity(),
-            temperature=self._solution.gas_temperature(),
-            pressure=self._solution.gas_pressure(),
+            temperature=self._solution.atmosphere.temperature(),
+            pressure=self._solution.atmosphere.pressure(),
             **self._solution.fugacities_by_hill_formula(),
         )
 
@@ -316,7 +320,7 @@ class DissolvedNumberDensity(NumberDensity[GasSpecies]):
             * AVOGADRO
             / self._species.molar_mass
             * self.reservoir_mass
-            / self._solution.gas_volume()
+            / self._solution.atmosphere.volume()
         )
 
         return np.log10(number_density)
@@ -543,6 +547,78 @@ class CondensedCollection(NumberDensity[CondensedSpecies], CollectionProtocol):
         raise NotImplementedError(f"trapped_abundance not relevant for {self.__class__.__name__}")
 
 
+class Atmosphere:
+    """Bulk atmospheric properties
+
+    Args:
+        solution: Solution
+    """
+
+    def __init__(self, solution: Solution):
+        self._gas_solution: dict[GasSpecies, GasCollection] = solution.gas_solution
+        self._planet: Planet = solution.planet
+
+    def mass(self) -> float:
+        """Mass"""
+        return sum(collection.gas_abundance.mass() for collection in self._gas_solution.values())
+
+    def molar_mass(self) -> float:
+        """Molar mass"""
+        return sum(
+            [
+                gas_species.molar_mass
+                * collection.gas_abundance.number_density()
+                / self.number_density()
+                for gas_species, collection in self._gas_solution.items()
+            ]
+        )
+
+    def moles(self) -> float:
+        """Moles"""
+        return sum(collection.gas_abundance.moles() for collection in self._gas_solution.values())
+
+    def number_density(self) -> float:
+        """Number density"""
+        return sum(
+            collection.gas_abundance.number_density() for collection in self._gas_solution.values()
+        )
+
+    def pressure(self) -> float:
+        """Pressure"""
+        return sum(
+            collection.gas_abundance.pressure() for collection in self._gas_solution.values()
+        )
+
+    def temperature(self) -> float:
+        """Temperature"""
+        return self._planet.surface_temperature
+
+    def volume(self) -> float:
+        """Volume
+
+        Derived using the mechanical pressure balance due to the weight of the atmosphere and the
+        ideal gas equation of state.
+        """
+        volume: float = self._planet.surface_area / self._planet.surface_gravity
+        volume *= GAS_CONSTANT * self.temperature() / self.molar_mass()
+
+        return volume
+
+    def output_dict(self) -> dict[str, float]:
+        """Output dictionary"""
+        output_dict: dict[str, float] = {}
+        output_dict["mass"] = self.mass()
+        output_dict["molar_mass"] = self.molar_mass()
+        output_dict["moles"] = self.moles()
+        # FIXME: Add element_moles?
+        output_dict["number_density"] = self.number_density()
+        output_dict["pressure"] = self.pressure()
+        output_dict["temperature"] = self.temperature()
+        output_dict["volume"] = self.volume()
+
+        return output_dict
+
+
 class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
     """The solution
 
@@ -558,6 +634,7 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
         super().__init__(init_dict, **kwargs)
         self._species: Species
         self._planet: Planet
+        self._atmosphere: Atmosphere
 
     @classmethod
     def from_species(cls, species: Species, planet: Planet) -> Self:
@@ -574,8 +651,13 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
             instance[condensed_species] = CondensedCollection(condensed_species, instance)
         instance._species = species
         instance._planet = planet
+        instance._atmosphere = Atmosphere(instance)
 
         return instance
+
+    @property
+    def atmosphere(self) -> Atmosphere:
+        return self._atmosphere
 
     @property
     def condensed_solution(self) -> dict[CondensedSpecies, CondensedCollection]:
@@ -708,44 +790,6 @@ class Solution(UserDict[ChemicalSpecies, CollectionProtocol]):
             fugacities[gas_species.hill_formula] = collection.gas_abundance.fugacity()
 
         return fugacities
-
-    def gas_mean_molar_mass(self) -> float:
-        """Mean molar mass"""
-        return sum(
-            [
-                gas_species.molar_mass
-                * collection.gas_abundance.number_density()
-                / self.gas_number_density()
-                for gas_species, collection in self.gas_solution.items()
-            ]
-        )
-
-    def gas_number_density(self) -> float:
-        """Gas number density"""
-        return sum(
-            collection.gas_abundance.number_density() for collection in self.gas_solution.values()
-        )
-
-    def gas_pressure(self) -> float:
-        """Gas pressure"""
-        return sum(
-            collection.gas_abundance.pressure() for collection in self.gas_solution.values()
-        )
-
-    def gas_temperature(self) -> float:
-        """Gas temperature"""
-        return self.planet.surface_temperature
-
-    def gas_volume(self) -> float:
-        """Total volume of the atmosphere
-
-        Derived using the mechanical pressure balance due to the weight of the atmosphere and the
-        ideal gas equation of state.
-        """
-        volume: float = self.planet.surface_area / self.planet.surface_gravity
-        volume *= GAS_CONSTANT * self.gas_temperature() / self.gas_mean_molar_mass()
-
-        return volume
 
     def get_reaction_array(self) -> npt.NDArray[np.float_]:
         """Gets the reaction array

@@ -98,10 +98,10 @@ class Output(UserDict):
         self._add_gas_species(interior_atmosphere)
         self._add_condensed_species(interior_atmosphere)
         # self._add_elements(interior_atmosphere)
-        # self._add_atmosphere(interior_atmosphere)
-        # self._add_constraints(interior_atmosphere)
+        self._add_atmosphere(interior_atmosphere)
+        self._add_constraints(interior_atmosphere)
         self._add_planet(interior_atmosphere)
-        # self._add_residual(interior_atmosphere)
+        self._add_residual(interior_atmosphere)
         # self._add_solution(interior_atmosphere)
         # self._add_raw_solution(interior_atmosphere)
 
@@ -118,22 +118,8 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        atmosphere: dict[str, float] = {}
-        gas: GasNumberDensity = interior_atmosphere.solution.gas
-        temperature: float = interior_atmosphere.planet.surface_temperature
-        gas_volume: float = interior_atmosphere.gas_volume
-        atmosphere["pressure"] = gas.total_pressure(temperature)
-        atmosphere["mean_molar_mass"] = gas.mean_molar_mass
-        atmosphere["volume"] = gas_volume
-        atmosphere["density"] = gas.mean_density(gas_volume)
-        atmosphere["mass"] = gas.total_mass(gas_volume)
-        # FIXME
-        # atmosphere["element_moles"] = interior_atmosphere.atmosphere_element_moles
-        atmosphere["species_moles"] = gas.total_moles(gas_volume)
-        atmosphere["molecules"] = gas.total_molecules(gas_volume)
-
         data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
-        data_list.append(atmosphere)
+        data_list.append(interior_atmosphere.solution.atmosphere.output_dict())
 
     def _add_condensed_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds condensed species.
@@ -152,8 +138,8 @@ class Output(UserDict):
         Args:
             interior_atmosphere: Interior atmosphere system
         """
-        temperature: float = interior_atmosphere.planet.surface_temperature
-        pressure: float = interior_atmosphere.solution.gas.gas_pressure(temperature)
+        temperature: float = interior_atmosphere.solution.atmosphere.temperature()
+        pressure: float = interior_atmosphere.solution.atmosphere.pressure()
         evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
             temperature, pressure
         )

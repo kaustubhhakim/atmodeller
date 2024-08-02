@@ -181,12 +181,15 @@ class _SpeciesConstraint(ABC, Generic[U, V]):
 class ActivityConstraint(_SpeciesConstraint[CondensedSpecies, float]):
     """An activity
 
+    This sets the activity of the condensate when it is stable, which is unity for a pure
+    substance.
+
     Args:
         species: The species to constrain
-        value: The activity. Defaults to unity for ideal behaviour.
+        value: The activity when the condensate is stable
     """
 
-    constraint_type: str = "activity"
+    constraint_type: str = "stable_activity"
 
     def activity(self, temperature: float, pressure: float) -> float:
         """Value of the activity constraint
@@ -383,19 +386,22 @@ class SystemConstraints(UserList[ConstraintProtocol]):
     def add_activity_constraints(self, species: Species) -> None:
         """Adds activity constraints
 
-        These constraints allow condensed phases to either be stable (activity of unity) or
-        unstable (activity less than unity).
+        These constraints set the activity of a stable condensate, which is assumed to be unity for
+        a pure component.
 
         Args:
             species: Species
         """
         for condensed_species in species.condensed_species:
             if condensed_species not in self.constrained_species:
-                # FIXME: Maybe don't set by default?
-                logger.debug("Automatically adding activity constraint for %s", condensed_species)
+                logger.debug(
+                    "Automatically adding stable activity constraint for %s", condensed_species
+                )
                 self.append(ActivityConstraint(condensed_species, 1))
             else:
-                logger.debug("Activity constraint for %s already included", condensed_species)
+                logger.debug(
+                    "Stable activity constraint for %s already included", condensed_species
+                )
 
     @property
     def constrained_species(self) -> list[ChemicalSpecies]:

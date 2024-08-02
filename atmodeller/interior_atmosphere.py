@@ -197,7 +197,7 @@ class InteriorAtmosphereSystem:
             # ensure the initial solution is bounded.
             log_solution: npt.NDArray = initial_solution.get_log10_value(
                 self.constraints,
-                temperature=self.solution.gas_temperature(),
+                temperature=self.solution.atmosphere.temperature(),
                 pressure=1,
                 perturb_log10_number_density=perturb_log10_number_density,
                 attempt=attempt,
@@ -285,8 +285,8 @@ class InteriorAtmosphereSystem:
 
         logger.debug("log_solution passed into _objective_func = %s", log_solution)
 
-        temperature: float = self.solution.gas_temperature()
-        pressure: float = self.solution.gas_pressure()
+        temperature: float = self.solution.atmosphere.temperature()
+        pressure: float = self.solution.atmosphere.pressure()
 
         reaction_array: npt.NDArray[np.float_] = self.solution.get_reaction_array()
         stability_array: npt.NDArray[np.float_] = self.solution.get_stability_array()
@@ -313,14 +313,16 @@ class InteriorAtmosphereSystem:
         residual_number_density: list[float] = []
         for constraint in self.constraints.mass_constraints:
             res: float = np.log10(self.solution.number_density(element=constraint.element))
-            res -= constraint.log10_number_of_molecules - np.log10(self.solution.gas_volume())
+            res -= constraint.log10_number_of_molecules - np.log10(
+                self.solution.atmosphere.volume()
+            )
             residual_number_density.append(res)
 
         residual_total_pressure: list[float] = []
         if len(self.constraints.total_pressure_constraint) == 1:
             constraint = self.constraints.total_pressure_constraint[0]
             residual_total_pressure.append(
-                np.log10(self.solution.gas_number_density())
+                np.log10(self.solution.atmosphere.number_density())
                 - constraint.get_log10_value(temperature=temperature, pressure=pressure)
             )
 
