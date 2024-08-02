@@ -216,6 +216,11 @@ class ChemicalSpecies:
             self.thermodata.data_source,
         )
 
+    @property
+    def atoms(self) -> int:
+        """Number of atoms"""
+        return self._formula.atoms
+
     def composition(self, isotopic: bool = False) -> Composition:
         """Composition of the species
 

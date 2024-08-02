@@ -87,11 +87,17 @@ class NumberDensityProtocol(Protocol):
 
     def number_density(self, *, element: str | None = None) -> float: ...
 
+    def element_number_density(self) -> float: ...
+
     def mass(self, *, element: str | None = None) -> float: ...
 
     def molecules(self, *, element: str | None = None) -> float: ...
 
+    def elements(self) -> float: ...
+
     def moles(self, *, element: str | None = None) -> float: ...
+
+    def element_moles(self) -> float: ...
 
 
 class ValueSetterMixin:
@@ -134,7 +140,7 @@ class NumberDensity(ABC, Generic[T_co]):
     def value(self) -> float: ...
 
     def number_density(self, *, element: str | None = None) -> float:
-        """Number density of the species or element
+        """Number density of the species or an individual element
 
         Args:
             element: Element to compute the number density for, or None to compute for the species.
@@ -154,8 +160,12 @@ class NumberDensity(ABC, Generic[T_co]):
 
         return count * 10**self.value
 
+    def element_number_density(self) -> float:
+        """Number density of all elements"""
+        return self._species.atoms * self.number_density()
+
     def mass(self, *, element: str | None = None) -> float:
-        """Mass of the species or element
+        """Mass of the species or an individual element
 
         Args:
             element: Element to compute the mass for, or None to compute for the species. Defaults
@@ -172,16 +182,20 @@ class NumberDensity(ABC, Generic[T_co]):
         return self.moles(element=element) * molar_mass
 
     def molecules(self, *, element: str | None = None) -> float:
-        """Number of molecules of the species or element
+        """Number of molecules of the species or number of an individual element
 
         Args:
             element: Element to compute the number of molecules for, or None to compute for the
                 species. Defaults to None.
 
         Returns:
-            Number of molecules for the species or `element` if not None.
+            Number of molecules for the species or number of `element` if not None.
         """
         return self.number_density(element=element) * self._solution.atmosphere.volume()
+
+    def elements(self) -> float:
+        """Total number of elements"""
+        return self._species.atoms * self.molecules()
 
     def moles(self, *, element: str | None = None) -> float:
         """Number of moles of the species or element
@@ -194,6 +208,10 @@ class NumberDensity(ABC, Generic[T_co]):
             Number of moles for the species or `element` if not None.
         """
         return self.molecules(element=element) / AVOGADRO
+
+    def element_moles(self) -> float:
+        """Total number of moles of elements"""
+        return self._species.atoms * self.moles()
 
     def output_dict(self) -> dict[str, float]:
         """Output dictionary"""
@@ -524,7 +542,7 @@ class SolutionContainer(UserDict[T, U]):
         return instance
 
     def number_density(self, *, element: str | None = None) -> float:
-        """Total number density of the species or element
+        """Total number density of the species or an individual element
 
         Args:
             element: Element to compute the number density for, or None to compute for the species.
@@ -535,8 +553,12 @@ class SolutionContainer(UserDict[T, U]):
         """
         return sum(value.number_density(element=element) for value in self.values())
 
+    def element_number_density(self) -> float:
+        """Number density of all elements"""
+        return sum(value.element_number_density() for value in self.values())
+
     def mass(self, *, element: str | None = None) -> float:
-        """Total mass of the species or element
+        """Total mass of the species or an individual element
 
         Args:
             element: Element to compute the mass for, or None to compute for the species. Defaults
@@ -548,19 +570,23 @@ class SolutionContainer(UserDict[T, U]):
         return sum(value.mass(element=element) for value in self.values())
 
     def molecules(self, *, element: str | None = None) -> float:
-        """Total number of molecules of the species or element
+        """Total number of molecules of the species or an individual element
 
         Args:
             element: Element to compute the number of molecules for, or None to compute for the
                 species. Defaults to None.
 
         Returns:
-            Number of molecules for the species or `element` if not None.
+            Number of molecules for the species or number of `element` if not None.
         """
         return sum(value.molecules(element=element) for value in self.values())
 
+    def elements(self) -> float:
+        """Total number of elements"""
+        return sum(value.elements() for value in self.values())
+
     def moles(self, *, element: str | None = None) -> float:
-        """Total number of moles of the species or element
+        """Total number of moles of the species or an individual element
 
         Args:
             element: Element to compute the number of moles for, or None to compute for the
@@ -570,6 +596,10 @@ class SolutionContainer(UserDict[T, U]):
             Number of moles for the species or `element` if not None.
         """
         return sum(value.moles(element=element) for value in self.values())
+
+    def element_moles(self) -> float:
+        """Total number of moles of elements"""
+        return sum(value.element_moles() for value in self.values())
 
 
 class Atmosphere(SolutionContainer[GasSpecies, GasNumberDensity]):
@@ -587,14 +617,6 @@ class Atmosphere(SolutionContainer[GasSpecies, GasNumberDensity]):
                 for species, value in self.items()
             ]
         )
-
-    def element_moles(self) -> float:
-        """Moles of elements"""
-        moles: float = 0
-        for species, value in self.items():
-            moles += species.composition().dataframe()["Count"].sum() * value.moles()
-
-        return moles
 
     def pressure(self) -> float:
         """Pressure"""
@@ -620,10 +642,12 @@ class Atmosphere(SolutionContainer[GasSpecies, GasNumberDensity]):
     def output_dict(self) -> dict[str, float]:
         """Output dictionary"""
         output_dict: dict[str, float] = {}
+        output_dict["elements"] = self.elements()
+        output_dict["element_moles"] = self.element_moles()
         output_dict["mass"] = self.mass()
         output_dict["molar_mass"] = self.molar_mass()
+        output_dict["molecules"] = self.molecules()
         output_dict["moles"] = self.moles()
-        output_dict["element_moles"] = self.element_moles()
         output_dict["number_density"] = self.number_density()
         output_dict["pressure"] = self.pressure()
         output_dict["temperature"] = self.temperature()
@@ -663,9 +687,12 @@ class Solution(SolutionContainer[ChemicalSpecies, GasCollection | CondensedColle
         for condensed_species in species.condensed_species:
             solution[condensed_species] = CondensedCollection(condensed_species, solution)
 
+        init_dict = {
+            species: collection.gas_abundance
+            for species, collection in solution.gas_solution.items()
+        }
+        # Only need to set these attributes once so pylint: disable=protected-access
         solution._species = species
-
-        init_dict = {species: collection.gas_abundance for species, collection in solution.items()}
         solution._atmosphere = Atmosphere.create(planet, init_dict)
 
         return solution
@@ -726,12 +753,12 @@ class Solution(SolutionContainer[ChemicalSpecies, GasCollection | CondensedColle
         index: int = 0
         for gas_collection in self.gas_solution.values():
             gas_collection.gas_abundance.value = value[index]
-            index += 1
+            index += gas_collection.NUMBER
         for condensed_collection in self.condensed_solution.values():
             condensed_collection.activity.value = value[index]
             condensed_collection.condensed_abundance.value = value[index + 1]
             condensed_collection.stability.value = value[index + 2]
-            index += 3  # Increment index by 3 for the next condensed species
+            index += condensed_collection.NUMBER
 
     def merge(self, other: Solution) -> None:
         """Merges the data from another solution
