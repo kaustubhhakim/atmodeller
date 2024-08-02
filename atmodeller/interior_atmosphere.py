@@ -245,7 +245,7 @@ class InteriorAtmosphereSystem:
                 self._residual = sol.fun
                 self.output.add(self, extra_output)
                 initial_solution.update(self.output)
-                logger.info(pprint.pformat(self.solution_dict()))
+                logger.info(pprint.pformat(self.output_solution()))
                 break
             else:
                 logger.warning("The solver failed.")
@@ -341,9 +341,9 @@ class InteriorAtmosphereSystem:
 
         return residual
 
-    def solution_dict(self) -> dict[str, float]:
-        """Solution in a dictionary"""
-        return self.solution.solution_dict()
+    def output_solution(self) -> dict[str, float]:
+        """Output the solution in a convenient form for comparison and benchmarking"""
+        return self.solution.output_solution()
 
     def isclose(
         self,
@@ -361,11 +361,11 @@ class InteriorAtmosphereSystem:
         Returns:
             True if the solution is close to the target, otherwise False
         """
-        if len((self.solution_dict())) != len(target_dict):
+        if len((self.output_solution())) != len(target_dict):
             return np.bool_(False)
 
         target_values: list = list(dict(sorted(target_dict.items())).values())
-        solution_values: list = list(dict(sorted(self.solution_dict().items())).values())
+        solution_values: list = list(dict(sorted(self.output_solution().items())).values())
         isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
 
         return isclose

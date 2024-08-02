@@ -812,8 +812,20 @@ class Solution(SolutionContainer[ChemicalSpecies, GasCollection | CondensedColle
 
         return stability_array
 
-    def raw_solution_dict(self) -> dict[str, float]:
-        """Raw solution in a dictionary"""
+    def output_full(self) -> dict[str, dict[str, float]]:
+        """Full output"""
+        output_dict: dict[str, dict[str, float]] = {}
+        for species, collection in self.items():
+            output_dict[species.name] = collection.output_dict()
+        output_dict["atmosphere"] = self.atmosphere.output_dict()
+        output_dict["planet"] = self.planet.output_dict()
+        output_dict["raw_solution"] = self.output_raw_solution()
+        output_dict["solution"] = self.output_solution()
+
+        return output_dict
+
+    def output_raw_solution(self) -> dict[str, float]:
+        """Output the raw solution as seen by the solver"""
         output: dict[str, float] = {}
         for gas_species, collection in self.gas_solution.items():
             output[gas_species.name] = collection.gas_abundance.value
@@ -825,8 +837,8 @@ class Solution(SolutionContainer[ChemicalSpecies, GasCollection | CondensedColle
 
         return output
 
-    def solution_dict(self) -> dict[str, float]:
-        """Solution as a dictionary"""
+    def output_solution(self) -> dict[str, float]:
+        """Output the solution in a convenient form for comparison and benchmarking"""
         output: dict[str, float] = {}
         for gas_species, collection in self.gas_solution.items():
             output[gas_species.name] = collection.gas_abundance.pressure()

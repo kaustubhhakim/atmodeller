@@ -95,42 +95,19 @@ class Output(UserDict):
             interior_atmosphere: Interior atmosphere system
             extra_output: Extra data to write to the output. Defaults to None.
         """
-        self._add_gas_species(interior_atmosphere)
-        self._add_condensed_species(interior_atmosphere)
+        for key, value in interior_atmosphere.solution.output_full().items():
+            data_list: list[dict[str, float]] = self.data.setdefault(key, [])
+            data_list.append(value)
+
+        # TODO: Reinstate
         # self._add_elements(interior_atmosphere)
-        self._add_atmosphere(interior_atmosphere)
+
         self._add_constraints(interior_atmosphere)
-        self._add_planet(interior_atmosphere)
         self._add_residual(interior_atmosphere)
-        self._add_solution(interior_atmosphere)
-        self._add_raw_solution(interior_atmosphere)
 
         if extra_output is not None:
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
             data_list.append(extra_output)
-
-    def _add_atmosphere(
-        self,
-        interior_atmosphere: InteriorAtmosphereSystem,
-    ) -> None:
-        """Adds atmosphere.
-
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        data_list: list[dict[str, float]] = self.data.setdefault("atmosphere", [])
-        data_list.append(interior_atmosphere.solution.atmosphere.output_dict())
-
-    def _add_condensed_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds condensed species.
-
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-
-        for species, collection in interior_atmosphere.solution.condensed_solution.items():
-            data_list: list[dict[str, float]] = self.data.setdefault(species.name, [])
-            data_list.append(collection.output_dict())
 
     def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds constraints.
@@ -264,25 +241,6 @@ class Output(UserDict):
             #         np.log10(output["total_moles"] / H_total_moles) + 12
             #     )
 
-    def _add_planet(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds the planetary properties.
-
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        data_list: list[dict[str, float]] = self.data.setdefault("planet", [])
-        data_list.append(interior_atmosphere.planet.output_dict())
-
-    def _add_gas_species(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds gas species.
-
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        for gas_species, collection in interior_atmosphere.solution.gas_solution.items():
-            data_list: list[dict[str, float]] = self.data.setdefault(gas_species.name, [])
-            data_list.append(collection.output_dict())
-
     def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the residual.
 
@@ -291,24 +249,6 @@ class Output(UserDict):
         """
         data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
         data_list.append(interior_atmosphere.residual_dict())
-
-    def _add_raw_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds the raw solution.
-
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        data_list: list[dict[str, float]] = self.data.setdefault("raw_solution", [])
-        data_list.append(interior_atmosphere.solution.raw_solution_dict())
-
-    def _add_solution(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds the solution.
-
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        data_list: list[dict[str, float]] = self.data.setdefault("solution", [])
-        data_list.append(interior_atmosphere.solution_dict())
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Output as a dictionary of dataframes

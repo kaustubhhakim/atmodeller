@@ -271,7 +271,7 @@ class InitialSolution(ABC, Generic[T]):
             perturb_log10_number_density=perturb_value,
         )
 
-        logger.debug("initial_solution = %s", self.solution.raw_solution_dict())
+        logger.debug("initial_solution = %s", self.solution.output_raw_solution())
 
         return self.solution.value
 
