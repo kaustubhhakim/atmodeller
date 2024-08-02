@@ -598,6 +598,8 @@ class Atmosphere:
 
         Derived using the mechanical pressure balance due to the weight of the atmosphere and the
         ideal gas equation of state.
+
+        TODO: Presumably for a non-ideal atmosphere the volume term requires a correction?
         """
         volume: float = self._planet.surface_area / self._planet.surface_gravity
         volume *= GAS_CONSTANT * self.temperature() / self.molar_mass()
