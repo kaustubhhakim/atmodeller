@@ -102,8 +102,8 @@ class Output(UserDict):
         self._add_constraints(interior_atmosphere)
         self._add_planet(interior_atmosphere)
         self._add_residual(interior_atmosphere)
-        # self._add_solution(interior_atmosphere)
-        # self._add_raw_solution(interior_atmosphere)
+        self._add_solution(interior_atmosphere)
+        self._add_raw_solution(interior_atmosphere)
 
         if extra_output is not None:
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
