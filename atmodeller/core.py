@@ -22,7 +22,7 @@ import logging
 import sys
 from collections import UserList
 from dataclasses import asdict, dataclass, field
-from typing import Mapping, TypeVar
+from typing import Mapping
 
 import numpy as np
 
@@ -38,7 +38,6 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
-T = TypeVar("T", bound=ChemicalSpecies)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
