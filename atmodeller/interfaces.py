@@ -276,4 +276,5 @@ class CondensedSpecies(ChemicalSpecies):
     """
 
 
+TypeChemicalSpecies = TypeVar("TypeChemicalSpecies", bound=ChemicalSpecies)
 TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies, covariant=True)

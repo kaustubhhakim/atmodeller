@@ -29,7 +29,7 @@ from molmass import Formula
 
 from atmodeller import AVOGADRO
 from atmodeller.core import GasSpecies, Species
-from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
+from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies, TypeChemicalSpecies
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import UnitConversion, filter_by_type, get_number_density
 
@@ -40,8 +40,7 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-U = TypeVar("U", bound=ChemicalSpecies)
-V = TypeVar("V")
+T = TypeVar("T")
 
 
 @runtime_checkable
@@ -56,9 +55,6 @@ class ConstraintProtocol(Protocol):
     def get_value(self, temperature: float, pressure: float) -> float: ...
 
     def get_log10_value(self, temperature: float, pressure: float) -> float: ...
-
-
-T = TypeVar("T", bound=ConstraintProtocol)
 
 
 class MassConstraintProtocol(ConstraintProtocol, Protocol):
@@ -160,7 +156,7 @@ class ElementMassConstraint(MassConstraintProtocol):
         return np.log10(self.get_value(*args, **kwargs))
 
 
-class _SpeciesConstraint(ABC, Generic[U, V]):
+class _SpeciesConstraint(ABC, Generic[TypeChemicalSpecies, T]):
     """A species constraint
 
     Args:
@@ -170,9 +166,9 @@ class _SpeciesConstraint(ABC, Generic[U, V]):
 
     constraint_type: str = "default"
 
-    def __init__(self, species: U, value: V):
-        self._species: U = species
-        self._value: V = value
+    def __init__(self, species: TypeChemicalSpecies, value: T):
+        self._species: TypeChemicalSpecies = species
+        self._value: T = value
         self._constraint: str = self.constraint_type
 
     @property
@@ -185,7 +181,7 @@ class _SpeciesConstraint(ABC, Generic[U, V]):
         return f"{self.species.name}_{self.constraint}"
 
     @property
-    def species(self) -> U:
+    def species(self) -> TypeChemicalSpecies:
         """Species to constrain"""
         return self._species
 
@@ -247,7 +243,7 @@ class ActivityConstraint(_SpeciesConstraint[CondensedSpecies, float]):
         return self.activity(temperature, pressure)
 
 
-class _FugacityConstraint(_SpeciesConstraint[GasSpecies, V]):
+class _FugacityConstraint(_SpeciesConstraint[GasSpecies, T]):
     """A fugacity constraint
 
     Args:
