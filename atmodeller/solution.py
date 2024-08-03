@@ -875,11 +875,11 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         return stability_array
 
     @property
-    def total_moles_hydrogen(self) -> float:
+    def total_moles_hydrogen(self) -> float | None:
         """Total moles of hydrogen"""
         moles_of_hydrogen: float = self.moles(element="H")
         if moles_of_hydrogen <= 0:
-            raise ValueError("Total number of hydrogen moles must be positive")
+            return
 
         return moles_of_hydrogen
 
@@ -891,9 +891,11 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             element_dict["total_mass"] = self.mass(element=element)
             total_moles = self.moles(element=element)
             element_dict["total_moles"] = total_moles
-            element_dict["logarithmic_abundance"] = (
-                np.log10(total_moles / self.total_moles_hydrogen) + 12
-            )
+            total_moles_hydrogen: float | None = self.total_moles_hydrogen
+            if total_moles_hydrogen is not None:
+                element_dict["logarithmic_abundance"] = (
+                    np.log10(total_moles / total_moles_hydrogen) + 12
+                )
             counter: Counter = Counter()
             for collection in self.values():
                 output: dict[str, float] = collection.output_dict(element=element)
