@@ -68,9 +68,10 @@ class InteriorAtmosphereSystem:
         logger.info("Creating an interior-atmosphere system")
         self.species.conform_solubilities_to_composition(self.planet.melt_composition)
         if self.initial_solution is None:
-            self.initial_solution = InitialSolutionDict(species=self.species, planet=self.planet)
+            self.initial_solution = InitialSolutionDict(species=self.species)
         self._reaction_network = ReactionNetworkWithCondensateStability(self.species)
-        self.solution = Solution.create_from_species(self.planet, self.species)
+        self.solution = Solution.create_from_species(species=self.species)
+        self.solution.planet = self.planet
 
     @property
     def constraints(self) -> SystemConstraints:

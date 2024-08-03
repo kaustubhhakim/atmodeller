@@ -571,36 +571,7 @@ class _CondensedCollection(_NumberDensity[CondensedSpecies]):
 
 
 class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
-    """A container for the solution
-
-    Args:
-        init_dict: Initialisation dictionary
-    """
-
-    def __init__(
-        self, init_dict: dict[TypeChemicalSpecies, TypeNumberDensity] | None = None, /, **kwargs
-    ):
-        super().__init__(init_dict, **kwargs)
-        self._planet: Planet
-
-    @classmethod
-    def create(
-        cls,
-        planet: Planet,
-        init_dict: dict[TypeChemicalSpecies, TypeNumberDensity] | None = None,
-    ) -> Self:
-        """Creates an instance
-
-        Args:
-            planet: Planet
-
-        Returns:
-            An instance
-        """
-        instance: Self = cls(init_dict)
-        instance._planet = planet
-
-        return instance
+    """A container for the solution"""
 
     def number_density(self, *, element: str | None = None) -> float:
         """Total number density of the species or an individual element
@@ -663,12 +634,18 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
         return sum(value.element_moles() for value in self.values())
 
 
-class Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
-    """Bulk properties of the atmosphere
+class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
+    """Bulk properties of the atmosphere"""
 
-    Args:
-        init_dict: Initialisation dictionary
-    """
+    _planet: Planet
+
+    @property
+    def planet(self) -> Planet:
+        return self._planet
+
+    @planet.setter
+    def planet(self, value: Planet) -> None:
+        self._planet: Planet = value
 
     def molar_mass(self) -> float:
         """Molar mass"""
@@ -693,7 +670,7 @@ class Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
         Derived using the mechanical pressure balance due to the weight of the atmosphere and the
         ideal gas equation of state.
 
-        TODO: Presumably for a non-ideal atmosphere the volume term requires a correction?
+        TODO: Should a correction be applied to the volume term for a non-ideal atmosphere?
         """
         volume: float = self._planet.surface_area / self._planet.surface_gravity
         volume *= GAS_CONSTANT * self.temperature() / self.molar_mass()
@@ -728,22 +705,17 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         init_dict: Initial dictionary
     """
 
-    @override
-    def __init__(self, init_dict=None, /, **kwargs):
-        super().__init__(init_dict, **kwargs)
-        self._planet: Planet
-        self._species: Species
-        self._atmosphere: Atmosphere
+    _species: Species
+    _atmosphere: _Atmosphere
 
     @classmethod
-    def create_from_species(cls, planet: Planet, species: Species) -> Self:
+    def create_from_species(cls, *, species: Species) -> Self:
         """Creates a Solution instance
 
         Args:
-            planet: Planet
             species: Species
         """
-        solution: Self = super().create(planet)
+        solution: Self = cls()
         for gas_species in species.gas_species:
             solution[gas_species] = _GasCollection(gas_species, solution)
         for condensed_species in species.condensed_species:
@@ -755,12 +727,12 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         }
         # Only need to set these attributes once so pylint: disable=protected-access
         solution._species = species
-        solution._atmosphere = Atmosphere.create(planet, init_dict)
+        solution._atmosphere = _Atmosphere(init_dict)
 
         return solution
 
     @property
-    def atmosphere(self) -> Atmosphere:
+    def atmosphere(self) -> _Atmosphere:
         return self._atmosphere
 
     @property
@@ -783,14 +755,18 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         return sum(collection.NUMBER for collection in self.values())
 
     @property
+    def planet(self) -> Planet:
+        return self._planet
+
+    @planet.setter
+    def planet(self, value: Planet) -> None:
+        self._planet = value
+        self._atmosphere.planet = value
+
+    @property
     def species(self) -> Species:
         """Species"""
         return self._species
-
-    @property
-    def planet(self) -> Planet:
-        """Planet"""
-        return self._planet
 
     @property
     def value(self) -> npt.NDArray[np.float_]:
@@ -828,8 +804,6 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         Args:
             other: The other solution to merge data from
         """
-        if self.planet != other.planet:
-            raise ValueError("Planet properties in `self` and `other` must be the same")
         if Counter(self.species) != Counter(other.species):
             raise ValueError("Species in `self` and `other` must be the same")
 

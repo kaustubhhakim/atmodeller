@@ -264,9 +264,10 @@ def test_regressor_override(generate_regressor_data):
     raw_solution = dataframes["raw_solution"]
     solution = dataframes["solution"]
 
-    solution_override = InitialSolutionDict({H2_g: 100000}, species=species, planet=planet)
+    val_H2: float = 30
+    solution_override = InitialSolutionDict({H2_g: val_H2}, species=species, planet=planet)
     initial_solution = InitialSolutionRegressor.from_pickle(
-        filename, species=species, solution_override=solution_override
+        filename, species=species, planet=planet, solution_override=solution_override
     )
 
     test_constraints = SystemConstraints(
@@ -277,13 +278,13 @@ def test_regressor_override(generate_regressor_data):
     )
 
     result = initial_solution.get_log10_value(
-        test_constraints, temperature=dummy_variable, pressure=dummy_variable
+        test_constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
 
     assert np.isclose(
         raw_solution.iloc[0]["H2O_g"], result[0], atol=REGRESSORTOL, rtol=REGRESSORTOL
     )
-    assert np.isclose(5, result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL)
+    assert np.isclose(val_H2, result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL)
     assert np.isclose(
         raw_solution.iloc[0]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
     )
