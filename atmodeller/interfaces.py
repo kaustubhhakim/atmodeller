@@ -16,13 +16,11 @@
 #
 """Interfaces"""
 
-# Protocol so pylint: disable=C0115
-
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Protocol, TypeVar, runtime_checkable
+from typing import Callable, TypeVar
 
 from molmass import Composition, Formula
 
@@ -32,9 +30,6 @@ from atmodeller.thermodata.interfaces import (
 )
 from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.utilities import UnitConversion
-
-if TYPE_CHECKING:
-    from atmodeller.core import GasSpecies
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -280,46 +275,5 @@ class CondensedSpecies(ChemicalSpecies):
         thermodata_filename: Filename in the thermodynamic dataset. Defaults to None.
     """
 
-
-@runtime_checkable
-class ConstraintProtocol(Protocol):
-
-    @property
-    def constraint(self) -> str: ...
-
-    @property
-    def name(self) -> str: ...
-
-    def get_value(self, temperature: float, pressure: float) -> float: ...
-
-    def get_log10_value(self, temperature: float, pressure: float) -> float: ...
-
-
-class MassConstraintProtocol(ConstraintProtocol, Protocol):
-
-    @property
-    def element(self) -> str: ...
-
-    @property
-    def mass(self) -> float: ...
-
-
-class ActivityConstraintProtocol(ConstraintProtocol, Protocol):
-
-    @property
-    def species(self) -> CondensedSpecies: ...
-
-    def activity(self, temperature: float, pressure: float) -> float: ...
-
-
-class GasConstraintProtocol(ConstraintProtocol, Protocol):
-
-    @property
-    def species(self) -> GasSpecies: ...
-
-    def fugacity(self, temperature: float, pressure: float) -> float: ...
-
-
-ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
 
 TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies, covariant=True)

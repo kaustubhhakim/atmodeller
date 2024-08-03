@@ -320,7 +320,7 @@ def reorder_dict(original_dict: dict[Any, Any], key_to_move_first: Any) -> dict:
 
 
 def get_molar_mass(species: str) -> float:
-    """Get molar mass
+    r"""Get molar mass
 
     Args:
         species: A species

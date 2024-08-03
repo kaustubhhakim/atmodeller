@@ -22,22 +22,14 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from collections import UserList
-from typing import Generic, TypeVar
+from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 from molmass import Formula
 
 from atmodeller import AVOGADRO
 from atmodeller.core import GasSpecies, Species
-from atmodeller.interfaces import (
-    ActivityConstraintProtocol,
-    ChemicalSpecies,
-    CondensedSpecies,
-    ConstraintProtocol,
-    GasConstraintProtocol,
-    MassConstraintProtocol,
-    ReactionNetworkConstraintProtocol,
-)
+from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import UnitConversion, filter_by_type, get_number_density
 
@@ -48,9 +40,53 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-T = TypeVar("T", bound=ConstraintProtocol)
 U = TypeVar("U", bound=ChemicalSpecies)
 V = TypeVar("V")
+
+
+@runtime_checkable
+class ConstraintProtocol(Protocol):
+
+    @property
+    def constraint(self) -> str: ...
+
+    @property
+    def name(self) -> str: ...
+
+    def get_value(self, temperature: float, pressure: float) -> float: ...
+
+    def get_log10_value(self, temperature: float, pressure: float) -> float: ...
+
+
+T = TypeVar("T", bound=ConstraintProtocol)
+
+
+class MassConstraintProtocol(ConstraintProtocol, Protocol):
+
+    @property
+    def element(self) -> str: ...
+
+    @property
+    def mass(self) -> float: ...
+
+
+class ActivityConstraintProtocol(ConstraintProtocol, Protocol):
+
+    @property
+    def species(self) -> CondensedSpecies: ...
+
+    def activity(self, temperature: float, pressure: float) -> float: ...
+
+
+class GasConstraintProtocol(ConstraintProtocol, Protocol):
+
+    @property
+    def species(self) -> GasSpecies: ...
+
+    def fugacity(self, temperature: float, pressure: float) -> float: ...
+
+
+ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
 
 
 class ElementMassConstraint(MassConstraintProtocol):
