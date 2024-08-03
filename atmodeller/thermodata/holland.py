@@ -43,7 +43,7 @@ else:
     from typing import override
 
 if TYPE_CHECKING:
-    from atmodeller.core import ChemicalSpecies
+    from atmodeller.interfaces import ChemicalSpecies
 
 
 logger: logging.Logger = logging.getLogger(__name__)

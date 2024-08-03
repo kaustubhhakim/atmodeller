@@ -23,7 +23,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from atmodeller.core import ChemicalSpecies
+    from atmodeller.interfaces import ChemicalSpecies
 
 logger: logging.Logger = logging.getLogger(__name__)
 
