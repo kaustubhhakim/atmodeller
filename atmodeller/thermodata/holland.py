@@ -45,7 +45,6 @@ else:
 if TYPE_CHECKING:
     from atmodeller.interfaces import ChemicalSpecies
 
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 HOLLAND_FILENAME: str = "holland_Mindata161127.csv"
