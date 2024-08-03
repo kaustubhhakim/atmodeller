@@ -222,9 +222,11 @@ def test_regressor(generate_regressor_data):
     raw_solution = dataframes["raw_solution"]
     solution = dataframes["solution"]
 
-    initial_solution = InitialSolutionRegressor.from_pickle(filename, species=species)
+    initial_solution = InitialSolutionRegressor.from_pickle(
+        filename, species=species, planet=planet
+    )
 
-    for index in [0]:  # , 5, 10, 15, 20, 25, 30, 35]:
+    for index in [0, 5, 10, 15, 20, 25, 30, 35]:
 
         test_constraints = SystemConstraints(
             [
@@ -234,21 +236,18 @@ def test_regressor(generate_regressor_data):
         )
 
         result = initial_solution.get_log10_value(
-            test_constraints, temperature=dummy_variable, pressure=dummy_variable
+            test_constraints, temperature=planet.surface_temperature, pressure=dummy_variable
         )
-
-        print(raw_solution.iloc[0]["H2O_g"])
-        print(result[0])
 
         assert np.isclose(
             raw_solution.iloc[index]["H2O_g"], result[0], atol=REGRESSORTOL, rtol=REGRESSORTOL
         )
-        # assert np.isclose(
-        #    raw_solution.iloc[index]["H2_g"], result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL
-        # )
-        # assert np.isclose(
-        #    raw_solution.iloc[index]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
-        # )
+        assert np.isclose(
+            raw_solution.iloc[index]["H2_g"], result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )
+        assert np.isclose(
+            raw_solution.iloc[index]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
+        )
 
 
 def test_regressor_override(generate_regressor_data):

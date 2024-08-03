@@ -416,12 +416,16 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self._fit(self.value)
 
     @classmethod
-    def from_pickle(cls, pickle_file: Path | str, **kwargs) -> InitialSolutionRegressor:
+    def from_pickle(
+        cls, pickle_file: Path | str, species: Species, planet: Planet, **kwargs
+    ) -> InitialSolutionRegressor:
         """Creates a regressor from output read from a pickle file.
 
         Args:
             pickle_file: Pickle file of the output from a previous (or similar) model run. The
                 constraints must be the same as the new model and in the same order.
+            species: Species
+            planet: Planet
             **kwargs: Arbitrary keyword arguments to pass through to the constructor
 
         Returns:
@@ -432,7 +436,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         except FileNotFoundError:
             output = Output.read_pickle(Path(pickle_file).with_suffix(".pkl"))
 
-        return cls(output, **kwargs)
+        return cls(output, species=species, planet=planet, **kwargs)
 
     def _get_select_values(
         self,
