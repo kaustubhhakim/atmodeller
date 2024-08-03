@@ -207,8 +207,8 @@ class InitialSolution(ABC, Generic[T]):
 
         # Gas constraints
         for constraint in constraints.gas_constraints:
-            self.solution[constraint.species].gas_abundance.value = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
+            self.solution.gas_solution[constraint.species].gas_abundance.value = (
+                constraint.get_log10_value(temperature=temperature, pressure=pressure)
             )
 
         for collection in self.solution.condensed_solution.values():
