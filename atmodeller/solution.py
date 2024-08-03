@@ -918,12 +918,11 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         output_dict: dict[str, dict[str, float]] = {}
         for species, collection in self.items():
             output_dict[species.name] = collection.output_dict()
+        output_dict |= self._output_elements()
         output_dict["atmosphere"] = self.atmosphere.output_dict()
         output_dict["planet"] = self.planet.output_dict()
         output_dict["raw_solution"] = self.output_raw_solution()
         output_dict["solution"] = self.output_solution()
-
-        output_dict |= self._output_elements()
 
         return output_dict
 
