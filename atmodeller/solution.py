@@ -29,7 +29,12 @@ import numpy.typing as npt
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.core import GasSpecies, Planet, Species
-from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
+from atmodeller.interfaces import (
+    ChemicalSpecies,
+    CondensedSpecies,
+    TypeChemicalSpecies,
+    TypeChemicalSpecies_co,
+)
 from atmodeller.utilities import UnitConversion, get_molar_mass
 
 if sys.version_info < (3, 11):
@@ -41,9 +46,6 @@ if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
-
-T = TypeVar("T", bound=ChemicalSpecies)
-T_co = TypeVar("T_co", bound=ChemicalSpecies, covariant=True)
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -58,10 +60,10 @@ LOG10_TAU: float = np.log10(TAU)
 """Log10 of the tau factor"""
 
 
-class ComponentProtocol(Protocol[T_co]):
+class ComponentProtocol(Protocol[TypeChemicalSpecies_co]):
     """Solution component protocol"""
 
-    _species: T_co
+    _species: TypeChemicalSpecies_co
     _solution: Solution
 
     @property
@@ -98,7 +100,7 @@ class _ValueSetterMixin:
         self._value = value
 
 
-class _NumberDensity(ABC, Generic[T_co]):
+class _NumberDensity(ABC, Generic[TypeChemicalSpecies_co]):
     """A number density solution
 
     Args:
@@ -109,8 +111,8 @@ class _NumberDensity(ABC, Generic[T_co]):
     output_prefix: str = ""
     """Prefix for the keys in the output dictionary"""
 
-    def __init__(self, species: T_co, solution: Solution):
-        self._species: T_co = species
+    def __init__(self, species: TypeChemicalSpecies_co, solution: Solution):
+        self._species: TypeChemicalSpecies_co = species
         self._solution: Solution = solution
 
     @property
@@ -217,7 +219,10 @@ class _NumberDensity(ABC, Generic[T_co]):
     #     return f"number_density={self.number_density():.2e}"
 
 
-class _NumberDensityWithSetter(_ValueSetterMixin, _NumberDensity[T_co]):
+TypeNumberDensity = TypeVar("TypeNumberDensity", bound=_NumberDensity)
+
+
+class _NumberDensityWithSetter(_ValueSetterMixin, _NumberDensity[TypeChemicalSpecies_co]):
     """A number density solution component with a setter"""
 
 
@@ -565,22 +570,25 @@ class _CondensedCollection(_NumberDensity[CondensedSpecies]):
         return output_dict
 
 
-U = TypeVar("U", bound=_NumberDensity)
-
-
-class _SolutionContainer(UserDict[T, U]):
+class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
     """A container for the solution
 
     Args:
         init_dict: Initialisation dictionary
     """
 
-    def __init__(self, init_dict: dict[T, U] | None = None, /, **kwargs):
+    def __init__(
+        self, init_dict: dict[TypeChemicalSpecies, TypeNumberDensity] | None = None, /, **kwargs
+    ):
         super().__init__(init_dict, **kwargs)
         self._planet: Planet
 
     @classmethod
-    def create(cls, planet: Planet, init_dict: dict[T, U] | None = None) -> Self:
+    def create(
+        cls,
+        planet: Planet,
+        init_dict: dict[TypeChemicalSpecies, TypeNumberDensity] | None = None,
+    ) -> Self:
         """Creates an instance
 
         Args:
