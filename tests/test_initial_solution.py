@@ -48,7 +48,7 @@ REGRESSORTOL: float = 8e-2
 """Tolerance for testing the regressor output"""
 
 dummy_variable: float = 1
-"""Dummy variable used for temperature and pressure arguments when they are not used internally"""
+"""Dummy variable used for pressure arguments when they are not used internally"""
 
 planet = Planet()
 
@@ -68,9 +68,9 @@ def test_default_dict():
 
     constraints: SystemConstraints = SystemConstraints([])
 
-    initial_solution = InitialSolutionDict(species=species, planet=planet)
+    initial_solution = InitialSolutionDict(species=species)
     result = initial_solution.get_log10_value(
-        constraints, temperature=dummy_variable, pressure=dummy_variable
+        constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
 
     assert np.all(result == 26)
@@ -86,13 +86,11 @@ def test_constraint_fill_dict():
 
     constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
-    initial_solution = InitialSolutionDict(
-        species=species, planet=planet, fill_log10_number_density=20
-    )
+    initial_solution = InitialSolutionDict(species=species, fill_log10_number_density=20)
     result = initial_solution.get_log10_value(
-        constraints, temperature=dummy_variable, pressure=dummy_variable
+        constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([28.55888672, 20, 20])
+    target = np.array([25.25785673, 20, 20])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -112,12 +110,12 @@ def test_args_constraint_fill_dict():
     constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
     initial_solution = InitialSolutionDict(
-        {CO_g: 1e24, H2_g: 1e25}, species=species, planet=planet, fill_log10_number_density=26
+        {CO_g: 1e24, H2_g: 1e25}, species=species, fill_log10_number_density=26
     )
     result = initial_solution.get_log10_value(
-        constraints, temperature=dummy_variable, pressure=dummy_variable
+        constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([28.55888672, 25, 24, 26])
+    target = np.array([25.25785673, 25, 24, 26])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -143,12 +141,11 @@ def test_args_fill_stability_dict():
     initial_solution = InitialSolutionDict(
         {CO_g: 1e24, H2_g: 1e25, "stability_C_cr": 2, H2O_l: 1e22},
         species=species,
-        planet=planet,
         fill_log10_activity=np.log10(0.8),
     )
 
     result = initial_solution.get_log10_value(
-        constraints, temperature=dummy_variable, pressure=dummy_variable
+        constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
     target = np.array([26, 25, 26, 24, 26, 26, 0, 22, -10, 0, 26, 0.30103])
 
@@ -168,11 +165,11 @@ def test_last_solution():
 
     constraints = SystemConstraints([])
 
-    initial_solution = InitialSolutionLast(species=species, planet=planet)
+    initial_solution = InitialSolutionLast(species=species)
 
     # The first initial condition will return the fill value for the pressure
     result = initial_solution.get_log10_value(
-        constraints, temperature=dummy_variable, pressure=dummy_variable
+        constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
     target = np.array([26, 26, 26])
 
@@ -199,7 +196,7 @@ def test_last_solution():
     system.solve(constraints, initial_solution=initial_solution)
 
     result = initial_solution.get_log10_value(
-        constraints, temperature=dummy_variable, pressure=dummy_variable
+        constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
     target = np.array([26.42725976, 26.44234405, 17.50993722])
 
@@ -222,9 +219,7 @@ def test_regressor(generate_regressor_data):
     raw_solution = dataframes["raw_solution"]
     solution = dataframes["solution"]
 
-    initial_solution = InitialSolutionRegressor.from_pickle(
-        filename, species=species, planet=planet
-    )
+    initial_solution = InitialSolutionRegressor.from_pickle(filename, species=species)
 
     for index in [0, 5, 10, 15, 20, 25, 30, 35]:
 
@@ -265,9 +260,9 @@ def test_regressor_override(generate_regressor_data):
     solution = dataframes["solution"]
 
     val_H2: float = 30
-    solution_override = InitialSolutionDict({H2_g: val_H2}, species=species, planet=planet)
+    solution_override = InitialSolutionDict({H2_g: val_H2}, species=species)
     initial_solution = InitialSolutionRegressor.from_pickle(
-        filename, species=species, planet=planet, solution_override=solution_override
+        filename, species=species, solution_override=solution_override
     )
 
     test_constraints = SystemConstraints(
@@ -278,7 +273,7 @@ def test_regressor_override(generate_regressor_data):
     )
 
     result = initial_solution.get_log10_value(
-        test_constraints, temperature=planet.surface_temperature, pressure=dummy_variable
+        test_constraints, temperature=1, pressure=dummy_variable
     )
 
     assert np.isclose(

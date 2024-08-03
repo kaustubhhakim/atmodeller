@@ -701,6 +701,9 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
 class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCollection]):
     """The solution
 
+    Since this solution class is also used for the initial solution, which does not require the
+    :class:`Planet`, :attr:`planet` is a property with a setter.
+
     Args:
         init_dict: Initial dictionary
     """
