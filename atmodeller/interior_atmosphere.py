@@ -147,8 +147,8 @@ class InteriorAtmosphereSystem:
             extra_output: Extra data to write to the output
             max_attempts: Maximum number of attempts to randomise the initial condition to find a
                 solution if the initial guess fails. Defaults to 10.
-            perturb_log10_number_density: Maximum log10 perturbation to apply to the pressures on failure.
-                Defaults to 2.0.
+            perturb_log10_number_density: Maximum log10 perturbation to apply to the pressures on
+                failure. Defaults to 2.0.
             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
             method: Type of solver. Defaults to 'hybr'.
             tol: Tolerance for termination. Defaults to None.
