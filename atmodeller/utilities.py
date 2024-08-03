@@ -30,6 +30,7 @@ from typing import Any, Callable, Type, TypeVar
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from molmass import Formula
 from scipy.constants import kilo, mega
 
 from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
@@ -316,6 +317,18 @@ def reorder_dict(original_dict: dict[Any, Any], key_to_move_first: Any) -> dict:
         key_to_move_first: original_dict[key_to_move_first],
         **{k: v for k, v in original_dict.items() if k != key_to_move_first},
     }
+
+
+def get_molar_mass(species: str) -> float:
+    """Get molar mass
+
+    Args:
+        species: A species
+
+    Returns:
+        Molar mass in kg m\ :sup:`-3`
+    """
+    return UnitConversion.g_to_kg(Formula(species).mass)
 
 
 def get_number_density(temperature: float, pressure: float) -> float:

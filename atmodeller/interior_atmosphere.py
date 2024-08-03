@@ -38,19 +38,6 @@ from atmodeller.solution import Solution
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-# TODO: Renamed, was element_moles
-# @property
-# def moles_of_elements(self) -> float:
-#     """Total number of moles of elements in the atmosphere"""
-#     number_density: float = 0
-#     for element in self.species.elements():
-#         number_density += self.element_gas_number_density(element)["atmosphere_number_density"]
-
-#     moles = self.number_density_to_moles(number_density)
-
-#     return moles
-
-
 @dataclass(kw_only=True)
 class InteriorAtmosphereSystem:
     """An interior-atmosphere system

@@ -23,12 +23,9 @@ import logging
 import pickle
 from collections import UserDict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Hashable
+from typing import TYPE_CHECKING, Hashable
 
 import pandas as pd
-from molmass import Formula
-
-from atmodeller.utilities import UnitConversion, reorder_dict
 
 if TYPE_CHECKING:
     from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
@@ -99,9 +96,6 @@ class Output(UserDict):
             data_list: list[dict[str, float]] = self.data.setdefault(key, [])
             data_list.append(value)
 
-        # TODO: Reinstate
-        # self._add_elements(interior_atmosphere)
-
         self._add_constraints(interior_atmosphere)
         self._add_residual(interior_atmosphere)
 
@@ -122,124 +116,6 @@ class Output(UserDict):
         )
         data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         data_list.append(evaluate_dict)
-
-    def _add_elements(
-        self,
-        interior_atmosphere: InteriorAtmosphereSystem,
-    ) -> None:
-        """Adds elements.
-
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        number_density: dict[str, Any] = {}
-        condensed_number_densities: dict[str, float] = (
-            interior_atmosphere.condensed_element_masses()
-        )
-        # FIXME: Currently unused
-        # gas_volume:float =  interior_atmosphere.gas_volume
-
-        for element in interior_atmosphere.species.elements():
-            number_density[element] = interior_atmosphere.element_number_density(element)
-
-        # To compute astronomical logarithmic abundances (dex) we need to store H abundance, which
-        # is used to normalise all other elemental abundances
-        number_density = reorder_dict(number_density, "H")
-        H_total_moles: float | None = None  # pylint: disable=invalid-name
-
-        # Create and add the output
-        for nn, (element, element_number_density) in enumerate(number_density.items()):
-            output: dict[str, float] = {}
-            logger.debug("Adding %s to output", element)
-            output["molar_mass"] = UnitConversion.g_to_kg(Formula(element).mass)
-            # Atmosphere
-            output["atmosphere_number_density"] = element_number_density[
-                "atmosphere_number_density"
-            ]
-            # FIXME
-            # output["atmosphere_moles"] = interior_atmosphere.number_density_to_moles(
-            #    output["atmosphere_number_density"]
-            # )
-            # output["atmosphere_mass"] = output["atmosphere_moles"] * output["molar_mass"]
-            # FIXME
-            # output["volume_mixing_ratio"] = (
-            #    output["atmosphere_moles"] / interior_atmosphere.atmosphere_element_moles
-            # )
-            # Melt
-            output["melt_number_density"] = element_number_density["melt_number_density"]
-            # FIXME
-            # output["melt_moles"] = interior_atmosphere.number_density_to_moles(
-            #    output["melt_number_density"]
-            # )
-            # output["melt_mass"] = output["melt_moles"] * output["molar_mass"]
-            # Solid
-            output["solid_number_density"] = element_number_density["solid_number_density"]
-            # FIXME
-            # output["solid_moles"] = interior_atmosphere.number_density_to_moles(
-            #    output["solid_number_density"]
-            # )
-            # output["solid_mass"] = output["solid_moles"] * output["molar_mass"]
-
-            try:
-                output["condensed_number_density"] = condensed_number_densities[element]
-                # FIXME
-                # output["condensed_moles"] = interior_atmosphere.number_density_to_moles(
-                #    output["condensed_number_density"]
-                # )
-                # output["condensed_mass"] = output["condensed_moles"] * output["molar_mass"]
-            except KeyError:
-                output["condensed_number_density"] = 0
-                # output["condensed_moles"] = 0
-                # output["condensed_mass"] = 0
-
-            # Totals
-            output["total_number_density"] = (
-                output["atmosphere_number_density"]
-                + output["melt_number_density"]
-                + output["solid_number_density"]
-                + output["condensed_number_density"]
-            )
-            # output["total_moles"] = (
-            #     output["atmosphere_moles"]
-            #     + output["melt_moles"]
-            #     + output["solid_moles"]
-            #     + output["condensed_moles"]
-            # )
-            # output["total_mass"] = (
-            #     output["atmosphere_mass"]
-            #     + output["melt_mass"]
-            #     + output["solid_mass"]
-            #     + output["condensed_mass"]
-            # )
-            # output["degree_of_condensation"] = output["condensed_mass"] / output["total_mass"]
-
-            # if interior_atmosphere.planet.mantle_melt_mass:
-            #     output["melt_ppmw"] = (
-            #         output["melt_mass"] / interior_atmosphere.planet.mantle_melt_mass
-            #     )
-            # else:
-            #     output["melt_ppmw"] = 0
-            # if interior_atmosphere.planet.mantle_solid_mass:
-            #     output["solid_ppmw"] = (
-            #         output["solid_mass"] / interior_atmosphere.planet.mantle_solid_mass
-            #     )
-            # else:
-            #     output["solid_ppmw"] = 0
-
-            # Create a unique key name
-            # key_name: str = f"{element}_total"
-            # data_list: list[dict[str, float]] = self.data.setdefault(key_name, [])
-            # data_list.append(output)
-
-            # # H, if present, is the first in the dictionary, so set as the normalising abundance
-            # if nn == 0 and element == "H":
-            #     H_total_moles = output["total_moles"]  # pylint: disable=invalid-name
-
-            # if H_total_moles is not None:
-            #     # Astronomical logarithmic abundance (dex), e.g. used by FastChem
-            #     output["logarithmic_abundance"] = (
-            #         np.log10(output["total_moles"] / H_total_moles) + 12
-            #     )
 
     def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
         """Adds the residual.
