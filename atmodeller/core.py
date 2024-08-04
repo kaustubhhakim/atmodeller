@@ -207,9 +207,8 @@ class Species(UserList[TypeChemicalSpecies]):
         elements: list[str] = []
         for species in self.data:
             elements.extend(species.elements)
-        unique_elements: list[str] = list(set(elements))
 
-        return unique_elements
+        return list(set(elements))
 
     def species_index(self, find_species: TypeChemicalSpecies) -> int:
         """Gets the index of a species

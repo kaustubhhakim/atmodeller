@@ -704,7 +704,6 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         init_dict: Initial dictionary
     """
 
-    _species: Species
     _atmosphere: _Atmosphere
 
     @classmethod
@@ -725,7 +724,6 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             for species, collection in solution.gas_solution.items()
         }
         # Only need to set these attributes once so pylint: disable=protected-access
-        solution._species = species
         solution._atmosphere = _Atmosphere(init_dict)
 
         return solution
@@ -764,11 +762,6 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         self._atmosphere.planet = value
 
     @property
-    def species(self) -> Species:
-        """Species"""
-        return self._species
-
-    @property
     def value(self) -> npt.NDArray[np.float_]:
         """The solution as an array for the solver"""
         value_list: list = []
@@ -798,15 +791,24 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             condensed_collection.stability.value = value[index + 2]
             index += condensed_collection.NUMBER
 
+    def elements(self) -> list[str]:
+        """Unique elements in the species
+
+        Returns:
+            A list of unique elements
+        """
+        elements: list[str] = []
+        for species in self:
+            elements.extend(species.elements)
+
+        return list(set(elements))
+
     def merge(self, other: Solution) -> None:
         """Merges the data from another solution
 
         Args:
             other: The other solution to merge data from
         """
-        if Counter(self.species) != Counter(other.species):
-            raise ValueError("Species in `self` and `other` must be the same")
-
         self.data |= other.data
 
     def fugacities_by_hill_formula(self) -> dict[str, float]:
@@ -833,8 +835,8 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
     def _output_elements(self) -> dict[str, dict[str, float]]:
         """Output for elements"""
         output_dict: dict[str, dict[str, float]] = {}
-        for element in self.species.elements():
-            element_dict: dict[str, float] = output_dict.setdefault(f"{element}_total", {})
+        for element in self.elements():
+            element_dict: dict[str, float] = output_dict.setdefault(f"element_{element}", {})
             element_dict["total_mass"] = self.mass(element=element)
             total_moles = self.moles(element=element)
             element_dict["total_moles"] = total_moles
@@ -866,7 +868,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """Full output"""
         output_dict: dict[str, dict[str, float]] = {}
         for species, collection in self.items():
-            output_dict[species.name] = collection.output_dict()
+            output_dict[f"species_{species.name}"] = collection.output_dict()
         output_dict |= self._output_elements()
         output_dict["atmosphere"] = self.atmosphere.output_dict()
         output_dict["planet"] = self.planet.output_dict()
