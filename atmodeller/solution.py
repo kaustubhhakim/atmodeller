@@ -715,9 +715,9 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             species: Species
         """
         solution: Self = cls()
-        for gas_species in species.gas_species:
+        for gas_species in species.gas_species():
             solution[gas_species] = _GasCollection(gas_species, solution)
-        for condensed_species in species.condensed_species:
+        for condensed_species in species.condensed_species():
             solution[condensed_species] = _CondensedCollection(condensed_species, solution)
 
         init_dict: dict[GasSpecies, _GasNumberDensity] = {
