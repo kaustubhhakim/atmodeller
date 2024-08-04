@@ -573,6 +573,10 @@ class _CondensedCollection(_NumberDensity[CondensedSpecies]):
 class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
     """A container for the solution"""
 
+    def _sum_values(self, method_name: str, *args, **kwargs) -> float:
+        """Helper method to sum values from the dictionary based on a given method name."""
+        return sum(getattr(value, method_name)(*args, **kwargs) for value in self.values())
+
     def number_density(self, *, element: str | None = None) -> float:
         """Total number density of the species or an individual element
 
@@ -583,11 +587,11 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
         Returns:
             Number density for the species or `element` if not None.
         """
-        return sum(value.number_density(element=element) for value in self.values())
+        return self._sum_values("number_density", element=element)
 
     def element_number_density(self) -> float:
         """Number density of all elements"""
-        return sum(value.element_number_density() for value in self.values())
+        return self._sum_values("element_number_density")
 
     def mass(self, *, element: str | None = None) -> float:
         """Total mass of the species or an individual element
@@ -599,7 +603,7 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
         Returns:
             Mass in kg for the species or `element` if not None.
         """
-        return sum(value.mass(element=element) for value in self.values())
+        return self._sum_values("mass", element=element)
 
     def molecules(self, *, element: str | None = None) -> float:
         """Total number of molecules of the species or an individual element
@@ -611,11 +615,11 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
         Returns:
             Number of molecules for the species or number of `element` if not None.
         """
-        return sum(value.molecules(element=element) for value in self.values())
+        return self._sum_values("molecules", element=element)
 
     def elements(self) -> float:
         """Total number of elements"""
-        return sum(value.elements() for value in self.values())
+        return self._sum_values("elements")
 
     def moles(self, *, element: str | None = None) -> float:
         """Total number of moles of the species or an individual element
@@ -627,11 +631,11 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
         Returns:
             Number of moles for the species or `element` if not None.
         """
-        return sum(value.moles(element=element) for value in self.values())
+        return self._sum_values("moles", element=element)
 
     def element_moles(self) -> float:
         """Total number of moles of elements"""
-        return sum(value.element_moles() for value in self.values())
+        return self._sum_values("element_moles")
 
 
 class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
@@ -639,6 +643,13 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
 
     planet: Planet
     """Planet"""
+
+    # def __init__(self, dict=None, /, **kwargs):
+    #     self.data = {}
+    #     if dict is not None:
+    #         self.update(dict)
+    #     if kwargs:
+    #         self.update(kwargs)
 
     def molar_mass(self) -> float:
         """Molar mass"""
