@@ -101,6 +101,33 @@ class InteriorAtmosphereSystem:
         """The total number of systems solved"""
         return self.output.size
 
+    def get_reaction_array(self) -> npt.NDArray[np.float_]:
+        """Gets the reaction array
+
+        Returns:
+            The reaction array
+        """
+        reaction_list: list = []
+        for collection in self.solution.gas_solution.values():
+            reaction_list.append(collection.gas_abundance.value)
+        for collection in self.solution.condensed_solution.values():
+            reaction_list.append(collection.activity.value)
+
+        return np.array(reaction_list, dtype=np.float_)
+
+    def get_stability_array(self) -> npt.NDArray[np.float_]:
+        """Gets the condensate stability array
+
+        Returns:
+            The condensate stability array
+        """
+        stability_array: npt.NDArray = np.zeros(self.species.number, dtype=np.float_)
+        for condensed_species, collection in self.solution.condensed_solution.items():
+            index: int = self.species.species_index(condensed_species)
+            stability_array[index] = collection.stability.value
+
+        return stability_array
+
     def residual_dict(self) -> dict[str, float]:
         """Residual of the objective function
 
@@ -276,8 +303,8 @@ class InteriorAtmosphereSystem:
         temperature: float = self.solution.atmosphere.temperature()
         pressure: float = self.solution.atmosphere.pressure()
 
-        reaction_array: npt.NDArray[np.float_] = self.solution.get_reaction_array()
-        stability_array: npt.NDArray[np.float_] = self.solution.get_stability_array()
+        reaction_array: npt.NDArray[np.float_] = self.get_reaction_array()
+        stability_array: npt.NDArray[np.float_] = self.get_stability_array()
 
         residual_reaction: npt.NDArray[np.float_] = self._reaction_network.get_residual(
             temperature=temperature,

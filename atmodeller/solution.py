@@ -821,33 +821,6 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
 
         return fugacities
 
-    def get_reaction_array(self) -> npt.NDArray[np.float_]:
-        """Gets the reaction array
-
-        Returns:
-            The reaction array
-        """
-        reaction_list: list = []
-        for collection in self.gas_solution.values():
-            reaction_list.append(collection.gas_abundance.value)
-        for collection in self.condensed_solution.values():
-            reaction_list.append(collection.activity.value)
-
-        return np.array(reaction_list, dtype=np.float_)
-
-    def get_stability_array(self) -> npt.NDArray[np.float_]:
-        """Gets the condensate stability array
-
-        Returns:
-            The condensate stability array
-        """
-        stability_array: npt.NDArray = np.zeros(self.species.number, dtype=np.float_)
-        for condensed_species, collection in self.condensed_solution.items():
-            index: int = self.species.species_index(condensed_species)
-            stability_array[index] = collection.stability.value
-
-        return stability_array
-
     @property
     def total_moles_hydrogen(self) -> float | None:
         """Total moles of hydrogen"""

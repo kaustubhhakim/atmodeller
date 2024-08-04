@@ -245,7 +245,7 @@ class Species(UserList[TypeChemicalSpecies]):
 
         return self.data[index]
 
-    def get_species_from_name(self, species_name: str) -> ChemicalSpecies:
+    def get_species_from_name(self, species_name: str) -> TypeChemicalSpecies:
         """Gets a species from its name
 
         Args:
