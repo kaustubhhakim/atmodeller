@@ -637,15 +637,8 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
 class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
     """Bulk properties of the atmosphere"""
 
-    _planet: Planet
-
-    @property
-    def planet(self) -> Planet:
-        return self._planet
-
-    @planet.setter
-    def planet(self, value: Planet) -> None:
-        self._planet: Planet = value
+    planet: Planet
+    """Planet"""
 
     def molar_mass(self) -> float:
         """Molar mass"""
@@ -661,8 +654,11 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
         return sum(value.pressure() for value in self.values())
 
     def temperature(self) -> float:
-        """Temperature"""
-        return self._planet.surface_temperature
+        """Temperature
+
+        This is the same as the surface temperature of the planet
+        """
+        return self.planet.surface_temperature
 
     def volume(self) -> float:
         """Volume
@@ -672,7 +668,7 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
 
         TODO: Should a correction be applied to the volume term for a non-ideal atmosphere?
         """
-        volume: float = self._planet.surface_area / self._planet.surface_gravity
+        volume: float = self.planet.surface_area / self.planet.surface_gravity
         volume *= GAS_CONSTANT * self.temperature() / self.molar_mass()
 
         return volume
@@ -759,11 +755,12 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
 
     @property
     def planet(self) -> Planet:
-        return self._planet
+        """Planet"""
+        return self._atmosphere.planet
 
     @planet.setter
     def planet(self, value: Planet) -> None:
-        self._planet = value
+        """Planet setter, which sets planet on :attr:`_atmosphere`"""
         self._atmosphere.planet = value
 
     @property
