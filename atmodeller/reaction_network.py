@@ -172,9 +172,8 @@ class ReactionNetwork:
         assert self.reaction_matrix is not None
 
         delta_n: float = 0
-        for species in self._species.gas_species():
-            species_index: int = self._species.species_index(species)
-            delta_n += self.reaction_matrix[reaction_index, species_index]
+        for gas_index in self._species.gas_species():
+            delta_n += self.reaction_matrix[reaction_index, gas_index]
 
         return delta_n
 
@@ -226,7 +225,7 @@ class ReactionNetwork:
         """
         gibbs_energy: float = 0
         assert self.reaction_matrix is not None
-        for species_index, species in enumerate(self._species.data):
+        for species_index, species in enumerate(self._species):
             assert species.thermodata is not None
             gibbs_energy += self.reaction_matrix[
                 reaction_index, species_index
@@ -321,12 +320,11 @@ class ReactionNetwork:
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
-        for gas_species in self._species.gas_species():
+        for gas_species_index, gas_species in self._species.gas_species().items():
             fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
                 temperature=temperature, pressure=pressure
             )
-            index: int = self._species.species_index(gas_species)
-            fugacity_coefficients[index] = fugacity_coefficient
+            fugacity_coefficients[gas_species_index] = fugacity_coefficient
 
         log_fugacity_coefficients: npt.NDArray[np.float_] = np.log10(fugacity_coefficients)
         logger.debug("Log10 fugacity coefficient vector = %s", log_fugacity_coefficients)
@@ -399,9 +397,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             constraints=constraints
         )
         activity_modifier: npt.NDArray[np.float_] = np.zeros_like(coefficient_matrix)
-        for species in self._species.condensed_species():
-            index: int = self._species.species_index(species)
-            activity_modifier[:, index] = coefficient_matrix[:, index]
+        for condensed_index in self._species.condensed_species():
+            activity_modifier[:, condensed_index] = coefficient_matrix[:, condensed_index]
 
         logger.debug("activity_modifier = %s", activity_modifier)
 

@@ -28,7 +28,7 @@ import numpy as np
 
 from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
-from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies, TypeChemicalSpecies
+from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.utilities import dataclass_to_logger, filter_by_type
@@ -173,7 +173,7 @@ class LiquidSpecies(CondensedSpecies):
         super().__init__(formula, "l", **kwargs)
 
 
-class Species(UserList[TypeChemicalSpecies]):
+class Species(UserList[ChemicalSpecies]):
     """A list of species
 
     Args:
@@ -188,15 +188,15 @@ class Species(UserList[TypeChemicalSpecies]):
     @property
     def number(self) -> int:
         """Number of species"""
-        return len(self)
+        return len(self.data)
 
-    def gas_species(self) -> Species[GasSpecies]:
+    def gas_species(self) -> dict[int, GasSpecies]:
         """Gas species"""
-        return Species(filter_by_type(self, GasSpecies).values())
+        return filter_by_type(self, GasSpecies)
 
-    def condensed_species(self) -> Species[CondensedSpecies]:
+    def condensed_species(self) -> dict[int, CondensedSpecies]:
         """Condensed species"""
-        return Species(filter_by_type(self, CondensedSpecies).values())
+        return filter_by_type(self, CondensedSpecies)
 
     def elements(self) -> list[str]:
         """Unique elements in the species
@@ -210,7 +210,7 @@ class Species(UserList[TypeChemicalSpecies]):
 
         return list(set(elements))
 
-    def species_index(self, find_species: TypeChemicalSpecies) -> int:
+    def species_index(self, find_species: ChemicalSpecies) -> int:
         """Gets the index of a species
 
         Args:
@@ -222,13 +222,13 @@ class Species(UserList[TypeChemicalSpecies]):
         Raises:
             ValueError: The species is not in the species list
         """
-        for index, species in enumerate(self):
+        for index, species in enumerate(self.data):
             if species is find_species:
                 return index
 
         raise ValueError(f"{find_species.name} is not in the species list")
 
-    def get_species(self, find_species: TypeChemicalSpecies) -> TypeChemicalSpecies:
+    def get_species(self, find_species: ChemicalSpecies) -> ChemicalSpecies:
         """Gets a species
 
         Args:
@@ -244,7 +244,7 @@ class Species(UserList[TypeChemicalSpecies]):
 
         return self.data[index]
 
-    def get_species_from_name(self, species_name: str) -> TypeChemicalSpecies:
+    def get_species_from_name(self, species_name: str) -> ChemicalSpecies:
         """Gets a species from its name
 
         Args:
@@ -280,14 +280,14 @@ class Species(UserList[TypeChemicalSpecies]):
             except KeyError as exc:
                 raise ValueError(f"Cannot find solubilities for {melt_composition}") from exc
 
-            for species in self.gas_species():
+            for gas_species in self.gas_species().values():
                 try:
-                    species.solubility = solubilities[species.hill_formula]
+                    gas_species.solubility = solubilities[gas_species.hill_formula]
                     logger.info(
                         "Found solubility law for %s: %s",
-                        species.hill_formula,
-                        species.solubility.__class__.__name__,
+                        gas_species.hill_formula,
+                        gas_species.solubility.__class__.__name__,
                     )
                 except KeyError:
-                    logger.info("No solubility law for %s", species.hill_formula)
-                    species.solubility = NoSolubility()
+                    logger.info("No solubility law for %s", gas_species.hill_formula)
+                    gas_species.solubility = NoSolubility()

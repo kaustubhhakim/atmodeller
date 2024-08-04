@@ -424,7 +424,7 @@ class SystemConstraints(UserList[ConstraintProtocol]):
         Args:
             species: Species
         """
-        for condensed_species in species.condensed_species():
+        for condensed_species in species.condensed_species().values():
             if condensed_species not in self.constrained_species:
                 logger.debug(
                     "Automatically adding stable activity constraint for %s", condensed_species
