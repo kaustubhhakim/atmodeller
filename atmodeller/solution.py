@@ -56,6 +56,10 @@ STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
 TAU: float = 1e-15
 """Tau factor for the stability of condensed species"""
+SPECIES_PREFIX: str = "species_"
+"""Name prefix for the output keys of species"""
+ELEMENT_PREFIX: str = "element_"
+"""Name prefix for the output keys of elements"""
 LOG10_TAU: float = np.log10(TAU)
 """Log10 of the tau factor"""
 
@@ -653,16 +657,14 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
 
     def molar_mass(self) -> float:
         """Molar mass"""
-        return sum(
-            [
-                species.molar_mass * value.number_density() / self.number_density()
-                for species, value in self.items()
-            ]
+        return (
+            sum([species.molar_mass * value.number_density() for species, value in self.items()])
+            / self.number_density()
         )
 
     def pressure(self) -> float:
         """Pressure"""
-        return sum(value.pressure() for value in self.values())
+        return self._sum_values("pressure")
 
     def temperature(self) -> float:
         """Temperature
@@ -775,7 +777,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
     @property
     def value(self) -> npt.NDArray[np.float_]:
         """The solution as an array for the solver"""
-        value_list: list = []
+        value_list: list[float] = []
         for gas_collection in self.gas_solution.values():
             value_list.append(gas_collection.gas_abundance.value)
         for condensed_collection in self.condensed_solution.values():
@@ -834,24 +836,25 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
 
         return fugacities
 
-    @property
     def total_moles_hydrogen(self) -> float | None:
         """Total moles of hydrogen"""
         moles_of_hydrogen: float = self.moles(element="H")
         if moles_of_hydrogen <= 0:
-            return
-
-        return moles_of_hydrogen
+            return None
+        else:
+            return moles_of_hydrogen
 
     def _output_elements(self) -> dict[str, dict[str, float]]:
         """Output for elements"""
         output_dict: dict[str, dict[str, float]] = {}
         for element in self.elements():
-            element_dict: dict[str, float] = output_dict.setdefault(f"element_{element}", {})
+            element_dict: dict[str, float] = output_dict.setdefault(
+                f"{ELEMENT_PREFIX}{element}", {}
+            )
             element_dict["total_mass"] = self.mass(element=element)
             total_moles = self.moles(element=element)
             element_dict["total_moles"] = total_moles
-            total_moles_hydrogen: float | None = self.total_moles_hydrogen
+            total_moles_hydrogen: float | None = self.total_moles_hydrogen()
             if total_moles_hydrogen is not None:
                 element_dict["logarithmic_abundance"] = (
                     np.log10(total_moles / total_moles_hydrogen) + 12
@@ -879,7 +882,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """Full output"""
         output_dict: dict[str, dict[str, float]] = {}
         for species, collection in self.items():
-            output_dict[f"species_{species.name}"] = collection.output_dict()
+            output_dict[f"{SPECIES_PREFIX}{species.name}"] = collection.output_dict()
         output_dict |= self._output_elements()
         output_dict["atmosphere"] = self.atmosphere.output_dict()
         output_dict["planet"] = self.planet.output_dict()

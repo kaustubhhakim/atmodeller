@@ -32,6 +32,7 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.solution import ELEMENT_PREFIX
 
 logger: logging.Logger = debug_logger()
 
@@ -46,12 +47,12 @@ def test_graphite_water_condensed_output(graphite_water_condensed) -> None:
 
     output = system.output(to_dict=True, to_excel=True)
 
-    assert 9.89452e18 == pytest.approx(output["C_total"][0]["atmosphere_mass"])
-    assert 9.81055e19 == pytest.approx(output["C_total"][0]["condensed_mass"])
-    assert 3.9873e19 == pytest.approx(output["O_total"][0]["atmosphere_mass"])
-    assert 2.4431158e21 == pytest.approx(output["O_total"][0]["condensed_mass"])
-    assert 2.17398e18 == pytest.approx(output["H_total"][0]["atmosphere_mass"])
-    assert 3.07826e20 == pytest.approx(output["H_total"][0]["condensed_mass"])
+    assert 9.89452e18 == pytest.approx(output[f"{ELEMENT_PREFIX}C"][0]["atmosphere_mass"])
+    assert 9.81055e19 == pytest.approx(output[f"{ELEMENT_PREFIX}C"][0]["condensed_mass"])
+    assert 3.9873e19 == pytest.approx(output[f"{ELEMENT_PREFIX}O"][0]["atmosphere_mass"])
+    assert 2.4431158e21 == pytest.approx(output[f"{ELEMENT_PREFIX}O"][0]["condensed_mass"])
+    assert 2.17398e18 == pytest.approx(output[f"{ELEMENT_PREFIX}H"][0]["atmosphere_mass"])
+    assert 3.07826e20 == pytest.approx(output[f"{ELEMENT_PREFIX}H"][0]["condensed_mass"])
 
 
 @pytest.mark.skip("Need to fix C-H-O condensed phase partitioning")
