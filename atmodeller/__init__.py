@@ -22,8 +22,11 @@ __version__: str = "0.1.0"
 
 import logging
 
+import numpy as np
 from molmass import Formula
 from scipy import constants
+
+np.seterr(divide="ignore")
 
 AVOGADRO: float = constants.Avogadro
 """Avogadro constant in 1/mol"""

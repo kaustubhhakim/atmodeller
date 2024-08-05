@@ -54,7 +54,7 @@ ACTIVITY_PREFIX: str = "activity_"
 """Name prefix for the activity of condensed species"""
 ELEMENT_PREFIX: str = "element_"
 """Name prefix for the output keys of elements"""
-SPECIES_PREFIX: str = "species_"
+SPECIES_PREFIX: str = ""
 """Name prefix for the output keys of species"""
 STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
@@ -881,16 +881,28 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
 
         return output_dict
 
-    def output_raw_solution(self) -> dict[str, float]:
-        """Outputs the raw solution as seen by the solver"""
+    def output_raw_solution(self, value_format: str = ".6f") -> dict[str, float]:
+        """Outputs the raw solution as seen by the solver
+
+        Args:
+            value_format: A format string that defines how the float values should be formatted.
+                For example, ".6f" formats the number to 6 decimal places.
+
+        Returns:
+            A dictionary with formatted keys and float values representing the raw solution.
+        """
         output: dict[str, float] = {}
         for gas_species, collection in self.gas_solution.items():
-            output[gas_species.name] = collection.gas_abundance.value
+            output[gas_species.name] = float(f"{collection.gas_abundance.value:{value_format}}")
         for condensed_species, collection in self.condensed_solution.items():
             species_name: str = condensed_species.name
-            output[f"{ACTIVITY_PREFIX}{species_name}"] = collection.activity.value
+            output[f"{ACTIVITY_PREFIX}{species_name}"] = float(
+                f"{collection.activity.value:{value_format}}"
+            )
             output[species_name] = collection.condensed_abundance.value
-            output[f"{STABILITY_PREFIX}{species_name}"] = collection.stability.value
+            output[f"{STABILITY_PREFIX}{species_name}"] = float(
+                f"{collection.stability.value:{value_format}}"
+            )
 
         return output
 

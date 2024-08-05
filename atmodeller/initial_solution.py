@@ -40,6 +40,7 @@ from atmodeller.solution import (
     ACTIVITY_PREFIX,
     LOG10_TAU,
     STABILITY_PREFIX,
+    TAU,
     ComponentWithSetterProtocol,
     Solution,
 )
@@ -65,7 +66,7 @@ class InitialSolutionProtocol(Protocol):
     @property
     def species(self) -> Species: ...
 
-    def get_log10_value(
+    def set(
         self,
         constraints: SystemConstraints,
         *,
@@ -73,7 +74,7 @@ class InitialSolutionProtocol(Protocol):
         pressure: float,
         perturb_log10_number_density: float = 0,
         attempt: int = 0,
-    ) -> npt.NDArray[np.float_]: ...
+    ) -> None: ...
 
     def update(self, output: Output) -> None: ...
 
@@ -105,7 +106,7 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26,
-        fill_log10_activity: float = 0,
+        fill_log10_activity: float = TAU,
         fill_log10_stability: float = LOG10_TAU,
     ):
         logger.debug("Creating %s", self.__class__.__name__)

@@ -217,7 +217,13 @@ class InteriorAtmosphereSystem:
                 perturb_log10_number_density=perturb_log10_number_density,
                 attempt=attempt,
             )
-            logger.info("Initial solution = %s", log_solution)
+            # FIXME: Hack for convenient output
+            initial_solution_output: Solution = Solution.create_from_species(species=self.species)
+            initial_solution_output.value = log_solution
+            logger.info(
+                "initial solution = %s",
+                pprint.pformat(initial_solution_output.output_raw_solution(".2e")),
+            )
             try:
                 sol = root(
                     self._objective_func,
@@ -232,7 +238,7 @@ class InteriorAtmosphereSystem:
                     options=options,
                 )
                 logger.info(sol["message"])
-                logger.info("sol = %s", sol)
+                logger.debug("sol = %s", sol)
 
             except TypeError as exc:
                 msg: str = (
@@ -249,18 +255,24 @@ class InteriorAtmosphereSystem:
                     sol.success = False
 
             if sol.success:
-                logger.info("Actual solution = %s", sol.x)
-                error: npt.NDArray = np.sqrt(mean_squared_error(sol.x, log_solution))
-                logger.info(
-                    "%s: RMSE (actual vs initial) = %s",
-                    self.initial_solution.__class__.__name__,
-                    error,
-                )
                 self._log_solution = sol.x
                 self._residual = sol.fun
+                residual_rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(self._residual**2))
+                logger.info("Residual RMSE = %.2e", residual_rmse)
+                logger.info(
+                    "Raw solution = %s", pprint.pformat(self.solution.output_raw_solution(".2e"))
+                )
+                initial_solution_rmse: npt.NDArray[np.float_] = np.sqrt(
+                    mean_squared_error(sol.x, log_solution)
+                )
+                logger.info(
+                    "Initial solution RMSE (%s) = %.2e",
+                    self.initial_solution.__class__.__name__,
+                    initial_solution_rmse,
+                )
                 self.output.add(self, extra_output)
                 initial_solution.update(self.output)
-                logger.info(pprint.pformat(self.output_solution()))
+                # logger.info(pprint.pformat(self.output_solution()))
                 break
             else:
                 logger.warning("The solver failed.")
@@ -350,9 +362,6 @@ class InteriorAtmosphereSystem:
             )
         )
         logger.debug("residual = %s", residual)
-
-        error: npt.NDArray[np.float_] = np.sqrt(np.sum(residual**2))
-        # logger.info("Residual RMS = %.2e", error)
 
         return residual
 
