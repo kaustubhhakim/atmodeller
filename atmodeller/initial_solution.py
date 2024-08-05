@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import logging
+import pprint
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -66,7 +67,7 @@ class InitialSolutionProtocol(Protocol):
     @property
     def species(self) -> Species: ...
 
-    def set(
+    def get_log10_value(
         self,
         constraints: SystemConstraints,
         *,
@@ -74,7 +75,7 @@ class InitialSolutionProtocol(Protocol):
         pressure: float,
         perturb_log10_number_density: float = 0,
         attempt: int = 0,
-    ) -> None: ...
+    ) -> npt.NDArray[np.float_]: ...
 
     def update(self, output: Output) -> None: ...
 
@@ -269,7 +270,9 @@ class InitialSolution(ABC, Generic[T]):
             perturb_log10_number_density=perturb_value,
         )
 
-        logger.debug("initial_solution = %s", self.solution.output_raw_solution())
+        logger.info(
+            "Initial solution estimate = %s", pprint.pformat(self.solution.output_raw_solution())
+        )
 
         return self.solution.value
 

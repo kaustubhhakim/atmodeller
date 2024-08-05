@@ -217,13 +217,6 @@ class InteriorAtmosphereSystem:
                 perturb_log10_number_density=perturb_log10_number_density,
                 attempt=attempt,
             )
-            # FIXME: Hack for convenient output
-            initial_solution_output: Solution = Solution.create_from_species(species=self.species)
-            initial_solution_output.value = log_solution
-            logger.info(
-                "initial solution = %s",
-                pprint.pformat(initial_solution_output.output_raw_solution(".2e")),
-            )
             try:
                 sol = root(
                     self._objective_func,
@@ -260,7 +253,7 @@ class InteriorAtmosphereSystem:
                 residual_rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(self._residual**2))
                 logger.info("Residual RMSE = %.2e", residual_rmse)
                 logger.info(
-                    "Raw solution = %s", pprint.pformat(self.solution.output_raw_solution(".2e"))
+                    "Raw solution = %s", pprint.pformat(self.solution.output_raw_solution())
                 )
                 initial_solution_rmse: npt.NDArray[np.float_] = np.sqrt(
                     mean_squared_error(sol.x, log_solution)
