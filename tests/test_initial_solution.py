@@ -147,7 +147,7 @@ def test_args_fill_stability_dict():
     result = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([26, 25, 26, 24, 26, 26, 0, 22, -10, 0, 26, 0.30103])
+    target = np.array([26, 25, 26, 24, 26, 26, 0, 22, -15, 0, 26, 0.30103])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -259,8 +259,12 @@ def test_regressor_override(generate_regressor_data):
     raw_solution = dataframes["raw_solution"]
     solution = dataframes["solution"]
 
-    val_H2: float = 30
-    solution_override = InitialSolutionDict({H2_g: val_H2}, species=species)
+    # For the override we must restrict the species to the specific species we want to override
+    number_density_H2: float = 1e30
+    species_H2 = species.get_species_from_name("H2_g")
+    species_only_H2 = Species([species_H2])
+    solution_override = InitialSolutionDict({H2_g: number_density_H2}, species=species_only_H2)
+
     initial_solution = InitialSolutionRegressor.from_pickle(
         filename, species=species, solution_override=solution_override
     )
@@ -273,13 +277,13 @@ def test_regressor_override(generate_regressor_data):
     )
 
     result = initial_solution.get_log10_value(
-        test_constraints, temperature=1, pressure=dummy_variable
+        test_constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
 
     assert np.isclose(
         raw_solution.iloc[0]["H2O_g"], result[0], atol=REGRESSORTOL, rtol=REGRESSORTOL
     )
-    assert np.isclose(val_H2, result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL)
+    assert np.isclose(np.log10(number_density_H2), result[1], atol=REGRESSORTOL, rtol=REGRESSORTOL)
     assert np.isclose(
         raw_solution.iloc[0]["O2_g"], result[2], atol=REGRESSORTOL, rtol=REGRESSORTOL
     )

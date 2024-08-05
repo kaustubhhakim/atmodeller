@@ -105,8 +105,8 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26,
-        fill_log10_activity: float = LOG10_TAU,
-        fill_log10_stability: float = -10,
+        fill_log10_activity: float = 0,
+        fill_log10_stability: float = LOG10_TAU,
     ):
         logger.debug("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -319,7 +319,6 @@ class InitialSolutionDict(InitialSolution[dict]):
             Log10 values or None
         """
         key: ChemicalSpecies | str = f"{prefix}{species.name}" if prefix else species
-
         try:
             output: float | None = np.log10(self.value[key], dtype=np.float_)
         except KeyError:
@@ -559,7 +558,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         """Includes a user-specified override to the initial solution"""
         super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
 
-        # FIXME:
         if self._solution_override is not None:
             self._solution_override.set_data(
                 constraints,
@@ -567,7 +565,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
                 pressure=pressure,
             )
             self.solution.merge(self._solution_override.solution)
-            print(self.solution)
 
     def action_fit(self, output: Output) -> tuple[int, int] | None:
         """Checks if a fit is necessary.

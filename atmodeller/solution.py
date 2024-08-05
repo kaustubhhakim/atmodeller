@@ -52,14 +52,14 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 ACTIVITY_PREFIX: str = "activity_"
 """Name prefix for the activity of condensed species"""
+ELEMENT_PREFIX: str = "element_"
+"""Name prefix for the output keys of elements"""
+SPECIES_PREFIX: str = "species_"
+"""Name prefix for the output keys of species"""
 STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
 TAU: float = 1e-15
 """Tau factor for the stability of condensed species"""
-SPECIES_PREFIX: str = "species_"
-"""Name prefix for the output keys of species"""
-ELEMENT_PREFIX: str = "element_"
-"""Name prefix for the output keys of elements"""
 LOG10_TAU: float = np.log10(TAU)
 """Log10 of the tau factor"""
 
@@ -219,8 +219,8 @@ class _NumberDensity(ABC, Generic[TypeChemicalSpecies_co]):
 
         return output_dict
 
-    # def __repr__(self) -> str:
-    #     return f"number_density={self.number_density():.2e}"
+    def __repr__(self) -> str:
+        return f"number_density={self.number_density():.2e}"
 
 
 TypeNumberDensity = TypeVar("TypeNumberDensity", bound=_NumberDensity)
@@ -497,11 +497,8 @@ class _GasCollection(_NumberDensity[GasSpecies]):
 
         return output_dict
 
-    # def __repr__(self) -> str:
-    #     repr_str: str = f"gas_{self.gas_abundance.__repr__()}, "
-    #     repr_str += f"dissolved_{self.dissolved_abundance.__repr__()}"
-
-    #     return repr_str
+    def __repr__(self) -> str:
+        return f"{self.gas_abundance!r}"
 
 
 class _CondensedCollection(_NumberDensity[CondensedSpecies]):
@@ -545,12 +542,12 @@ class _CondensedCollection(_NumberDensity[CondensedSpecies]):
     def value(self) -> float:
         return self.condensed_abundance.value
 
-    # def __repr__(self) -> str:
-    #     base_repr: str = super().__repr__().rstrip(")")
-    #     repr_str: str = f"{base_repr}, activity={10**self.activity.value}, "
-    #     repr_str += f"stability={10**self.stability.value}"
+    def __repr__(self) -> str:
+        base_repr: str = super().__repr__().rstrip(")")
+        repr_str: str = f"{base_repr}, activity={10**self.activity.value}, "
+        repr_str += f"stability={10**self.stability.value}"
 
-    #     return repr_str
+        return repr_str
 
     @override
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:
@@ -647,13 +644,6 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
 
     planet: Planet
     """Planet"""
-
-    # def __init__(self, dict=None, /, **kwargs):
-    #     self.data = {}
-    #     if dict is not None:
-    #         self.update(dict)
-    #     if kwargs:
-    #         self.update(kwargs)
 
     def molar_mass(self) -> float:
         """Molar mass"""
