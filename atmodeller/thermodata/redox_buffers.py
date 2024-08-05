@@ -58,7 +58,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
     ):
         self.log10_shift: float = log10_shift
         self.calibration: ExperimentalCalibration = calibration
-        logger.info("Setting experimental calibration = %s", calibration)
+        logger.debug("Setting experimental calibration = %s", calibration)
 
     @abstractmethod
     def _get_buffer_log10_value(self, temperature: float, pressure: float, **kwargs) -> float:

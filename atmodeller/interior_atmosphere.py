@@ -352,7 +352,7 @@ class InteriorAtmosphereSystem:
         logger.debug("residual = %s", residual)
 
         error: npt.NDArray[np.float_] = np.sqrt(np.sum(residual**2))
-        logger.info("Residual RMS = %.2e", error)
+        # logger.info("Residual RMS = %.2e", error)
 
         return residual
 
