@@ -22,6 +22,7 @@ import logging
 import pprint
 from dataclasses import dataclass, field
 
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from scipy.linalg import LinAlgError
@@ -32,7 +33,7 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
-from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
+from atmodeller.reaction_network_jax import ReactionNetworkWithCondensateStability
 from atmodeller.solution import Solution
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class InteriorAtmosphereSystem:
     """Solution"""
     _reaction_network: ReactionNetworkWithCondensateStability = field(init=False)
     _constraints: SystemConstraints = field(init=False, default_factory=SystemConstraints)
-    _residual: npt.NDArray = field(init=False)
+    _residual: jnp.ndarray = field(init=False)
     _attempted_solves: int = field(init=False, default=0)
     _failed_solves: int = field(init=False, default=0)
 
@@ -101,7 +102,7 @@ class InteriorAtmosphereSystem:
         """The total number of systems solved"""
         return self.output.size
 
-    def get_reaction_array(self) -> npt.NDArray[np.float_]:
+    def get_reaction_array(self) -> jnp.ndarray:
         """Gets the reaction array
 
         Returns:
@@ -113,18 +114,18 @@ class InteriorAtmosphereSystem:
         for collection in self.solution.condensed_solution.values():
             reaction_list.append(collection.activity.value)
 
-        return np.array(reaction_list, dtype=np.float_)
+        return jnp.array(reaction_list, dtype=jnp.float_)
 
-    def get_stability_array(self) -> npt.NDArray[np.float_]:
+    def get_stability_array(self) -> jnp.ndarray:
         """Gets the condensate stability array
 
         Returns:
             The condensate stability array
         """
-        stability_array: npt.NDArray = np.zeros(self.species.number, dtype=np.float_)
+        stability_array: jnp.ndarray = jnp.zeros(self.species.number, dtype=jnp.float_)
         for condensed_species, collection in self.solution.condensed_solution.items():
             index: int = self.species.species_index(condensed_species)
-            stability_array[index] = collection.stability.value
+            stability_array = stability_array.at[index].set(collection.stability.value)
 
         return stability_array
 
@@ -135,19 +136,19 @@ class InteriorAtmosphereSystem:
         """
         output: dict[str, float] = {}
         for index, reaction in enumerate(self._reaction_network.reactions().values()):
-            output[reaction] = self._residual[index]
+            output[reaction] = self._residual[index].item()
         for index, constraint in enumerate(self.constraints.reaction_network_constraints):
             row_index: int = self._reaction_network.number_reactions + index
-            output[constraint.name] = self._residual[row_index]
+            output[constraint.name] = self._residual[row_index].item()
         for index, constraint in enumerate(self.constraints.mass_constraints):
             row_index = (
                 self._reaction_network.number_reactions
                 + self.constraints.number_reaction_network_constraints
                 + index
             )
-            output[constraint.name] = self._residual[row_index]
+            output[constraint.name] = self._residual[row_index].item()
         for index, constraint in enumerate(self.constraints.total_pressure_constraint):
-            output[constraint.name] = self._residual[-1]  # Always last index if applied
+            output[constraint.name] = self._residual[-1].item()  # Always last index if applied
 
         output["rms"] = np.sqrt(np.mean(np.array(list(output.values())) ** 2))
 
@@ -194,14 +195,14 @@ class InteriorAtmosphereSystem:
 
         # These can be determined once per solve because they depend on reaction stoichiometry and
         # constraints, both of which are known and both of which are independent of the solution.
-        coefficient_matrix: npt.NDArray[np.float_] = self._reaction_network.get_coefficient_matrix(
+        coefficient_matrix: jnp.ndarray = self._reaction_network.get_coefficient_matrix(
             self.constraints
         )
-        activity_modifier: npt.NDArray[np.float_] = self._reaction_network.get_activity_modifier(
+        activity_modifier: jnp.ndarray = self._reaction_network.get_activity_modifier(
             self.constraints
         )
-        equilibrium_modifier: npt.NDArray[np.float_] = (
-            self._reaction_network.get_equilibrium_modifier(self.constraints)
+        equilibrium_modifier: jnp.ndarray = self._reaction_network.get_equilibrium_modifier(
+            self.constraints
         )
 
         for attempt in range(max_attempts):
@@ -210,7 +211,7 @@ class InteriorAtmosphereSystem:
             # The only constraints that require pressure are the fugacity constraints, so for the
             # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
             # ensure the initial solution is bounded.
-            log_solution: npt.NDArray = initial_solution.get_log10_value(
+            log_solution: jnp.ndarray = initial_solution.get_log10_value(
                 self.constraints,
                 temperature=self.solution.atmosphere.temperature(),
                 pressure=1,
@@ -229,6 +230,7 @@ class InteriorAtmosphereSystem:
                     method=method,
                     tol=tol,
                     options=options,
+                    # TODO: Add jac=
                 )
                 logger.info(sol["message"])
                 logger.debug("sol = %s", sol)
@@ -248,15 +250,18 @@ class InteriorAtmosphereSystem:
                     sol.success = False
 
             if sol.success:
-                self._log_solution = sol.x
+                # Below doesm't seem to be used anywhere
+                # self._log_solution = sol.x
                 self._residual = sol.fun
-                residual_rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(self._residual**2))
+                residual_rmse: npt.NDArray[np.float_] = np.sqrt(
+                    np.sum(np.array(self._residual) ** 2)
+                )
                 logger.info("Residual RMSE = %.2e", residual_rmse)
                 logger.info(
                     "Actual solution = %s", pprint.pformat(self.solution.output_raw_solution())
                 )
                 initial_solution_rmse: npt.NDArray[np.float_] = np.sqrt(
-                    mean_squared_error(sol.x, log_solution)
+                    mean_squared_error(sol.x, np.array(log_solution))
                 )
                 logger.info(
                     "Initial solution RMSE (%s) = %.2e",
@@ -284,11 +289,11 @@ class InteriorAtmosphereSystem:
 
     def _objective_func(
         self,
-        log_solution: npt.NDArray,
-        coefficient_matrix: npt.NDArray,
-        activity_modifier: npt.NDArray,
-        equilibrium_modifier: npt.NDArray,
-    ) -> npt.NDArray[np.float_]:
+        log_solution: jnp.ndarray,
+        coefficient_matrix: jnp.ndarray,
+        activity_modifier: jnp.ndarray,
+        equilibrium_modifier: jnp.ndarray,
+    ) -> jnp.ndarray:
         """Objective function for the non-linear system.
 
         Args:
@@ -308,10 +313,10 @@ class InteriorAtmosphereSystem:
         temperature: float = self.solution.atmosphere.temperature()
         pressure: float = self.solution.atmosphere.pressure()
 
-        reaction_array: npt.NDArray[np.float_] = self.get_reaction_array()
-        stability_array: npt.NDArray[np.float_] = self.get_stability_array()
+        reaction_array: jnp.ndarray = self.get_reaction_array()
+        stability_array: jnp.ndarray = self.get_stability_array()
 
-        residual_reaction: npt.NDArray[np.float_] = self._reaction_network.get_residual(
+        residual_reaction: jnp.ndarray = self._reaction_network.get_residual(
             temperature=temperature,
             pressure=pressure,
             constraints=self.constraints,
@@ -322,31 +327,35 @@ class InteriorAtmosphereSystem:
             stability_array=stability_array,
         )
 
-        residual_stability: list[float] = []
+        residual_stability_list: list[jnp.ndarray] = []
         for collection in self.solution.condensed_solution.values():
-            residual_stability.append(
+            residual_stability_list.append(
                 collection.stability.value
                 - collection.tauc.value
                 + collection.condensed_abundance.value
             )
+        residual_stability = jnp.array(residual_stability_list)
 
-        residual_number_density: list[float] = []
+        residual_number_density_list: list[jnp.ndarray] = []
         for constraint in self.constraints.mass_constraints:
-            res: float = np.log10(self.solution.number_density(element=constraint.element))
-            res -= constraint.log10_number_of_molecules - np.log10(
+            res: jnp.ndarray = jnp.log10(self.solution.number_density(element=constraint.element))
+            res -= constraint.log10_number_of_molecules - jnp.log10(
                 self.solution.atmosphere.volume()
             )
-            residual_number_density.append(res)
+            residual_number_density_list.append(res)
+        residual_number_density = jnp.array(residual_number_density_list)
 
-        residual_total_pressure: list[float] = []
+        residual_total_pressure_list: list[jnp.ndarray] = []
         if len(self.constraints.total_pressure_constraint) == 1:
             constraint = self.constraints.total_pressure_constraint[0]
-            residual_total_pressure.append(
-                np.log10(self.solution.atmosphere.number_density())
+            residual_total_pressure_list.append(
+                jnp.log10(self.solution.atmosphere.number_density())
                 - constraint.get_log10_value(temperature=temperature, pressure=pressure)
             )
+            residual_total_pressure = jnp.array(residual_total_pressure_list)
 
-        residual: npt.NDArray[np.float_] = np.concatenate(
+        # Concatenate all residuals
+        residual: jnp.ndarray = jnp.concatenate(
             (
                 residual_reaction,
                 residual_stability,

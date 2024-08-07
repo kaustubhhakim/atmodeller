@@ -279,7 +279,7 @@ class _GasNumberDensity(_NumberDensityWithSetter[GasSpecies]):
         """Log10 fugacity"""
         return self.log10_pressure() + self.log10_fugacity_coefficient()
 
-    def fugacity(self) -> float:
+    def fugacity(self) -> jnp.ndarray:
         """Fugacity"""
         return 10 ** self.log10_fugacity()
 
@@ -306,7 +306,7 @@ class _GasNumberDensity(_NumberDensityWithSetter[GasSpecies]):
         if element is None:
             output_dict["pressure"] = self.pressure()
             output_dict["fugacity_coefficient"] = self.fugacity_coefficient()
-            output_dict["fugacity"] = self.fugacity()
+            output_dict["fugacity"] = self.fugacity().item()
             output_dict["volume_mixing_ratio"] = self.volume_mixing_ratio()
 
         return output_dict
@@ -338,9 +338,9 @@ class _DissolvedNumberDensity(_NumberDensity[GasSpecies]):
         return self._solution.planet.mantle_melt_mass
 
     @property
-    def value(self) -> float:
+    def value(self) -> jnp.ndarray:
         """Log10 of the number density"""
-        number_density: float = (
+        number_density: jnp.ndarray = (
             UnitConversion.ppm_to_fraction(self.ppmw())
             * AVOGADRO
             / self._species.molar_mass
@@ -848,7 +848,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             total_moles_hydrogen: float | None = self.total_moles_hydrogen()
             if total_moles_hydrogen is not None:
                 element_dict["logarithmic_abundance"] = (
-                    jnp.log10(total_moles / total_moles_hydrogen) + 12
+                    jnp.log10(total_moles / total_moles_hydrogen).item() + 12
                 )
             counter: Counter = Counter()
             for collection in self.values():

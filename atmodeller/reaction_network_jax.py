@@ -20,12 +20,10 @@
 
 from __future__ import annotations
 
-import copy
 import logging
 import pprint
 import sys
 
-import jax
 import jax.numpy as jnp
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
