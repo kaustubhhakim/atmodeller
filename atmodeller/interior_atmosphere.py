@@ -253,7 +253,7 @@ class InteriorAtmosphereSystem:
                 residual_rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(self._residual**2))
                 logger.info("Residual RMSE = %.2e", residual_rmse)
                 logger.info(
-                    "Raw solution = %s", pprint.pformat(self.solution.output_raw_solution())
+                    "Actual solution = %s", pprint.pformat(self.solution.output_raw_solution())
                 )
                 initial_solution_rmse: npt.NDArray[np.float_] = np.sqrt(
                     mean_squared_error(sol.x, log_solution)

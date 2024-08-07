@@ -110,7 +110,7 @@ def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
     return earth_bse
 
 
-def earth_oceans_to_kg(number_of_earth_oceans: float = 1) -> float:
+def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: float = 1) -> float:
     h_grams: float = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: float = UnitConversion().g_to_kg(h_grams)
     return h_kg

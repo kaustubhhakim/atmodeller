@@ -42,7 +42,7 @@ from atmodeller.solubility.hydrogen_species import (
 )
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
-from atmodeller.utilities import earth_oceans_to_kg
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -68,7 +68,7 @@ def test_H2O() -> None:
 
     oceans: float = 2
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -97,7 +97,7 @@ def test_H_fO2() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -139,7 +139,7 @@ def test_H_fO2_holland() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -171,7 +171,7 @@ def test_H_basalt_melt() -> None:
 
     oceans: float = 1
     planet: Planet = Planet(melt_composition="basalt")
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -213,7 +213,7 @@ def test_H_fO2_plus() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -245,7 +245,7 @@ def test_H_fO2_minus() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -277,7 +277,7 @@ def test_H_five_oceans() -> None:
 
     oceans: float = 5
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -309,7 +309,7 @@ def test_H_1500K() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -346,7 +346,7 @@ def test_H_and_C() -> None:
     oceans: float = 1
     ch_ratio: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: float = ch_ratio * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -384,7 +384,7 @@ def test_H_and_C_total_pressure() -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -497,7 +497,7 @@ def test_H_and_C_real_gas() -> None:
     oceans: float = 10
     planet: Planet = Planet()
     planet.surface_temperature = 2000
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: float = h_kg
 
     constraints: SystemConstraints = SystemConstraints(

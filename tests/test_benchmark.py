@@ -33,7 +33,7 @@ from atmodeller.constraints import (
 from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
-from atmodeller.utilities import earth_oceans_to_kg
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
 
@@ -60,7 +60,7 @@ def test_H_O(helper) -> None:
 
     oceans: float = 1
     planet: Planet = Planet()
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 6.25774e20
 
     constraints: SystemConstraints = SystemConstraints(
@@ -101,7 +101,7 @@ def test_CHO_reduced(helper) -> None:
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(3)
+    h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -153,7 +153,7 @@ def test_CHO_IW(helper) -> None:
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(3)
+    h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -208,7 +208,7 @@ def test_CHO_oxidised(helper) -> None:
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1)
+    h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 0.1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -251,7 +251,7 @@ def test_CHO_highly_oxidised(helper) -> None:
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1)
+    h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 5 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -291,7 +291,7 @@ def test_CHO_middle_temperature(helper) -> None:
     planet.surface_temperature = 873
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1)
+    h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -331,7 +331,7 @@ def test_CHO_low_temperature(helper) -> None:
     planet.surface_temperature = 450
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1)
+    h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -372,7 +372,7 @@ def test_graphite_condensed(helper) -> None:
     planet.surface_temperature = 873
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1)
+    h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 5 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -418,7 +418,7 @@ def test_graphite_unstable(helper) -> None:
     planet.surface_temperature = 1400
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(3)
+    h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
 
     constraints: SystemConstraints = SystemConstraints(
@@ -460,7 +460,7 @@ def test_water_condensed(helper) -> None:
     planet.surface_temperature = 411.75
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1)
+    h_kg: float = earth_oceans_to_hydrogen_mass(1)
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -500,7 +500,7 @@ def test_water_condensed_O_abundance(helper) -> None:
     planet.surface_temperature = 411.75
     system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
 
-    h_kg: float = earth_oceans_to_kg(1)
+    h_kg: float = earth_oceans_to_hydrogen_mass(1)
     o_kg: float = 1.14375e21
 
     constraints: SystemConstraints = SystemConstraints(

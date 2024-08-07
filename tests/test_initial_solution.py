@@ -36,7 +36,7 @@ from atmodeller.initial_solution import (
     InitialSolutionRegressor,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
-from atmodeller.utilities import earth_oceans_to_kg
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
 
@@ -180,7 +180,7 @@ def test_last_solution():
 
     # This is the same as test_H_O in test_benchmark.py
     oceans = 1
-    h_kg: float = earth_oceans_to_kg(oceans)
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 6.25774e20
 
     constraints = SystemConstraints(
