@@ -27,6 +27,7 @@ import sys
 
 import jax
 import jax.numpy as jnp
+from jax import lax
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
@@ -514,17 +515,18 @@ def partial_rref(matrix: jnp.ndarray) -> jnp.ndarray:
     for i in range(ncols):
         # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
         if augmented_matrix[i, i] == 0:
-            nonzero_row = jnp.nonzero(augmented_matrix[i:, i])[0][0] + i
-            augmented_matrix = jax.numpy.index_update(
-                augmented_matrix,
-                jax.numpy.ix_([i, nonzero_row], slice(None)),
-                augmented_matrix[[nonzero_row, i], :],
-            )
+            nonzero_rows = jnp.nonzero(augmented_matrix[i:, i])[0]
+            if nonzero_rows.size > 0:
+                nonzero_row = nonzero_rows[0] + i
+                # Swap rows
+                augmented_matrix = augmented_matrix.at[i, :].set(augmented_matrix[nonzero_row, :])
+                augmented_matrix = augmented_matrix.at[nonzero_row, :].set(augmented_matrix[i, :])
+
         # Perform row operations to eliminate values below the pivot.
         for j in range(i + 1, nrows):
             ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-            augmented_matrix = augmented_matrix.at[j].set(
-                augmented_matrix[j] - ratio * augmented_matrix[i]
+            augmented_matrix = augmented_matrix.at[j, :].set(
+                augmented_matrix[j, :] - ratio * augmented_matrix[i, :]
             )
 
     logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
@@ -532,13 +534,15 @@ def partial_rref(matrix: jnp.ndarray) -> jnp.ndarray:
     # Backward substitution
     for i in range(ncols - 1, -1, -1):
         # Normalize the pivot row.
-        augmented_matrix = augmented_matrix.at[i].set(augmented_matrix[i] / augmented_matrix[i, i])
+        augmented_matrix = augmented_matrix.at[i, :].set(
+            augmented_matrix[i, :] / augmented_matrix[i, i]
+        )
         # Eliminate values above the pivot.
         for j in range(i - 1, -1, -1):
             if augmented_matrix[j, i] != 0:
                 ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-                augmented_matrix = augmented_matrix.at[j].set(
-                    augmented_matrix[j] - ratio * augmented_matrix[i]
+                augmented_matrix = augmented_matrix.at[j, :].set(
+                    augmented_matrix[j, :] - ratio * augmented_matrix[i, :]
                 )
 
     logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
