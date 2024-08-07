@@ -70,7 +70,11 @@ def test_reaction_network() -> None:
 
     planet = Planet()
     constraints: SystemConstraints = SystemConstraints(
-        [FugacityConstraint(H2O_g, 10), FugacityConstraint(H2_g, 10)]
+        [
+            FugacityConstraint(H2O_g, 0.2570770067190733),
+            # FugacityConstraint(H2_g, 10),
+            FugacityConstraint(O2_g, 8.838043080858959e-08),
+        ]
     )
 
     reaction_network = ReactionNetwork(species)
@@ -94,3 +98,5 @@ def test_reaction_network() -> None:
 
     sol = root(residual_wrapper, test_eval, method="hybr", jac=jacob)
     print(sol)
+
+    print(reaction_network.solution.output_solution())

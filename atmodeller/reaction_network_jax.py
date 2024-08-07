@@ -286,7 +286,7 @@ class ReactionNetwork:
             #    pressure=pressure,
             # )
             # FIXME: Hack to try jax
-            log10Kc = 10.0
+            log10Kc = 17.47976865
             rhs = rhs.at[reaction_index].set(log10Kc)
 
         # Constraints
@@ -347,6 +347,8 @@ class ReactionNetwork:
         for collection in solution.condensed_solution.values():
             reaction_list.append(collection.activity.value)
 
+        # FIXME: Hack to get output
+        self.solution = solution
         coefficient_matrix = self.get_coefficient_matrix(self.constraints)
         reaction_array = jnp.array(reaction_list)
 
