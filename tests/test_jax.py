@@ -24,6 +24,7 @@ import logging
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from scipy.optimize import root
 
 from atmodeller import __version__, debug_logger
@@ -91,12 +92,18 @@ def test_reaction_network() -> None:
     jacob_eval = jacob(test_eval)
     logger.warning("jacob_eval = %s", jacob_eval)
 
-    # Define a wrapper function for scipy.optimize.root
-    def residual_wrapper(x):
-        # return jax.numpy.array(reaction_network.get_residual_jax(x))
-        return reaction_network.get_residual_jax(x)
+    sol = root(reaction_network.get_residual_jax, test_eval, method="hybr", jac=jacob)
 
-    sol = root(residual_wrapper, test_eval, method="hybr", jac=jacob)
-    print(sol)
+    target_dict = {
+        "H2O_g": 0.25707719341563373,
+        "H2_g": 0.249646956461615,
+        "O2_g": 8.838052554822744e-08,
+    }
 
-    print(reaction_network.solution.output_solution())
+    target_values: list = list(dict(sorted(target_dict.items())).values())
+    solution_values: list = list(
+        dict(sorted(reaction_network.solution.output_solution().items())).values()
+    )
+    isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=RTOL, atol=ATOL).all()
+
+    assert isclose
