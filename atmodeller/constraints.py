@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from collections import UserList
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
-import numpy as np
+import jax.numpy as jnp
 from molmass import Formula
 
 from atmodeller import AVOGADRO
@@ -52,9 +52,9 @@ class ConstraintProtocol(Protocol):
     @property
     def name(self) -> str: ...
 
-    def get_value(self, temperature: float, pressure: float) -> float: ...
+    def get_value(self, temperature: float, pressure: float) -> jnp.ndarray | float: ...
 
-    def get_log10_value(self, temperature: float, pressure: float) -> float: ...
+    def get_log10_value(self, temperature: float, pressure: float) -> jnp.ndarray | float: ...
 
 
 class MassConstraintProtocol(ConstraintProtocol, Protocol):
@@ -124,10 +124,11 @@ class ElementMassConstraint(MassConstraintProtocol):
         return f"{self.element}_{self.constraint}"
 
     @property
-    def log10_number_of_molecules(self) -> float:
+    def log10_number_of_molecules(self) -> jnp.ndarray:
         """Log10 number of molecules"""
-        return np.log10(self.mass) + np.log10(AVOGADRO) - np.log10(self.molar_mass)
+        return jnp.log10(self.mass) + jnp.log10(AVOGADRO) - jnp.log10(self.molar_mass)
 
+    @override
     def get_value(self, *args, **kwargs) -> float:
         """Computes the value for given input arguments.
 
@@ -143,7 +144,8 @@ class ElementMassConstraint(MassConstraintProtocol):
 
         return self.mass
 
-    def get_log10_value(self, *args, **kwargs) -> float:
+    @override
+    def get_log10_value(self, *args, **kwargs) -> jnp.ndarray:
         """Computes the log10 value for given input arguments.
 
         Args:
@@ -153,7 +155,7 @@ class ElementMassConstraint(MassConstraintProtocol):
         Returns:
             The log10 evaluated value
         """
-        return np.log10(self.get_value(*args, **kwargs))
+        return jnp.log10(self.get_value(*args, **kwargs))
 
 
 class _SpeciesConstraint(ABC, Generic[TypeChemicalSpecies, T]):
@@ -186,7 +188,7 @@ class _SpeciesConstraint(ABC, Generic[TypeChemicalSpecies, T]):
         return self._species
 
     @abstractmethod
-    def get_value(self, temperature: float, pressure: float) -> float:
+    def get_value(self, temperature: float, pressure: float) -> jnp.ndarray | float:
         """Computes the value for given input arguments.
 
         Args:
@@ -197,7 +199,7 @@ class _SpeciesConstraint(ABC, Generic[TypeChemicalSpecies, T]):
             The evaluated value
         """
 
-    def get_log10_value(self, temperature: float, pressure: float) -> float:
+    def get_log10_value(self, temperature: float, pressure: float) -> jnp.ndarray:
         """Computes the log10 value for given input arguments.
 
         Args:
@@ -207,7 +209,7 @@ class _SpeciesConstraint(ABC, Generic[TypeChemicalSpecies, T]):
         Returns:
             The log10 evaluated value
         """
-        return np.log10(self.get_value(temperature, pressure))
+        return jnp.log10(self.get_value(temperature, pressure))
 
 
 class ActivityConstraint(_SpeciesConstraint[CondensedSpecies, float]):
@@ -324,7 +326,7 @@ class MassConstraint(_SpeciesConstraint[ChemicalSpecies, float]):
 
     constraint_type: str = "mass"
 
-    def mass(self, *args, **kwargs) -> float:
+    def mass(self, *args, **kwargs) -> jnp.ndarray | float:
         """Value of the mass constraint in kg"""
         return self.get_value(*args, **kwargs)
 
@@ -404,8 +406,8 @@ class TotalPressureConstraint(ConstraintProtocol):
         return get_number_density(temperature, self.total_pressure())
 
     @override
-    def get_log10_value(self, *args, **kwargs) -> float:
-        return np.log10(self.get_value(*args, **kwargs))
+    def get_log10_value(self, *args, **kwargs) -> jnp.ndarray | float:
+        return jnp.log10(self.get_value(*args, **kwargs))
 
 
 class SystemConstraints(UserList[ConstraintProtocol]):
@@ -502,7 +504,7 @@ class SystemConstraints(UserList[ConstraintProtocol]):
 
         return evaluated_constraints
 
-    def evaluate_log10(self, temperature: float, pressure: float) -> dict[str, float]:
+    def evaluate_log10(self, temperature: float, pressure: float) -> dict[str, jnp.ndarray]:
         """Evaluates all constraints and returns the log10 values.
 
         Args:
@@ -513,5 +515,5 @@ class SystemConstraints(UserList[ConstraintProtocol]):
             A dictionary of the log10 evaluated constraints in the same order as the constraints
         """
         return {
-            key: np.log10(value) for key, value in self.evaluate(temperature, pressure).items()
+            key: jnp.log10(value) for key, value in self.evaluate(temperature, pressure).items()
         }

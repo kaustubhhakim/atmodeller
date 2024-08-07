@@ -24,8 +24,7 @@ from abc import ABC, abstractmethod
 from collections import Counter, UserDict
 from typing import Generic, Protocol, TypeVar, cast
 
-import numpy as np
-import numpy.typing as npt
+import jax.numpy as jnp
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.core import GasSpecies, Planet, Species
@@ -60,7 +59,7 @@ STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
 TAU: float = 1e-15
 """Tau factor for the stability of condensed species"""
-LOG10_TAU: float = np.log10(TAU)
+LOG10_TAU: jnp.ndarray = jnp.log10(TAU)
 """Log10 of the tau factor"""
 
 
@@ -258,17 +257,17 @@ class _GasNumberDensity(_NumberDensityWithSetter[GasSpecies]):
             * self._solution.atmosphere.temperature()
         )
 
-    def log10_pressure(self) -> float:
+    def log10_pressure(self) -> jnp.ndarray:
         """Log10 pressure"""
-        return np.log10(self.pressure())
+        return jnp.log10(self.pressure())
 
     def density(self) -> float:
         """Density"""
         return self.mass() / self._solution.atmosphere.volume()
 
-    def log10_fugacity_coefficient(self) -> float:
+    def log10_fugacity_coefficient(self) -> jnp.ndarray:
         """Log10 fugacity coefficient"""
-        return np.log10(self.fugacity_coefficient())
+        return jnp.log10(self.fugacity_coefficient())
 
     def fugacity_coefficient(self) -> float:
         """Fugacity coefficient"""
@@ -276,7 +275,7 @@ class _GasNumberDensity(_NumberDensityWithSetter[GasSpecies]):
             self._solution.atmosphere.temperature(), self._solution.atmosphere.pressure()
         )
 
-    def log10_fugacity(self) -> float:
+    def log10_fugacity(self) -> jnp.ndarray:
         """Log10 fugacity"""
         return self.log10_pressure() + self.log10_fugacity_coefficient()
 
@@ -349,7 +348,7 @@ class _DissolvedNumberDensity(_NumberDensity[GasSpecies]):
             / self._solution.atmosphere.volume()
         )
 
-        return np.log10(number_density)
+        return jnp.log10(number_density)
 
     @override
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:
@@ -419,11 +418,13 @@ class _TauC(_CondensedSolutionComponent):
     """
 
     @property
-    def value(self) -> float:
+    def value(self) -> jnp.ndarray:
         element_number_densities: list[float] = [
             self._solution.number_density(element=element) for element in self._species.elements
         ]
-        log10_tauc: float = LOG10_TAU + np.log10(np.min(element_number_densities))
+        log10_tauc: jnp.ndarray = LOG10_TAU + jnp.log10(
+            jnp.min(jnp.array(element_number_densities))
+        )
         logger.debug("log10_tau (%s) = %f", self._species.name, log10_tauc)
 
         return log10_tauc
@@ -465,8 +466,8 @@ class _GasCollection(_NumberDensity[GasSpecies]):
         self.trapped_abundance: _TrappedNumberDensity = _TrappedNumberDensity(species, solution)
 
     @property
-    def value(self) -> float:
-        return np.log10(
+    def value(self) -> jnp.ndarray:
+        return jnp.log10(
             10**self.gas_abundance.value
             + 10**self.dissolved_abundance.value
             + 10**self.trapped_abundance.value
@@ -765,7 +766,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         self._atmosphere.planet = value
 
     @property
-    def value(self) -> npt.NDArray[np.float_]:
+    def value(self) -> jnp.ndarray:
         """The solution as an array for the solver"""
         value_list: list[float] = []
         for gas_collection in self.gas_solution.values():
@@ -775,10 +776,10 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             value_list.append(condensed_collection.condensed_abundance.value)
             value_list.append(condensed_collection.stability.value)
 
-        return np.array(value_list, dtype=np.float_)
+        return jnp.array(value_list)
 
     @value.setter
-    def value(self, value: npt.NDArray[np.float_]) -> None:
+    def value(self, value: jnp.ndarray) -> None:
         """Sets the solution from an array.
 
         Args:
@@ -814,13 +815,13 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """
         self.data |= other.data
 
-    def fugacities_by_hill_formula(self) -> dict[str, float]:
+    def fugacities_by_hill_formula(self) -> dict[str, jnp.ndarray]:
         """Fugacities by Hill formula
 
         Returns:
             Fugacities by Hill formula
         """
-        fugacities: dict[str, float] = {}
+        fugacities: dict[str, jnp.ndarray] = {}
         for gas_species, collection in self.gas_solution.items():
             fugacities[gas_species.hill_formula] = collection.gas_abundance.fugacity()
 
@@ -847,7 +848,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             total_moles_hydrogen: float | None = self.total_moles_hydrogen()
             if total_moles_hydrogen is not None:
                 element_dict["logarithmic_abundance"] = (
-                    np.log10(total_moles / total_moles_hydrogen) + 12
+                    jnp.log10(total_moles / total_moles_hydrogen) + 12
                 )
             counter: Counter = Counter()
             for collection in self.values():
