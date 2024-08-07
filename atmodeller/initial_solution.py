@@ -28,6 +28,7 @@ from typing import Any, Generic, Protocol, TypeVar, cast
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from numpy import random
 from scipy.sparse import spmatrix
 from sklearn.linear_model import SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -222,6 +223,28 @@ class InitialSolution(ABC, Generic[T]):
                 self._max_log10_number_density,
             )
             self.fill(collection.stability, self._fill_log10_stability)
+            # if perturb_log10_number_density:
+            #     self.perturb(collection.condensed_abundance, perturb_log10_number_density)
+            # stability = random.choice(["stable", "unstable"])
+            # if stability == "stable":
+            #    collection.activity.value = TAU
+            #    collection.stability.value = LOG10_TAU
+            # else:
+            #    collection.activity.value = TAU
+            #    collection.stability.value = -1
+            # collection.stability.value = -7
+            # collection.activity.value = -0.3010299956639812  # log10(0.5)
+            # Satisfy auxilliary equation by construction
+            # collection.condensed_abundance.value = LOG10_TAU - collection.stability.value
+
+        # for species in self.solution.activity.data:
+        #     stability: str = random.choice(["stable", "unstable"])
+        #     if stability == "stable":
+        #         self.solution.activity.data[species] = 0
+        #         self.solution.mass.data[species] = 19
+        #     else:
+        #         self.solution.activity.data[species] = -24
+        #         self.solution.mass.data[species] = -16
 
         # Testing satisfying the condensate stability criteria by construction did not appear to
         # yield improved performance of the solver.
