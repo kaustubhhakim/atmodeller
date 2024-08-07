@@ -212,7 +212,7 @@ class InitialSolution(ABC, Generic[T]):
 
         for collection in self.solution.condensed_solution.values():
             self.fill(collection.activity, self._fill_log10_activity)
-            self.clip(collection.activity, 0)
+            self.clip(collection.activity, maximum_value=0)
             self.fill(collection.condensed_abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.condensed_abundance, perturb_log10_number_density)
@@ -666,7 +666,7 @@ class InitialSolutionLast(InitialSolutionProtocol):
 
     @override
     def update(self, output: Output) -> None:
-        if output.size == self._switch_iteration:
+        if output.size >= self._switch_iteration:
             value_dict: dict[ChemicalSpecies | str, float] = output["raw_solution"][-1]
             # InitialSolutionDict takes the log10, so we must raise 10 to the values.
             value_dict = {key: 10**value for key, value in value_dict.items()}
