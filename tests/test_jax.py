@@ -66,39 +66,35 @@ def test_reaction_network() -> None:
     O2_g: GasSpecies = GasSpecies("O2", thermodata_dataset=ThermodynamicDatasetHollandAndPowell())
 
     species: Species = Species([H2O_g, H2_g, O2_g])
-
-    temperature = 1500
-
-    planet = Planet()
+    planet = Planet(surface_temperature=2000)
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(H2O_g, 0.2570770067190733),
-            # FugacityConstraint(H2_g, 10),
             FugacityConstraint(O2_g, 8.838043080858959e-08),
         ]
     )
 
-    reaction_network = ReactionNetwork(species)
-    reaction_network.temperature = temperature
-    reaction_network.planet = planet
-    reaction_network.constraints = constraints
+    reaction_network = ReactionNetwork(species=species, planet=planet, constraints=constraints)
 
     test_eval = jnp.array([25.0, 27.0, 24.0])
 
-    residual = reaction_network.get_residual_jax(test_eval)
+    residual = reaction_network._objective_func(test_eval)
     logger.warning("residual = %s", residual)
 
-    jacob = jax.jacobian(reaction_network.get_residual_jax)
+    jacob = jax.jacobian(reaction_network._objective_func)
     jacob_eval = jacob(test_eval)
     logger.warning("jacob_eval = %s", jacob_eval)
 
-    sol = root(reaction_network.get_residual_jax, test_eval, method="hybr", jac=jacob)
+    sol = root(reaction_network._objective_func, test_eval, method="hybr", jac=jacob)
 
     target_dict = {
         "H2O_g": 0.25707719341563373,
         "H2_g": 0.249646956461615,
         "O2_g": 8.838052554822744e-08,
     }
+
+    logger.warning(sol)
+    logger.warning(reaction_network.solution.output_solution())
 
     target_values: list = list(dict(sorted(target_dict.items())).values())
     solution_values: list = list(

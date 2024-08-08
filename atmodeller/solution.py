@@ -778,6 +778,12 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """Planet setter, which sets planet on :attr:`_atmosphere`"""
         self._atmosphere.planet = value
 
+    def pressure(self) -> jnp.ndarray:
+        return self.atmosphere.pressure()
+
+    def temperature(self) -> float:
+        return self.atmosphere.temperature()
+
     @property
     def value(self) -> jnp.ndarray:
         """The solution as an array for the solver"""
@@ -839,6 +845,20 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             fugacities[gas_species.hill_formula] = collection.gas_abundance.fugacity()
 
         return fugacities
+
+    def get_reaction_array(self) -> jnp.ndarray:
+        """Gets the reaction array
+
+        Returns:
+            The reaction array
+        """
+        reaction_list: list = []
+        for collection in self.gas_solution.values():
+            reaction_list.append(collection.gas_abundance.value)
+        for collection in self.condensed_solution.values():
+            reaction_list.append(collection.activity.value)
+
+        return jnp.array(reaction_list, dtype=jnp.float_)
 
     def total_moles_hydrogen(self) -> jnp.ndarray | None:
         """Total moles of hydrogen"""

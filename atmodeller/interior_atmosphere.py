@@ -102,19 +102,20 @@ class InteriorAtmosphereSystem:
         """The total number of systems solved"""
         return self.output.size
 
-    def get_reaction_array(self) -> jnp.ndarray:
-        """Gets the reaction array
+    # TODO: Remove, now moved to Solution class
+    # def get_reaction_array(self) -> jnp.ndarray:
+    #     """Gets the reaction array
 
-        Returns:
-            The reaction array
-        """
-        reaction_list: list = []
-        for collection in self.solution.gas_solution.values():
-            reaction_list.append(collection.gas_abundance.value)
-        for collection in self.solution.condensed_solution.values():
-            reaction_list.append(collection.activity.value)
+    #     Returns:
+    #         The reaction array
+    #     """
+    #     reaction_list: list = []
+    #     for collection in self.solution.gas_solution.values():
+    #         reaction_list.append(collection.gas_abundance.value)
+    #     for collection in self.solution.condensed_solution.values():
+    #         reaction_list.append(collection.activity.value)
 
-        return jnp.array(reaction_list, dtype=jnp.float_)
+    #     return jnp.array(reaction_list, dtype=jnp.float_)
 
     def get_stability_array(self) -> jnp.ndarray:
         """Gets the condensate stability array
