@@ -76,16 +76,7 @@ def test_reaction_network() -> None:
 
     reaction_network = ReactionNetwork(species=species, planet=planet, constraints=constraints)
 
-    test_eval = jnp.array([25.0, 27.0, 24.0])
-
-    residual = reaction_network._objective_func(test_eval)
-    logger.warning("residual = %s", residual)
-
-    jacob = jax.jacobian(reaction_network._objective_func)
-    jacob_eval = jacob(test_eval)
-    logger.warning("jacob_eval = %s", jacob_eval)
-
-    sol = root(reaction_network._objective_func, test_eval, method="hybr", jac=jacob)
+    sol, solution = reaction_network.solve()
 
     target_dict = {
         "H2O_g": 0.25707719341563373,
@@ -94,12 +85,10 @@ def test_reaction_network() -> None:
     }
 
     logger.warning(sol)
-    logger.warning(reaction_network.solution.output_solution())
+    logger.warning(solution.output_solution())
 
     target_values: list = list(dict(sorted(target_dict.items())).values())
-    solution_values: list = list(
-        dict(sorted(reaction_network.solution.output_solution().items())).values()
-    )
+    solution_values: list = list(dict(sorted(solution.output_solution().items())).values())
     isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=RTOL, atol=ATOL).all()
 
     assert isclose

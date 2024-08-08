@@ -23,12 +23,16 @@ from __future__ import annotations
 import logging
 import pprint
 import sys
+from typing import Callable
 
+import jax
 import jax.numpy as jnp
+from scipy.optimize import OptimizeResult, root
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
+from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.solution import Solution
 
 if sys.version_info < (3, 12):
@@ -147,7 +151,7 @@ class ReactionNetwork:
             Natural log of the equilibrium constant in terms of partial pressures
         """
         gibbs_energy: jnp.ndarray | float = self._get_reaction_gibbs_energy_of_formation(
-            reaction_index, temperature=self.temperature(), pressure=self.pressure()
+            reaction_index
         )
         lnKp: jnp.ndarray | float = -gibbs_energy / (GAS_CONSTANT * self.temperature())
 
@@ -335,7 +339,7 @@ class ReactionNetwork:
 
         return log_fugacity_coefficients
 
-    def _objective_func(self, solution_array: jnp.ndarray) -> jnp.ndarray:
+    def objective_function(self, solution_array: jnp.ndarray) -> jnp.ndarray:
         """Objective function
 
         Args:
@@ -358,6 +362,39 @@ class ReactionNetwork:
         )
 
         return residual
+
+    def jacobian(self) -> Callable:
+        return jax.jacobian(self.objective_function)
+
+    def solve(
+        self,
+        initial_solution: InitialSolutionProtocol | None = None,
+        *,
+        method: str = "hybr",
+        tol: float | None = None,
+        **options,
+    ) -> tuple(OptimizeResult, Solution):
+
+        if initial_solution is None:
+            initial_solution = InitialSolutionDict(species=self._species)
+        assert initial_solution is not None
+
+        initial_solution_guess: jnp.ndarray = initial_solution.get_log10_value(
+            self.constraints,
+            temperature=self.temperature(),
+            pressure=1,
+        )
+
+        sol = root(
+            self.objective_function,
+            initial_solution_guess,
+            method=method,
+            jac=self.jacobian(),
+            tol=tol,
+            options=options,
+        )
+
+        return sol, self.solution
 
 
 class ReactionNetworkWithCondensateStability(ReactionNetwork):

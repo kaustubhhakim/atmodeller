@@ -45,6 +45,7 @@ T = TypeVar("T")
 
 @runtime_checkable
 class ConstraintProtocol(Protocol):
+    """Constraint protocol"""
 
     @property
     def constraint(self) -> str: ...
@@ -52,9 +53,11 @@ class ConstraintProtocol(Protocol):
     @property
     def name(self) -> str: ...
 
-    def get_value(self, temperature: float, pressure: float) -> jnp.ndarray | float: ...
+    def get_value(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray | float: ...
 
-    def get_log10_value(self, temperature: float, pressure: float) -> jnp.ndarray | float: ...
+    def get_log10_value(
+        self, temperature: float, pressure: jnp.ndarray
+    ) -> jnp.ndarray | float: ...
 
 
 class MassConstraintProtocol(ConstraintProtocol, Protocol):
@@ -71,7 +74,7 @@ class ActivityConstraintProtocol(ConstraintProtocol, Protocol):
     @property
     def species(self) -> CondensedSpecies: ...
 
-    def activity(self, temperature: float, pressure: float) -> float: ...
+    def activity(self, temperature: float, pressure: jnp.ndarray) -> float: ...
 
 
 class GasConstraintProtocol(ConstraintProtocol, Protocol):
@@ -79,7 +82,7 @@ class GasConstraintProtocol(ConstraintProtocol, Protocol):
     @property
     def species(self) -> GasSpecies: ...
 
-    def fugacity(self, temperature: float, pressure: float) -> float: ...
+    def fugacity(self, temperature: float, pressure: jnp.ndarray) -> float: ...
 
 
 ReactionNetworkConstraintProtocol = ActivityConstraintProtocol | GasConstraintProtocol
@@ -188,7 +191,7 @@ class _SpeciesConstraint(ABC, Generic[TypeChemicalSpecies, T]):
         return self._species
 
     @abstractmethod
-    def get_value(self, temperature: float, pressure: float) -> jnp.ndarray | float:
+    def get_value(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray | float:
         """Computes the value for given input arguments.
 
         Args:
@@ -199,7 +202,7 @@ class _SpeciesConstraint(ABC, Generic[TypeChemicalSpecies, T]):
             The evaluated value
         """
 
-    def get_log10_value(self, temperature: float, pressure: float) -> jnp.ndarray:
+    def get_log10_value(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray:
         """Computes the log10 value for given input arguments.
 
         Args:
@@ -225,7 +228,7 @@ class ActivityConstraint(_SpeciesConstraint[CondensedSpecies, float]):
 
     constraint_type: str = "stable_activity"
 
-    def activity(self, temperature: float, pressure: float) -> float:
+    def activity(self, temperature: float, pressure: jnp.ndarray) -> float:
         """Value of the activity constraint
 
         Args:
@@ -241,7 +244,7 @@ class ActivityConstraint(_SpeciesConstraint[CondensedSpecies, float]):
         return self._value
 
     @override
-    def get_value(self, temperature: float, pressure: float) -> float:
+    def get_value(self, temperature: float, pressure: jnp.ndarray) -> float:
         return self.activity(temperature, pressure)
 
 
@@ -256,7 +259,7 @@ class _FugacityConstraint(_SpeciesConstraint[GasSpecies, T]):
     constraint_type: str = "fugacity"
 
     @abstractmethod
-    def fugacity(self, temperature: float, pressure: float) -> float:
+    def fugacity(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray | float:
         """Value of the fugacity constraint in bar
 
         Args:
@@ -267,7 +270,7 @@ class _FugacityConstraint(_SpeciesConstraint[GasSpecies, T]):
             Fugacity in bar
         """
 
-    def pressure(self, temperature: float, pressure: float) -> float:
+    def pressure(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray | float:
         """Value of the pressure constraint in bar
 
         Args:
@@ -277,13 +280,13 @@ class _FugacityConstraint(_SpeciesConstraint[GasSpecies, T]):
         Returns:
             Pressure in bar
         """
-        fugacity: float = self.fugacity(temperature, pressure)
+        fugacity: jnp.ndarray = self.fugacity(temperature, pressure)
         fugacity /= self.species.eos.fugacity_coefficient(temperature, pressure)
 
         return fugacity
 
     @override
-    def get_value(self, temperature: float, pressure: float) -> float:
+    def get_value(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray:
         return get_number_density(temperature, self.fugacity(temperature, pressure))
 
 
@@ -296,7 +299,7 @@ class FugacityConstraint(_FugacityConstraint[float]):
     """
 
     @override
-    def fugacity(self, temperature: float, pressure: float) -> float:
+    def fugacity(self, temperature: float, pressure: jnp.ndarray) -> float:
         del temperature
         del pressure
 
@@ -312,7 +315,7 @@ class BufferedFugacityConstraint(_FugacityConstraint[RedoxBufferProtocol]):
     """
 
     @override
-    def fugacity(self, temperature: float, pressure: float) -> float:
+    def fugacity(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray | float:
         return self._value.get_value(temperature, pressure)
 
 
@@ -341,7 +344,7 @@ class PressureConstraint(_SpeciesConstraint[GasSpecies, float]):
 
     constraint_type: str = "pressure"
 
-    def fugacity(self, temperature: float, pressure: float) -> float:
+    def fugacity(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray:
         """Value of the fugacity constraint in bar
 
         Args:
@@ -351,7 +354,7 @@ class PressureConstraint(_SpeciesConstraint[GasSpecies, float]):
         Returns:
             Fugacity in bar
         """
-        fugacity: float = self.pressure(temperature, pressure)
+        fugacity: jnp.ndarray = self.pressure(temperature, pressure)
         fugacity *= self.species.eos.fugacity_coefficient(temperature, pressure)
 
         return fugacity
@@ -372,7 +375,7 @@ class PressureConstraint(_SpeciesConstraint[GasSpecies, float]):
         return self._value
 
     @override
-    def get_value(self, temperature: float, pressure: float) -> float:
+    def get_value(self, temperature: float, pressure: float) -> jnp.ndarray | float:
         return get_number_density(temperature, self.fugacity(temperature, pressure))
 
 
@@ -401,7 +404,7 @@ class TotalPressureConstraint(ConstraintProtocol):
         return self._value
 
     @override
-    def get_value(self, temperature: float, pressure: float) -> float:
+    def get_value(self, temperature: float, pressure: jnp.ndarray) -> jnp.ndarray | float:
         del pressure
         return get_number_density(temperature, self.total_pressure())
 
@@ -485,7 +488,9 @@ class SystemConstraints(UserList[ConstraintProtocol]):
         """Number of constraints related to the reaction network"""
         return len(self.reaction_network_constraints)
 
-    def evaluate(self, temperature: float, pressure: float) -> dict[str, float]:
+    def evaluate(
+        self, temperature: float, pressure: jnp.ndarray
+    ) -> dict[str, jnp.ndarray | float]:
         """Evaluates all constraints.
 
         Args:
@@ -495,7 +500,7 @@ class SystemConstraints(UserList[ConstraintProtocol]):
         Returns:
             A dictionary of the evaluated constraints in the same order as the constraints
         """
-        evaluated_constraints: dict[str, float] = {}
+        evaluated_constraints: dict[str, jnp.ndarray | float] = {}
         for constraint in self.data:
             evaluated_constraints[constraint.name] = constraint.get_value(
                 temperature=temperature,
@@ -504,7 +509,7 @@ class SystemConstraints(UserList[ConstraintProtocol]):
 
         return evaluated_constraints
 
-    def evaluate_log10(self, temperature: float, pressure: float) -> dict[str, jnp.ndarray]:
+    def evaluate_log10(self, temperature: float, pressure: jnp.ndarray) -> dict[str, jnp.ndarray]:
         """Evaluates all constraints and returns the log10 values.
 
         Args:
