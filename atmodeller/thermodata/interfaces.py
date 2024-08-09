@@ -22,6 +22,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
+from jax import Array
+from jax.typing import ArrayLike
+
 if TYPE_CHECKING:
     from atmodeller.interfaces import ChemicalSpecies
 
@@ -32,9 +35,9 @@ class RedoxBufferProtocol(Protocol):
 
     def __init__(self, *args, **kwargs): ...
 
-    def get_log10_value(self, temperature: float, pressure: float, **kwargs) -> float: ...
+    def get_log10_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> ArrayLike: ...
 
-    def get_value(self, temperature: float, pressure: float, **kwargs) -> float: ...
+    def get_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> ArrayLike: ...
 
 
 class ThermodynamicDataForSpeciesProtocol(Protocol):
@@ -42,7 +45,7 @@ class ThermodynamicDataForSpeciesProtocol(Protocol):
     @property
     def data_source(self) -> str: ...
 
-    def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float: ...
+    def get_formation_gibbs(self, *, temperature: float, pressure: ArrayLike) -> ArrayLike: ...
 
 
 class ThermodynamicDataset(ABC):
@@ -105,7 +108,7 @@ class ThermodynamicDataForSpeciesABC(ABC):
         self.data: Any = data
 
     @abstractmethod
-    def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
+    def get_formation_gibbs(self, *, temperature: float, pressure: ArrayLike) -> ArrayLike:
         r"""Gets the standard Gibbs free energy of formation.
 
         Args:
