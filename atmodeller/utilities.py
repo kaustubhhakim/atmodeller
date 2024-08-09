@@ -41,7 +41,7 @@ from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-MultiplyT = TypeVar("MultiplyT", float, npt.NDArray, pd.Series, pd.DataFrame, Array)
+MultiplyT = TypeVar("MultiplyT", float, npt.NDArray, pd.Series, pd.DataFrame, Array, ArrayLike)
 
 
 def profile_decorator(func):

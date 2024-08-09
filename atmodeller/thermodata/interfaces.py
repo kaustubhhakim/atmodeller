@@ -22,7 +22,6 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
-from jax import Array
 from jax.typing import ArrayLike
 
 if TYPE_CHECKING:
