@@ -61,11 +61,9 @@ def test_simple() -> None:
 
 def test_reaction_network() -> None:
 
-    H2O_g: GasSpecies = GasSpecies(
-        "H2O", thermodata_dataset=ThermodynamicDatasetHollandAndPowell()
-    )
-    H2_g: GasSpecies = GasSpecies("H2", thermodata_dataset=ThermodynamicDatasetHollandAndPowell())
-    O2_g: GasSpecies = GasSpecies("O2", thermodata_dataset=ThermodynamicDatasetHollandAndPowell())
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
 
     species: Species = Species([H2O_g, H2_g, O2_g])
     planet = Planet(surface_temperature=2000)
@@ -80,9 +78,6 @@ def test_reaction_network() -> None:
     reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
 
     sol, solution = reaction_network.solve_optimistix(constraints=constraints)
-
-    print(sol.stats)
-    print(sol.state)
 
     target_dict = {
         "H2O_g": 0.25707719341563373,
