@@ -117,18 +117,19 @@ class InteriorAtmosphereSystem:
 
     #     return jnp.array(reaction_list, dtype=jnp.float_)
 
-    def get_stability_array(self) -> jnp.ndarray:
-        """Gets the condensate stability array
+    # TODO: Moved to reaction network jax
+    # def get_stability_array(self) -> jnp.ndarray:
+    #     """Gets the condensate stability array
 
-        Returns:
-            The condensate stability array
-        """
-        stability_array: jnp.ndarray = jnp.zeros(self.species.number, dtype=jnp.float_)
-        for condensed_species, collection in self.solution.condensed_solution.items():
-            index: int = self.species.species_index(condensed_species)
-            stability_array = stability_array.at[index].set(collection.stability.value)
+    #     Returns:
+    #         The condensate stability array
+    #     """
+    #     stability_array: jnp.ndarray = jnp.zeros(self.species.number, dtype=jnp.float_)
+    #     for condensed_species, collection in self.solution.condensed_solution.items():
+    #         index: int = self.species.species_index(condensed_species)
+    #         stability_array = stability_array.at[index].set(collection.stability.value)
 
-        return stability_array
+    #     return stability_array
 
     def residual_dict(self) -> dict[str, float]:
         """Residual of the objective function

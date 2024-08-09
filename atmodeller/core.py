@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections import UserList
 from dataclasses import asdict, dataclass, field
 from typing import Mapping
 
@@ -28,7 +27,7 @@ import numpy as np
 
 from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
-from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies
+from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies, ImmutableList
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.utilities import dataclass_to_logger, filter_by_type
@@ -173,7 +172,7 @@ class LiquidSpecies(CondensedSpecies):
         super().__init__(formula, "l", **kwargs)
 
 
-class Species(UserList[ChemicalSpecies]):
+class Species(ImmutableList[ChemicalSpecies]):
     """A list of species
 
     Args:

@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Generic, TypeVar
+from typing import Callable, Generic, Protocol, TypeVar
 
 from molmass import Composition, Formula
 
@@ -301,3 +301,23 @@ class ImmutableList(Sequence, Generic[T]):
 
     def __repr__(self):
         return f"ImmutableList({self.data})"
+
+
+# Couldn't get this to behave properly
+# # Type variable for generic protocol
+# _TypeArithmetic = TypeVar("_TypeArithmetic", bound="Arithmetic")
+
+
+# class Arithmetic(Protocol[_TypeArithmetic]):
+
+#     def __add__(self, other: _TypeArithmetic | float) -> _TypeArithmetic | float: ...
+
+#     def __sub__(self, other: _TypeArithmetic | float) -> _TypeArithmetic | float: ...
+
+#     def __mul__(self, other: _TypeArithmetic | float) -> _TypeArithmetic | float: ...
+
+#     def __truediv__(self, other: _TypeArithmetic | float) -> _TypeArithmetic | float: ...
+
+
+# # Define a helper type that can be either an arithmetic type or a float/int
+# TypeArithmetic = Arithmetic | float
