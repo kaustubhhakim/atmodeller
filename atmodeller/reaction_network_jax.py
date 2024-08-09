@@ -28,6 +28,7 @@ import jax
 import jax.numpy as jnp
 import optimistix as optx
 from jax import Array
+from jaxtyping import ArrayLike
 from optimistix._solution import Solution as Solution_optx
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
@@ -136,7 +137,7 @@ class ReactionNetwork:
 
         return reactions
 
-    def _get_lnKp(self, reaction_index: int, pressure: Array) -> Array | float:
+    def _get_lnKp(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
         Args:
@@ -146,14 +147,14 @@ class ReactionNetwork:
         Returns:
             Natural log of the equilibrium constant in terms of partial pressures
         """
-        gibbs_energy: Array | float = self._get_reaction_gibbs_energy_of_formation(
+        gibbs_energy: ArrayLike = self._get_reaction_gibbs_energy_of_formation(
             reaction_index, pressure
         )
-        lnKp: Array | float = -gibbs_energy / (GAS_CONSTANT * self.temperature())
+        lnKp: ArrayLike = -1 * gibbs_energy / (GAS_CONSTANT * self.temperature())
 
         return lnKp
 
-    def _get_log10Kp(self, reaction_index: int, pressure: Array) -> Array | float:
+    def _get_log10Kp(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the log10 of the equilibrium constant in terms of partial pressures.
 
         Args:
@@ -163,8 +164,8 @@ class ReactionNetwork:
         Returns:
             log10 of the equilibrium constant in terms of partial pressures
         """
-        lnKp: Array | float = self._get_lnKp(reaction_index, pressure)
-        log10Kp: Array | float = lnKp / jnp.log(10)
+        lnKp: Array = self._get_lnKp(reaction_index, pressure)
+        log10Kp: Array = lnKp / jnp.log(10)
 
         return log10Kp
 
@@ -190,7 +191,7 @@ class ReactionNetwork:
 
         return delta_n
 
-    def _get_lnKc(self, reaction_index: int, pressure: Array) -> Array | float:
+    def _get_lnKc(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the natural log of the equilibrium constant in terms of number densities.
 
         Args:
@@ -200,15 +201,15 @@ class ReactionNetwork:
         Returns:
             Natural log of the equilibrium constant in terms of number densities
         """
-        lnKp: Array | float = self._get_lnKp(reaction_index, pressure)
-        delta_n: Array | float = self._get_delta_n(reaction_index)
-        lnKc: Array | float = lnKp - delta_n * (
+        lnKp: ArrayLike = self._get_lnKp(reaction_index, pressure)
+        delta_n: ArrayLike = self._get_delta_n(reaction_index)
+        lnKc: ArrayLike = lnKp - delta_n * (
             jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(self.temperature())
         )
 
         return lnKc
 
-    def _get_log10Kc(self, reaction_index: int, pressure: Array) -> Array | float:
+    def _get_log10Kc(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the log10 of the equilibrium constant in terms of number densities.
 
         Args:
@@ -218,14 +219,14 @@ class ReactionNetwork:
         Returns:
             log10 of the equilibrium constant in terms of number densities
         """
-        lnKc: Array | float = self._get_lnKc(reaction_index, pressure)
-        log10Kc: Array | float = lnKc / jnp.log(10)
+        lnKc: Array = self._get_lnKc(reaction_index, pressure)
+        log10Kc: Array = lnKc / jnp.log(10)
 
         return log10Kc
 
     def _get_reaction_gibbs_energy_of_formation(
-        self, reaction_index: int, pressure: Array
-    ) -> Array | float:
+        self, reaction_index: int, pressure: ArrayLike
+    ) -> Array:
         r"""Gets the Gibb's free energy of formation for a reaction.
 
         Args:
@@ -235,15 +236,19 @@ class ReactionNetwork:
         Returns:
             The Gibb's free energy of the reaction in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        gibbs_energy: float = 0
+        gibbs_energy: Array = jnp.zeros(())
+
         assert self.reaction_matrix is not None
+
         for species_index, species in enumerate(self._species):
             assert species.thermodata is not None
-            # TODO: Convert to JAX
-            gibbs_energy += self.reaction_matrix[
-                reaction_index, species_index
-            ] * species.thermodata.get_formation_gibbs(
+            # Get Gibb's formation energy for the current species
+            formation_gibbs: ArrayLike = species.thermodata.get_formation_gibbs(
                 temperature=self._planet.surface_temperature, pressure=pressure
+            )
+            gibbs_energy = (
+                gibbs_energy
+                + self.reaction_matrix[reaction_index, species_index] * formation_gibbs
             )
 
         return gibbs_energy
@@ -276,7 +281,7 @@ class ReactionNetwork:
 
     def get_right_hand_side(
         self,
-        pressure: Array,
+        pressure: ArrayLike,
         *,
         constraints: SystemConstraints,
     ) -> Array:
@@ -294,11 +299,7 @@ class ReactionNetwork:
 
         # Reactions
         for reaction_index in range(self.number_reactions):
-            # log10Kc: float = self._get_log10Kc(
-            #    reaction_index
-            # )
-            # FIXME: Hack to try jax
-            log10Kc = 17.47976865
+            log10Kc: Array = self._get_log10Kc(reaction_index, pressure)
             rhs = rhs.at[reaction_index].set(log10Kc)
 
         # Constraints
@@ -316,7 +317,7 @@ class ReactionNetwork:
 
     def _assemble_log_fugacity_coefficients(
         self,
-        pressure: float,
+        pressure: ArrayLike,
     ) -> Array:
         """Assembles the fugacity coefficient vector on the left-hand side of the equations.
 
@@ -420,6 +421,11 @@ class ReactionNetwork:
         solution: Solution = Solution.create_from_species(species=self._species)
         solution.planet = self._planet
         solution.value = jnp.array(sol.value)
+
+        print("sol = ", sol)
+        result = sol.result
+        print("string = ", str(result._value))
+        print("result = ", optx.RESULTS[result])
 
         return sol, solution
 
