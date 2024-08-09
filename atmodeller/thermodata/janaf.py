@@ -22,6 +22,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING
 
+from jaxtyping import ArrayLike
 from molmass import Composition
 from scipy.constants import kilo
 from thermochem import janaf
@@ -177,7 +178,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
             super().__init__(species, data_source, data)
 
         @override
-        def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
+        def get_formation_gibbs(self, *, temperature: float, pressure: ArrayLike) -> ArrayLike:
             r"""Gets the standard Gibbs free energy of formation.
 
             Note that thermochem v0.8.2 returns J not kJ. But the main branch, which atmodeller
@@ -193,7 +194,7 @@ class ThermodynamicDatasetJANAF(ThermodynamicDataset):
             """
 
             del pressure
-            gibbs: float = self.data.DeltaG(temperature) * kilo
+            gibbs: ArrayLike = self.data.DeltaG(temperature) * kilo
 
             # logger.debug(
             #     "Species = %s, standard Gibbs energy of formation = %f",
