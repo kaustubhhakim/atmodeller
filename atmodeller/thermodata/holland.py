@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import pandas as pd
+from jaxtyping import ArrayLike
 
 from atmodeller.thermodata import DATA_DIRECTORY
 from atmodeller.thermodata.interfaces import (
@@ -151,13 +152,13 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
             self.dKdT_factor: float = -1.5e-4
 
         @override
-        def get_formation_gibbs(self, *, temperature: float, pressure: float) -> float:
-            gibbs: float = self._get_enthalpy(temperature) - temperature * self._get_entropy(
+        def get_formation_gibbs(self, *, temperature: float, pressure: ArrayLike) -> ArrayLike:
+            gibbs: ArrayLike = self._get_enthalpy(temperature) - temperature * self._get_entropy(
                 temperature
             )
 
             if self.species.phase == "cr" or self.species.phase == "l":
-                gibbs += self._get_volume_pressure_integral(temperature, pressure)
+                gibbs = gibbs + self._get_volume_pressure_integral(temperature, pressure)
 
             # logger.debug(
             #     "Species = %s, standard Gibbs energy of formation = %f",
@@ -261,7 +262,9 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
             )
             return bulk_modulus
 
-        def _get_volume_pressure_integral(self, temperature: float, pressure: float) -> float:
+        def _get_volume_pressure_integral(
+            self, temperature: float, pressure: ArrayLike
+        ) -> ArrayLike:
             """Computes the volume-pressure integral :cite:p:`HP98{p312}`
 
             Args:
@@ -274,7 +277,7 @@ class ThermodynamicDatasetHollandAndPowell(ThermodynamicDataset):
             volume: float = self._get_volume_at_temperature(temperature)
             bulk_modulus: float = self._get_bulk_modulus_at_temperature(temperature)
             # Uses P-1 instead of P.
-            integral_vp: float = (
+            integral_vp: ArrayLike = (
                 volume
                 * bulk_modulus
                 / (self.dKdP - 1)
