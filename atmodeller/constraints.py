@@ -21,7 +21,6 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
-from collections import UserList
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 import jax.numpy as jnp
@@ -29,7 +28,12 @@ from molmass import Formula
 
 from atmodeller import AVOGADRO
 from atmodeller.core import GasSpecies, Species
-from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies, TypeChemicalSpecies
+from atmodeller.interfaces import (
+    ChemicalSpecies,
+    CondensedSpecies,
+    ImmutableList,
+    TypeChemicalSpecies,
+)
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import UnitConversion, filter_by_type, get_number_density
 
@@ -413,50 +417,47 @@ class TotalPressureConstraint(ConstraintProtocol):
         return jnp.log10(self.get_value(*args, **kwargs))
 
 
-class SystemConstraints(UserList[ConstraintProtocol]):
-    """A collection of constraints
+class SystemConstraints(ImmutableList[ConstraintProtocol]):
+    """A collection of constraints"""
 
-    Args:
-        initlist: Initial list of constraints. Defaults to None.
-    """
+    # TODO: Check for immutability problems with jax
+    # def add_activity_constraints(self, species: Species) -> None:
+    #     """Adds activity constraints
 
-    def add_activity_constraints(self, species: Species) -> None:
-        """Adds activity constraints
+    #     These constraints set the activity of a stable condensate, which is assumed to be unity for
+    #     a pure component.
 
-        These constraints set the activity of a stable condensate, which is assumed to be unity for
-        a pure component.
-
-        Args:
-            species: Species
-        """
-        for condensed_species in species.condensed_species().values():
-            if condensed_species not in self.constrained_species:
-                logger.debug(
-                    "Automatically adding stable activity constraint for %s", condensed_species
-                )
-                self.append(ActivityConstraint(condensed_species, 1))
-            else:
-                logger.debug(
-                    "Stable activity constraint for %s already included", condensed_species
-                )
+    #     Args:
+    #         species: Species
+    #     """
+    #     for condensed_species in species.condensed_species().values():
+    #         if condensed_species not in self.constrained_species:
+    #             logger.debug(
+    #                 "Automatically adding stable activity constraint for %s", condensed_species
+    #             )
+    #             self.append(ActivityConstraint(condensed_species, 1))
+    #         else:
+    #             logger.debug(
+    #                 "Stable activity constraint for %s already included", condensed_species
+    #             )
 
     @property
-    def constrained_species(self) -> list[ChemicalSpecies]:
+    def constrained_species(self) -> tuple[ChemicalSpecies, ...]:
         """Constraints applied to species
 
         Species constraints are only applied in the context of the reaction network
         """
-        return [constraint.species for constraint in self.reaction_network_constraints]
+        return tuple(constraint.species for constraint in self.reaction_network_constraints)
 
     @property
-    def mass_constraints(self) -> list[ElementMassConstraint]:
+    def mass_constraints(self) -> tuple[ElementMassConstraint, ...]:
         """Constraints related to element mass conservation"""
-        return list(filter_by_type(self, ElementMassConstraint).values())
+        return tuple(filter_by_type(self, ElementMassConstraint).values())
 
     @property
-    def total_pressure_constraint(self) -> list[TotalPressureConstraint]:
+    def total_pressure_constraint(self) -> tuple[TotalPressureConstraint, ...]:
         """Total pressure constraint"""
-        total_pressure: list[TotalPressureConstraint] = list(
+        total_pressure: tuple[TotalPressureConstraint, ...] = tuple(
             filter_by_type(self, TotalPressureConstraint).values()
         )
         if len(total_pressure) > 1:
@@ -465,60 +466,62 @@ class SystemConstraints(UserList[ConstraintProtocol]):
         return total_pressure
 
     @property
-    def activity_constraints(self) -> list[ActivityConstraintProtocol]:
+    def activity_constraints(self) -> tuple[ActivityConstraintProtocol, ...]:
         """Constraints related to condensed species activities"""
-        return list(filter_by_type(self, ActivityConstraintProtocol).values())
+        return tuple(filter_by_type(self, ActivityConstraintProtocol).values())
 
     @property
-    def gas_constraints(self) -> list[GasConstraintProtocol]:
+    def gas_constraints(self) -> tuple[GasConstraintProtocol, ...]:
         """Constraints related to gas species fugacities and pressures"""
-        return list(filter_by_type(self, GasConstraintProtocol).values())
+        return tuple(filter_by_type(self, GasConstraintProtocol).values())
 
     @property
-    def reaction_network_constraints(self) -> list[ReactionNetworkConstraintProtocol]:
+    def reaction_network_constraints(self) -> tuple[ReactionNetworkConstraintProtocol, ...]:
         """Constraints related to the reaction network"""
         constraints: list[ReactionNetworkConstraintProtocol] = []
         constraints.extend(self.activity_constraints)
         constraints.extend(self.gas_constraints)
 
-        return constraints
+        return tuple(constraints)
 
     @property
     def number_reaction_network_constraints(self) -> int:
         """Number of constraints related to the reaction network"""
         return len(self.reaction_network_constraints)
 
-    def evaluate(
-        self, temperature: float, pressure: jnp.ndarray
-    ) -> dict[str, jnp.ndarray | float]:
-        """Evaluates all constraints.
+    # TODO: Check for immutability problems with jax
+    # def evaluate(
+    #     self, temperature: float, pressure: jnp.ndarray
+    # ) -> dict[str, jnp.ndarray | float]:
+    #     """Evaluates all constraints.
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
 
-        Returns:
-            A dictionary of the evaluated constraints in the same order as the constraints
-        """
-        evaluated_constraints: dict[str, jnp.ndarray | float] = {}
-        for constraint in self.data:
-            evaluated_constraints[constraint.name] = constraint.get_value(
-                temperature=temperature,
-                pressure=pressure,
-            )
+    #     Returns:
+    #         A dictionary of the evaluated constraints in the same order as the constraints
+    #     """
+    #     evaluated_constraints: dict[str, jnp.ndarray | float] = {}
+    #     for constraint in self.data:
+    #         evaluated_constraints[constraint.name] = constraint.get_value(
+    #             temperature=temperature,
+    #             pressure=pressure,
+    #         )
 
-        return evaluated_constraints
+    #     return evaluated_constraints
 
-    def evaluate_log10(self, temperature: float, pressure: jnp.ndarray) -> dict[str, jnp.ndarray]:
-        """Evaluates all constraints and returns the log10 values.
+    # TODO: Check for immutability problems with jax
+    # def evaluate_log10(self, temperature: float, pressure: jnp.ndarray) -> dict[str, jnp.ndarray]:
+    #     """Evaluates all constraints and returns the log10 values.
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
 
-        Returns:
-            A dictionary of the log10 evaluated constraints in the same order as the constraints
-        """
-        return {
-            key: jnp.log10(value) for key, value in self.evaluate(temperature, pressure).items()
-        }
+    #     Returns:
+    #         A dictionary of the log10 evaluated constraints in the same order as the constraints
+    #     """
+    #     return {
+    #         key: jnp.log10(value) for key, value in self.evaluate(temperature, pressure).items()
+    #     }

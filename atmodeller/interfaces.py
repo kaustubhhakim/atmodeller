@@ -19,8 +19,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Callable, TypeVar
+from typing import Callable, Generic, TypeVar
 
 from molmass import Composition, Formula
 
@@ -278,3 +279,25 @@ class CondensedSpecies(ChemicalSpecies):
 
 TypeChemicalSpecies = TypeVar("TypeChemicalSpecies", bound=ChemicalSpecies)
 TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies, covariant=True)
+T = TypeVar("T")
+
+
+class ImmutableList(Sequence, Generic[T]):
+    """An immutable list
+
+    Args:
+        iterable: Iterable
+    """
+
+    def __init__(self, iterable):
+        # Store the data as a tuple to ensure immutability
+        self.data: tuple[T, ...] = tuple(iterable)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+    def __repr__(self):
+        return f"ImmutableList({self.data})"

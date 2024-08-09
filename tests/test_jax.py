@@ -24,7 +24,6 @@ import logging
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from scipy.optimize import root
 
 from atmodeller import __version__, debug_logger
@@ -68,15 +67,15 @@ def test_reaction_network() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
     planet = Planet(surface_temperature=2000)
     constraints: SystemConstraints = SystemConstraints(
-        [
+        (
             FugacityConstraint(H2O_g, 0.2570770067190733),
             FugacityConstraint(O2_g, 8.838043080858959e-08),
-        ]
+        )
     )
 
-    reaction_network = ReactionNetwork(species=species, planet=planet, constraints=constraints)
+    reaction_network = ReactionNetwork(species=species, planet=planet)
 
-    sol, solution = reaction_network.solve_optimistix()
+    sol, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
         "H2O_g": 0.25707719341563373,
@@ -84,4 +83,54 @@ def test_reaction_network() -> None:
         "O2_g": 8.838052554822744e-08,
     }
 
+    print(solution.output_solution())
+
     assert solution.isclose(target_dict)
+
+
+def test_reaction_network_vmap() -> None:
+
+    H2O_g: GasSpecies = GasSpecies(
+        "H2O", thermodata_dataset=ThermodynamicDatasetHollandAndPowell()
+    )
+    H2_g: GasSpecies = GasSpecies("H2", thermodata_dataset=ThermodynamicDatasetHollandAndPowell())
+    O2_g: GasSpecies = GasSpecies("O2", thermodata_dataset=ThermodynamicDatasetHollandAndPowell())
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
+    planet = Planet(surface_temperature=2000)
+
+    reaction_network = ReactionNetwork(species=species, planet=planet)
+
+    constraints_batch: list[SystemConstraints] = [
+        SystemConstraints(
+            (
+                FugacityConstraint(H2O_g, 0.2570770067190733),
+                FugacityConstraint(O2_g, 8.838043080858959e-08),
+            )
+        ),
+        SystemConstraints(
+            (
+                FugacityConstraint(H2O_g, 0.2570770067190733),
+                FugacityConstraint(O2_g, 8.838043080858959e-08),
+            ),
+        ),
+    ]
+
+    # Vectorize the solver method using jax.vmap with PyTree and static args
+    vmap_solve = jax.vmap(reaction_network.solve_optimistix)
+
+    # constraints_batch = jax.tree_map(lambda x: jnp.stack(x, axis=0), constraints_batch)
+
+    vmap_solve(constraints=constraints_batch)
+
+    # sol, solution = reaction_network.solve_optimistix(constraints=constraints)
+
+    # target_dict = {
+    #    "H2O_g": 0.25707719341563373,
+    #    "H2_g": 0.249646956461615,
+    #    "O2_g": 8.838052554822744e-08,
+    # }
+
+    # print(solution.output_solution())
+
+    # assert solution.isclose(target_dict)

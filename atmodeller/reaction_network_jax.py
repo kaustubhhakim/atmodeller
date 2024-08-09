@@ -53,10 +53,9 @@ class ReactionNetwork:
         constraints: Constraints
     """
 
-    def __init__(self, *, species: Species, planet: Planet, constraints: SystemConstraints):
+    def __init__(self, *, species: Species, planet: Planet):
         self._species: Species = species
         self.planet = planet
-        self.constraints: SystemConstraints = constraints
         logger.info("Creating a reaction network")
         logger.info("Species = %s", self._species.names)
         self.reaction_matrix: jnp.ndarray | None = self.get_reaction_matrix()
@@ -70,9 +69,6 @@ class ReactionNetwork:
         else:
             assert self.reaction_matrix is not None
             return self.reaction_matrix.shape[0]
-
-    def pressure(self) -> jnp.ndarray:
-        return self.solution.pressure()
 
     def temperature(self) -> float:
         return self.planet.surface_temperature
@@ -139,32 +135,34 @@ class ReactionNetwork:
 
         return reactions
 
-    def _get_lnKp(self, reaction_index: int) -> jnp.ndarray | float:
+    def _get_lnKp(self, reaction_index: int, pressure: jnp.ndarray) -> jnp.ndarray | float:
         """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
         Args:
             reaction_index: Row index of the reaction in :attr:`reaction_matrix`
+            pressure: Pressure in bar
 
         Returns:
             Natural log of the equilibrium constant in terms of partial pressures
         """
         gibbs_energy: jnp.ndarray | float = self._get_reaction_gibbs_energy_of_formation(
-            reaction_index
+            reaction_index, pressure
         )
         lnKp: jnp.ndarray | float = -gibbs_energy / (GAS_CONSTANT * self.temperature())
 
         return lnKp
 
-    def _get_log10Kp(self, reaction_index: int) -> jnp.ndarray | float:
+    def _get_log10Kp(self, reaction_index: int, pressure: jnp.ndarray) -> jnp.ndarray | float:
         """Gets the log10 of the equilibrium constant in terms of partial pressures.
 
         Args:
             reaction_index: Row index of the reaction in :attr:`reaction_matrix`
+            pressure: Pressure in bar
 
         Returns:
             log10 of the equilibrium constant in terms of partial pressures
         """
-        lnKp: jnp.ndarray | float = self._get_lnKp(reaction_index)
+        lnKp: jnp.ndarray | float = self._get_lnKp(reaction_index, pressure)
         log10Kp: jnp.ndarray | float = lnKp / jnp.log(10)
 
         return log10Kp
@@ -191,16 +189,17 @@ class ReactionNetwork:
 
         return delta_n
 
-    def _get_lnKc(self, reaction_index: int) -> jnp.ndarray | float:
+    def _get_lnKc(self, reaction_index: int, pressure: jnp.ndarray) -> jnp.ndarray | float:
         """Gets the natural log of the equilibrium constant in terms of number densities.
 
         Args:
             reaction_index: Row index of the reaction in :attr:`reaction_matrix`
+            pressure: Pressure in bar
 
         Returns:
             Natural log of the equilibrium constant in terms of number densities
         """
-        lnKp: jnp.ndarray | float = self._get_lnKp(reaction_index)
+        lnKp: jnp.ndarray | float = self._get_lnKp(reaction_index, pressure)
         delta_n: jnp.ndarray | float = self._get_delta_n(reaction_index)
         lnKc: jnp.ndarray | float = lnKp - delta_n * (
             jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(self.temperature())
@@ -208,25 +207,29 @@ class ReactionNetwork:
 
         return lnKc
 
-    def _get_log10Kc(self, reaction_index: int) -> jnp.ndarray | float:
+    def _get_log10Kc(self, reaction_index: int, pressure: jnp.ndarray) -> jnp.ndarray | float:
         """Gets the log10 of the equilibrium constant in terms of number densities.
 
         Args:
             reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            pressure: Pressure in bar
 
         Returns:
             log10 of the equilibrium constant in terms of number densities
         """
-        lnKc: jnp.ndarray | float = self._get_lnKc(reaction_index)
+        lnKc: jnp.ndarray | float = self._get_lnKc(reaction_index, pressure)
         log10Kc: jnp.ndarray | float = lnKc / jnp.log(10)
 
         return log10Kc
 
-    def _get_reaction_gibbs_energy_of_formation(self, reaction_index: int) -> jnp.ndarray | float:
+    def _get_reaction_gibbs_energy_of_formation(
+        self, reaction_index: int, pressure: jnp.ndarray
+    ) -> jnp.ndarray | float:
         r"""Gets the Gibb's free energy of formation for a reaction.
 
         Args:
             reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
+            pressure: Pressure in bar
 
         Returns:
             The Gibb's free energy of the reaction in :math:`\mathrm{J}\mathrm{mol}^{-1}`
@@ -239,12 +242,12 @@ class ReactionNetwork:
             gibbs_energy += self.reaction_matrix[
                 reaction_index, species_index
             ] * species.thermodata.get_formation_gibbs(
-                temperature=self.temperature(), pressure=self.pressure()
+                temperature=self.temperature(), pressure=pressure
             )
 
         return gibbs_energy
 
-    def get_coefficient_matrix(self) -> jnp.ndarray:
+    def get_coefficient_matrix(self, constraints: SystemConstraints) -> jnp.ndarray:
         """Gets the coefficient matrix.
 
         Args:
@@ -253,13 +256,13 @@ class ReactionNetwork:
         Returns:
             The coefficient matrix with the stoichiometry and constraints
         """
-        nrows: int = self.constraints.number_reaction_network_constraints + self.number_reactions
+        nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
         coeff: jnp.ndarray = jnp.zeros((nrows, self._species.number))
         if self.reaction_matrix is not None:
             coeff = coeff.at[0 : self.number_reactions].set(self.reaction_matrix)
 
-        for index, constraint in enumerate(self.constraints.reaction_network_constraints):
+        for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
             species_index: int = self._species.species_index(constraint.species)
@@ -270,13 +273,19 @@ class ReactionNetwork:
 
         return coeff
 
-    def _right_hand_side(self) -> jnp.ndarray:
+    def get_right_hand_side(
+        self, pressure: jnp.ndarray, constraints: SystemConstraints
+    ) -> jnp.ndarray:
         """Assembles the right-hand side vector of values for the system of equations.
+
+        Args:
+            pressure: Pressure in bar
+            constraints: Constraints
 
         Returns:
             The right-hand side vector of values
         """
-        nrows: int = self.number_reactions + self.constraints.number_reaction_network_constraints
+        nrows: int = self.number_reactions + constraints.number_reaction_network_constraints
         rhs: jnp.ndarray = jnp.zeros(nrows, dtype=jnp.float_)
 
         # Reactions
@@ -289,14 +298,12 @@ class ReactionNetwork:
             rhs = rhs.at[reaction_index].set(log10Kc)
 
         # Constraints
-        for index, constraint in enumerate(self.constraints.reaction_network_constraints):
+        for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
             # pylint: disable=line-too-long
             # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
             rhs = rhs.at[row_index].set(
-                constraint.get_log10_value(
-                    temperature=self.temperature(), pressure=self.pressure()
-                )
+                constraint.get_log10_value(temperature=self.temperature(), pressure=pressure)
             )
 
         logger.debug("_right_hand_side = %s", rhs)
@@ -342,6 +349,7 @@ class ReactionNetwork:
 
         Args:
             solution_array: Array of the solution
+            constraints: System constraints
 
         Returns:
             Residual array
@@ -350,6 +358,10 @@ class ReactionNetwork:
         self.solution.planet = self.planet
         self.solution.value = solution_array
 
+        pressure: jnp.ndarray = self.solution.atmosphere.pressure()
+
+        constraints = args[0]
+
         # FIXME: Commented out for simplicity
         # log_fugacity_coefficients: jnp.ndarray = self._assemble_log_fugacity_coefficients(
         #    temperature=temperature, pressure=pressure
@@ -357,66 +369,72 @@ class ReactionNetwork:
         residual: jnp.ndarray = (
             # FIXME: Commented out for simplicity
             # coefficient_matrix.dot(log_fugacity_coefficients)
-            self.get_coefficient_matrix().dot(self.solution.get_reaction_array())
-            - self._right_hand_side()
+            self.get_coefficient_matrix(constraints).dot(self.solution.get_reaction_array())
+            - self.get_right_hand_side(pressure, constraints)
         )
 
         return residual
 
-    def jacobian(self) -> Callable:
-        return jax.jacobian(self.objective_function)
+    # def jacobian(self) -> Callable:
+    #     return jax.jacobian(self.objective_function)
 
-    def solve(
-        self,
-        initial_solution: InitialSolutionProtocol | None = None,
-        *,
-        method: str = "hybr",
-        tol: float | None = None,
-        **options,
-    ) -> tuple(OptimizeResult, Solution):
+    # def solve(
+    #     self,
+    #     initial_solution: InitialSolutionProtocol | None = None,
+    #     *,
+    #     method: str = "hybr",
+    #     tol: float | None = None,
+    #     **options,
+    # ) -> tuple(OptimizeResult, Solution):
 
-        if initial_solution is None:
-            initial_solution = InitialSolutionDict(species=self._species)
-        assert initial_solution is not None
+    #     if initial_solution is None:
+    #         initial_solution = InitialSolutionDict(species=self._species)
+    #     assert initial_solution is not None
 
-        initial_solution_guess: jnp.ndarray = initial_solution.get_log10_value(
-            self.constraints,
-            temperature=self.temperature(),
-            pressure=1,
-        )
+    #     initial_solution_guess: jnp.ndarray = initial_solution.get_log10_value(
+    #         self.constraints,
+    #         temperature=self.temperature(),
+    #         pressure=1,
+    #     )
 
-        sol = root(
-            self.objective_function,
-            initial_solution_guess,
-            method=method,
-            jac=self.jacobian(),
-            tol=tol,
-            options=options,
-        )
+    #     sol = root(
+    #         self.objective_function,
+    #         initial_solution_guess,
+    #         method=method,
+    #         jac=self.jacobian(),
+    #         tol=tol,
+    #         options=options,
+    #     )
 
-        return sol, self.solution
+    #     return sol, self.solution
 
     def solve_optimistix(
         self,
         initial_solution: InitialSolutionProtocol | None = None,
         *,
+        constraints: SystemConstraints,
         method: str = "hybr",
         tol: float | None = None,
         **options,
-    ) -> tuple(OptimizeResult, Solution):
+    ) -> tuple[OptimizeResult, Solution]:
 
         if initial_solution is None:
             initial_solution = InitialSolutionDict(species=self._species)
         assert initial_solution is not None
 
         initial_solution_guess: jnp.ndarray = initial_solution.get_log10_value(
-            self.constraints,
+            constraints,
             temperature=self.temperature(),
             pressure=1,
         )
 
         solver = optx.Newton(rtol=1e-8, atol=1e-8)
-        sol = optx.root_find(self.objective_function, solver, initial_solution_guess)
+        sol = optx.root_find(
+            self.objective_function,
+            solver,
+            initial_solution_guess,
+            args=(constraints,),
+        )
 
         solution: Solution = Solution.create_from_species(species=self._species)
         solution.planet = self.planet
