@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Callable, Generic, Protocol, TypeVar
 
@@ -282,22 +282,28 @@ TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies
 T = TypeVar("T")
 
 
-class ImmutableList(Sequence, Generic[T]):
+class ImmutableList(Sequence[T], Generic[T]):
     """An immutable list
 
     Args:
         iterable: Iterable
     """
 
-    def __init__(self, iterable):
+    def __init__(self, iterable: Iterable[T]):
         # Store the data as a tuple to ensure immutability
         self.data: tuple[T, ...] = tuple(iterable)
+
+    def __contains__(self, item: T) -> bool:
+        return item in self.data
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         return self.data[index]
+
+    def __iter__(self) -> Iterator[T]:
+        return iter(self.data)
 
     def __repr__(self):
         return f"ImmutableList({self.data})"
