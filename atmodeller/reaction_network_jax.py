@@ -27,6 +27,7 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
+import optimistix as optx
 from scipy.optimize import OptimizeResult, root
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
@@ -54,15 +55,12 @@ class ReactionNetwork:
 
     def __init__(self, *, species: Species, planet: Planet, constraints: SystemConstraints):
         self._species: Species = species
+        self.planet = planet
         self.constraints: SystemConstraints = constraints
         logger.info("Creating a reaction network")
         logger.info("Species = %s", self._species.names)
         self.reaction_matrix: jnp.ndarray | None = self.get_reaction_matrix()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
-
-        # TODO: Is this the best approach to create its own solution here?
-        self.solution: Solution = Solution.create_from_species(species=self._species)
-        self.solution.planet = planet
 
     @property
     def number_reactions(self) -> int:
@@ -77,7 +75,7 @@ class ReactionNetwork:
         return self.solution.pressure()
 
     def temperature(self) -> float:
-        return self.solution.temperature()
+        return self.planet.surface_temperature
 
     def formula_matrix(self) -> jnp.ndarray:
         """Gets the formula matrix
@@ -339,7 +337,7 @@ class ReactionNetwork:
 
         return log_fugacity_coefficients
 
-    def objective_function(self, solution_array: jnp.ndarray) -> jnp.ndarray:
+    def objective_function(self, solution_array: jnp.ndarray, args) -> jnp.ndarray:
         """Objective function
 
         Args:
@@ -348,6 +346,8 @@ class ReactionNetwork:
         Returns:
             Residual array
         """
+        self.solution = Solution.create_from_species(species=self._species)
+        self.solution.planet = self.planet
         self.solution.value = solution_array
 
         # FIXME: Commented out for simplicity
@@ -395,6 +395,34 @@ class ReactionNetwork:
         )
 
         return sol, self.solution
+
+    def solve_optimistix(
+        self,
+        initial_solution: InitialSolutionProtocol | None = None,
+        *,
+        method: str = "hybr",
+        tol: float | None = None,
+        **options,
+    ) -> tuple(OptimizeResult, Solution):
+
+        if initial_solution is None:
+            initial_solution = InitialSolutionDict(species=self._species)
+        assert initial_solution is not None
+
+        initial_solution_guess: jnp.ndarray = initial_solution.get_log10_value(
+            self.constraints,
+            temperature=self.temperature(),
+            pressure=1,
+        )
+
+        solver = optx.Newton(rtol=1e-8, atol=1e-8)
+        sol = optx.root_find(self.objective_function, solver, initial_solution_guess)
+
+        solution: Solution = Solution.create_from_species(species=self._species)
+        solution.planet = self.planet
+        solution.value = jnp.array(sol.value)
+
+        return sol, solution
 
 
 class ReactionNetworkWithCondensateStability(ReactionNetwork):

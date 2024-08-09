@@ -76,7 +76,7 @@ def test_reaction_network() -> None:
 
     reaction_network = ReactionNetwork(species=species, planet=planet, constraints=constraints)
 
-    sol, solution = reaction_network.solve()
+    sol, solution = reaction_network.solve_optimistix()
 
     target_dict = {
         "H2O_g": 0.25707719341563373,
@@ -84,11 +84,4 @@ def test_reaction_network() -> None:
         "O2_g": 8.838052554822744e-08,
     }
 
-    logger.warning(sol)
-    logger.warning(solution.output_solution())
-
-    target_values: list = list(dict(sorted(target_dict.items())).values())
-    solution_values: list = list(dict(sorted(solution.output_solution().items())).values())
-    isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=RTOL, atol=ATOL).all()
-
-    assert isclose
+    assert solution.isclose(target_dict)

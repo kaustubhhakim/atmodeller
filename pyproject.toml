@@ -22,6 +22,7 @@ seaborn = "^0.13.2"
 cmcrameri = "^1.7"
 typing-extensions = "^4.12.2"
 jax = "^0.4.31"
+optimistix = "^0.0.7"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.2"
