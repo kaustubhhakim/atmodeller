@@ -32,6 +32,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from jax import Array
+from jaxtyping import ArrayLike
 from molmass import Formula
 from scipy.constants import kilo, mega
 
