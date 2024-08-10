@@ -23,6 +23,9 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Callable, Generic, TypeVar
 
+import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
 from molmass import Composition, Formula
 
 from atmodeller.thermodata.interfaces import (
@@ -81,7 +84,7 @@ class ExperimentalCalibration:
             logger.info("Set maximum evaluation pressure (pressure < %f)", self.pressure_max)
             self._clips_to_apply.append(self._clip_pressure_max)
 
-    def _clip_pressure_max(self, temperature: float, pressure: float) -> tuple[float, float]:
+    def _clip_pressure_max(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
         """Clips maximum pressure
 
         Args:
@@ -93,9 +96,9 @@ class ExperimentalCalibration:
         """
         assert self.pressure_max is not None
 
-        return temperature, min(pressure, self.pressure_max)
+        return temperature, jnp.minimum(pressure, jnp.array(self.pressure_max))
 
-    def _clip_pressure_min(self, temperature: float, pressure: float) -> tuple[float, float]:
+    def _clip_pressure_min(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
         """Clips minimum pressure
 
         Args:
@@ -107,9 +110,11 @@ class ExperimentalCalibration:
         """
         assert self.pressure_min is not None
 
-        return temperature, max(pressure, self.pressure_min)
+        return temperature, jnp.maximum(pressure, jnp.array(self.pressure_min))
 
-    def _clip_temperature_max(self, temperature: float, pressure: float) -> tuple[float, float]:
+    def _clip_temperature_max(
+        self, temperature: float, pressure: ArrayLike
+    ) -> tuple[float, Array]:
         """Clips maximum temperature
 
         Args:
@@ -121,9 +126,11 @@ class ExperimentalCalibration:
         """
         assert self.temperature_max is not None
 
-        return min(temperature, self.temperature_max), pressure
+        return min(temperature, self.temperature_max), jnp.array(pressure)
 
-    def _clip_temperature_min(self, temperature: float, pressure: float) -> tuple[float, float]:
+    def _clip_temperature_min(
+        self, temperature: float, pressure: ArrayLike
+    ) -> tuple[float, Array]:
         """Clips minimum temperature
 
         Args:
@@ -135,9 +142,9 @@ class ExperimentalCalibration:
         """
         assert self.temperature_min is not None
 
-        return max(temperature, self.temperature_min), pressure
+        return max(temperature, self.temperature_min), jnp.array(pressure)
 
-    def get_within_range(self, temperature: float, pressure: float) -> tuple[float, float]:
+    def get_within_range(self, temperature: float, pressure: ArrayLike) -> tuple[float, ArrayLike]:
         """Gets temperature and pressure conditions within the calibration range.
 
         Args:
@@ -152,7 +159,7 @@ class ExperimentalCalibration:
 
         return temperature, pressure
 
-    def get_penalty(self, temperature: float, pressure: float) -> float:
+    def get_penalty(self, temperature: float, pressure: ArrayLike) -> Array:
         """Gets a penalty value if temperature and pressure are outside the calibration range
 
         This is based on the quadratic penalty method.
@@ -164,10 +171,11 @@ class ExperimentalCalibration:
         Returns:
             A penalty value
         """
+        pressure_: Array = jnp.array(pressure)
         temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
         penalty = (
-            self.temperature_penalty * (temperature_clip - temperature) ** 2
-            + self.pressure_penalty * (pressure_clip - pressure) ** 2
+            self.pressure_penalty * (pressure_clip - pressure_) ** 2
+            + self.temperature_penalty * (temperature_clip - temperature) ** 2
         )
 
         return penalty
