@@ -180,9 +180,9 @@ class Species(ImmutableList[ChemicalSpecies]):
     """
 
     @property
-    def names(self) -> list[str]:
+    def names(self) -> tuple[str, ...]:
         """Unique names of the species"""
-        return [species.name for species in self.data]
+        return tuple([species.name for species in self.data])
 
     @property
     def number(self) -> int:
@@ -197,17 +197,18 @@ class Species(ImmutableList[ChemicalSpecies]):
         """Condensed species"""
         return filter_by_type(self, CondensedSpecies)
 
-    def elements(self) -> list[str]:
+    def elements(self) -> tuple[str, ...]:
         """Unique elements in the species
 
         Returns:
-            A list of unique elements
+            Unique elements in the species
         """
         elements: list[str] = []
         for species in self.data:
             elements.extend(species.elements)
+        unique_elements: tuple[str, ...] = tuple(set(elements))
 
-        return list(set(elements))
+        return unique_elements
 
     def species_index(self, find_species: ChemicalSpecies) -> int:
         """Gets the index of a species

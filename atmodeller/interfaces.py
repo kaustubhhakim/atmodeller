@@ -307,7 +307,7 @@ class ImmutableList(Sequence[T], Generic[T]):
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> T:
         return self.data[index]
 
     def __iter__(self) -> Iterator[T]:
