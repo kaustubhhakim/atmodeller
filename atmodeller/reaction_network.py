@@ -20,39 +20,49 @@
 
 from __future__ import annotations
 
-import copy
 import logging
 import pprint
 import sys
+from typing import Callable
 
+import jax
+import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
+import optimistix as optx
+from jax import Array, lax
+from jaxtyping import ArrayLike
+from optimistix._solution import Solution as Solution_optx
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Species
-from atmodeller.utilities import partial_rref
+from atmodeller.core import Planet, Species
+from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
+from atmodeller.solution import Solution
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
 
+jax.config.update("jax_enable_x64", True)
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ReactionNetwork:
-    """Determines the reactions to solve a chemical network.
+    """A chemical reaction network.
 
     Args:
         species: Species
+        planet: Planet
     """
 
-    def __init__(self, species: Species):
+    def __init__(self, *, species: Species, planet: Planet):
         self._species: Species = species
+        self._planet = planet
         logger.info("Creating a reaction network")
         logger.info("Species = %s", self._species.names)
-        self.reaction_matrix: npt.NDArray | None = self.get_reaction_matrix()
+        self.reaction_matrix: Array | None = self.get_reaction_matrix()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
     @property
@@ -64,7 +74,10 @@ class ReactionNetwork:
             assert self.reaction_matrix is not None
             return self.reaction_matrix.shape[0]
 
-    def formula_matrix(self) -> npt.NDArray[np.int_]:
+    def temperature(self) -> float:
+        return self._planet.surface_temperature
+
+    def formula_matrix(self) -> Array:
         """Gets the formula matrix
 
         Elements are given in rows and species in columns following the convention in
@@ -73,8 +86,8 @@ class ReactionNetwork:
         Returns:
             The formula matrix
         """
-        matrix: npt.NDArray[np.int_] = np.zeros(
-            (len(self._species.elements()), len(self._species.data)), dtype=np.int_
+        formula_matrix: Array = jnp.zeros(
+            (len(self._species.elements()), len(self._species.data)), dtype=jnp.int_
         )
         for element_index, element in enumerate(self._species.elements()):
             for species_index, species in enumerate(self._species.data):
@@ -82,11 +95,13 @@ class ReactionNetwork:
                     count: int = species.composition()[element].count
                 except KeyError:
                     count = 0
-                matrix[element_index, species_index] = count
+                formula_matrix = formula_matrix.at[element_index, species_index].set(count)
 
-        return matrix
+        logger.debug("formula_matrix = %s", formula_matrix)
 
-    def get_reaction_matrix(self) -> npt.NDArray[np.float_] | None:
+        return formula_matrix
+
+    def get_reaction_matrix(self) -> Array | None:
         """Gets the reaction matrix
 
         Returns:
@@ -96,7 +111,7 @@ class ReactionNetwork:
             logger.debug("Only one species therefore no reactions")
             return None
 
-        transpose_formula_matrix: npt.NDArray[np.int_] = self.formula_matrix().T
+        transpose_formula_matrix: Array = self.formula_matrix().T
 
         return partial_rref(transpose_formula_matrix)
 
@@ -112,7 +127,7 @@ class ReactionNetwork:
                 reactants: str = ""
                 products: str = ""
                 for species_index, species in enumerate(self._species.data):
-                    coeff: float = self.reaction_matrix[reaction_index, species_index]
+                    coeff: float = self.reaction_matrix[reaction_index, species_index].item()
                     if coeff != 0:
                         if coeff < 0:
                             reactants += f"{abs(coeff)} {species.name} + "
@@ -126,41 +141,39 @@ class ReactionNetwork:
 
         return reactions
 
-    def _get_lnKp(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+    def _get_lnKp(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
         Args:
             reaction_index: Row index of the reaction in :attr:`reaction_matrix`
-            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
             Natural log of the equilibrium constant in terms of partial pressures
         """
-        gibbs_energy: float = self._get_reaction_gibbs_energy_of_formation(
-            reaction_index, temperature=temperature, pressure=pressure
+        gibbs_energy: ArrayLike = self._get_reaction_gibbs_energy_of_formation(
+            reaction_index, pressure
         )
-        lnKp: float = -gibbs_energy / (GAS_CONSTANT * temperature)
+        lnKp: ArrayLike = -1 * gibbs_energy / (GAS_CONSTANT * self.temperature())
 
         return lnKp
 
-    def _get_log10Kp(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+    def _get_log10Kp(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the log10 of the equilibrium constant in terms of partial pressures.
 
         Args:
             reaction_index: Row index of the reaction in :attr:`reaction_matrix`
-            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
             log10 of the equilibrium constant in terms of partial pressures
         """
-        lnKp: float = self._get_lnKp(reaction_index, temperature=temperature, pressure=pressure)
-        log10Kp: float = lnKp / np.log(10)
+        lnKp: Array = self._get_lnKp(reaction_index, pressure)
+        log10Kp: Array = lnKp / jnp.log(10)
 
         return log10Kp
 
-    def _get_delta_n(self, reaction_index: int) -> float:
+    def _get_delta_n(self, reaction_index: int) -> Array:
         """Gets the difference in the moles of gas products compared to the moles of gas reactants.
 
         Args:
@@ -171,69 +184,80 @@ class ReactionNetwork:
         """
         assert self.reaction_matrix is not None
 
-        delta_n: float = 0
-        for gas_index in self._species.gas_species():
-            delta_n += self.reaction_matrix[reaction_index, gas_index]
+        delta_n = jnp.sum(
+            jnp.array(
+                [
+                    self.reaction_matrix[reaction_index, gas_index]
+                    for gas_index in self._species.gas_species()
+                ]
+            )
+        )
 
         return delta_n
 
-    def _get_lnKc(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+    def _get_lnKc(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the natural log of the equilibrium constant in terms of number densities.
 
         Args:
             reaction_index: Row index of the reaction in :attr:`reaction_matrix`
-            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
             Natural log of the equilibrium constant in terms of number densities
         """
-        lnKp: float = self._get_lnKp(reaction_index, temperature=temperature, pressure=pressure)
-        delta_n: float = self._get_delta_n(reaction_index)
-        lnKc: float = lnKp - delta_n * (np.log(BOLTZMANN_CONSTANT_BAR) + np.log(temperature))
+        lnKp: ArrayLike = self._get_lnKp(reaction_index, pressure)
+        delta_n: ArrayLike = self._get_delta_n(reaction_index)
+        lnKc: ArrayLike = lnKp - delta_n * (
+            jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(self.temperature())
+        )
 
         return lnKc
 
-    def _get_log10Kc(self, reaction_index: int, *, temperature: float, pressure: float) -> float:
+    def _get_log10Kc(self, reaction_index: int, pressure: ArrayLike) -> Array:
         """Gets the log10 of the equilibrium constant in terms of number densities.
 
         Args:
             reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
-            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
             log10 of the equilibrium constant in terms of number densities
         """
-        lnKc: float = self._get_lnKc(reaction_index, temperature=temperature, pressure=pressure)
-        log10Kc: float = lnKc / np.log(10)
+        lnKc: Array = self._get_lnKc(reaction_index, pressure)
+        log10Kc: Array = lnKc / jnp.log(10)
 
         return log10Kc
 
     def _get_reaction_gibbs_energy_of_formation(
-        self, reaction_index: int, *, temperature: float, pressure: float
-    ) -> float:
+        self, reaction_index: int, pressure: ArrayLike
+    ) -> Array:
         r"""Gets the Gibb's free energy of formation for a reaction.
 
         Args:
             reaction_index: Row index of the reaction as it appears in :attr:`reaction_matrix`
-            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
             The Gibb's free energy of the reaction in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        gibbs_energy: float = 0
+        gibbs_energy: Array = jnp.zeros(())
+
         assert self.reaction_matrix is not None
+
         for species_index, species in enumerate(self._species):
             assert species.thermodata is not None
-            gibbs_energy += self.reaction_matrix[
-                reaction_index, species_index
-            ] * species.thermodata.get_formation_gibbs(temperature=temperature, pressure=pressure)
+            # Get Gibb's formation energy for the current species
+            formation_gibbs: ArrayLike = species.thermodata.get_formation_gibbs(
+                temperature=self.temperature(), pressure=pressure
+            )
+            gibbs_energy = (
+                gibbs_energy
+                + self.reaction_matrix[reaction_index, species_index] * formation_gibbs
+            )
 
         return gibbs_energy
 
-    def get_coefficient_matrix(self, constraints: SystemConstraints) -> npt.NDArray[np.float_]:
+    def get_coefficient_matrix(self, *, constraints: SystemConstraints) -> Array:
         """Gets the coefficient matrix.
 
         Args:
@@ -244,32 +268,30 @@ class ReactionNetwork:
         """
         nrows: int = constraints.number_reaction_network_constraints + self.number_reactions
 
-        coeff: npt.NDArray[np.float_] = np.zeros((nrows, self._species.number))
+        coeff: Array = jnp.zeros((nrows, self._species.number))
         if self.reaction_matrix is not None:
-            coeff[0 : self.number_reactions] = self.reaction_matrix.copy()
+            coeff = coeff.at[0 : self.number_reactions].set(self.reaction_matrix)
 
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             logger.debug("Apply %s constraint for %s", constraint.name, constraint.species)
             row_index: int = self.number_reactions + index
             species_index: int = self._species.species_index(constraint.species)
             logger.debug("Row %02d: Setting %s coefficient", row_index, constraint.species)
-            coeff[row_index, species_index] = 1
+            coeff = coeff.at[row_index, species_index].set(1.0)
 
         logger.debug("Coefficient matrix = \n%s", coeff)
 
         return coeff
 
-    def _assemble_right_hand_side_values(
+    def get_right_hand_side(
         self,
+        pressure: ArrayLike,
         *,
-        temperature: float,
-        pressure: float,
         constraints: SystemConstraints,
-    ) -> npt.NDArray[np.float_]:
+    ) -> Array:
         """Assembles the right-hand side vector of values for the system of equations.
 
         Args:
-            temperature: Temperature in K
             pressure: Pressure in bar
             constraints: Constraints for the system of equations
 
@@ -277,34 +299,30 @@ class ReactionNetwork:
             The right-hand side vector of values
         """
         nrows: int = self.number_reactions + constraints.number_reaction_network_constraints
-        rhs: npt.NDArray[np.float_] = np.zeros(nrows, dtype=float)
+        rhs: Array = jnp.zeros(nrows, dtype=jnp.float_)
 
         # Reactions
         for reaction_index in range(self.number_reactions):
-            log10Kc: float = self._get_log10Kc(
-                reaction_index,
-                temperature=temperature,
-                pressure=pressure,
-            )
-            rhs[reaction_index] = log10Kc
+            log10Kc: Array = self._get_log10Kc(reaction_index, pressure)
+            rhs = rhs.at[reaction_index].set(log10Kc)
 
         # Constraints
         for index, constraint in enumerate(constraints.reaction_network_constraints):
             row_index: int = self.number_reactions + index
             # pylint: disable=line-too-long
             # logger.debug("Row %02d: Setting %s %s", row_index, constraint.species, constraint.name)
-            rhs[row_index] = constraint.get_log10_value(temperature=temperature, pressure=pressure)
+            rhs = rhs.at[row_index].set(
+                constraint.get_log10_value(temperature=self.temperature(), pressure=pressure)
+            )
 
-        logger.debug("RHS vector = %s", rhs)
+        logger.debug("_right_hand_side = %s", rhs)
 
         return rhs
 
     def _assemble_log_fugacity_coefficients(
         self,
-        *,
-        temperature: float,
-        pressure: float,
-    ) -> npt.NDArray[np.float_]:
+        pressure: ArrayLike,
+    ) -> Array:
         """Assembles the fugacity coefficient vector on the left-hand side of the equations.
 
         Args:
@@ -315,137 +333,288 @@ class ReactionNetwork:
             The log10(fugacity coefficient) vector
         """
         # Initialise to ideal behaviour.
-        fugacity_coefficients: npt.NDArray[np.float_] = np.ones_like(self._species, dtype=float)
+        fugacity_coefficients: Array = jnp.ones_like(self._species)
 
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
         for gas_species_index, gas_species in self._species.gas_species().items():
-            fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
-                temperature=temperature, pressure=pressure
+            fugacity_coefficient: ArrayLike = gas_species.eos.fugacity_coefficient(
+                temperature=self.temperature(), pressure=pressure
             )
-            fugacity_coefficients[gas_species_index] = fugacity_coefficient
+            fugacity_coefficients = fugacity_coefficients.at[gas_species_index].set(
+                fugacity_coefficient
+            )
 
-        log_fugacity_coefficients: npt.NDArray[np.float_] = np.log10(fugacity_coefficients)
-        logger.debug("Log10 fugacity coefficient vector = %s", log_fugacity_coefficients)
+        log_fugacity_coefficients: Array = jnp.log10(fugacity_coefficients)
+        logger.debug("Log10 fugacity coefficients = %s", log_fugacity_coefficients)
 
         return log_fugacity_coefficients
 
-    def get_residual(
-        self,
-        *,
-        temperature: float,
-        pressure: float,
-        constraints: SystemConstraints,
-        coefficient_matrix: npt.NDArray[np.float_],
-        reaction_array: npt.NDArray[np.float_],
-        **kwargs,
-    ) -> npt.NDArray[np.float_]:
-        """The residual array of the reaction network
+    def objective_function(self, solution_array: Array, args) -> Array:
+        """Objective function
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-            constraints: Constraints for the system of equations
-            coefficient_matrix: Coefficient matrix
-            reaction_array: Reaction array
-            **kwargs: Catches additional keyword arguments used by child classes
+            solution_array: Array of the solution
+            args: Tuple of other arguments
 
         Returns:
-            The residual vector of the reaction network
+            Residual array
         """
-        del kwargs
-        log_fugacity_coefficients: npt.NDArray[np.float_] = (
-            self._assemble_log_fugacity_coefficients(temperature=temperature, pressure=pressure)
-        )
-        rhs: npt.NDArray[np.float_] = self._assemble_right_hand_side_values(
-            temperature=temperature, pressure=pressure, constraints=constraints
-        )
-        residual_reaction: npt.NDArray[np.float_] = (
-            coefficient_matrix.dot(log_fugacity_coefficients)
-            + coefficient_matrix.dot(reaction_array)
-            - rhs
+        solution: Solution = Solution.create_from_species(species=self._species)
+        solution.planet = self._planet
+        solution.value = solution_array
+
+        constraints = args[0]
+        residual: Array = self.get_residual(solution, constraints)
+
+        return residual
+
+    def jacobian(self, args) -> Callable:
+        """Creates a Jacobian callable function.
+
+        Args:
+            args: Tuple of other arguments
+
+        Returns:
+            A callable function that computes the Jacobian with respect to `solution_array`.
+        """
+
+        # Partially apply `args` to the `objective_function`
+        def wrapped_objective(solution_array):
+            return self.objective_function(solution_array, args)
+
+        return jax.jacobian(wrapped_objective)
+
+    def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:
+        """Gets the residual
+
+        Args:
+            solution: Solution
+            constraints: Constraints for the system of equations
+
+        Returns:
+            Residual array
+        """
+        # FIXME: Commented out for simplicity
+        # log_fugacity_coefficients: Array = self._assemble_log_fugacity_coefficients(
+        #    temperature=temperature, pressure=pressure
+        # )
+
+        pressure: Array = solution.atmosphere.pressure()
+
+        residual: Array = (
+            # FIXME: Commented out for simplicity
+            # coefficient_matrix.dot(log_fugacity_coefficients)
+            self.get_coefficient_matrix(constraints=constraints).dot(solution.get_reaction_array())
+            - self.get_right_hand_side(pressure, constraints=constraints)
         )
 
-        return residual_reaction
+        return residual
+
+    def solve_optimistix(
+        self,
+        initial_solution: InitialSolutionProtocol | None = None,
+        *,
+        constraints: SystemConstraints,
+        tol: float = 1.0e-8,
+    ) -> tuple[Solution_optx, Callable, Solution]:
+
+        if initial_solution is None:
+            initial_solution = InitialSolutionDict(species=self._species)
+        assert initial_solution is not None
+
+        initial_solution_guess: Array = initial_solution.get_log10_value(
+            constraints,
+            temperature=self.temperature(),
+            pressure=1,
+        )
+
+        solver = optx.Newton(rtol=tol, atol=tol)
+        sol = optx.root_find(
+            self.objective_function,
+            solver,
+            initial_solution_guess,
+            args=(constraints,),
+        )
+
+        solution: Solution = Solution.create_from_species(species=self._species)
+        solution.planet = self._planet
+        solution.value = jnp.array(sol.value)
+
+        residual = self.get_residual(solution, constraints)
+        rmse = np.sqrt(np.sum(np.array(residual) ** 2))
+        # Success is indicated by no message
+        if optx.RESULTS[sol.result] == "":
+            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
+            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+
+        # It is useful to also return the jacobian of this system for testing
+        jacobian: Callable = self.jacobian((constraints,))
+        logger.info("Jacobian = %s", jacobian(solution.value))
+
+        return sol, jacobian, solution
 
 
 class ReactionNetworkWithCondensateStability(ReactionNetwork):
-    """A reaction network with condensate stability
+    """A chemical reaction network with condensate stability
 
     This automatically determines condensate stability using the extended law of mass-action
     (xLMA) equations :cite:p:`LKS17`. Also see :cite:p:`KSP24`.
 
     Args:
         species: Species
-
-    Attributes:
-        species: Species
-        reaction_matrix: The reaction stoichiometry matrix
+        planet: Planet
     """
 
-    def get_activity_modifier(self, constraints: SystemConstraints) -> npt.NDArray[np.float_]:
+    def get_activity_modifier(self, *, constraints: SystemConstraints) -> Array:
         """Gets the activity modifier matrix for condensate stability
 
         Args:
-            constraints: Constraints
+            constraints: Constraints for the system of equations
 
         Returns:
             Activity modifier matrix
         """
-        coefficient_matrix: npt.NDArray[np.float_] = self.get_coefficient_matrix(
-            constraints=constraints
+        coefficient_matrix: Array = self.get_coefficient_matrix(constraints=constraints)
+        activity_modifier: Array = jnp.zeros_like(coefficient_matrix)
+        condensed_indices: Array = jnp.array(
+            tuple(self._species.condensed_species().keys()), dtype=jnp.int_
         )
-        activity_modifier: npt.NDArray[np.float_] = np.zeros_like(coefficient_matrix)
-        for condensed_index in self._species.condensed_species():
-            activity_modifier[:, condensed_index] = coefficient_matrix[:, condensed_index]
+        activity_modifier = activity_modifier.at[:, condensed_indices].set(
+            coefficient_matrix[:, condensed_indices]
+        )
 
         logger.debug("activity_modifier = %s", activity_modifier)
 
         return activity_modifier
 
-    def get_equilibrium_modifier(self, constraints: SystemConstraints) -> npt.NDArray[np.float_]:
+    def get_equilibrium_modifier(self, *, constraints: SystemConstraints) -> Array:
         """Gets the equilibrium constant modifier matrix for condensate stability
 
         Args:
-            constraints: Constraints
+            constraints: Constraints for the system of equations
 
         Returns:
             Equilibrium constant modifier matrix
         """
-        activity_modifier: npt.NDArray[np.float_] = self.get_activity_modifier(
-            constraints=constraints
-        )
-        equilibrium_modifier: npt.NDArray[np.float_] = copy.deepcopy(activity_modifier)
-        equilibrium_modifier[self.number_reactions :, :] = 0
+        activity_modifier: Array = self.get_activity_modifier(constraints=constraints)
+        equilibrium_modifier: Array = activity_modifier.at[self.number_reactions :, :].set(0)
 
         logger.debug("equilibrium_modifier = %s", equilibrium_modifier)
 
         return equilibrium_modifier
 
+    def get_stability_array(self, solution: Solution) -> Array:
+        """Gets the condensate stability array
+
+        Args:
+            solution: Solution
+
+        Returns:
+            The condensate stability array
+        """
+        stability_array: Array = jnp.zeros(self._species.number, dtype=jnp.float_)
+        for condensed_species, collection in solution.condensed_solution.items():
+            index: int = self._species.species_index(condensed_species)
+            stability_array = stability_array.at[index].set(collection.stability.value)
+
+        return stability_array
+
     @override
-    def get_residual(
-        self,
-        *,
-        temperature: float,
-        pressure: float,
-        constraints: SystemConstraints,
-        coefficient_matrix: npt.NDArray[np.float_],
-        activity_modifier: npt.NDArray[np.float_],
-        equilibrium_modifier: npt.NDArray[np.float_],
-        reaction_array: npt.NDArray[np.float_],
-        stability_array: npt.NDArray[np.float_],
-    ) -> npt.NDArray[np.float_]:
+    def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:
+        stability_array: Array = self.get_stability_array(solution)
+        residual: Array = super().get_residual(solution, constraints)
+        activity_modifier: Array = self.get_activity_modifier(constraints=constraints)
+        equilibrium_modifier: Array = self.get_equilibrium_modifier(constraints=constraints)
 
-        residual_reaction: npt.NDArray[np.float_] = super().get_residual(
-            temperature=temperature,
-            pressure=pressure,
-            constraints=constraints,
-            coefficient_matrix=coefficient_matrix,
-            reaction_array=reaction_array,
-        )
+        residual = residual + jnp.dot(activity_modifier, 10**stability_array)
+        residual = residual - jnp.dot(equilibrium_modifier, 10**stability_array)
 
-        residual_reaction += activity_modifier.dot(10**stability_array)
-        residual_reaction -= equilibrium_modifier.dot(10**stability_array)
+        return residual
 
-        return residual_reaction
+
+def partial_rref(matrix: Array) -> Array:
+    """Computes the partial reduced row echelon form to determine linear components.
+
+    Args:
+        matrix: The matrix to compute the reduced row echelon form.
+
+    Returns:
+        A matrix of linear components.
+    """
+    nrows, ncols = matrix.shape
+
+    # Augment the matrix with the identity matrix
+    augmented_matrix: Array = jnp.hstack((matrix, jnp.eye(nrows)))
+    logger.debug("augmented_matrix = \n%s", augmented_matrix)
+
+    def swap_rows(matrix: Array, row1: ArrayLike, row2: ArrayLike) -> Array:
+        """Swaps two rows in the matrix."""
+        # Extract rows to swap
+        row1_data: Array = lax.dynamic_slice(matrix, (row1, 0), (1, matrix.shape[1]))
+        row2_data: Array = lax.dynamic_slice(matrix, (row2, 0), (1, matrix.shape[1]))
+        # Update matrix
+        matrix = lax.dynamic_update_slice(matrix, row2_data, (row1, 0))
+        matrix = lax.dynamic_update_slice(matrix, row1_data, (row2, 0))
+
+        return matrix
+
+    # Forward elimination
+    def forward_step(i: int, matrix: Array) -> Array:
+        # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
+        pivot_value: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))
+        if pivot_value == 0:
+            nonzero_rows: Array = jnp.nonzero(matrix[i:, i])[0]
+            if nonzero_rows.size > 0:
+                nonzero_row: Array = nonzero_rows[0] + i
+                matrix = swap_rows(matrix, i, nonzero_row)
+
+        # Perform row operations to eliminate values below the pivot.
+        for j in range(i + 1, nrows):
+            pivot: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
+            ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
+            row_i: Array = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows))
+            row_j: Array = lax.dynamic_slice(matrix, (j, 0), (1, ncols + nrows))
+            matrix = lax.dynamic_update_slice(matrix, row_j - ratio * row_i, (j, 0))
+
+        return matrix
+
+    for i in range(ncols):
+        augmented_matrix = forward_step(i, augmented_matrix)
+
+    logger.warning("augmented_matrix after forward step = \n%s", augmented_matrix)
+
+    # Backward substitution
+    def backward_step(i: int, matrix: Array):
+        # Normalize the pivot row.
+        pivot: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
+        logger.warning("pivot = %s", pivot)
+        normalized_row = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows)) / pivot
+        logger.warning("normalized_row = %s", normalized_row)
+        matrix = lax.dynamic_update_slice(matrix, normalized_row, (i, 0))
+        logger.warning("matrix = %s", matrix)
+        # Eliminate values above the pivot.
+        for j in range(i - 1, -1, -1):
+            if lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] != 0:
+                # Scaled pivot row.
+                pivot = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
+                ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
+                logger.warning("j=%d not zero and ratio = %s", j, ratio)
+                row_i: Array = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows))
+                row_j: Array = lax.dynamic_slice(matrix, (j, 0), (1, ncols + nrows))
+                matrix = lax.dynamic_update_slice(matrix, row_j - ratio * row_i, (j, 0))
+
+        return matrix
+
+    for i in range(ncols - 1, -1, -1):
+        augmented_matrix = backward_step(i, augmented_matrix)
+
+    logger.warning("augmented_matrix after backward step = \n%s", augmented_matrix)
+
+    reduced_matrix = lax.dynamic_slice(augmented_matrix, (0, 0), (nrows, ncols))
+    component_matrix = lax.dynamic_slice(augmented_matrix, (ncols, ncols), (nrows - ncols, nrows))
+    logger.debug("reduced_matrix = \n%s", reduced_matrix)
+    logger.debug("component_matrix = \n%s", component_matrix)
+
+    return component_matrix

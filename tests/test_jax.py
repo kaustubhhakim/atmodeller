@@ -34,7 +34,7 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies, Planet
 from atmodeller.interior_atmosphere import Species
-from atmodeller.reaction_network_jax import (
+from atmodeller.reaction_network import (
     ReactionNetwork,
     ReactionNetworkWithCondensateStability,
 )

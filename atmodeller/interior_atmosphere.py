@@ -33,7 +33,7 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
-from atmodeller.reaction_network_jax import ReactionNetworkWithCondensateStability
+from atmodeller.reaction_network import ReactionNetworkWithCondensateStability
 from atmodeller.solution import Solution
 
 logger: logging.Logger = logging.getLogger(__name__)
