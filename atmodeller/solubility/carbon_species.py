@@ -23,7 +23,9 @@ from __future__ import annotations
 import logging
 import sys
 
-import numpy as np
+import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
 
 from atmodeller.solubility.interfaces import Solubility
 from atmodeller.utilities import UnitConversion
@@ -44,12 +46,12 @@ class CH4_basalt_ardia(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, *, pressure: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
-        pressure_gpa: float = UnitConversion.bar_to_GPa(pressure)
-        one_bar_in_gpa: float = UnitConversion.bar_to_GPa(1)
-        k: float = np.exp(4.93 - (1.93 * (pressure_gpa - one_bar_in_gpa)))
-        ppmw: float = k * UnitConversion.bar_to_GPa(fugacity)
+        pressure_gpa: ArrayLike = UnitConversion.bar_to_GPa(pressure)
+        one_bar_in_gpa: ArrayLike = UnitConversion.bar_to_GPa(1)
+        k: Array = jnp.exp(4.93 - (1.93 * (pressure_gpa - one_bar_in_gpa)))
+        ppmw: Array = k * UnitConversion.bar_to_GPa(fugacity)
 
         return ppmw
 
@@ -64,10 +66,10 @@ class CO_basalt_armstrong(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, *, pressure: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
-        logco_ppm: float = -0.738 + (0.876 * np.log10(fugacity)) - (5.44e-5 * pressure)
-        ppmw: float = 10**logco_ppm
+        logco_ppm: Array = -0.738 + (0.876 * jnp.log10(fugacity)) - (5.44e-5 * pressure)
+        ppmw: Array = 10**logco_ppm
 
         return ppmw
 
@@ -81,10 +83,10 @@ class CO_basalt_yoshioka(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        co_wtp: float = 10 ** (-5.20 + (0.8 * np.log10(fugacity)))
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(co_wtp)
+        co_wtp: Array = 10 ** (-5.20 + (0.8 * jnp.log10(fugacity)))
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(co_wtp)
 
         return ppmw
 
@@ -98,10 +100,10 @@ class CO_rhyolite_yoshioka(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        co_wtp: float = 10 ** (-4.08 + (0.52 * np.log10(fugacity)))
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(co_wtp)
+        co_wtp: Array = 10 ** (-4.08 + (0.52 * jnp.log10(fugacity)))
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(co_wtp)
 
         return ppmw
 
@@ -116,10 +118,10 @@ class CO2_basalt_dixon(Solubility):
 
     @override
     def concentration(
-        self, fugacity: float, *, temperature: float, pressure: float, **kwargs
-    ) -> float:
+        self, fugacity: ArrayLike, *, temperature: float, pressure: ArrayLike, **kwargs
+    ) -> Array:
         del kwargs
-        ppmw: float = (3.8e-7) * fugacity * np.exp(-23 * (pressure - 1) / (83.15 * temperature))
-        ppmw = 1.0e4 * (4400 * ppmw) / (36.6 - 44 * ppmw)
+        arg: Array = jnp.exp(-23 * (pressure - 1) / (83.15 * temperature)) * fugacity * 3.8e-7
+        ppmw: Array = 1.0e4 * (4400 * arg) / (36.6 - 44 * arg)
 
         return ppmw

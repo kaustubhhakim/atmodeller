@@ -25,6 +25,8 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Protocol
 
+from jax.typing import ArrayLike
+
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
@@ -36,12 +38,12 @@ logger: logging.Logger = logging.getLogger(__name__)
 class SolubilityProtocol(Protocol):
     def concentration(
         self,
-        fugacity: float,
+        fugacity: ArrayLike,
         *,
         temperature: float,
-        pressure: float,
+        pressure: ArrayLike,
         **kwargs,
-    ) -> float: ...
+    ) -> ArrayLike: ...
 
 
 class Solubility(ABC):
@@ -50,12 +52,12 @@ class Solubility(ABC):
     @abstractmethod
     def concentration(
         self,
-        fugacity: float,
+        fugacity: ArrayLike,
         *,
         temperature: float | None = None,
-        pressure: float | None = None,
+        pressure: ArrayLike | None = None,
         **kwargs,
-    ) -> float:
+    ) -> ArrayLike:
         """Dissolved volatile concentration in the melt in ppmw
 
         Args:
@@ -87,7 +89,7 @@ class SolubilityPowerLaw(Solubility):
         self.exponent: float = exponent
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
         del kwargs
 
         return self.constant * fugacity**self.exponent
@@ -104,7 +106,7 @@ class NoSolubility(Solubility):
     """No solubility"""
 
     @override
-    def concentration(self, *args, **kwargs) -> float:
+    def concentration(self, *args, **kwargs) -> ArrayLike:
         del args
         del kwargs
 
