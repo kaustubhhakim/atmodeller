@@ -23,7 +23,9 @@ from __future__ import annotations
 import logging
 import sys
 
-import numpy as np
+import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
 
 from atmodeller.solubility.interfaces import Solubility
 from atmodeller.utilities import UnitConversion
@@ -46,13 +48,15 @@ class S2_sulfate_andesite_boulliung(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, *, temperature: float, O2: float, **kwargs) -> float:
+    def concentration(
+        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
+    ) -> Array:
         # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (31586.2393 / temperature)
-        logs_wtp: float = logcs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(O2))
-        s_wtp: float = 10**logs_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(s_wtp)
+        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
+        s_wtp: Array = 10**logs_wtp
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(s_wtp)
 
         return ppmw
 
@@ -66,12 +70,14 @@ class S2_sulfide_andesite_boulliung(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, *, temperature: float, O2: float, **kwargs) -> float:
+    def concentration(
+        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
+    ) -> Array:
         del kwargs
         logcs: float = 0.225 - (8921.0927 / temperature)
-        logs_wtp: float = logcs - (0.5 * (np.log10(O2) - np.log10(fugacity)))
-        s_wtp: float = 10**logs_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(s_wtp)
+        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
+        s_wtp: Array = 10**logs_wtp
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(s_wtp)
 
         return ppmw
 
@@ -86,15 +92,19 @@ class S2_andesite_boulliung(Solubility):
     @override
     def concentration(
         self,
-        fugacity: float,
+        fugacity: ArrayLike,
         *,
         temperature: float,
-        O2: float,
+        O2: ArrayLike,
         **kwargs,
-    ) -> float:
+    ) -> ArrayLike:
         del kwargs
-        concentration: float = self.sulfide.concentration(fugacity, temperature=temperature, O2=O2)
-        concentration += self.sulfate.concentration(fugacity, temperature=temperature, O2=O2)
+        concentration: ArrayLike = self.sulfide.concentration(
+            fugacity, temperature=temperature, O2=O2
+        )
+        concentration = concentration + self.sulfate.concentration(
+            fugacity, temperature=temperature, O2=O2
+        )
 
         return concentration
 
@@ -109,14 +119,16 @@ class S2_sulfate_basalt_boulliung(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, *, temperature: float, O2: float, **kwargs) -> float:
+    def concentration(
+        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
+    ) -> Array:
         # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (32333.5635 / temperature)
-        logso4_wtp: float = logcs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(O2))
-        so4_wtp: float = 10**logso4_wtp
-        s_wtp: float = so4_wtp * (32.065 / 96.06)
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(s_wtp)
+        logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
+        so4_wtp: Array = 10**logso4_wtp
+        s_wtp: Array = so4_wtp * (32.065 / 96.06)
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(s_wtp)
 
         return ppmw
 
@@ -131,13 +143,15 @@ class S2_sulfide_basalt_boulliung(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, *, temperature: float, O2: float, **kwargs) -> float:
+    def concentration(
+        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
+    ) -> Array:
         # Fugacity is fS2
         del kwargs
         logcs: float = 0.225 - (8045.7465 / temperature)
-        logs_wtp: float = logcs - (0.5 * (np.log10(O2) - np.log10(fugacity)))
-        s_wtp: float = 10**logs_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(s_wtp)
+        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
+        s_wtp: Array = 10**logs_wtp
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(s_wtp)
 
         return ppmw
 
@@ -154,17 +168,17 @@ class S2_basalt_boulliung(Solubility):
     @override
     def concentration(
         self,
-        fugacity: float,
+        fugacity: ArrayLike,
         *,
         temperature: float,
-        O2: float,
+        O2: ArrayLike,
         **kwargs,
-    ) -> float:
+    ) -> ArrayLike:
         del kwargs
-        concentration: float = self.sulfide_solubility.concentration(
+        concentration: ArrayLike = self.sulfide_solubility.concentration(
             fugacity, temperature=temperature, O2=O2
         )
-        concentration += self.sulfate_solubility.concentration(
+        concentration = concentration + self.sulfate_solubility.concentration(
             fugacity, temperature=temperature, O2=O2
         )
 
@@ -183,18 +197,18 @@ class S2_sulfate_trachybasalt_boulliung(Solubility):
     @override
     def concentration(
         self,
-        fugacity: float,
+        fugacity: ArrayLike,
         *,
         temperature: float,
-        O2: float,
+        O2: ArrayLike,
         **kwargs,
-    ) -> float:
+    ) -> Array:
         # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (32446.366 / temperature)
-        logs_wtp: float = logcs + (0.5 * np.log10(fugacity)) + (1.5 * np.log10(O2))
-        s_wtp: float = 10**logs_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(s_wtp)
+        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
+        s_wtp: Array = 10**logs_wtp
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(s_wtp)
 
         return ppmw
 
@@ -210,18 +224,18 @@ class S2_sulfide_trachybasalt_boulliung(Solubility):
     @override
     def concentration(
         self,
-        fugacity: float,
+        fugacity: ArrayLike,
         *,
         temperature: float,
-        O2: float,
+        O2: ArrayLike,
         **kwargs,
-    ) -> float:
+    ) -> Array:
         # Fugacity is fS2
         del kwargs
         logcs: float = 0.225 - (7842.5 / temperature)
-        logs_wtp: float = logcs - (0.5 * (np.log10(O2) - np.log10(fugacity)))
-        s_wtp: float = 10**logs_wtp
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(s_wtp)
+        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
+        s_wtp: Array = 10**logs_wtp
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(s_wtp)
 
         return ppmw
 
@@ -237,25 +251,25 @@ class S_mercury_magma_namur(Solubility):
     """
 
     def __init__(self):
-        self.coefficients: tuple[float, ...] = (7.25, -2.54e4, 0.04, -0.551)
+        self.coefficients: Array = jnp.array([7.25, -2.54e4, 0.04, -0.551])
 
     @override
     def concentration(
         self,
-        fugacity: float,
+        fugacity: ArrayLike,
         *,
         temperature: float,
-        O2: float,
+        O2: ArrayLike,
         **kwargs,
-    ) -> float:
+    ) -> Array:
         del kwargs
-        wt_perc: float = np.exp(
+        wt_perc: Array = jnp.exp(
             self.coefficients[0]
             + (self.coefficients[1] / temperature)
             + ((self.coefficients[2] * fugacity) / temperature)
-            + (self.coefficients[3] * np.log10(O2))
+            + (self.coefficients[3] * jnp.log10(O2))
             - 0.136
         )
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(wt_perc)
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(wt_perc)
 
         return ppmw

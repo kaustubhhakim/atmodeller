@@ -84,8 +84,8 @@ class SolubilityPowerLaw(Solubility):
         exponent: Exponent
     """
 
-    def __init__(self, constant: float, exponent: float):
-        self.constant: float = constant
+    def __init__(self, constant: ArrayLike, exponent: float):
+        self.constant: ArrayLike = constant
         self.exponent: float = exponent
 
     @override

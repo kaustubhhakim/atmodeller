@@ -23,7 +23,9 @@ from __future__ import annotations
 import logging
 import sys
 
-import numpy as np
+import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.solubility.interfaces import Solubility, SolubilityPowerLaw
@@ -47,10 +49,10 @@ class Cl2_ano_dio_for_thomas(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        cl_wtp: float = 140.52 * np.sqrt(fugacity)
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(cl_wtp)
+        cl_wtp: Array = 140.52 * jnp.sqrt(fugacity)
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(cl_wtp)
 
         return ppmw
 
@@ -64,10 +66,10 @@ class Cl2_basalt_thomas(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        cl_wtp: float = 78.56 * np.sqrt(fugacity)
-        ppmw: float = UnitConversion.weight_percent_to_ppmw(cl_wtp)
+        cl_wtp: Array = 78.56 * jnp.sqrt(fugacity)
+        ppmw: Array = UnitConversion.weight_percent_to_ppmw(cl_wtp)
 
         return ppmw
 
@@ -81,13 +83,13 @@ class He_basalt(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
         del kwargs
         henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
         # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
-        he_conc: float = (henry_sol_constant / 2.24e4) * fugacity
+        he_conc: ArrayLike = (henry_sol_constant / 2.24e4) * fugacity
         # Convert He conc from mol/g to g H2/g total and then to ppmw
-        ppmw: float = he_conc * 4.0026 * 1e6
+        ppmw: ArrayLike = he_conc * 4.0026 * 1e6
 
         return ppmw
 
@@ -104,17 +106,23 @@ class N2_basalt_bernadou(Solubility):
 
     @override
     def concentration(
-        self, fugacity: float, *, temperature: float, pressure: float, O2: float, **kwargs
-    ) -> float:
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: float,
+        pressure: ArrayLike,
+        O2: ArrayLike,
+        **kwargs,
+    ) -> Array:
         del kwargs
-        k13: float = np.exp(
+        k13: Array = jnp.exp(
             -(29344 + 121 * temperature + 4 * pressure) / (GAS_CONSTANT * temperature)
         )
-        k14: float = np.exp(
+        k14: Array = jnp.exp(
             -(183733 + 172 * temperature - 5 * pressure) / (GAS_CONSTANT * temperature)
         )
-        molfrac: float = (k13 * fugacity) + ((O2 ** (-3 / 4)) * k14 * (fugacity**0.5))
-        ppmw: float = UnitConversion.fraction_to_ppm(molfrac)
+        molfrac: Array = (k13 * fugacity) + ((O2 ** (-3 / 4)) * k14 * (fugacity**0.5))
+        ppmw: Array = UnitConversion.fraction_to_ppm(molfrac)
 
         return ppmw
 
@@ -142,22 +150,28 @@ class N2_basalt_dasgupta(Solubility):
 
     @override
     def concentration(
-        self, fugacity: float, *, temperature: float, pressure: float, O2: float, **kwargs
-    ) -> float:
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: float,
+        pressure: ArrayLike,
+        O2: ArrayLike,
+        **kwargs,
+    ) -> Array:
         del kwargs
-        fugacity_gpa: float = UnitConversion.bar_to_GPa(fugacity)
-        pressure_gpa: float = UnitConversion.bar_to_GPa(pressure)
-        logiw_fugacity: float = (
+        fugacity_gpa: ArrayLike = UnitConversion.bar_to_GPa(fugacity)
+        pressure_gpa: ArrayLike = UnitConversion.bar_to_GPa(pressure)
+        logiw_fugacity: ArrayLike = (
             -28776.8 / temperature
             + 14.057
             + 0.055 * (pressure - 1) / temperature
-            - 0.8853 * np.log(temperature)
+            - 0.8853 * jnp.log(temperature)
         )
-        fo2_shift = np.log10(O2) - logiw_fugacity
-        ppmw: float = (fugacity_gpa**0.5) * np.exp(
+        fo2_shift: Array = jnp.log10(O2) - logiw_fugacity
+        ppmw: Array = jnp.exp(
             (5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)
-        )
-        ppmw += fugacity_gpa * np.exp(
+        ) * (fugacity_gpa**0.5)
+        ppmw = ppmw + fugacity_gpa * jnp.exp(
             4.67 + (7.11 * self.xsio2) - (13.06 * self.xal2o3) - (120.67 * self.xtio2)
         )
 
@@ -176,11 +190,11 @@ class N2_basalt_libourel(Solubility):
         self._power_law: SolubilityPowerLaw = SolubilityPowerLaw(constant=0.0611, exponent=1)
 
     @override
-    def concentration(self, fugacity: float, *, O2: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, *, O2: ArrayLike, **kwargs) -> ArrayLike:
         del kwargs
-        ppmw: float = self._power_law.concentration(fugacity)
-        constant: float = (O2**-0.75) * 5.97e-10
+        ppmw: ArrayLike = self._power_law.concentration(fugacity)
+        constant: ArrayLike = (O2**-0.75) * 5.97e-10
         power_law: SolubilityPowerLaw = SolubilityPowerLaw(constant=constant, exponent=0.5)
-        ppmw += power_law.concentration(fugacity)
+        ppmw = ppmw + power_law.concentration(fugacity)
 
         return ppmw
