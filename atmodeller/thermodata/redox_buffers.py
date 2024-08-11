@@ -64,7 +64,9 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
         logger.debug("Setting experimental calibration = %s", calibration)
 
     @abstractmethod
-    def _get_buffer_log10_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> Array:
+    def _get_buffer_log10_value(
+        self, temperature: float, pressure: ArrayLike, **kwargs
+    ) -> ArrayLike:
         """Log10 value at the buffer
 
         Args:
@@ -79,7 +81,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
     @override
     def get_log10_value(
         self, temperature: float, pressure: ArrayLike, penalty: bool = True, **kwargs
-    ) -> Array:
+    ) -> ArrayLike:
         """Log10 value including any shift
 
         Args:
@@ -91,8 +93,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
         Returns:
             Log10 of the fugacity including any shift
         """
-
-        log10_value: Array = self._get_buffer_log10_value(
+        log10_value: ArrayLike = self._get_buffer_log10_value(
             temperature=temperature, pressure=pressure, **kwargs
         )
         log10_value = log10_value + self.log10_shift
@@ -175,16 +176,16 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
         calibration: ExperimentalCalibration = IronWustiteBufferHirschmann21Calibration
     ):
         super().__init__(log10_shift, calibration=calibration)
-        self.a: list[float] = [6.844864, 1.175691e-1, 1.143873e-3, 0, 0]
-        self.b: list[float] = [5.791364e-4, -2.891434e-4, -2.737171e-7, 0, 0]
-        self.c: list[float] = [-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7]
-        self.d: list[float] = [-2.769002e4, 5.285977e2, -2.919275, 0, 0]
-        self.e: list[float] = [8.463095, -3.000307e-3, 7.213445e-5, 0, 0]
-        self.f: list[float] = [1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0]
-        self.g: list[float] = [-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4]
-        self.h: list[float] = [-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0]
+        self.a: Array = jnp.array([6.844864, 1.175691e-1, 1.143873e-3, 0, 0])
+        self.b: Array = jnp.array([5.791364e-4, -2.891434e-4, -2.737171e-7, 0, 0])
+        self.c: Array = jnp.array([-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7])
+        self.d: Array = jnp.array([-2.769002e4, 5.285977e2, -2.919275, 0, 0])
+        self.e: Array = jnp.array([8.463095, -3.000307e-3, 7.213445e-5, 0, 0])
+        self.f: Array = jnp.array([1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0])
+        self.g: Array = jnp.array([-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4])
+        self.h: Array = jnp.array([-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0])
 
-    def _evaluate_m(self, pressure: ArrayLike, coefficients: list[float]) -> ArrayLike:
+    def _evaluate_m(self, pressure: ArrayLike, coefficients: Array) -> Array:
         """Evaluates an m parameter
 
         Args:
@@ -194,7 +195,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
         Return:
             m parameter
         """
-        m: ArrayLike = (
+        m: Array = (
             coefficients[0]
             + coefficients[1] * pressure
             + coefficients[2] * pressure**2
@@ -205,7 +206,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
         return m
 
     def _evaluate_fO2(
-        self, temperature: float, pressure: ArrayLike, coefficients: list[list[float]]
+        self, temperature: float, pressure: ArrayLike, coefficients: tuple[Array, ...]
     ) -> Array:
         """Evaluates the fO2
 
@@ -226,7 +227,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
 
         return log10fO2
 
-    def _fcc_bcc_iron(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def _fcc_bcc_iron(self, temperature: float, pressure: ArrayLike) -> Array:
         """log10fO2 for fcc and bcc iron
 
         Args:
@@ -236,13 +237,13 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
         Return:
             log10fO2 for fcc and bcc iron
         """
-        log10fO2: ArrayLike = self._evaluate_fO2(
-            temperature, pressure, [self.a, self.b, self.c, self.d]
+        log10fO2: Array = self._evaluate_fO2(
+            temperature, pressure, (self.a, self.b, self.c, self.d)
         )
 
         return log10fO2
 
-    def _hcp_iron(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def _hcp_iron(self, temperature: float, pressure: ArrayLike) -> Array:
         """log10fO2 for hcp iron
 
         Args:
@@ -253,7 +254,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
             log10fO2 for hcp iron
         """
         log10fO2: ArrayLike = self._evaluate_fO2(
-            temperature, pressure, [self.e, self.f, self.g, self.h]
+            temperature, pressure, (self.e, self.f, self.g, self.h)
         )
 
         return log10fO2
@@ -265,8 +266,8 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
             temperature: Temperature in K
             pressure: Pressure in GPa
         """
-        x: list[float] = [-18.64, 0.04359, -5.069e-6]
-        threshold: Array = jnp.array(x[0] + x[1] * temperature + x[2] * temperature**2)
+        x: Array = jnp.array([-18.64, 0.04359, -5.069e-6])
+        threshold: Array = x[0] + x[1] * temperature + x[2] * temperature**2
 
         return jnp.array(pressure) > threshold
 
@@ -274,21 +275,14 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
     def _get_buffer_log10_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
         pressure_GPa: ArrayLike = UnitConversion.bar_to_GPa(pressure)
-        # TODO: Remove old which is not JAX compliant
-        # if self._use_hcp(temperature, pressure_GPa):
-        #     return self._hcp_iron(temperature, pressure_GPa)
-        # else:
-        #     return self._fcc_bcc_iron(temperature, pressure_GPa)
 
-        def hcp_case(_):
+        def hcp_case() -> Array:
             return self._hcp_iron(temperature, pressure_GPa)
 
-        def fcc_bcc_case(_):
+        def fcc_bcc_case() -> Array:
             return self._fcc_bcc_iron(temperature, pressure_GPa)
 
-        return lax.cond(
-            self._use_hcp(temperature, pressure_GPa), hcp_case, fcc_bcc_case, operand=None
-        )
+        return lax.cond(self._use_hcp(temperature, pressure_GPa), hcp_case, fcc_bcc_case)
 
 
 class IronWustiteBufferHirschmann(RedoxBufferProtocol):
@@ -302,6 +296,7 @@ class IronWustiteBufferHirschmann(RedoxBufferProtocol):
         self.low_temperature_buffer: _RedoxBuffer = IronWustiteBufferHirschmann08(log10_shift)
         self.high_temperature_buffer: _RedoxBuffer = IronWustiteBufferHirschmann21(log10_shift)
 
+    @override
     def get_log10_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> ArrayLike:
         """Log10 value including any shift
 
@@ -327,6 +322,7 @@ class IronWustiteBufferHirschmann(RedoxBufferProtocol):
                 temperature=temperature, pressure=pressure, **kwargs
             )
 
+    @override
     def get_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> ArrayLike:
         """Value including any shift
 
