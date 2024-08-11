@@ -27,7 +27,11 @@ import jax.numpy as jnp
 import pytest
 
 from atmodeller import __version__, debug_logger
-from atmodeller.constraints import FugacityConstraint, SystemConstraints
+from atmodeller.constraints import (
+    BufferedFugacityConstraint,
+    FugacityConstraint,
+    SystemConstraints,
+)
 from atmodeller.core import GasSpecies, Planet
 from atmodeller.interior_atmosphere import Species
 from atmodeller.reaction_network_jax import (
@@ -35,14 +39,17 @@ from atmodeller.reaction_network_jax import (
     ReactionNetworkWithCondensateStability,
 )
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
-RTOL: float = 1.0e-6
+RTOL: float = 1.0e-8
 """Relative tolerance"""
-ATOL: float = 1.0e-6
+ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.INFO)
+
+planet: Planet = Planet()
 
 
 def test_simple() -> None:
@@ -60,36 +67,63 @@ def test_simple() -> None:
     print("Jacobian:\n", jacobian)
 
 
-def test_hydrogen_species() -> None:
+def test_H_fugacities() -> None:
+    """Tests H species with imposed fugacities"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
     H2_g: GasSpecies = GasSpecies("H2")
     O2_g: GasSpecies = GasSpecies("O2")
 
     species: Species = Species([H2O_g, H2_g, O2_g])
-    planet = Planet(surface_temperature=2000)
     constraints: SystemConstraints = SystemConstraints(
         (
             FugacityConstraint(H2O_g, 0.2570770067190733),
             FugacityConstraint(O2_g, 8.838043080858959e-08),
-            # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         )
     )
-
     reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
-
-    _, jacobian, solution = reaction_network.solve_optimistix(constraints=constraints)
+    _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
-        "H2O_g": 0.25707719341563373,
-        "H2_g": 0.249646956461615,
-        "O2_g": 8.838052554822744e-08,
+        "H2O_g": 0.257077006719072,
+        "H2_g": 0.24964688044710262,
+        "O2_g": 8.838043080858959e-08,
     }
 
-    assert solution.isclose(target_dict)
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
-def test_hydrogen_carbon_species() -> None:
+def test_H_with_buffer() -> None:
+    """Tests H species with an imposed fO2 buffer"""
+
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
+    constraints: SystemConstraints = SystemConstraints(
+        (
+            FugacityConstraint(H2O_g, 0.2570770067190733),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+        )
+    )
+    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
+
+    target_dict = {
+        "H2O_g": 0.257077006719072,
+        "H2_g": 0.24964688044710262,
+        "O2_g": 8.838043080858887e-08,
+    }
+
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+
+
+def test_H_and_C_no_solubility() -> None:
+    """Tests H2-H2O and CO-CO2 with imposed fugacities and no solubility.
+
+    This test is based on test_C_and_H() in test_CHO.py but without solubility.
+    """
 
     H2O_g: GasSpecies = GasSpecies("H2O")  # , solubility=H2O_peridotite_sossi())
     H2_g: GasSpecies = GasSpecies("H2")
@@ -98,19 +132,14 @@ def test_hydrogen_carbon_species() -> None:
     CO2_g: GasSpecies = GasSpecies("CO2")  # , solubility=CO2_basalt_dixon())
 
     species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
-    planet = Planet(surface_temperature=2000)
-
     constraints: SystemConstraints = SystemConstraints(
         [
             FugacityConstraint(CO_g, 26.625148913955194),
             FugacityConstraint(H2O_g, 99.19769919121012),
             FugacityConstraint(O2_g, 8.981953412412735e-08),
-            # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
     reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
-
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
@@ -121,7 +150,7 @@ def test_hydrogen_carbon_species() -> None:
         "O2_g": 8.981953412412735e-08,
     }
 
-    assert solution.isclose(target_dict)
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
 @pytest.mark.skip(reason="Cannot get vmap to work as desired")

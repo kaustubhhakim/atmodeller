@@ -956,8 +956,8 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         Args:
             target_dict: Dictionary of the target values, which should adhere to the format of
                 :meth:`output_solution()`
-            rtol: Relative tolerance. Defaults to 1.0E-5.
-            atol: Absolute tolerance. Defaults to 1.0E-8.
+            rtol: Relative tolerance. Defaults to 1.0e-5.
+            atol: Absolute tolerance. Defaults to 1.0e-8.
 
         Returns:
             True if the solution is close to the target, otherwise False
