@@ -26,8 +26,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Protocol
 
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+from jax import Array
+from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
@@ -44,7 +47,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 class RealGasProtocol(Protocol):
 
-    def fugacity_coefficient(self, temperature: float, pressure: float) -> float: ...
+    def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike: ...
 
 
 @dataclass(kw_only=True)
@@ -69,7 +72,7 @@ class RealGas(ABC):
     )
     """Calibration range of the temperature and pressure"""
 
-    def compressibility_parameter(self, temperature: float, pressure: float) -> float:
+    def compressibility_parameter(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Compressibility parameter
 
         Args:
@@ -79,13 +82,13 @@ class RealGas(ABC):
         Returns:
             The compressibility parameter, which is dimensionless
         """
-        volume: float = self.volume(temperature, pressure)
-        volume_ideal: float = self.ideal_volume(temperature, pressure)
-        compressibility_parameter: float = volume / volume_ideal
+        volume: ArrayLike = self.volume(temperature, pressure)
+        volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
+        compressibility_parameter: ArrayLike = volume / volume_ideal
 
         return compressibility_parameter
 
-    def ln_fugacity(self, temperature: float, pressure: float) -> float:
+    def ln_fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Natural log of the fugacity
 
         Args:
@@ -95,13 +98,13 @@ class RealGas(ABC):
         Returns:
             Natural log of the fugacity
         """
-        ln_fugacity: float = self.volume_integral(temperature, pressure) / (
+        ln_fugacity: ArrayLike = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT * temperature
         )
 
         return ln_fugacity
 
-    def fugacity(self, temperature: float, pressure: float) -> float:
+    def fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Fugacity
 
         Args:
@@ -111,11 +114,11 @@ class RealGas(ABC):
         Returns:
             Fugacity in bar
         """
-        fugacity: float = np.exp(self.ln_fugacity(temperature, pressure))
+        fugacity: ArrayLike = jnp.exp(self.ln_fugacity(temperature, pressure))
 
         return fugacity
 
-    def fugacity_coefficient(self, temperature: float, pressure: float) -> float:
+    def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Fugacity coefficient
 
         Args:
@@ -125,29 +128,30 @@ class RealGas(ABC):
         Returns:
             fugacity coefficient, which is non-dimensional
         """
-        fugacity_coefficient: float = self.fugacity(temperature, pressure) / pressure
+        fugacity_coefficient: ArrayLike = self.fugacity(temperature, pressure) / pressure
 
-        if fugacity_coefficient == np.inf:
-            logger.debug("Fugacity coefficient has blown up (unphysical)")
-            logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-            logger.debug("Setting fugacity coefficient to unity (ideal gas)")
-            fugacity_coefficient = 1
+        # FIXME: This switch block is probably not jax compliant
+        # if fugacity_coefficient == np.inf:
+        #     logger.debug("Fugacity coefficient has blown up (unphysical)")
+        #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
+        #     logger.debug("Setting fugacity coefficient to unity (ideal gas)")
+        #     fugacity_coefficient = 1
 
-        elif fugacity_coefficient == 0:
-            logger.debug("Fugacity coefficient is zero (unphysical)")
-            logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-            logger.debug("Setting fugacity coefficient to unity (ideal gas)")
-            fugacity_coefficient = 1
+        # elif fugacity_coefficient == 0:
+        #     logger.debug("Fugacity coefficient is zero (unphysical)")
+        #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
+        #     logger.debug("Setting fugacity coefficient to unity (ideal gas)")
+        #     fugacity_coefficient = 1
 
-        elif fugacity_coefficient < 0:
-            logger.debug("Fugacity coefficient is negative (unphysical)")
-            logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-            logger.debug("Setting fugacity coefficient to unity (ideal gas)")
-            fugacity_coefficient = 1
+        # elif fugacity_coefficient < 0:
+        #     logger.debug("Fugacity coefficient is negative (unphysical)")
+        #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
+        #     logger.debug("Setting fugacity coefficient to unity (ideal gas)")
+        #     fugacity_coefficient = 1
 
         return fugacity_coefficient
 
-    def ideal_volume(self, temperature: float, pressure: float) -> float:
+    def ideal_volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         r"""Ideal volume
 
         Args:
@@ -157,12 +161,12 @@ class RealGas(ABC):
         Returns:
             Ideal volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        volume_ideal: float = GAS_CONSTANT_BAR * temperature / pressure
+        volume_ideal: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
 
         return volume_ideal
 
     @abstractmethod
-    def volume(self, temperature: float, pressure: float) -> float:
+    def volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         r"""Volume
 
         Args:
@@ -174,7 +178,7 @@ class RealGas(ABC):
         """
 
     @abstractmethod
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         r"""Volume integral
 
         .. math::
@@ -219,7 +223,7 @@ class CorrespondingStatesMixin(ABC):
     critical_pressure: float = 1
     """Critical pressure in bar"""
 
-    def scaled_pressure(self, pressure: float) -> float:
+    def scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
         """Scaled pressure
 
         This is a reduced pressure when :attr:`critical_pressure` is not unity.
@@ -230,7 +234,7 @@ class CorrespondingStatesMixin(ABC):
         Returns:
             The scaled (reduced) pressure, which is dimensionless
         """
-        scaled_pressure: float = pressure / self.critical_pressure
+        scaled_pressure: ArrayLike = pressure / self.critical_pressure
 
         return scaled_pressure
 
@@ -265,13 +269,20 @@ class IdealGas(RealGas):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
+    # def fugacity_coefficient(
+    #     self,
+    #     temperature: float,
+    #     pressure: Array | np.ndarray | np.bool_ | np.number | bool | int | float | complex,
+    # ) -> Array | np.ndarray | np.bool_ | np.number | bool | int | float | complex:
+    #     return 1.0
+
     @override
-    def volume(self, temperature: float, pressure: float) -> float:
+    def volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         return self.ideal_volume(temperature, pressure)
 
     @override
-    def volume_integral(self, temperature: float, pressure: float) -> float:
-        volume_integral: float = GAS_CONSTANT_BAR * temperature * np.log(pressure)
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
+        volume_integral: Array = GAS_CONSTANT_BAR * temperature * jnp.log(pressure)
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral

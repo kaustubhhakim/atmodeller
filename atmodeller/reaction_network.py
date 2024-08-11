@@ -283,7 +283,7 @@ class ReactionNetwork:
 
         return coeff
 
-    def get_right_hand_side(
+    def _get_right_hand_side(
         self,
         pressure: ArrayLike,
         *,
@@ -319,21 +319,20 @@ class ReactionNetwork:
 
         return rhs
 
-    def _assemble_log_fugacity_coefficients(
+    def _get_log_fugacity_coefficients(
         self,
         pressure: ArrayLike,
     ) -> Array:
-        """Assembles the fugacity coefficient vector on the left-hand side of the equations.
+        """Assembles the log10 fugacity coefficients.
 
         Args:
-            temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
             The log10(fugacity coefficient) vector
         """
         # Initialise to ideal behaviour.
-        fugacity_coefficients: Array = jnp.ones_like(self._species)
+        fugacity_coefficients: Array = jnp.ones(self._species.number, dtype=jnp.float_)
 
         # Fugacity coefficients are only relevant for gas species. The initialisation of the array
         # above to unity ensures that the coefficients are all zero for condensed species, once the
@@ -396,19 +395,10 @@ class ReactionNetwork:
         Returns:
             Residual array
         """
-        # FIXME: Commented out for simplicity
-        # log_fugacity_coefficients: Array = self._assemble_log_fugacity_coefficients(
-        #    temperature=temperature, pressure=pressure
-        # )
-
         pressure: Array = solution.atmosphere.pressure()
-
-        residual: Array = (
-            # FIXME: Commented out for simplicity
-            # coefficient_matrix.dot(log_fugacity_coefficients)
-            self.get_coefficient_matrix(constraints=constraints).dot(solution.get_reaction_array())
-            - self.get_right_hand_side(pressure, constraints=constraints)
-        )
+        residual: Array = self.get_coefficient_matrix(constraints=constraints).dot(
+            self._get_log_fugacity_coefficients(pressure) + solution.get_reaction_array()
+        ) - self._get_right_hand_side(pressure, constraints=constraints)
 
         return residual
 
@@ -597,7 +587,7 @@ def partial_rref(matrix: Array) -> Array:
         # Eliminate values above the pivot.
         for j in range(i - 1, -1, -1):
             if lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] != 0:
-                # Scaled pivot row.
+                # Scaled pivot row
                 pivot = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
                 ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
                 logger.warning("j=%d not zero and ratio = %s", j, ratio)

@@ -28,11 +28,12 @@ import pytest
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    ActivityConstraint,
     BufferedFugacityConstraint,
     FugacityConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, Planet
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies
 from atmodeller.interior_atmosphere import Species
 from atmodeller.reaction_network import (
     ReactionNetwork,
@@ -47,7 +48,7 @@ ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+# logger.setLevel(logging.INFO)
 
 planet: Planet = Planet()
 
@@ -148,6 +149,89 @@ def test_H_and_C_no_solubility() -> None:
         "H2O_g": 99.19769919121012,
         "H2_g": 95.55582495038334,
         "O2_g": 8.981953412412735e-08,
+    }
+
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+
+
+@pytest.mark.skip(reason="Probably don't make sense without a mass constraint")
+def test_graphite_condensed() -> None:
+    """Graphite stable with around 50% condensed C mass fraction"""
+
+    O2_g: GasSpecies = GasSpecies("O2")
+    H2_g: GasSpecies = GasSpecies("H2")
+    CO_g: GasSpecies = GasSpecies("CO")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    C_cr: SolidSpecies = SolidSpecies("C")
+
+    species: Species = Species([O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr])
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(CH4_g, 96.86234030526238),
+            FugacityConstraint(H2O_g, 4.532525784559842),
+            ActivityConstraint(C_cr, 1),
+        ]
+    )
+
+    warm_planet: Planet = Planet(surface_temperature=873)
+    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=warm_planet)
+    _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
+
+    target_dict = {
+        "CH4_g": 96.86234030526238,
+        "CO2_g": 0.06051299046298187,
+        "CO_g": 0.07273637701072179,
+        "activity_C_cr": 1.0,
+        "H2O_g": 4.532525784559842,
+        "H2_g": 14.593415393593949,
+        "O2_g": 1.2762699614653323e-25,
+        "mass_C_cr": 3.5416383046342194e20,
+    }
+
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+
+
+@pytest.mark.skip(reason="Probably don't make sense without a mass constraint")
+def test_graphite_water_condensed() -> None:
+    """C and water in equilibrium at 430 K and 10 bar"""
+
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
+    H2O_l = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
+    CO_g = GasSpecies("CO")
+    CO2_g = GasSpecies("CO2")
+    CH4_g = GasSpecies("CH4")
+    C_cr = SolidSpecies("C")
+
+    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+    constraints = SystemConstraints(
+        [
+            FugacityConstraint(CO2_g, 4.286974741683041),
+            FugacityConstraint(H2O_g, 5.3837944619697),
+            ActivityConstraint(H2O_l, 1),
+            ActivityConstraint(C_cr, 1),
+        ]
+    )
+
+    cool_planet = Planet(surface_temperature=430)
+    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=cool_planet)
+    _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
+
+    target_dict = {
+        "CH4_g": 0.32688481623407045,
+        "CO2_g": 4.286974741683041,
+        "CO_g": 2.7984895865705653e-06,
+        "C_cr": 1.0,
+        "H2O_g": 5.3837944619697,
+        "H2O_l": 1.0,
+        "H2_g": 0.0023431770406624397,
+        "O2_g": 4.7858901816146536e-48,
+        "mass_C_cr": 9.810548377514692e19,
+        "mass_H2O_l": 2.7509418192551134e21,
     }
 
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
