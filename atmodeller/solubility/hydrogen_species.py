@@ -23,7 +23,9 @@ from __future__ import annotations
 import logging
 import sys
 
-import numpy as np
+import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
 
 from atmodeller.solubility.interfaces import Solubility, SolubilityPowerLaw
 
@@ -43,9 +45,9 @@ class H2_andesite_hirschmann(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        ppmw: float = 10 ** (0.60128868 * np.log10(fugacity) + 1.01058631)
+        ppmw: Array = 10 ** (0.60128868 * jnp.log10(fugacity) + 1.01058631)
 
         return ppmw
 
@@ -58,9 +60,9 @@ class H2_basalt_hirschmann(Solubility):
     """
 
     @override
-    def concentration(self, fugacity: float, **kwargs) -> float:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        ppmw: float = 10 ** (0.52413928 * np.log10(fugacity) + 1.10083602)
+        ppmw: Array = 10 ** (0.52413928 * jnp.log10(fugacity) + 1.10083602)
 
         return ppmw
 
