@@ -332,11 +332,13 @@ class _DissolvedNumberDensity(_NumberDensity[GasSpecies]):
 
     def ppmw(self) -> Array:
         """Parts-per-million by weight of the volatile"""
-        return self._species.solubility.concentration(
-            fugacity=self._solution.gas_solution[self._species].gas_abundance.fugacity(),
-            temperature=self._solution.atmosphere.temperature(),
-            pressure=self._solution.atmosphere.pressure(),
-            **self._solution.fugacities_by_hill_formula(),
+        return jnp.array(
+            self._species.solubility.concentration(
+                fugacity=self._solution.gas_solution[self._species].gas_abundance.fugacity(),
+                temperature=self._solution.atmosphere.temperature(),
+                pressure=self._solution.atmosphere.pressure(),
+                **self._solution.fugacities_by_hill_formula(),
+            )
         )
 
     @property
@@ -347,7 +349,7 @@ class _DissolvedNumberDensity(_NumberDensity[GasSpecies]):
     @property
     def value(self) -> Array:
         """Log10 of the number density"""
-        number_density: Array = (
+        number_density: ArrayLike = (
             UnitConversion.ppm_to_fraction(self.ppmw())
             * AVOGADRO
             / self._species.molar_mass

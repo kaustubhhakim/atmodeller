@@ -260,50 +260,6 @@ def delete_entries_with_suffix(input_dict: dict[Any, Any], suffix: str) -> dict[
     return {key: value for key, value in input_dict.items() if not key.endswith(suffix)}
 
 
-# TODO: Remove, now in reaction network and converted to jax
-# def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
-#     """Computes the partial reduced row echelon form to determine linear components
-
-#     Returns:
-#         A matrix of linear components
-#     """
-#     nrows: int = matrix.shape[0]
-#     ncols: int = matrix.shape[1]
-
-#     augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
-#     logger.debug("augmented_matrix = \n%s", augmented_matrix)
-
-#     # Forward elimination
-#     for i in range(ncols):
-#         # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
-#         if augmented_matrix[i, i] == 0:
-#             nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
-#             augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
-#         # Perform row operations to eliminate values below the pivot.
-#         for j in range(i + 1, nrows):
-#             ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
-#             augmented_matrix[j] -= ratio * augmented_matrix[i]
-#     logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
-
-#     # Backward substitution
-#     for i in range(ncols - 1, -1, -1):
-#         # Normalize the pivot row.
-#         augmented_matrix[i] /= augmented_matrix[i, i]
-#         # Eliminate values above the pivot.
-#         for j in range(i - 1, -1, -1):
-#             if augmented_matrix[j, i] != 0:
-#                 ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-#                 augmented_matrix[j] -= ratio * augmented_matrix[i]
-#     logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
-
-#     reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
-#     component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
-#     logger.debug("reduced_matrix = \n%s", reduced_matrix)
-#     logger.debug("component_matrix = \n%s", component_matrix)
-
-#     return component_matrix
-
-
 def reorder_dict(original_dict: dict[Any, Any], key_to_move_first: Any) -> dict:
     """Reorders a dictionary to put a particular key first
 
