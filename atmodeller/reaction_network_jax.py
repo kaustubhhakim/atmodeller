@@ -248,7 +248,7 @@ class ReactionNetwork:
             assert species.thermodata is not None
             # Get Gibb's formation energy for the current species
             formation_gibbs: ArrayLike = species.thermodata.get_formation_gibbs(
-                temperature=self._planet.surface_temperature, pressure=pressure
+                temperature=self.temperature(), pressure=pressure
             )
             gibbs_energy = (
                 gibbs_energy
@@ -339,15 +339,15 @@ class ReactionNetwork:
         # above to unity ensures that the coefficients are all zero for condensed species, once the
         # log is taken.
         for gas_species_index, gas_species in self._species.gas_species().items():
-            fugacity_coefficient: float = gas_species.eos.fugacity_coefficient(
-                temperature=temperature, pressure=pressure
+            fugacity_coefficient: ArrayLike = gas_species.eos.fugacity_coefficient(
+                temperature=self.temperature(), pressure=pressure
             )
             fugacity_coefficients = fugacity_coefficients.at[gas_species_index].set(
                 fugacity_coefficient
             )
 
         log_fugacity_coefficients: Array = jnp.log10(fugacity_coefficients)
-        logger.debug("Log10 fugacity coefficient vector = %s", log_fugacity_coefficients)
+        logger.debug("Log10 fugacity coefficients = %s", log_fugacity_coefficients)
 
         return log_fugacity_coefficients
 
@@ -449,8 +449,8 @@ class ReactionNetwork:
             logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
 
+        # It is useful to also return the jacobian of this system for testing
         jacobian: Callable = self.jacobian((constraints,))
-
         logger.info("Jacobian = %s", jacobian(solution.value))
 
         return sol, jacobian, solution
@@ -478,7 +478,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         """
         coefficient_matrix: Array = self.get_coefficient_matrix(constraints=constraints)
         activity_modifier: Array = jnp.zeros_like(coefficient_matrix)
-        condensed_indices = jnp.array(
+        condensed_indices: Array = jnp.array(
             tuple(self._species.condensed_species().keys()), dtype=jnp.int_
         )
         activity_modifier = activity_modifier.at[:, condensed_indices].set(
@@ -499,7 +499,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             Equilibrium constant modifier matrix
         """
         activity_modifier: Array = self.get_activity_modifier(constraints=constraints)
-        equilibrium_modifier = activity_modifier.at[self.number_reactions :, :].set(0)
+        equilibrium_modifier: Array = activity_modifier.at[self.number_reactions :, :].set(0)
 
         logger.debug("equilibrium_modifier = %s", equilibrium_modifier)
 
@@ -618,64 +618,3 @@ def partial_rref(matrix: Array) -> Array:
     logger.debug("component_matrix = \n%s", component_matrix)
 
     return component_matrix
-
-
-# def partial_rref_numpy(matrix: Array) -> Array:
-#     """Computes the partial reduced row echelon form to determine linear components
-
-#     Args:
-#         matrix: The matrix to compute the reduced row echelon form
-
-#     Returns:
-#         A matrix of linear components
-#     """
-#     nrows, ncols = matrix.shape
-
-#     # Augment the matrix with the identity matrix
-#     augmented_matrix: Array = jnp.hstack((matrix, jnp.eye(nrows)))
-#     logger.debug("augmented_matrix = \n%s", augmented_matrix)
-
-#     # Forward elimination
-#     for i in range(ncols):
-#         # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
-#         if augmented_matrix[i, i] == 0:
-#             nonzero_rows: Array = jnp.nonzero(augmented_matrix[i:, i])[0]
-#             if nonzero_rows.size > 0:
-#                 nonzero_row = nonzero_rows[0] + i
-#                 # Swap rows
-#                 augmented_matrix = augmented_matrix.at[i, :].set(augmented_matrix[nonzero_row, :])
-#                 augmented_matrix = augmented_matrix.at[nonzero_row, :].set(augmented_matrix[i, :])
-#         logger.warning("after pivot swap = %s", augmented_matrix)
-
-#         # Perform row operations to eliminate values below the pivot.
-#         for j in range(i + 1, nrows):
-#             ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-#             augmented_matrix = augmented_matrix.at[j, :].set(
-#                 augmented_matrix[j, :] - ratio * augmented_matrix[i, :]
-#             )
-
-#     logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
-
-#     # Backward substitution
-#     for i in range(ncols - 1, -1, -1):
-#         # Normalize the pivot row.
-#         augmented_matrix = augmented_matrix.at[i, :].set(
-#             augmented_matrix[i, :] / augmented_matrix[i, i]
-#         )
-#         # Eliminate values above the pivot.
-#         for j in range(i - 1, -1, -1):
-#             if augmented_matrix[j, i] != 0:
-#                 ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-#                 augmented_matrix = augmented_matrix.at[j, :].set(
-#                     augmented_matrix[j, :] - ratio * augmented_matrix[i, :]
-#                 )
-
-#     logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
-
-#     # Extract the reduced matrix and component matrix
-#     reduced_matrix = augmented_matrix[:, :ncols]
-#     component_matrix = augmented_matrix[ncols:, ncols:]
-#     logger.debug("reduced_matrix = \n%s", reduced_matrix)
-#     logger.debug("component_matrix = \n%s", component_matrix)
-
-#     return component_matrix
