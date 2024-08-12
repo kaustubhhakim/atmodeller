@@ -154,6 +154,37 @@ def test_H_and_C_no_solubility() -> None:
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
+@pytest.mark.skip(reason="Need to make SystemConstraints compatible with JAX's array capabilities")
+def test_H_fugacities_batched() -> None:
+    """Tests H species with imposed fugacities for multiple constraints"""
+
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
+    constraints_list: list[SystemConstraints] = [
+        SystemConstraints(
+            (
+                FugacityConstraint(H2O_g, 0.2570770067190733),
+                FugacityConstraint(O2_g, 8.838043080858959e-08),
+            )
+        ),
+        SystemConstraints(
+            (
+                FugacityConstraint(H2O_g, 1.0),
+                FugacityConstraint(O2_g, 8.838043080858959e-08),
+            )
+        ),
+        # Add more constraints as needed
+    ]
+
+    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    solutions, jacobians, final_solutions = reaction_network.solve_optimistix_batched(
+        constraints_list=constraints_list
+    )
+
+
 @pytest.mark.skip(reason="Probably don't make sense without a mass constraint")
 def test_graphite_condensed() -> None:
     """Graphite stable with around 50% condensed C mass fraction"""
@@ -247,7 +278,6 @@ def test_reaction_network_vmap() -> None:
     O2_g: GasSpecies = GasSpecies("O2", thermodata_dataset=ThermodynamicDatasetHollandAndPowell())
 
     species: Species = Species([H2O_g, H2_g, O2_g])
-    planet = Planet(surface_temperature=2000)
 
     reaction_network = ReactionNetwork(species=species, planet=planet)
 
