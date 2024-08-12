@@ -445,6 +445,29 @@ class ReactionNetwork:
 
         return sol, jacobian, solution
 
+    # TODO: Framework for batched calculations
+    # def solve_optimistix_batched(
+    #     self,
+    #     initial_solution: InitialSolutionProtocol | None = None,
+    #     *,
+    #     constraints_list: list[SystemConstraints],
+    #     tol: float = 1.0e-8,
+    # ) -> tuple[list[Solution_optx], list[Callable], list[Solution]]:
+
+    #     # Vectorize the solve_optimistix method over the constraints_list
+    #     solve_optimistix_vmap = jax.vmap(
+    #         lambda constraints: self.solve_optimistix(
+    #             initial_solution=initial_solution, constraints=constraints, tol=tol
+    #         ),
+    #         in_axes=(0,),
+    #     )
+
+    #     # Apply vmap over the constraints_list
+    #     solutions, jacobians, final_solutions =
+    #       solve_optimistix_vmap(jnp.array(constraints_list))
+
+    #     return solutions, jacobians, final_solutions
+
 
 class ReactionNetworkWithCondensateStability(ReactionNetwork):
     """A chemical reaction network with condensate stability
