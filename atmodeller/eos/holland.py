@@ -50,11 +50,10 @@ import sys
 from dataclasses import dataclass, field
 from typing import Callable
 
-import jax.numpy as np
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array, lax
+from jax import Array
 from jax.typing import ArrayLike
 from scipy.constants import kilo
 
