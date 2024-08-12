@@ -348,7 +348,8 @@ pressure.
 """
 
 H2_SS92: RealGas = CombinedEOSModel(
-    models=(_H2_low_pressure_SS92, _H2_high_pressure_SS92), upper_pressure_bounds=(1000,)
+    models=(_H2_low_pressure_SS92, _H2_high_pressure_SS92),
+    upper_pressure_bounds=jnp.array((1000,)),
 )
 """H2 EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1b}`"""
 
@@ -453,7 +454,7 @@ _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
 
 H2S_SS92: RealGas = CombinedEOSModel(
     models=(_H2S_low_pressure_SS92, _H2S_high_pressure_SS92),
-    upper_pressure_bounds=(500,),
+    upper_pressure_bounds=jnp.array((500,)),
     calibration=ExperimentalCalibration(pressure_min=1, pressure_max=10e3),
 )
 """H2S EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1d}`"""
@@ -520,7 +521,7 @@ def get_corresponding_states_SS92(
 
     combined_model: RealGas = CombinedEOSModel(
         models=(low_pressure, medium_pressure, high_pressure),
-        upper_pressure_bounds=(1000, 5000),
+        upper_pressure_bounds=jnp.array((1000, 5000)),
         calibration=calibration,
     )
 

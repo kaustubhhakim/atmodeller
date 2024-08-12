@@ -35,6 +35,7 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies
 from atmodeller.eos.holland import CO_CORK_HP91, H2_CORK_HP91, CO2_CORK_simple_HP91
+from atmodeller.eos.saxena import H2_SF87
 from atmodeller.interior_atmosphere import Species
 from atmodeller.reaction_network import (
     ReactionNetwork,
@@ -181,6 +182,32 @@ def test_H_and_C_holland() -> None:
         "H2O_g": 99.19769919121023,
         "H2_g": 92.6111431024925,
         "O2_g": 8.981953412412754e-08,
+    }
+
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+
+
+def test_H_and_C_saxena(helper) -> None:
+    """Tests H2-H2O and real gas EOS from Saxena"""
+
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2", eos=H2_SF87)
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(H2O_g, 1000),
+            FugacityConstraint(O2_g, 8.981953412412735e-08),
+        ]
+    )
+    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
+
+    target_dict = {
+        "H2O_g": 99.19769919121012,
+        "H2_g": 95.55582495038334,
+        "O2_g": 8.981953412412735e-08,
     }
 
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)

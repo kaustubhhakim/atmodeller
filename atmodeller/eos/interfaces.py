@@ -176,7 +176,7 @@ class RealGas(ABC):
         return volume_ideal
 
     @abstractmethod
-    def volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume
 
         Args:
@@ -188,7 +188,7 @@ class RealGas(ABC):
         """
 
     @abstractmethod
-    def volume_integral(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume integral
 
         .. math::
@@ -903,7 +903,6 @@ class CORK(CorrespondingStatesMixin, RealGas):
         )
 
 
-# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class CombinedEOSModel(RealGas):
     """Combines multiple EOS models for different pressure ranges into a single EOS model.
@@ -915,11 +914,11 @@ class CombinedEOSModel(RealGas):
 
     models: tuple[RealGas, ...]
     """EOS models ordered by increasing pressure from lowest to highest"""
-    upper_pressure_bounds: tuple[float, ...]
+    upper_pressure_bounds: Array
     """Upper pressure bound in bar relevant to the EOS by position"""
 
-    def _get_index(self, pressure: float) -> int:
-        """Gets the index of the appropriate EOS model using the pressure
+    def _get_index(self, pressure: ArrayLike) -> int:
+        """Gets the index of the appropriate EOS model using the upper pressure bound
 
         Args:
             pressure: Pressure in bar
@@ -927,42 +926,52 @@ class CombinedEOSModel(RealGas):
         Returns:
             Index of the relevant EOS model
         """
-        for index, pressure_high in enumerate(self.upper_pressure_bounds):
-            if pressure < pressure_high:
-                return index
-        # If the pressure is higher than all specified pressure ranges, use the last model.
-        return len(self.models) - 1
+
+        def body_fun(i: int, carry: int) -> int:
+            pressure_high: Array = self.upper_pressure_bounds[i]
+            condition = pressure >= pressure_high
+            new_index: int = lax.cond(condition, lambda _: i + 1, lambda _: carry, None)
+
+            return new_index
+
+        init_carry: int = 0  # Initial carry value
+        index = lax.fori_loop(0, len(self.upper_pressure_bounds), body_fun, init_carry)
+
+        return index
 
     @override
-    def volume(self, temperature: float, pressure: float) -> float:
-        index: int = self._get_index(pressure)
-        volume: float = self.models[index].volume(temperature, pressure)
-
+    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
+        index = self._get_index(pressure)
+        volume: Array = lax.switch(
+            index, [model.volume for model in self.models], temperature, pressure
+        )
         return volume
 
     @override
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         index: int = self._get_index(pressure)
 
-        if index == 0:
+        def compute_integral(i: int, prev_pressure: ArrayLike) -> Array:
+            """Compute integral from previous pressure to current pressure."""
+            return self.models[i].volume_integral(temperature, pressure) - self.models[
+                i
+            ].volume_integral(temperature, prev_pressure)
+
+        def case_0() -> Array:
             return self.models[0].volume_integral(temperature, pressure)
 
-        elif index > 0 and index <= len(self.models):
-            # logger.debug("Performing pressure integration")
-            volume = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
-            for i in range(1, index):
-                dvolume = self.models[i].volume_integral(
-                    temperature, self.upper_pressure_bounds[i]
-                ) - self.models[i].volume_integral(temperature, self.upper_pressure_bounds[i - 1])
-                volume += dvolume
-            dvolume_last = self.models[index].volume_integral(temperature, pressure) - self.models[
-                index
-            ].volume_integral(temperature, self.upper_pressure_bounds[index - 1])
+        def case_1() -> Array:
+            volume0 = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
+            dvolume = compute_integral(1, self.upper_pressure_bounds[0])
+            return volume0 + dvolume
 
-            return volume + dvolume_last
+        def case_2() -> Array:
+            volume0 = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
+            dvolume0 = compute_integral(1, self.upper_pressure_bounds[0])
+            dvolume1 = compute_integral(2, self.upper_pressure_bounds[1])
+            return volume0 + dvolume0 + dvolume1
 
-        else:
-            raise ValueError("Index cannot be greater than the number of models")
+        return lax.switch(index, [case_0, case_1, case_2])
 
 
 @dataclass(frozen=True)
