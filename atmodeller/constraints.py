@@ -290,7 +290,7 @@ class _FugacityConstraint(_SpeciesConstraint[GasSpecies, T]):
         return fugacity
 
     @override
-    def get_value(self, temperature: float, pressure: ArrayLike) -> Array:
+    def get_value(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         return get_number_density(temperature, self.fugacity(temperature, pressure))
 
 
@@ -379,7 +379,7 @@ class PressureConstraint(_SpeciesConstraint[GasSpecies, float]):
         return self._value
 
     @override
-    def get_value(self, temperature: float, pressure: ArrayLike) -> Array:
+    def get_value(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         return get_number_density(temperature, self.fugacity(temperature, pressure))
 
 
@@ -408,7 +408,7 @@ class TotalPressureConstraint(ConstraintProtocol):
         return self._value
 
     @override
-    def get_value(self, temperature: float, pressure: ArrayLike) -> Array:
+    def get_value(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         del pressure
 
         return get_number_density(temperature, self.total_pressure())
@@ -425,8 +425,8 @@ class SystemConstraints(ImmutableList[ConstraintProtocol]):
     # def add_activity_constraints(self, species: Species) -> None:
     #     """Adds activity constraints
 
-    #     These constraints set the activity of a stable condensate, which is assumed to be unity for
-    #     a pure component.
+    #     These constraints set the activity of a stable condensate, which is assumed to be unity
+    #     for a pure component.
 
     #     Args:
     #         species: Species
@@ -513,7 +513,8 @@ class SystemConstraints(ImmutableList[ConstraintProtocol]):
     #     return evaluated_constraints
 
     # TODO: Check for immutability problems with jax
-    # def evaluate_log10(self, temperature: float, pressure: jnp.ndarray) -> dict[str, jnp.ndarray]:
+    # def evaluate_log10(self, temperature: float, pressure: jnp.ndarray) ->
+    #   dict[str, jnp.ndarray]:
     #     """Evaluates all constraints and returns the log10 values.
 
     #     Args:
