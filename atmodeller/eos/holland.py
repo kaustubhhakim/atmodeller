@@ -50,8 +50,12 @@ import sys
 from dataclasses import dataclass, field
 from typing import Callable
 
+import jax.numpy as np
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+from jax import Array, lax
+from jax.typing import ArrayLike
 from scipy.constants import kilo
 
 from atmodeller.eos.interfaces import (
@@ -90,7 +94,7 @@ class MRKCorrespondingStatesHP91(MRKExplicitABC):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    a_coefficients: tuple[float, ...] = field(init=False, default=(5.45963e-9, -8.63920e-10, 0))
+    a_coefficients: Array = field(init=False, default=jnp.array((5.45963e-9, -8.63920e-10, 0)))
     b0: float = field(init=False, default=9.18301e-6)
 
     @classmethod
@@ -135,10 +139,10 @@ class CORKCorrespondingStatesHP91(CORK):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    P0: float = field(init=False, default=0)
-    a_virial: tuple[float, float] = field(init=False, default=(6.93054e-9, -8.38293e-10))
-    b_virial: tuple[float, float] = field(init=False, default=(-3.30558e-7, 2.30524e-8))
-    c_virial: tuple[float, float] = field(init=False, default=(0, 0))
+    P0: ArrayLike = field(init=False, default=0)
+    a_virial: Array = field(init=False, default=jnp.array((6.93054e-9, -8.38293e-10)))
+    b_virial: Array = field(init=False, default=jnp.array((-3.30558e-7, 2.30524e-8)))
+    c_virial: Array = field(init=False, default=jnp.array((0, 0)))
 
     @classmethod
     def get_species(
@@ -211,6 +215,7 @@ b0_H2O: float = 1.465e-5
 """b parameter value is the same across all phases (i.e. gas, fluid, liquid)"""
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class _MRKH2OLiquidHP91(MRKImplicitABC):
     """MRK for liquid H2O :cite:p`HP91{Equation 6}`
@@ -256,6 +261,7 @@ class _MRKH2OLiquidHP91(MRKImplicitABC):
         return np.min(volume_roots)
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class _MRKH2OGasHP91(MRKImplicitABC):
     """MRK for gaseous H2O :cite:p:`HP91{Equation 6a}`
@@ -298,6 +304,7 @@ class _MRKH2OGasHP91(MRKImplicitABC):
         return np.max(volume_roots)
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class _MRKH2OFluidHP91(MRKImplicitABC):
     """MRK for supercritical H2O :cite:p:`HP91{Equation 6}`
@@ -346,6 +353,7 @@ class _MRKH2OFluidHP91(MRKImplicitABC):
         return volume_roots[0]
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class MRKCO2HP91(MRKImplicitABC):
     """MRK for CO2 :cite:p:`HP91`
@@ -396,6 +404,7 @@ This is the same as the CO2 MRK model in :cite:t:`HP91`.
 """
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class MRKH2OHP91(MRKCriticalBehaviour):
     """MRK for H2O that includes critical behaviour
@@ -443,14 +452,14 @@ This is the same as the H2O MRK model in :cite:t:`HP91`.
 #   b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
 #   c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
 
-_a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
-    map(lambda y: y * 1e-5 / kilo, x)
+_a_conversion: Callable[[tuple[float, ...]], Array] = lambda x: jnp.array(
+    [y * 1e-5 / kilo for y in x]
 )
-_b_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
-    map(lambda y: y * 1e-5 / kilo**0.5, x)
+_b_conversion: Callable[[tuple[float, ...]], Array] = lambda x: jnp.array(
+    [y * 1e-5 / kilo**0.5 for y in x]
 )
-_c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(
-    map(lambda y: y * 1e-5 / kilo**0.25, x)
+_c_conversion: Callable[[tuple[float, ...]], Array] = lambda x: jnp.array(
+    [y * 1e-5 / kilo**0.25 for y in x]
 )
 
 CO2_CORK_HP91: RealGas = CORK(
