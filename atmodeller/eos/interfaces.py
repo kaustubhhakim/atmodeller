@@ -951,24 +951,26 @@ class CombinedEOSModel(RealGas):
     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         index: int = self._get_index(pressure)
 
-        def compute_integral(i: int, prev_pressure: ArrayLike) -> Array:
-            """Compute integral from previous pressure to current pressure."""
-            return self.models[i].volume_integral(temperature, pressure) - self.models[
+        def compute_integral(i: int, pressure_high: ArrayLike, pressure_low: ArrayLike) -> Array:
+            """Compute pressure integral."""
+            return self.models[i].volume_integral(temperature, pressure_high) - self.models[
                 i
-            ].volume_integral(temperature, prev_pressure)
+            ].volume_integral(temperature, pressure_low)
 
         def case_0() -> Array:
             return self.models[0].volume_integral(temperature, pressure)
 
         def case_1() -> Array:
             volume0 = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
-            dvolume = compute_integral(1, self.upper_pressure_bounds[0])
+            dvolume = compute_integral(1, pressure, self.upper_pressure_bounds[0])
             return volume0 + dvolume
 
         def case_2() -> Array:
             volume0 = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
-            dvolume0 = compute_integral(1, self.upper_pressure_bounds[0])
-            dvolume1 = compute_integral(2, self.upper_pressure_bounds[1])
+            dvolume0 = compute_integral(
+                1, self.upper_pressure_bounds[1], self.upper_pressure_bounds[0]
+            )
+            dvolume1 = compute_integral(2, pressure, self.upper_pressure_bounds[1])
             return volume0 + dvolume0 + dvolume1
 
         return lax.switch(index, [case_0, case_1, case_2])

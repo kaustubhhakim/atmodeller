@@ -41,6 +41,8 @@ from atmodeller.reaction_network import (
     ReactionNetwork,
     ReactionNetworkWithCondensateStability,
 )
+from atmodeller.solubility.carbon_species import CO2_basalt_dixon
+from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
@@ -50,7 +52,7 @@ ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)
 
 planet: Planet = Planet()
 
@@ -156,14 +158,18 @@ def test_H_and_C_no_solubility() -> None:
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_holland() -> None:
-    """Tests H2-H2O and CO-CO2 with real gas EOS from Holland and Powell."""
+@pytest.mark.skip(reason="Passes, but more useful when mass constraints are added")
+def test_H_and_C_with_solubility() -> None:
+    """Tests H2-H2O and CO-CO2 with imposed fugacities and no solubility.
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2", eos=H2_CORK_HP91)
+    This test is based on test_C_and_H() in test_CHO.py but without solubility.
+    """
+
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
     O2_g: GasSpecies = GasSpecies("O2")
-    CO_g: GasSpecies = GasSpecies("CO", eos=CO_CORK_HP91)
-    CO2_g: GasSpecies = GasSpecies("CO2", eos=CO2_CORK_simple_HP91)
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2", solubility=CO2_basalt_dixon())
 
     species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
     constraints: SystemConstraints = SystemConstraints(
@@ -177,10 +183,41 @@ def test_H_and_C_holland() -> None:
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
-        "CO2_g": 5.764665646425151,
-        "CO_g": 25.2176711260008,
-        "H2O_g": 99.19769919121023,
-        "H2_g": 92.6111431024925,
+        "CO2_g": 6.0622728258770024,
+        "CO_g": 26.625148913955194,
+        "H2O_g": 99.19769919121012,
+        "H2_g": 95.55582495038334,
+        "O2_g": 8.981953412412735e-08,
+    }
+
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+
+
+def test_H_and_C_holland() -> None:
+    """Tests H2-H2O and CO-CO2 with real gas EOS from Holland and Powell."""
+
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2", eos=H2_CORK_HP91)
+    O2_g: GasSpecies = GasSpecies("O2")
+    CO_g: GasSpecies = GasSpecies("CO", eos=CO_CORK_HP91)
+    CO2_g: GasSpecies = GasSpecies("CO2", eos=CO2_CORK_simple_HP91)
+
+    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            FugacityConstraint(CO_g, 26.625148913955194),
+            FugacityConstraint(H2O_g, 10000),
+            FugacityConstraint(O2_g, 8.981953412412735e-08),
+        ]
+    )
+    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
+
+    target_dict = {
+        "CO2_g": 0.6283663007874475,
+        "CO_g": 2.5425375910504195,
+        "H2O_g": 10000.0,
+        "H2_g": 1693.4983324561576,
         "O2_g": 8.981953412412754e-08,
     }
 
@@ -188,7 +225,10 @@ def test_H_and_C_holland() -> None:
 
 
 def test_H_and_C_saxena(helper) -> None:
-    """Tests H2-H2O and real gas EOS from Saxena"""
+    """Tests H2-H2O and real gas EOS from Saxena
+
+    The fugacity is large to check that the volume integral is performed correctly.
+    """
 
     H2O_g: GasSpecies = GasSpecies("H2O")
     H2_g: GasSpecies = GasSpecies("H2", eos=H2_SF87)
@@ -197,18 +237,14 @@ def test_H_and_C_saxena(helper) -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
     constraints: SystemConstraints = SystemConstraints(
         [
-            FugacityConstraint(H2O_g, 1000),
+            FugacityConstraint(H2O_g, 10000),
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
     reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
-    target_dict = {
-        "H2O_g": 99.19769919121012,
-        "H2_g": 95.55582495038334,
-        "O2_g": 8.981953412412735e-08,
-    }
+    target_dict = {"H2O_g": 10000.0, "H2_g": 9539.109221925035, "O2_g": 8.981953412412754e-08}
 
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 

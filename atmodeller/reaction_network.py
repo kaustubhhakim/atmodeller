@@ -420,6 +420,9 @@ class ReactionNetwork:
             pressure=1,
         )
 
+        # Other options if the surface is not well-behaved
+        # solver = optx.Dogleg(rtol=tol, atol=tol)
+        # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
         solver = optx.Newton(rtol=tol, atol=tol)
         sol = optx.root_find(
             self.objective_function,
@@ -438,6 +441,7 @@ class ReactionNetwork:
         if optx.RESULTS[sol.result] == "":
             logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
         # It is useful to also return the jacobian of this system for testing
         jacobian: Callable = self.jacobian((constraints,))
