@@ -29,7 +29,7 @@ from typing import Protocol
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array
+from jax import Array, lax
 from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
 
@@ -104,7 +104,7 @@ class RealGas(ABC):
 
         return ln_fugacity
 
-    def fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def fugacity(self, temperature: float, pressure: ArrayLike) -> Array:
         """Fugacity
 
         Args:
@@ -114,11 +114,11 @@ class RealGas(ABC):
         Returns:
             Fugacity in bar
         """
-        fugacity: ArrayLike = jnp.exp(self.ln_fugacity(temperature, pressure))
+        fugacity: Array = jnp.exp(self.ln_fugacity(temperature, pressure))
 
         return fugacity
 
-    def ln_fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def ln_fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> Array:
         """Natural log of the fugacity coefficient
 
         Args:
@@ -128,9 +128,9 @@ class RealGas(ABC):
         Returns:
             Natural log of the fugacity coefficient
         """
-        return self.ln_fugacity(temperature, pressure) - jnp.log(pressure)
+        return -jnp.log(pressure) + self.ln_fugacity(temperature, pressure)
 
-    def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> Array:
         """Fugacity coefficient
 
         Args:
@@ -142,7 +142,7 @@ class RealGas(ABC):
         """
         return jnp.exp(self.ln_fugacity_coefficient(temperature, pressure))
 
-        # FIXME: This switch block is probably not jax compliant
+        # FIXME: This switch block is not JAX compliant, and may not be required anymore.
         # if fugacity_coefficient == np.inf:
         #     logger.debug("Fugacity coefficient has blown up (unphysical)")
         #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
@@ -279,13 +279,6 @@ class IdealGas(RealGas):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    # def fugacity_coefficient(
-    #     self,
-    #     temperature: float,
-    #     pressure: Array | np.ndarray | np.bool_ | np.number | bool | int | float | complex,
-    # ) -> Array | np.ndarray | np.bool_ | np.number | bool | int | float | complex:
-    #     return 1.0
-
     @override
     def volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         return self.ideal_volume(temperature, pressure)
@@ -316,13 +309,13 @@ class ModifiedRedlichKwongABC(RealGas):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    a_coefficients: tuple[float, ...]
+    a_coefficients: Array
     """Coefficients for the Modified Redlich Kwong (MRK) `a` parameter"""
     b0: float
     """The Redlich-Kwong constant `b`"""
 
     @abstractmethod
-    def a(self, temperature: float) -> float:
+    def a(self, temperature: float) -> Array:
         r"""MRK `a` parameter computed from :attr:`a_coefficients`.
 
         Args:
@@ -349,7 +342,7 @@ class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
     """A Modified Redlich Kwong (MRK) EOS in explicit form"""
 
     @override
-    def a(self, temperature: float) -> float:
+    def a(self, temperature: float) -> Array:
         r"""MRK `a` parameter from :attr:`a_coefficients` :cite:p:`HP91{Equation 9}`
 
         Args:
@@ -359,12 +352,12 @@ class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
             MRK `a` parameter in
             :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
         """
-        a: float = (
+        a: Array = (
             self.a_coefficients[0] * self.critical_temperature ** (5.0 / 2)
             + self.a_coefficients[1] * self.critical_temperature ** (3.0 / 2) * temperature
             + self.a_coefficients[2] * self.critical_temperature ** (1.0 / 2) * temperature**2
         )
-        a /= self.critical_pressure
+        a = a / self.critical_pressure
 
         return a
 
@@ -379,7 +372,7 @@ class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
         return b
 
     @override
-    def volume(self, temperature: float, pressure: float) -> float:
+    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume-explicit equation :cite:p:`HP91{Equation 7}`
 
         Without complications of critical phenomena the MRK equation can be simplified using the
@@ -399,20 +392,20 @@ class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
         Returns:
             MRK volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
         """
-        volume: float = (
-            GAS_CONSTANT_BAR * temperature / pressure
-            + self.b
-            - self.a(temperature)
+        volume: Array = (
+            jnp.sqrt(temperature)
+            * -self.a(temperature)
             * GAS_CONSTANT_BAR
-            * np.sqrt(temperature)
             / (GAS_CONSTANT_BAR * temperature + self.b * pressure)
             / (GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
+            + GAS_CONSTANT_BAR * temperature / pressure
+            + self.b
         )
 
         return volume
 
     @override
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume-explicit integral :cite:p:`HP91{Equation 8}`
 
         Args:
@@ -422,15 +415,15 @@ class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
         Returns:
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        volume_integral: float = (
-            GAS_CONSTANT_BAR * temperature * np.log(pressure)
+        volume_integral: Array = (
+            GAS_CONSTANT_BAR * temperature * jnp.log(pressure)
             + self.b * pressure
             + self.a(temperature)
             / self.b
-            / np.sqrt(temperature)
+            / jnp.sqrt(temperature)
             * (
-                np.log(GAS_CONSTANT_BAR * temperature + self.b * pressure)
-                - np.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
+                jnp.log(GAS_CONSTANT_BAR * temperature + self.b * pressure)
+                - jnp.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
             )
         )
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
@@ -438,6 +431,7 @@ class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
         return volume_integral
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class MRKImplicitABC(ModifiedRedlichKwongABC):
     """A Modified Redlich Kwong (MRK) EOS in implicit form
@@ -447,7 +441,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
     """
 
     @override
-    def a(self, temperature: float) -> float:
+    def a(self, temperature: float) -> Array:
         r"""MRK `a` parameter from :attr:`a_coefficients` :cite:p:`HP91{Equation 6}`
 
         Args:
@@ -457,7 +451,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             MRK `a` parameter in
             :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
         """
-        a: float = (
+        a: Array = (
             self.a_coefficients[0]
             + self.a_coefficients[1] * self.delta_temperature_for_a(temperature)
             + self.a_coefficients[2] * self.delta_temperature_for_a(temperature) ** 2
@@ -486,7 +480,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         """
         return self.b0
 
-    def A_factor(self, temperature: float, pressure: float) -> float:
+    def A_factor(self, temperature: float, pressure: ArrayLike) -> Array:
         """`A` factor :cite:p:`HP91{Appendix A}`
 
         Args:
@@ -497,11 +491,11 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
             `A` factor, which is non-dimensional
         """
         del pressure
-        A_factor: float = self.a(temperature) / (self.b * GAS_CONSTANT_BAR * temperature**1.5)
+        A_factor: Array = self.a(temperature) / (self.b * GAS_CONSTANT_BAR * temperature**1.5)
 
         return A_factor
 
-    def B_factor(self, temperature: float, pressure: float) -> float:
+    def B_factor(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """`B` factor :cite:p:`HP91{Appendix A}`
 
         Args:
@@ -511,7 +505,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         Returns:
             `B` factor, which is non-dimensional
         """
-        B_factor: float = self.b * pressure / (GAS_CONSTANT_BAR * temperature)
+        B_factor: ArrayLike = self.b * pressure / (GAS_CONSTANT_BAR * temperature)
 
         return B_factor
 
@@ -519,8 +513,8 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
     def volume_integral(
         self,
         temperature: float,
-        pressure: float,
-    ) -> float:
+        pressure: ArrayLike,
+    ) -> Array:
         r"""Volume integral :cite:p:`HP91{Equation A.2}`
 
         Args:
@@ -530,19 +524,22 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         Returns:
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        z: float = self.compressibility_parameter(temperature, pressure)
-        A: float = self.A_factor(temperature, pressure)
-        B: float = self.B_factor(temperature, pressure)
+        z: ArrayLike = self.compressibility_parameter(temperature, pressure)
+        A: Array = self.A_factor(temperature, pressure)
+        B: ArrayLike = self.B_factor(temperature, pressure)
         # The base class requires a specification of the volume_integral, but the equations are in
         # terms of the fugacity coefficient.
-        ln_fugacity_coefficient: float = z - 1 - np.log(z - B) - A * np.log(1 + B / z)
-        ln_fugacity: float = np.log(pressure) + ln_fugacity_coefficient
-        volume_integral: float = GAS_CONSTANT_BAR * temperature * ln_fugacity
+        ln_fugacity_coefficient: Array = -jnp.log(z - B) - A * jnp.log(1 + B / z) + z - 1  # type: ignore
+        ln_fugacity: Array = jnp.log(pressure) + ln_fugacity_coefficient
+        volume_integral: Array = GAS_CONSTANT_BAR * temperature * ln_fugacity
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
         return volume_integral
 
-    def volume_roots(self, temperature: float, pressure: float) -> npt.NDArray:
+    # TODO: Needs updating to support JAX. Can use optimistix root finder, but then need to tailor
+    # the initial guesses to find the correct root
+
+    def volume_roots(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Real and (potentially) physically meaningful volume solutions of the MRK equation
 
         Args:
@@ -577,6 +574,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         return positive_roots
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class MRKCriticalBehaviour(RealGas):
     r"""A MRK equation of state that accommodates critical behaviour :cite:p:`HP91{Appendix A}`
@@ -709,19 +707,19 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    a_coefficients: tuple[float, ...]
+    a_coefficients: Array
     r"""Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where :math:`a_0` and
     :math:`a_1` may be additionally (internally) scaled by critical parameters
     (:attr:`critical_temperature` and :attr:`critical_pressure`) for corresponding states."""
-    b_coefficients: tuple[float, ...]
+    b_coefficients: Array
     """Coefficients for the `b` parameter. See :attr:`a_coefficients` documentation."""
-    c_coefficients: tuple[float, ...]
+    c_coefficients: Array
     """Coefficients for the `c` parameter. See :attr:`a_coefficients` documentation."""
-    P0: float
+    P0: ArrayLike
     """Pressure at which the MRK equation begins to overestimate the molar volume significantly 
     and may be determined from experimental data."""
 
-    def a(self, temperature: float) -> float:
+    def a(self, temperature: float) -> Array:
         r"""`a` parameter :cite:p:`HP98`
 
         This is also the `d` parameter in :cite:t:`HP91`.
@@ -732,15 +730,15 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
         Returns:
             `a` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^{-1}`
         """
-        a: float = (
+        a: Array = (
             self.a_coefficients[0] * self.critical_temperature
             + self.a_coefficients[1] * temperature
         )
-        a /= self.critical_pressure**2
+        a = a / self.critical_pressure**2
 
         return a
 
-    def b(self, temperature: float) -> float:
+    def b(self, temperature: float) -> Array:
         r"""`b` parameter :cite:p:`HP98`
 
         This is also the `c` parameter in :cite:t:`HP91`.
@@ -751,15 +749,15 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
         Returns:
             `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{2}`
         """
-        b: float = (
+        b: Array = (
             self.b_coefficients[0] * self.critical_temperature
             + self.b_coefficients[1] * temperature
         )
-        b /= self.critical_pressure ** (3 / 2)
+        b = b / self.critical_pressure ** (3 / 2)
 
         return b
 
-    def c(self, temperature: float) -> float:
+    def c(self, temperature: float) -> Array:
         r"""`c` parameter :cite:p:`HP98`
 
         Args:
@@ -768,15 +766,33 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
         Returns:
             `c` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{4}`
         """
-        c: float = (
+        c: Array = (
             self.c_coefficients[0] * self.critical_temperature
             + self.c_coefficients[1] * temperature
         )
-        c /= self.critical_pressure ** (5 / 4)
+        c = c / self.critical_pressure ** (5 / 4)
 
         return c
 
-    def volume(self, temperature: float, pressure: float) -> float:
+    def delta_pressure(self, pressure: ArrayLike) -> Array:
+        """Pressure difference
+
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            Pressure difference relative to :attr:`P0`
+        """
+        delta_pressure: Array = lax.cond(
+            jnp.asarray(pressure) > jnp.asarray(self.P0),
+            lambda pressure: jnp.asarray(pressure - self.P0, dtype=jnp.float_),
+            lambda pressure: jnp.array(0, dtype=jnp.float_),
+            pressure,
+        )
+
+        return delta_pressure
+
+    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume contribution
 
         Args:
@@ -786,15 +802,16 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
         Returns:
             Volume contribution in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        volume: float = (
-            self.a(temperature) * (pressure - self.P0)
-            + self.b(temperature) * (pressure - self.P0) ** 0.5
-            + self.c(temperature) * (pressure - self.P0) ** 0.25
+        delta_pressure: Array = self.delta_pressure(pressure)
+        volume: Array = (
+            self.a(temperature) * delta_pressure
+            + self.b(temperature) * delta_pressure**0.5
+            + self.c(temperature) * delta_pressure**0.25
         )
 
         return volume
 
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume integral :math:`V dP` contribution
 
         Args:
@@ -804,10 +821,11 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
         Returns:
             Volume integral contribution in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        volume_integral: float = (
-            self.a(temperature) / 2.0 * (pressure - self.P0) ** 2
-            + 2.0 / 3.0 * self.b(temperature) * (pressure - self.P0) ** (3.0 / 2.0)
-            + 4.0 / 5.0 * self.c(temperature) * (pressure - self.P0) ** (5.0 / 4.0)
+        delta_pressure: Array = self.delta_pressure(pressure)
+        volume_integral: Array = (
+            self.a(temperature) / 2.0 * delta_pressure**2
+            + 2.0 / 3.0 * self.b(temperature) * delta_pressure ** (3.0 / 2.0)
+            + 4.0 / 5.0 * self.c(temperature) * delta_pressure ** (5.0 / 4.0)
         )
         volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
 
@@ -832,16 +850,16 @@ class CORK(CorrespondingStatesMixin, RealGas):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    P0: float
+    P0: ArrayLike
     """Pressure at which the MRK equation begins to overestimate the molar volume significantly 
     and may be determined from experimental data."""
     mrk: RealGas
     """MRK model for computing the MRK contribution"""
-    a_virial: tuple[float, ...] = (0, 0)
+    a_virial: Array = jnp.array((0, 0))
     """`a` coefficients for the virial compensation"""
-    b_virial: tuple[float, ...] = (0, 0)
+    b_virial: Array = jnp.array((0, 0))
     """`b` coefficients for the virial compensation"""
-    c_virial: tuple[float, ...] = (0, 0)
+    c_virial: Array = jnp.array((0, 0))
     """`c` coefficients for the virial compensation"""
     virial: VirialCompensation = field(init=False)
     """The virial compensation model"""
@@ -857,7 +875,7 @@ class CORK(CorrespondingStatesMixin, RealGas):
         )
 
     @override
-    def volume(self, temperature: float, pressure: float) -> float:
+    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume :cite:p:`HP91{Equation 7a}`
 
         Args:
@@ -867,15 +885,10 @@ class CORK(CorrespondingStatesMixin, RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        volume: float = self.mrk.volume(temperature, pressure)
-
-        if pressure > self.P0:
-            volume += self.virial.volume(temperature, pressure)
-
-        return volume
+        return self.virial.volume(temperature, pressure) + self.mrk.volume(temperature, pressure)
 
     @override
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral(self, temperature: float, pressure: float) -> Array:
         r"""Volume integral :cite:p:`HP91{Equation 8}`
 
         Args:
@@ -885,14 +898,12 @@ class CORK(CorrespondingStatesMixin, RealGas):
         Returns:
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        volume_integral: float = self.mrk.volume_integral(temperature, pressure)
-
-        if pressure > self.P0:
-            volume_integral += self.virial.volume_integral(temperature, pressure)
-
-        return volume_integral
+        return self.virial.volume_integral(temperature, pressure) + self.mrk.volume_integral(
+            temperature, pressure
+        )
 
 
+# TODO: Update to support JAX
 @dataclass(kw_only=True)
 class CombinedEOSModel(RealGas):
     """Combines multiple EOS models for different pressure ranges into a single EOS model.
