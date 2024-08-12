@@ -155,8 +155,8 @@ def test_H_and_C_no_solubility() -> None:
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_real_gas() -> None:
-    """Tests H2-H2O and CO-CO2 with real gas EOS."""
+def test_H_and_C_holland() -> None:
+    """Tests H2-H2O and CO-CO2 with real gas EOS from Holland and Powell."""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
     H2_g: GasSpecies = GasSpecies("H2", eos=H2_CORK_HP91)

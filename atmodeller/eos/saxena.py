@@ -46,7 +46,9 @@ import sys
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
-import numpy as np
+import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import (
@@ -83,21 +85,21 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
             states model.
     """
 
-    a_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    a_coefficients: Array = field(default_factory=lambda: jnp.array(()))
     """`a` coefficients"""
-    b_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    b_coefficients: Array = field(default_factory=lambda: jnp.array(()))
     """`b` coefficients"""
-    c_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    c_coefficients: Array = field(default_factory=lambda: jnp.array(()))
     """`c` coefficients"""
-    d_coefficients: tuple[float, ...] = field(default_factory=tuple)
+    d_coefficients: Array = field(default_factory=lambda: jnp.array(()))
     """`d` coefficients"""
-    standard_state_pressure: float = field(init=False, default=1)
+    standard_state_pressure: ArrayLike = field(init=False, default=1)
     """Standard state pressure with the appropriate units"""
 
     @abstractmethod
     def _get_compressibility_coefficient(
-        self, scaled_temperature: float, coefficients: tuple[float, ...]
-    ) -> float:
+        self, scaled_temperature: float, coefficients: Array
+    ) -> Array:
         """General form of the coefficients for the compressibility calculation
         :cite:p:`SS92{Equation 1}`
 
@@ -109,7 +111,7 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
             The relevant coefficient
         """
 
-    def _a(self, scaled_temperature: float) -> float:
+    def _a(self, scaled_temperature: float) -> Array:
         """`a` parameter
 
         Args:
@@ -118,11 +120,11 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
         Returns:
             a parameter
         """
-        a: float = self._get_compressibility_coefficient(scaled_temperature, self.a_coefficients)
+        a: Array = self._get_compressibility_coefficient(scaled_temperature, self.a_coefficients)
 
         return a
 
-    def _b(self, scaled_temperature: float) -> float:
+    def _b(self, scaled_temperature: float) -> Array:
         """`b` parameter
 
         Args:
@@ -131,11 +133,11 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
         Returns:
             b parameter
         """
-        b: float = self._get_compressibility_coefficient(scaled_temperature, self.b_coefficients)
+        b: Array = self._get_compressibility_coefficient(scaled_temperature, self.b_coefficients)
 
         return b
 
-    def _c(self, scaled_temperature: float) -> float:
+    def _c(self, scaled_temperature: float) -> Array:
         """`c` parameter
 
         Args:
@@ -144,11 +146,11 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
         Returns:
             c parameter
         """
-        c: float = self._get_compressibility_coefficient(scaled_temperature, self.c_coefficients)
+        c: Array = self._get_compressibility_coefficient(scaled_temperature, self.c_coefficients)
 
         return c
 
-    def _d(self, scaled_temperature: float) -> float:
+    def _d(self, scaled_temperature: float) -> Array:
         """`d` parameter
 
         Args:
@@ -157,12 +159,12 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
         Returns:
             d parameter
         """
-        d: float = self._get_compressibility_coefficient(scaled_temperature, self.d_coefficients)
+        d: Array = self._get_compressibility_coefficient(scaled_temperature, self.d_coefficients)
 
         return d
 
     @override
-    def compressibility_parameter(self, temperature: float, pressure: float) -> float:
+    def compressibility_parameter(self, temperature: float, pressure: ArrayLike) -> Array:
         """Compressibility parameter :cite:p:`SS92{Equation 2}`
 
         This overrides the base class because the compressibility factor is used to determine the
@@ -177,13 +179,13 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
             The compressibility parameter, which is dimensionless
         """
         Tr: float = self.scaled_temperature(temperature)
-        Pr: float = self.scaled_pressure(pressure)
-        Z: float = self._a(Tr) + self._b(Tr) * Pr + self._c(Tr) * Pr**2 + self._d(Tr) * Pr**3
+        Pr: ArrayLike = self.scaled_pressure(pressure)
+        Z: Array = self._a(Tr) + self._b(Tr) * Pr + self._c(Tr) * Pr**2 + self._d(Tr) * Pr**3
 
         return Z
 
     @override
-    def volume(self, temperature: float, pressure: float) -> float:
+    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume :cite:p:`SS92{Equation 1}`
 
         Args:
@@ -193,13 +195,13 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        Z: float = self.compressibility_parameter(temperature, pressure)
-        volume: float = Z * self.ideal_volume(temperature, pressure)
+        Z: Array = self.compressibility_parameter(temperature, pressure)
+        volume: Array = Z * self.ideal_volume(temperature, pressure)
 
         return volume
 
     @override
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         r"""Volume integral :cite:p:`SS92{Equation 11}`
 
         Args:
@@ -210,12 +212,12 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
         Tr: float = self.scaled_temperature(temperature)
-        Pr: float = self.scaled_pressure(pressure)
-        P0r: float = self.scaled_pressure(self.standard_state_pressure)
-        volume_integral: float = (
+        Pr: ArrayLike = self.scaled_pressure(pressure)
+        P0r: ArrayLike = self.scaled_pressure(self.standard_state_pressure)
+        volume_integral: Array = (
             (
-                self._a(Tr) * np.log(Pr / P0r)
-                + self._b(Tr) * (Pr - P0r)
+                self._a(Tr) * jnp.log(Pr / P0r)
+                + self._b(Tr) * (Pr - P0r)  # type: ignore
                 + (1.0 / 2) * self._c(Tr) * (Pr**2 - P0r**2)
                 + (1.0 / 3) * self._d(Tr) * (Pr**3 - P0r**3)
             )
@@ -233,8 +235,8 @@ class SaxenaFiveCoefficients(SaxenaABC):
 
     @override
     def _get_compressibility_coefficient(
-        self, scaled_temperature: float, coefficients: tuple[float, ...]
-    ) -> float:
+        self, scaled_temperature: float, coefficients: Array
+    ) -> Array:
         """General form of the coefficients for the compressibility calculation
         :cite:p:`SS92{Equation 3b}`
 
@@ -245,7 +247,7 @@ class SaxenaFiveCoefficients(SaxenaABC):
         Returns
             The relevant coefficient
         """
-        coefficient: float = (
+        coefficient: Array = (
             coefficients[0]
             + coefficients[1] / scaled_temperature
             + coefficients[2] / scaled_temperature ** (3 / 2)
@@ -262,8 +264,8 @@ class SaxenaEightCoefficients(SaxenaABC):
 
     @override
     def _get_compressibility_coefficient(
-        self, scaled_temperature: float, coefficients: tuple[float, ...]
-    ) -> float:
+        self, scaled_temperature: float, coefficients: Array
+    ) -> Array:
         """General form of the coefficients for the compressibility calculation
         :cite:p:`SS92{Equation 3a}`
 
@@ -274,7 +276,7 @@ class SaxenaEightCoefficients(SaxenaABC):
         Returns
             The relevant coefficient
         """
-        coefficient: float = (
+        coefficient: Array = (
             coefficients[0]
             + coefficients[1] * scaled_temperature
             + coefficients[2] / scaled_temperature
@@ -282,7 +284,7 @@ class SaxenaEightCoefficients(SaxenaABC):
             + coefficients[4] / scaled_temperature**2
             + coefficients[5] * scaled_temperature**3
             + coefficients[6] / scaled_temperature**3
-            + coefficients[7] * np.log(scaled_temperature)
+            + coefficients[7] * jnp.log(scaled_temperature)
         )
 
         return coefficient
@@ -291,11 +293,11 @@ class SaxenaEightCoefficients(SaxenaABC):
 _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
     critical_temperature=critical_parameters["H2"].temperature,
     critical_pressure=critical_parameters["H2"].pressure,
-    a_coefficients=(1, 0, 0, 0, 0),
-    b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
+    a_coefficients=jnp.array((1, 0, 0, 0, 0)),
+    b_coefficients=jnp.array((0, 0.9827e-1, 0, -0.2709, 0)),
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
-    c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
-    d_coefficients=(0, 0, 0, 0, 0),
+    c_coefficients=jnp.array((0, 0, -0.1030e-2, 0, 0.1472e-1)),
+    d_coefficients=jnp.array((0, 0, 0, 0, 0)),
     calibration=ExperimentalCalibration(pressure_max=1000),
 )
 """H2 low pressure (<1000 bar) :cite:p:`SS92{Table 1b}`
@@ -307,10 +309,10 @@ In :cite:t:`SF87a{Equation 23}` the final `c` coefficient is 0.1472e-1, not 0.14
 :cite:t:`SS92{Table 1b}`. The earlier work is assumed to be correct.
 """
 _H2_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
-    a_coefficients=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1),
-    b_coefficients=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5),
-    c_coefficients=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10),
-    d_coefficients=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0),
+    a_coefficients=jnp.array((2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1)),
+    b_coefficients=jnp.array((-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5)),
+    c_coefficients=jnp.array((-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10)),
+    d_coefficients=jnp.array((-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0)),
     calibration=ExperimentalCalibration(pressure_min=1000),
 )
 """H2 high pressure (>1000 bar) :cite:p:`SS92{Table 1b}`
@@ -324,10 +326,16 @@ compares well to :obj:`_H2_high_pressure_SS92_refit`.
 _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["H2"].temperature,
     critical_pressure=critical_parameters["H2"].pressure,
-    a_coefficients=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
-    b_coefficients=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
-    c_coefficients=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
-    d_coefficients=(2.28281107e-11, 0, -1.07138603e-08, 0, 3.67720815e-07, 0, 0, 0),
+    a_coefficients=jnp.array(
+        (1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03)
+    ),
+    b_coefficients=jnp.array(
+        (1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04)
+    ),
+    c_coefficients=jnp.array(
+        (2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07)
+    ),
+    d_coefficients=jnp.array((2.28281107e-11, 0, -1.07138603e-08, 0, 3.67720815e-07, 0, 0, 0)),
     calibration=ExperimentalCalibration(pressure_min=1000),
 )
 """H2 high pressure (>1000 bar)
@@ -347,10 +355,10 @@ H2_SS92: RealGas = CombinedEOSModel(
 _H2_high_pressure_SF88: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["H2"].temperature,
     critical_pressure=critical_parameters["H2"].pressure,
-    a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
-    b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
-    c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
-    d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
+    a_coefficients=jnp.array((1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694)),
+    b_coefficients=jnp.array((-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4)),
+    c_coefficients=jnp.array((-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5)),
+    d_coefficients=jnp.array((-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0)),
 )
 """H2 high pressure :cite:p:`SF88{Table on page 1196}`
 
@@ -363,28 +371,34 @@ Further investigations are warranted before this model should be used.
 SO2_SS92: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["SO2"].temperature,
     critical_pressure=critical_parameters["SO2"].pressure,
-    a_coefficients=(0.92854, 0.43269e-1, -0.24671, 0, 0.24999, 0, -0.53182, -0.16461e-1),
-    b_coefficients=(
-        0.84866e-3,
-        -0.18379e-2,
-        0.66787e-1,
-        0,
-        -0.29427e-1,
-        0,
-        0.29003e-1,
-        0.54808e-2,
+    a_coefficients=jnp.array(
+        (0.92854, 0.43269e-1, -0.24671, 0, 0.24999, 0, -0.53182, -0.16461e-1)
     ),
-    c_coefficients=(
-        -0.35456e-3,
-        0.23316e-4,
-        0.94159e-3,
-        0,
-        -0.81653e-3,
-        0,
-        0.23154e-3,
-        0.55542e-4,
+    b_coefficients=jnp.array(
+        (
+            0.84866e-3,
+            -0.18379e-2,
+            0.66787e-1,
+            0,
+            -0.29427e-1,
+            0,
+            0.29003e-1,
+            0.54808e-2,
+        )
     ),
-    d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    c_coefficients=jnp.array(
+        (
+            -0.35456e-3,
+            0.23316e-4,
+            0.94159e-3,
+            0,
+            -0.81653e-3,
+            0,
+            0.23154e-3,
+            0.55542e-4,
+        )
+    ),
+    d_coefficients=jnp.array((0, 0, 0, 0, 0, 0, 0, 0)),
     calibration=ExperimentalCalibration(pressure_min=1, pressure_max=10e3),
 )
 """SO2 EOS :cite:p:`SS92{Table 1c}`"""
@@ -392,10 +406,14 @@ SO2_SS92: RealGas = SaxenaEightCoefficients(
 _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["H2S"].temperature,
     critical_pressure=critical_parameters["H2S"].pressure,
-    a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
-    b_coefficients=(0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515),
-    c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
-    d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    a_coefficients=jnp.array(
+        (0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1)
+    ),
+    b_coefficients=jnp.array((0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515)),
+    c_coefficients=jnp.array(
+        (-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972)
+    ),
+    d_coefficients=jnp.array((0, 0, 0, 0, 0, 0, 0, 0)),
     calibration=ExperimentalCalibration(pressure_min=1, pressure_max=500),
 )
 """H2S low pressure (1-500 bar) :cite:p:`SS92{Table 1d}`"""
@@ -403,28 +421,32 @@ _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
 _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
     critical_temperature=critical_parameters["H2S"].temperature,
     critical_pressure=critical_parameters["H2S"].pressure,
-    a_coefficients=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
-    b_coefficients=(
-        0.22545e-1,
-        0.17473e-2,
-        0.48253e-1,
-        0,
-        -0.19890e-1,
-        0,
-        0.32794e-1,
-        -0.10985e-1,
+    a_coefficients=jnp.array((0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058)),
+    b_coefficients=jnp.array(
+        (
+            0.22545e-1,
+            0.17473e-2,
+            0.48253e-1,
+            0,
+            -0.19890e-1,
+            0,
+            0.32794e-1,
+            -0.10985e-1,
+        )
     ),
-    c_coefficients=(
-        0.57375e-3,
-        -0.20944e-5,
-        -0.11894e-2,
-        0,
-        0.14661e-2,
-        0,
-        -0.75605e-3,
-        -0.27985e-3,
+    c_coefficients=jnp.array(
+        (
+            0.57375e-3,
+            -0.20944e-5,
+            -0.11894e-2,
+            0,
+            0.14661e-2,
+            0,
+            -0.75605e-3,
+            -0.27985e-3,
+        )
     ),
-    d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    d_coefficients=jnp.array((0, 0, 0, 0, 0, 0, 0, 0)),
     calibration=ExperimentalCalibration(pressure_min=500, pressure_max=10e3),
 )
 """H2S high pressure (500-10000 bar) :cite:p:`SS92{Table 1d}`"""
@@ -464,11 +486,11 @@ def get_corresponding_states_SS92(
     low_pressure: RealGas = SaxenaFiveCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
-        a_coefficients=(1, 0, 0, 0, 0),
-        b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
+        a_coefficients=jnp.array((1, 0, 0, 0, 0)),
+        b_coefficients=jnp.array((0, 0.9827e-1, 0, -0.2709, 0)),
         # Saxena and Fei (1987) CMP, Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
-        c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
-        d_coefficients=(0, 0, 0, 0, 0),
+        c_coefficients=jnp.array((0, 0, -0.1030e-2, 0, 0.1472e-1)),
+        d_coefficients=jnp.array((0, 0, 0, 0, 0)),
         calibration=ExperimentalCalibration(pressure_max=1000),
     )
 
@@ -476,11 +498,11 @@ def get_corresponding_states_SS92(
     medium_pressure: RealGas = SaxenaEightCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
-        a_coefficients=(1, 0, 0, 0, -5.917e-1, 0, 0, 0),
-        b_coefficients=(0, 0, 9.122e-2, 0, 0, 0, 0, 0),
+        a_coefficients=jnp.array((1, 0, 0, 0, -5.917e-1, 0, 0, 0)),
+        b_coefficients=jnp.array((0, 0, 9.122e-2, 0, 0, 0, 0, 0)),
         # Saxena and Fei (1987) CMP, Eq. 21, C first coefficient = 1.4164e-4 (not negative)
-        c_coefficients=(0, 0, 0, 0, 1.4164e-4, 0, 0, -2.8349e-6),
-        d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+        c_coefficients=jnp.array((0, 0, 0, 0, 1.4164e-4, 0, 0, -2.8349e-6)),
+        d_coefficients=jnp.array((0, 0, 0, 0, 0, 0, 0, 0)),
         calibration=ExperimentalCalibration(pressure_min=1000, pressure_max=5000),
     )
 
@@ -489,10 +511,10 @@ def get_corresponding_states_SS92(
     high_pressure: RealGas = SaxenaEightCoefficients(
         critical_temperature=critical_temperature,
         critical_pressure=critical_pressure,
-        a_coefficients=(2.0614, 0, 0, 0, -2.2351, 0, 0, -3.9411e-1),
-        b_coefficients=(0, 0, 5.5125e-2, 0, 3.9344e-2, 0, 0, 0),
-        c_coefficients=(0, 0, -1.8935e-6, 0, -1.1092e-5, 0, -2.1892e-5, 0),
-        d_coefficients=(0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0),
+        a_coefficients=jnp.array((2.0614, 0, 0, 0, -2.2351, 0, 0, -3.9411e-1)),
+        b_coefficients=jnp.array((0, 0, 5.5125e-2, 0, 3.9344e-2, 0, 0, 0)),
+        c_coefficients=jnp.array((0, 0, -1.8935e-6, 0, -1.1092e-5, 0, -2.1892e-5, 0)),
+        d_coefficients=jnp.array((0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0)),
         calibration=ExperimentalCalibration(pressure_min=5000),
     )
 
