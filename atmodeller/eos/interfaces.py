@@ -118,6 +118,18 @@ class RealGas(ABC):
 
         return fugacity
 
+    def ln_fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+        """Natural log of the fugacity coefficient
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Natural log of the fugacity coefficient
+        """
+        return self.ln_fugacity(temperature, pressure) - jnp.log(pressure)
+
     def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Fugacity coefficient
 
@@ -128,7 +140,7 @@ class RealGas(ABC):
         Returns:
             fugacity coefficient, which is non-dimensional
         """
-        fugacity_coefficient: ArrayLike = self.fugacity(temperature, pressure) / pressure
+        return jnp.exp(self.ln_fugacity_coefficient(temperature, pressure))
 
         # FIXME: This switch block is probably not jax compliant
         # if fugacity_coefficient == np.inf:
@@ -148,8 +160,6 @@ class RealGas(ABC):
         #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
         #     logger.debug("Setting fugacity coefficient to unity (ideal gas)")
         #     fugacity_coefficient = 1
-
-        return fugacity_coefficient
 
     def ideal_volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         r"""Ideal volume
@@ -202,8 +212,8 @@ class RealGas(ABC):
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
 
-    # def __repr__(self) -> str:
-    #     return f"{self.__class__.__name__}"
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
 
 
 @dataclass(kw_only=True)
