@@ -33,6 +33,7 @@ import optimistix as optx
 from jax import Array, lax
 from jaxtyping import ArrayLike
 from optimistix._solution import Solution as Solution_optx
+from scipy.optimize import OptimizeResult, root
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
@@ -92,6 +93,7 @@ class Solver(ABC):
         solution.planet = self._planet
         solution.value = solution_array
 
+        # Required for optimistix
         constraints = args[0]
         residual: Array = self.get_residual(solution, constraints)
 
@@ -112,6 +114,74 @@ class Solver(ABC):
             return self.objective_function(solution_array, args)
 
         return jax.jacobian(wrapped_objective)
+
+    def solve(self, *args, solver="scipy", **kwargs) -> tuple:
+        """Solve
+
+        Args:
+            solver: Solver to use. Defaults to optimistix.
+            *args: Positional arguments to pass through
+            **kwargs: Keyword arguments to pass through
+
+        Returns:
+            Solution tuple
+        """
+        if solver == "optimistix":
+            return self.solve_optimistix(*args, **kwargs)
+        else:
+            return self.solve_scipy(*args, **kwargs)
+
+    def solve_scipy(
+        self,
+        initial_solution: InitialSolutionProtocol | None = None,
+        *,
+        constraints: SystemConstraints,
+        tol: float = 1.0e-8,
+    ) -> tuple[OptimizeResult, None, Solution]:
+        """Solve using scipy
+
+        Args:
+            constraints: Constraints for the system of equations
+            initial_solution: Initial condition for this solve only. Defaults to None.
+            tol: Tolerance. Defaults to 1.0e-8.
+
+        Returns:
+            Scipy solution, Jacobian function (currently None), solution
+        """
+
+        if initial_solution is None:
+            initial_solution = InitialSolutionDict(species=self._species)
+        assert initial_solution is not None
+
+        initial_solution_guess: Array = initial_solution.get_log10_value(
+            constraints,
+            temperature=self.temperature(),
+            pressure=1,
+        )
+
+        # TODO: Hacky to enclose the args in an extra tuple, but the arguments by root seem to
+        # be passed differently to optimistix? To clarfiy and clean up eventually.
+        sol: OptimizeResult = root(
+            self.objective_function, initial_solution_guess, args=((constraints,),), tol=tol
+        )
+
+        solution: Solution = Solution.create_from_species(self._species)
+        solution.planet = self._planet
+        solution.value = jnp.array(sol.x)
+
+        residual = self.get_residual(solution, constraints)
+        rmse = np.sqrt(np.sum(np.array(residual) ** 2))
+        # Success is indicated by no message
+        if sol.success:
+            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, 2)
+            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+
+        # It is useful to also return the jacobian of this system for testing
+        # jacobian: Callable = self.jacobian((constraints,))
+        # logger.info("Jacobian = %s", jacobian(solution.value))
+
+        return sol, None, solution
 
     def solve_optimistix(
         self,
@@ -713,17 +783,14 @@ def partial_rref(matrix: Array) -> Array:
     for i in range(ncols):
         augmented_matrix = forward_step(i, augmented_matrix)
 
-    logger.warning("augmented_matrix after forward step = \n%s", augmented_matrix)
+    logger.info("augmented_matrix after forward step = \n%s", augmented_matrix)
 
     # Backward substitution
     def backward_step(i: int, matrix: Array):
         # Normalize the pivot row.
         pivot: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
-        logger.warning("pivot = %s", pivot)
         normalized_row = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows)) / pivot
-        logger.warning("normalized_row = %s", normalized_row)
         matrix = lax.dynamic_update_slice(matrix, normalized_row, (i, 0))
-        logger.warning("matrix = %s", matrix)
         # Eliminate values above the pivot.
         for j in range(i - 1, -1, -1):
             if lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] != 0:
@@ -740,7 +807,7 @@ def partial_rref(matrix: Array) -> Array:
     for i in range(ncols - 1, -1, -1):
         augmented_matrix = backward_step(i, augmented_matrix)
 
-    logger.warning("augmented_matrix after backward step = \n%s", augmented_matrix)
+    logger.info("augmented_matrix after backward step = \n%s", augmented_matrix)
 
     reduced_matrix = lax.dynamic_slice(augmented_matrix, (0, 0), (nrows, ncols))
     component_matrix = lax.dynamic_slice(augmented_matrix, (ncols, ncols), (nrows - ncols, nrows))
