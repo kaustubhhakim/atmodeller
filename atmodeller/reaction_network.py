@@ -179,7 +179,7 @@ class Solver(ABC):
         rmse = np.sqrt(np.sum(np.array(residual) ** 2))
         # Success is indicated by no message
         if sol.success:
-            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, 2)
+            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
