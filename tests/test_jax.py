@@ -126,7 +126,7 @@ def test_H_fugacities_system() -> None:
 
 
 def test_H_total_pressure() -> None:
-    """Tests H2-H2O and CO-CO2 with a total pressure constraint."""
+    """Tests H species with a total pressure constraint."""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
     H2_g: GasSpecies = GasSpecies("H2")
@@ -135,7 +135,6 @@ def test_H_total_pressure() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
     constraints: SystemConstraints = SystemConstraints(
         (
-            # FugacityConstraint(H2O_g, 0.2570770067190733),
             FugacityConstraint(O2_g, 8.838043080858959e-08),
             TotalPressureConstraint(0.5067239755466055),
         )
@@ -149,7 +148,7 @@ def test_H_total_pressure() -> None:
         "O2_g": 8.838043080858959e-08,
     }
 
-    # assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
 def test_H_with_buffer() -> None:
