@@ -719,11 +719,17 @@ class InteriorAtmosphereSystem(Solver):
         """
         reaction_residual: jnp.ndarray = self._reaction_network.get_residual(solution, constraints)
 
+        # FIXME: This works with the scipy solver but something is amiss with the optimistix
+        # solver.
         number_residual: Array = jnp.zeros(len(constraints.mass_constraints), dtype=jnp.float_)
         for index, constraint in enumerate(constraints.mass_constraints):
             value: Array = (
                 jnp.log10(solution.number_density(element=constraint.element))
+                # - 46.96664792007731
+                # FIXME: Commenting out above for optimistix testing (doesn't solve the problem)
                 - constraint.log10_number_of_molecules
+                # + 19.92972060766075
+                # FIXME: Commenting out above for optimistix testing (doesn't solve the problem)
                 + jnp.log10(solution.atmosphere.volume())
             )
             number_residual = number_residual.at[index].set(value)

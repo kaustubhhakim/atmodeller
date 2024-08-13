@@ -319,11 +319,15 @@ def test_H_fO2_no_solubility() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             ElementMassConstraint("H", h_kg),
+            # FugacityConstraint(O2_g, 8.981953412412735e-08),
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
     system = InteriorAtmosphereSystem(species=species, planet=planet)
+    # scipy works
     _, _, solution = system.solve(solver="scipy", constraints=constraints)
+    # optimistix has problems
+    # _, _, solution = system.solve(solver="optimistix", constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 76.4640268903594,
