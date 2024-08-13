@@ -35,7 +35,7 @@ from jaxtyping import ArrayLike
 from optimistix._solution import Solution as Solution_optx
 from scipy.optimize import OptimizeResult, root
 
-from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT, SOLVER
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
@@ -89,6 +89,8 @@ class Solver(ABC):
         Returns:
             Residual array
         """
+        logger.debug("log_solution passed into _objective_func = %s", solution_array)
+
         solution: Solution = Solution.create_from_species(self._species)
         solution.planet = self._planet
         solution.value = solution_array
@@ -115,11 +117,11 @@ class Solver(ABC):
 
         return jax.jacobian(wrapped_objective)
 
-    def solve(self, *args, solver="scipy", **kwargs) -> tuple:
+    def solve(self, *args, solver=SOLVER, **kwargs) -> tuple:
         """Solve
 
         Args:
-            solver: Solver to use. Defaults to optimistix.
+            solver: Solver to use. Defaults to TODO.
             *args: Positional arguments to pass through
             **kwargs: Keyword arguments to pass through
 
@@ -127,8 +129,10 @@ class Solver(ABC):
             Solution tuple
         """
         if solver == "optimistix":
+            logger.info("Using Optimistix solver")
             return self.solve_optimistix(*args, **kwargs)
         else:
+            logger.info("Using SciPy root solver")
             return self.solve_scipy(*args, **kwargs)
 
     def solve_scipy(
@@ -149,6 +153,8 @@ class Solver(ABC):
             Scipy solution, Jacobian function (currently None), solution
         """
 
+        # FIXME: When available, could pass in the Jacobian function determined by JAX.
+
         if initial_solution is None:
             initial_solution = InitialSolutionDict(species=self._species)
         assert initial_solution is not None
@@ -160,7 +166,7 @@ class Solver(ABC):
         )
 
         # TODO: Hacky to enclose the args in an extra tuple, but the arguments by root seem to
-        # be passed differently to optimistix? To clarfiy and clean up eventually.
+        # be passed differently to optimistix? To clarfiy and clean up.
         sol: OptimizeResult = root(
             self.objective_function, initial_solution_guess, args=((constraints,),), tol=tol
         )
@@ -718,7 +724,7 @@ class InteriorAtmosphereSystem(Solver):
             value: Array = (
                 jnp.log10(solution.number_density(element=constraint.element))
                 - constraint.log10_number_of_molecules
-                - jnp.log10(solution.atmosphere.volume())
+                + jnp.log10(solution.atmosphere.volume())
             )
             number_residual = number_residual.at[index].set(value)
 
@@ -797,7 +803,6 @@ def partial_rref(matrix: Array) -> Array:
                 # Scaled pivot row
                 pivot = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
                 ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
-                logger.warning("j=%d not zero and ratio = %s", j, ratio)
                 row_i: Array = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows))
                 row_j: Array = lax.dynamic_slice(matrix, (j, 0), (1, ncols + nrows))
                 matrix = lax.dynamic_update_slice(matrix, row_j - ratio * row_i, (j, 0))

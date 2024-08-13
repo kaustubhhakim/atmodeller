@@ -323,12 +323,12 @@ def test_H_fO2_mass() -> None:
         ]
     )
     system = InteriorAtmosphereSystem(species=species, planet=planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     target: dict[str, float] = {
-        "H2O_g": 0.2570770067190733,
-        "H2_g": 0.24964688044710354,
-        "O2_g": 8.838043080858959e-08,
+        "H2O_g": 76.4640268903594,
+        "H2_g": 73.85383684116132,
+        "O2_g": 8.934086206529951e-08,
     }
 
     assert solution.isclose(target, rtol=RTOL, atol=ATOL)
