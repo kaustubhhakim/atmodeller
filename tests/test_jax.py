@@ -304,7 +304,7 @@ def test_H_and_C_saxena(helper) -> None:
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fO2_mass() -> None:
+def test_H_fO2_no_solubility() -> None:
     """Tests H2-H2O at the IW buffer."""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -329,6 +329,38 @@ def test_H_fO2_mass() -> None:
         "H2O_g": 76.4640268903594,
         "H2_g": 73.85383684116132,
         "O2_g": 8.934086206529951e-08,
+    }
+
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+
+
+# This is a copy of test_H_fO2 in test_CHO.py, copied here for convenience to compare with the
+# above case without solubility
+def test_H_fO2_with_solubility() -> None:
+    """Tests H2-H2O at the IW buffer."""
+
+    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
+
+    oceans: float = 1
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+
+    constraints: SystemConstraints = SystemConstraints(
+        [
+            ElementMassConstraint("H", h_kg),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+        ]
+    )
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve(solver="scipy", constraints=constraints)
+
+    target: dict[str, float] = {
+        "H2O_g": 0.2570770067190733,
+        "H2_g": 0.24964688044710354,
+        "O2_g": 8.838043080858959e-08,
     }
 
     assert solution.isclose(target, rtol=RTOL, atol=ATOL)
