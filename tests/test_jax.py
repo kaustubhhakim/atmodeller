@@ -32,12 +32,13 @@ from atmodeller.constraints import (
     BufferedFugacityConstraint,
     FugacityConstraint,
     SystemConstraints,
+    TotalPressureConstraint,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.eos.holland import CO_CORK_HP91, H2_CORK_HP91, CO2_CORK_simple_HP91
 from atmodeller.eos.saxena import H2_SF87
-from atmodeller.interior_atmosphere import Species
 from atmodeller.reaction_network import (
+    InteriorAtmosphereSystem,
     ReactionNetwork,
     ReactionNetworkWithCondensateStability,
 )
@@ -96,6 +97,59 @@ def test_H_fugacities() -> None:
     }
 
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+
+
+def test_H_fugacities_system() -> None:
+    """Tests H species with imposed fugacities"""
+
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
+    constraints: SystemConstraints = SystemConstraints(
+        (
+            FugacityConstraint(H2O_g, 0.2570770067190733),
+            FugacityConstraint(O2_g, 8.838043080858959e-08),
+        )
+    )
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
+
+    target_dict = {
+        "H2O_g": 0.257077006719072,
+        "H2_g": 0.24964688044710262,
+        "O2_g": 8.838043080858959e-08,
+    }
+
+    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+
+
+def test_H_total_pressure() -> None:
+    """Tests H2-H2O and CO-CO2 with a total pressure constraint."""
+
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+
+    species: Species = Species([H2O_g, H2_g, O2_g])
+    constraints: SystemConstraints = SystemConstraints(
+        (
+            # FugacityConstraint(H2O_g, 0.2570770067190733),
+            FugacityConstraint(O2_g, 8.838043080858959e-08),
+            TotalPressureConstraint(0.5067239755466055),
+        )
+    )
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
+
+    target_dict = {
+        "H2O_g": 0.257077006719072,
+        "H2_g": 0.24964688044710262,
+        "O2_g": 8.838043080858959e-08,
+    }
+
+    # assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
 def test_H_with_buffer() -> None:

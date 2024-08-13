@@ -30,8 +30,8 @@ from atmodeller.constraints import (
     PressureConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet, Species
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 

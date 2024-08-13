@@ -113,7 +113,7 @@ class InitialSolution(ABC, Generic[T]):
         logger.debug("Creating %s", self.__class__.__name__)
         self.value: T = value
         self._species: Species = species
-        self.solution: Solution = Solution.create_from_species(species=species)
+        self.solution: Solution = Solution.create_from_species(species)
         self._min_log10_number_density: float = min_log10_number_density
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density

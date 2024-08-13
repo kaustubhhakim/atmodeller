@@ -727,7 +727,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
     _atmosphere: _Atmosphere
 
     @classmethod
-    def create_from_species(cls, *, species: Species) -> Self:
+    def create_from_species(cls, species: Species) -> Self:
         """Creates a Solution instance
 
         Args:

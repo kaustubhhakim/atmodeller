@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import pprint
 import sys
+from abc import ABC, abstractmethod
 from typing import Callable
 
 import jax
@@ -49,7 +50,151 @@ jax.config.update("jax_enable_x64", True)
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class ReactionNetwork:
+class Solver(ABC):
+    """A solver
+
+    Args:
+        species: Species
+        planet: Planet
+    """
+
+    def __init__(self, species: Species, planet: Planet):
+        self._species: Species = species
+        self._planet: Planet = planet
+        logger.info("Species = %s", self._species.names)
+
+    def temperature(self) -> float:
+        return self._planet.surface_temperature
+
+    @abstractmethod
+    def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:
+        """Gets the residual
+
+        Args:
+            solution: Solution
+            constraints: Constraints for the system of equations
+
+        Returns:
+            Residual array
+        """
+
+    def objective_function(self, solution_array: Array, args) -> Array:
+        """Objective function
+
+        Args:
+            solution_array: Array of the solution
+            args: Tuple of other arguments
+
+        Returns:
+            Residual array
+        """
+        solution: Solution = Solution.create_from_species(self._species)
+        solution.planet = self._planet
+        solution.value = solution_array
+
+        constraints = args[0]
+        residual: Array = self.get_residual(solution, constraints)
+
+        return residual
+
+    def jacobian(self, args) -> Callable:
+        """Creates a Jacobian callable function.
+
+        Args:
+            args: Tuple of other arguments
+
+        Returns:
+            A callable function that computes the Jacobian with respect to `solution_array`.
+        """
+
+        # Partially apply `args` to the `objective_function`
+        def wrapped_objective(solution_array):
+            return self.objective_function(solution_array, args)
+
+        return jax.jacobian(wrapped_objective)
+
+    def solve_optimistix(
+        self,
+        initial_solution: InitialSolutionProtocol | None = None,
+        *,
+        constraints: SystemConstraints,
+        tol: float = 1.0e-8,
+    ) -> tuple[Solution_optx, Callable, Solution]:
+        """Solve using optimistix
+
+        Args:
+            constraints: Constraints for the system of equations
+            initial_solution: Initial condition for this solve only. Defaults to None.
+            tol: Tolerance. Defaults to 1.0e-8.
+
+        Returns:
+            Optimistix solution, Jacobian function, solution
+        """
+
+        if initial_solution is None:
+            initial_solution = InitialSolutionDict(species=self._species)
+        assert initial_solution is not None
+
+        initial_solution_guess: Array = initial_solution.get_log10_value(
+            constraints,
+            temperature=self.temperature(),
+            pressure=1,
+        )
+
+        # Other options if the surface is not well-behaved
+        # solver = optx.Dogleg(rtol=tol, atol=tol)
+        # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
+        solver = optx.Newton(rtol=tol, atol=tol)
+        sol = optx.root_find(
+            self.objective_function,
+            solver,
+            initial_solution_guess,
+            args=(constraints,),
+        )
+
+        solution: Solution = Solution.create_from_species(self._species)
+        solution.planet = self._planet
+        solution.value = jnp.array(sol.value)
+
+        residual = self.get_residual(solution, constraints)
+        rmse = np.sqrt(np.sum(np.array(residual) ** 2))
+        # Success is indicated by no message
+        if optx.RESULTS[sol.result] == "":
+            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
+            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+
+        # It is useful to also return the jacobian of this system for testing
+        jacobian: Callable = self.jacobian((constraints,))
+        logger.info("Jacobian = %s", jacobian(solution.value))
+
+        return sol, jacobian, solution
+
+    # TODO: Framework for batched calculations
+    # def solve_optimistix_batched(
+    #     self,
+    #     initial_solution: InitialSolutionProtocol | None = None,
+    #     *,
+    #     constraints_list: list[SystemConstraints],
+    #     tol: float = 1.0e-8,
+    # ) -> tuple[list[Solution_optx], list[Callable], list[Solution]]:
+
+    #     # Vectorize the solve_optimistix method over the constraints_list
+    #     solve_optimistix_vmap = jax.vmap(
+    #         lambda constraints: self.solve_optimistix(
+    #             initial_solution=initial_solution, constraints=constraints, tol=tol
+    #         ),
+    #         in_axes=(0,),
+    #     )
+
+    #     # Apply vmap over the constraints_list
+    #     solutions, jacobians, final_solutions =
+    #       solve_optimistix_vmap(jnp.array(constraints_list))
+
+    #     return solutions, jacobians, final_solutions
+
+
+class ReactionNetwork(Solver):
     """A chemical reaction network.
 
     Args:
@@ -57,11 +202,10 @@ class ReactionNetwork:
         planet: Planet
     """
 
-    def __init__(self, *, species: Species, planet: Planet):
-        self._species: Species = species
-        self._planet = planet
+    @override
+    def __init__(self, *args, **kwargs):
         logger.info("Creating a reaction network")
-        logger.info("Species = %s", self._species.names)
+        super().__init__(*args, **kwargs)
         self.reaction_matrix: Array | None = self.get_reaction_matrix()
         logger.info("Reactions = \n%s", pprint.pformat(self.reactions()))
 
@@ -73,9 +217,6 @@ class ReactionNetwork:
         else:
             assert self.reaction_matrix is not None
             return self.reaction_matrix.shape[0]
-
-    def temperature(self) -> float:
-        return self._planet.surface_temperature
 
     def formula_matrix(self) -> Array:
         """Gets the formula matrix
@@ -350,41 +491,7 @@ class ReactionNetwork:
 
         return log_fugacity_coefficients
 
-    def objective_function(self, solution_array: Array, args) -> Array:
-        """Objective function
-
-        Args:
-            solution_array: Array of the solution
-            args: Tuple of other arguments
-
-        Returns:
-            Residual array
-        """
-        solution: Solution = Solution.create_from_species(species=self._species)
-        solution.planet = self._planet
-        solution.value = solution_array
-
-        constraints = args[0]
-        residual: Array = self.get_residual(solution, constraints)
-
-        return residual
-
-    def jacobian(self, args) -> Callable:
-        """Creates a Jacobian callable function.
-
-        Args:
-            args: Tuple of other arguments
-
-        Returns:
-            A callable function that computes the Jacobian with respect to `solution_array`.
-        """
-
-        # Partially apply `args` to the `objective_function`
-        def wrapped_objective(solution_array):
-            return self.objective_function(solution_array, args)
-
-        return jax.jacobian(wrapped_objective)
-
+    @override
     def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:
         """Gets the residual
 
@@ -401,76 +508,6 @@ class ReactionNetwork:
         ) - self._get_right_hand_side(pressure, constraints=constraints)
 
         return residual
-
-    def solve_optimistix(
-        self,
-        initial_solution: InitialSolutionProtocol | None = None,
-        *,
-        constraints: SystemConstraints,
-        tol: float = 1.0e-8,
-    ) -> tuple[Solution_optx, Callable, Solution]:
-
-        if initial_solution is None:
-            initial_solution = InitialSolutionDict(species=self._species)
-        assert initial_solution is not None
-
-        initial_solution_guess: Array = initial_solution.get_log10_value(
-            constraints,
-            temperature=self.temperature(),
-            pressure=1,
-        )
-
-        # Other options if the surface is not well-behaved
-        # solver = optx.Dogleg(rtol=tol, atol=tol)
-        # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
-        solver = optx.Newton(rtol=tol, atol=tol)
-        sol = optx.root_find(
-            self.objective_function,
-            solver,
-            initial_solution_guess,
-            args=(constraints,),
-        )
-
-        solution: Solution = Solution.create_from_species(species=self._species)
-        solution.planet = self._planet
-        solution.value = jnp.array(sol.value)
-
-        residual = self.get_residual(solution, constraints)
-        rmse = np.sqrt(np.sum(np.array(residual) ** 2))
-        # Success is indicated by no message
-        if optx.RESULTS[sol.result] == "":
-            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
-            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
-            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
-
-        # It is useful to also return the jacobian of this system for testing
-        jacobian: Callable = self.jacobian((constraints,))
-        logger.info("Jacobian = %s", jacobian(solution.value))
-
-        return sol, jacobian, solution
-
-    # TODO: Framework for batched calculations
-    # def solve_optimistix_batched(
-    #     self,
-    #     initial_solution: InitialSolutionProtocol | None = None,
-    #     *,
-    #     constraints_list: list[SystemConstraints],
-    #     tol: float = 1.0e-8,
-    # ) -> tuple[list[Solution_optx], list[Callable], list[Solution]]:
-
-    #     # Vectorize the solve_optimistix method over the constraints_list
-    #     solve_optimistix_vmap = jax.vmap(
-    #         lambda constraints: self.solve_optimistix(
-    #             initial_solution=initial_solution, constraints=constraints, tol=tol
-    #         ),
-    #         in_axes=(0,),
-    #     )
-
-    #     # Apply vmap over the constraints_list
-    #     solutions, jacobians, final_solutions =
-    #       solve_optimistix_vmap(jnp.array(constraints_list))
-
-    #     return solutions, jacobians, final_solutions
 
 
 class ReactionNetworkWithCondensateStability(ReactionNetwork):
@@ -547,6 +584,82 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
 
         residual = residual + jnp.dot(activity_modifier, 10**stability_array)
         residual = residual - jnp.dot(equilibrium_modifier, 10**stability_array)
+
+        # Auxiliary condensate stability equations
+        auxiliary_residual: Array = jnp.zeros(
+            len(self._species.condensed_species()), dtype=jnp.float_
+        )
+        for index, collection in enumerate(solution.condensed_solution.values()):
+            value: Array = (
+                collection.stability.value
+                - collection.tauc.value
+                + collection.condensed_abundance.value
+            )
+            auxiliary_residual = auxiliary_residual.at[index].set(value)
+
+        # TODO: Have to do this here because above modifies the residual and therefore relies on
+        # the same array length. This should be cleaned up.
+        pressure: Array = solution.atmosphere.pressure()
+        pressure_residual: Array = jnp.zeros(
+            len(constraints.total_pressure_constraint), dtype=jnp.float_
+        )
+        if len(constraints.total_pressure_constraint) == 1:
+            constraint = constraints.total_pressure_constraint[0]
+            value: Array = jnp.log10(
+                solution.atmosphere.number_density()
+            ) - constraint.get_log10_value(temperature=self.temperature(), pressure=pressure)
+            pressure_residual = pressure_residual.at[0].set(value)
+
+        return jnp.concatenate((residual, auxiliary_residual, pressure_residual))
+
+
+class InteriorAtmosphereSystem(Solver):
+    """An interior-atmosphere system
+
+    Args:
+        species: Species
+        planet: Planet
+    """
+
+    def __init__(self, *args, **kwargs):
+        logger.info("Creating an interior-atmosphere system")
+        super().__init__(*args, **kwargs)
+        self._reaction_network = ReactionNetworkWithCondensateStability(
+            self._species, self._planet
+        )
+        # TODO: Need to reinstate this somewhere
+        # self.species.conform_solubilities_to_composition(self.planet.melt_composition)
+
+    @override
+    def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:
+        """Gets the residual
+
+        Args:
+            solution: Solution
+            constraints: Constraints for the system of equations
+
+        Returns:
+            Residual array
+        """
+        reaction_residual: jnp.ndarray = self._reaction_network.get_residual(solution, constraints)
+
+        number_residual: Array = jnp.zeros(len(constraints.mass_constraints), dtype=jnp.float_)
+        for index, constraint in enumerate(constraints.mass_constraints):
+            value: Array = (
+                jnp.log10(solution.number_density(element=constraint.element))
+                - constraint.log10_number_of_molecules
+                - jnp.log10(solution.atmosphere.volume())
+            )
+            number_residual = number_residual.at[index].set(value)
+
+        # Concatenate all residuals
+        residual: Array = jnp.concatenate(
+            (
+                reaction_residual,
+                number_residual,
+            )
+        )
+        logger.debug("residual = %s", residual)
 
         return residual
 

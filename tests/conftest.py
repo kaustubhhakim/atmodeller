@@ -31,8 +31,8 @@ from atmodeller.constraints import (
     PressureConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem, Planet
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
