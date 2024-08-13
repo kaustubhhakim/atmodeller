@@ -165,7 +165,7 @@ def test_H_with_buffer() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         )
     )
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
@@ -197,7 +197,7 @@ def test_H_and_C_no_solubility() -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
@@ -232,7 +232,7 @@ def test_H_and_C_with_solubility() -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
@@ -263,7 +263,7 @@ def test_H_and_C_holland() -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
@@ -294,7 +294,7 @@ def test_H_and_C_saxena(helper) -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {"H2O_g": 10000.0, "H2_g": 9539.109221925035, "O2_g": 8.981953412412754e-08}
@@ -327,7 +327,7 @@ def test_H_fugacities_batched() -> None:
         # Add more constraints as needed
     ]
 
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=planet)
     solutions, jacobians, final_solutions = reaction_network.solve_optimistix_batched(
         constraints_list=constraints_list
     )
@@ -355,7 +355,7 @@ def test_graphite_condensed() -> None:
     )
 
     warm_planet: Planet = Planet(surface_temperature=873)
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=warm_planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {
@@ -397,7 +397,7 @@ def test_graphite_water_condensed() -> None:
     )
 
     cool_planet = Planet(surface_temperature=430)
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=cool_planet)
+    reaction_network = InteriorAtmosphereSystem(species=species, planet=cool_planet)
     _, _, solution = reaction_network.solve_optimistix(constraints=constraints)
 
     target_dict = {

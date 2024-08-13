@@ -76,14 +76,14 @@ def test_H2O() -> None:
         ]
     )
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species, planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 1.0312913336898137,
     }
 
-    system.solve_optimistix(constraints=constraints)
-    # assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2() -> None:
@@ -105,8 +105,8 @@ def test_H_fO2() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.2570770067190733,
@@ -114,8 +114,7 @@ def test_H_fO2() -> None:
         "O2_g": 8.838043080858959e-08,
     }
 
-    system.solve_optimistix(constraints=constraints)
-    # assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_holland() -> None:
@@ -147,8 +146,8 @@ def test_H_fO2_holland() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.25706291267455456,
@@ -156,8 +155,7 @@ def test_H_fO2_holland() -> None:
         "O2_g": 8.838045400824612e-08,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_basalt_melt() -> None:
@@ -179,8 +177,8 @@ def test_H_basalt_melt() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.09442361772602827,
@@ -188,8 +186,7 @@ def test_H_basalt_melt() -> None:
         "O2_g": 8.837679290584522e-08,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_plus() -> None:
@@ -221,8 +218,8 @@ def test_H_fO2_plus() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(2)),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.25822630157632576,
@@ -230,8 +227,7 @@ def test_H_fO2_plus() -> None:
         "O2_g": 8.837799444728465e-06,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_minus() -> None:
@@ -253,8 +249,8 @@ def test_H_fO2_minus() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.23441348219541092,
@@ -262,8 +258,7 @@ def test_H_fO2_minus() -> None:
         "O2_g": 8.839768586501877e-10,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_five_oceans() -> None:
@@ -285,8 +280,8 @@ def test_H_five_oceans() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 6.259516638093527,
@@ -294,8 +289,7 @@ def test_H_five_oceans() -> None:
         "O2_g": 8.846766776792243e-08,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_1500K() -> None:
@@ -317,8 +311,8 @@ def test_H_1500K() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     planet.surface_temperature = 1500.0  # K
 
@@ -328,8 +322,7 @@ def test_H_1500K() -> None:
         "O2_g": 2.3940728554564946e-12,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C() -> None:
@@ -356,8 +349,8 @@ def test_H_and_C() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "CO2_g": 13.500258901609417,
@@ -367,8 +360,7 @@ def test_H_and_C() -> None:
         "O2_g": 8.886185271201372e-08,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C_total_pressure() -> None:
@@ -393,8 +385,8 @@ def test_H_and_C_total_pressure() -> None:
             TotalPressureConstraint(value=100),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "CO2_g": 18.38547187555166,
@@ -404,8 +396,7 @@ def test_H_and_C_total_pressure() -> None:
         "O2_g": 8.90272867718254e-08,
     }
 
-    system.solve_optimistix(constraints=constraints)
-    # assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_pH2_fO2_real_gas() -> None:
@@ -430,8 +421,8 @@ def test_pH2_fO2_real_gas() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 1466.9613852210507,
@@ -439,8 +430,7 @@ def test_pH2_fO2_real_gas() -> None:
         "O2_g": 1.0453574209588085e-07,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_fH2_fO2_real_gas() -> None:
@@ -465,8 +455,8 @@ def test_fH2_fO2_real_gas() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 1001.131462103614,
@@ -474,8 +464,7 @@ def test_fH2_fO2_real_gas() -> None:
         "O2_g": 9.96495147231471e-08,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C_real_gas() -> None:
@@ -507,8 +496,8 @@ def test_H_and_C_real_gas() -> None:
             ElementMassConstraint("C", value=c_kg),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve_optimistix(constraints=constraints)
 
     target: dict[str, float] = {
         "CH4_g": 10.300421855316944,
@@ -519,5 +508,4 @@ def test_H_and_C_real_gas() -> None:
         "O2_g": 1.0132255325169718e-07,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
