@@ -319,20 +319,27 @@ def test_H_fO2_no_solubility() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             ElementMassConstraint("H", h_kg),
-            # FugacityConstraint(O2_g, 8.981953412412735e-08),
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            FugacityConstraint(O2_g, 8.981953412412735e-08),
+            # FIXME: This might be causing problems for optimistix when large pressures are tried?
+            # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
     system = InteriorAtmosphereSystem(species=species, planet=planet)
     # scipy works
     _, _, solution = system.solve(solver="scipy", constraints=constraints)
     # optimistix has problems
-    # _, _, solution = system.solve(solver="optimistix", constraints=constraints)
+    # , _, solution = system.solve(solver="optimistix", constraints=constraints)
+
+    raw_solution = {
+        "H2O_g": 26.44337025528577,
+        "H2_g": 26.427125822303424,
+        "O2_g": 17.512257519792122,
+    }
 
     target: dict[str, float] = {
-        "H2O_g": 76.4640268903594,
-        "H2_g": 73.85383684116132,
-        "O2_g": 8.934086206529951e-08,
+        "H2O_g": 76.64494795089428,
+        "H2_g": 73.8310594846528,
+        "O2_g": 8.981953412412683e-08,
     }
 
     assert solution.isclose(target, rtol=RTOL, atol=ATOL)
