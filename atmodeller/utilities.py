@@ -315,3 +315,17 @@ def get_log10_number_density(*args, **kwargs) -> Array:
         Log10 number density
     """
     return jnp.log10(get_number_density(*args, **kwargs))
+
+
+def logsumexp_base10(log_values: ArrayLike) -> Array:
+    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
+
+    Args:
+        log10_values: Array of log10 values to sum.
+
+    Returns:
+        The log10 of the sum of exponentials of the input values.
+    """
+    max_log: Array = jnp.max(log_values)
+
+    return max_log + jnp.log10(jnp.sum(jnp.power(10, log_values - max_log)))
