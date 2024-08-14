@@ -168,11 +168,11 @@ class _NumberDensity(ABC, Generic[TypeChemicalSpecies_co]):
         """
         if element is not None:
             if element in self._species.composition():
-                return 10 ** self.log10_number_density(element=element)
+                return jnp.power(10, self.log10_number_density(element=element))
             else:
                 return jnp.array(0)
 
-        return 10 ** self.log10_number_density()
+        return jnp.power(10, self.log10_number_density())
 
     def mass(self, *, element: str | None = None) -> Array:
         """Mass of the species or an individual element
@@ -271,15 +271,15 @@ class _GasNumberDensity(_NumberDensityWithSetter[GasSpecies]):
 
     def pressure(self) -> Array:
         """Pressure in bar"""
-        return (
-            self.number_density()
-            * BOLTZMANN_CONSTANT_BAR
-            * self._solution.atmosphere.temperature()
-        )
+        return jnp.power(10, self.log10_pressure())
 
     def log10_pressure(self) -> Array:
         """Log10 pressure"""
-        return jnp.log10(self.pressure())
+        return (
+            self.log10_number_density()
+            + jnp.log10(BOLTZMANN_CONSTANT_BAR)
+            + jnp.log10(self._solution.atmosphere.temperature())
+        )
 
     def density(self) -> Array:
         """Density"""
@@ -303,7 +303,7 @@ class _GasNumberDensity(_NumberDensityWithSetter[GasSpecies]):
 
     def fugacity(self) -> Array:
         """Fugacity"""
-        return 10 ** self.log10_fugacity()
+        return jnp.power(10, self.log10_fugacity())
 
     def volume_mixing_ratio(self) -> Array:
         """Volume mixing ratio"""
@@ -489,10 +489,14 @@ class _GasCollection(_NumberDensity[GasSpecies]):
 
     @property
     def value(self) -> Array:
-        return jnp.log10(
-            10**self.gas_abundance.value
-            + 10**self.dissolved_abundance.value
-            + 10**self.trapped_abundance.value
+        return logsumexp_base10(
+            jnp.array(
+                [
+                    self.gas_abundance.value,
+                    self.dissolved_abundance.value,
+                    self.trapped_abundance.value,
+                ]
+            )
         )
 
     @override
@@ -706,7 +710,10 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
 
     def pressure(self) -> Array:
         """Pressure"""
-        return self._sum_values("pressure")
+        log10_pressure: Array = logsumexp_base10(
+            jnp.array([value.log10_pressure() for value in self.values()])
+        )
+        return jnp.power(10, log10_pressure)
 
     def temperature(self) -> float:
         """Temperature
@@ -715,18 +722,27 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
         """
         return self.planet.surface_temperature
 
-    def volume(self) -> Array:
-        """Volume
+    def log10_volume(self) -> Array:
+        """Log10 volume
 
         Derived using the mechanical pressure balance due to the weight of the atmosphere and the
         ideal gas equation of state.
 
         TODO: Should a correction be applied to the volume term for a non-ideal atmosphere?
         """
-        volume: Array = GAS_CONSTANT * self.temperature() / self.molar_mass()
-        volume *= self.planet.surface_area / self.planet.surface_gravity
+        log10_volume: Array = (
+            jnp.log10(GAS_CONSTANT)
+            + jnp.log10(self.temperature())
+            - jnp.log10(self.molar_mass())
+            + jnp.log10(self.planet.surface_area)
+            - jnp.log10(self.planet.surface_gravity)
+        )
 
-        return volume
+        return log10_volume
+
+    def volume(self) -> Array:
+        """Volume"""
+        return jnp.power(10, self.log10_volume())
 
     def output_dict(self) -> dict[str, float]:
         """Output dictionary

@@ -727,8 +727,7 @@ class InteriorAtmosphereSystem(Solver):
             value: Array = (
                 solution.log10_number_density(element=constraint.element)
                 - constraint.log10_number_of_molecules
-                # TODO: Could also compute this directly using logarithms?
-                + jnp.log10(solution.atmosphere.volume())
+                + solution.atmosphere.log10_volume()
             )
             number_residual = number_residual.at[index].set(value)
 
