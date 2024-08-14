@@ -27,6 +27,7 @@ from functools import wraps
 from pstats import SortKey, Stats
 from typing import Any, Callable, Type, TypeVar
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
@@ -329,4 +330,7 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1) -> Array:
     """
     max_log: Array = jnp.max(log_values)
 
-    return max_log + jnp.log10(jnp.sum(prefactors * jnp.power(10, log_values - max_log)))
+    # Ensure prefactors are converted to JAX arrays for compatibility
+    prefactors_: Array = jnp.asarray(prefactors)
+
+    return max_log + jnp.log10(jnp.sum(prefactors_ * jnp.power(10, log_values - max_log)))
