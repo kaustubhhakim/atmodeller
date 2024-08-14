@@ -22,11 +22,15 @@ __version__: str = "0.1.0"
 
 import logging
 
-import numpy as np
+import jax
+import numpy as jnp
 from molmass import Formula
 from scipy import constants
 
-np.seterr(divide="ignore")
+jax.config.update("jax_enable_x64", True)
+jnp.set_printoptions(precision=15)  # For better clarity in printed output
+
+print("Package initialized with double precision (float64)")
 
 AVOGADRO: float = constants.Avogadro
 """Avogadro constant in 1/mol"""
