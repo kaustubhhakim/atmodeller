@@ -46,8 +46,6 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
-jax.config.update("jax_enable_x64", True)
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -226,7 +224,7 @@ class Solver(ABC):
             solver,
             initial_solution_guess,
             args=(constraints,),
-            throw=False,
+            throw=True,
         )
 
         solution: Solution = Solution.create_from_species(self._species)

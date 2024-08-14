@@ -279,7 +279,7 @@ def test_H_and_C_holland() -> None:
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_saxena(helper) -> None:
+def test_H_and_C_saxena() -> None:
     """Tests H2-H2O and real gas EOS from Saxena
 
     The fugacity is large to check that the volume integral is performed correctly.
@@ -325,16 +325,8 @@ def test_H_fO2_no_solubility() -> None:
         ]
     )
     system = InteriorAtmosphereSystem(species=species, planet=planet)
-    # scipy works
-    _, _, solution = system.solve(solver="scipy", constraints=constraints)
-    # optimistix has problems
-    # , _, solution = system.solve(solver="optimistix", constraints=constraints)
-
-    raw_solution = {
-        "H2O_g": 26.44337025528577,
-        "H2_g": 26.427125822303424,
-        "O2_g": 17.512257519792122,
-    }
+    # _, _, solution = system.solve(solver="scipy", constraints=constraints)
+    _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 76.64494795089428,
@@ -366,7 +358,7 @@ def test_H_fO2_with_solubility() -> None:
         ]
     )
     system = InteriorAtmosphereSystem(species=species, planet=planet)
-    _, _, solution = system.solve(solver="scipy", constraints=constraints)
+    _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.2570770067190733,
