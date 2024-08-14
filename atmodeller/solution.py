@@ -94,7 +94,7 @@ class _ValueSetterMixin:
     @property
     def value(self) -> Array:
         """Gets the value."""
-        return jnp.array(self._value)
+        return jnp.asarray(self._value)
 
     @value.setter
     def value(self, value: ArrayLike) -> None:
@@ -347,7 +347,7 @@ class _DissolvedNumberDensity(_NumberDensity[GasSpecies]):
 
     def ppmw(self) -> Array:
         """Parts-per-million by weight of the volatile"""
-        return jnp.array(
+        return jnp.asarray(
             self._species.solubility.concentration(
                 fugacity=self._solution.gas_solution[self._species].gas_abundance.fugacity(),
                 temperature=self._solution.atmosphere.temperature(),
@@ -362,17 +362,24 @@ class _DissolvedNumberDensity(_NumberDensity[GasSpecies]):
         return self._solution.planet.mantle_melt_mass
 
     @property
-    def value(self) -> Array:
-        """Log10 of the number density"""
-        number_density: ArrayLike = (
-            UnitConversion.ppm_to_fraction(self.ppmw())
+    def value(self) -> ArrayLike:
+        """Log10 of the number density
+
+        If there is no solubility or no reservoir mass then -jnp.inf is returned
+        """
+        ppmw_value: Array = self.ppmw()
+
+        number_density: Array = jnp.where(
+            (ppmw_value > 0) & (self.reservoir_mass > 0),
+            UnitConversion.ppm_to_fraction(ppmw_value)
             * AVOGADRO
             / self._species.molar_mass
             * self.reservoir_mass
-            / self._solution.atmosphere.volume()
+            / self._solution.atmosphere.volume(),
+            -jnp.inf,
         )
 
-        return jnp.log10(number_density)
+        return jnp.where(number_density == -jnp.inf, -jnp.inf, jnp.log10(number_density))
 
     @override
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:
@@ -489,16 +496,13 @@ class _GasCollection(_NumberDensity[GasSpecies]):
 
     @property
     def value(self) -> Array:
-        return logsumexp_base10(
-            jnp.array(
-                [
-                    self.gas_abundance.value,
-                    # FIXME: This breaks when there is no dissolved content.
-                    # self.dissolved_abundance.value,
-                    # self.trapped_abundance.value,
-                ]
-            )
-        )
+        gas_value: Array = self.gas_abundance.value
+        dissolved_value: ArrayLike = self.dissolved_abundance.value
+        trapped_value: ArrayLike = self.trapped_abundance.value
+
+        log10_values: Array = jnp.asarray((gas_value, dissolved_value, trapped_value))
+
+        return logsumexp_base10(log10_values)
 
     @override
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:

@@ -213,41 +213,6 @@ def test_H_and_C_no_solubility() -> None:
     assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="Passes, but more useful when mass constraints are added")
-def test_H_and_C_with_solubility() -> None:
-    """Tests H2-H2O and CO-CO2 with imposed fugacities and no solubility.
-
-    This test is based on test_C_and_H() in test_CHO.py but without solubility.
-    """
-
-    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
-    H2_g: GasSpecies = GasSpecies("H2")
-    O2_g: GasSpecies = GasSpecies("O2")
-    CO_g: GasSpecies = GasSpecies("CO")
-    CO2_g: GasSpecies = GasSpecies("CO2", solubility=CO2_basalt_dixon())
-
-    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            FugacityConstraint(CO_g, 26.625148913955194),
-            FugacityConstraint(H2O_g, 99.19769919121012),
-            FugacityConstraint(O2_g, 8.981953412412735e-08),
-        ]
-    )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
-    _, _, solution = system.solve(constraints=constraints)
-
-    target_dict = {
-        "CO2_g": 6.0622728258770024,
-        "CO_g": 26.625148913955194,
-        "H2O_g": 99.19769919121012,
-        "H2_g": 95.55582495038334,
-        "O2_g": 8.981953412412735e-08,
-    }
-
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
-
-
 def test_H_and_C_holland() -> None:
     """Tests H2-H2O and CO-CO2 with real gas EOS from Holland and Powell."""
 
@@ -332,38 +297,6 @@ def test_H_fO2_no_solubility() -> None:
         "H2O_g": 76.64494795089428,
         "H2_g": 73.8310594846528,
         "O2_g": 8.981953412412683e-08,
-    }
-
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
-
-
-# This is a copy of test_H_fO2 in test_CHO.py, copied here for convenience to compare with the
-# above case without solubility
-def test_H_fO2_with_solubility() -> None:
-    """Tests H2-H2O at the IW buffer."""
-
-    H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
-    H2_g: GasSpecies = GasSpecies("H2")
-    O2_g: GasSpecies = GasSpecies("O2")
-
-    species: Species = Species([H2O_g, H2_g, O2_g])
-
-    oceans: float = 1
-    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
-
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            ElementMassConstraint("H", h_kg),
-            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
-        ]
-    )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
-    _, _, solution = system.solve(constraints=constraints)
-
-    target: dict[str, float] = {
-        "H2O_g": 0.2570770067190733,
-        "H2_g": 0.24964688044710354,
-        "O2_g": 8.838043080858959e-08,
     }
 
     assert solution.isclose(target, rtol=RTOL, atol=ATOL)

@@ -27,7 +27,6 @@ from functools import wraps
 from pstats import SortKey, Stats
 from typing import Any, Callable, Type, TypeVar
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt

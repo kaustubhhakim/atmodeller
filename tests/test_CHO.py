@@ -52,7 +52,7 @@ ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+# logger.setLevel(logging.INFO)
 
 eos_holland: dict[str, RealGas] = get_holland_eos_models()
 
@@ -80,7 +80,7 @@ def test_H2O() -> None:
     )
 
     system = InteriorAtmosphereSystem(species=species, planet=planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="optimistix", constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 1.0312913336898137,
