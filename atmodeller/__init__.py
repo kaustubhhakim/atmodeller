@@ -54,7 +54,7 @@ OCEAN_MOLES: float = 7.68894973907177e22
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 """Mass of H2 in one present-day Earth ocean in grams"""
 
-SOLVER = "optimistix"  # "scipy"  # or 'optimistix'
+DEFAULT_SOLVER: str = "optimistix"  # or "scipy"
 """Default solver"""
 
 # Create the package logger.

@@ -35,7 +35,7 @@ from jaxtyping import ArrayLike
 from optimistix._solution import Solution as Solution_optx
 from scipy.optimize import OptimizeResult, root
 
-from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT, SOLVER
+from atmodeller import BOLTZMANN_CONSTANT_BAR, DEFAULT_SOLVER, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
@@ -115,7 +115,7 @@ class Solver(ABC):
 
         return jax.jacobian(wrapped_objective)
 
-    def solve(self, *args, solver=SOLVER, **kwargs) -> tuple:
+    def solve(self, *args, solver=DEFAULT_SOLVER, **kwargs) -> tuple:
         """Solve
 
         Args:
