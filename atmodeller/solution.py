@@ -37,7 +37,7 @@ from atmodeller.interfaces import (
     TypeChemicalSpecies,
     TypeChemicalSpecies_co,
 )
-from atmodeller.utilities import UnitConversion, get_molar_mass
+from atmodeller.utilities import UnitConversion, get_molar_mass, logsumexp_base10
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -138,6 +138,24 @@ class _NumberDensity(ABC, Generic[TypeChemicalSpecies_co]):
         """Number density of all elements"""
         return self._species.atoms * self.number_density()
 
+    def log10_number_density(self, *, element: str | None = None) -> Array:
+        """Log10 number density of the species or an individual element
+
+        Args:
+            element: Element to compute the log10 number density for, or None to compute for the
+                species. Defaults to None.
+
+        Returns:
+            Number density for the species or `element` if not None.
+        """
+        if element is not None:
+            assert element in self._species.composition()
+            count: int = self._species.composition()[element].count
+        else:
+            count = 1
+
+        return jnp.log10(count) + self.value
+
     def number_density(self, *, element: str | None = None) -> Array:
         """Number density of the species or an individual element
 
@@ -149,15 +167,12 @@ class _NumberDensity(ABC, Generic[TypeChemicalSpecies_co]):
             Number density for the species or `element` if not None.
         """
         if element is not None:
-            try:
-                count: int = self._species.composition()[element].count
-            except KeyError:
-                # Element not in formula
-                count = 0
-        else:
-            count = 1
+            if element in self._species.composition():
+                return 10 ** self.log10_number_density(element=element)
+            else:
+                return jnp.array(0)
 
-        return count * 10**self.value
+        return 10 ** self.log10_number_density()
 
     def mass(self, *, element: str | None = None) -> Array:
         """Mass of the species or an individual element
@@ -588,15 +603,35 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
             jnp.array([getattr(value, method_name)(*args, **kwargs) for value in self.values()])
         )
 
-    def number_density(self, *, element: str | None = None) -> Array:
-        """Total number density of the species or an individual element
+    def log10_number_density(self, *, element: str | None = None) -> Array:
+        """Log10 number density of all species or an individual element
 
         Args:
-            element: Element to compute the number density for, or None to compute for the species.
+            element: Element to compute the log10 number density for, or None to compute for all
+                species. Defaults to None.
+
+        Returns:
+            Number density for all species or `element` if not None.
+        """
+        log10_number_densities: Array = jnp.array(
+            [
+                value.log10_number_density(element=element)
+                for value in self.values()
+                if element in value._species.composition()
+            ]
+        )
+
+        return logsumexp_base10(log10_number_densities)
+
+    def number_density(self, *, element: str | None = None) -> Array:
+        """Number density of all species or an individual element
+
+        Args:
+            element: Element to compute the number density for, or None to compute for all species.
                 Defaults to None.
 
         Returns:
-            Number density for the species or `element` if not None.
+            Number density for all species or `element` if not None.
         """
         return self._sum_values("number_density", element=element)
 
