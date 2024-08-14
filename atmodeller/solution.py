@@ -493,8 +493,9 @@ class _GasCollection(_NumberDensity[GasSpecies]):
             jnp.array(
                 [
                     self.gas_abundance.value,
-                    self.dissolved_abundance.value,
-                    self.trapped_abundance.value,
+                    # FIXME: This breaks when there is no dissolved content.
+                    # self.dissolved_abundance.value,
+                    # self.trapped_abundance.value,
                 ]
             )
         )
