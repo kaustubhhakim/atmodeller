@@ -617,13 +617,18 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
         Returns:
             Number density for all species or `element` if not None.
         """
-        log10_number_densities: Array = jnp.array(
-            [
-                value.log10_number_density(element=element)
-                for value in self.values()
-                if element in value._species.composition()
-            ]
-        )
+        if element is not None:
+            log10_number_densities: Array = jnp.array(
+                [
+                    value.log10_number_density(element=element)
+                    for value in self.values()
+                    if element in value._species.composition()
+                ]
+            )
+        else:
+            log10_number_densities = jnp.array(
+                [value.log10_number_density() for value in self.values()]
+            )
 
         return logsumexp_base10(log10_number_densities)
 
@@ -694,19 +699,20 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
     planet: Planet
     """Planet"""
 
+    def log10_molar_mass(self) -> Array:
+        """Log10 molar mass"""
+        molar_masses: Array = jnp.array([value._species.molar_mass for value in self.values()])
+        log10_number_densities: Array = jnp.array([value.value for value in self.values()])
+
+        molar_mass: Array = (
+            logsumexp_base10(log10_number_densities, molar_masses) - self.log10_number_density()
+        )
+
+        return molar_mass
+
     def molar_mass(self) -> Array:
         """Molar mass"""
-        return (
-            jnp.sum(
-                jnp.array(
-                    [
-                        species.molar_mass * value.number_density()
-                        for species, value in self.items()
-                    ]
-                )
-            )
-            / self.number_density()
-        )
+        return jnp.power(10, self.log10_molar_mass())
 
     def pressure(self) -> Array:
         """Pressure"""
@@ -733,7 +739,7 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensity]):
         log10_volume: Array = (
             jnp.log10(GAS_CONSTANT)
             + jnp.log10(self.temperature())
-            - jnp.log10(self.molar_mass())
+            - self.log10_molar_mass()
             + jnp.log10(self.planet.surface_area)
             - jnp.log10(self.planet.surface_gravity)
         )
