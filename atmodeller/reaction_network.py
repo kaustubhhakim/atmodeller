@@ -226,6 +226,7 @@ class Solver(ABC):
             solver,
             initial_solution_guess,
             args=(constraints,),
+            throw=False,
         )
 
         solution: Solution = Solution.create_from_species(self._species)
@@ -724,12 +725,9 @@ class InteriorAtmosphereSystem(Solver):
         number_residual: Array = jnp.zeros(len(constraints.mass_constraints), dtype=jnp.float_)
         for index, constraint in enumerate(constraints.mass_constraints):
             value: Array = (
-                jnp.log10(solution.number_density(element=constraint.element))
-                # - 46.96664792007731
-                # FIXME: Commenting out above for optimistix testing (doesn't solve the problem)
+                solution.log10_number_density(element=constraint.element)
                 - constraint.log10_number_of_molecules
-                # + 19.92972060766075
-                # FIXME: Commenting out above for optimistix testing (doesn't solve the problem)
+                # TODO: Could also compute this directly using logarithms?
                 + jnp.log10(solution.atmosphere.volume())
             )
             number_residual = number_residual.at[index].set(value)
