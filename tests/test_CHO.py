@@ -14,15 +14,13 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Tests for ideal C-H-O interior-atmosphere systems"""
+"""Tests for ideal C-H-O systems"""
 
 # Convenient to use naming convention so pylint: disable=C0103
 
 from __future__ import annotations
 
 import logging
-
-import pytest
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
@@ -55,6 +53,7 @@ logger: logging.Logger = debug_logger()
 # logger.setLevel(logging.INFO)
 
 eos_holland: dict[str, RealGas] = get_holland_eos_models()
+planet: Planet = Planet()
 
 
 def test_version():
@@ -70,7 +69,6 @@ def test_H2O() -> None:
     species: Species = Species([H2O_g])
 
     oceans: float = 2
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -99,7 +97,6 @@ def test_H_fO2() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -140,7 +137,6 @@ def test_H_fO2_holland() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -161,7 +157,6 @@ def test_H_fO2_holland() -> None:
     assert solution.isclose(target, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="The melt composition is not correctly applied and needs to be fixed")
 def test_H_basalt_melt() -> None:
     """Tests H2-H2O at the IW buffer."""
 
@@ -169,10 +164,9 @@ def test_H_basalt_melt() -> None:
     H2_g: GasSpecies = GasSpecies("H2")
     O2_g: GasSpecies = GasSpecies("O2")
 
-    species: Species = Species([H2O_g, H2_g, O2_g])
+    species: Species = Species([H2O_g, H2_g, O2_g], melt_composition="basalt")
 
     oceans: float = 1
-    planet: Planet = Planet(melt_composition="basalt")
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -213,7 +207,6 @@ def test_H_fO2_plus() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -244,7 +237,6 @@ def test_H_fO2_minus() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -275,7 +267,6 @@ def test_H_five_oceans() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 5
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -342,7 +333,6 @@ def test_H_and_C() -> None:
 
     oceans: float = 1
     ch_ratio: float = 1
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: float = ch_ratio * h_kg
 
@@ -379,7 +369,6 @@ def test_H_and_C_total_pressure() -> None:
     species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
 
     oceans: float = 1
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -417,8 +406,6 @@ def test_pH2_fO2_real_gas() -> None:
 
     species: Species = Species([H2O_g, H2_g, O2_g])
 
-    planet: Planet = Planet()
-
     constraints: SystemConstraints = SystemConstraints(
         [
             PressureConstraint(H2_g, value=1000),
@@ -450,8 +437,6 @@ def test_fH2_fO2_real_gas() -> None:
     O2_g: GasSpecies = GasSpecies("O2")
 
     species: Species = Species([H2O_g, H2_g, O2_g])
-
-    planet: Planet = Planet()
 
     constraints: SystemConstraints = SystemConstraints(
         [
@@ -488,8 +473,6 @@ def test_H_and_C_real_gas() -> None:
     species: Species = Species([H2_g, H2O_g, O2_g, CO_g, CO2_g, CH4_g])
 
     oceans: float = 10
-    planet: Planet = Planet()
-    planet.surface_temperature = 2000
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: float = h_kg
 

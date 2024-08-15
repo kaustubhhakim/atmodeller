@@ -55,7 +55,6 @@ class Planet:
         mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
         surface_radius: Radius of the planetary surface in m. Defaults to Earth.
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
-        melt_composition: Melt composition of the planet. Default is None.
     """
 
     planet_mass: float = 5.972e24
@@ -68,8 +67,6 @@ class Planet:
     """Radius of the surface in m"""
     surface_temperature: float = 2000.0
     """Temperature of the surface in K"""
-    melt_composition: str | None = None
-    """Melt composition"""
     mantle_mass: float = field(init=False)
     """Mass of the mantle"""
     mantle_melt_mass: float = field(init=False)
@@ -179,6 +176,10 @@ class Species(ImmutableList[ChemicalSpecies]):
         initlist: Initial list of species. Defaults to None.
     """
 
+    def __init__(self, *args, melt_composition: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.conform_solubilities_to_composition(melt_composition)
+
     @property
     def names(self) -> tuple[str, ...]:
         """Unique names of the species"""
@@ -262,7 +263,7 @@ class Species(ImmutableList[ChemicalSpecies]):
 
         raise ValueError(f"{species_name} is not in the species list")
 
-    def conform_solubilities_to_composition(self, melt_composition: str | None = None) -> None:
+    def conform_solubilities_to_composition(self, melt_composition: str | None) -> None:
         """Conforms the solubilities of the gas species to the planet composition.
 
         Args:
