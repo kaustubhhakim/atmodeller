@@ -31,11 +31,12 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
-from atmodeller.reaction_network import InteriorAtmosphereSystem
+from atmodeller.reaction_network import InteriorAtmosphereSystem, Solver
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
+# logger.setLevel(logging.INFO)
 
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage"""
@@ -48,7 +49,7 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def test_H_O() -> None:
+def test_H_O(helper) -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint.
 
     The FastChem element abundance file is:
@@ -85,8 +86,7 @@ def test_H_O() -> None:
         "O2_g": 8.91399329e-08,
     }
 
-    # FIXME: Did use log comparison from helper
-    assert solution.isclose(fastchem_result, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_reduced(helper) -> None:
@@ -104,9 +104,7 @@ def test_CHO_reduced(helper) -> None:
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 1400
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    warm_planet: Planet = Planet(surface_temperature=1400)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
@@ -120,6 +118,9 @@ def test_CHO_reduced(helper) -> None:
         ]
     )
 
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    _, _, solution = system.solve(constraints=constraints)
+
     factsage_result: dict[str, float] = {
         "H2_g": 175.5,
         "H2O_g": 13.8,
@@ -129,8 +130,7 @@ def test_CHO_reduced(helper) -> None:
         "O2_g": 1.25e-15,
     }
 
-    system.solve(constraints)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_IW(helper) -> None:
@@ -156,9 +156,7 @@ def test_CHO_IW(helper) -> None:
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 1400
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    warm_planet: Planet = Planet(surface_temperature=1400)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
@@ -171,6 +169,9 @@ def test_CHO_IW(helper) -> None:
             ElementMassConstraint("C", c_kg),
         ]
     )
+
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 28.66,
@@ -190,10 +191,8 @@ def test_CHO_IW(helper) -> None:
         "O2_g": 3.96475584e-13,
     }
 
-    system.solve(constraints)
-
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
-    assert helper.isclose(system, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_oxidised(helper) -> None:
@@ -211,9 +210,7 @@ def test_CHO_oxidised(helper) -> None:
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 1400
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    warm_planet: Planet = Planet(surface_temperature=1400)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 0.1 * h_kg
@@ -226,6 +223,9 @@ def test_CHO_oxidised(helper) -> None:
         ]
     )
 
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    _, _, solution = system.solve(constraints=constraints)
+
     factsage_result: dict[str, float] = {
         "CH4_g": 0.00129,
         "CO2_g": 3.25,
@@ -235,10 +235,10 @@ def test_CHO_oxidised(helper) -> None:
         "O2_g": 1.29e-11,
     }
 
-    system.solve(constraints)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
+# TODO: This test fails with the Optimistix Newton, but passes with Dogleg and LM
 def test_CHO_highly_oxidised(helper) -> None:
     """C-H-O system at IW+4
 
@@ -254,9 +254,7 @@ def test_CHO_highly_oxidised(helper) -> None:
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 1400
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    warm_planet: Planet = Planet(surface_temperature=1400)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 5 * h_kg
@@ -269,6 +267,9 @@ def test_CHO_highly_oxidised(helper) -> None:
         ]
     )
 
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    _, _, solution = system.solve(constraints=constraints)
+
     factsage_result: dict[str, float] = {
         "CH4_g": 7.13e-05,
         "CO2_g": 357.23,
@@ -278,8 +279,7 @@ def test_CHO_highly_oxidised(helper) -> None:
         "O2_g": 1.14e-09,
     }
 
-    system.solve(constraints)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_middle_temperature(helper) -> None:
