@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Callable, Generic, TypeVar
 
@@ -301,17 +301,13 @@ class ImmutableList(Sequence[T], Generic[T]):
         # Store the data as a tuple to ensure immutability
         self.data: tuple[T, ...] = tuple(iterable)
 
-    def __contains__(self, item: T) -> bool:
-        return item in self.data
-
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, index: int) -> T:
+    def __getitem__(self, index: int | slice) -> T | ImmutableList[T]:
+        if isinstance(index, slice):
+            return ImmutableList(self.data[index])
         return self.data[index]
 
-    def __iter__(self) -> Iterator[T]:
-        return iter(self.data)
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ImmutableList({self.data})"
