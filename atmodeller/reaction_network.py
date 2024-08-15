@@ -216,9 +216,9 @@ class Solver(ABC):
         )
 
         # Other options if the surface is not well-behaved
-        # solver = optx.Dogleg(rtol=tol, atol=tol)
+        solver = optx.Dogleg(rtol=tol, atol=tol)
         # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
-        solver = optx.Newton(rtol=tol, atol=tol)
+        # solver = optx.Newton(rtol=tol, atol=tol)
         sol = optx.root_find(
             self.objective_function,
             solver,

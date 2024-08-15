@@ -24,6 +24,7 @@ import logging
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
+    ActivityConstraint,
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
@@ -32,6 +33,7 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.reaction_network import InteriorAtmosphereSystem, Solver
+from atmodeller.solution import Solution
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -293,9 +295,7 @@ def test_CHO_middle_temperature(helper) -> None:
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 873
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    cool_planet: Planet = Planet(surface_temperature=873)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
@@ -308,6 +308,9 @@ def test_CHO_middle_temperature(helper) -> None:
         ]
     )
 
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    _, _, solution = system.solve(constraints=constraints)
+
     factsage_result: dict[str, float] = {
         "H2_g": 59.066,
         "H2O_g": 18.320,
@@ -317,10 +320,10 @@ def test_CHO_middle_temperature(helper) -> None:
         "O2_g": 1.27e-25,
     }
 
-    system.solve(constraints)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
+# FIXME: Does not pass with Optimistix Newton solver. Dogleg works decent.
 def test_CHO_low_temperature(helper) -> None:
     """C-H-O system at 450 K"""
 
@@ -333,9 +336,7 @@ def test_CHO_low_temperature(helper) -> None:
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 450
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    cool_planet: Planet = Planet(surface_temperature=450)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
@@ -348,6 +349,9 @@ def test_CHO_low_temperature(helper) -> None:
         ]
     )
 
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    _, _, solution = system.solve(constraints=constraints)
+
     factsage_result: dict[str, float] = {
         "H2_g": 55.475,
         "H2O_g": 8.0,
@@ -357,8 +361,7 @@ def test_CHO_low_temperature(helper) -> None:
         "O2_g": 7.85e-54,
     }
 
-    system.solve(constraints)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_graphite_condensed(helper) -> None:
@@ -374,9 +377,7 @@ def test_graphite_condensed(helper) -> None:
 
     species: Species = Species([O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 873
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    cool_planet: Planet = Planet(surface_temperature=873)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 5 * h_kg
@@ -386,8 +387,12 @@ def test_graphite_condensed(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
+            ActivityConstraint(C_cr, 1),
         ]
     )
+
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    _, _, solution = system.solve(solver="optimistix", constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "O2_g": 1.27e-25,
@@ -400,8 +405,7 @@ def test_graphite_condensed(helper) -> None:
         "mass_C_cr": 3.54162e20,
     }
 
-    system.solve(constraints, factor=10)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_graphite_unstable(helper) -> None:
@@ -420,9 +424,7 @@ def test_graphite_unstable(helper) -> None:
 
     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g, C_cr])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 1400
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    warm_planet: Planet = Planet(surface_temperature=1400)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
@@ -432,8 +434,12 @@ def test_graphite_unstable(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(0.5)),
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
+            ActivityConstraint(C_cr, 1),
         ]
     )
+
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "O2_g": 4.11e-13,
@@ -448,23 +454,21 @@ def test_graphite_unstable(helper) -> None:
         "mass_C_cr": 512893.3781184358,
     }
 
-    system.solve(constraints, factor=1)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
+# Works with Optimistix LevenbergMarquardt, fails with Dogleg and Newton
 def test_water_condensed(helper) -> None:
     """Condensed water at 10 bar"""
 
     H2_g: GasSpecies = GasSpecies("H2")
     H2O_g: GasSpecies = GasSpecies("H2O")
     O2_g: GasSpecies = GasSpecies("O2")
-    H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
 
     species: Species = Species([H2_g, H2O_g, O2_g, H2O_l])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 411.75
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    cool_planet: Planet = Planet(surface_temperature=411.75)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
 
@@ -472,8 +476,12 @@ def test_water_condensed(helper) -> None:
         [
             FugacityConstraint(H2_g, 7),
             ElementMassConstraint("H", h_kg),
+            ActivityConstraint(H2O_l, 1),
         ]
     )
+
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    _, _, solution = system.solve(solver="optimistix", constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,
@@ -483,8 +491,7 @@ def test_water_condensed(helper) -> None:
         "mass_H2O_l": 1.23802e21,
     }
 
-    system.solve(constraints, factor=10)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_water_condensed_O_abundance(helper) -> None:
@@ -498,13 +505,11 @@ def test_water_condensed_O_abundance(helper) -> None:
     H2_g: GasSpecies = GasSpecies("H2")
     H2O_g: GasSpecies = GasSpecies("H2O")
     O2_g: GasSpecies = GasSpecies("O2")
-    H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
 
     species: Species = Species([H2_g, H2O_g, O2_g, H2O_l])
 
-    planet: Planet = Planet()
-    planet.surface_temperature = 411.75
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    cool_planet: Planet = Planet(surface_temperature=411.75)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     o_kg: float = 1.14375e21
@@ -513,8 +518,12 @@ def test_water_condensed_O_abundance(helper) -> None:
         [
             ElementMassConstraint("O", o_kg),
             ElementMassConstraint("H", h_kg),
+            ActivityConstraint(H2O_l, 1),
         ]
     )
+
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,
@@ -524,14 +533,13 @@ def test_water_condensed_O_abundance(helper) -> None:
         "mass_H2O_l": 1.247201e21,
     }
 
-    system.solve(constraints, factor=1)
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
-    system = graphite_water_condensed
+    solution: Solution = graphite_water_condensed
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,
@@ -546,6 +554,4 @@ def test_graphite_water_condensed(helper, graphite_water_condensed) -> None:
         "mass_H2O_l": 2.74821e21,
     }
 
-    system.output(to_excel=True)
-
-    assert helper.isclose(system, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)

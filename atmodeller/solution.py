@@ -453,7 +453,6 @@ class _TauC(_CondensedSolutionComponent):
             self._solution.number_density(element=element) for element in self._species.elements
         ]
         log10_tauc: Array = LOG10_TAU + jnp.log10(jnp.min(jnp.array(element_number_densities)))
-        logger.debug("log10_tau (%s) = %f", self._species.name, log10_tauc)
 
         return log10_tauc
 

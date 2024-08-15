@@ -26,13 +26,14 @@ import numpy.typing as npt
 import pytest
 
 from atmodeller.constraints import (
+    ActivityConstraint,
     BufferedFugacityConstraint,
     ElementMassConstraint,
     PressureConstraint,
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.reaction_network import InteriorAtmosphereSystem, Solver
 from atmodeller.solution import Solution
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
@@ -112,9 +113,7 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
 
     species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
 
-    planet = Planet()
-    planet.surface_temperature = 430
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    cool_planet: Planet = Planet(surface_temperature=411.75)
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
@@ -127,12 +126,15 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("C", c_kg),
             ElementMassConstraint("O", o_kg),
+            ActivityConstraint(H2O_l, 1),
+            ActivityConstraint(C_cr, 1),
         ]
     )
 
-    system.solve(constraints, method="lm", max_attempts=1)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    _, _, solution = system.solve(constraints=constraints)
 
-    return system
+    return solution
 
 
 @pytest.fixture
