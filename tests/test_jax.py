@@ -14,17 +14,19 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Tests for ideal C-H-O interior-atmosphere systems"""
+"""Tests for JAX"""
 
 # Convenient to use naming convention so pylint: disable=C0103
 
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
 import pytest
+from jax import Array
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
@@ -42,9 +44,8 @@ from atmodeller.reaction_network import (
     InteriorAtmosphereSystem,
     ReactionNetwork,
     ReactionNetworkWithCondensateStability,
+    Solver,
 )
-from atmodeller.solubility.carbon_species import CO2_basalt_dixon
-from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -70,12 +71,12 @@ def test_simple() -> None:
         return jax.jacobian(vector_function)(x)
 
     # Test with a 2-D vector
-    x = jnp.array([1.0, 2.0])
-    jacobian = compute_jacobian(x)
+    x: Array = jnp.array([1.0, 2.0])
+    jacobian: Callable = compute_jacobian(x)
     print("Jacobian:\n", jacobian)
 
 
-def test_H_fugacities() -> None:
+def test_H_fugacities(helper) -> None:
     """Tests H species with imposed fugacities"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -89,19 +90,21 @@ def test_H_fugacities() -> None:
             FugacityConstraint(O2_g, 8.838043080858959e-08),
         )
     )
-    reaction_network = ReactionNetworkWithCondensateStability(species=species, planet=planet)
+    reaction_network: Solver = ReactionNetworkWithCondensateStability(
+        species=species, planet=planet
+    )
     _, _, solution = reaction_network.solve(constraints=constraints)
 
-    target_dict = {
+    target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
         "H2_g": 0.24964688044710262,
         "O2_g": 8.838043080858959e-08,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fugacities_system() -> None:
+def test_H_fugacities_system(helper) -> None:
     """Tests H species with imposed fugacities"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -115,19 +118,19 @@ def test_H_fugacities_system() -> None:
             FugacityConstraint(O2_g, 8.838043080858959e-08),
         )
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {
+    target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
         "H2_g": 0.24964688044710262,
         "O2_g": 8.838043080858959e-08,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_total_pressure() -> None:
+def test_H_total_pressure(helper) -> None:
     """Tests H species with a total pressure constraint."""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -141,19 +144,19 @@ def test_H_total_pressure() -> None:
             TotalPressureConstraint(0.5067239755466055),
         )
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {
+    target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
         "H2_g": 0.24964688044710262,
         "O2_g": 8.838043080858959e-08,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_with_buffer() -> None:
+def test_H_with_buffer(helper) -> None:
     """Tests H species with an imposed fO2 buffer"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -167,19 +170,19 @@ def test_H_with_buffer() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         )
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {
+    target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
         "H2_g": 0.24964688044710262,
         "O2_g": 8.838043080858887e-08,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_no_solubility() -> None:
+def test_H_and_C_no_solubility(helper) -> None:
     """Tests H2-H2O and CO-CO2 with imposed fugacities and no solubility.
 
     This test is based on test_C_and_H() in test_CHO.py but without solubility.
@@ -199,10 +202,10 @@ def test_H_and_C_no_solubility() -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {
+    target: dict[str, float] = {
         "CO2_g": 6.0622728258770024,
         "CO_g": 26.625148913955194,
         "H2O_g": 99.19769919121012,
@@ -210,10 +213,10 @@ def test_H_and_C_no_solubility() -> None:
         "O2_g": 8.981953412412735e-08,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_holland() -> None:
+def test_H_and_C_holland(helper) -> None:
     """Tests H2-H2O and CO-CO2 with real gas EOS from Holland and Powell."""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -230,10 +233,10 @@ def test_H_and_C_holland() -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {
+    target: dict[str, float] = {
         "CO2_g": 0.6283663007874475,
         "CO_g": 2.5425375910504195,
         "H2O_g": 10000.0,
@@ -241,10 +244,10 @@ def test_H_and_C_holland() -> None:
         "O2_g": 8.981953412412754e-08,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_saxena() -> None:
+def test_H_and_C_saxena(helper) -> None:
     """Tests H2-H2O and real gas EOS from Saxena
 
     The fugacity is large to check that the volume integral is performed correctly.
@@ -261,15 +264,19 @@ def test_H_and_C_saxena() -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {"H2O_g": 10000.0, "H2_g": 9539.109221925035, "O2_g": 8.981953412412754e-08}
+    target: dict[str, float] = {
+        "H2O_g": 10000.0,
+        "H2_g": 9539.109221925035,
+        "O2_g": 8.981953412412754e-08,
+    }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fO2_no_solubility() -> None:
+def test_H_fO2_no_solubility(helper) -> None:
     """Tests H2-H2O at the IW buffer."""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -284,26 +291,23 @@ def test_H_fO2_no_solubility() -> None:
     constraints: SystemConstraints = SystemConstraints(
         [
             ElementMassConstraint("H", h_kg),
-            FugacityConstraint(O2_g, 8.981953412412735e-08),
-            # FIXME: This might be causing problems for optimistix when large pressures are tried?
-            # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+            BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
-    # _, _, solution = system.solve(solver="scipy", constraints=constraints)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
-        "H2O_g": 76.64494795089428,
-        "H2_g": 73.8310594846528,
-        "O2_g": 8.981953412412683e-08,
+        "H2O_g": 76.46402689279567,
+        "H2_g": 73.85383684279368,
+        "O2_g": 8.934086206704404e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 @pytest.mark.skip(reason="Need to make SystemConstraints compatible with JAX's array capabilities")
-def test_H_fugacities_batched() -> None:
+def test_H_fugacities_batched(helper) -> None:
     """Tests H species with imposed fugacities for multiple constraints"""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -334,7 +338,7 @@ def test_H_fugacities_batched() -> None:
 
 
 @pytest.mark.skip(reason="Probably don't make sense without a mass constraint")
-def test_graphite_condensed() -> None:
+def test_graphite_condensed(helper) -> None:
     """Graphite stable with around 50% condensed C mass fraction"""
 
     O2_g: GasSpecies = GasSpecies("O2")
@@ -358,7 +362,7 @@ def test_graphite_condensed() -> None:
     system = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {
+    target = {
         "CH4_g": 96.86234030526238,
         "CO2_g": 0.06051299046298187,
         "CO_g": 0.07273637701072179,
@@ -369,11 +373,11 @@ def test_graphite_condensed() -> None:
         "mass_C_cr": 3.5416383046342194e20,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 @pytest.mark.skip(reason="Probably don't make sense without a mass constraint")
-def test_graphite_water_condensed() -> None:
+def test_graphite_water_condensed(helper) -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     H2O_g = GasSpecies("H2O")
@@ -400,7 +404,7 @@ def test_graphite_water_condensed() -> None:
     system = InteriorAtmosphereSystem(species=species, planet=cool_planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    target_dict = {
+    target = {
         "CH4_g": 0.32688481623407045,
         "CO2_g": 4.286974741683041,
         "CO_g": 2.7984895865705653e-06,
@@ -413,11 +417,11 @@ def test_graphite_water_condensed() -> None:
         "mass_H2O_l": 2.7509418192551134e21,
     }
 
-    assert solution.isclose(target_dict, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 @pytest.mark.skip(reason="Cannot get vmap to work as desired")
-def test_reaction_network_vmap() -> None:
+def test_reaction_network_vmap(helper) -> None:
 
     H2O_g: GasSpecies = GasSpecies(
         "H2O", thermodata_dataset=ThermodynamicDatasetHollandAndPowell()
@@ -453,7 +457,7 @@ def test_reaction_network_vmap() -> None:
 
     # sol, solution = reaction_network.solve_optimistix(constraints=constraints)
 
-    # target_dict = {
+    # target = {
     #    "H2O_g": 0.25707719341563373,
     #    "H2_g": 0.249646956461615,
     #    "O2_g": 8.838052554822744e-08,
@@ -461,4 +465,4 @@ def test_reaction_network_vmap() -> None:
 
     # print(solution.output_solution())
 
-    # assert solution.isclose(target_dict)
+    # assert solution.isclose(target)

@@ -33,6 +33,7 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.solution import Solution
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -43,26 +44,43 @@ class Helper:
 
     @staticmethod
     def isclose(
-        system: InteriorAtmosphereSystem,
+        solution: Solution,
         target: dict[str, float],
         *,
         log: bool = False,
         rtol: float = 1.0e-6,
         atol: float = 1.0e-6,
     ) -> np.bool_:
+        """Determines if the solution is close to a target solution within a tolerance.
 
-        if len((system.output_solution())) != len(target):
+        Args:
+            solution: Solution
+            target_dict: Dictionary of the target values, which should adhere to the format of
+                :meth:`solution.Solution.output_solution()`
+            rtol: Relative tolerance. Defaults to 1.0e-6.
+            atol: Absolute tolerance. Defaults to 1.0e-6.
+
+        Returns:
+            True if the solution is close to the target, otherwise False
+        """
+        output: dict[str, float] = solution.output_solution()
+
+        if len(output) != len(target):
             return np.bool_(False)
 
-        target_values: npt.NDArray = np.array(list(dict(sorted(target.items())).values()))
-        solution_values: npt.NDArray = np.array(
-            list(dict(sorted(system.output_solution().items())).values())
+        target_values: npt.NDArray[np.float_] = np.array(
+            list(dict(sorted(target.items())).values())
+        )
+        solution_values: npt.NDArray[np.float_] = np.array(
+            list(dict(sorted(output.items())).values())
         )
         if log:
             target_values = np.log10(target_values)
             solution_values = np.log10(solution_values)
 
-        isclose: npt.NDArray = np.isclose(target_values, solution_values, rtol=rtol, atol=atol)
+        isclose: npt.NDArray[np.bool_] = np.isclose(
+            target_values, solution_values, rtol=rtol, atol=atol
+        )
 
         logger.debug("isclose = %s", isclose)
 

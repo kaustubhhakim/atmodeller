@@ -25,7 +25,6 @@ from collections import Counter, UserDict
 from typing import Generic, Protocol, TypeVar, cast
 
 import jax.numpy as jnp
-import numpy as np
 from jax import Array
 from jax.typing import ArrayLike
 
@@ -1009,48 +1008,24 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
 
         return output
 
-    def isclose(
-        self,
-        target_dict: dict[str, float],
-        rtol: float = 1.0e-5,
-        atol: float = 1.0e-8,
-    ) -> np.bool_:
-        """Determines if the solution is close to a target solution within a tolerance.
 
-        Args:
-            target_dict: Dictionary of the target values, which should adhere to the format of
-                :meth:`output_solution()`
-            rtol: Relative tolerance. Defaults to 1.0e-5.
-            atol: Absolute tolerance. Defaults to 1.0e-8.
+# TODO: Still required?  Move to test conf?
+# def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
+#     """Writes a log message with the tightest tolerance that is satisfied.
 
-        Returns:
-            True if the solution is close to the target, otherwise False
-        """
-        if len((self.output_solution())) != len(target_dict):
-            return np.bool_(False)
+#     Args:
+#         target_dict: Dictionary of the target values, which should adhere to the format of
+#             :meth:`output_solution()`
+#         message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
+#             to an empty string.
 
-        target_values: list = list(dict(sorted(target_dict.items())).values())
-        solution_values: list = list(dict(sorted(self.output_solution().items())).values())
-        isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
+#     Returns:
+#         The tightest tolerance satisfied
+#     """
+#     for log_tolerance in (-6, -5, -4, -3, -2, -1):
+#         tol: float = 10**log_tolerance
+#         if self.isclose(target_dict, rtol=tol, atol=tol):
+#             logger.info("%s (tol = %f)".lstrip(), message, tol)
+#             return tol
 
-        return isclose
-
-    def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
-        """Writes a log message with the tightest tolerance that is satisfied.
-
-        Args:
-            target_dict: Dictionary of the target values, which should adhere to the format of
-                :meth:`output_solution()`
-            message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
-                to an empty string.
-
-        Returns:
-            The tightest tolerance satisfied
-        """
-        for log_tolerance in (-6, -5, -4, -3, -2, -1):
-            tol: float = 10**log_tolerance
-            if self.isclose(target_dict, rtol=tol, atol=tol):
-                logger.info("%s (tol = %f)".lstrip(), message, tol)
-                return tol
-
-        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
+#     logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)

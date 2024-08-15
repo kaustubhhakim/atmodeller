@@ -31,7 +31,7 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.reaction_network import InteriorAtmosphereSystem
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -40,8 +40,15 @@ logger: logging.Logger = debug_logger()
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage"""
 
+planet: Planet = Planet()
 
-def test_H_O(helper) -> None:
+
+def test_version():
+    """Test version."""
+    assert __version__ == "0.1.0"
+
+
+def test_H_O() -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint.
 
     The FastChem element abundance file is:
@@ -59,7 +66,6 @@ def test_H_O(helper) -> None:
     species: Species = Species([H2_g, H2O_g, O2_g])
 
     oceans: float = 1
-    planet: Planet = Planet()
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 6.25774e20
 
@@ -70,7 +76,8 @@ def test_H_O(helper) -> None:
         ]
     )
 
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve(solver="optimistix", constraints=constraints)
 
     fastchem_result: dict[str, float] = {
         "H2O_g": 76.45861543,
@@ -78,8 +85,8 @@ def test_H_O(helper) -> None:
         "O2_g": 8.91399329e-08,
     }
 
-    system.solve(constraints)
-    assert helper.isclose(system, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    # FIXME: Did use log comparison from helper
+    assert solution.isclose(fastchem_result, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 def test_CHO_reduced(helper) -> None:

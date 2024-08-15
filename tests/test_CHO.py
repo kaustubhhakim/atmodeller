@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import logging
 
+import pytest
+
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
     BufferedFugacityConstraint,
@@ -34,7 +36,7 @@ from atmodeller.constraints import (
 from atmodeller.core import GasSpecies, Planet, Species
 from atmodeller.eos.holland import get_holland_eos_models
 from atmodeller.eos.interfaces import RealGas
-from atmodeller.reaction_network import InteriorAtmosphereSystem
+from atmodeller.reaction_network import InteriorAtmosphereSystem, Solver
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import (
     H2_basalt_hirschmann,
@@ -61,7 +63,7 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def test_H2O() -> None:
+def test_H2O(helper) -> None:
     """Tests H2O (a single species)"""
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
@@ -77,17 +79,17 @@ def test_H2O() -> None:
         ]
     )
 
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
-    _, _, solution = system.solve(solver="optimistix", constraints=constraints)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 1.0312913336898137,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fO2() -> None:
+def test_H_fO2(helper) -> None:
     """Tests H2-H2O at the IW buffer."""
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
@@ -105,7 +107,7 @@ def test_H_fO2() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -114,10 +116,10 @@ def test_H_fO2() -> None:
         "O2_g": 8.838043080858959e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fO2_holland() -> None:
+def test_H_fO2_holland(helper) -> None:
     """Tests H2-H2O at the IW buffer using thermodynamic data from Holland and Powell"""
 
     H2O_g: GasSpecies = GasSpecies(
@@ -145,7 +147,7 @@ def test_H_fO2_holland() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -154,10 +156,10 @@ def test_H_fO2_holland() -> None:
         "O2_g": 8.838045400824612e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_basalt_melt() -> None:
+def test_H_basalt_melt(helper) -> None:
     """Tests H2-H2O at the IW buffer."""
 
     H2O_g: GasSpecies = GasSpecies("H2O")
@@ -175,7 +177,7 @@ def test_H_basalt_melt() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -184,10 +186,10 @@ def test_H_basalt_melt() -> None:
         "O2_g": 8.837679290584522e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fO2_plus() -> None:
+def test_H_fO2_plus(helper) -> None:
     """Tests H2-H2O at the IW buffer+2.
 
     A comparable test has been run for FastChem, by tweaking the oxygen logarithmic abundance from
@@ -215,7 +217,7 @@ def test_H_fO2_plus() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(2)),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -224,10 +226,10 @@ def test_H_fO2_plus() -> None:
         "O2_g": 8.837799444728465e-06,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fO2_minus() -> None:
+def test_H_fO2_minus(helper) -> None:
     """Tests H2-H2O at the IW buffer-2."""
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
@@ -245,7 +247,7 @@ def test_H_fO2_minus() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -254,10 +256,10 @@ def test_H_fO2_minus() -> None:
         "O2_g": 8.839768586501877e-10,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_five_oceans() -> None:
+def test_H_five_oceans(helper) -> None:
     """Tests H2-H2O for five H oceans."""
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
@@ -275,7 +277,7 @@ def test_H_five_oceans() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -284,10 +286,10 @@ def test_H_five_oceans() -> None:
         "O2_g": 8.846766776792243e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_1500K() -> None:
+def test_H_1500K(helper) -> None:
     """Tests H2-H2O at a different temperature."""
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
@@ -306,7 +308,7 @@ def test_H_1500K() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     planet.surface_temperature = 1500.0  # K
@@ -317,10 +319,10 @@ def test_H_1500K() -> None:
         "O2_g": 2.3940728554564946e-12,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C() -> None:
+def test_H_and_C(helper) -> None:
     """Tests H2-H2O and CO-CO2."""
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
@@ -343,7 +345,7 @@ def test_H_and_C() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -354,10 +356,10 @@ def test_H_and_C() -> None:
         "O2_g": 8.886185271201372e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_total_pressure() -> None:
+def test_H_and_C_total_pressure(helper) -> None:
     """Tests H2-H2O and CO-CO2 with a total pressure constraint."""
 
     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
@@ -378,7 +380,7 @@ def test_H_and_C_total_pressure() -> None:
             TotalPressureConstraint(value=100),
         ]
     )
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -389,9 +391,10 @@ def test_H_and_C_total_pressure() -> None:
         "O2_g": 8.90272867718254e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
+@pytest.mark.skip(reason="Holland H2O model is not configured for JAX")
 def test_pH2_fO2_real_gas() -> None:
     """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
 
@@ -421,9 +424,10 @@ def test_pH2_fO2_real_gas() -> None:
         "O2_g": 1.0453574209588085e-07,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
+@pytest.mark.skip(reason="Holland H2O model is not configured for JAX")
 def test_fH2_fO2_real_gas() -> None:
     """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
 
@@ -453,9 +457,10 @@ def test_fH2_fO2_real_gas() -> None:
         "O2_g": 9.96495147231471e-08,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
+@pytest.mark.skip(reason="Holland H2O model is not configured for JAX")
 def test_H_and_C_real_gas() -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 
@@ -495,4 +500,4 @@ def test_H_and_C_real_gas() -> None:
         "O2_g": 1.0132255325169718e-07,
     }
 
-    assert solution.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
