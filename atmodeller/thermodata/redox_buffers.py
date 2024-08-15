@@ -78,9 +78,10 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
             log10 of the fugacity at the buffer
         """
 
+    # TODO: Not sure how a penalty will behave with JAX,
     @override
     def get_log10_value(
-        self, temperature: float, pressure: ArrayLike, penalty: bool = True, **kwargs
+        self, temperature: float, pressure: ArrayLike, penalty: bool = False, **kwargs
     ) -> ArrayLike:
         """Log10 value including any shift
 
@@ -121,7 +122,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
         log10_value: ArrayLike = self.get_log10_value(
             temperature=temperature, pressure=pressure, penalty=penalty, **kwargs
         )
-        value: ArrayLike = 10**log10_value
+        value: ArrayLike = jnp.power(10, log10_value)
 
         return value
 
@@ -318,12 +319,10 @@ class IronWustiteBufferHirschmann(RedoxBufferProtocol):
         if temperature < self.high_temperature_buffer.calibration.temperature_min:
             return self.low_temperature_buffer.get_log10_value(temperature, pressure, **kwargs)
         else:
-            return self.high_temperature_buffer.get_log10_value(
-                temperature=temperature, pressure=pressure, **kwargs
-            )
+            return self.high_temperature_buffer.get_log10_value(temperature, pressure, **kwargs)
 
     @override
-    def get_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> ArrayLike:
+    def get_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> Array:
         """Value including any shift
 
         Args:
@@ -337,7 +336,7 @@ class IronWustiteBufferHirschmann(RedoxBufferProtocol):
         log10_value: ArrayLike = self.get_log10_value(
             temperature=temperature, pressure=pressure, **kwargs
         )
-        value: ArrayLike = 10**log10_value
+        value: Array = jnp.power(10, log10_value)
 
         return value
 

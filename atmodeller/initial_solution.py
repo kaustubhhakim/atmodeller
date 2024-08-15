@@ -204,11 +204,13 @@ class InitialSolution(ABC, Generic[T]):
                 self._max_log10_number_density,
             )
 
-        # Gas constraints
-        for constraint in constraints.gas_constraints:
-            self.solution.gas_solution[constraint.species].gas_abundance.value = (
-                constraint.get_log10_value(temperature=temperature, pressure=pressure)
-            )
+        # TODO: This causes problems for Optimistix solver and is probably best avoided. Maybe to
+        # remove soon
+        # # Gas constraints
+        # for constraint in constraints.gas_constraints:
+        #     self.solution.gas_solution[constraint.species].gas_abundance.value = (
+        #         constraint.get_log10_value(temperature=temperature, pressure=pressure)
+        #     )
 
         for collection in self.solution.condensed_solution.values():
             self.fill(collection.activity, self._fill_log10_activity)

@@ -238,7 +238,6 @@ def test_CHO_oxidised(helper) -> None:
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# TODO: This test fails with the Optimistix Newton, but passes with Dogleg and LM
 def test_CHO_highly_oxidised(helper) -> None:
     """C-H-O system at IW+4
 
