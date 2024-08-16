@@ -24,7 +24,9 @@ from abc import ABC, abstractmethod
 from collections import Counter, UserDict
 from typing import Generic, Protocol, TypeVar, cast
 
+import jax
 import jax.numpy as jnp
+import numpy as np
 from jax import Array
 from jax.typing import ArrayLike
 
@@ -487,20 +489,23 @@ class _GasCollection(_NumberDensity[GasSpecies]):
         self._solution: Solution = solution
         super().__init__(species, solution)
         self.gas_abundance: _GasNumberDensity = _GasNumberDensity(species, solution)
-        self.dissolved_abundance: _DissolvedNumberDensity = _DissolvedNumberDensity(
-            species, solution
-        )
-        self.trapped_abundance: _TrappedNumberDensity = _TrappedNumberDensity(species, solution)
+        # FIXME: This raises NaN issues for Optimistix
+        # self.dissolved_abundance: _DissolvedNumberDensity = _DissolvedNumberDensity(
+        #    species, solution
+        # )
+        # self.trapped_abundance: _TrappedNumberDensity = _TrappedNumberDensity(species, solution)
 
     @property
     def value(self) -> Array:
-        gas_value: Array = self.gas_abundance.value
-        dissolved_value: ArrayLike = self.dissolved_abundance.value
-        trapped_value: ArrayLike = self.trapped_abundance.value
+        # gas_value: Array = self.gas_abundance.value
+        # dissolved_value: ArrayLike = self.dissolved_abundance.value
+        # trapped_value: ArrayLike = self.trapped_abundance.value
 
-        log10_values: Array = jnp.asarray((gas_value, dissolved_value, trapped_value))
+        # log10_values: Array = jnp.asarray((gas_value, dissolved_value, trapped_value))
 
-        return logsumexp_base10(log10_values)
+        # return logsumexp_base10(log10_values)
+
+        return self.gas_abundance.value
 
     @override
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:
@@ -632,6 +637,9 @@ class _SolutionContainer(UserDict[TypeChemicalSpecies, TypeNumberDensity]):
             log10_number_densities = jnp.array(
                 [value.log10_number_density() for value in self.values()]
             )
+
+        # For Optimistix/JAX debugging
+        # jax.debug.print("log10_number_densities = {out}", out=log10_number_densities)
 
         return logsumexp_base10(log10_number_densities)
 

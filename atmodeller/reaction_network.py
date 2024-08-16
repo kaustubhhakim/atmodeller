@@ -97,6 +97,10 @@ class Solver(ABC):
         constraints = args[0]
         residual: Array = self.get_residual(solution, constraints)
 
+        # For Optimistix/JAX debugging
+        jax.debug.print("solution into objective = {solution}", solution=solution.value)
+        jax.debug.print("residual out of objective = {residual}", residual=residual)
+
         return residual
 
     def jacobian(self, args) -> Callable:
@@ -216,9 +220,12 @@ class Solver(ABC):
         )
 
         # Other options if the surface is not well-behaved
-        solver = optx.Dogleg(rtol=tol, atol=tol)
+        # solver = optx.BFGS(rtol=1e-3, atol=1e-3)
+        # solver = optx.OptaxMinimiser(optax.adabelief(learning_rate=0.01), rtol=tol, atol=tol)
+        # solver = optx.Dogleg(rtol=tol, atol=tol)
         # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
-        # solver = optx.Newton(rtol=tol, atol=tol)
+        solver = optx.Newton(rtol=tol, atol=tol)
+        # solver = optx.Chord(rtol=tol, atol=tol)
         sol = optx.root_find(
             self.objective_function,
             solver,
@@ -718,8 +725,6 @@ class InteriorAtmosphereSystem(Solver):
         """
         reaction_residual: jnp.ndarray = self._reaction_network.get_residual(solution, constraints)
 
-        # FIXME: This works with the scipy solver but something is amiss with the optimistix
-        # solver.
         number_residual: Array = jnp.zeros(len(constraints.mass_constraints), dtype=jnp.float_)
         for index, constraint in enumerate(constraints.mass_constraints):
             value: Array = (

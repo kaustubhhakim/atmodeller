@@ -107,7 +107,7 @@ class InitialSolution(ABC, Generic[T]):
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26,
-        fill_log10_activity: float = TAU,
+        fill_log10_activity: float = -TAU,
         fill_log10_stability: float = LOG10_TAU,
     ):
         logger.debug("Creating %s", self.__class__.__name__)

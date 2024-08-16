@@ -280,6 +280,19 @@ class IdealGas(RealGas):
     """
 
     @override
+    def fugacity_coefficient(self, *args, **kwargs) -> Array:
+        """Fugacity coefficient
+
+        Although the fugacity coefficient is self-consistently calculated in the base class, this
+        approach apparently adversely affects the Jacobian estimation, driving the pressure to
+        infinity and causing an NaN crash. Since we know that the fugacity coefficient of an ideal
+        gas is unity by definition we simply impose it here to pass a constant to the solver.
+        """
+        del args
+        del kwargs
+        return jnp.array(1)
+
+    @override
     def volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         return self.ideal_volume(temperature, pressure)
 
