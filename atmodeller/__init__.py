@@ -28,20 +28,13 @@ from molmass import Formula
 from scipy import constants
 
 jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_debug_nans", True)
-jax.config.update("jax_debug_infs", False)
-jax.config.update("jax_disable_jit", True)
-
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
-
 print("Package initialized with double precision (float64)")
 
-import os
-
-os.environ["JAX_DEBUG_NANS"] = "1"
-os.environ["JAX_DISABLE_JIT"] = "1"
-# os.environ["EQX_ON_ERROR"] = "breakpoint"
-
+# For debugging
+# jax.config.update("jax_debug_nans", True)
+# jax.config.update("jax_debug_infs", False)
+# jax.config.update("jax_disable_jit", True)
 
 AVOGADRO: float = constants.Avogadro
 """Avogadro constant in 1/mol"""
