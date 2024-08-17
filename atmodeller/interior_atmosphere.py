@@ -111,7 +111,7 @@ class InteriorAtmosphereSystem:
     #     """
     #     reaction_list: list = []
     #     for collection in self.solution.gas_solution.values():
-    #         reaction_list.append(collection.gas_abundance.value)
+    #         reaction_list.append(collection.abundance.value)
     #     for collection in self.solution.condensed_solution.values():
     #         reaction_list.append(collection.activity.value)
 
@@ -332,9 +332,7 @@ class InteriorAtmosphereSystem:
         residual_stability_list: list[jnp.ndarray] = []
         for collection in self.solution.condensed_solution.values():
             residual_stability_list.append(
-                collection.stability.value
-                - collection.tauc.value
-                + collection.condensed_abundance.value
+                collection.stability.value - collection.tauc.value + collection.abundance.value
             )
         residual_stability = jnp.array(residual_stability_list)
 
