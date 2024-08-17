@@ -195,11 +195,11 @@ class InitialSolution(ABC, Generic[T]):
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
         for collection in self.solution.gas_solution.values():
-            self.fill(collection.gas_abundance, self._fill_log10_number_density)
+            self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
-                self.perturb(collection.gas_abundance, perturb_log10_number_density)
+                self.perturb(collection.abundance, perturb_log10_number_density)
             self.clip(
-                collection.gas_abundance,
+                collection.abundance,
                 self._min_log10_number_density,
                 self._max_log10_number_density,
             )
@@ -208,24 +208,24 @@ class InitialSolution(ABC, Generic[T]):
         # remove soon
         # # Gas constraints
         # for constraint in constraints.gas_constraints:
-        #     self.solution.gas_solution[constraint.species].gas_abundance.value = (
+        #     self.solution.gas_solution[constraint.species].abundance.value = (
         #         constraint.get_log10_value(temperature=temperature, pressure=pressure)
         #     )
 
         for collection in self.solution.condensed_solution.values():
             self.fill(collection.activity, self._fill_log10_activity)
             self.clip(collection.activity, maximum_value=0)
-            self.fill(collection.condensed_abundance, self._fill_log10_number_density)
+            self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
-                self.perturb(collection.condensed_abundance, perturb_log10_number_density)
+                self.perturb(collection.abundance, perturb_log10_number_density)
             self.clip(
-                collection.condensed_abundance,
+                collection.abundance,
                 self._min_log10_number_density,
                 self._max_log10_number_density,
             )
             self.fill(collection.stability, self._fill_log10_stability)
             # if perturb_log10_number_density:
-            #     self.perturb(collection.condensed_abundance, perturb_log10_number_density)
+            #     self.perturb(collection.abundance, perturb_log10_number_density)
             # stability = random.choice(["stable", "unstable"])
             # if stability == "stable":
             #    collection.activity.value = TAU
@@ -236,7 +236,7 @@ class InitialSolution(ABC, Generic[T]):
             # collection.stability.value = -7
             # collection.activity.value = -0.3010299956639812  # log10(0.5)
             # Satisfy auxilliary equation by construction
-            # collection.condensed_abundance.value = LOG10_TAU - collection.stability.value
+            # collection.abundance.value = LOG10_TAU - collection.stability.value
 
         # for species in self.solution.activity.data:
         #     stability: str = random.choice(["stable", "unstable"])
@@ -251,7 +251,7 @@ class InitialSolution(ABC, Generic[T]):
         # yield improved performance of the solver.
         # for collection in self.solution.condensed_solution.values():
         #     collection.stability.value = (
-        #         collection.tauc.value - collection.condensed_abundance.value
+        #         collection.tauc.value - collection.abundance.value
         #     )
 
         # We do not apply activity constraints because they only define the activity of a stable
@@ -363,7 +363,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         for gas_species, collection in self.solution.gas_solution.items():
             value: float | None = self._get_log10_values(gas_species, "")
             if value is not None:
-                collection.gas_abundance.value = value
+                collection.abundance.value = value
 
         for condensed_species, collection in self.solution.condensed_solution.items():
             value = self._get_log10_values(condensed_species, ACTIVITY_PREFIX)
@@ -371,7 +371,7 @@ class InitialSolutionDict(InitialSolution[dict]):
                 collection.activity.value = value
             value = self._get_log10_values(condensed_species, "")
             if value is not None:
-                collection.condensed_abundance.value = value
+                collection.abundance.value = value
             value = self._get_log10_values(condensed_species, STABILITY_PREFIX)
             if value is not None:
                 collection.stability.value = value
