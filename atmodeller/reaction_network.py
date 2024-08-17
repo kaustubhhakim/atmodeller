@@ -119,6 +119,15 @@ class Solver(ABC):
 
         return jax.jacobian(wrapped_objective)
 
+    def jacobian_scipy(self, solution_array: Array, args) -> Callable:
+        # constraints = args[0]
+
+        # Partially apply `args` to the `objective_function`
+        def wrapped_objective(solution_array):
+            return self.objective_function(solution_array, args)
+
+        return jax.jacobian(wrapped_objective)(solution_array)
+
     def solve(self, *args, solver=DEFAULT_SOLVER, **kwargs) -> tuple:
         """Solve
 
@@ -168,9 +177,14 @@ class Solver(ABC):
         )
 
         # TODO: Hacky to enclose the args in an extra tuple, but the arguments by root seem to
-        # be passed differently to optimistix? To clarfiy and clean up.
+        # be passed differently to optimistix? To clarify and clean up with a consistent solver
+        # interface.
         sol: OptimizeResult = root(
-            self.objective_function, initial_solution_guess, args=((constraints,),), tol=tol
+            self.objective_function,
+            initial_solution_guess,
+            args=((constraints,),),
+            tol=tol,
+            jac=self.jacobian_scipy,
         )
 
         solution: Solution = Solution.create_from_species(self._species)
@@ -673,9 +687,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         )
         for index, collection in enumerate(solution.condensed_solution.values()):
             value: Array = (
-                collection.stability.value
-                - collection.tauc.value
-                + collection.condensed_abundance.value
+                collection.stability.value - collection.tauc.value + collection.abundance.value
             )
             auxiliary_residual = auxiliary_residual.at[index].set(value)
 
