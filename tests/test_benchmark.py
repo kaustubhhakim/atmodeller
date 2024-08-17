@@ -346,6 +346,8 @@ def test_CHO_middle_temperature(helper) -> None:
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
+# TODO: Clean up the comments around this test. Optimistix can work when the initial condition is
+# closer. Also compare with simple_CHO_low_temperature.py to check they are the same.
 # Solves with Optimistix Newton, although one of the solution estimates during the solve is
 # very large, although the solver does then correct back. This also happens when starting from an
 # initial condition with all zeros.
@@ -371,19 +373,23 @@ def test_CHO_middle_temperature(helper) -> None:
 # [ 26.950804271305103  26.109794190538366   9.537726547231674
 #   11.303174110529152  26.411827270747313 -27.8908415136999  ]
 def test_CHO_low_temperature(helper) -> None:
-    """C-H-O system at 450 K"""
+    """C-H-O system at 450 K
+
+    This is the canonical case that has been simplified in simple_CHO_low_temperature.py for
+    testing the solver options.
+    """
 
     # thermodata_dataset = ThermodynamicDatasetHollandAndPowell()
     thermodata_dataset = ThermodynamicDatasetJANAF()
 
     H2_g: GasSpecies = GasSpecies("H2", thermodata_dataset=thermodata_dataset)
     H2O_g: GasSpecies = GasSpecies("H2O", thermodata_dataset=thermodata_dataset)
-    CO_g: GasSpecies = GasSpecies("CO", thermodata_dataset=thermodata_dataset)
     CO2_g: GasSpecies = GasSpecies("CO2", thermodata_dataset=thermodata_dataset)
-    CH4_g: GasSpecies = GasSpecies("CH4", thermodata_dataset=thermodata_dataset)
     O2_g: GasSpecies = GasSpecies("O2", thermodata_dataset=thermodata_dataset)
+    CH4_g: GasSpecies = GasSpecies("CH4", thermodata_dataset=thermodata_dataset)
+    CO_g: GasSpecies = GasSpecies("CO", thermodata_dataset=thermodata_dataset)
 
-    species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+    species: Species = Species([H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g])
 
     # Doesn't work for any temperature below 2000 K, not just the original of 450 K
     cool_planet: Planet = Planet(surface_temperature=450)
@@ -404,15 +410,15 @@ def test_CHO_low_temperature(helper) -> None:
     )
 
     system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
-    solver, jacobian, solution = system.solve(constraints=constraints)
+    solver, jacobian, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2_g": 55.475,
         "H2O_g": 8.0,
-        "CO_g": 2.12e-16,
         "CO2_g": 1.24e-14,
-        "CH4_g": 16.037,
         "O2_g": 7.85e-54,
+        "CH4_g": 16.037,
+        "CO_g": 2.12e-16,
     }
 
     # log10_number_densities = [26.719937065256797 43.171618901656146 20.64657795026752
@@ -430,20 +436,21 @@ def test_CHO_low_temperature(helper) -> None:
     # log10_number_densities = [-1.997837134509417e+17  5.362650693619739e+01 -1.997837134509418e+17
     #   3.313828274852963e+01 -7.991348538037672e+17  3.995674269018836e+17]
 
-    test_number_density: Array = jnp.array(
-        [
-            26.719937065256797,
-            43.171618901656146,
-            20.64657795026752,
-            39.70471743073109,
-            19.76625234452046,
-            6.694542320632276,
-        ]
-    )
+    # TODO: When cleaned up the solver interfaces this can be tidied up.
+    # test_number_density: Array = jnp.array(
+    #     [
+    #         26.719937065256797,
+    #         43.171618901656146,
+    #         20.64657795026752,
+    #         39.70471743073109,
+    #         19.76625234452046,
+    #         6.694542320632276,
+    #     ]
+    # )
 
-    out: Array = jacobian(test_number_density)
+    # out: Array = jacobian(test_number_density)
 
-    jax.debug.print("Evaluated Jac = {out}", out=out)
+    # jax.debug.print("Evaluated Jac = {out}", out=out)
 
     # assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
