@@ -350,7 +350,7 @@ class _DissolvedNumberDensity(_NumberDensity[GasSpecies]):
         """Parts-per-million by weight of the volatile"""
         return jnp.asarray(
             self._species.solubility.concentration(
-                fugacity=self._solution.gas_solution[self._species].gas_abundance.fugacity(),
+                fugacity=self._solution.gas_solution[self._species].abundance.fugacity(),
                 temperature=self._solution.atmosphere.temperature(),
                 pressure=self._solution.atmosphere.pressure(),
                 **self._solution.fugacities_by_hill_formula(),
@@ -488,7 +488,7 @@ class _GasCollection(_NumberDensity[GasSpecies]):
         self._species: GasSpecies = species
         self._solution: Solution = solution
         super().__init__(species, solution)
-        self.gas_abundance: _GasNumberDensity = _GasNumberDensity(species, solution)
+        self.abundance: _GasNumberDensity = _GasNumberDensity(species, solution)
         # FIXME: This raises NaN issues for Optimistix
         # self.dissolved_abundance: _DissolvedNumberDensity = _DissolvedNumberDensity(
         #    species, solution
@@ -497,7 +497,7 @@ class _GasCollection(_NumberDensity[GasSpecies]):
 
     @property
     def value(self) -> Array:
-        # gas_value: Array = self.gas_abundance.value
+        # gas_value: Array = self.abundance.value
         # dissolved_value: ArrayLike = self.dissolved_abundance.value
         # trapped_value: ArrayLike = self.trapped_abundance.value
 
@@ -505,7 +505,7 @@ class _GasCollection(_NumberDensity[GasSpecies]):
 
         # return logsumexp_base10(log10_values)
 
-        return self.gas_abundance.value
+        return self.abundance.value
 
     @override
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:
@@ -522,7 +522,7 @@ class _GasCollection(_NumberDensity[GasSpecies]):
             Output dictionary
         """
         output_dict: dict[str, float] = (
-            self.gas_abundance.output_dict(element=element)
+            self.abundance.output_dict(element=element)
             | self.dissolved_abundance.output_dict(element=element)
             | self.trapped_abundance.output_dict(element=element)
         )
@@ -533,7 +533,7 @@ class _GasCollection(_NumberDensity[GasSpecies]):
         return output_dict
 
     def __repr__(self) -> str:
-        return f"{self.gas_abundance!r}"
+        return f"{self.abundance!r}"
 
 
 class _CondensedCollection(_NumberDensity[CondensedSpecies]):
@@ -560,9 +560,7 @@ class _CondensedCollection(_NumberDensity[CondensedSpecies]):
         self._species: CondensedSpecies = species
         self._solution: Solution = solution
         super().__init__(species, solution)
-        self.condensed_abundance: _CondensedNumberDensity = _CondensedNumberDensity(
-            species, solution
-        )
+        self.abundance: _CondensedNumberDensity = _CondensedNumberDensity(species, solution)
         self.activity: _CondensedSolutionComponent = _CondensedSolutionComponent(species, solution)
         self.stability: _CondensedSolutionComponent = _CondensedSolutionComponent(
             species, solution
@@ -575,7 +573,7 @@ class _CondensedCollection(_NumberDensity[CondensedSpecies]):
 
     @property
     def value(self) -> Array:
-        return self.condensed_abundance.value
+        return self.abundance.value
 
     def __repr__(self) -> str:
         base_repr: str = super().__repr__().rstrip(")")
@@ -860,10 +858,10 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """The solution as an array for the solver"""
         value_list: list[Array] = []
         for gas_collection in self.gas_solution.values():
-            value_list.append(gas_collection.gas_abundance.value)
+            value_list.append(gas_collection.abundance.value)
         for condensed_collection in self.condensed_solution.values():
             value_list.append(condensed_collection.activity.value)
-            value_list.append(condensed_collection.condensed_abundance.value)
+            value_list.append(condensed_collection.abundance.value)
             value_list.append(condensed_collection.stability.value)
 
         return jnp.array(value_list)
@@ -877,11 +875,11 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """
         index: int = 0
         for gas_collection in self.gas_solution.values():
-            gas_collection.gas_abundance.value = value[index]
+            gas_collection.abundance.value = value[index]
             index += gas_collection.NUMBER
         for condensed_collection in self.condensed_solution.values():
             condensed_collection.activity.value = value[index]
-            condensed_collection.condensed_abundance.value = value[index + 1]
+            condensed_collection.abundance.value = value[index + 1]
             condensed_collection.stability.value = value[index + 2]
             index += condensed_collection.NUMBER
 
@@ -913,7 +911,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """
         fugacities: dict[str, Array] = {}
         for gas_species, collection in self.gas_solution.items():
-            fugacities[gas_species.hill_formula] = collection.gas_abundance.fugacity()
+            fugacities[gas_species.hill_formula] = collection.abundance.fugacity()
 
         return fugacities
 
@@ -925,7 +923,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """
         reaction_list: list = []
         for collection in self.gas_solution.values():
-            reaction_list.append(collection.gas_abundance.value)
+            reaction_list.append(collection.abundance.value)
         for collection in self.condensed_solution.values():
             reaction_list.append(collection.activity.value)
 
@@ -994,11 +992,11 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """
         output: dict[str, float] = {}
         for gas_species, collection in self.gas_solution.items():
-            output[gas_species.name] = collection.gas_abundance.value.item()
+            output[gas_species.name] = collection.abundance.value.item()
         for condensed_species, collection in self.condensed_solution.items():
             species_name: str = condensed_species.name
             output[f"{ACTIVITY_PREFIX}{species_name}"] = collection.activity.value.item()
-            output[species_name] = collection.condensed_abundance.value.item()
+            output[species_name] = collection.abundance.value.item()
             output[f"{STABILITY_PREFIX}{species_name}"] = collection.stability.value.item()
 
         return output
@@ -1007,11 +1005,11 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
         """Outputs the solution in a convenient form for comparison and benchmarking"""
         output: dict[str, float] = {}
         for gas_species, collection in self.gas_solution.items():
-            output[gas_species.name] = collection.gas_abundance.pressure().item()
+            output[gas_species.name] = collection.abundance.pressure().item()
         for condensed_species, collection in self.condensed_solution.items():
             species_name: str = condensed_species.name
             output[f"{ACTIVITY_PREFIX}{species_name}"] = 10 ** collection.activity.value.item()
-            output[f"mass_{species_name}"] = collection.condensed_abundance.mass().item()
+            output[f"mass_{species_name}"] = collection.abundance.mass().item()
 
         return output
 
