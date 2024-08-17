@@ -318,7 +318,6 @@ def get_log10_number_density(*args, **kwargs) -> Array:
     return jnp.log10(get_number_density(*args, **kwargs))
 
 
-# Smarter implementation
 def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1) -> Array:
     """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
 
@@ -330,26 +329,6 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1) -> Array:
         The log10 of the sum of prefactors multiplied by exponentials of the input values.
     """
     max_log: Array = jnp.max(log_values)
-
-    # TODO: Remove after debugging complete
-    # jax.debug.print("max_log = {max_log}", max_log=max_log)
-    # Ensure prefactors are converted to JAX arrays for compatibility
     prefactors_: Array = jnp.asarray(prefactors)
 
     return max_log + jnp.log10(jnp.sum(prefactors_ * jnp.power(10, log_values - max_log)))
-
-
-# Naive implementation kept for testing
-# def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1) -> Array:
-#     """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
-
-#     Args:
-#         log10_values: Array of log10 values to sum
-#         prefactors: Array of prefactors corresponding to each log10 value
-
-#     Returns:
-#         The log10 of the sum of prefactors multiplied by exponentials of the input values.
-#     """
-#     prefactors_: Array = jnp.asarray(prefactors)
-
-#     return jnp.log10(jnp.sum(prefactors_ * jnp.power(10, log_values)))
