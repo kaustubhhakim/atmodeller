@@ -530,7 +530,7 @@ def test_graphite_unstable(helper) -> None:
     )
 
     system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "O2_g": 4.11e-13,
@@ -572,7 +572,7 @@ def test_water_condensed(helper) -> None:
     )
 
     system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,
@@ -613,7 +613,7 @@ def test_water_condensed_O_abundance(helper) -> None:
     )
 
     system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,

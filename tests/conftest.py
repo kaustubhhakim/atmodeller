@@ -132,7 +132,7 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
     )
 
     system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     return solution
 

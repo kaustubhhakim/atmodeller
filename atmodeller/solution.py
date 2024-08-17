@@ -806,8 +806,7 @@ class Solution(_SolutionContainer[ChemicalSpecies, _GasCollection | _CondensedCo
             solution[condensed_species] = _CondensedCollection(condensed_species, solution)
 
         init_dict: dict[GasSpecies, _GasNumberDensity] = {
-            species: collection.gas_abundance
-            for species, collection in solution.gas_solution.items()
+            species: collection.abundance for species, collection in solution.gas_solution.items()
         }
         # Only need to set these attributes once so pylint: disable=protected-access
         solution._atmosphere = _Atmosphere(init_dict)
