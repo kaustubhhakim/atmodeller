@@ -232,15 +232,13 @@ class _NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies_co]):
         Returns:
             Output dictionary
         """
-        output_dict: dict[str, float] = {}
-        output_dict[f"{self.output_prefix}number_density"] = self.number_density(
-            element=element
-        ).item()
-        output_dict[f"{self.output_prefix}mass"] = self.mass(element=element).item()
-        output_dict[f"{self.output_prefix}molecules"] = self.molecules(element=element).item()
-        output_dict[f"{self.output_prefix}moles"] = self.moles(element=element).item()
+        output: dict[str, float] = {}
+        output[f"{self.output_prefix}number_density"] = self.number_density(element=element).item()
+        output[f"{self.output_prefix}mass"] = self.mass(element=element).item()
+        output[f"{self.output_prefix}molecules"] = self.molecules(element=element).item()
+        output[f"{self.output_prefix}moles"] = self.moles(element=element).item()
 
-        return output_dict
+        return output
 
     def __repr__(self) -> str:
         return f"number_density={self.number_density():.2e}"
@@ -329,15 +327,15 @@ class _GasNumberDensitySpeciesSetter(_NumberDensitySpeciesSetter[GasSpecies]):
         Returns:
             Output dictionary
         """
-        output_dict: dict[str, float] = super().output_dict(element=element)
+        output: dict[str, float] = super().output_dict(element=element)
 
         if element is None:
-            output_dict["pressure"] = self.pressure().item()
-            output_dict["fugacity_coefficient"] = self.fugacity_coefficient().item()
-            output_dict["fugacity"] = self.fugacity().item()
-            output_dict["volume_mixing_ratio"] = self.volume_mixing_ratio().item()
+            output["pressure"] = self.pressure().item()
+            output["fugacity_coefficient"] = self.fugacity_coefficient().item()
+            output["fugacity"] = self.fugacity().item()
+            output["volume_mixing_ratio"] = self.volume_mixing_ratio().item()
 
-        return output_dict
+        return output
 
 
 class _DissolvedNumberDensitySpecies(_NumberDensitySpecies[GasSpecies]):
@@ -401,11 +399,11 @@ class _DissolvedNumberDensitySpecies(_NumberDensitySpecies[GasSpecies]):
         Returns:
             Output dictionary
         """
-        output_dict: dict[str, float] = super().output_dict(element=element)
+        output: dict[str, float] = super().output_dict(element=element)
         if element is None:
-            output_dict[f"{self.output_prefix}ppmw"] = self.ppmw().item()
+            output[f"{self.output_prefix}ppmw"] = self.ppmw().item()
 
-        return output_dict
+        return output
 
 
 class _TrappedNumberDensitySpecies(_DissolvedNumberDensitySpecies):
@@ -530,16 +528,16 @@ class _GasSpeciesContainer(_NumberDensitySpecies[GasSpecies]):
         Returns:
             Output dictionary
         """
-        output_dict: dict[str, float] = (
+        output: dict[str, float] = (
             self.abundance.output_dict(element=element)
             | self.dissolved_abundance.output_dict(element=element)
             | self.trapped_abundance.output_dict(element=element)
         )
         if element is None:
-            output_dict |= super().output_dict()
-            output_dict["molar_mass"] = self._species.molar_mass
+            output |= super().output_dict()
+            output["molar_mass"] = self._species.molar_mass
 
-        return output_dict
+        return output
 
     def __repr__(self) -> str:
         return f"{self.abundance!r}"
@@ -608,16 +606,21 @@ class _CondensedSpeciesContainer(_NumberDensitySpecies[CondensedSpecies]):
         Returns:
             Output dictionary
         """
-        output_dict: dict[str, float] = super().output_dict(element=element)
+        output: dict[str, float] = super().output_dict(element=element)
         if element is None:
-            output_dict["activity"] = 10 ** self.activity.value.item()
-            output_dict["molar_mass"] = self.species.molar_mass
+            output["activity"] = 10 ** self.activity.value.item()
+            output["molar_mass"] = self.species.molar_mass
 
-        return output_dict
+        return output
 
 
-class _SolutionContainer(ImmutableDict[TypeChemicalSpecies, TypeNumberDensitySpecies]):
+class _Collection(ImmutableDict[TypeChemicalSpecies, TypeNumberDensitySpecies]):
     """A container for the solution"""
+
+    output_prefix: str = ""
+    """Prefix for the keys in the output dictionary"""
+
+    # TODO: This assumes that the data are contained in self.data
 
     def _sum_values(self, method_name: str, *args, **kwargs) -> Array:
         """Helper method to sum values from the dictionary based on a given method name."""
@@ -715,8 +718,62 @@ class _SolutionContainer(ImmutableDict[TypeChemicalSpecies, TypeNumberDensitySpe
         """Total number of moles of elements"""
         return self._sum_values("element_moles")
 
+    def output_dict(self, *, element: str | None = None) -> dict[str, float]:
+        """Output dictionary
 
-class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensitySpeciesSetter]):
+        Args:
+            element: Element to compute the output for, or None to compute for the species.
+                Defaults to None.
+
+        Returns:
+            Output dictionary
+        """
+        output: dict[str, float] = {}
+        output[f"{self.output_prefix}number_density"] = self.number_density(element=element).item()
+        output[f"{self.output_prefix}mass"] = self.mass(element=element).item()
+        output[f"{self.output_prefix}molecules"] = self.molecules(element=element).item()
+        output[f"{self.output_prefix}moles"] = self.moles(element=element).item()
+        output[f"{self.output_prefix}elements"] = self.elements().item()
+        output[f"{self.output_prefix}element_moles"] = self.element_moles().item()
+
+        return output
+
+
+class _GasCollection(_Collection[GasSpecies, _GasSpeciesContainer]):
+    """A collection of gas species"""
+
+    @override
+    def __init__(self, data: dict[GasSpecies, _GasSpeciesContainer] | None = None):
+        if data is None:
+            self.data: dict[T, U] = {}
+        else:
+            self.data = data
+
+    @override
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # TODO: Instantiating a gas collection should also instantiate the atmosphere
+        self.atmosphere: _Collection[GasSpecies, _GasNumberDensitySpeciesSetter]
+
+    @classmethod
+    def create(cls, species: Species) -> Self:
+        """Creates an instance from species
+
+        Args:
+            species: Species
+        """
+        gas_collection: Self = cls()
+        for gas_species in species.gas_species().values():
+            gas_collection.data[gas_species] = _GasSpeciesContainer(
+                gas_species,
+            )
+
+
+class _CondensedCollection(_Collection[CondensedSpecies, _CondensedSpeciesContainer]):
+    """A collection of condensed species"""
+
+
+class _Atmosphere(_Collection[GasSpecies, _GasNumberDensitySpeciesSetter]):
     """Bulk properties of the atmosphere"""
 
     @override
@@ -783,24 +840,15 @@ class _Atmosphere(_SolutionContainer[GasSpecies, _GasNumberDensitySpeciesSetter]
         Returns:
             Output dictionary
         """
-        output_dict: dict[str, float] = {}
-        output_dict["mass"] = self.mass().item()
-        output_dict["molecules"] = self.molecules().item()
-        output_dict["moles"] = self.moles().item()
-        output_dict["number_density"] = self.number_density().item()
-        output_dict["molar_mass"] = self.molar_mass().item()
-        output_dict["elements"] = self.elements().item()
-        output_dict["element_moles"] = self.element_moles().item()
-        output_dict["pressure"] = self.pressure().item()
-        output_dict["temperature"] = self.temperature()
-        output_dict["volume"] = self.volume().item()
+        output: dict[str, float] = super().output_dict()
+        output[f"{self.output_prefix}pressure"] = self.pressure().item()
+        output[f"{self.output_prefix}temperature"] = self.temperature()
+        output[f"{self.output_prefix}volume"] = self.volume().item()
 
-        return output_dict
+        return output
 
 
-class Solution(
-    _SolutionContainer[ChemicalSpecies, _GasSpeciesContainer | _CondensedSpeciesContainer]
-):
+class Solution(_Collection[ChemicalSpecies, _GasSpeciesContainer | _CondensedSpeciesContainer]):
     """The solution
 
     Since this solution class is also used for the initial solution, which does not require the
@@ -942,6 +990,7 @@ class Solution(
         """
         self.data |= other.data
 
+    # TODO: This should move to the gas collection only
     def fugacities_by_hill_formula(self) -> dict[str, Array]:
         """Fugacities by Hill formula
 
@@ -1012,16 +1061,16 @@ class Solution(
 
     def output_full(self) -> dict[str, dict[str, float]]:
         """Full output"""
-        output_dict: dict[str, dict[str, float]] = {}
+        output: dict[str, dict[str, float]] = {}
         for species, collection in self.items():
-            output_dict[f"{SPECIES_PREFIX}{species.name}"] = collection.output_dict()
-        output_dict |= self._output_elements()
-        output_dict["atmosphere"] = self.atmosphere.output_dict()
-        output_dict["planet"] = self.planet.output_dict()
-        output_dict["raw_solution"] = self.output_raw_solution()
-        output_dict["solution"] = self.output_solution()
+            output[f"{SPECIES_PREFIX}{species.name}"] = collection.output_dict()
+        output |= self._output_elements()
+        output["atmosphere"] = self.atmosphere.output_dict()
+        output["planet"] = self.planet.output_dict()
+        output["raw_solution"] = self.output_raw_solution()
+        output["solution"] = self.output_solution()
 
-        return output_dict
+        return output
 
     def output_raw_solution(self) -> dict[str, float]:
         """Outputs the raw solution as seen by the solver
