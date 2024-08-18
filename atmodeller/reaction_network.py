@@ -89,8 +89,7 @@ class Solver(ABC):
         """
         logger.debug("log_solution passed into _objective_func = %s", solution_array)
 
-        solution: Solution = Solution.create_from_species(self._species)
-        solution.planet = self._planet
+        solution: Solution = Solution.create_from_species_and_planet(self._species, self._planet)
         solution.value = solution_array
 
         # Required for optimistix
@@ -187,8 +186,7 @@ class Solver(ABC):
             jac=self.jacobian_scipy,
         )
 
-        solution: Solution = Solution.create_from_species(self._species)
-        solution.planet = self._planet
+        solution: Solution = Solution.create_from_species_and_planet(self._species, self._planet)
         solution.value = jnp.array(sol.x)
 
         residual = self.get_residual(solution, constraints)
@@ -248,8 +246,7 @@ class Solver(ABC):
             throw=True,
         )
 
-        solution: Solution = Solution.create_from_species(self._species)
-        solution.planet = self._planet
+        solution: Solution = Solution.create_from_species_and_planet(self._species, self._planet)
         solution.value = jnp.array(sol.value)
 
         residual = self.get_residual(solution, constraints)

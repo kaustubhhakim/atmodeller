@@ -19,9 +19,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Generic, TypeVar
+from typing import Callable, Generic, Iterator, TypeVar
 
 import jax.numpy as jnp
 from jax import Array
@@ -288,6 +288,7 @@ class CondensedSpecies(ChemicalSpecies):
 TypeChemicalSpecies = TypeVar("TypeChemicalSpecies", bound=ChemicalSpecies)
 TypeChemicalSpecies_co = TypeVar("TypeChemicalSpecies_co", bound=ChemicalSpecies, covariant=True)
 T = TypeVar("T")
+U = TypeVar("U")
 
 
 class ImmutableList(Sequence[T], Generic[T]):
@@ -298,10 +299,9 @@ class ImmutableList(Sequence[T], Generic[T]):
     """
 
     def __init__(self, iterable: Iterable[T]):
-        # Store the data as a tuple to ensure immutability
         self.data: tuple[T, ...] = tuple(iterable)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
     def __getitem__(self, index: int | slice) -> T | ImmutableList[T]:
@@ -311,3 +311,29 @@ class ImmutableList(Sequence[T], Generic[T]):
 
     def __repr__(self) -> str:
         return f"ImmutableList({self.data})"
+
+
+class ImmutableDict(Mapping[T, U], Generic[T, U]):
+    """An immutable dictionary
+
+    Args:
+        data: Mapping
+    """
+
+    def __init__(self, data: dict[T, U] | None = None):
+        if data is None:
+            self.data: dict[T, U] = {}
+        else:
+            self.data = data
+
+    def __getitem__(self, key) -> U:
+        return self.data[key]
+
+    def __iter__(self) -> Iterator[T]:
+        return iter(self.data)
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __repr__(self):
+        return f"ImmutableDict({self.data})"

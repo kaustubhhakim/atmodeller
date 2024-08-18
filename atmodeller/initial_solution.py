@@ -42,7 +42,7 @@ from atmodeller.solution import (
     LOG10_TAU,
     STABILITY_PREFIX,
     TAU,
-    ComponentWithSetterProtocol,
+    ComponentSetterProtocol,
     Solution,
 )
 
@@ -127,7 +127,7 @@ class InitialSolution(ABC, Generic[T]):
 
     def clip(
         self,
-        component: ComponentWithSetterProtocol,
+        component: ComponentSetterProtocol,
         minimum_value: float | None = None,
         maximum_value: float | None = None,
     ) -> None:
@@ -140,7 +140,7 @@ class InitialSolution(ABC, Generic[T]):
         """
         component.value = np.clip(component.value, minimum_value, maximum_value)
 
-    def fill(self, component: ComponentWithSetterProtocol, fill_value: float) -> None:
+    def fill(self, component: ComponentSetterProtocol, fill_value: float) -> None:
         """Fills value if it is missing.
 
         Args:
@@ -152,7 +152,7 @@ class InitialSolution(ABC, Generic[T]):
         if not hasattr(component, "_value"):
             component.value = float(fill_value)
 
-    def perturb(self, component: ComponentWithSetterProtocol, perturb: float = 0) -> None:
+    def perturb(self, component: ComponentSetterProtocol, perturb: float = 0) -> None:
         """Perturbs value.
 
         Args:
