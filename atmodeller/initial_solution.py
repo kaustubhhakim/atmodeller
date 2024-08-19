@@ -34,7 +34,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Species
+from atmodeller.core import Planet, Species
 from atmodeller.interfaces import ChemicalSpecies
 from atmodeller.output import Output
 from atmodeller.solution import (
@@ -42,8 +42,8 @@ from atmodeller.solution import (
     LOG10_TAU,
     STABILITY_PREFIX,
     TAU,
-    ComponentSetterProtocol,
     Solution,
+    SpeciesComponentSetterProtocol,
 )
 
 if sys.version_info < (3, 12):
@@ -113,7 +113,9 @@ class InitialSolution(ABC, Generic[T]):
         logger.debug("Creating %s", self.__class__.__name__)
         self.value: T = value
         self._species: Species = species
-        self.solution: Solution = Solution.create_from_species(species)
+        # FIXME: TODO: Hack
+        planet = Planet()
+        self.solution: Solution = Solution.create(species, planet)
         self._min_log10_number_density: float = min_log10_number_density
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
@@ -127,7 +129,7 @@ class InitialSolution(ABC, Generic[T]):
 
     def clip(
         self,
-        component: ComponentSetterProtocol,
+        component: SpeciesComponentSetterProtocol,
         minimum_value: float | None = None,
         maximum_value: float | None = None,
     ) -> None:
@@ -140,7 +142,7 @@ class InitialSolution(ABC, Generic[T]):
         """
         component.value = np.clip(component.value, minimum_value, maximum_value)
 
-    def fill(self, component: ComponentSetterProtocol, fill_value: float) -> None:
+    def fill(self, component: SpeciesComponentSetterProtocol, fill_value: float) -> None:
         """Fills value if it is missing.
 
         Args:
@@ -152,7 +154,7 @@ class InitialSolution(ABC, Generic[T]):
         if not hasattr(component, "_value"):
             component.value = float(fill_value)
 
-    def perturb(self, component: ComponentSetterProtocol, perturb: float = 0) -> None:
+    def perturb(self, component: SpeciesComponentSetterProtocol, perturb: float = 0) -> None:
         """Perturbs value.
 
         Args:

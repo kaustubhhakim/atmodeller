@@ -89,7 +89,7 @@ class Solver(ABC):
         """
         logger.debug("log_solution passed into _objective_func = %s", solution_array)
 
-        solution: Solution = Solution.create_from_species_and_planet(self._species, self._planet)
+        solution: Solution = Solution.create(self._species, self._planet)
         solution.value = solution_array
 
         # Required for optimistix
@@ -186,16 +186,18 @@ class Solver(ABC):
             jac=self.jacobian_scipy,
         )
 
-        solution: Solution = Solution.create_from_species_and_planet(self._species, self._planet)
+        solution: Solution = Solution.create(self._species, self._planet)
         solution.value = jnp.array(sol.x)
 
         residual = self.get_residual(solution, constraints)
         rmse = np.sqrt(np.sum(np.array(residual) ** 2))
         # Success is indicated by no message
         if sol.success:
-            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
-            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
-            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+            logger.info("Success")
+            # TODO: To reinstate
+            # logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
+            # logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+            # logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
         # It is useful to also return the jacobian of this system for testing
         # jacobian: Callable = self.jacobian((constraints,))
@@ -246,7 +248,7 @@ class Solver(ABC):
             throw=True,
         )
 
-        solution: Solution = Solution.create_from_species_and_planet(self._species, self._planet)
+        solution: Solution = Solution.create(self._species, self._planet)
         solution.value = jnp.array(sol.value)
 
         residual = self.get_residual(solution, constraints)
@@ -254,8 +256,9 @@ class Solver(ABC):
         # Success is indicated by no message
         if optx.RESULTS[sol.result] == "":
             logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
-            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
-            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+            # TODO: To reinstate
+            # logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+            # logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
         # It is useful to also return the jacobian of this system for testing
         jacobian: Callable = self.jacobian((constraints,))

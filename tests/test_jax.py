@@ -93,7 +93,7 @@ def test_H_fugacities(helper) -> None:
     reaction_network: Solver = ReactionNetworkWithCondensateStability(
         species=species, planet=planet
     )
-    _, _, solution = reaction_network.solve(constraints=constraints)
+    _, _, solution = reaction_network.solve(solver="scipy", constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
@@ -119,7 +119,7 @@ def test_H_fugacities_system(helper) -> None:
         )
     )
     system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.257077006719072,

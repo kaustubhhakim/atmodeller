@@ -336,4 +336,4 @@ class ImmutableDict(Mapping[T, U], Generic[T, U]):
         return len(self.data)
 
     def __repr__(self):
-        return f"ImmutableDict({self.data})"
+        return f"{self.__class__.__name__}({self.data})"
