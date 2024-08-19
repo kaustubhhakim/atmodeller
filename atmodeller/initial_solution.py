@@ -196,7 +196,7 @@ class InitialSolution(ABC, Generic[T]):
         """
         self.set_data(constraints, temperature=temperature, pressure=pressure)
 
-        for collection in self.solution.gas_solution.values():
+        for collection in self.solution.gas.values():
             self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
@@ -210,7 +210,7 @@ class InitialSolution(ABC, Generic[T]):
         # remove soon
         # # Gas constraints
         # for constraint in constraints.gas_constraints:
-        #     self.solution.gas_solution[constraint.species].abundance.value = (
+        #     self.solution.gas[constraint.species].abundance.value = (
         #         constraint.get_log10_value(temperature=temperature, pressure=pressure)
         #     )
 
@@ -362,7 +362,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         del args
         del kwargs
 
-        for gas_species, collection in self.solution.gas_solution.items():
+        for gas_species, collection in self.solution.gas.items():
             value: float | None = self._get_log10_values(gas_species, "")
             if value is not None:
                 collection.abundance.value = value

@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
-from collections import ChainMap, Counter
+from collections import ChainMap
 from typing import Generic, Protocol, TypeVar
 
 import jax
@@ -66,8 +66,6 @@ TAU: float = 1e-15
 LOG10_TAU: jnp.ndarray = jnp.log10(TAU)
 """Log10 of the tau factor"""
 
-# Individual species
-
 
 class SpeciesComponentProtocol(Protocol[TypeChemicalSpecies_co]):
     """Species component protocol"""
@@ -78,6 +76,7 @@ class SpeciesComponentProtocol(Protocol[TypeChemicalSpecies_co]):
     def value(self) -> Array: ...
 
 
+# TODO: This is used for the initial condition but might not be required now
 class SpeciesComponentSetterProtocol(SpeciesComponentProtocol, Protocol):
     """Species component with setter protocol"""
 
@@ -256,14 +255,13 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
 
         return output
 
-    def __repr__(self) -> str:
-        return f"number_density={self.number_density():.2e}"
-
 
 TypeNumberDensitySpecies = TypeVar("TypeNumberDensitySpecies", bound=NumberDensitySpecies)
-TypeNumberDensitySpecies_co = TypeVar(
-    "TypeNumberDensitySpecies_co", bound=NumberDensitySpecies, covariant=True
-)
+
+# TODO: Might not be required anymore
+# TypeNumberDensitySpecies_co = TypeVar(
+#     "TypeNumberDensitySpecies_co", bound=NumberDensitySpecies, covariant=True
+# )
 
 
 class _NumberDensitySpeciesSetter(_ValueSetterMixin, NumberDensitySpecies[TypeChemicalSpecies]):
@@ -271,21 +269,11 @@ class _NumberDensitySpeciesSetter(_ValueSetterMixin, NumberDensitySpecies[TypeCh
 
 
 class _CondensedNumberDensitySpeciesSetter(_NumberDensitySpeciesSetter[CondensedSpecies]):
-    """A number density with a setter for a condensed species
-
-    Args:
-        species: A gas species
-        solution: The solution
-    """
+    """A number density with a setter for a condensed species"""
 
 
 class GasNumberDensitySpeciesSetter(_NumberDensitySpeciesSetter[GasSpecies]):
-    """A number density with a setter for a gas species
-
-    Args:
-        species: A gas species
-        solution: The solution
-    """
+    """A number density with a setter for a gas species"""
 
     output_prefix: str = "atmosphere_"
     """Prefix for the keys in the output dictionary"""
@@ -332,7 +320,7 @@ class GasNumberDensitySpeciesSetter(_NumberDensitySpeciesSetter[GasSpecies]):
         Args:
             atmosphere: Atmosphere
         """
-        return jnp.array(
+        return jnp.asarray(
             self._species.eos.fugacity_coefficient(atmosphere.temperature(), atmosphere.pressure())
         )
 
@@ -451,7 +439,7 @@ class DissolvedNumberDensitySpecies(NumberDensitySpecies[GasSpecies]):
         )
 
     @property
-    def value(self) -> ArrayLike:
+    def value(self) -> Array:
         return self._value
 
     @override
@@ -541,10 +529,6 @@ class TrappedNumberDensitySpecies(DissolvedNumberDensitySpecies):
 #         return log10_tauc
 
 
-# Containers for the (potentially) multiple reservoirs that an individual species is contained
-# within.
-
-
 class GasSpeciesContainer(NumberDensitySpecies[GasSpecies]):
     """Gas species container
 
@@ -553,7 +537,7 @@ class GasSpeciesContainer(NumberDensitySpecies[GasSpecies]):
 
     Attributes:
         species: The gas species
-        gas: Species in the gas phase
+        abundance: Species in the gas phase, which is the primary solution quantity
         dissolved: Species dissolved in melt
         trapped: Species trapped in solids
     """
@@ -572,32 +556,28 @@ class GasSpeciesContainer(NumberDensitySpecies[GasSpecies]):
     def __init__(self, species: GasSpecies):
         super().__init__(species)
         self.abundance: GasNumberDensitySpeciesSetter = GasNumberDensitySpeciesSetter(species)
-        self.dissolved_abundance: DissolvedNumberDensitySpecies = DissolvedNumberDensitySpecies(
-            species
-        )
-        self.trapped_abundance: TrappedNumberDensitySpecies = TrappedNumberDensitySpecies(species)
+        self.dissolved: DissolvedNumberDensitySpecies = DissolvedNumberDensitySpecies(species)
+        self.trapped: TrappedNumberDensitySpecies = TrappedNumberDensitySpecies(species)
 
-    def set_interior_values(self, gas_abundance: Array, atmosphere: Atmosphere) -> None:
+    def set_interior_values(self, atmosphere: Atmosphere) -> None:
         """Sets the number density of interior reservoirs
 
+        This can only be called when the atmosphere has been updated because the fugacities of
+        potentially multiple gas species are required to update the dissolved and trapped contents.
+
         Args:
-            gas_abundance: Log10 number density in the gas
             atmosphere: Atmosphere
         """
-        # TODO: This must be uncomment to work. Unsure why.
-        self.abundance.value = gas_abundance
-        # jax.debug.print("now here = {out}", out=self.abundance.value)
-        self.dissolved_abundance.set_value(atmosphere)
-        self.trapped_abundance.set_value(atmosphere)
+        self.dissolved.set_value(atmosphere)
+        self.trapped.set_value(atmosphere)
 
     @property
     def value(self) -> Array:
-        gas_value: Array = self.abundance.value
-        dissolved_value: ArrayLike = self.dissolved_abundance.value
-        trapped_value: ArrayLike = self.trapped_abundance.value
-        log10_values: Array = jnp.asarray((gas_value, dissolved_value, trapped_value))
+        values: Array = jnp.asarray(
+            (self.abundance.value, self.dissolved.value, self.trapped.value)
+        )
 
-        return logsumexp_base10(log10_values)
+        return logsumexp_base10(values)
 
     @override
     def output_dict(
@@ -618,17 +598,14 @@ class GasSpeciesContainer(NumberDensitySpecies[GasSpecies]):
         """
         output: dict[str, float] = (
             self.abundance.output_dict(atmosphere, element=element)
-            | self.dissolved_abundance.output_dict(atmosphere, element=element)
-            | self.trapped_abundance.output_dict(atmosphere, element=element)
+            | self.dissolved.output_dict(atmosphere, element=element)
+            | self.trapped.output_dict(atmosphere, element=element)
         )
         if element is None:
             output |= super().output_dict(atmosphere)
             output["molar_mass"] = self._species.molar_mass
 
         return output
-
-    def __repr__(self) -> str:
-        return f"{self.abundance!r}"
 
 
 # class _CondensedSpeciesContainer(NumberDensitySpecies[CondensedSpecies]):
@@ -701,7 +678,7 @@ class GasSpeciesContainer(NumberDensitySpecies[GasSpecies]):
 
 
 class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies]):
-    """TODO: Mixin"""
+    """Collection mixin to compute aggregated quantities"""
 
     output_prefix: str = ""
     """Prefix for the keys in the output dictionary"""
@@ -723,7 +700,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
             Number density for all species or `element` if not None.
         """
         if element is not None:
-            log10_number_densities: Array = jnp.array(
+            log10_number_densities: Array = jnp.asarray(
                 [
                     value.log10_number_density(element=element)
                     for value in self.data.values()
@@ -731,12 +708,9 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
                 ]
             )
         else:
-            log10_number_densities = jnp.array(
+            log10_number_densities = jnp.asarray(
                 [value.log10_number_density() for value in self.data.values()]
             )
-
-        # For Optimistix/JAX debugging
-        # jax.debug.print("log10_number_densities = {out}", out=log10_number_densities)
 
         return logsumexp_base10(log10_number_densities)
 
@@ -754,7 +728,9 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
 
     def element_number_density(self) -> Array:
         """Number density of all elements"""
-        return jnp.sum(jnp.array([value.element_number_density() for value in self.data.values()]))
+        return jnp.sum(
+            jnp.asarray([value.element_number_density() for value in self.data.values()])
+        )
 
     def mass(self, element: str | None = None) -> Array:
         """Total mass of the species or an individual element
@@ -767,7 +743,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
             Mass in kg for the species or `element` if not None.
         """
         return jnp.sum(
-            jnp.array(
+            jnp.asarray(
                 [value.mass(self.atmosphere, element=element) for value in self.data.values()]
             )
         )
@@ -783,7 +759,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
             Number of molecules for the species or number of `element` if not None.
         """
         return jnp.sum(
-            jnp.array(
+            jnp.asarray(
                 [value.molecules(self.atmosphere, element=element) for value in self.data.values()]
             )
         )
@@ -791,7 +767,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
     def elements(self) -> Array:
         """Total number of elements"""
         return jnp.sum(
-            jnp.array([value.elements(self.atmosphere) for value in self.data.values()])
+            jnp.asarray([value.elements(self.atmosphere) for value in self.data.values()])
         )
 
     def moles(self, element: str | None = None) -> Array:
@@ -805,7 +781,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
             Number of moles for the species or `element` if not None.
         """
         return jnp.sum(
-            jnp.array(
+            jnp.asarray(
                 [value.moles(self.atmosphere, element=element) for value in self.data.values()]
             )
         )
@@ -813,7 +789,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
     def element_moles(self) -> Array:
         """Total number of moles of elements"""
         return jnp.sum(
-            jnp.array([value.element_moles(self.atmosphere) for value in self.data.values()])
+            jnp.asarray([value.element_moles(self.atmosphere) for value in self.data.values()])
         )
 
     def output_dict(self, *, element: str | None = None) -> dict[str, float]:
@@ -906,7 +882,7 @@ class Atmosphere(
     def log10_molar_mass(self) -> Array:
         """Log10 molar mass"""
         molar_masses: Array = jnp.array([value.species.molar_mass for value in self.data.values()])
-        log10_number_densities: Array = jnp.array([value.value for value in self.data.values()])
+        log10_number_densities: Array = jnp.asarray([value.value for value in self.data.values()])
         molar_mass: Array = (
             logsumexp_base10(log10_number_densities, molar_masses) - self.log10_number_density()
         )
@@ -920,7 +896,7 @@ class Atmosphere(
     def pressure(self) -> Array:
         """Pressure"""
         log10_pressure: Array = logsumexp_base10(
-            jnp.array([value.log10_pressure(self) for value in self.data.values()])
+            jnp.asarray([value.log10_pressure(self) for value in self.data.values()])
         )
         return jnp.power(10, log10_pressure)
 
@@ -962,7 +938,7 @@ class GasCollection(
         super().__init__(data)
         self._planet: Planet = planet
         self._atmosphere: Atmosphere = Atmosphere(
-            {species: collection.abundance for species, collection in self.items()}, planet
+            {species: collection.abundance for species, collection in self.data.items()}, planet
         )
 
     @classmethod
@@ -1005,14 +981,11 @@ class GasCollection(
         index: int = 0
         for container in self.data.values():
             container.abundance.value = value[index]
-            jax.debug.print("here = {out}", out=container.abundance.value)
-
-        # jax.debug.print("{out}", out=self.atmosphere)
-
-        index = 0
-        for container in self.data.values():
-            container.set_interior_values(value[index], self.atmosphere)
             index += container.NUMBER
+
+        # Finally we can set all the interior values
+        for container in self.data.values():
+            container.set_interior_values(self.atmosphere)
 
     def output_raw_solution(self) -> dict[str, float]:
         output: dict[str, float] = {}
@@ -1097,9 +1070,6 @@ class Solution(CollectionMixin):
 
         return cls(gas_collection, planet)  # , condensed_collection, planet)
 
-    def __repr__(self) -> str:
-        return self.data.__repr__()
-
     #     # _atmosphere: Atmosphere
 
     #     # @classmethod
@@ -1129,7 +1099,7 @@ class Solution(CollectionMixin):
     #     #     """
     #     #     solution: Self = cls.create_from_species(species)
     #     #     init_dict: dict[GasSpecies, GasNumberDensitySpeciesSetter] = {
-    #     #         species: collection.abundance for species, collection in solution.gas_solution.items()
+    #     #         species: collection.abundance for species, collection in solution.gas.items()
     #     #     }
     #     #     # Only need to set these attributes once so pylint: disable=protected-access
     #     #     solution._atmosphere = Atmosphere(init_dict, planet)
@@ -1157,10 +1127,6 @@ class Solution(CollectionMixin):
         return {}
 
     @property
-    def gas_solution(self) -> GasCollection:  # dict[GasSpecies, GasSpeciesContainer]:
-        return self.gas
-
-    @property
     def number(self) -> int:
         """Total number of solution quantities"""
         return sum(collection.NUMBER for collection in self.data.values())
@@ -1170,17 +1136,11 @@ class Solution(CollectionMixin):
         """Planet"""
         return self._planet
 
-    def pressure(self) -> Array:
-        return self.atmosphere.pressure()
-
-    def temperature(self) -> float:
-        return self.atmosphere.temperature()
-
     #     @property
     #     def value(self) -> Array:
     #         """The solution as an array for the solver"""
     #         value_list: list[Array] = []
-    #         for gas_collection in self.gas_solution.values():
+    #         for gas_collection in self.gas.values():
     #             value_list.append(gas_collection.abundance.value)
     #         for condensed_collection in self.condensed_solution.values():
     #             value_list.append(condensed_collection.activity.value)
@@ -1197,7 +1157,7 @@ class Solution(CollectionMixin):
     #             value: An array, which is usually passed by the solver.
     #         """
     #         index: int = 0
-    #         for gas_collection in self.gas_solution.values():
+    #         for gas_collection in self.gas.values():
     #             gas_collection.abundance.value = value[index]
     #             index += gas_collection.NUMBER
     #         for condensed_collection in self.condensed_solution.values():
@@ -1311,7 +1271,7 @@ class Solution(CollectionMixin):
 #             A dictionary with formatted keys and float values representing the raw solution.
 #         """
 #         output: dict[str, float] = {}
-#         for gas_species, collection in self.gas_solution.items():
+#         for gas_species, collection in self.gas.items():
 #             output[gas_species.name] = collection.abundance.value.item()
 #         for condensed_species, collection in self.condensed_solution.items():
 #             species_name: str = condensed_species.name
@@ -1324,7 +1284,7 @@ class Solution(CollectionMixin):
 #     def output_solution(self) -> dict[str, float]:
 #         """Outputs the solution in a convenient form for comparison and benchmarking"""
 #         output: dict[str, float] = {}
-#         for gas_species, collection in self.gas_solution.items():
+#         for gas_species, collection in self.gas.items():
 #             output[gas_species.name] = collection.abundance.pressure().item()
 #         for condensed_species, collection in self.condensed_solution.items():
 #             species_name: str = condensed_species.name

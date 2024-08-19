@@ -51,10 +51,10 @@ TOLERANCE: float = 5.0e-2
 
 planet: Planet = Planet()
 
-jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_debug_nans", True)
-jax.config.update("jax_disable_jit", True)
-jax.config.update("jax_debug_infs", False)
+# jax.config.update("jax_enable_x64", True)
+# jax.config.update("jax_debug_nans", True)
+# jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_debug_infs", False)
 
 
 def test_version():

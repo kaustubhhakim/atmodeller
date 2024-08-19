@@ -110,7 +110,7 @@ class InteriorAtmosphereSystem:
     #         The reaction array
     #     """
     #     reaction_list: list = []
-    #     for collection in self.solution.gas_solution.values():
+    #     for collection in self.solution.gas.values():
     #         reaction_list.append(collection.abundance.value)
     #     for collection in self.solution.condensed_solution.values():
     #         reaction_list.append(collection.activity.value)
