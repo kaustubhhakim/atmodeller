@@ -41,7 +41,13 @@ from atmodeller.interfaces import (
     TypeChemicalSpecies,
     TypeChemicalSpecies_co,
 )
-from atmodeller.utilities import UnitConversion, get_molar_mass, logsumexp_base10
+from atmodeller.solubility.interfaces import NoSolubility
+from atmodeller.utilities import (
+    UnitConversion,
+    get_molar_mass,
+    logsumexp_base10,
+    safe_log10,
+)
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -371,20 +377,24 @@ class DissolvedNumberDensitySpecies(NumberDensitySpecies[GasSpecies]):
 
     @property
     def value(self) -> Array:
-        ppmw_value: Array = self.ppmw()
-        reservoir_mass: float = self.reservoir_mass()
+        small_value_for_gradient_stability: Array = jnp.array(-100.0)
 
-        return jnp.where(
-            (ppmw_value > 0) & (reservoir_mass > 0),
-            jnp.log10(
-                UnitConversion.ppm_to_fraction(ppmw_value)
-                * AVOGADRO
-                / self._species.molar_mass
-                * self.reservoir_mass()
-                / self.atmosphere.volume()
-            ),
-            -jnp.inf,
-        )
+        if isinstance(self.species.solubility, NoSolubility):
+            # Short-cut for no solubility for improved speed since autodiffing solubility is slow.
+            out: Array = small_value_for_gradient_stability
+        else:
+            # Calculating the ppmw seems slow, possibly due to the functional dependencies when
+            # autodiffing. Hence this is an obvious candidate for future performance improvements.
+            ppmw_value: Array = self.ppmw()
+            out = (
+                safe_log10(UnitConversion.ppm_to_fraction(ppmw_value))
+                + jnp.log10(AVOGADRO)
+                - jnp.log10(self._species.molar_mass)
+                + safe_log10(self.reservoir_mass())
+                - jnp.log10(self.atmosphere.volume())
+            )
+
+        return out
 
     @override
     def output_dict(self, element: str | None = None) -> dict[str, float]:
@@ -498,9 +508,8 @@ class GasSpeciesContainer(NumberDensitySpeciesSetter[GasSpecies]):
     @property
     def value(self) -> Array:
         """Total abundance across all reservoirs"""
-        # FIXME: Still seems to throw some NaNs. Unsure why. But test was wrong anyway so maybe OK.
         values: Array = jnp.asarray(
-            (self.abundance.value,)  # self.dissolved.value, self.trapped.value)
+            (self.abundance.value, self.dissolved.value, self.trapped.value)
         )
 
         return logsumexp_base10(values)
@@ -1158,14 +1167,14 @@ if __name__ == "__main__":
     planet_: Planet = Planet()
 
     # Must create and then set a value
-    out = GasCollection.create(species_, planet_)
-    out.value = jnp.array([26, 28, 24])
+    out_test = GasCollection.create(species_, planet_)
+    out_test.value = jnp.array([26, 28, 24])
 
-    print(out.atmosphere)
-    print(out.atmosphere.moles())
-    print(out.atmosphere.number_density())
-    out.value = jnp.array([1, 2, 3])
-    print(out.atmosphere.number_density(element="H"))
+    print(out_test.atmosphere)
+    print(out_test.atmosphere.moles())
+    print(out_test.atmosphere.number_density())
+    out_test.value = jnp.array([1, 2, 3])
+    print(out_test.atmosphere.number_density(element="H"))
 
     print("Trying solution")
 
