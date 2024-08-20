@@ -214,7 +214,7 @@ class InitialSolution(ABC, Generic[T]):
         #         constraint.get_log10_value(temperature=temperature, pressure=pressure)
         #     )
 
-        for collection in self.solution.condensed_solution.values():
+        for collection in self.solution.condensed.values():
             self.fill(collection.activity, self._fill_log10_activity)
             self.clip(collection.activity, maximum_value=0)
             self.fill(collection.abundance, self._fill_log10_number_density)
@@ -251,7 +251,7 @@ class InitialSolution(ABC, Generic[T]):
 
         # Testing satisfying the condensate stability criteria by construction did not appear to
         # yield improved performance of the solver.
-        # for collection in self.solution.condensed_solution.values():
+        # for collection in self.solution.condensed.values():
         #     collection.stability.value = (
         #         collection.tauc.value - collection.abundance.value
         #     )
@@ -367,7 +367,7 @@ class InitialSolutionDict(InitialSolution[dict]):
             if value is not None:
                 collection.abundance.value = value
 
-        for condensed_species, collection in self.solution.condensed_solution.items():
+        for condensed_species, collection in self.solution.condensed.items():
             value = self._get_log10_values(condensed_species, ACTIVITY_PREFIX)
             if value is not None:
                 collection.activity.value = value

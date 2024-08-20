@@ -194,14 +194,13 @@ class Solver(ABC):
         # Success is indicated by no message
         if sol.success:
             logger.info("Success")
-            # TODO: To reinstate
-            # logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
-            # logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
-            # logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
+            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
         # It is useful to also return the jacobian of this system for testing
-        # jacobian: Callable = self.jacobian((constraints,))
-        # logger.info("Jacobian = %s", jacobian(solution.value))
+        jacobian: Callable = self.jacobian((constraints,))
+        logger.info("Jacobian = %s", jacobian(solution.value))
 
         return sol, None, solution
 
@@ -236,9 +235,9 @@ class Solver(ABC):
         # Other options if the surface is not well-behaved
         # solver = optx.BFGS(rtol=1e-3, atol=1e-3)
         # solver = optx.OptaxMinimiser(optax.adabelief(learning_rate=0.01), rtol=tol, atol=tol)
-        # solver = optx.Dogleg(rtol=tol, atol=tol)
+        solver = optx.Dogleg(rtol=tol, atol=tol)
         # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
-        solver = optx.Newton(rtol=tol, atol=tol)
+        # solver = optx.Newton(rtol=tol, atol=tol)
         # solver = optx.Chord(rtol=tol, atol=tol)
         sol = optx.root_find(
             self.objective_function,
@@ -665,7 +664,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
             The condensate stability array
         """
         stability_array: Array = jnp.zeros(self._species.number, dtype=jnp.float_)
-        for condensed_species, collection in solution.condensed_solution.items():
+        for condensed_species, collection in solution.condensed.items():
             index: int = self._species.species_index(condensed_species)
             stability_array = stability_array.at[index].set(collection.stability.value)
 
@@ -685,7 +684,7 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         auxiliary_residual: Array = jnp.zeros(
             len(self._species.condensed_species()), dtype=jnp.float_
         )
-        for index, collection in enumerate(solution.condensed_solution.values()):
+        for index, collection in enumerate(solution.condensed.values()):
             value: Array = (
                 collection.stability.value - collection.tauc.value + collection.abundance.value
             )

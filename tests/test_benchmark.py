@@ -51,10 +51,10 @@ TOLERANCE: float = 5.0e-2
 
 planet: Planet = Planet()
 
-# jax.config.update("jax_enable_x64", True)
-# jax.config.update("jax_debug_nans", True)
-# jax.config.update("jax_disable_jit", True)
-# jax.config.update("jax_debug_infs", False)
+jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_debug_nans", True)
+jax.config.update("jax_disable_jit", True)
+jax.config.update("jax_debug_infs", False)
 
 
 def test_version():
@@ -483,7 +483,7 @@ def test_graphite_condensed(helper) -> None:
     )
 
     system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
-    _, _, solution = system.solve(constraints=constraints)
+    _, _, solution = system.solve(solver="optimistix", constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "O2_g": 1.27e-25,
