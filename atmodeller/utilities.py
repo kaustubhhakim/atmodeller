@@ -27,7 +27,6 @@ from functools import wraps
 from pstats import SortKey, Stats
 from typing import Any, Callable, Type, TypeVar
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
@@ -37,7 +36,7 @@ from jaxtyping import ArrayLike
 from molmass import Formula
 from scipy.constants import kilo, mega
 
-from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
+from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, MACHEPS, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -318,7 +317,7 @@ def get_log10_number_density(*args, **kwargs) -> Array:
     return jnp.log10(get_number_density(*args, **kwargs))
 
 
-def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1) -> Array:
+def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
     """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
 
     Args:
@@ -331,4 +330,12 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1) -> Array:
     max_log: Array = jnp.max(log_values)
     prefactors_: Array = jnp.asarray(prefactors)
 
-    return max_log + jnp.log10(jnp.sum(prefactors_ * jnp.power(10, log_values - max_log)))
+    value_sum: Array = jnp.sum(prefactors_ * jnp.power(10, log_values - max_log))
+
+    return max_log + safe_log10(value_sum)
+
+
+def safe_log10(x: ArrayLike) -> Array:
+    """Computes log10 of x, safely adding machine epsilon to avoid log of zero."""
+
+    return jnp.log10(x + MACHEPS)
