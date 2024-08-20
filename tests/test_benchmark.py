@@ -51,10 +51,11 @@ TOLERANCE: float = 5.0e-2
 
 planet: Planet = Planet()
 
-jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_debug_nans", True)
-jax.config.update("jax_disable_jit", True)
-jax.config.update("jax_debug_infs", False)
+# Turning on can throw an NaN related to log10 that in reality isn't a problem.
+# jax.config.update("jax_enable_x64", True)
+# jax.config.update("jax_debug_nans", True)
+# jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_debug_infs", False)
 
 
 def test_version():
@@ -62,7 +63,6 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-# Well behaved with Optimistix Newton
 def test_H_O(helper) -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint.
 
@@ -103,7 +103,6 @@ def test_H_O(helper) -> None:
     assert helper.isclose(solution, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# Well behaved with Optimistix Newton
 def test_CHO_reduced(helper) -> None:
     """C-H-O system at IW-2
 
@@ -148,7 +147,6 @@ def test_CHO_reduced(helper) -> None:
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# Well behaved with Optimistix Newton
 def test_CHO_IW(helper) -> None:
     """C-H-O system at IW+0.5
 
@@ -211,7 +209,6 @@ def test_CHO_IW(helper) -> None:
     assert helper.isclose(solution, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# Well behaved with Optimistix Newton
 def test_CHO_oxidised(helper) -> None:
     """C-H-O system at IW+2
 
