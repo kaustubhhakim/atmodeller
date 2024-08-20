@@ -311,8 +311,6 @@ def test_H_1500K(helper) -> None:
     system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
-    planet.surface_temperature = 1500.0  # K
-
     target: dict[str, float] = {
         "H2O_g": 0.25666635568842355,
         "H2_g": 0.31320683835217444,
