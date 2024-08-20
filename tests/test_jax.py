@@ -185,14 +185,14 @@ def test_H_with_buffer(helper) -> None:
 def test_H_and_C_no_solubility(helper) -> None:
     """Tests H2-H2O and CO-CO2 with imposed fugacities and no solubility.
 
-    This test is based on test_C_and_H() in test_CHO.py but without solubility.
+    This test is based on test_H_and_C() in test_CHO.py but without solubility.
     """
 
-    H2O_g: GasSpecies = GasSpecies("H2O")  # , solubility=H2O_peridotite_sossi())
+    H2O_g: GasSpecies = GasSpecies("H2O")
     H2_g: GasSpecies = GasSpecies("H2")
     O2_g: GasSpecies = GasSpecies("O2")
     CO_g: GasSpecies = GasSpecies("CO")
-    CO2_g: GasSpecies = GasSpecies("CO2")  # , solubility=CO2_basalt_dixon())
+    CO2_g: GasSpecies = GasSpecies("CO2")
 
     species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g])
     constraints: SystemConstraints = SystemConstraints(
