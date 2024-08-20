@@ -27,7 +27,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from collections import ChainMap
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar, cast
 
 import jax.numpy as jnp
 from jax import Array
@@ -259,11 +259,9 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
 
 
 TypeNumberDensitySpecies = TypeVar("TypeNumberDensitySpecies", bound=NumberDensitySpecies)
-
-# TODO: Might not be required anymore
-# TypeNumberDensitySpecies_co = TypeVar(
-#     "TypeNumberDensitySpecies_co", bound=NumberDensitySpecies, covariant=True
-# )
+TypeNumberDensitySpecies_co = TypeVar(
+    "TypeNumberDensitySpecies_co", bound=NumberDensitySpecies, covariant=True
+)
 
 
 class NumberDensitySpeciesSetter(_ValueSetterMixin, NumberDensitySpecies[TypeChemicalSpecies]):
@@ -515,14 +513,13 @@ class GasSpeciesContainer(NumberDensitySpeciesSetter[GasSpecies]):
         """
         self.abundance.value = gas_abundance
 
-    @property
-    def atmosphere(self) -> Atmosphere:
-        return self._atmosphere
-
-    @atmosphere.setter
+    @NumberDensitySpeciesSetter.atmosphere.setter
     def atmosphere(self, value: Atmosphere) -> None:
         """Sets and propagates the atmosphere through all reservoirs"""
-        self._atmosphere = value
+        # Call super() atmosphere setter
+        NumberDensitySpeciesSetter.atmosphere.__set__(
+            cast(NumberDensitySpeciesSetter, self), value
+        )
         self.abundance.atmosphere = value
         self.dissolved.atmosphere = value
         self.trapped.atmosphere = value
@@ -622,13 +619,13 @@ class GasSpeciesContainer(NumberDensitySpeciesSetter[GasSpecies]):
 #         return output
 
 
-class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies]):
+class CollectionMixin(ABC, Generic[TypeChemicalSpecies_co, TypeNumberDensitySpecies_co]):
     """Collection mixin to compute aggregated quantities"""
 
     output_prefix: str = ""
     """Prefix for the keys in the output dictionary"""
 
-    data: dict[TypeChemicalSpecies, TypeNumberDensitySpecies]
+    data: dict[TypeChemicalSpecies_co, TypeNumberDensitySpecies_co]
     _atmosphere: Atmosphere
 
     @property
@@ -637,6 +634,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies, TypeNumberDensitySpecies
 
     @atmosphere.setter
     def atmosphere(self, value: Atmosphere) -> None:
+        """Sets the atmosphere to self and all data values consistently"""
         self._atmosphere = value
         for container in self.data.values():
             container.atmosphere = value
@@ -780,10 +778,7 @@ class Atmosphere(
     def __init__(self, data: dict[GasSpecies, GasNumberDensitySpeciesSetter], planet: Planet):
         super().__init__(data)
         self._planet: Planet = planet
-
-    @property
-    def atmosphere(self) -> Atmosphere:
-        return self
+        self.atmosphere = self
 
     @property
     def planet(self) -> Planet:
@@ -873,7 +868,6 @@ class GasCollection(
     def __init__(self, data: dict[GasSpecies, GasSpeciesContainer], planet: Planet):
         super().__init__(data)
         self._planet: Planet = planet
-        # Must use atmosphere setter to also propagate the atmosphere to the data values.
         self.atmosphere: Atmosphere = Atmosphere(
             {species: collection.abundance for species, collection in self.data.items()}, planet
         )
@@ -909,18 +903,8 @@ class GasCollection(
         Args:
             value: An array, which is usually passed by the solver.
         """
-        # TODO: Can remove this comment, no longer relevant
-        # Must set all gas species first because potentially multiple gas species are required to
-        # compute the interior dissolved and trapped content.
-        index: int = 0
-        for container in self.data.values():
+        for index, container in enumerate(self.data.values()):
             container.value = value[index]
-            index += container.NUMBER
-
-        # TODO: These are now computed dynamically from the atmosphere
-        # Finally we can set all the interior values
-        # for container in self.data.values():
-        #    container.set_interior_values(self.atmosphere)
 
     def output_raw_solution(self) -> dict[str, float]:
         output: dict[str, float] = {}
@@ -1275,5 +1259,5 @@ if __name__ == "__main__":
 
     solution: Solution = Solution.create(species_, planet_)
     solution.value = jnp.array([6, 7, 8])
-    print(solution)
-    print(solution.molecules("H"))
+    print(solution.output_dict())
+    print(solution.atmosphere.output_dict())
