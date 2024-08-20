@@ -18,6 +18,9 @@ from scipy.optimize import OptimizeResult, root
 # Scipy also fails if this is commented out. Evidently double precision is required regardless.
 jax.config.update("jax_enable_x64", True)
 
+MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
+"""Machine epsilon"""
+
 # For scaling
 GAS_CONSTANT_BAR: float = gas_constant * 1.0e-5
 BOLTZMANN_CONSTANT_BAR: float = Boltzmann * 1.0e-5
@@ -246,11 +249,28 @@ def objective_function(solution: Array, *args) -> Array:
     return residual
 
 
-def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1) -> Array:
+def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
+    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
+
+    Args:
+        log10_values: Array of log10 values to sum
+        prefactors: Array of prefactors corresponding to each log10 value
+
+    Returns:
+        The log10 of the sum of prefactors multiplied by exponentials of the input values.
+    """
     max_log: Array = jnp.max(log_values)
     prefactors_: Array = jnp.asarray(prefactors)
 
-    return max_log + jnp.log10(jnp.sum(prefactors_ * jnp.power(10, log_values - max_log)))
+    value_sum: Array = jnp.sum(prefactors_ * jnp.power(10, log_values - max_log))
+
+    return max_log + safe_log10(value_sum)
+
+
+def safe_log10(x: ArrayLike) -> Array:
+    """Computes log10 of x, safely adding machine epsilon to avoid log of zero."""
+
+    return jnp.log10(x)  #  + MACHEPS)
 
 
 if __name__ == "__main__":
