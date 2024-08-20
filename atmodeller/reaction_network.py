@@ -235,9 +235,9 @@ class Solver(ABC):
         # Other options if the surface is not well-behaved
         # solver = optx.BFGS(rtol=1e-3, atol=1e-3)
         # solver = optx.OptaxMinimiser(optax.adabelief(learning_rate=0.01), rtol=tol, atol=tol)
-        solver = optx.Dogleg(rtol=tol, atol=tol)
+        # solver = optx.Dogleg(rtol=tol, atol=tol)
         # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
-        # solver = optx.Newton(rtol=tol, atol=tol)
+        solver = optx.Newton(rtol=tol, atol=tol)
         # solver = optx.Chord(rtol=tol, atol=tol)
         sol = optx.root_find(
             self.objective_function,
@@ -255,9 +255,8 @@ class Solver(ABC):
         # Success is indicated by no message
         if optx.RESULTS[sol.result] == "":
             logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
-            # TODO: To reinstate
-            # logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
-            # logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+            logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
+            logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
         # It is useful to also return the jacobian of this system for testing
         jacobian: Callable = self.jacobian((constraints,))
