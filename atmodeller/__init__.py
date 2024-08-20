@@ -60,6 +60,8 @@ OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 
 DEFAULT_SOLVER: str = "optimistix"  # or "scipy"
 """Default solver"""
+MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
+"""Machine epsilon"""
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config
