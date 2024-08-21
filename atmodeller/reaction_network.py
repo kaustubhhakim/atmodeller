@@ -719,8 +719,6 @@ class InteriorAtmosphereSystem(Solver):
         self._reaction_network = ReactionNetworkWithCondensateStability(
             self._species, self._planet
         )
-        # TODO: Need to reinstate this somewhere
-        # self.species.conform_solubilities_to_composition(self.planet.melt_composition)
 
     @override
     def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:

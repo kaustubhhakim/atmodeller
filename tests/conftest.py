@@ -43,8 +43,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 class Helper:
     """Helper class for tests"""
 
-    @staticmethod
+    @classmethod
     def isclose(
+        cls,
         solution: Solution,
         target: dict[str, float],
         *,
@@ -56,7 +57,7 @@ class Helper:
 
         Args:
             solution: Solution
-            target_dict: Dictionary of the target values, which should adhere to the format of
+            target: Dictionary of the target values, which should adhere to the format of
                 :meth:`solution.Solution.output_solution()`
             rtol: Relative tolerance. Defaults to 1.0e-6.
             atol: Absolute tolerance. Defaults to 1.0e-6.
@@ -86,6 +87,29 @@ class Helper:
         logger.debug("isclose = %s", isclose)
 
         return isclose.all()
+
+    @classmethod
+    def isclose_tolerance(
+        cls, solution: Solution, target: dict[str, float], log: bool = False, message: str = ""
+    ) -> float | None:
+        """Writes a log message with the tightest tolerance satisfied.
+
+        Args:
+            target: Dictionary of the target values, which should adhere to the format of
+                :meth:`solution.Solution.output_solution()`
+            message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
+                to an empty string.
+
+        Returns:
+            The tightest tolerance satisfied
+        """
+        for log_tolerance in (-6, -5, -4, -3, -2, -1):
+            tol: float = 10**log_tolerance
+            if cls.isclose(solution, target, log=log, rtol=tol, atol=tol):
+                logger.info("%s (tol = %f)".lstrip(), message, tol)
+                return tol
+
+        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
 
 
 @pytest.fixture

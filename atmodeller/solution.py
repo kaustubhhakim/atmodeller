@@ -26,16 +26,18 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
-from collections import ChainMap
-from typing import Generic, Protocol, TypeVar, cast
+from collections import ChainMap, Counter
+from collections.abc import Mapping
+from typing import Generic, Iterator, Protocol, TypeVar, cast
 
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
-from atmodeller.core import GasSpecies, Planet, Species
+from atmodeller.core import GasSpecies, LiquidSpecies, Planet, Species
 from atmodeller.interfaces import (
+    ChemicalSpecies,
     CondensedSpecies,
     ImmutableDict,
     TypeChemicalSpecies,
@@ -116,7 +118,7 @@ class _ValueSetterMixin:
         self._value = value
 
 
-class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
+class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies_co]):
     """A number density for a species
 
     This class must be instantiated for all gas species before :class:`Atmosphere` can be
@@ -132,8 +134,8 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
     _atmosphere: Atmosphere
     """Atmosphere"""
 
-    def __init__(self, species: TypeChemicalSpecies):
-        self._species: TypeChemicalSpecies = species
+    def __init__(self, species: TypeChemicalSpecies_co):
+        self._species: TypeChemicalSpecies_co = species
 
     @property
     @abstractmethod
@@ -142,6 +144,7 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
 
     @property
     def atmosphere(self) -> Atmosphere:
+        """Atmosphere"""
         return self._atmosphere
 
     @atmosphere.setter
@@ -149,19 +152,19 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
         self._atmosphere = value
 
     @property
-    def species(self) -> TypeChemicalSpecies:
+    def species(self) -> TypeChemicalSpecies_co:
         return self._species
 
     def elements(self) -> Array:
-        """Total number of elements"""
+        """Number of elements"""
         return self._species.atoms * self.molecules()
 
     def element_moles(self) -> Array:
-        """Total number of moles of elements"""
+        """Number of moles of elements"""
         return self._species.atoms * self.moles()
 
     def element_number_density(self) -> Array:
-        """Number density of all elements"""
+        """Number density of elements"""
         return self._species.atoms * self.number_density()
 
     def log10_number_density(self, element: str | None = None) -> Array:
@@ -233,7 +236,6 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
         """Number of moles of the species or element
 
         Args:
-            atmosphere: Atmosphere
             element: Element to compute the number of moles for, or None to compute for the
                 species. Defaults to None.
 
@@ -246,7 +248,7 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies]):
         """Output dictionary
 
         This must return a dictionary of summable values when the dictionary is converted to a
-        Counter().
+        Counter(). TODO: Check this is still true or required.
 
         Args:
             element: Element to compute the output for, or None to compute for the species.
@@ -651,6 +653,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies_co, TypeNumberDensitySpec
 
     @property
     def atmosphere(self) -> Atmosphere:
+        """Atmosphere"""
         return self._atmosphere
 
     @atmosphere.setter
@@ -662,6 +665,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies_co, TypeNumberDensitySpec
 
     @property
     def planet(self) -> Planet:
+        """Planet"""
         return self._planet
 
     def log10_number_density(self, element: str | None = None) -> Array:
@@ -939,7 +943,7 @@ class CondensedCollection(
         self.atmosphere: Atmosphere = atmosphere
 
     @classmethod
-    def create_from_species(cls, species: Species, planet: Planet, atmosphere: Atmosphere) -> Self:
+    def create(cls, species: Species, planet: Planet, atmosphere: Atmosphere) -> Self:
         """Creates a condensed collection from species.
 
         Args:
@@ -998,12 +1002,23 @@ class CondensedCollection(
         return output
 
 
-class Solution(CollectionMixin[TypeChemicalSpecies_co, TypeNumberDensitySpecies_co]):
+SomeContainer = GasSpeciesContainer | CondensedSpeciesContainer
+
+
+class Solution(CollectionMixin[ChemicalSpecies, SomeContainer]):
     """The solution
 
-    # TODO: Update all
+    Args:
+        gas_collection: Gas collection
+        condensed_collection: Condensed collection
+        planet: Planet
+
+    Attributes:
+        gas: Gas collection
+        condensed: Condensed collection
     """
 
+    @override
     def __init__(
         self,
         gas_collection: GasCollection,
@@ -1016,8 +1031,9 @@ class Solution(CollectionMixin[TypeChemicalSpecies_co, TypeNumberDensitySpecies_
         self.atmosphere = self.gas.atmosphere
 
     @property
-    def data(self):
-        return ChainMap(self.gas.data, self.condensed.data)
+    def data(self) -> Mapping[ChemicalSpecies, SomeContainer]:
+        # Linter gets confused due to invariance of ChainMap type parameters
+        return ChainMap(self.gas.data, self.condensed.data)  # type: ignore
 
     @property
     def value(self) -> Array:
@@ -1038,7 +1054,7 @@ class Solution(CollectionMixin[TypeChemicalSpecies_co, TypeNumberDensitySpecies_
     @classmethod
     def create(cls, species: Species, planet: Planet) -> Self:
         gas_collection: GasCollection = GasCollection.create(species, planet)
-        condensed_collection: CondensedCollection = CondensedCollection.create_from_species(
+        condensed_collection: CondensedCollection = CondensedCollection.create(
             species, planet, gas_collection.atmosphere
         )
 
@@ -1049,18 +1065,17 @@ class Solution(CollectionMixin[TypeChemicalSpecies_co, TypeNumberDensitySpecies_
         """Total number of solution quantities"""
         return sum(collection.NUMBER for collection in self.data.values())
 
-    #     # FIXME: Same name as method in base class. Conflict?
-    #     def elements(self) -> list[str]:
-    #         """Unique elements in the species
+    def unique_elements(self) -> tuple[str, ...]:
+        """Unique elements in the species
 
-    #         Returns:
-    #             A list of unique elements
-    #         """
-    #         elements: list[str] = []
-    #         for species in self:
-    #             elements.extend(species.elements)
+        Returns:
+            A list of unique elements
+        """
+        unique_elements: list[str] = []
+        for species in self:
+            unique_elements.extend(species.elements)
 
-    #         return list(set(elements))
+        return tuple(set(unique_elements))
 
     def get_reaction_array(self) -> Array:
         """Gets the reaction array
@@ -1076,60 +1091,60 @@ class Solution(CollectionMixin[TypeChemicalSpecies_co, TypeNumberDensitySpecies_
 
         return jnp.array(reaction_list, dtype=jnp.float_)
 
-    #     def total_moles_hydrogen(self) -> Array | None:
-    #         """Total moles of hydrogen"""
-    #         moles_of_hydrogen: Array = self.moles(element="H")
-    #         if moles_of_hydrogen <= 0:
-    #             return None
-    #         else:
-    #             return moles_of_hydrogen
+    def total_moles_hydrogen(self) -> Array | None:
+        """Total moles of hydrogen"""
+        moles_of_hydrogen: Array = self.moles(element="H")
+        if moles_of_hydrogen <= 0:
+            return None
+        else:
+            return moles_of_hydrogen
 
-    #     def _output_elements(self) -> dict[str, dict[str, float]]:
-    #         """Output for elements"""
-    #         output_dict: dict[str, dict[str, float]] = {}
-    #         for element in self.elements():
-    #             element_dict: dict[str, float] = output_dict.setdefault(
-    #                 f"{ELEMENT_PREFIX}{element}", {}
-    #             )
-    #             element_dict["total_mass"] = self.mass(element=element).item()
-    #             total_moles = self.moles(element=element)
-    #             element_dict["total_moles"] = total_moles.item()
-    #             total_moles_hydrogen: Array | None = self.total_moles_hydrogen()
-    #             if total_moles_hydrogen is not None:
-    #                 element_dict["logarithmic_abundance"] = (
-    #                     jnp.log10(total_moles / total_moles_hydrogen).item() + 12
-    #                 )
-    #             counter: Counter = Counter()
-    #             for collection in self.values():
-    #                 output: dict[str, float] = collection.output_dict(element=element)
-    #                 counter += Counter(output)
-    #             element_dict |= dict(counter)
-    #             try:
-    #                 element_dict["degree_of_condensation"] = (
-    #                     element_dict["condensed_moles"] / element_dict["total_moles"]
-    #                 )
-    #             except KeyError:
-    #                 # No condensed species for this element
-    #                 pass
-    #             element_dict["volume_mixing_ratio"] = (
-    #                 element_dict["atmosphere_moles"] / self.atmosphere.element_moles().item()
-    #             )
-    #             element_dict["molar_mass"] = get_molar_mass(element)
+    def _output_elements(self) -> dict[str, dict[str, float]]:
+        """Output for elements"""
+        output_dict: dict[str, dict[str, float]] = {}
+        for element in self.unique_elements():
+            element_dict: dict[str, float] = output_dict.setdefault(
+                f"{ELEMENT_PREFIX}{element}", {}
+            )
+            element_dict["total_mass"] = self.mass(element=element).item()
+            total_moles = self.moles(element=element)
+            element_dict["total_moles"] = total_moles.item()
+            total_moles_hydrogen: Array | None = self.total_moles_hydrogen()
+            if total_moles_hydrogen is not None:
+                element_dict["logarithmic_abundance"] = (
+                    jnp.log10(total_moles / total_moles_hydrogen).item() + 12
+                )
+            counter: Counter = Counter()
+            for collection in self.data.values():
+                output: dict[str, float] = collection.output_dict(element=element)
+                counter += Counter(output)
+            element_dict |= dict(counter)
+            try:
+                element_dict["degree_of_condensation"] = (
+                    element_dict["condensed_moles"] / element_dict["total_moles"]
+                )
+            except KeyError:
+                # No condensed species for this element
+                pass
+            element_dict["volume_mixing_ratio"] = (
+                element_dict["atmosphere_moles"] / self.atmosphere.element_moles().item()
+            )
+            element_dict["molar_mass"] = get_molar_mass(element)
 
-    #         return output_dict
+        return output_dict
 
-    #     def output_full(self) -> dict[str, dict[str, float]]:
-    #         """Full output"""
-    #         output: dict[str, dict[str, float]] = {}
-    #         for species, collection in self.items():
-    #             output[f"{SPECIES_PREFIX}{species.name}"] = collection.output_dict()
-    #         output |= self._output_elements()
-    #         output["atmosphere"] = self.atmosphere.output_dict()
-    #         output["planet"] = self.planet.output_dict()
-    #         output["raw_solution"] = self.output_raw_solution()
-    #         output["solution"] = self.output_solution()
+    def output_full(self) -> dict[str, dict[str, float]]:
+        """Full output"""
+        output: dict[str, dict[str, float]] = {}
+        for species, collection in self.data.items():
+            output[f"{SPECIES_PREFIX}{species.name}"] = collection.output_dict()
+        output |= self._output_elements()
+        output["atmosphere"] = self.atmosphere.output_dict()
+        output["planet"] = self.planet.output_dict()
+        output["raw_solution"] = self.output_raw_solution()
+        output["solution"] = self.output_solution()
 
-    #         return output
+        return output
 
     def output_raw_solution(self) -> dict[str, float]:
         return self.gas.output_raw_solution() | self.condensed.output_raw_solution()
@@ -1137,49 +1152,44 @@ class Solution(CollectionMixin[TypeChemicalSpecies_co, TypeNumberDensitySpecies_
     def output_solution(self) -> dict[str, float]:
         return self.gas.output_solution() | self.condensed.output_solution()
 
+    def __getitem__(self, key) -> SomeContainer:
+        return self.data[key]
 
-# # TODO: Still required?  Move to test conf?
-# # def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
-# #     """Writes a log message with the tightest tolerance that is satisfied.
+    def __iter__(self) -> Iterator[ChemicalSpecies]:
+        return iter(self.data)
 
-# #     Args:
-# #         target_dict: Dictionary of the target values, which should adhere to the format of
-# #             :meth:`output_solution()`
-# #         message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
-# #             to an empty string.
-
-# #     Returns:
-# #         The tightest tolerance satisfied
-# #     """
-# #     for log_tolerance in (-6, -5, -4, -3, -2, -1):
-# #         tol: float = 10**log_tolerance
-# #         if self.isclose(target_dict, rtol=tol, atol=tol):
-# #             logger.info("%s (tol = %f)".lstrip(), message, tol)
-# #             return tol
-
-# #     logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
+    def __len__(self) -> int:
+        return len(self.data)
 
 
 if __name__ == "__main__":
 
     # Quick testing
-    species_: Species = Species([GasSpecies("H2O"), GasSpecies("H2"), GasSpecies("O2")])
+    H2O_g = GasSpecies("H2O")
+    H2_g = GasSpecies("H2")
+    O2_g = GasSpecies("O2")
+    H2O_l = LiquidSpecies("H2O")
+    species_: Species = Species([H2O_g, H2_g, O2_g, H2O_l])
     planet_: Planet = Planet()
 
     # Must create and then set a value
-    out_test = GasCollection.create(species_, planet_)
-    out_test.value = jnp.array([26, 28, 24])
+    # out_test = GasCollection.create(species_, planet_)
+    # out_test.value = jnp.array([26, 28, 24])
 
-    print(out_test.atmosphere)
-    print(out_test.atmosphere.moles())
-    print(out_test.atmosphere.number_density())
-    out_test.value = jnp.array([1, 2, 3])
-    print(out_test.atmosphere.number_density(element="H"))
+    # print(out_test.atmosphere)
+    # print(out_test.atmosphere.moles())
+    # print(out_test.atmosphere.number_density())
+    # out_test.value = jnp.array([1, 2, 3])
+    # print(out_test.atmosphere.number_density(element="H"))
 
     print("Trying solution")
 
     solution: Solution = Solution.create(species_, planet_)
-    solution.value = jnp.array([6, 7, 8])
-    print(solution.output_dict())
-    print(solution.atmosphere.output_dict())
-    print(solution.atmosphere.elements())
+    solution.value = jnp.array([6, 7, 8, 9])
+    print(solution.data)
+    print(solution[H2O_g].moles("O"))
+
+    print(solution.output_full())
+    # print(solution.output_dict())
+    # print(solution.atmosphere.output_dict())
+    # print(solution.atmosphere.elements())

@@ -320,11 +320,11 @@ class ImmutableDict(Mapping[T, U], Generic[T, U]):
         data: Mapping
     """
 
-    def __init__(self, data: dict[T, U] | None = None):
+    def __init__(self, data: Mapping[T, U] | None = None):
         if data is None:
             self.data: dict[T, U] = {}
         else:
-            self.data = data
+            self.data = dict(data)
 
     def __getitem__(self, key) -> U:
         return self.data[key]

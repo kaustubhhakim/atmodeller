@@ -23,12 +23,11 @@ import logging
 import pickle
 from collections import UserDict
 from pathlib import Path
-from typing import TYPE_CHECKING, Hashable
+from typing import Hashable
 
 import pandas as pd
 
-if TYPE_CHECKING:
-    from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.solution import Solution
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -83,13 +82,11 @@ class Output(UserDict):
 
         return cls(output_data)
 
-    def add(
-        self, interior_atmosphere: InteriorAtmosphereSystem, extra_output: dict[str, float] | None
-    ) -> None:
+    def add(self, solution: Solution, extra_output: dict[str, float] | None) -> None:
         """Adds all outputs.
 
         Args:
-            interior_atmosphere: Interior atmosphere system
+            solution: Solution
             extra_output: Extra data to write to the output. Defaults to None.
         """
         for key, value in interior_atmosphere.solution.output_full().items():
@@ -103,28 +100,29 @@ class Output(UserDict):
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
             data_list.append(extra_output)
 
-    def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds constraints.
+    # TODO: To reinstate
+    # def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+    #     """Adds constraints.
 
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        temperature: float = interior_atmosphere.solution.atmosphere.temperature()
-        pressure: float = interior_atmosphere.solution.atmosphere.pressure()
-        evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
-            temperature, pressure
-        )
-        data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
-        data_list.append(evaluate_dict)
+    #     Args:
+    #         interior_atmosphere: Interior atmosphere system
+    #     """
+    #     temperature: float = interior_atmosphere.solution.atmosphere.temperature()
+    #     pressure: float = interior_atmosphere.solution.atmosphere.pressure()
+    #     evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
+    #         temperature, pressure
+    #     )
+    #     data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
+    #     data_list.append(evaluate_dict)
 
-    def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-        """Adds the residual.
+    # def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
+    #     """Adds the residual.
 
-        Args:
-            interior_atmosphere: Interior atmosphere system
-        """
-        data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
-        data_list.append(interior_atmosphere.residual_dict())
+    #     Args:
+    #         interior_atmosphere: Interior atmosphere system
+    #     """
+    #     data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
+    #     data_list.append(interior_atmosphere.residual_dict())
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Output as a dictionary of dataframes
