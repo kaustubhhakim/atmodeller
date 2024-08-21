@@ -25,14 +25,12 @@ from cProfile import Profile
 from dataclasses import asdict
 from functools import wraps
 from pstats import SortKey, Stats
-from typing import Any, Callable, Type, TypeVar
+from typing import Any, Callable, Type, TypeVar, cast
 
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
-import pandas as pd
 from jax import Array
-from jaxtyping import ArrayLike
+from jax.typing import ArrayLike
 from molmass import Formula
 from scipy.constants import kilo, mega
 
@@ -41,7 +39,6 @@ from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, MACHEPS, OCEAN_MASS_H
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-MultiplyT = TypeVar("MultiplyT", float, npt.NDArray, pd.Series, pd.DataFrame, Array, ArrayLike)
 
 
 def profile_decorator(func):
@@ -120,88 +117,78 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: float = 1) -> float:
 
 
 class UnitConversion:
-    """Unit conversions"""
+    """Unit conversions
+
+    Unsure how to best type this class.
+    """
 
     @staticmethod
-    def atmosphere_to_bar(value_atmosphere: MultiplyT = 1) -> MultiplyT:
+    def atmosphere_to_bar(value_atmosphere=1.0):
         """atmosphere to bar"""
         return value_atmosphere * ATMOSPHERE
 
     @staticmethod
-    def bar_to_Pa(  # Symbol name, so pylint: disable=C0103
-        value_bar: MultiplyT = 1,
-    ) -> MultiplyT:
+    def bar_to_Pa(value_bar=1.0):  # Symbol name, so pylint: disable=C0103
         """bar to Pa"""
         return value_bar * 1e5
 
     @classmethod
-    def Pa_to_bar(  # Symbol name, so pylint: disable=C0103
-        cls,
-        value_Pa: MultiplyT = 1,
-    ) -> MultiplyT:
+    def Pa_to_bar(cls, value_Pa=1.0):  # Symbol name, so pylint: disable=C0103
         """Pa to bar"""
         return value_Pa / cls.bar_to_Pa()
 
     @classmethod
-    def bar_to_GPa(  # Symbol name, so pylint: disable=C0103
-        cls, value_bar: MultiplyT = 1
-    ) -> MultiplyT:
+    def bar_to_GPa(cls, value_bar=1.0):  # Symbol name, so pylint: disable=C0103
         """Bar to GPa"""
         return cls.bar_to_Pa(value_bar) * 1.0e-9
 
     @classmethod
-    def GPa_to_bar(  # Symbol name, so pylint: disable=C0103
-        cls, value_GPa: MultiplyT = 1
-    ) -> MultiplyT:
+    def GPa_to_bar(cls, value_GPa=1.0):  # Symbol name, so pylint: disable=C0103
         """GPa to bar"""
         return value_GPa / cls.bar_to_GPa()
 
     @staticmethod
-    def fraction_to_ppm(value_fraction: MultiplyT = 1) -> MultiplyT:
+    def fraction_to_ppm(value_fraction=1.0):
         """Mole or mass fraction to parts-per-million by mole or mass, respectively."""
         return value_fraction * mega
 
     @staticmethod
-    def g_to_kg(value_grams: MultiplyT = 1) -> MultiplyT:
+    def g_to_kg(value_grams=1.0):
         """Grams to kilograms"""
         return value_grams / kilo
 
     @classmethod
-    def ppm_to_fraction(cls, value_ppm: MultiplyT = 1) -> MultiplyT:
+    def ppm_to_fraction(cls, value_ppm=1.0):
         """Parts-per-million by mole or mass to mole or mass fraction, respectively."""
         return value_ppm / cls.fraction_to_ppm()
 
     @classmethod
-    def ppm_to_percent(cls, value_ppm: MultiplyT = 1) -> MultiplyT:
+    def ppm_to_percent(cls, value_ppm=1.0):
         """Parts-per-million by percent"""
         return cls.ppm_to_fraction(value_ppm) * 100
 
     @classmethod
-    def cm3_to_m3(cls, cm_cubed: MultiplyT = 1) -> MultiplyT:
+    def cm3_to_m3(cls, cm_cubed=1.0):
         """cm\ :sup:`3` to m\ :sup:`3`"""  # type: ignore reStructuredText so pylint: disable=W1401
         return cm_cubed * 1.0e-6
 
     @classmethod
-    def m3_bar_to_J(  # Symbol name, so pylint: disable=C0103
-        cls, m3_bar: MultiplyT = 1
-    ) -> MultiplyT:
+    def m3_bar_to_J(cls, m3_bar=1.0):  # Symbol name, so pylint: disable=C0103
         """m\ :sup:`3` bar to J"""  # type: ignore reStructuredText so pylint: disable=W1401
         return m3_bar * 1e5
 
     @classmethod
-    def J_to_m3_bar(  # Symbol name, so pylint: disable=C0103
-        cls, joules: MultiplyT = 1
-    ) -> MultiplyT:
+    def J_to_m3_bar(cls, joules=1):  # Symbol name, so pylint: disable=C0103
         """J to m\ :sup:`3` bar"""  # type: ignore reStructuredText so pylint: disable=W1401
         return joules / cls.m3_bar_to_J()
 
     @classmethod
-    def litre_to_m3(cls, litre: MultiplyT = 1) -> MultiplyT:
+    def litre_to_m3(cls, litre=1.0):
         """litre to m\ :sup:`3`"""  # type: ignore reStructuredText so pylint: disable=W1401
         return litre * 1e-3
 
     @staticmethod
-    def weight_percent_to_ppmw(value_weight_percent: MultiplyT = 1) -> MultiplyT:
+    def weight_percent_to_ppmw(value_weight_percent=1.0):
         """Weight percent to parts-per-million by weight"""
         return value_weight_percent * 1.0e4
 
@@ -288,7 +275,7 @@ def get_molar_mass(species: str) -> float:
     Returns:
         Molar mass in kg m\ :sup:`-3`
     """
-    return UnitConversion.g_to_kg(Formula(species).mass)
+    return cast(float, UnitConversion.g_to_kg(Formula(species).mass))
 
 
 def get_number_density(temperature: float, pressure: ArrayLike) -> ArrayLike:
@@ -317,7 +304,7 @@ def get_log10_number_density(*args, **kwargs) -> Array:
     return jnp.log10(get_number_density(*args, **kwargs))
 
 
-def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
+def logsumexp_base10(log_values: ArrayLike, prefactors: ArrayLike = 1.0) -> Array:
     """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
 
     Args:

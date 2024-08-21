@@ -89,12 +89,12 @@ class Output(UserDict):
             solution: Solution
             extra_output: Extra data to write to the output. Defaults to None.
         """
-        for key, value in interior_atmosphere.solution.output_full().items():
+        for key, value in solution.output_full().items():
             data_list: list[dict[str, float]] = self.data.setdefault(key, [])
             data_list.append(value)
 
-        self._add_constraints(interior_atmosphere)
-        self._add_residual(interior_atmosphere)
+        # self._add_constraints(interior_atmosphere)
+        # self._add_residual(interior_atmosphere)
 
         if extra_output is not None:
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
