@@ -45,10 +45,10 @@ from atmodeller.interfaces import (
 )
 from atmodeller.solubility.interfaces import NoSolubility
 from atmodeller.utilities import (
-    UnitConversion,
     get_molar_mass,
     logsumexp_base10,
     safe_log10,
+    unit_conversion,
 )
 
 if sys.version_info < (3, 11):
@@ -389,7 +389,7 @@ class DissolvedNumberDensitySpecies(NumberDensitySpecies[GasSpecies]):
             # autodiffing. Hence this is an obvious candidate for future performance improvements.
             ppmw_value: Array = self.ppmw()
             out = (
-                safe_log10(UnitConversion.ppm_to_fraction(ppmw_value))
+                safe_log10(ppmw_value * unit_conversion.ppm_to_fraction)
                 + jnp.log10(AVOGADRO)
                 - jnp.log10(self._species.molar_mass)
                 + safe_log10(self.reservoir_mass())

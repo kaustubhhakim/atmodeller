@@ -34,7 +34,7 @@ from atmodeller.eos.holland import (
     get_holland_eos_models,
 )
 from atmodeller.eos.interfaces import RealGas
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -55,77 +55,77 @@ def test_version():
 def test_CORK_H2O_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 2a}`"""
     expected: float = 47.502083040419844
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(873, 1000, H2O_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_CO2_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 7}`"""
     expected: float = 96.13326116472262
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(873, 1000, CO2_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_CO_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8a}`"""
     expected: float = 131.475184896045
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1173, 1000, CO_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_CO_volume_2kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8a}`"""
     expected: float = 71.32153159834933
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(973, 2000, CO_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_CO_volume_4kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8a}`"""
     expected: float = 62.22167162862537
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1473, 4000, CO_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_CH4_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8b}`"""
     expected: float = 131.6743085645421
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1173, 1000, CH4_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_CH4_volume_2kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8b}`"""
     expected: float = 72.14376119913776
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(973, 2000, CH4_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_CH4_volume_4kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8b}`"""
     expected: float = 63.106094264549
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1473, 4000, CH4_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_H2_volume_500bar(check_values) -> None:
     """:cite:t:`HP91{Figure 8c}`"""
     expected: float = 149.1657987388235
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(773, 500, H2_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_H2_volume_1800bar(check_values) -> None:
     """:cite:t:`HP91{Figure 8c}`"""
     expected: float = 55.04174839002075
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(773, 1800, H2_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CORK_H2_volume_10kb(check_values) -> None:
     """:cite:t:`HP91{Figure 8c}`"""
     expected: float = 20.67497630046999
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(773, 10000, H2_CORK_HP91, expected, rtol=RTOL, atol=ATOL)
 
 

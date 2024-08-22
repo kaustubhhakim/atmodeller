@@ -28,7 +28,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.solubility.interfaces import Solubility
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -48,10 +48,10 @@ class CH4_basalt_ardia(Solubility):
     @override
     def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
-        pressure_gpa: ArrayLike = UnitConversion.bar_to_GPa(pressure)
-        one_bar_in_gpa: ArrayLike = UnitConversion.bar_to_GPa(1)
+        pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
+        one_bar_in_gpa: ArrayLike = unit_conversion.bar_to_GPa
         k: Array = jnp.exp(4.93 - (1.93 * (pressure_gpa - one_bar_in_gpa)))
-        ppmw: Array = k * UnitConversion.bar_to_GPa(fugacity)
+        ppmw: Array = k * fugacity * unit_conversion.bar_to_GPa
 
         return ppmw
 
@@ -86,7 +86,7 @@ class CO_basalt_yoshioka(Solubility):
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         co_wtp: Array = 10 ** (-5.20 + (0.8 * jnp.log10(fugacity)))
-        ppmw: Array = UnitConversion.weight_percent_to_ppmw(co_wtp)
+        ppmw: Array = co_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
@@ -103,7 +103,7 @@ class CO_rhyolite_yoshioka(Solubility):
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         co_wtp: Array = 10 ** (-4.08 + (0.52 * jnp.log10(fugacity)))
-        ppmw: Array = UnitConversion.weight_percent_to_ppmw(co_wtp)
+        ppmw: Array = co_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 

@@ -17,6 +17,7 @@
 """Utilities for tests"""
 
 import pytest
+from jax.typing import ArrayLike
 from pytest import approx
 
 from atmodeller.eos.interfaces import RealGas
@@ -45,7 +46,7 @@ class CheckValues:
             rtol: Relative tolerance
             atol: Absolute tolerance
         """
-        compressibility: float = eos.compressibility_parameter(temperature, pressure)
+        compressibility: ArrayLike = eos.compressibility_parameter(temperature, pressure)
 
         assert compressibility == approx(expected, rtol, atol)
 
@@ -64,7 +65,7 @@ class CheckValues:
             atol: Absolute tolerance
         """
 
-        fugacity_coeff: float = eos.fugacity_coefficient(temperature, pressure)
+        fugacity_coeff: ArrayLike = eos.fugacity_coefficient(temperature, pressure)
 
         assert fugacity_coeff == approx(expected, rtol, atol)
 
@@ -81,7 +82,7 @@ class CheckValues:
             expected: The expected value
         """
 
-        volume: float = eos.volume(temperature, pressure)
+        volume: ArrayLike = eos.volume(temperature, pressure)
 
         assert volume == approx(expected, rtol, atol)
 

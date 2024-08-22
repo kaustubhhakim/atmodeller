@@ -29,7 +29,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.solubility.interfaces import Solubility, SolubilityPowerLaw
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -52,7 +52,7 @@ class Cl2_ano_dio_for_thomas(Solubility):
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         cl_wtp: Array = 140.52 * jnp.sqrt(fugacity)
-        ppmw: Array = UnitConversion.weight_percent_to_ppmw(cl_wtp)
+        ppmw: Array = cl_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
@@ -69,7 +69,7 @@ class Cl2_basalt_thomas(Solubility):
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         cl_wtp: Array = 78.56 * jnp.sqrt(fugacity)
-        ppmw: Array = UnitConversion.weight_percent_to_ppmw(cl_wtp)
+        ppmw: Array = cl_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
@@ -122,7 +122,7 @@ class N2_basalt_bernadou(Solubility):
             -(183733 + 172 * temperature - 5 * pressure) / (GAS_CONSTANT * temperature)
         )
         molfrac: Array = (k13 * fugacity) + ((O2 ** (-3 / 4)) * k14 * (fugacity**0.5))
-        ppmw: Array = UnitConversion.fraction_to_ppm(molfrac)
+        ppmw: Array = molfrac * unit_conversion.fraction_to_ppm
 
         return ppmw
 
@@ -159,8 +159,8 @@ class N2_basalt_dasgupta(Solubility):
         **kwargs,
     ) -> Array:
         del kwargs
-        fugacity_gpa: ArrayLike = UnitConversion.bar_to_GPa(fugacity)
-        pressure_gpa: ArrayLike = UnitConversion.bar_to_GPa(pressure)
+        fugacity_gpa: ArrayLike = fugacity * unit_conversion.bar_to_GPa
+        pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
         logiw_fugacity: ArrayLike = (
             -28776.8 / temperature
             + 14.057

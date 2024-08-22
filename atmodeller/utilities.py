@@ -22,10 +22,10 @@ import functools
 import logging
 from collections.abc import Collection, MutableMapping
 from cProfile import Profile
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from functools import wraps
 from pstats import SortKey, Stats
-from typing import Any, Callable, Type, TypeVar, cast
+from typing import Any, Callable, Type, TypeVar
 
 import jax.numpy as jnp
 import numpy as np
@@ -112,85 +112,8 @@ def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
 
 def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: float = 1) -> float:
     h_grams: float = number_of_earth_oceans * OCEAN_MASS_H2
-    h_kg: float = UnitConversion().g_to_kg(h_grams)
+    h_kg: float = h_grams * unit_conversion.g_to_kg
     return h_kg
-
-
-class UnitConversion:
-    """Unit conversions
-
-    Unsure how to best type this class.
-    """
-
-    @staticmethod
-    def atmosphere_to_bar(value_atmosphere=1.0):
-        """atmosphere to bar"""
-        return value_atmosphere * ATMOSPHERE
-
-    @staticmethod
-    def bar_to_Pa(value_bar=1.0):  # Symbol name, so pylint: disable=C0103
-        """bar to Pa"""
-        return value_bar * 1e5
-
-    @classmethod
-    def Pa_to_bar(cls, value_Pa=1.0):  # Symbol name, so pylint: disable=C0103
-        """Pa to bar"""
-        return value_Pa / cls.bar_to_Pa()
-
-    @classmethod
-    def bar_to_GPa(cls, value_bar=1.0):  # Symbol name, so pylint: disable=C0103
-        """Bar to GPa"""
-        return cls.bar_to_Pa(value_bar) * 1.0e-9
-
-    @classmethod
-    def GPa_to_bar(cls, value_GPa=1.0):  # Symbol name, so pylint: disable=C0103
-        """GPa to bar"""
-        return value_GPa / cls.bar_to_GPa()
-
-    @staticmethod
-    def fraction_to_ppm(value_fraction=1.0):
-        """Mole or mass fraction to parts-per-million by mole or mass, respectively."""
-        return value_fraction * mega
-
-    @staticmethod
-    def g_to_kg(value_grams=1.0):
-        """Grams to kilograms"""
-        return value_grams / kilo
-
-    @classmethod
-    def ppm_to_fraction(cls, value_ppm=1.0):
-        """Parts-per-million by mole or mass to mole or mass fraction, respectively."""
-        return value_ppm / cls.fraction_to_ppm()
-
-    @classmethod
-    def ppm_to_percent(cls, value_ppm=1.0):
-        """Parts-per-million by percent"""
-        return cls.ppm_to_fraction(value_ppm) * 100
-
-    @classmethod
-    def cm3_to_m3(cls, cm_cubed=1.0):
-        """cm\ :sup:`3` to m\ :sup:`3`"""  # type: ignore reStructuredText so pylint: disable=W1401
-        return cm_cubed * 1.0e-6
-
-    @classmethod
-    def m3_bar_to_J(cls, m3_bar=1.0):  # Symbol name, so pylint: disable=C0103
-        """m\ :sup:`3` bar to J"""  # type: ignore reStructuredText so pylint: disable=W1401
-        return m3_bar * 1e5
-
-    @classmethod
-    def J_to_m3_bar(cls, joules=1):  # Symbol name, so pylint: disable=C0103
-        """J to m\ :sup:`3` bar"""  # type: ignore reStructuredText so pylint: disable=W1401
-        return joules / cls.m3_bar_to_J()
-
-    @classmethod
-    def litre_to_m3(cls, litre=1.0):
-        """litre to m\ :sup:`3`"""  # type: ignore reStructuredText so pylint: disable=W1401
-        return litre * 1e-3
-
-    @staticmethod
-    def weight_percent_to_ppmw(value_weight_percent=1.0):
-        """Weight percent to parts-per-million by weight"""
-        return value_weight_percent * 1.0e4
 
 
 def flatten(
@@ -275,7 +198,7 @@ def get_molar_mass(species: str) -> float:
     Returns:
         Molar mass in kg m\ :sup:`-3`
     """
-    return cast(float, UnitConversion.g_to_kg(Formula(species).mass))
+    return Formula(species).mass * unit_conversion.g_to_kg
 
 
 def get_number_density(temperature: float, pressure: ArrayLike) -> ArrayLike:
@@ -326,3 +249,170 @@ def safe_log10(x: ArrayLike) -> Array:
     """Computes log10 of x, safely adding machine epsilon to avoid log of zero."""
 
     return jnp.log10(x + MACHEPS)
+
+
+@dataclass(frozen=True)
+class ExperimentalCalibration:
+    """Experimental calibration range
+
+    Args:
+        temperature_min: Minimum temperature in K. Defaults to None (i.e. not specified).
+        temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
+        pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
+        pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
+        temperature_penalty: Penalty coefficients for temperature. Defaults to 1000.
+        pressure_penalty: Penalty coefficient for pressure. Defaults to 1000.
+    """
+
+    temperature_min: float | None = None
+    """Minimum temperature in K"""
+    temperature_max: float | None = None
+    """Maximum temperature in K"""
+    pressure_min: float | None = None
+    """Minimum pressure in bar"""
+    pressure_max: float | None = None
+    """Maximum pressure in bar"""
+    temperature_penalty: float = 1e3
+    """Temperature penalty"""
+    pressure_penalty: float = 1e3
+    """Pressure penalty"""
+    _clips_to_apply: list[Callable] = field(init=False, default_factory=list, repr=False)
+    """Clips to apply"""
+
+    def __post_init__(self):
+        if self.temperature_min is not None:
+            logger.info(
+                "Set minimum evaluation temperature (temperature > %f)", self.temperature_min
+            )
+            self._clips_to_apply.append(self._clip_temperature_min)
+        if self.temperature_max is not None:
+            logger.info(
+                "Set maximum evaluation temperature (temperature < %f)", self.temperature_max
+            )
+            self._clips_to_apply.append(self._clip_temperature_max)
+        if self.pressure_min is not None:
+            logger.info("Set minimum evaluation pressure (pressure > %f)", self.pressure_min)
+            self._clips_to_apply.append(self._clip_pressure_min)
+        if self.pressure_max is not None:
+            logger.info("Set maximum evaluation pressure (pressure < %f)", self.pressure_max)
+            self._clips_to_apply.append(self._clip_pressure_max)
+
+    def _clip_pressure_max(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
+        """Clips maximum pressure
+
+        Args:
+            temperature: Temperature in K
+            pressure: pressure in bar
+
+        Returns:
+            Temperature, and clipped pressure
+        """
+        assert self.pressure_max is not None
+
+        return temperature, jnp.minimum(pressure, jnp.array(self.pressure_max))
+
+    def _clip_pressure_min(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
+        """Clips minimum pressure
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Temperature, and clipped pressure
+        """
+        assert self.pressure_min is not None
+
+        return temperature, jnp.maximum(pressure, jnp.array(self.pressure_min))
+
+    def _clip_temperature_max(
+        self, temperature: float, pressure: ArrayLike
+    ) -> tuple[float, Array]:
+        """Clips maximum temperature
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Clipped temperature, and pressure
+        """
+        assert self.temperature_max is not None
+
+        return min(temperature, self.temperature_max), jnp.array(pressure)
+
+    def _clip_temperature_min(
+        self, temperature: float, pressure: ArrayLike
+    ) -> tuple[float, Array]:
+        """Clips minimum temperature
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Clipped temperature, and pressure
+        """
+        assert self.temperature_min is not None
+
+        return max(temperature, self.temperature_min), jnp.array(pressure)
+
+    def get_within_range(self, temperature: float, pressure: ArrayLike) -> tuple[float, ArrayLike]:
+        """Gets temperature and pressure conditions within the calibration range.
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            temperature in K, pressure in bar, according to prescribed clips
+        """
+        for clip_func in self._clips_to_apply:
+            temperature, pressure = clip_func(temperature, pressure)
+
+        return temperature, pressure
+
+    def get_penalty(self, temperature: float, pressure: ArrayLike) -> Array:
+        """Gets a penalty value if temperature and pressure are outside the calibration range
+
+        This is based on the quadratic penalty method.
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            A penalty value
+        """
+        pressure_: Array = jnp.array(pressure)
+        temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
+        penalty = (
+            self.pressure_penalty * (pressure_clip - pressure_) ** 2
+            + self.temperature_penalty * (temperature_clip - temperature) ** 2
+        )
+
+        return penalty
+
+
+# Convenient to use symbol names so pylint: disable=invalid-name
+@dataclass(frozen=True)
+class UnitConversion:
+    """Unit conversions"""
+
+    atmosphere_to_bar: float = ATMOSPHERE
+    bar_to_Pa: float = 1.0e5
+    bar_to_GPa: float = 1.0e-4
+    Pa_to_bar: float = 1.0e-5
+    GPa_to_bar: float = 1.0e4
+    fraction_to_ppm: float = mega
+    g_to_kg: float = 1 / kilo
+    ppm_to_fraction: float = 1 / mega
+    ppm_to_percent: float = 100 / mega
+    percent_to_ppm: float = 1.0e4
+    cm3_to_m3: float = 1.0e-6
+    m3_bar_to_J: float = 1.0e5
+    J_to_m3_bar: float = 1.0e-5
+    litre_to_m3: float = 1.0e-3
+
+
+unit_conversion = UnitConversion()

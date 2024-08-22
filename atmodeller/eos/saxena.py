@@ -54,11 +54,10 @@ from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import (
     CombinedEOSModel,
     CorrespondingStatesMixin,
-    ExperimentalCalibration,
     RealGas,
     critical_parameters,
 )
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -224,7 +223,7 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
             * GAS_CONSTANT_BAR
             * temperature
         )
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
 
         return volume_integral
 

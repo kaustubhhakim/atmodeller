@@ -44,8 +44,8 @@ import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
-from atmodeller.eos.interfaces import ExperimentalCalibration, RealGas
-from atmodeller.utilities import UnitConversion
+from atmodeller.eos.interfaces import RealGas
+from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -171,7 +171,7 @@ class BeattieBridgeman(RealGas):
                 + (self.c * self.b * self.B0 / temperature**3) * 4 / (3 * vol**3)
             )
         )
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
 
         return volume_integral
 
@@ -180,9 +180,9 @@ class BeattieBridgeman(RealGas):
 # in bar). Using the original table values below allows easy visual comparison and ensures that
 # the base class does not have to deal with unit conversions.
 
-volume_conversion: Callable = UnitConversion.litre_to_m3
+volume_conversion: Callable = lambda x: x * unit_conversion.litre_to_m3
 # Converts PV**2 coefficient to be in terms of m^3 and bar
-A0_conversion: Callable = lambda x: x * ATMOSPHERE * UnitConversion.litre_to_m3() ** 2
+A0_conversion: Callable = lambda x: x * ATMOSPHERE * unit_conversion.litre_to_m3**2
 
 H2_Beattie_holley: RealGas = BeattieBridgeman(
     A0=A0_conversion(0.1975),

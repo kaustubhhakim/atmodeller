@@ -299,7 +299,7 @@ def test_H_1500K(helper) -> None:
     species: Species = Species([H2O_g, H2_g, O2_g])
 
     oceans: float = 1
-    planet: Planet = Planet(surface_temperature=1500)
+    warm_planet: Planet = Planet(surface_temperature=1500)
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
 
     constraints: SystemConstraints = SystemConstraints(
@@ -308,7 +308,7 @@ def test_H_1500K(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -393,7 +393,7 @@ def test_H_and_C_total_pressure(helper) -> None:
 
 
 @pytest.mark.skip(reason="Holland H2O model is not configured for JAX")
-def test_pH2_fO2_real_gas() -> None:
+def test_pH2_fO2_real_gas(helper) -> None:
     """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
 
     Applies a constraint to the partial pressure of H2.
@@ -426,7 +426,7 @@ def test_pH2_fO2_real_gas() -> None:
 
 
 @pytest.mark.skip(reason="Holland H2O model is not configured for JAX")
-def test_fH2_fO2_real_gas() -> None:
+def test_fH2_fO2_real_gas(helper) -> None:
     """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
 
     Applies a constraint to the fugacity of H2.
@@ -459,7 +459,7 @@ def test_fH2_fO2_real_gas() -> None:
 
 
 @pytest.mark.skip(reason="Holland H2O model is not configured for JAX")
-def test_H_and_C_real_gas() -> None:
+def test_H_and_C_real_gas(helper) -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 
     H2_g: GasSpecies = GasSpecies("H2", solubility=H2_basalt_hirschmann(), eos=eos_holland["H2"])

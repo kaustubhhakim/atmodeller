@@ -37,7 +37,7 @@ from atmodeller.interfaces import (
     TypeChemicalSpecies,
 )
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
-from atmodeller.utilities import UnitConversion, filter_by_type, get_number_density
+from atmodeller.utilities import filter_by_type, get_number_density, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -123,7 +123,7 @@ class ElementMassConstraint(MassConstraintProtocol):
     @property
     def molar_mass(self) -> float:
         r"""Molar mass in :math:\mathrm{kg}\mathrm{mol}^{-1}"""
-        return UnitConversion.g_to_kg(self._formula.mass)
+        return self._formula.mass * unit_conversion.g_to_kg
 
     @property
     def name(self) -> str:

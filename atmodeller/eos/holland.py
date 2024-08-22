@@ -59,13 +59,13 @@ from scipy.constants import kilo
 
 from atmodeller.eos.interfaces import (
     CORK,
-    ExperimentalCalibration,
     MRKCriticalBehaviour,
     MRKExplicitABC,
     MRKImplicitABC,
     RealGas,
     critical_parameters,
 )
+from atmodeller.utilities import ExperimentalCalibration
 
 if sys.version_info < (3, 12):
     from typing_extensions import override

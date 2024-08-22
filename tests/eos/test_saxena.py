@@ -25,7 +25,7 @@ import logging
 from atmodeller import __version__, debug_logger
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.eos.saxena import H2_SF87, get_saxena_eos_models
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -86,61 +86,61 @@ def test_O2(check_values) -> None:
 def test_H2_low_pressure_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 1}`"""
     expected: float = 7279.356114821697
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(873, 10, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_medium_pressure_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 1}`"""
     expected: float = 164.38851468757488
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(873, 500, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_high_pressure_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 1}`"""
     expected: float = 41.97871061892679
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1473, 4000, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_high_pressure2_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 1}`"""
     expected: float = 20.806595067793276
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1073, 10000, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_high_pressure3_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 1}`"""
     expected: float = 71.50153474005484
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(673, 1000, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2S_low_pressure_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 3}`"""
     expected: float = 272.7266232763035
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(673, 200, eos_models["H2S"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2S_medium_pressure_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 3}`"""
     expected: float = 116.55537998390933
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1873, 2000, eos_models["H2S"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_SO2_low_pressure_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 2}`"""
     expected: float = 8308.036738813245
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1073, 10, eos_models["SO2"], expected, rtol=RTOL, atol=ATOL)
 
 
 def test_SO2_high_pressure_SS92(check_values) -> None:
     """:cite:t:`SS92{Figure 2}`"""
     expected: float = 70.86864302460566
-    expected = UnitConversion.cm3_to_m3(expected)
+    expected *= unit_conversion.cm3_to_m3
     check_values.volume(1873, 4000, eos_models["SO2"], expected, rtol=RTOL, atol=ATOL)

@@ -28,9 +28,8 @@ from jax import Array, lax
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.interfaces import ExperimentalCalibration
 from atmodeller.thermodata.interfaces import RedoxBufferProtocol
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -129,7 +128,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
 
 # 27.5 GPa is given in the abstract of :cite:t:`HGD08`
 IronWustiteBufferHirschmann08Calibration: ExperimentalCalibration = ExperimentalCalibration(
-    pressure_max=UnitConversion.GPa_to_bar(27.5)
+    pressure_max=27.5 * unit_conversion.GPa_to_bar
 )
 
 
@@ -162,7 +161,7 @@ class IronWustiteBufferHirschmann08(_RedoxBuffer):
 # 3000 K. Extrapolation to lower temperatures (<1000 K) or higher pressures (>100 GPa) is not
 # recommended."
 IronWustiteBufferHirschmann21Calibration: ExperimentalCalibration = ExperimentalCalibration(
-    temperature_min=1000, pressure_max=UnitConversion.GPa_to_bar(100)
+    temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
 )
 
 
@@ -275,7 +274,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
     @override
     def _get_buffer_log10_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
-        pressure_GPa: ArrayLike = UnitConversion.bar_to_GPa(pressure)
+        pressure_GPa: ArrayLike = pressure * unit_conversion.bar_to_GPa
 
         def hcp_case() -> Array:
             return self._hcp_iron(temperature, pressure_GPa)
@@ -388,7 +387,7 @@ class IronWustiteBufferFischer(_RedoxBuffer):
         self, temperature: float, pressure: ArrayLike, **kwargs
     ) -> ArrayLike:
         del kwargs
-        pressure_GPa: ArrayLike = UnitConversion.bar_to_GPa(pressure)
+        pressure_GPa: ArrayLike = pressure * unit_conversion.bar_to_GPa
         a_coeff: ArrayLike = 6.44059 + 0.00463099 * pressure_GPa
         b_coeff: ArrayLike = (
             -28.1808

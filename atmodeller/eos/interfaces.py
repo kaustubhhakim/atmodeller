@@ -34,8 +34,7 @@ from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
-from atmodeller.interfaces import ExperimentalCalibration
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -299,7 +298,7 @@ class IdealGas(RealGas):
     @override
     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         volume_integral: Array = GAS_CONSTANT_BAR * temperature * jnp.log(pressure)
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
 
         return volume_integral
 
@@ -439,7 +438,7 @@ class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
                 - jnp.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
             )
         )
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
 
         return volume_integral
 
@@ -545,7 +544,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         ln_fugacity_coefficient: Array = -jnp.log(z - B) - A * jnp.log(1 + B / z) + z - 1  # type: ignore
         ln_fugacity: Array = jnp.log(pressure) + ln_fugacity_coefficient
         volume_integral: Array = GAS_CONSTANT_BAR * temperature * ln_fugacity
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
 
         return volume_integral
 
@@ -840,7 +839,7 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
             + 2.0 / 3.0 * self.b(temperature) * delta_pressure ** (3.0 / 2.0)
             + 4.0 / 5.0 * self.c(temperature) * delta_pressure ** (5.0 / 4.0)
         )
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
 
         return volume_integral
 

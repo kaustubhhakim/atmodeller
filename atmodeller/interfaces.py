@@ -20,12 +20,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Callable, Generic, Iterator, TypeVar
+from typing import Generic, Iterator, TypeVar
 
-import jax.numpy as jnp
-from jax import Array
-from jax.typing import ArrayLike
 from molmass import Composition, Formula
 
 from atmodeller.thermodata.interfaces import (
@@ -33,152 +29,9 @@ from atmodeller.thermodata.interfaces import (
     ThermodynamicDataset,
 )
 from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class ExperimentalCalibration:
-    """Experimental calibration range
-
-    Args:
-        temperature_min: Minimum temperature in K. Defaults to None (i.e. not specified).
-        temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
-        pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
-        pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
-        temperature_penalty: Penalty coefficients for temperature. Defaults to 1000.
-        pressure_penalty: Penalty coefficient for pressure. Defaults to 1000.
-    """
-
-    temperature_min: float | None = None
-    """Minimum temperature in K"""
-    temperature_max: float | None = None
-    """Maximum temperature in K"""
-    pressure_min: float | None = None
-    """Minimum pressure in bar"""
-    pressure_max: float | None = None
-    """Maximum pressure in bar"""
-    temperature_penalty: float = 1e3
-    """Temperature penalty"""
-    pressure_penalty: float = 1e3
-    """Pressure penalty"""
-    _clips_to_apply: list[Callable] = field(init=False, default_factory=list, repr=False)
-    """Clips to apply"""
-
-    def __post_init__(self):
-        if self.temperature_min is not None:
-            logger.info(
-                "Set minimum evaluation temperature (temperature > %f)", self.temperature_min
-            )
-            self._clips_to_apply.append(self._clip_temperature_min)
-        if self.temperature_max is not None:
-            logger.info(
-                "Set maximum evaluation temperature (temperature < %f)", self.temperature_max
-            )
-            self._clips_to_apply.append(self._clip_temperature_max)
-        if self.pressure_min is not None:
-            logger.info("Set minimum evaluation pressure (pressure > %f)", self.pressure_min)
-            self._clips_to_apply.append(self._clip_pressure_min)
-        if self.pressure_max is not None:
-            logger.info("Set maximum evaluation pressure (pressure < %f)", self.pressure_max)
-            self._clips_to_apply.append(self._clip_pressure_max)
-
-    def _clip_pressure_max(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
-        """Clips maximum pressure
-
-        Args:
-            temperature: Temperature in K
-            pressure: pressure in bar
-
-        Returns:
-            Temperature, and clipped pressure
-        """
-        assert self.pressure_max is not None
-
-        return temperature, jnp.minimum(pressure, jnp.array(self.pressure_max))
-
-    def _clip_pressure_min(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
-        """Clips minimum pressure
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Temperature, and clipped pressure
-        """
-        assert self.pressure_min is not None
-
-        return temperature, jnp.maximum(pressure, jnp.array(self.pressure_min))
-
-    def _clip_temperature_max(
-        self, temperature: float, pressure: ArrayLike
-    ) -> tuple[float, Array]:
-        """Clips maximum temperature
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Clipped temperature, and pressure
-        """
-        assert self.temperature_max is not None
-
-        return min(temperature, self.temperature_max), jnp.array(pressure)
-
-    def _clip_temperature_min(
-        self, temperature: float, pressure: ArrayLike
-    ) -> tuple[float, Array]:
-        """Clips minimum temperature
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Clipped temperature, and pressure
-        """
-        assert self.temperature_min is not None
-
-        return max(temperature, self.temperature_min), jnp.array(pressure)
-
-    def get_within_range(self, temperature: float, pressure: ArrayLike) -> tuple[float, ArrayLike]:
-        """Gets temperature and pressure conditions within the calibration range.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            temperature in K, pressure in bar, according to prescribed clips
-        """
-        for clip_func in self._clips_to_apply:
-            temperature, pressure = clip_func(temperature, pressure)
-
-        return temperature, pressure
-
-    def get_penalty(self, temperature: float, pressure: ArrayLike) -> Array:
-        """Gets a penalty value if temperature and pressure are outside the calibration range
-
-        This is based on the quadratic penalty method.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            A penalty value
-        """
-        pressure_: Array = jnp.array(pressure)
-        temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
-        penalty = (
-            self.pressure_penalty * (pressure_clip - pressure_) ** 2
-            + self.temperature_penalty * (temperature_clip - temperature) ** 2
-        )
-
-        return penalty
 
 
 class ChemicalSpecies:
@@ -249,7 +102,7 @@ class ChemicalSpecies:
     @property
     def molar_mass(self) -> float:
         r"""Molar mass in :math:\mathrm{kg}\mathrm{mol}^{-1}"""
-        return UnitConversion.g_to_kg(self._formula.mass)
+        return self._formula.mass * unit_conversion.g_to_kg
 
     @property
     def name(self) -> str:
