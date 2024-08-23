@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import pprint
 import sys
+from typing import Protocol
 
 import jax.numpy as jnp
 from jax import Array, lax
@@ -41,7 +42,12 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class ReactionNetwork:
+class ResidualProtocol(Protocol):
+
+    def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array: ...
+
+
+class ReactionNetwork(ResidualProtocol):
     """A chemical reaction network.
 
     Args:
@@ -342,6 +348,7 @@ class ReactionNetwork:
 
         return log_fugacity_coefficients
 
+    @override
     def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:
         """Gets the residual
 
@@ -432,8 +439,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         activity_modifier: Array = self.get_activity_modifier(constraints=constraints)
         equilibrium_modifier: Array = self.get_equilibrium_modifier(constraints=constraints)
 
-        residual = residual + jnp.dot(activity_modifier, 10**stability_array)
-        residual = residual - jnp.dot(equilibrium_modifier, 10**stability_array)
+        residual = residual + jnp.dot(activity_modifier, jnp.power(10, stability_array))
+        residual = residual - jnp.dot(equilibrium_modifier, jnp.power(10, stability_array))
 
         # Auxiliary condensate stability equations
         auxiliary_residual: Array = jnp.zeros(
@@ -461,22 +468,20 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         return jnp.concatenate((residual, auxiliary_residual, pressure_residual))
 
 
-class InteriorAtmosphereSystem(ReactionNetwork):
-    """An interior-atmosphere system
+class InteriorAtmosphereSystem:
+    """An interior atmosphere system
 
     Args:
         species: Species
         planet: Planet
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, species: Species, planet: Planet):
         logger.info("Creating an interior-atmosphere system")
-        super().__init__(*args, **kwargs)
-        self._reaction_network = ReactionNetworkWithCondensateStability(
-            self._species, self._planet
-        )
+        self._species: Species = species
+        self._planet: Planet = planet
+        self._reaction_network = ReactionNetworkWithCondensateStability(species, planet)
 
-    @override
     def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array:
         """Gets the residual
 

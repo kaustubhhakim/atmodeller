@@ -33,7 +33,7 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
-from atmodeller.reaction_network import InteriorAtmosphereSystem, Solver
+from atmodeller.reaction_network import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 

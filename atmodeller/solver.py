@@ -24,6 +24,8 @@ from abc import ABC, abstractmethod
 from typing import Callable
 
 import jax
+import jax.numpy as jnp
+import numpy as np
 from jax import Array
 from optimistix._solution import Solution as Solution_optx
 from scipy.optimize import OptimizeResult, root
