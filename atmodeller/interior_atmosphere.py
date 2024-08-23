@@ -31,7 +31,7 @@ from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionProtocol
 from atmodeller.reaction_network import ReactionNetworkWithMassBalance
 from atmodeller.solution import Solution
-from atmodeller.solver import Solver, SolverOptimistix
+from atmodeller.solver import Solver, SolverOptimistix, SolverScipy
 
 # import jax.numpy as jnp
 # import numpy as np
@@ -84,7 +84,9 @@ class InteriorAtmosphereSystem:
             tol: Tolerance. Defaults to 1.0e-8.
         """
         # TODO: Add flag for choice
-        solver_: Solver = SolverOptimistix()
+        # solver_: Solver = SolverOptimistix()
+
+        solver_: Solver = SolverScipy()
 
         a, b, c = solver_.solve(
             self._reaction_network,

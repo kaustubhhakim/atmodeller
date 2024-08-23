@@ -22,11 +22,12 @@ import logging
 import pprint
 import sys
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import optimistix as optx
 from jax import Array
 from optimistix._solution import Solution as Solution_optx
@@ -58,7 +59,8 @@ class Solver(ABC):
         """Gets the initial solution
 
         Args:
-            solve_me: Some system to solve
+            solve_me: System to solve
+            constraints: Constraints for the system of equations
             initial_solution: Initial condition. Defaults to None.
 
         Returns:
@@ -76,52 +78,44 @@ class Solver(ABC):
 
         return initial_solution_guess
 
-    def jacobian(self, *args, **kwargs) -> Callable:
+    def jacobian(self, kwargs: dict[str, Any]) -> Callable:
         """Creates a Jacobian callable function.
 
         Args:
-            *args: Arbitrary positional arguments
-            **kwargs: Arbitrary keyword arguments
+            kwargs: Required keyword arguments
 
         Returns:
             A callable function that computes the Jacobian with respect to `solution_array`.
         """
 
-        # Partially apply `args` to the `objective_function`
-        def wrapped_objective(solution_array):
-            return self.objective_function(solution_array, *args, **kwargs)
+        # Partially apply `kwargs` to the `objective_function`
+        def wrapped_objective(solution_array) -> Array:
+            return self.objective_function(solution_array, kwargs)
 
         return jax.jacobian(wrapped_objective)
 
-    def objective_function(
-        self, solution_array: Array, args
-    ):  # solve_me: ResidualProtocol, constraints: SystemConstraints
-        # ) -> Array:
+    def objective_function(self, solution_array: Array, kwargs: dict[str, Any]) -> Array:
         """Objective function
 
         Args:
             solution_array: Array of the solution
-            solve_me: Some system to solve
-            constraints: System constraints
+            kwargs: Required keyword arguments
 
         Returns:
             Residual array
         """
-        logger.debug("log_solution passed into _objective_func = %s", solution_array)
+        logger.debug("solution_array passed into objective_functiom = %s", solution_array)
 
-        solve_me = args[0]
-        constraints = args[1]
+        solve_me: ResidualProtocol = kwargs["solve_me"]
+        constraints: SystemConstraints = kwargs["constraints"]
 
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
         solution.value = solution_array
 
-        # Required for optimistix
-        # constraints = args[0]
         residual: Array = solve_me.get_residual(solution, constraints)
 
-        # For Optimistix/JAX debugging
-        jax.debug.print("solution into objective = {solution}", solution=solution.value)
-        jax.debug.print("residual out of objective = {residual}", residual=residual)
+        # jax.debug.print("solution into objective = {solution}", solution=solution.value)
+        # jax.debug.print("residual out of objective = {residual}", residual=residual)
 
         return residual
 
@@ -133,17 +127,17 @@ class Solver(ABC):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> tuple:
+    ) -> tuple[Any, Callable, Solution]:
         """Solve
 
         Args:
-            solve_me: Some system to solve
-            initial_solution: Initial solution
+            solve_me: System to solve
             constraints: Constraints for the system of equations
+            initial_solution: Initial solution
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Solver solution object, Jacobian function, atmodeller solution object
+            Solver solution object, Jacobian function, atmodeller solution
         """
 
 
@@ -159,27 +153,21 @@ class SolverOptimistix(Solver):
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
     ) -> tuple[Solution_optx, Callable, Solution]:
-        """Solve using optimistix
+        """Solve using Optimistix
 
         Args:
+            solve_me: System to solve
             constraints: Constraints for the system of equations
             initial_solution: Initial condition for this solve only. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Optimistix solution, Jacobian function, solution
+            Optimistix solution, Jacobian function, atmodeller solution
         """
-
-        print(solve_me)
-        print(constraints)
-        print(initial_solution)
-        print(tol)
-
         initial_solution_guess: Array = self.get_initial_solution(
             solve_me, constraints=constraints, initial_solution=initial_solution
         )
-
-        print(initial_solution_guess)
+        kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
 
         # Other options if the surface is not well-behaved
         # solver = optx.BFGS(rtol=1e-3, atol=1e-3)
@@ -188,43 +176,50 @@ class SolverOptimistix(Solver):
         # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
         solver = optx.Newton(rtol=tol, atol=tol)
         # solver = optx.Chord(rtol=tol, atol=tol)
+
         sol = optx.root_find(
             self.objective_function,
             solver,
             initial_solution_guess,
-            args=(solve_me, constraints),
+            args=kwargs,
             throw=True,
         )
 
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
         solution.value = jnp.array(sol.value)
+        residual: Array = solve_me.get_residual(solution, constraints)
+        rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
 
-        residual = solve_me.get_residual(solution, constraints)
-        rmse = np.sqrt(np.sum(np.array(residual) ** 2))
         # Success is indicated by no message
         if optx.RESULTS[sol.result] == "":
-            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"])
+            logger.info(
+                "Optimistix success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"]
+            )
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
-        # It is useful to also return the jacobian of this system for testing
-        # jacobian: Callable = self.jacobian((constraints,))
-        # logger.info("Jacobian = %s", jacobian(solution.value))
+        jacobian: Callable = self.jacobian(kwargs)
+        logger.info("Jacobian = %s", jacobian(solution.value))
 
-        return sol, None, solution
+        return sol, jacobian, solution
 
 
 class SolverScipy(Solver):
     """SciPy solver"""
 
-    def jacobian_scipy(self, solution_array: Array, args) -> Callable:
-        # constraints = args[0]
+    def _jacobian_scipy(self, solution_array: Array, kwargs: dict[str, Any]) -> Callable:
+        """Jacobian for scipy root, which must accept the same arguments as the objective function.
 
-        # Partially apply `args` to the `objective_function`
-        def wrapped_objective(solution_array):
-            return self.objective_function(solution_array, args)
+        Args:
+            solution_array: Array of the solution
+            kwargs: Required keyword arguments
 
-        return jax.jacobian(wrapped_objective)(solution_array)
+        Returns:
+            The evaluated Jacobian at the given `solution_array`.
+        """
+        jacobian_func: Callable = self.jacobian(kwargs)
+
+        return jacobian_func(solution_array)
 
     @override
     def solve(
@@ -234,49 +229,45 @@ class SolverScipy(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> tuple[OptimizeResult, None, Solution]:
-        """Solve using scipy
+    ) -> tuple[OptimizeResult, Callable, Solution]:
+        """Solve using Scipy
 
         Args:
+            solve_me: System to solve
             constraints: Constraints for the system of equations
             initial_solution: Initial condition for this solve only. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Scipy solution, Jacobian function (currently None), solution
+            Scipy solution, Jacobian function, atmodeller solution
         """
         initial_solution_guess: Array = self.get_initial_solution(
             solve_me, constraints=constraints, initial_solution=initial_solution
         )
+        kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
 
-        # TODO: Hacky to enclose the args in an extra tuple, but the arguments by root seem to
-        # be passed differently to optimistix? To clarify and clean up with a consistent solver
-        # interface.
         sol: OptimizeResult = root(
             self.objective_function,
             initial_solution_guess,
-            args=((constraints,),),
+            args=kwargs,
             tol=tol,
-            jac=self.jacobian_scipy,
+            jac=self._jacobian_scipy,
         )
 
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
         solution.value = jnp.array(sol.x)
+        residual: Array = solve_me.get_residual(solution, constraints)
+        rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
 
-        residual = solve_me.get_residual(solution, constraints)
-        rmse = np.sqrt(np.sum(np.array(residual) ** 2))
-        # Success is indicated by no message
         if sol.success:
-            logger.info("Success")
-            logger.info("Success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
+            logger.info("Scipy success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
-        # It is useful to also return the jacobian of this system for testing
-        jacobian: Callable = self.jacobian((constraints,))
+        jacobian: Callable = self.jacobian(kwargs)
         logger.info("Jacobian = %s", jacobian(solution.value))
 
-        return sol, None, solution
+        return sol, jacobian, solution
 
 
 # TODO: Framework for batched calculations
