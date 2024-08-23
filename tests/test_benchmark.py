@@ -36,7 +36,7 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
-from atmodeller.reaction_network import InteriorAtmosphereSystem, Solver
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
@@ -132,7 +132,7 @@ def test_CHO_reduced(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -184,7 +184,7 @@ def test_CHO_IW(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -237,7 +237,7 @@ def test_CHO_oxidised(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -287,7 +287,7 @@ def test_CHO_highly_oxidised(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -328,7 +328,7 @@ def test_CHO_middle_temperature(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=cool_planet)
     _, _, solution = system.solve(constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -406,7 +406,7 @@ def test_CHO_low_temperature(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=cool_planet)
     solver, jacobian, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -479,7 +479,7 @@ def test_graphite_condensed(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=cool_planet)
     _, _, solution = system.solve(solver="optimistix", constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -526,7 +526,7 @@ def test_graphite_unstable(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -568,7 +568,7 @@ def test_water_condensed(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=cool_planet)
     _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {
@@ -609,7 +609,7 @@ def test_water_condensed_O_abundance(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=cool_planet)
     _, _, solution = system.solve(solver="scipy", constraints=constraints)
 
     factsage_result: dict[str, float] = {

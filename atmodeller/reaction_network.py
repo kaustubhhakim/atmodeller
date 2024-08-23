@@ -43,8 +43,23 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ResidualProtocol(Protocol):
+    """Protocol for some system to solve"""
+
+    _species: Species
+    _planet: Planet
 
     def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array: ...
+
+    @property
+    def species(self) -> Species:
+        return self._species
+
+    @property
+    def planet(self) -> Planet:
+        return self._planet
+
+    def temperature(self) -> float:
+        return self.planet.surface_temperature
 
 
 class ReactionNetwork(ResidualProtocol):
@@ -71,9 +86,6 @@ class ReactionNetwork(ResidualProtocol):
         else:
             assert self.reaction_matrix is not None
             return self.reaction_matrix.shape[0]
-
-    def temperature(self) -> float:
-        return self._planet.surface_temperature
 
     def formula_matrix(self) -> Array:
         """Gets the formula matrix
@@ -468,8 +480,8 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         return jnp.concatenate((residual, auxiliary_residual, pressure_residual))
 
 
-class InteriorAtmosphereSystem:
-    """An interior atmosphere system
+class ReactionNetworkWithMassBalance(ResidualProtocol):
+    """A reaction network with condensate stability and mass balance
 
     Args:
         species: Species
@@ -477,7 +489,7 @@ class InteriorAtmosphereSystem:
     """
 
     def __init__(self, species: Species, planet: Planet):
-        logger.info("Creating an interior-atmosphere system")
+        logger.info("Creating a reaction network with mass balance")
         self._species: Species = species
         self._planet: Planet = planet
         self._reaction_network = ReactionNetworkWithCondensateStability(species, planet)

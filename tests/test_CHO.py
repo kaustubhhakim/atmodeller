@@ -36,7 +36,7 @@ from atmodeller.constraints import (
 from atmodeller.core import GasSpecies, Planet, Species
 from atmodeller.eos.holland import get_holland_eos_models
 from atmodeller.eos.interfaces import RealGas
-from atmodeller.reaction_network import InteriorAtmosphereSystem, Solver
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import (
     H2_basalt_hirschmann,
@@ -79,7 +79,7 @@ def test_H2O(helper) -> None:
         ]
     )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -107,7 +107,7 @@ def test_H_fO2(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -147,7 +147,7 @@ def test_H_fO2_holland(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -177,7 +177,7 @@ def test_H_basalt_melt(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -217,7 +217,7 @@ def test_H_fO2_plus(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(2)),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -247,7 +247,7 @@ def test_H_fO2_minus(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -277,7 +277,7 @@ def test_H_five_oceans(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -308,7 +308,7 @@ def test_H_1500K(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=warm_planet)
+    system = InteriorAtmosphereSystem(species=species, planet=warm_planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -343,7 +343,7 @@ def test_H_and_C(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -378,7 +378,7 @@ def test_H_and_C_total_pressure(helper) -> None:
             TotalPressureConstraint(value=100),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {

@@ -40,11 +40,10 @@ from atmodeller.constraints import (
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.eos.holland import CO_CORK_HP91, H2_CORK_HP91, CO2_CORK_simple_HP91
 from atmodeller.eos.saxena import H2_SF87
+from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.reaction_network import (
-    InteriorAtmosphereSystem,
     ReactionNetwork,
     ReactionNetworkWithCondensateStability,
-    Solver,
 )
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
@@ -90,10 +89,8 @@ def test_H_fugacities(helper) -> None:
             FugacityConstraint(O2_g, 8.838043080858959e-08),
         )
     )
-    reaction_network: Solver = ReactionNetworkWithCondensateStability(
-        species=species, planet=planet
-    )
-    _, _, solution = reaction_network.solve(constraints=constraints)
+    interior_atmosphere = InteriorAtmosphereSystem(species=species, planet=planet)
+    _, _, solution = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
@@ -118,7 +115,7 @@ def test_H_fugacities_system(helper) -> None:
             FugacityConstraint(O2_g, 8.838043080858959e-08),
         )
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -144,7 +141,7 @@ def test_H_total_pressure(helper) -> None:
             TotalPressureConstraint(0.5067239755466055),
         )
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -170,7 +167,7 @@ def test_H_with_buffer(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         )
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -202,7 +199,7 @@ def test_H_and_C_no_solubility(helper) -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -233,7 +230,7 @@ def test_H_and_C_holland(helper) -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -264,7 +261,7 @@ def test_H_and_C_saxena(helper) -> None:
             FugacityConstraint(O2_g, 8.981953412412735e-08),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -294,7 +291,7 @@ def test_H_fO2_no_solubility(helper) -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=planet)
+    system = InteriorAtmosphereSystem(species=species, planet=planet)
     _, _, solution = system.solve(constraints=constraints)
 
     target: dict[str, float] = {
@@ -448,7 +445,7 @@ def test_reaction_network_vmap(helper) -> None:
         ),
     ]
 
-    # Vectorize the solver method using jax.vmap with PyTree and static args
+    # Vectorize th method using jax.vmap with PyTree and static args
     vmap_solve = jax.vmap(reaction_network.solve_optimistix)
 
     # constraints_batch = jax.tree_map(lambda x: jnp.stack(x, axis=0), constraints_batch)
