@@ -46,7 +46,17 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Solver(ABC):
-    """A solver"""
+    """A solver
+
+    Args:
+        *args: Positional keyword arguments for child classes.
+        **kwargs: Keyword arguments for child classes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        del args
+        del kwargs
+        logger.debug("Creating %s", self.__class__.__name__)
 
     def get_initial_solution(
         self,
@@ -201,7 +211,24 @@ class SolverOptimistix(Solver):
 
 
 class SolverScipy(Solver):
-    """SciPy solver"""
+    """SciPy solver
+
+    Args:
+        method: Type of solver. Defaults to `hybr`.
+        jac: Jacobian. If True uses the JAX autodiff derived Jacobian, otherwise False uses a
+            numerical approximation. Defaults to False.
+        options: A dictionary of solver options. Defaults to None.
+    """
+
+    @override
+    def __init__(self, method: str = "hybr", jac: bool = False, options: dict | None = None):
+        super().__init__()
+        self.method: str = method
+        if jac:
+            self.jac: Callable | bool = self._jacobian_scipy
+        else:
+            self.jac = False
+        self.options: dict | None = options
 
     def _jacobian_scipy(self, solution_array: Array, kwargs: dict[str, Any]) -> Callable:
         """Jacobian for scipy root, which must accept the same arguments as the objective function.
@@ -246,8 +273,10 @@ class SolverScipy(Solver):
             self.objective_function,
             initial_solution_guess,
             args=kwargs,
-            tol=tol,
+            method=self.method,
             jac=self._jacobian_scipy,
+            tol=tol,
+            options=self.options,
         )
 
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)

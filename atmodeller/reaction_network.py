@@ -576,7 +576,7 @@ def partial_rref(matrix: Array) -> Array:
     for i in range(ncols):
         augmented_matrix = forward_step(i, augmented_matrix)
 
-    logger.info("augmented_matrix after forward step = \n%s", augmented_matrix)
+    logger.debug("augmented_matrix after forward step = \n%s", augmented_matrix)
 
     # Backward substitution
     def backward_step(i: int, matrix: Array):
@@ -599,7 +599,7 @@ def partial_rref(matrix: Array) -> Array:
     for i in range(ncols - 1, -1, -1):
         augmented_matrix = backward_step(i, augmented_matrix)
 
-    logger.info("augmented_matrix after backward step = \n%s", augmented_matrix)
+    logger.debug("augmented_matrix after backward step = \n%s", augmented_matrix)
 
     reduced_matrix = lax.dynamic_slice(augmented_matrix, (0, 0), (nrows, ncols))
     component_matrix = lax.dynamic_slice(augmented_matrix, (ncols, ncols), (nrows - ncols, nrows))

@@ -19,16 +19,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
-
-from optimistix._solution import Solution as Solution_optx
 
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionProtocol
 from atmodeller.reaction_network import ReactionNetworkWithMassBalance
 from atmodeller.solution import Solution
-from atmodeller.solver import Solver, SolverOptimistix, SolverScipy
+from atmodeller.solver import Solver, SolverScipy
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -51,11 +48,13 @@ class InteriorAtmosphereSystem:
 
     def solve(
         self,
-        solver: str = "optimistix",
+        solver: str = "scipy",
+        method: str = "",
         *,
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
+        options: dict | None = None,
     ) -> Solution:
         """Solve
 
@@ -64,6 +63,7 @@ class InteriorAtmosphereSystem:
             constraints: Constraints for the system of equations
             initial_solution: Initial condition for this solve only. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
+            options: A dictionary of solver options. Defaults to None.
         """
         # TODO: Add flag for choice
         # solver_: Solver = SolverOptimistix()

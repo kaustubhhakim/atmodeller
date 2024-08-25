@@ -53,7 +53,8 @@ ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)
+# logger.setLevel(logging.WARNING)
 
 eos_holland: dict[str, RealGas] = get_holland_eos_models()
 planet: Planet = Planet()
