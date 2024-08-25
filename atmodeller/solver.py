@@ -321,3 +321,194 @@ class SolverScipy(Solver):
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
         return solution
+
+
+class SolverScipyTryAgain(Solver):
+    """Scipy solver that perturbs the initial solution on failure and tries again.
+
+    Args:
+        method: Type of solver. Defaults to `hybr`.
+        jac: Jacobian. If True uses the JAX autodiff derived Jacobian, otherwise False uses a
+            numerical approximation. Note this differs from the definition of jac in the
+            scipy.optimize.root documentation. Defaults to False.
+        options: A dictionary of solver options. Defaults to None.
+    """
+
+    @override
+    def __init__(self, method: str = "hybr", jac: bool = False, options: dict | None = None):
+        super().__init__()
+        logger.debug("Creating %s with %s and jac = %s)", self.__class__.__name__, method, jac)
+        solver = SolverScipy(method, jac, options)
+
+    @override
+    def solve(
+        self,
+        solve_me: ResidualProtocol,
+        *,
+        constraints: SystemConstraints,
+        initial_solution: InitialSolutionProtocol | None = None,
+        tol: float = 1.0e-8,
+    ) -> Solution:
+        """Solve using Scipy
+
+        Args:
+            solve_me: System to solve
+            constraints: Constraints for the system of equations
+            initial_solution: Initial condition for this solve only. Defaults to None.
+            tol: Tolerance. Defaults to 1.0e-8.
+
+        Returns:
+            Solution
+        """
+
+
+#     @property
+#     def failed_solves(self) -> int:
+#         """Number of failed solves"""
+#         percentage_failed: float = self._failed_solves * 100 / self.number_of_attempted_solves
+#         logger.info(
+#             "%d failed solves from a total attempted of %d (%.1f %%)",
+#             self._failed_solves,
+#             self.number_of_attempted_solves,
+#             percentage_failed,
+#         )
+
+#         return self._failed_solves
+
+#     @property
+#     def number_of_attempted_solves(self) -> int:
+#         """The total number of systems with attempted solves"""
+#         return self._attempted_solves
+
+#     def solve(
+#         self,
+#         constraints: SystemConstraints,
+#         *,
+#         initial_solution: InitialSolutionProtocol | None = None,
+#         extra_output: dict[str, float] | None = None,
+#         max_attempts: int = 20,
+#         perturb_log10_number_density: float = 2.0,
+#         errors: str = "ignore",
+#         method: str = "hybr",
+#         tol: float | None = None,
+#         **options,
+#     ) -> None:
+#         """Solves the system to determine the activities and partial pressures with constraints.
+
+#         Args:
+#             constraints: Constraints for the system of equations
+#             initial_solution: Initial condition for this solve only. Defaults to 'None', meaning
+#                 that the default (self.initial_solution) is used.
+#             extra_output: Extra data to write to the output
+#             max_attempts: Maximum number of attempts to randomise the initial condition to find a
+#                 solution if the initial guess fails. Defaults to 10.
+#             perturb_log10_number_density: Maximum log10 perturbation to apply to the pressures on
+#                 failure. Defaults to 2.0.
+#             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
+#             method: Type of solver. Defaults to 'hybr'.
+#             tol: Tolerance for termination. Defaults to None.
+#             **options: Keyword arguments for solver options. Available keywords depend on method.
+#         """
+#         logger.info("Solving system number %d", self.number_of_solves)
+#         self._attempted_solves += 1
+
+#         self._constraints = constraints
+#         self._constraints.add_activity_constraints(self.species)
+
+#         if initial_solution is None:
+#             initial_solution = self.initial_solution
+#         assert initial_solution is not None
+
+#         # These can be determined once per solve because they depend on reaction stoichiometry and
+#         # constraints, both of which are known and both of which are independent of the solution.
+#         coefficient_matrix: jnp.ndarray = self._reaction_network.get_coefficient_matrix(
+#             self.constraints
+#         )
+#         activity_modifier: jnp.ndarray = self._reaction_network.get_activity_modifier(
+#             self.constraints
+#         )
+#         equilibrium_modifier: jnp.ndarray = self._reaction_network.get_equilibrium_modifier(
+#             self.constraints
+#         )
+
+#         for attempt in range(max_attempts):
+#             logger.info("Attempt %d/%d", attempt + 1, max_attempts)
+
+#             # The only constraints that require pressure are the fugacity constraints, so for the
+#             # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
+#             # ensure the initial solution is bounded.
+#             log_solution: jnp.ndarray = initial_solution.get_log10_value(
+#                 self.constraints,
+#                 temperature=self.solution.atmosphere.temperature(),
+#                 pressure=1,
+#                 perturb_log10_number_density=perturb_log10_number_density,
+#                 attempt=attempt,
+#             )
+#             try:
+#                 sol = root(
+#                     self._objective_func,
+#                     log_solution,
+#                     args=(
+#                         coefficient_matrix,
+#                         activity_modifier,
+#                         equilibrium_modifier,
+#                     ),
+#                     method=method,
+#                     tol=tol,
+#                     options=options,
+#                     # TODO: Add jac=
+#                 )
+#                 logger.info(sol["message"])
+#                 logger.debug("sol = %s", sol)
+
+#             except TypeError as exc:
+#                 msg: str = (
+#                     f"{exc}\nAdditional context: Number of unknowns and constraints must be equal"
+#                 )
+#                 raise ValueError(msg) from exc
+
+#             except LinAlgError:
+#                 if errors == "raise":
+#                     raise
+#                 else:
+#                     logger.warning("Linear algebra error")
+#                     sol = OptimizeResult()
+#                     sol.success = False
+
+#             if sol.success:
+#                 # Below doesm't seem to be used anywhere
+#                 # self._log_solution = sol.x
+#                 self._residual = sol.fun
+#                 residual_rmse: npt.NDArray[np.float_] = np.sqrt(
+#                     np.sum(np.array(self._residual) ** 2)
+#                 )
+#                 logger.info("Residual RMSE = %.2e", residual_rmse)
+#                 logger.info(
+#                     "Actual solution = %s", pprint.pformat(self.solution.output_raw_solution())
+#                 )
+#                 initial_solution_rmse: npt.NDArray[np.float_] = np.sqrt(
+#                     mean_squared_error(sol.x, np.array(log_solution))
+#                 )
+#                 logger.info(
+#                     "Initial solution RMSE (%s) = %.2e",
+#                     self.initial_solution.__class__.__name__,
+#                     initial_solution_rmse,
+#                 )
+#                 self.output.add(self, extra_output)
+#                 initial_solution.update(self.output)
+#                 # logger.info(pprint.pformat(self.output_solution()))
+#                 break
+#             else:
+#                 logger.warning("The solver failed.")
+
+#         if not sol.success:
+#             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
+#             self._failed_solves += 1
+#             if errors == "raise":
+#                 logger.error(msg)
+#                 logger.error("constraints = %s", self.constraints)
+#                 raise RuntimeError(msg)
+#             else:
+#                 logger.warning(msg)
+#                 logger.warning("constraints = %s", self.constraints)
+#                 logger.warning("Continuing with next solve")

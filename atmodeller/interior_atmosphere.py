@@ -108,61 +108,9 @@ class InteriorAtmosphereSystem:
 #         self.solution.planet = self.planet
 
 #     @property
-#     def constraints(self) -> SystemConstraints:
-#         """Constraints"""
-#         return self._constraints
-
-#     @property
-#     def failed_solves(self) -> int:
-#         """Number of failed solves"""
-#         percentage_failed: float = self._failed_solves * 100 / self.number_of_attempted_solves
-#         logger.info(
-#             "%d failed solves from a total attempted of %d (%.1f %%)",
-#             self._failed_solves,
-#             self.number_of_attempted_solves,
-#             percentage_failed,
-#         )
-
-#         return self._failed_solves
-
-#     @property
-#     def number_of_attempted_solves(self) -> int:
-#         """The total number of systems with attempted solves"""
-#         return self._attempted_solves
-
-#     @property
 #     def number_of_solves(self) -> int:
 #         """The total number of systems solved"""
 #         return self.output.size
-
-#     # TODO: Remove, now moved to Solution class
-#     # def get_reaction_array(self) -> jnp.ndarray:
-#     #     """Gets the reaction array
-
-#     #     Returns:
-#     #         The reaction array
-#     #     """
-#     #     reaction_list: list = []
-#     #     for collection in self.solution.gas.values():
-#     #         reaction_list.append(collection.abundance.value)
-#     #     for collection in self.solution.condensed.values():
-#     #         reaction_list.append(collection.activity.value)
-
-#     #     return jnp.array(reaction_list, dtype=jnp.float_)
-
-#     # TODO: Moved to reaction network jax
-#     # def get_stability_array(self) -> jnp.ndarray:
-#     #     """Gets the condensate stability array
-
-#     #     Returns:
-#     #         The condensate stability array
-#     #     """
-#     #     stability_array: jnp.ndarray = jnp.zeros(self.species.number, dtype=jnp.float_)
-#     #     for condensed_species, collection in self.solution.condensed.items():
-#     #         index: int = self.species.species_index(condensed_species)
-#     #         stability_array = stability_array.at[index].set(collection.stability.value)
-
-#     #     return stability_array
 
 #     def residual_dict(self) -> dict[str, float]:
 #         """Residual of the objective function
@@ -403,47 +351,3 @@ class InteriorAtmosphereSystem:
 #     def output_solution(self) -> dict[str, float]:
 #         """Output the solution in a convenient form for comparison and benchmarking"""
 #         return self.solution.output_solution()
-
-#     def isclose(
-#         self,
-#         target_dict: dict[str, float],
-#         rtol: float = 1.0e-5,
-#         atol: float = 1.0e-8,
-#     ) -> np.bool_:
-#         """Determines if the solution pressures are close to target values within a tolerance.
-
-#         Args:
-#             target_dict: Dictionary of the target values
-#             rtol: Relative tolerance. Defaults to 1.0E-5.
-#             atol: Absolute tolerance. Defaults to 1.0E-8.
-
-#         Returns:
-#             True if the solution is close to the target, otherwise False
-#         """
-#         if len((self.output_solution())) != len(target_dict):
-#             return np.bool_(False)
-
-#         target_values: list = list(dict(sorted(target_dict.items())).values())
-#         solution_values: list = list(dict(sorted(self.output_solution().items())).values())
-#         isclose: np.bool_ = np.isclose(target_values, solution_values, rtol=rtol, atol=atol).all()
-
-#         return isclose
-
-#     def isclose_tolerance(self, target_dict: dict[str, float], message: str = "") -> float | None:
-#         """Writes a log message with the tightest tolerance that is satisfied.
-
-#         Args:
-#             target_dict: Dictionary of the target values
-#             message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
-#                 to an empty string.
-
-#         Returns:
-#             The tightest tolerance satisfied
-#         """
-#         for log_tolerance in (-6, -5, -4, -3, -2, -1):
-#             tol: float = 10**log_tolerance
-#             if self.isclose(target_dict, rtol=tol, atol=tol):
-#                 logger.info("%s (tol = %f)".lstrip(), message, tol)
-#                 return tol
-
-#         logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
