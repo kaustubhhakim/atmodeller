@@ -25,28 +25,10 @@ from optimistix._solution import Solution as Solution_optx
 
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
-
-# from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
-# from atmodeller.output import Output
 from atmodeller.initial_solution import InitialSolutionProtocol
 from atmodeller.reaction_network import ReactionNetworkWithMassBalance
 from atmodeller.solution import Solution
 from atmodeller.solver import Solver, SolverOptimistix, SolverScipy
-
-# import jax.numpy as jnp
-# import numpy as np
-# import numpy.typing as npt
-# from jax import Array
-
-
-# import pprint
-# from dataclasses import dataclass, field
-
-# from scipy.linalg import LinAlgError
-# from scipy.optimize import OptimizeResult, root
-# from sklearn.metrics import mean_squared_error
-
-# from atmodeller.solution import Solution
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -74,7 +56,7 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> tuple[Solution_optx, Callable, Solution]:
+    ) -> Solution:
         """Solve
 
         Args:
@@ -88,14 +70,14 @@ class InteriorAtmosphereSystem:
 
         solver_: Solver = SolverScipy()
 
-        a, b, c = solver_.solve(
+        solution: Solution = solver_.solve(
             self._reaction_network,
             constraints=constraints,
             initial_solution=initial_solution,
             tol=tol,
         )
 
-        return (a, b, c)
+        return solution
 
 
 # @dataclass(kw_only=True)

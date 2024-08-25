@@ -30,7 +30,6 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array
-from optimistix._solution import Solution as Solution_optx
 from scipy.optimize import OptimizeResult, root
 
 from atmodeller.constraints import SystemConstraints
@@ -127,7 +126,7 @@ class Solver(ABC):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> tuple[Any, Callable, Solution]:
+    ) -> Solution:
         """Solve
 
         Args:
@@ -137,7 +136,7 @@ class Solver(ABC):
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Solver solution object, Jacobian function, atmodeller solution
+            Solution
         """
 
 
@@ -152,7 +151,7 @@ class SolverOptimistix(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> tuple[Solution_optx, Callable, Solution]:
+    ) -> Solution:
         """Solve using Optimistix
 
         Args:
@@ -162,7 +161,7 @@ class SolverOptimistix(Solver):
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Optimistix solution, Jacobian function, atmodeller solution
+            Solution
         """
         initial_solution_guess: Array = self.get_initial_solution(
             solve_me, constraints=constraints, initial_solution=initial_solution
@@ -198,10 +197,7 @@ class SolverOptimistix(Solver):
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
-        jacobian: Callable = self.jacobian(kwargs)
-        logger.info("Jacobian = %s", jacobian(solution.value))
-
-        return sol, jacobian, solution
+        return solution
 
 
 class SolverScipy(Solver):
@@ -229,7 +225,7 @@ class SolverScipy(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> tuple[OptimizeResult, Callable, Solution]:
+    ) -> Solution:
         """Solve using Scipy
 
         Args:
@@ -239,7 +235,7 @@ class SolverScipy(Solver):
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Scipy solution, Jacobian function, atmodeller solution
+            Solution
         """
         initial_solution_guess: Array = self.get_initial_solution(
             solve_me, constraints=constraints, initial_solution=initial_solution
@@ -264,10 +260,7 @@ class SolverScipy(Solver):
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
-        jacobian: Callable = self.jacobian(kwargs)
-        logger.info("Jacobian = %s", jacobian(solution.value))
-
-        return sol, jacobian, solution
+        return solution
 
 
 # TODO: Framework for batched calculations
