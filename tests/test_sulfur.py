@@ -83,7 +83,7 @@ def test_S2_SO_Sulfide_IW() -> None:
         "S2_g": 1.0000000000000021e-05,
     }
 
-    system.solve(constraints)
+    system.solve(constraints=constraints)
     assert system.isclose(target, rtol=RTOL, atol=ATOL)
 
 

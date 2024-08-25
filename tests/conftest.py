@@ -198,7 +198,7 @@ def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
                     PressureConstraint(H2O_g, H2O_pressure),
                 ]
             )
-            system.solve(constraints)
+            system.solve(constraints=constraints)
 
     filename = Path("ic_regressor_test_data")
     system.output(filename, to_excel=True, to_pickle=True)

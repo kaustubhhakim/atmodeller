@@ -193,7 +193,7 @@ def test_last_solution():
     system = InteriorAtmosphereSystem(species=species, planet=planet)
 
     # Following the solve we test that the initial condition returns the previous solution
-    system.solve(constraints, initial_solution=initial_solution)
+    system.solve(constraints=constraints, initial_solution=initial_solution)
 
     result = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable

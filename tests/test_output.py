@@ -91,4 +91,4 @@ def test_trappist_output() -> None:
     )
 
     system = InteriorAtmosphereSystem(species=species, planet=trappist1e)
-    system.solve(constraints)
+    system.solve(constraints=constraints)

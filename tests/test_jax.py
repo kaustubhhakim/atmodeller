@@ -42,6 +42,7 @@ from atmodeller.eos.holland import CO_CORK_HP91, H2_CORK_HP91, CO2_CORK_simple_H
 from atmodeller.eos.saxena import H2_SF87
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
+from atmodeller.solver import SolverOptimistix
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -89,7 +90,9 @@ def test_H_fugacities(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.257077006719072,

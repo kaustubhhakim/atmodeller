@@ -53,11 +53,6 @@ class Solver(ABC):
         **kwargs: Keyword arguments for child classes.
     """
 
-    def __init__(self, *args, **kwargs):
-        del args
-        del kwargs
-        logger.debug("Creating %s", self.__class__.__name__)
-
     def get_initial_solution(
         self,
         solve_me: ResidualProtocol,
@@ -151,7 +146,38 @@ class Solver(ABC):
 
 
 class SolverOptimistix(Solver):
-    """Optimistix solver"""
+    """Optimistix solver
+
+    Args:
+        method: Type of solver. Options are `bfgs`, `chord`, `dogleg`, `lm`, and `newton`. Defaults
+            to `newton`.
+    """
+
+    @override
+    def __init__(self, method: str = "newton"):
+        super().__init__()
+        self.method: str = method
+        self.solver = self._get_solver()
+        logger.debug("Creating %s with %s", self.__class__.__name__, method)
+
+    def _get_solver(self):
+        """Gets the Optimistic solver
+
+        Returns:
+            Solver class
+        """
+        if self.method == "bfgs":
+            solver = optx.BFGS
+        elif self.method == "chord":
+            solver = optx.Chord
+        elif self.method == "dogleg":
+            solver = optx.Dogleg
+        elif self.method == "lm":
+            solver = optx.LevenbergMarquardt
+        elif self.method == "newton":
+            solver = optx.Newton
+
+        return solver
 
     @override
     def solve(
@@ -178,13 +204,7 @@ class SolverOptimistix(Solver):
         )
         kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
 
-        # Other options if the surface is not well-behaved
-        # solver = optx.BFGS(rtol=1e-3, atol=1e-3)
-        # solver = optx.OptaxMinimiser(optax.adabelief(learning_rate=0.01), rtol=tol, atol=tol)
-        # solver = optx.Dogleg(rtol=tol, atol=tol)
-        # solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
-        solver = optx.Newton(rtol=tol, atol=tol)
-        # solver = optx.Chord(rtol=tol, atol=tol)
+        solver = self.solver(rtol=tol, atol=tol)
 
         sol = optx.root_find(
             self.objective_function,
@@ -202,7 +222,10 @@ class SolverOptimistix(Solver):
         # Success is indicated by no message
         if optx.RESULTS[sol.result] == "":
             logger.info(
-                "Optimistix success. RMSE = %0.2e, steps = %d", rmse, sol.stats["num_steps"]
+                "Optimistix success with %s. RMSE = %0.2e, steps = %d",
+                self.method,
+                rmse,
+                sol.stats["num_steps"],
             )
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
@@ -216,7 +239,8 @@ class SolverScipy(Solver):
     Args:
         method: Type of solver. Defaults to `hybr`.
         jac: Jacobian. If True uses the JAX autodiff derived Jacobian, otherwise False uses a
-            numerical approximation. Defaults to False.
+            numerical approximation. Note this differs from the definition of jac in the
+            scipy.optimize.root documentation. Defaults to False.
         options: A dictionary of solver options. Defaults to None.
     """
 
@@ -229,6 +253,7 @@ class SolverScipy(Solver):
         else:
             self.jac = False
         self.options: dict | None = options
+        logger.debug("Creating %s with %s and jac = %s)", self.__class__.__name__, method, jac)
 
     def _jacobian_scipy(self, solution_array: Array, kwargs: dict[str, Any]) -> Callable:
         """Jacobian for scipy root, which must accept the same arguments as the objective function.
@@ -285,32 +310,14 @@ class SolverScipy(Solver):
         rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
 
         if sol.success:
-            logger.info("Scipy success. RMSE = %0.2e, steps = %d", rmse, sol["nfev"])
+            logger.info(
+                "Scipy success with %s and jac=%s. RMSE=%0.2e, steps=%d",
+                self.method,
+                self.jac,
+                rmse,
+                sol["nfev"],
+            )
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
 
         return solution
-
-
-# TODO: Framework for batched calculations
-# class solve_optimistix_batched(
-#     self,
-#     initial_solution: InitialSolutionProtocol | None = None,
-#     *,
-#     constraints_list: list[SystemConstraints],
-#     tol: float = 1.0e-8,
-# ) -> tuple[list[Solution_optx], list[Callable], list[Solution]]:
-
-#     # Vectorize the solve_optimistix method over the constraints_list
-#     solve_optimistix_vmap = jax.vmap(
-#         lambda constraints: self.solve_optimistix(
-#             initial_solution=initial_solution, constraints=constraints, tol=tol
-#         ),
-#         in_axes=(0,),
-#     )
-
-#     # Apply vmap over the constraints_list
-#     solutions, jacobians, final_solutions =
-#       solve_optimistix_vmap(jnp.array(constraints_list))
-
-#     return solutions, jacobians, final_solutions

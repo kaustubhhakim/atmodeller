@@ -48,29 +48,21 @@ class InteriorAtmosphereSystem:
 
     def solve(
         self,
-        solver: str = "scipy",
-        method: str = "",
+        solver: Solver = SolverScipy(),
         *,
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-        options: dict | None = None,
     ) -> Solution:
         """Solve
 
         Args:
-            solver: Solver. Defaults to Optimistix.
+            solver: Solver. Defaults to SolverScipy.
             constraints: Constraints for the system of equations
             initial_solution: Initial condition for this solve only. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
-            options: A dictionary of solver options. Defaults to None.
         """
-        # TODO: Add flag for choice
-        # solver_: Solver = SolverOptimistix()
-
-        solver_: Solver = SolverScipy()
-
-        solution: Solution = solver_.solve(
+        solution: Solution = solver.solve(
             self._reaction_network,
             constraints=constraints,
             initial_solution=initial_solution,
