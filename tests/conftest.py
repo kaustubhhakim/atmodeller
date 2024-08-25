@@ -33,6 +33,7 @@ from atmodeller.constraints import (
     SystemConstraints,
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
@@ -118,7 +119,7 @@ def helper():
 
 
 @pytest.fixture
-def graphite_water_condensed() -> InteriorAtmosphereSystem:
+def graphite_water_condensed() -> Solution:
     """C and water in equilibrium at 430 K and 10 bar
 
     This system is convenient for testing several parts of the code, so it is a fixture so it can
@@ -154,9 +155,19 @@ def graphite_water_condensed() -> InteriorAtmosphereSystem:
             ActivityConstraint(C_cr, 1),
         ]
     )
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=cool_planet
+    )
 
-    system: Solver = InteriorAtmosphereSystem(species=species, planet=cool_planet)
-    _, _, solution = system.solve(solver="scipy", constraints=constraints)
+    # TODO: Trying to guide the initial solution more but there's still a bug somewhere, probably
+    # with the mass scaling for condensates.
+    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+        {CH4_g: 1.0, H2O_g: 5}, species=species
+    )
+
+    solution: Solution = interior_atmosphere.solve(
+        constraints=constraints, initial_solution=initial_solution
+    )
 
     return solution
 
