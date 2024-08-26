@@ -74,7 +74,7 @@ STABILITY_PREFIX: str = "stability_"
 """Name prefix for the stability of condensed species"""
 TAU: float = 1e-15
 """Tau factor for the stability of condensed species"""
-LOG10_TAU: jnp.ndarray = jnp.log10(TAU)
+LOG10_TAU: Array = jnp.log10(TAU)
 """Log10 of the tau factor"""
 
 

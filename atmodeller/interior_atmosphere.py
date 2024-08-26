@@ -70,7 +70,7 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> Solution:
+    ) -> tuple[Solution, bool]:
         """Solve
 
         Args:

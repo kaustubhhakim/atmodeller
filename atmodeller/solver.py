@@ -57,7 +57,6 @@ class Solver(ABC):
         initial_solution: InitialSolutionProtocol | None = None,
         pressure: float = 1.0,
         perturb_log10_number_density: float = 0,
-        attempt: int = 0,
     ) -> Array:
         """Gets the initial solution
 
@@ -68,13 +67,14 @@ class Solver(ABC):
             pressure: Total pressure to evaluate the constraints. Defaults to 1.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities. Defaults to 0.0.
-            attempt: Attempt number to find a solution. Defaults to 0.
 
         Returns:
             An array of the initial solution
         """
         if initial_solution is None:
-            initial_solution_ = InitialSolutionDict(species=solve_me.species)
+            initial_solution_ = InitialSolutionDict(
+                species=solve_me.species, planet=solve_me.planet
+            )
         else:
             initial_solution_ = initial_solution
 
@@ -83,7 +83,6 @@ class Solver(ABC):
             temperature=solve_me.temperature(),
             pressure=pressure,
             perturb_log10_number_density=perturb_log10_number_density,
-            attempt=attempt,
         )
 
         return initial_solution_guess
@@ -139,7 +138,6 @@ class Solver(ABC):
         tol: float = 1.0e-8,
         pressure: float = 1.0,
         perturb_log10_number_density: float = 0,
-        attempt: int = 0,
     ) -> tuple[Solution, bool]:
         """Solve
 
@@ -151,7 +149,6 @@ class Solver(ABC):
             pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities. Defaults to 0.0.
-            attempt: Attempt number to find a solution. Defaults to 0.
 
         Returns:
             Solution and a bool to indicate success
@@ -299,7 +296,6 @@ class SolverScipy(Solver):
         tol: float = 1.0e-8,
         pressure: float = 1.0,
         perturb_log10_number_density: float = 0,
-        attempt: int = 0,
     ) -> tuple[Solution, bool]:
         """Solve using Scipy
 
@@ -311,7 +307,6 @@ class SolverScipy(Solver):
             pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities. Defaults to 0.0.
-            attempt: Attempt number to find a solution. Defaults to 0.
 
         Returns:
             Solution and a bool to indicate success
@@ -322,7 +317,6 @@ class SolverScipy(Solver):
             initial_solution=initial_solution,
             pressure=pressure,
             perturb_log10_number_density=perturb_log10_number_density,
-            attempt=attempt,
         )
         kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
 
@@ -339,7 +333,6 @@ class SolverScipy(Solver):
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
 
         if sol.success:
-            print(sol)
             solution.value = jnp.array(sol.x)
             residual: Array = solve_me.get_residual(solution, constraints)
             rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
@@ -426,7 +419,6 @@ class SolverScipyTryAgain(Solver):
                     initial_solution=initial_solution,
                     tol=tol,
                     perturb_log10_number_density=perturb_log10_number_density,
-                    attempt=attempt,
                 )
             except TypeError as exc:
                 msg: str = (

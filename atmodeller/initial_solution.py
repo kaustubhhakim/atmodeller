@@ -25,9 +25,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar, cast
 
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from jax import Array
 from jaxtyping import ArrayLike
 from scipy.sparse import spmatrix
 from sklearn.linear_model import SGDRegressor
@@ -75,8 +77,7 @@ class InitialSolutionProtocol(Protocol):
         temperature: float,
         pressure: ArrayLike,
         perturb_log10_number_density: float = 0,
-        attempt: int = 0,
-    ) -> npt.NDArray[np.float_]: ...
+    ) -> Array: ...
 
     def update(self, output: Output) -> None: ...
 
@@ -87,17 +88,17 @@ class InitialSolution(ABC, Generic[T]):
     Args:
         value: An object used to compute the initial solution
         species: Species
+        planet: Planet
         min_log10_number_density: Minimum log10 number density. Defaults to
             :data:`MIN_LOG10_NUMBER_DENSITY`.
         max_log10_number_density: Maximum log10 number density. Defaults to
             :data:`MAX_LOG10_NUMBER_DENSITY`.
         fill_log10_number_density: Fill value for number density. Defaults to 26.
-        fill_log10_activity: Fill value for activity. Defaults to -LOG10_TAU.
-        fill_log10_stability: Fill value for stability. Defaults to -10.
+        fill_log10_activity: Fill value for activity. Defaults to -TAU.
+        fill_log10_stability: Fill value for stability. Defaults to LOG10_TAU.
 
     Attributes:
         value: An object used to compute the initial solution
-        solution: The initial solution
     """
 
     def __init__(
@@ -105,55 +106,56 @@ class InitialSolution(ABC, Generic[T]):
         value: T,
         *,
         species: Species,
+        planet: Planet,
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26,
         fill_log10_activity: float = -TAU,
-        fill_log10_stability: float = LOG10_TAU,
+        fill_log10_stability: Array = LOG10_TAU,
     ):
         logger.debug("Creating %s", self.__class__.__name__)
         self.value: T = value
         self._species: Species = species
-        # FIXME: TODO: Hack
-        planet = Planet()
+        self._planet: Planet = planet
         self.solution: Solution = Solution.create(species, planet)
         self._min_log10_number_density: float = min_log10_number_density
         self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
         self._fill_log10_activity: float = fill_log10_activity
-        self._fill_log10_stability: float = fill_log10_stability
+        self._fill_log10_stability: ArrayLike = fill_log10_stability
 
     @property
     def species(self) -> Species:
         """Species"""
         return self._species
 
-    def clip(
-        self,
-        component: SpeciesComponentSetterProtocol,
-        minimum_value: float | None = None,
-        maximum_value: float | None = None,
-    ) -> None:
-        """clips the value.
+    # def clip(
+    #     self,
+    #     component: SpeciesComponentSetterProtocol,
+    #     minimum_value: float | None = None,
+    #     maximum_value: float | None = None,
+    # ) -> None:
+    #     """clips the value.
 
-        Args:
-            component: Solution component
-            minimum_value: Minimum value. Defaults to None, meaning do not clip.
-            maximum_value: Maximum value. Defaults to None, meaning do not clip.
-        """
-        component.value = np.clip(component.value, minimum_value, maximum_value)
+    #     Args:
+    #         component: Solution component
+    #         minimum_value: Minimum value. Defaults to None, meaning do not clip.
+    #         maximum_value: Maximum value. Defaults to None, meaning do not clip.
+    #     """
+    #     component.value = np.clip(component.value, minimum_value, maximum_value)
 
-    def fill(self, component: SpeciesComponentSetterProtocol, fill_value: float) -> None:
+    def fill(self, component: SpeciesComponentSetterProtocol, fill_value: ArrayLike) -> None:
         """Fills value if it is missing.
 
         Args:
             component: Solution component
             fill_value: The fill value
         """
+        # FIXME: Below still required?
         # Force float to prevent integer overflow when later performing exponentiation, which can
         # occur with the np.int64 data type
         if not hasattr(component, "_value"):
-            component.value = float(fill_value)
+            component.value = fill_value  # float(fill_value)
 
     def perturb(self, component: SpeciesComponentSetterProtocol, perturb: float = 0) -> None:
         """Perturbs value.
@@ -162,11 +164,11 @@ class InitialSolution(ABC, Generic[T]):
             component: Solution component
             perturb: Maximum log10 value to perturb the value. Defaults to 0.
         """
-        component.value += perturb * (2 * np.random.rand() - 1)
+        component.value = component.value + perturb * (2 * np.random.rand() - 1)
 
     @abstractmethod
     def set_data(
-        self, constraints: SystemConstraints, *, temperature: float, pressure: float
+        self, constraints: SystemConstraints, *, temperature: float, pressure: ArrayLike
     ) -> None:
         """Sets the raw data for the initial solution.
 
@@ -183,7 +185,7 @@ class InitialSolution(ABC, Generic[T]):
         constraints: SystemConstraints,
         *,
         temperature: float,
-        pressure: float,
+        pressure: ArrayLike,
         perturb_log10_number_density: float = 0,
     ) -> None:
         """Processes the initial solution data.
@@ -201,63 +203,33 @@ class InitialSolution(ABC, Generic[T]):
             self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
-            self.clip(
-                collection.abundance,
-                self._min_log10_number_density,
-                self._max_log10_number_density,
-            )
+            # self.clip(
+            #     collection.abundance,
+            #     self._min_log10_number_density,
+            #     self._max_log10_number_density,
+            # )
 
-        # TODO: This causes problems for Optimistix solver and is probably best avoided. Maybe to
-        # remove soon
-        # # Gas constraints
-        # for constraint in constraints.gas_constraints:
-        #     self.solution.gas[constraint.species].abundance.value = (
-        #         constraint.get_log10_value(temperature=temperature, pressure=pressure)
-        #     )
+        # TODO: Unsure whether this helps or hinders the solvers
+        # Gas constraints
+        for constraint in constraints.gas_constraints:
+            self.solution.gas[constraint.species].abundance.value = constraint.get_log10_value(
+                temperature=temperature, pressure=pressure
+            )
 
         for collection in self.solution.condensed.values():
             self.fill(collection.activity, self._fill_log10_activity)
-            self.clip(collection.activity, maximum_value=0)
+            # self.clip(collection.activity, maximum_value=0)
             self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
-            self.clip(
-                collection.abundance,
-                self._min_log10_number_density,
-                self._max_log10_number_density,
-            )
+            # self.clip(
+            #     collection.abundance,
+            #     self._min_log10_number_density,
+            #     self._max_log10_number_density,
+            # )
             self.fill(collection.stability, self._fill_log10_stability)
-            # if perturb_log10_number_density:
-            #     self.perturb(collection.abundance, perturb_log10_number_density)
-            # stability = random.choice(["stable", "unstable"])
-            # if stability == "stable":
-            #    collection.activity.value = TAU
-            #    collection.stability.value = LOG10_TAU
-            # else:
-            #    collection.activity.value = TAU
-            #    collection.stability.value = -1
-            # collection.stability.value = -7
-            # collection.activity.value = -0.3010299956639812  # log10(0.5)
-            # Satisfy auxilliary equation by construction
-            # collection.abundance.value = LOG10_TAU - collection.stability.value
 
-        # for species in self.solution.activity.data:
-        #     stability: str = random.choice(["stable", "unstable"])
-        #     if stability == "stable":
-        #         self.solution.activity.data[species] = 0
-        #         self.solution.mass.data[species] = 19
-        #     else:
-        #         self.solution.activity.data[species] = -24
-        #         self.solution.mass.data[species] = -16
-
-        # Testing satisfying the condensate stability criteria by construction did not appear to
-        # yield improved performance of the solver.
-        # for collection in self.solution.condensed.values():
-        #     collection.stability.value = (
-        #         collection.tauc.value - collection.abundance.value
-        #     )
-
-        # We do not apply activity constraints because they only define the activity of a stable
+        # Do not apply activity constraints because they only define the activity of a stable
         # condensate (i.e. unity for a pure component), but whether or not the condensate is
         # stable must be simultaneously solved for, giving rise to activity less than the stable
         # value for unstable condensates.
@@ -267,34 +239,26 @@ class InitialSolution(ABC, Generic[T]):
         constraints: SystemConstraints,
         *,
         temperature: float,
-        pressure: float,
+        pressure: ArrayLike,
         perturb_log10_number_density: float = 0,
-        attempt: int = 0,
-    ) -> npt.NDArray[np.float_]:
+    ) -> Array:
         """Gets the log10 value of the initial solution.
 
         Args:
             constraints: Constraints
             temperature: Temperature in K
             pressure: Pressure in bar
-            perturb_log10_number_density: Maximum log10 value to perturb the gas number densities.
+            perturb_log10_number_density: Maximum log10 value to perturb the number densities.
                 Defaults to 0.
-            attempt: Solution attempt number
 
         Returns:
             The initial solution
         """
-        # Only perturb the value after the first attempt
-        if attempt == 0:
-            perturb_value = 0
-        else:
-            perturb_value = perturb_log10_number_density
-
         self.process_data(
             constraints,
             temperature=temperature,
             pressure=pressure,
-            perturb_log10_number_density=perturb_value,
+            perturb_log10_number_density=perturb_log10_number_density,
         )
 
         logger.info(
@@ -320,26 +284,26 @@ class InitialSolutionDict(InitialSolution[dict]):
     Args:
         value: Dictionary of the initial solution. Defaults to None, meaning to use default values.
         species: Species
+        planet: Planet
         **kwargs: Optional keyword arguments to pass through to the base class.
 
     Attributes:
         value: A dictionary used to compute the initial solution
-        solution: The initial solution
     """
 
     @override
-    def __init__(self, value: dict | None = None, *, species: Species, **kwargs):
+    def __init__(self, value: dict | None = None, *, species: Species, planet: Planet, **kwargs):
         if value is None:
             value_dict: dict = {}
         else:
             value_dict = value
-        super().__init__(value_dict, species=species, **kwargs)
+        super().__init__(value_dict, species=species, planet=planet, **kwargs)
 
     def _get_log10_values(
         self,
         species: ChemicalSpecies,
         prefix: str,
-    ) -> float | None:
+    ) -> Array | None:
         """Gets log10 values.
 
         Args:
@@ -351,7 +315,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         """
         key: ChemicalSpecies | str = f"{prefix}{species.name}" if prefix else species
         try:
-            output: float | None = np.log10(self.value[key], dtype=np.float_)
+            output: Array | None = jnp.log10(self.value[key])
         except KeyError:
             # Ignore missing keys. These are later filled with fill values.
             output = None
@@ -364,7 +328,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         del kwargs
 
         for gas_species, collection in self.solution.gas.items():
-            value: float | None = self._get_log10_values(gas_species, "")
+            value: Array | None = self._get_log10_values(gas_species, "")
             if value is not None:
                 collection.abundance.value = value
 
@@ -389,6 +353,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     Args:
         value: Output for constructing the regressor
         species: Species
+        planet: Planet
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
@@ -420,6 +385,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         value: Output,
         *,
         species: Species,
+        planet: Planet,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
@@ -427,7 +393,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         solution_override: InitialSolutionDict | None = None,
         **kwargs,
     ):
-        super().__init__(value, species=species, **kwargs)
+        super().__init__(value, species=species, planet=planet, **kwargs)
         self.fit: bool = fit
         # Ensure consistency of arguments and correct handling of fit versus partial refit.
         self.fit_batch_size: int = fit_batch_size if self.fit else 0
@@ -657,6 +623,7 @@ class InitialSolutionLast(InitialSolutionProtocol):
         value: An initial solution until `switch_iteration` is reached. Defaults to None, meaning
             that :class:`InitialSolutionDict` is used with default arguments.
         species: Species
+        planet: Planet
         switch_iteration: Iteration number to switch the initial solution to the previous solution.
             Defaults to 1.
         **kwargs: Optional keyword arguments to instantiate :class:`InitialSolutionDict`
@@ -671,15 +638,19 @@ class InitialSolutionLast(InitialSolutionProtocol):
         value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
+        planet: Planet,
         switch_iteration: int = 1,
         **kwargs,
     ):
         if value is None:
-            value_start: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+            value_start: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, planet=planet, **kwargs
+            )
         else:
             value_start = value
         self.value: InitialSolutionProtocol = value_start
         self._species: Species = species
+        self._planet: Planet = planet
         self._switch_iteration: int = switch_iteration
         self._kwargs = kwargs
 
@@ -688,7 +659,7 @@ class InitialSolutionLast(InitialSolutionProtocol):
         return self.value.species
 
     @override
-    def get_log10_value(self, *args, **kwargs) -> npt.NDArray[np.float_]:
+    def get_log10_value(self, *args, **kwargs) -> Array:
         return self.value.get_log10_value(*args, **kwargs)
 
     @override
@@ -701,7 +672,9 @@ class InitialSolutionLast(InitialSolutionProtocol):
             for species in self.species.data:
                 value_dict[species] = value_dict.pop(species.name)
 
-            self.value = InitialSolutionDict(value_dict, species=self.species, **self._kwargs)
+            self.value = InitialSolutionDict(
+                value_dict, species=self.species, planet=self._planet, **self._kwargs
+            )
         else:
             self.value.update(output)
 
@@ -712,6 +685,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
     Args:
         value: An initial solution until `switch_iteration` is reached. Defaults to None.
         species: Species
+        planet: Planet
         fit: Fit the regressor during the model run. This will replace the original regressor by a
             regressor trained only on the data from the current model. Defaults to True.
         fit_batch_size: Number of solutions to calculate before fitting model data if fit is True.
@@ -733,6 +707,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
+        planet: Planet,
         fit: bool = True,
         fit_batch_size: int = 100,
         partial_fit: bool = True,
@@ -741,11 +716,14 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         **kwargs,
     ):
         if value is None:
-            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+            value_init: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, planet=planet, **kwargs
+            )
         else:
             value_init = value
         self.value: InitialSolutionProtocol = value_init
         self._species: Species = species
+        self._planet: Planet = planet
         self._switch_iteration: int = switch_iteration
         self._fit: bool = fit
         self._fit_batch_size: int = fit_batch_size
@@ -758,7 +736,7 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         return self.value.species
 
     @override
-    def get_log10_value(self, *args, **kwargs) -> npt.NDArray[np.float_]:
+    def get_log10_value(self, *args, **kwargs) -> Array:
         return self.value.get_log10_value(*args, **kwargs)
 
     @override
@@ -766,7 +744,8 @@ class InitialSolutionSwitchRegressor(InitialSolutionProtocol):
         if output.size == self._switch_iteration:
             self.value = InitialSolutionRegressor(
                 output,
-                species=self._species,
+                species=self.species,
+                planet=self._planet,
                 fit=self._fit,
                 fit_batch_size=self._fit_batch_size,
                 partial_fit=self._partial_fit,
@@ -783,6 +762,7 @@ class InitialSolutionSwitchOnFail(InitialSolutionProtocol):
     Args:
         value: An initial solution until `switch_fails` is reached. Defaults to None.
         species: Species
+        planet: Planet
         value_on_fail: An initial solution after `switch_fails` is reached. Defaults to None.
         switch_fails: Number of fails before switching the initial solution. Defaults to 1.
         **kwargs: Optional keyword arguments to instantiate :class:`InitialSolutionDict`
@@ -798,18 +778,21 @@ class InitialSolutionSwitchOnFail(InitialSolutionProtocol):
         value: InitialSolutionProtocol | None = None,
         *,
         species: Species,
+        planet: Planet,
         value_on_fail: InitialSolutionProtocol | None = None,
         switch_fails: int = 1,
         **kwargs,
     ):
         if value is None:
-            value_init: InitialSolutionProtocol = InitialSolutionDict(species=species, **kwargs)
+            value_init: InitialSolutionProtocol = InitialSolutionDict(
+                species=species, planet=planet, **kwargs
+            )
         else:
             value_init = value
         self.value: InitialSolutionProtocol = value_init
         if value_on_fail is None:
             value_on_fail_init: InitialSolutionProtocol = InitialSolutionDict(
-                species=species, **kwargs
+                species=species, planet=planet, **kwargs
             )
         else:
             value_on_fail_init = value_on_fail
@@ -822,14 +805,14 @@ class InitialSolutionSwitchOnFail(InitialSolutionProtocol):
         return self.value.species
 
     @override
-    def get_log10_value(self, *args, attempt: int, **kwargs) -> npt.NDArray[np.float_]:
+    def get_log10_value(self, *args, attempt: int, **kwargs) -> Array:
         if attempt < self._switch_fails:
             logger.warning("Before switch on fail, attempt = %d", attempt)
-            return self.value.get_log10_value(*args, attempt=attempt, **kwargs)
+            return self.value.get_log10_value(*args, **kwargs)
         else:
             attempt = attempt - self._switch_fails
             logger.warning("After switch on fail, attempt = %d", attempt)
-            return self.value_on_fail.get_log10_value(*args, attempt=attempt, **kwargs)
+            return self.value_on_fail.get_log10_value(*args, **kwargs)
 
     @override
     def update(self, output: Output) -> None:

@@ -177,7 +177,7 @@ def solve_with_optimistix(method="Dogleg", tol: float = 1.0e-8) -> None:
     )
 
     # Shifted solution
-    solution: npt.NDArray[np.float_] = scaled_to_dimensional_base10(sol.value)
+    solution: Array = scaled_to_dimensional_base10(sol.value)
 
     if optx.RESULTS[sol.result] == "" and np.isclose(solution, known_solution_array).all():
         print(
