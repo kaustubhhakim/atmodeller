@@ -109,9 +109,9 @@ class InitialSolution(ABC, Generic[T]):
         planet: Planet,
         min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
         max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
-        fill_log10_number_density: float = 26,
+        fill_log10_number_density: float = 26.0,
         fill_log10_activity: float = -TAU,
-        fill_log10_stability: Array = LOG10_TAU,
+        fill_log10_stability: ArrayLike = LOG10_TAU,
     ):
         logger.debug("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -129,6 +129,7 @@ class InitialSolution(ABC, Generic[T]):
         """Species"""
         return self._species
 
+    # TODO: Not JAX compliant. Revise or remove.
     # def clip(
     #     self,
     #     component: SpeciesComponentSetterProtocol,
@@ -203,6 +204,7 @@ class InitialSolution(ABC, Generic[T]):
             self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
+            # TODO: Not JAX compliant. Revise or remove.
             # self.clip(
             #     collection.abundance,
             #     self._min_log10_number_density,
@@ -218,10 +220,12 @@ class InitialSolution(ABC, Generic[T]):
 
         for collection in self.solution.condensed.values():
             self.fill(collection.activity, self._fill_log10_activity)
+            # TODO: Not JAX compliant. Revise or remove.
             # self.clip(collection.activity, maximum_value=0)
             self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
+            # TODO: Not JAX compliant. Revise or remove.
             # self.clip(
             #     collection.abundance,
             #     self._min_log10_number_density,

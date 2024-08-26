@@ -70,7 +70,7 @@ class InteriorAtmosphereSystem:
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> tuple[Solution, bool]:
+    ) -> Solution:
         """Solve
 
         Args:
@@ -94,7 +94,7 @@ class InteriorAtmosphereSystem:
         # self.output.add(self, extra_output)
         # initial_solution.update(self.output)
 
-        return solution, success
+        return solution
 
 
 # @dataclass(kw_only=True)

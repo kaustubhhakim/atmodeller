@@ -292,7 +292,7 @@ def test_HOS_Species_IW(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverScipy(jac=False), constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.9903915306258877,
