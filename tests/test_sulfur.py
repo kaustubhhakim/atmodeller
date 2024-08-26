@@ -79,7 +79,9 @@ def test_S2_SO_Sulfide_IW(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "O2_g": 8.837305999112288e-08,
@@ -112,7 +114,9 @@ def test_AllS_Sulfide_IW(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "O2S_g": 0.0051503430108147475,
@@ -147,7 +151,7 @@ def test_AllS_Sulfate_IW(helper) -> None:
         species=species, planet=planet
     )
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(method="lm", jac=True), constraints=constraints
+        solver=SolverOptimistix(), constraints=constraints
     )
 
     target: dict[str, float] = {
@@ -183,7 +187,7 @@ def test_AllS_TotalSolubility_IW(helper) -> None:
         species=species, planet=planet
     )
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(method="lm", jac=True), constraints=constraints
+        solver=SolverOptimistix(), constraints=constraints
     )
 
     target: dict[str, float] = {
@@ -218,7 +222,9 @@ def test_AllS_TotalSolubility_IWp3(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "O2S_g": 100.69672945635124,
@@ -253,7 +259,7 @@ def test_AllS_TotalSolubility_IWm3(helper) -> None:
         species=species, planet=planet
     )
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(method="lm", jac=True), constraints=constraints
+        solver=SolverOptimistix(), constraints=constraints
     )
 
     target: dict[str, float] = {
@@ -343,7 +349,9 @@ def test_CHONS_Species_IW_MixConstraints(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "CO2_g": 48.16030372489886,
@@ -386,7 +394,9 @@ def test_COS_Species_IW(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "CO2_g": 48.40004714798208,
@@ -431,7 +441,9 @@ def test_CHOS_Species_IW(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "CO2_g": 48.18987265370282,
