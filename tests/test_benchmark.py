@@ -333,7 +333,7 @@ def test_CHO_middle_temperature(helper) -> None:
         species=species, planet=cool_planet
     )
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverOptimistix(), constraints=constraints
+        solver=SolverOptimistix(method="lm"), constraints=constraints
     )
 
     factsage_result: dict[str, float] = {
@@ -423,7 +423,7 @@ def test_graphite_condensed(helper) -> None:
         species=species, planet=cool_planet
     )
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(jac=True), constraints=constraints
+        solver=SolverOptimistix(), constraints=constraints
     )
 
     factsage_result: dict[str, float] = {

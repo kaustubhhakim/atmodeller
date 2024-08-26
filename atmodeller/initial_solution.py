@@ -174,10 +174,10 @@ class InitialSolution(ABC, Generic[T]):
                 self.perturb(collection.abundance, perturb_log10_number_density)
 
         # Gas constraints
-        for constraint in constraints.gas_constraints:
-            self.solution.gas[constraint.species].abundance.value = constraint.get_log10_value(
-                temperature=temperature, pressure=pressure
-            )
+        # for constraint in constraints.gas_constraints:
+        #     self.solution.gas[constraint.species].abundance.value = constraint.get_log10_value(
+        #         temperature=temperature, pressure=pressure
+        #     )
 
         for collection in self.solution.condensed.values():
             self.fill(collection.activity, self._fill_log10_activity)
