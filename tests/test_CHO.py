@@ -421,7 +421,7 @@ def test_H_and_C_total_pressure(helper) -> None:
         species=species, planet=planet
     )
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverOptimistix(), constraints=constraints
+        solver=SolverOptimistix(method="lm"), constraints=constraints
     )
 
     target: dict[str, float] = {
