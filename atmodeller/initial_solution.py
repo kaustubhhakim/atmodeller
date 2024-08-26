@@ -58,11 +58,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-MIN_LOG10_NUMBER_DENSITY: float = -40
-"""Minimum log10 of the initial number density"""
-MAX_LOG10_NUMBER_DENSITY: float = 40
-"""Maximum log10 of the initial number density"""
-
 
 class InitialSolutionProtocol(Protocol):
     """Initial solution protocol"""
@@ -89,10 +84,6 @@ class InitialSolution(ABC, Generic[T]):
         value: An object used to compute the initial solution
         species: Species
         planet: Planet
-        min_log10_number_density: Minimum log10 number density. Defaults to
-            :data:`MIN_LOG10_NUMBER_DENSITY`.
-        max_log10_number_density: Maximum log10 number density. Defaults to
-            :data:`MAX_LOG10_NUMBER_DENSITY`.
         fill_log10_number_density: Fill value for number density. Defaults to 26.
         fill_log10_activity: Fill value for activity. Defaults to -TAU.
         fill_log10_stability: Fill value for stability. Defaults to LOG10_TAU.
@@ -107,8 +98,6 @@ class InitialSolution(ABC, Generic[T]):
         *,
         species: Species,
         planet: Planet,
-        min_log10_number_density: float = MIN_LOG10_NUMBER_DENSITY,
-        max_log10_number_density: float = MAX_LOG10_NUMBER_DENSITY,
         fill_log10_number_density: float = 26.0,
         fill_log10_activity: float = -TAU,
         fill_log10_stability: ArrayLike = LOG10_TAU,
@@ -118,32 +107,14 @@ class InitialSolution(ABC, Generic[T]):
         self._species: Species = species
         self._planet: Planet = planet
         self.solution: Solution = Solution.create(species, planet)
-        self._min_log10_number_density: float = min_log10_number_density
-        self._max_log10_number_density: float = max_log10_number_density
         self._fill_log10_number_density: float = fill_log10_number_density
-        self._fill_log10_activity: float = fill_log10_activity
+        self._fill_log10_activity: ArrayLike = fill_log10_activity
         self._fill_log10_stability: ArrayLike = fill_log10_stability
 
     @property
     def species(self) -> Species:
         """Species"""
         return self._species
-
-    # TODO: Not JAX compliant. Revise or remove.
-    # def clip(
-    #     self,
-    #     component: SpeciesComponentSetterProtocol,
-    #     minimum_value: float | None = None,
-    #     maximum_value: float | None = None,
-    # ) -> None:
-    #     """clips the value.
-
-    #     Args:
-    #         component: Solution component
-    #         minimum_value: Minimum value. Defaults to None, meaning do not clip.
-    #         maximum_value: Maximum value. Defaults to None, meaning do not clip.
-    #     """
-    #     component.value = np.clip(component.value, minimum_value, maximum_value)
 
     def fill(self, component: SpeciesComponentSetterProtocol, fill_value: ArrayLike) -> None:
         """Fills value if it is missing.
@@ -152,11 +123,8 @@ class InitialSolution(ABC, Generic[T]):
             component: Solution component
             fill_value: The fill value
         """
-        # FIXME: Below still required?
-        # Force float to prevent integer overflow when later performing exponentiation, which can
-        # occur with the np.int64 data type
         if not hasattr(component, "_value"):
-            component.value = fill_value  # float(fill_value)
+            component.value = jnp.asarray(fill_value)
 
     def perturb(self, component: SpeciesComponentSetterProtocol, perturb: float = 0) -> None:
         """Perturbs value.
@@ -204,14 +172,7 @@ class InitialSolution(ABC, Generic[T]):
             self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
-            # TODO: Not JAX compliant. Revise or remove.
-            # self.clip(
-            #     collection.abundance,
-            #     self._min_log10_number_density,
-            #     self._max_log10_number_density,
-            # )
 
-        # TODO: Unsure whether this helps or hinders the solvers
         # Gas constraints
         for constraint in constraints.gas_constraints:
             self.solution.gas[constraint.species].abundance.value = constraint.get_log10_value(
@@ -220,17 +181,9 @@ class InitialSolution(ABC, Generic[T]):
 
         for collection in self.solution.condensed.values():
             self.fill(collection.activity, self._fill_log10_activity)
-            # TODO: Not JAX compliant. Revise or remove.
-            # self.clip(collection.activity, maximum_value=0)
             self.fill(collection.abundance, self._fill_log10_number_density)
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
-            # TODO: Not JAX compliant. Revise or remove.
-            # self.clip(
-            #     collection.abundance,
-            #     self._min_log10_number_density,
-            #     self._max_log10_number_density,
-            # )
             self.fill(collection.stability, self._fill_log10_stability)
 
         # Do not apply activity constraints because they only define the activity of a stable
