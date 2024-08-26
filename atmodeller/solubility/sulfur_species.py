@@ -28,7 +28,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.solubility.interfaces import Solubility
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import safe_log10, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -54,7 +54,7 @@ class S2_sulfate_andesite_boulliung(Solubility):
         # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (31586.2393 / temperature)
-        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
+        logs_wtp: Array = logcs + (0.5 * safe_log10(fugacity)) + (1.5 * safe_log10(O2))
         s_wtp: Array = 10**logs_wtp
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
@@ -75,7 +75,7 @@ class S2_sulfide_andesite_boulliung(Solubility):
     ) -> Array:
         del kwargs
         logcs: float = 0.225 - (8921.0927 / temperature)
-        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
+        logs_wtp: Array = logcs - (0.5 * (safe_log10(O2) - safe_log10(fugacity)))
         s_wtp: Array = 10**logs_wtp
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
@@ -125,7 +125,7 @@ class S2_sulfate_basalt_boulliung(Solubility):
         # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (32333.5635 / temperature)
-        logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
+        logso4_wtp: Array = logcs + (0.5 * safe_log10(fugacity)) + (1.5 * safe_log10(O2))
         so4_wtp: Array = 10**logso4_wtp
         s_wtp: Array = so4_wtp * (32.065 / 96.06)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
@@ -149,7 +149,7 @@ class S2_sulfide_basalt_boulliung(Solubility):
         # Fugacity is fS2
         del kwargs
         logcs: float = 0.225 - (8045.7465 / temperature)
-        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
+        logs_wtp: Array = logcs - (0.5 * (safe_log10(O2) - safe_log10(fugacity)))
         s_wtp: Array = 10**logs_wtp
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
@@ -206,7 +206,7 @@ class S2_sulfate_trachybasalt_boulliung(Solubility):
         # Fugacity is fS2
         del kwargs
         logcs: float = -12.948 + (32446.366 / temperature)
-        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
+        logs_wtp: Array = logcs + (0.5 * safe_log10(fugacity)) + (1.5 * safe_log10(O2))
         s_wtp: Array = 10**logs_wtp
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
@@ -233,7 +233,7 @@ class S2_sulfide_trachybasalt_boulliung(Solubility):
         # Fugacity is fS2
         del kwargs
         logcs: float = 0.225 - (7842.5 / temperature)
-        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
+        logs_wtp: Array = logcs - (0.5 * (safe_log10(O2) - safe_log10(fugacity)))
         s_wtp: Array = 10**logs_wtp
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
@@ -267,7 +267,7 @@ class S_mercury_magma_namur(Solubility):
             self.coefficients[0]
             + (self.coefficients[1] / temperature)
             + ((self.coefficients[2] * fugacity) / temperature)
-            + (self.coefficients[3] * jnp.log10(O2))
+            + (self.coefficients[3] * safe_log10(O2))
             - 0.136
         )
         ppmw: Array = wt_perc * unit_conversion.percent_to_ppm
