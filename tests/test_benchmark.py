@@ -34,7 +34,6 @@ from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Spe
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
 from atmodeller.solver import SolverOptimistix, SolverScipy
-from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 

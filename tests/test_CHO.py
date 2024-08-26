@@ -401,7 +401,9 @@ def test_H_and_C_total_pressure(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(
+        solver=SolverScipy(method="lm", jac=True), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "CO2_g": 18.38547187555166,
