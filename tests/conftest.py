@@ -165,7 +165,7 @@ def graphite_water_condensed() -> Solution:
     # TODO: Trying to guide the initial solution more but there's still a bug somewhere, probably
     # with the mass scaling for condensates.
     initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {CH4_g: 1.0, H2O_g: 5.0, O2_g: 1.0e-48}, species=species
+        {CH4_g: 1.0, H2O_g: 5.0, O2_g: 1.0e-48}, species=species, planet=cool_planet
     )
 
     solution: Solution = interior_atmosphere.solve(

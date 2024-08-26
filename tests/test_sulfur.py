@@ -43,7 +43,7 @@ from atmodeller.solubility.sulfur_species import (
     S2_sulfide_basalt_boulliung,
 )
 from atmodeller.solution import Solution
-from atmodeller.solver import SolverOptimistix, SolverScipy
+from atmodeller.solver import SolverOptimistix
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 RTOL: float = 1.0e-6

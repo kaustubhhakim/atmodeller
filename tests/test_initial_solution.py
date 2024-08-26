@@ -20,6 +20,7 @@
 
 import logging
 
+import jax.numpy as jnp
 import numpy as np
 
 from atmodeller import __version__, debug_logger
@@ -68,7 +69,7 @@ def test_default_dict():
 
     constraints: SystemConstraints = SystemConstraints([])
 
-    initial_solution = InitialSolutionDict(species=species)
+    initial_solution = InitialSolutionDict(species=species, planet=planet)
     result = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
@@ -86,7 +87,9 @@ def test_constraint_fill_dict():
 
     constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
-    initial_solution = InitialSolutionDict(species=species, fill_log10_number_density=20)
+    initial_solution = InitialSolutionDict(
+        species=species, planet=planet, fill_log10_number_density=20
+    )
     result = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
@@ -110,7 +113,7 @@ def test_args_constraint_fill_dict():
     constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
 
     initial_solution = InitialSolutionDict(
-        {CO_g: 1e24, H2_g: 1e25}, species=species, fill_log10_number_density=26
+        {CO_g: 1e24, H2_g: 1e25}, species=species, planet=planet, fill_log10_number_density=26
     )
     result = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
@@ -141,7 +144,8 @@ def test_args_fill_stability_dict():
     initial_solution = InitialSolutionDict(
         {CO_g: 1e24, H2_g: 1e25, "stability_C_cr": 2, H2O_l: 1e22},
         species=species,
-        fill_log10_activity=np.log10(0.8),
+        planet=planet,
+        fill_log10_activity=jnp.log10(0.8),
     )
 
     result = initial_solution.get_log10_value(
@@ -165,7 +169,7 @@ def test_last_solution():
 
     constraints = SystemConstraints([])
 
-    initial_solution = InitialSolutionLast(species=species)
+    initial_solution = InitialSolutionLast(species=species, planet=planet)
 
     # The first initial condition will return the fill value for the pressure
     result = initial_solution.get_log10_value(
@@ -263,7 +267,9 @@ def test_regressor_override(generate_regressor_data):
     number_density_H2: float = 1e30
     species_H2 = species.get_species_from_name("H2_g")
     species_only_H2 = Species([species_H2])
-    solution_override = InitialSolutionDict({H2_g: number_density_H2}, species=species_only_H2)
+    solution_override = InitialSolutionDict(
+        {H2_g: number_density_H2}, species=species_only_H2, planet=planet
+    )
 
     initial_solution = InitialSolutionRegressor.from_pickle(
         filename, species=species, solution_override=solution_override

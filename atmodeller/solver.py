@@ -366,7 +366,6 @@ class SolverScipyTryAgain(Solver):
             solution if the initial guess fails. Defaults to 20.
         perturb_log10_number_density: Maximum log10 perturbation to apply to the number densities
             on failure. Defaults to 2.
-        errors: Either `raise` solver errors or `ignore`. Defaults to `ignore`.
     """
 
     @override
@@ -439,17 +438,6 @@ class SolverScipyTryAgain(Solver):
                 # Perturb solution and try again
                 perturb_log10_number_density = self._perturb_log10_number_density
 
-        msg: str = f"Solver failed after {self._max_attempts} attempt(s) (errors = {self._errors})"
+        logger.info("%s failed after %d attempts", __class__.__name__, self._max_attempts)
 
-        if self._errors == "raise":
-            logger.error(msg)
-            logger.error("constraints = %s", constraints)
-            raise RuntimeError(msg)
-
-        else:
-            logger.warning(msg)
-            logger.warning("constraints = %s", constraints)
-            logger.warning("Continuing ...")
-            solution: Solution = Solution.create(solve_me.species, solve_me.planet)
-
-            return solution, False
+        return solution, False

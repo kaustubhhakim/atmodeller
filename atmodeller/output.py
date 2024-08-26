@@ -82,7 +82,7 @@ class Output(UserDict):
 
         return cls(output_data)
 
-    def add(self, solution: Solution, extra_output: dict[str, float] | None) -> None:
+    def add(self, solution: Solution, extra_output: dict[str, float] | None = None) -> None:
         """Adds all outputs.
 
         Args:
