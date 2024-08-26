@@ -36,7 +36,7 @@ from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Spe
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
-from atmodeller.solver import SolverOptimistix, SolverScipy
+from atmodeller.solver import SolverScipy
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ def graphite_water_condensed() -> Solution:
 
     species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
 
-    cool_planet: Planet = Planet(surface_temperature=411.75)
+    cool_planet: Planet = Planet(surface_temperature=430)  # 411.75)
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
@@ -162,14 +162,15 @@ def graphite_water_condensed() -> Solution:
         species=species, planet=cool_planet
     )
 
-    # TODO: Trying to guide the initial solution more but there's still a bug somewhere, probably
-    # with the mass scaling for condensates.
+    # Help the solver with an improved initial guess
     initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {CH4_g: 1.0, H2O_g: 5.0, O2_g: 1.0e-48}, species=species, planet=cool_planet
+        {O2_g: 1.0e-48}, species=species, planet=cool_planet
     )
 
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(jac=True), constraints=constraints, initial_solution=initial_solution
+        solver=SolverScipy(method="lm", jac=True),
+        constraints=constraints,
+        initial_solution=initial_solution,
     )
 
     return solution

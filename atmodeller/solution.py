@@ -977,10 +977,10 @@ class CondensedCollection(
             value: An array, which is usually passed by the solver.
         """
         for index, container in enumerate(self.data.values()):
-            container.activity.value = value[index]
-            container.abundance.value = value[index + 1]
-            container.stability.value = value[index + 2]
-            index += container.NUMBER
+            start_index: int = index * container.NUMBER
+            container.activity.value = value[start_index]
+            container.abundance.value = value[start_index + 1]
+            container.stability.value = value[start_index + 2]
 
     def output_raw_solution(self) -> dict[str, float]:
         output: dict[str, float] = {}
