@@ -28,7 +28,6 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.solubility.interfaces import Solubility, SolubilityPowerLaw
-from atmodeller.utilities import safe_log10
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -48,7 +47,7 @@ class H2_andesite_hirschmann(Solubility):
     @override
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        ppmw: Array = 10 ** (0.60128868 * safe_log10(fugacity) + 1.01058631)
+        ppmw: Array = 10 ** (0.60128868 * jnp.log10(fugacity) + 1.01058631)
 
         return ppmw
 
@@ -63,7 +62,7 @@ class H2_basalt_hirschmann(Solubility):
     @override
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
-        ppmw: Array = 10 ** (0.52413928 * safe_log10(fugacity) + 1.10083602)
+        ppmw: Array = 10 ** (0.52413928 * jnp.log10(fugacity) + 1.10083602)
 
         return ppmw
 

@@ -242,7 +242,7 @@ def logsumexp_base10(log_values: ArrayLike, prefactors: ArrayLike = 1.0) -> Arra
 
     value_sum: Array = jnp.sum(prefactors_ * jnp.power(10, log_values - max_log))
 
-    return max_log + safe_log10(value_sum)
+    return max_log + jnp.log10(value_sum)
 
 
 def safe_log10(x: ArrayLike) -> Array:
