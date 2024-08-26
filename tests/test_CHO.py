@@ -42,7 +42,8 @@ from atmodeller.solubility.hydrogen_species import (
     H2_basalt_hirschmann,
     H2O_peridotite_sossi,
 )
-from atmodeller.solver import SolverScipy
+from atmodeller.solution import Solution
+from atmodeller.solver import SolverOptimistix
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -84,7 +85,9 @@ def test_H2O(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 1.0312913336898137,
@@ -114,7 +117,9 @@ def test_H_fO2(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.2570770067190733,
@@ -156,7 +161,9 @@ def test_H_fO2_holland(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.25706291267455456,
@@ -188,7 +195,9 @@ def test_H_basalt_melt(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.09442361772602827,
@@ -230,7 +239,9 @@ def test_H_fO2_plus(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.25822630157632576,
@@ -262,7 +273,9 @@ def test_H_fO2_minus(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.23441348219541092,
@@ -294,7 +307,9 @@ def test_H_five_oceans(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 6.259516638093527,
@@ -327,7 +342,9 @@ def test_H_1500K(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "H2O_g": 0.25666635568842355,
@@ -364,7 +381,9 @@ def test_H_and_C(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "CO2_g": 13.500258901609417,
@@ -401,8 +420,8 @@ def test_H_and_C_total_pressure(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(
-        solver=SolverScipy(method="lm", jac=True), constraints=constraints
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
     )
 
     target: dict[str, float] = {
@@ -440,7 +459,7 @@ def test_pH2_fO2_real_gas(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 1466.9613852210507,
@@ -475,7 +494,7 @@ def test_fH2_fO2_real_gas(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 1001.131462103614,
@@ -517,7 +536,7 @@ def test_H_and_C_real_gas(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "CH4_g": 10.300421855316944,

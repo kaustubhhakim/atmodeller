@@ -388,7 +388,7 @@ def test_graphite_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(constraints=constraints)
 
     target = {
         "CH4_g": 96.86234030526238,
@@ -432,7 +432,7 @@ def test_graphite_water_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution, _ = interior_atmosphere.solve(constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(constraints=constraints)
 
     target = {
         "CH4_g": 0.32688481623407045,

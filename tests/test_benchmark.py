@@ -86,7 +86,9 @@ def test_H_O(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     fastchem_result: dict[str, float] = {
         "H2O_g": 76.45861543,
@@ -128,7 +130,9 @@ def test_CHO_reduced(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "H2_g": 175.5,
@@ -181,7 +185,9 @@ def test_CHO_IW(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "CH4_g": 28.66,
@@ -235,7 +241,9 @@ def test_CHO_oxidised(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.00129,
@@ -281,7 +289,7 @@ def test_CHO_highly_oxidised(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution, _ = interior_atmosphere.solve(
+    solution: Solution = interior_atmosphere.solve(
         solver=SolverOptimistix(method="lm"), constraints=constraints
     )
 
@@ -324,7 +332,9 @@ def test_CHO_middle_temperature(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "H2_g": 59.066,
@@ -367,7 +377,9 @@ def test_CHO_low_temperature(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverScipy(jac=True), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverScipy(jac=True), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "H2_g": 55.475,
@@ -410,7 +422,9 @@ def test_graphite_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverScipy(jac=True), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverScipy(jac=True), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "O2_g": 1.27e-25,
@@ -458,7 +472,7 @@ def test_graphite_unstable(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution, _ = interior_atmosphere.solve(
+    solution: Solution = interior_atmosphere.solve(
         solver=SolverOptimistix(method="dogleg"), constraints=constraints
     )
 
@@ -502,7 +516,9 @@ def test_water_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
+    solution: Solution = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,
@@ -543,7 +559,7 @@ def test_water_condensed_O_abundance(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution, _ = interior_atmosphere.solve(
+    solution: Solution = interior_atmosphere.solve(
         solver=SolverScipy(method="lm", jac=True), constraints=constraints
     )
 
