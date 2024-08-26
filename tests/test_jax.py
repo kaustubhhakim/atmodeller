@@ -41,8 +41,7 @@ from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Spe
 from atmodeller.eos.holland import CO_CORK_HP91, H2_CORK_HP91, CO2_CORK_simple_HP91
 from atmodeller.eos.saxena import H2_SF87
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
-from atmodeller.solution import Solution
-from atmodeller.solver import SolverOptimistix
+from atmodeller.solver import SolverOptimistix, SolverScipy, SolverScipyTryAgain
 from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -90,7 +89,7 @@ def test_H_fugacities(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(
+    solution, success = interior_atmosphere.solve(
         solver=SolverOptimistix(), constraints=constraints
     )
 
@@ -120,7 +119,7 @@ def test_H_fugacities_system(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
@@ -148,7 +147,7 @@ def test_H_total_pressure(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
@@ -176,7 +175,7 @@ def test_H_with_buffer(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.257077006719072,
@@ -210,7 +209,9 @@ def test_H_and_C_no_solubility(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(
+        solver=SolverScipy(method="lm"), constraints=constraints
+    )
 
     target: dict[str, float] = {
         "CO2_g": 6.0622728258770024,
@@ -243,7 +244,7 @@ def test_H_and_C_holland(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "CO2_g": 0.6283663007874475,
@@ -276,7 +277,7 @@ def test_H_and_C_saxena(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 10000.0,
@@ -308,7 +309,7 @@ def test_H_fO2_no_solubility(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 76.46402689279567,
@@ -374,7 +375,7 @@ def test_graphite_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target = {
         "CH4_g": 96.86234030526238,
@@ -418,7 +419,7 @@ def test_graphite_water_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, success = interior_atmosphere.solve(constraints=constraints)
 
     target = {
         "CH4_g": 0.32688481623407045,

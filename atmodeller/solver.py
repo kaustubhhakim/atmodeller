@@ -30,6 +30,7 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array
+from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 
 from atmodeller.constraints import SystemConstraints
@@ -46,12 +47,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Solver(ABC):
-    """A solver
-
-    Args:
-        *args: Positional keyword arguments for child classes.
-        **kwargs: Keyword arguments for child classes.
-    """
+    """A solver"""
 
     def get_initial_solution(
         self,
@@ -59,6 +55,9 @@ class Solver(ABC):
         *,
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
+        pressure: float = 1.0,
+        perturb_log10_number_density: float = 0,
+        attempt: int = 0,
     ) -> Array:
         """Gets the initial solution
 
@@ -66,18 +65,24 @@ class Solver(ABC):
             solve_me: System to solve
             constraints: Constraints for the system of equations
             initial_solution: Initial condition. Defaults to None.
+            pressure: Total pressure to evaluate the constraints. Defaults to 1.
+            perturb_log10_number_density: Maximum log10 perturbation to apply to the number
+                densities. Defaults to 0.0.
+            attempt: Attempt number to find a solution. Defaults to 0.
 
         Returns:
             An array of the initial solution
         """
         if initial_solution is None:
-            initial_solution = InitialSolutionDict(species=solve_me.species)
-        assert initial_solution is not None
+            initial_solution_ = InitialSolutionDict(species=solve_me.species)
+        assert initial_solution_ is not None
 
-        initial_solution_guess: Array = initial_solution.get_log10_value(
+        initial_solution_guess: Array = initial_solution_.get_log10_value(
             constraints,
             temperature=solve_me.temperature(),
-            pressure=1,
+            pressure=pressure,
+            perturb_log10_number_density=perturb_log10_number_density,
+            attempt=attempt,
         )
 
         return initial_solution_guess
@@ -108,7 +113,7 @@ class Solver(ABC):
         Returns:
             Residual array
         """
-        logger.debug("solution_array passed into objective_functiom = %s", solution_array)
+        logger.debug("solution_array passed into objective_function = %s", solution_array)
 
         solve_me: ResidualProtocol = kwargs["solve_me"]
         constraints: SystemConstraints = kwargs["constraints"]
@@ -131,7 +136,10 @@ class Solver(ABC):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> Solution:
+        pressure: float = 1.0,
+        perturb_log10_number_density: float = 0,
+        attempt: int = 0,
+    ) -> tuple[Solution, bool]:
         """Solve
 
         Args:
@@ -139,9 +147,13 @@ class Solver(ABC):
             constraints: Constraints for the system of equations
             initial_solution: Initial solution
             tol: Tolerance. Defaults to 1.0e-8.
+            pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
+            perturb_log10_number_density: Maximum log10 perturbation to apply to the number
+                densities. Defaults to 0.0.
+            attempt: Attempt number to find a solution. Defaults to 0.
 
         Returns:
-            Solution
+            Solution and a bool to indicate success
         """
 
 
@@ -187,7 +199,7 @@ class SolverOptimistix(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> Solution:
+    ) -> tuple[Solution, bool]:
         """Solve using Optimistix
 
         Args:
@@ -197,30 +209,30 @@ class SolverOptimistix(Solver):
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Solution
+            Solution and a bool to indicate success
         """
         initial_solution_guess: Array = self.get_initial_solution(
             solve_me, constraints=constraints, initial_solution=initial_solution
         )
         kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
 
-        solver = self.solver(rtol=tol, atol=tol)
+        solver_optx = self.solver(rtol=tol, atol=tol)
 
         sol = optx.root_find(
             self.objective_function,
-            solver,
+            solver_optx,
             initial_solution_guess,
             args=kwargs,
             throw=True,
         )
 
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
-        solution.value = jnp.array(sol.value)
-        residual: Array = solve_me.get_residual(solution, constraints)
-        rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
 
         # Success is indicated by no message
         if optx.RESULTS[sol.result] == "":
+            solution.value = jnp.array(sol.value)
+            residual: Array = solve_me.get_residual(solution, constraints)
+            rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
             logger.info(
                 "Optimistix success with %s. RMSE = %0.2e, steps = %d",
                 self.method,
@@ -229,8 +241,12 @@ class SolverOptimistix(Solver):
             )
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+            success: bool = True
+        else:
+            logger.warning("The solver failed.")
+            success = False
 
-        return solution
+        return solution, success
 
 
 class SolverScipy(Solver):
@@ -277,7 +293,10 @@ class SolverScipy(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> Solution:
+        pressure: float = 1.0,
+        perturb_log10_number_density: float = 0,
+        attempt: int = 0,
+    ) -> tuple[Solution, bool]:
         """Solve using Scipy
 
         Args:
@@ -285,12 +304,21 @@ class SolverScipy(Solver):
             constraints: Constraints for the system of equations
             initial_solution: Initial condition for this solve only. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
+            pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
+            perturb_log10_number_density: Maximum log10 perturbation to apply to the number
+                densities. Defaults to 0.0.
+            attempt: Attempt number to find a solution. Defaults to 0.
 
         Returns:
-            Solution
+            Solution and a bool to indicate success
         """
         initial_solution_guess: Array = self.get_initial_solution(
-            solve_me, constraints=constraints, initial_solution=initial_solution
+            solve_me,
+            constraints=constraints,
+            initial_solution=initial_solution,
+            pressure=pressure,
+            perturb_log10_number_density=perturb_log10_number_density,
+            attempt=attempt,
         )
         kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
 
@@ -305,11 +333,11 @@ class SolverScipy(Solver):
         )
 
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
-        solution.value = jnp.array(sol.x)
-        residual: Array = solve_me.get_residual(solution, constraints)
-        rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
 
         if sol.success:
+            solution.value = jnp.array(sol.x)
+            residual: Array = solve_me.get_residual(solution, constraints)
+            rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
             logger.info(
                 "Scipy success with %s and jac=%s. RMSE=%0.2e, steps=%d",
                 self.method,
@@ -319,8 +347,12 @@ class SolverScipy(Solver):
             )
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
+            success: bool = True
+        else:
+            logger.warning("The solver failed (message=%s).", sol.message)
+            success = False
 
-        return solution
+        return solution, success
 
 
 class SolverScipyTryAgain(Solver):
@@ -328,17 +360,33 @@ class SolverScipyTryAgain(Solver):
 
     Args:
         method: Type of solver. Defaults to `hybr`.
-        jac: Jacobian. If True uses the JAX autodiff derived Jacobian, otherwise False uses a
-            numerical approximation. Note this differs from the definition of jac in the
+        jac: Jacobian. If True uses the JAX autodiff jacobian, otherwise False uses a numerical
+            approximation. Note this differs from the definition of jac in the
             scipy.optimize.root documentation. Defaults to False.
         options: A dictionary of solver options. Defaults to None.
+        max_attempts: Maximum number of attempts to randomise the initial condition to find a
+            solution if the initial guess fails. Defaults to 10.
+        perturb_log10_number_density: Maximum log10 perturbation to apply to the number densities
+            on failure. Defaults to 2.0.
+        errors: Either `raise` solver errors or `ignore`. Defaults to `ignore`.
     """
 
     @override
-    def __init__(self, method: str = "hybr", jac: bool = False, options: dict | None = None):
+    def __init__(
+        self,
+        method: str = "hybr",
+        jac: bool = False,
+        options: dict | None = None,
+        max_attempts: int = 20,
+        perturb_log10_number_density: float = 2.0,
+        errors: str = "ignore",
+    ):
         super().__init__()
         logger.debug("Creating %s with %s and jac = %s)", self.__class__.__name__, method, jac)
-        solver = SolverScipy(method, jac, options)
+        self._solver: Solver = SolverScipy(method, jac, options)
+        self._max_attempts: int = max_attempts
+        self._perturb_log10_number_density: float = perturb_log10_number_density
+        self._errors: str = errors
 
     @override
     def solve(
@@ -348,7 +396,7 @@ class SolverScipyTryAgain(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-    ) -> Solution:
+    ) -> tuple[Solution, bool]:
         """Solve using Scipy
 
         Args:
@@ -358,157 +406,52 @@ class SolverScipyTryAgain(Solver):
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
-            Solution
+            Solution and a bool to indicate success
         """
+        # For the first solution we try without a perturbation
+        perturb_log10_number_density: float = 0
 
+        for attempt in range(self._max_attempts):
+            logger.info("Attempt %d/%d", attempt + 1, self._max_attempts)
 
-#     @property
-#     def failed_solves(self) -> int:
-#         """Number of failed solves"""
-#         percentage_failed: float = self._failed_solves * 100 / self.number_of_attempted_solves
-#         logger.info(
-#             "%d failed solves from a total attempted of %d (%.1f %%)",
-#             self._failed_solves,
-#             self.number_of_attempted_solves,
-#             percentage_failed,
-#         )
+            try:
+                solution, success = self._solver.solve(
+                    solve_me,
+                    constraints=constraints,
+                    initial_solution=initial_solution,
+                    tol=tol,
+                    perturb_log10_number_density=perturb_log10_number_density,
+                    attempt=attempt,
+                )
+            except TypeError as exc:
+                msg: str = (
+                    f"{exc}\nAdditional context: Number of unknowns and constraints must be equal"
+                )
+                raise ValueError(msg) from exc
 
-#         return self._failed_solves
+            except LinAlgError:
+                if self._errors == "raise":
+                    raise
+                else:
+                    logger.warning("Linear algebra error")
+                    success = False
 
-#     @property
-#     def number_of_attempted_solves(self) -> int:
-#         """The total number of systems with attempted solves"""
-#         return self._attempted_solves
+            if success:
+                return solution, success
+            else:
+                # Perturb solution and try again
+                perturb_log10_number_density = self._perturb_log10_number_density
 
-#     def solve(
-#         self,
-#         constraints: SystemConstraints,
-#         *,
-#         initial_solution: InitialSolutionProtocol | None = None,
-#         extra_output: dict[str, float] | None = None,
-#         max_attempts: int = 20,
-#         perturb_log10_number_density: float = 2.0,
-#         errors: str = "ignore",
-#         method: str = "hybr",
-#         tol: float | None = None,
-#         **options,
-#     ) -> None:
-#         """Solves the system to determine the activities and partial pressures with constraints.
+        msg: str = f"Solver failed after {self._max_attempts} attempt(s) (errors = {self._errors})"
 
-#         Args:
-#             constraints: Constraints for the system of equations
-#             initial_solution: Initial condition for this solve only. Defaults to 'None', meaning
-#                 that the default (self.initial_solution) is used.
-#             extra_output: Extra data to write to the output
-#             max_attempts: Maximum number of attempts to randomise the initial condition to find a
-#                 solution if the initial guess fails. Defaults to 10.
-#             perturb_log10_number_density: Maximum log10 perturbation to apply to the pressures on
-#                 failure. Defaults to 2.0.
-#             errors: Either 'raise' solver errors or 'ignore'. Defaults to 'ignore'.
-#             method: Type of solver. Defaults to 'hybr'.
-#             tol: Tolerance for termination. Defaults to None.
-#             **options: Keyword arguments for solver options. Available keywords depend on method.
-#         """
-#         logger.info("Solving system number %d", self.number_of_solves)
-#         self._attempted_solves += 1
+        if self._errors == "raise":
+            logger.error(msg)
+            logger.error("constraints = %s", constraints)
+            raise RuntimeError(msg)
+        else:
+            logger.warning(msg)
+            logger.warning("constraints = %s", constraints)
+            logger.warning("Continuing ...")
+            solution: Solution = Solution.create(solve_me.species, solve_me.planet)
 
-#         self._constraints = constraints
-#         self._constraints.add_activity_constraints(self.species)
-
-#         if initial_solution is None:
-#             initial_solution = self.initial_solution
-#         assert initial_solution is not None
-
-#         # These can be determined once per solve because they depend on reaction stoichiometry and
-#         # constraints, both of which are known and both of which are independent of the solution.
-#         coefficient_matrix: jnp.ndarray = self._reaction_network.get_coefficient_matrix(
-#             self.constraints
-#         )
-#         activity_modifier: jnp.ndarray = self._reaction_network.get_activity_modifier(
-#             self.constraints
-#         )
-#         equilibrium_modifier: jnp.ndarray = self._reaction_network.get_equilibrium_modifier(
-#             self.constraints
-#         )
-
-#         for attempt in range(max_attempts):
-#             logger.info("Attempt %d/%d", attempt + 1, max_attempts)
-
-#             # The only constraints that require pressure are the fugacity constraints, so for the
-#             # purpose of determining the initial solution we evaluate them (if present) at 1 bar to
-#             # ensure the initial solution is bounded.
-#             log_solution: jnp.ndarray = initial_solution.get_log10_value(
-#                 self.constraints,
-#                 temperature=self.solution.atmosphere.temperature(),
-#                 pressure=1,
-#                 perturb_log10_number_density=perturb_log10_number_density,
-#                 attempt=attempt,
-#             )
-#             try:
-#                 sol = root(
-#                     self._objective_func,
-#                     log_solution,
-#                     args=(
-#                         coefficient_matrix,
-#                         activity_modifier,
-#                         equilibrium_modifier,
-#                     ),
-#                     method=method,
-#                     tol=tol,
-#                     options=options,
-#                     # TODO: Add jac=
-#                 )
-#                 logger.info(sol["message"])
-#                 logger.debug("sol = %s", sol)
-
-#             except TypeError as exc:
-#                 msg: str = (
-#                     f"{exc}\nAdditional context: Number of unknowns and constraints must be equal"
-#                 )
-#                 raise ValueError(msg) from exc
-
-#             except LinAlgError:
-#                 if errors == "raise":
-#                     raise
-#                 else:
-#                     logger.warning("Linear algebra error")
-#                     sol = OptimizeResult()
-#                     sol.success = False
-
-#             if sol.success:
-#                 # Below doesm't seem to be used anywhere
-#                 # self._log_solution = sol.x
-#                 self._residual = sol.fun
-#                 residual_rmse: npt.NDArray[np.float_] = np.sqrt(
-#                     np.sum(np.array(self._residual) ** 2)
-#                 )
-#                 logger.info("Residual RMSE = %.2e", residual_rmse)
-#                 logger.info(
-#                     "Actual solution = %s", pprint.pformat(self.solution.output_raw_solution())
-#                 )
-#                 initial_solution_rmse: npt.NDArray[np.float_] = np.sqrt(
-#                     mean_squared_error(sol.x, np.array(log_solution))
-#                 )
-#                 logger.info(
-#                     "Initial solution RMSE (%s) = %.2e",
-#                     self.initial_solution.__class__.__name__,
-#                     initial_solution_rmse,
-#                 )
-#                 self.output.add(self, extra_output)
-#                 initial_solution.update(self.output)
-#                 # logger.info(pprint.pformat(self.output_solution()))
-#                 break
-#             else:
-#                 logger.warning("The solver failed.")
-
-#         if not sol.success:
-#             msg: str = f"Solver failed after {max_attempts} attempt(s) (errors = {errors})"
-#             self._failed_solves += 1
-#             if errors == "raise":
-#                 logger.error(msg)
-#                 logger.error("constraints = %s", self.constraints)
-#                 raise RuntimeError(msg)
-#             else:
-#                 logger.warning(msg)
-#                 logger.warning("constraints = %s", self.constraints)
-#                 logger.warning("Continuing with next solve")
+            return solution, False

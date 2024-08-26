@@ -28,6 +28,7 @@ from typing import Any, Generic, Protocol, TypeVar, cast
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from jaxtyping import ArrayLike
 from scipy.sparse import spmatrix
 from sklearn.linear_model import SGDRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -72,7 +73,7 @@ class InitialSolutionProtocol(Protocol):
         constraints: SystemConstraints,
         *,
         temperature: float,
-        pressure: float,
+        pressure: ArrayLike,
         perturb_log10_number_density: float = 0,
         attempt: int = 0,
     ) -> npt.NDArray[np.float_]: ...

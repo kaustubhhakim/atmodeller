@@ -23,6 +23,7 @@ import logging
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.initial_solution import InitialSolutionProtocol
+from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithMassBalance
 from atmodeller.solution import Solution
 from atmodeller.solver import Solver, SolverScipy
@@ -36,6 +37,11 @@ class InteriorAtmosphereSystem:
     Args:
         species: Species
         planet: Planet
+
+    Attributes:
+        species: Species
+        planet: Planet
+        output: Output
     """
 
     def __init__(self, species: Species, planet: Planet):
@@ -45,6 +51,17 @@ class InteriorAtmosphereSystem:
         self._reaction_network: ReactionNetworkWithMassBalance = ReactionNetworkWithMassBalance(
             species, planet
         )
+        self._output: Output = Output()
+
+    @property
+    def number_of_solves(self) -> int:
+        """The total number of systems solved"""
+        return self.output.size
+
+    @property
+    def output(self) -> Output:
+        """Output"""
+        return self._output
 
     def solve(
         self,
@@ -62,14 +79,22 @@ class InteriorAtmosphereSystem:
             initial_solution: Initial condition for this solve only. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
         """
-        solution: Solution = solver.solve(
+        logger.info("Solving system number %d", self.number_of_solves)
+
+        solution, success = solver.solve(
             self._reaction_network,
             constraints=constraints,
             initial_solution=initial_solution,
             tol=tol,
         )
 
-        return solution
+        # if not success:
+
+        # TODO: Reinstate if the solve is successful then update output accordingly.
+        # self.output.add(self, extra_output)
+        # initial_solution.update(self.output)
+
+        return solution, success
 
 
 # @dataclass(kw_only=True)
