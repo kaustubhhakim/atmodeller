@@ -42,6 +42,7 @@ from atmodeller.solubility.sulfur_species import (
     S2_sulfate_basalt_boulliung,
     S2_sulfide_basalt_boulliung,
 )
+from atmodeller.solver import SolverOptimistix, SolverScipy
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 RTOL: float = 1.0e-6
@@ -57,7 +58,7 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-def test_S2_SO_Sulfide_IW() -> None:
+def test_S2_SO_Sulfide_IW(helper) -> None:
     """Tests S2 and SO Sulfide Solubilities at the IW buffer, 2000 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -74,8 +75,10 @@ def test_S2_SO_Sulfide_IW() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "O2_g": 8.837305999112288e-08,
@@ -83,11 +86,10 @@ def test_S2_SO_Sulfide_IW() -> None:
         "S2_g": 1.0000000000000021e-05,
     }
 
-    system.solve(constraints=constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_AllS_Sulfide_IW() -> None:
+def test_AllS_Sulfide_IW(helper) -> None:
     """Tests SO, S2, and SO2 Sulfide Solubility at the IW buffer, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -106,8 +108,10 @@ def test_AllS_Sulfide_IW() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "O2S_g": 0.0051503430108147475,
@@ -116,11 +120,10 @@ def test_AllS_Sulfide_IW() -> None:
         "S2_g": 0.0038617334921464104,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_AllS_Sulfate_IW() -> None:
+def test_AllS_Sulfate_IW(helper) -> None:
     """Tests SO, S2, and SO2 Sulfate Solubility at the IW buffer, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -139,8 +142,10 @@ def test_AllS_Sulfate_IW() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(solver=SolverScipy(), constraints=constraints)
 
     target: dict[str, float] = {
         "O2S_g": 1.063284666606797,
@@ -149,11 +154,10 @@ def test_AllS_Sulfate_IW() -> None:
         "S2_g": 161.02246440252563,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_AllS_TotalSolubility_IW() -> None:
+def test_AllS_TotalSolubility_IW(helper) -> None:
     """Tests SO, S2, and SO2 Sulfide+Sulfate Solubility at the IW buffer, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -172,8 +176,10 @@ def test_AllS_TotalSolubility_IW() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "O2S_g": 0.005150342505310183,
@@ -182,11 +188,10 @@ def test_AllS_TotalSolubility_IW() -> None:
         "S2_g": 0.003861732734095561,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_AllS_TotalSolubility_IWp3() -> None:
+def test_AllS_TotalSolubility_IWp3(helper) -> None:
     """Tests SO, S2, and SO2 Sulfide+Sulfate Solubility at IW+3, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -205,8 +210,10 @@ def test_AllS_TotalSolubility_IWp3() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(3)),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "O2S_g": 100.69672945635124,
@@ -215,11 +222,10 @@ def test_AllS_TotalSolubility_IWp3() -> None:
         "S2_g": 1.4551766876176104,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_AllS_TotalSolubility_IWm3() -> None:
+def test_AllS_TotalSolubility_IWm3(helper) -> None:
     """Tests SO, S2, and SO2 Sulfide+Sulfate Solubility at IW-3, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -238,8 +244,10 @@ def test_AllS_TotalSolubility_IWm3() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-3)),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "O2S_g": 1.6287452019154868e-07,
@@ -248,11 +256,10 @@ def test_AllS_TotalSolubility_IWm3() -> None:
         "S2_g": 3.862105789686752e-06,
     }
 
-    system.solve(constraints, factor=1)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_HOS_Species_IW() -> None:
+def test_HOS_Species_IW(helper) -> None:
     """Tests Sulfur Solubility with H, O and S species at IW, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -276,8 +283,10 @@ def test_HOS_Species_IW() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "H2O_g": 0.9903915306258877,
@@ -288,11 +297,10 @@ def test_HOS_Species_IW() -> None:
         "S2_g": 0.0038606727019204617,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_CHONS_Species_IW_MixConstraints() -> None:
+def test_CHONS_Species_IW_MixConstraints(helper) -> None:
     """Tests Sulfur Solubility with C, H, N, O, S species at IW, 2173 K,
     Mix of Fugacity and Mass Constraints."""
 
@@ -323,8 +331,10 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "CO2_g": 48.16030372489886,
@@ -338,11 +348,10 @@ def test_CHONS_Species_IW_MixConstraints() -> None:
         "S2_g": 0.004999999999999994,
     }
 
-    system.solve(constraints, factor=1)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_COS_Species_IW() -> None:
+def test_COS_Species_IW(helper) -> None:
     """Tests Sulfur Solubility with C, O and S species at IW, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -365,8 +374,10 @@ def test_COS_Species_IW() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "CO2_g": 48.40004714798208,
@@ -377,11 +388,10 @@ def test_COS_Species_IW() -> None:
         "S2_g": 0.003932969025751321,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_CHOS_Species_IW() -> None:
+def test_CHOS_Species_IW(helper) -> None:
     """Tests Sulfur Solubility with H, C, O and S species at IW-3, 2173 K."""
 
     OS_g: GasSpecies = GasSpecies("OS")
@@ -409,8 +419,10 @@ def test_CHOS_Species_IW() -> None:
             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
         ]
     )
-
-    system: InteriorAtmosphereSystem = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+    solution, _ = interior_atmosphere.solve(constraints=constraints)
 
     target: dict[str, float] = {
         "CO2_g": 48.18987265370282,
@@ -423,5 +435,4 @@ def test_CHOS_Species_IW() -> None:
         "S2_g": 0.003933140539967806,
     }
 
-    system.solve(constraints)
-    assert system.isclose(target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)

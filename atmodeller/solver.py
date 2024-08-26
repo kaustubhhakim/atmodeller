@@ -64,7 +64,7 @@ class Solver(ABC):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial condition. Defaults to None.
+            initial_solution: Initial solution. Defaults to None.
             pressure: Total pressure to evaluate the constraints. Defaults to 1.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities. Defaults to 0.0.
@@ -75,7 +75,8 @@ class Solver(ABC):
         """
         if initial_solution is None:
             initial_solution_ = InitialSolutionDict(species=solve_me.species)
-        assert initial_solution_ is not None
+        else:
+            initial_solution_ = initial_solution
 
         initial_solution_guess: Array = initial_solution_.get_log10_value(
             constraints,
@@ -145,7 +146,7 @@ class Solver(ABC):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial solution
+            initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
             pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
@@ -163,12 +164,14 @@ class SolverOptimistix(Solver):
     Args:
         method: Type of solver. Options are `bfgs`, `chord`, `dogleg`, `lm`, and `newton`. Defaults
             to `newton`.
+        max_steps: Maximum number of steps. Defaults to 256
     """
 
     @override
-    def __init__(self, method: str = "newton"):
+    def __init__(self, method: str = "newton", max_steps: int = 256):
         super().__init__()
         self.method: str = method
+        self.max_steps: int = max_steps
         self.solver = self._get_solver()
         logger.debug("Creating %s with %s", self.__class__.__name__, method)
 
@@ -205,7 +208,7 @@ class SolverOptimistix(Solver):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial condition for this solve only. Defaults to None.
+            initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
@@ -224,6 +227,7 @@ class SolverOptimistix(Solver):
             initial_solution_guess,
             args=kwargs,
             throw=True,
+            max_steps=self.max_steps,
         )
 
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
@@ -302,7 +306,7 @@ class SolverScipy(Solver):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial condition for this solve only. Defaults to None.
+            initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
             pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
@@ -327,7 +331,7 @@ class SolverScipy(Solver):
             initial_solution_guess,
             args=kwargs,
             method=self.method,
-            jac=self._jacobian_scipy,
+            jac=self.jac,
             tol=tol,
             options=self.options,
         )
@@ -335,13 +339,14 @@ class SolverScipy(Solver):
         solution: Solution = Solution.create(solve_me.species, solve_me.planet)
 
         if sol.success:
+            print(sol)
             solution.value = jnp.array(sol.x)
             residual: Array = solve_me.get_residual(solution, constraints)
             rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
             logger.info(
                 "Scipy success with %s and jac=%s. RMSE=%0.2e, steps=%d",
                 self.method,
-                self.jac,
+                self.jac if self.jac is False else True,
                 rmse,
                 sol["nfev"],
             )
@@ -365,9 +370,9 @@ class SolverScipyTryAgain(Solver):
             scipy.optimize.root documentation. Defaults to False.
         options: A dictionary of solver options. Defaults to None.
         max_attempts: Maximum number of attempts to randomise the initial condition to find a
-            solution if the initial guess fails. Defaults to 10.
+            solution if the initial guess fails. Defaults to 20.
         perturb_log10_number_density: Maximum log10 perturbation to apply to the number densities
-            on failure. Defaults to 2.0.
+            on failure. Defaults to 2.
         errors: Either `raise` solver errors or `ignore`. Defaults to `ignore`.
     """
 
@@ -397,12 +402,12 @@ class SolverScipyTryAgain(Solver):
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
     ) -> tuple[Solution, bool]:
-        """Solve using Scipy
+        """Solve
 
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial condition for this solve only. Defaults to None.
+            initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
 
         Returns:
@@ -448,6 +453,7 @@ class SolverScipyTryAgain(Solver):
             logger.error(msg)
             logger.error("constraints = %s", constraints)
             raise RuntimeError(msg)
+
         else:
             logger.warning(msg)
             logger.warning("constraints = %s", constraints)

@@ -36,6 +36,7 @@ from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Spe
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
+from atmodeller.solver import SolverOptimistix, SolverScipy
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -162,11 +163,11 @@ def graphite_water_condensed() -> Solution:
     # TODO: Trying to guide the initial solution more but there's still a bug somewhere, probably
     # with the mass scaling for condensates.
     initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {CH4_g: 1.0, H2O_g: 5}, species=species
+        {CH4_g: 1.0, H2O_g: 5.0, O2_g: 1.0e-48}, species=species
     )
 
     solution: Solution = interior_atmosphere.solve(
-        constraints=constraints, initial_solution=initial_solution
+        solver=SolverScipy(jac=True), constraints=constraints, initial_solution=initial_solution
     )
 
     return solution

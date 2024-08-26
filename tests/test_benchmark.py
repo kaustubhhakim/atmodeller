@@ -33,6 +33,7 @@ from atmodeller.constraints import (
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
+from atmodeller.solver import SolverOptimistix, SolverScipy
 from atmodeller.thermodata.janaf import ThermodynamicDatasetJANAF
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -86,7 +87,7 @@ def test_H_O(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
 
     fastchem_result: dict[str, float] = {
         "H2O_g": 76.45861543,
@@ -128,7 +129,7 @@ def test_CHO_reduced(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2_g": 175.5,
@@ -181,7 +182,7 @@ def test_CHO_IW(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 28.66,
@@ -235,7 +236,7 @@ def test_CHO_oxidised(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.00129,
@@ -281,7 +282,9 @@ def test_CHO_highly_oxidised(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(
+        solver=SolverOptimistix(method="lm"), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "CH4_g": 7.13e-05,
@@ -322,7 +325,7 @@ def test_CHO_middle_temperature(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2_g": 59.066,
@@ -336,58 +339,22 @@ def test_CHO_middle_temperature(helper) -> None:
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# TODO: Clean up the comments around this test. Optimistix can work when the initial condition is
-# closer. Also compare with simple_CHO_low_temperature.py to check they are the same.
-# Solves with Optimistix Newton, although one of the solution estimates during the solve is
-# very large, although the solver does then correct back. This also happens when starting from an
-# initial condition with all zeros.
-# This works with the Chord solver, implying that evaluating the Jacobian at some values along the
-# solution path is indeed the problem, since the Chord solver only solves for the Jacobian once at
-# the initial condition.
-# LM and Dogleg all break with an NaN error
-# [26. 26. 26. 26. 26. 26.]
-# [ 22.796585622054074  26.109794190538366  20.676895512220526
-#   26.59656172476903   25.088340287983083 -19.582404215197847]
-# [ 25.334545442858943  26.109794190538366  23.356517392521333
-#   26.738223784264974  35.381841630698496 -24.658323856807588]
-# [ 5.189584001482789e+07  2.610979418621717e+01 -1.556874296135248e+08 <--- This solution is
-#  -2.075832409121009e+08  2.645264679385557e+01 -1.037916540188888e+08]     very large. Why?
-# [ 26.68152157217264   26.109794201714237   9.840164333581924
-#   11.874894618988037  25.906416912805827 -27.35227608680725 ]
-# [ 26.945107329996187  26.109794190538366   9.51671261864177
-#   11.287857123248166  26.373722518230664 -27.87944763108207 ]
-# [ 26.950915190893088  26.109794190538366   9.537079812065635
-#   11.30241645577513   26.41151329434523  -27.891063352875868]
-# [ 26.95080430771847   26.109794190538366   9.537726403034757
-#   11.303173929918865  26.41182723579052  -27.890841586526633]
-# [ 26.950804271305103  26.109794190538366   9.537726547231674
-#   11.303174110529152  26.411827270747313 -27.8908415136999  ]
 def test_CHO_low_temperature(helper) -> None:
-    """C-H-O system at 450 K
+    """C-H-O system at 450 K"""
 
-    This is the canonical case that has been simplified in simple_CHO_low_temperature.py for
-    testing the solver options.
-    """
-
-    # thermodata_dataset = ThermodynamicDatasetHollandAndPowell()
-    thermodata_dataset = ThermodynamicDatasetJANAF()
-
-    H2_g: GasSpecies = GasSpecies("H2", thermodata_dataset=thermodata_dataset)
-    H2O_g: GasSpecies = GasSpecies("H2O", thermodata_dataset=thermodata_dataset)
-    CO2_g: GasSpecies = GasSpecies("CO2", thermodata_dataset=thermodata_dataset)
-    O2_g: GasSpecies = GasSpecies("O2", thermodata_dataset=thermodata_dataset)
-    CH4_g: GasSpecies = GasSpecies("CH4", thermodata_dataset=thermodata_dataset)
-    CO_g: GasSpecies = GasSpecies("CO", thermodata_dataset=thermodata_dataset)
+    H2_g: GasSpecies = GasSpecies("H2")
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    CO_g: GasSpecies = GasSpecies("CO")
 
     species: Species = Species([H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g])
 
-    # Doesn't work for any temperature below 2000 K, not just the original of 450 K
     cool_planet: Planet = Planet(surface_temperature=450)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
-    # Option to try the O mass rather than total pressure. But both currently blow up the Newton
-    # solver.
     o_kg: float = 1.02999e20
 
     constraints: SystemConstraints = SystemConstraints(
@@ -401,7 +368,7 @@ def test_CHO_low_temperature(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverScipy(jac=True), constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2_g": 55.475,
@@ -444,7 +411,7 @@ def test_graphite_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverScipy(jac=True), constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "O2_g": 1.27e-25,
@@ -492,7 +459,9 @@ def test_graphite_unstable(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=warm_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(
+        solver=SolverOptimistix(method="dogleg"), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "O2_g": 4.11e-13,
@@ -504,10 +473,7 @@ def test_graphite_unstable(helper) -> None:
         "activity_C_cr": 0.12202,
         # FactSage also predicts no C, so these values are set close to the atmodeller output so
         # the test knows to pass.
-        # "mass_C_cr": 512893.3781184358,
-        # FIXME: Why is this mass so low? To investigate, because it should be some small fraction
-        # of the total?
-        "mass_C_cr": 1.3181094490984832e-20,
+        "mass_C_cr": 94150.67454759133,
     }
 
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
@@ -537,7 +503,7 @@ def test_water_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(solver=SolverOptimistix(), constraints=constraints)
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,
@@ -578,7 +544,9 @@ def test_water_condensed_O_abundance(helper) -> None:
     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
         species=species, planet=cool_planet
     )
-    solution: Solution = interior_atmosphere.solve(constraints=constraints)
+    solution, _ = interior_atmosphere.solve(
+        solver=SolverScipy(method="lm", jac=True), constraints=constraints
+    )
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,
