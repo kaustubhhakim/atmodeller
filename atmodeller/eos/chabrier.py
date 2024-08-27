@@ -46,10 +46,12 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
+import jax.numpy as jnp
 import pandas as pd
-from scipy.integrate import trapezoid
-from scipy.interpolate import RectBivariateSpline
+from jax import Array
+from jax.scipy.integrate import trapezoid
+from jax.scipy.interpolate import RegularGridInterpolator
+from jax.typing import ArrayLike
 
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos.interfaces import RealGas
@@ -80,7 +82,7 @@ class Chabrier(RealGas):
     """Filename of the density-T-P data"""
     standard_state_pressure: float = field(init=False, default=1)
     """Standard state pressure with the appropriate units. Set to 1 bar"""
-    log10density_func: RectBivariateSpline = field(init=False)
+    log10density_func: RegularGridInterpolator = field(init=False)
     """Spline to evaluate the density"""
 
     def __post_init__(self):
@@ -109,33 +111,35 @@ class Chabrier(RealGas):
         pivot_table: pd.DataFrame = df.pivot(
             index="#log T [K]", columns="log P [GPa]", values="log rho [g/cc]"
         )
-        self.log10density_func: RectBivariateSpline = RectBivariateSpline(
-            pivot_table.index.to_numpy(), pivot_table.columns.to_numpy(), pivot_table.to_numpy()
-        )
+        # Convert the pivot table to JAX arrays
+        log_T: Array = jnp.array(pivot_table.index.to_numpy())
+        log_P: Array = jnp.array(pivot_table.columns.to_numpy())
+        log_rho: Array = jnp.array(pivot_table.to_numpy())
+
+        # Use JAX's RegularGridInterpolator for interpolation
+        self.log10density_func = RegularGridInterpolator((log_T, log_P), log_rho)
 
     @override
-    def volume(self, temperature: float, pressure: float) -> float:
+    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
         # Get log10 (density [g/cm3]) from the Chabrier H2 table
-        log10density_gcc = self.log10density_func(
-            np.log10(temperature), np.log10(UnitConversion.bar_to_GPa(pressure))
+        log10density_gcc: Array = self.log10density_func(
+            jnp.log10(temperature), jnp.log10(UnitConversion.bar_to_GPa * pressure)
         )
         # Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
-        molar_density: float = np.power(10, log10density_gcc.item()) / (
-            UnitConversion.cm3_to_m3(1) * 2.016
-        )
-        volume: float = 1 / molar_density
+        molar_density: Array = jnp.power(10, log10density_gcc) / (UnitConversion.cm3_to_m3 * 2.016)
+        volume: Array = 1 / molar_density
 
         return volume
 
     @override
-    def volume_integral(self, temperature: float, pressure: float) -> float:
+    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
         # For loop for the first part of the integral
-        pressures = np.logspace(
-            np.log10(self.standard_state_pressure), np.log10(pressure), num=1000
+        pressures: Array = jnp.logspace(
+            jnp.log10(self.standard_state_pressure), jnp.log10(pressure), num=1000
         )
-        volumes = np.array([self.volume(temperature, pressure) for pressure in pressures])
-        volume_integral = trapezoid(volumes, pressures)
-        volume_integral = UnitConversion.m3_bar_to_J(volume_integral)
+        volumes: Array = jnp.array([self.volume(temperature, pressure) for pressure in pressures])
+        volume_integral: Array = trapezoid(volumes, pressures)
+        volume_integral = UnitConversion.m3_bar_to_J * volume_integral
 
         return volume_integral
 
