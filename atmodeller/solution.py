@@ -34,7 +34,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT, MACHEPS
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, Species
 from atmodeller.interfaces import (
     ChemicalSpecies,
@@ -44,12 +44,7 @@ from atmodeller.interfaces import (
     TypeChemicalSpecies_co,
 )
 from atmodeller.solubility.interfaces import NoSolubility
-from atmodeller.utilities import (
-    get_molar_mass,
-    logsumexp_base10,
-    safe_log10,
-    unit_conversion,
-)
+from atmodeller.utilities import get_molar_mass, logsumexp_base10, unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -379,9 +374,10 @@ class DissolvedNumberDensitySpecies(NumberDensitySpecies[GasSpecies]):
 
     @property
     def value(self) -> Array:
-        small_value_for_gradient_stability: Array = jnp.array(-100.0)
+        # TODO: Depending on testing, could switch this to a small number instead of inf
+        small_value_for_gradient_stability: Array = jnp.array(-jnp.inf)  # jnp.array(-100.0)
 
-        if isinstance(self.species.solubility, NoSolubility):
+        if isinstance(self.species.solubility, NoSolubility) or self.reservoir_mass() < MACHEPS:
             # Short-cut for no solubility for improved speed since autodiffing solubility is slow.
             out: Array = small_value_for_gradient_stability
         else:
@@ -389,10 +385,10 @@ class DissolvedNumberDensitySpecies(NumberDensitySpecies[GasSpecies]):
             # autodiffing. Hence this is an obvious candidate for future performance improvements.
             ppmw_value: Array = self.ppmw()
             out = (
-                safe_log10(ppmw_value * unit_conversion.ppm_to_fraction)
+                jnp.log10(ppmw_value * unit_conversion.ppm_to_fraction)
                 + jnp.log10(AVOGADRO)
                 - jnp.log10(self._species.molar_mass)
-                + safe_log10(self.reservoir_mass())
+                + jnp.log10(self.reservoir_mass())
                 - jnp.log10(self.atmosphere.volume())
             )
 

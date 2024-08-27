@@ -36,7 +36,7 @@ from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Spe
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
-from atmodeller.solver import SolverScipy
+from atmodeller.solver import SolverOptimistix, SolverScipy
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -163,15 +163,17 @@ def graphite_water_condensed() -> Solution:
     )
 
     # Help the solver with an improved initial guess
-    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {O2_g: 1.0e-48}, species=species, planet=cool_planet
-    )
+    # initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+    #    {O2_g: 1.0e-48}, species=species, planet=cool_planet
+    # )
 
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(method="lm", jac=True),
+        solver=SolverOptimistix(method="lm"),
         constraints=constraints,
-        initial_solution=initial_solution,
+        # initial_solution=initial_solution,
     )
+
+    interior_atmosphere.output(to_excel=True)
 
     return solution
 

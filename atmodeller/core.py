@@ -207,9 +207,10 @@ class Species(ImmutableList[ChemicalSpecies]):
         elements: list[str] = []
         for species in self.data:
             elements.extend(species.elements)
-        unique_elements: tuple[str, ...] = tuple(set(elements))
+        unique_elements: list[str] = list(set(elements))
+        sorted_elements: list[str] = sorted(unique_elements)
 
-        return unique_elements
+        return tuple(sorted_elements)
 
     def species_index(self, find_species: ChemicalSpecies) -> int:
         """Gets the index of a species
