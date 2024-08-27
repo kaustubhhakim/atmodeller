@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 
-from atmodeller import __version__, debug_logger
+from atmodeller import __version__, debug_file_logger
 from atmodeller.constraints import (
     ActivityConstraint,
     BufferedFugacityConstraint,
@@ -37,7 +37,7 @@ from atmodeller.solver import SolverOptimistix, SolverScipy
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
-logger: logging.Logger = debug_logger()
+logger: logging.Logger = debug_file_logger()
 # logger.setLevel(logging.INFO)
 
 TOLERANCE: float = 5.0e-2

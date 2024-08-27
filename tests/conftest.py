@@ -163,14 +163,14 @@ def graphite_water_condensed() -> Solution:
     )
 
     # Help the solver with an improved initial guess
-    # initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-    #    {O2_g: 1.0e-48}, species=species, planet=cool_planet
-    # )
+    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+        {O2_g: 1.0e-48}, species=species, planet=cool_planet
+    )
 
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverOptimistix(method="lm"),
+        solver=SolverScipy(method="lm"),
         constraints=constraints,
-        # initial_solution=initial_solution,
+        initial_solution=initial_solution,
     )
 
     interior_atmosphere.output(to_excel=True)
