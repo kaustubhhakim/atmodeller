@@ -137,7 +137,16 @@ class Chabrier(RealGas):
         pressures: Array = jnp.logspace(
             jnp.log10(self.standard_state_pressure), jnp.log10(pressure), num=1000
         )
-        volumes: Array = jnp.array([self.volume(temperature, pressure) for pressure in pressures])
+        log10temperatures: Array = jnp.full_like(pressures, jnp.log10(temperature))
+        log10pressures_GPa: Array = jnp.log10(UnitConversion.bar_to_GPa * pressures)
+
+        log10densities_gcc: Array = self.log10density_func(log10temperatures, log10pressures_GPa)
+
+        molar_densities: Array = jnp.power(10, log10densities_gcc) / (
+            UnitConversion.cm3_to_m3 * 2.016
+        )
+        volumes: Array = 1 / molar_densities
+
         volume_integral: Array = trapezoid(volumes, pressures)
         volume_integral = UnitConversion.m3_bar_to_J * volume_integral
 
