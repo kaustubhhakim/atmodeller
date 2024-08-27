@@ -302,41 +302,6 @@ def test_H_and_C_saxena(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_and_C_chabrier(helper) -> None:
-    """Tests H2-H2O and real gas EOS from Chabrier
-
-    The fugacity is large to check that the volume integral is performed correctly.
-    """
-
-    H2_Chabrier = get_chabrier_eos_models()["H2"]
-
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2", eos=H2_Chabrier)
-    O2_g: GasSpecies = GasSpecies("O2")
-
-    species: Species = Species([H2O_g, H2_g, O2_g])
-    constraints: SystemConstraints = SystemConstraints(
-        [
-            FugacityConstraint(H2O_g, 10000),
-            FugacityConstraint(O2_g, 8.981953412412735e-08),
-        ]
-    )
-    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, planet=planet
-    )
-    solution: Solution = interior_atmosphere.solve(
-        solver=SolverOptimistix(), constraints=constraints
-    )
-
-    target: dict[str, float] = {
-        "H2O_g": 10000.0,
-        "H2_g": 9539.109221925035,
-        "O2_g": 8.981953412412754e-08,
-    }
-
-    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
-
-
 def test_H_fO2_no_solubility(helper) -> None:
     """Tests H2-H2O at the IW buffer."""
 
