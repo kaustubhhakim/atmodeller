@@ -117,13 +117,13 @@ class Chabrier(RealGas):
         log_rho: Array = jnp.array(pivot_table.to_numpy())
 
         # Use JAX's RegularGridInterpolator for interpolation
-        self.log10density_func = RegularGridInterpolator((log_T, log_P), log_rho)
+        self.log10density_func = RegularGridInterpolator((log_T, log_P), log_rho, method="linear")
 
     @override
     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
         # Get log10 (density [g/cm3]) from the Chabrier H2 table
         log10density_gcc: Array = self.log10density_func(
-            jnp.log10(temperature), jnp.log10(UnitConversion.bar_to_GPa * pressure)
+            (jnp.log10(temperature), jnp.log10(UnitConversion.bar_to_GPa * pressure))
         )
         # Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
         molar_density: Array = jnp.power(10, log10density_gcc) / (UnitConversion.cm3_to_m3 * 2.016)
@@ -140,7 +140,7 @@ class Chabrier(RealGas):
         log10temperatures: Array = jnp.full_like(pressures, jnp.log10(temperature))
         log10pressures_GPa: Array = jnp.log10(UnitConversion.bar_to_GPa * pressures)
 
-        log10densities_gcc: Array = self.log10density_func(log10temperatures, log10pressures_GPa)
+        log10densities_gcc: Array = self.log10density_func((log10temperatures, log10pressures_GPa))
 
         molar_densities: Array = jnp.power(10, log10densities_gcc) / (
             UnitConversion.cm3_to_m3 * 2.016
