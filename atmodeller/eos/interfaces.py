@@ -282,10 +282,9 @@ class IdealGas(RealGas):
     def fugacity_coefficient(self, *args, **kwargs) -> Array:
         """Fugacity coefficient
 
-        Although the fugacity coefficient is self-consistently calculated in the base class, this
-        approach apparently adversely affects the Jacobian estimation, driving the pressure to
-        infinity and causing an NaN crash. Since we know that the fugacity coefficient of an ideal
-        gas is unity by definition we simply impose it here to pass a constant to the solver.
+        Since we know that the fugacity coefficient of an ideal gas is unity by definition we
+        simply impose it here to pass a constant to the solver. This seems to avoid some NaN
+        crashes with the Optimistix solver.
         """
         del args
         del kwargs
