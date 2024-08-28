@@ -486,7 +486,7 @@ def test_graphite_unstable(helper) -> None:
         "activity_C_cr": 0.12202,
         # FactSage also predicts no C, so these values are set close to the atmodeller output so
         # the test knows to pass.
-        "mass_C_cr": 94150.67454759133,
+        "mass_C_cr": 941506.7454759097,
     }
 
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)

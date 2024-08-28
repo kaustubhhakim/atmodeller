@@ -372,9 +372,15 @@ class ReactionNetwork(ResidualProtocol):
             Residual array
         """
         pressure: Array = solution.atmosphere.pressure()
-        residual: Array = self.get_coefficient_matrix(constraints=constraints).dot(
-            self._get_log_fugacity_coefficients(pressure) + solution.get_reaction_array()
-        ) - self._get_right_hand_side(pressure, constraints=constraints)
+        residual: Array = (
+            self.get_coefficient_matrix(constraints=constraints).dot(
+                self._get_log_fugacity_coefficients(pressure)
+            )
+            + self.get_coefficient_matrix(constraints=constraints).dot(
+                solution.get_reaction_array()
+            )
+            - self._get_right_hand_side(pressure, constraints=constraints)
+        )
 
         return residual
 

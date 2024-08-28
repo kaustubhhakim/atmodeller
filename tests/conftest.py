@@ -164,7 +164,7 @@ def graphite_water_condensed() -> Solution:
 
     # Help the solver with an improved initial guess
     initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {O2_g: 1.0e-48}, species=species, planet=cool_planet
+        {O2_g: 1e-48}, species=species, planet=cool_planet
     )
 
     solution: Solution = interior_atmosphere.solve(

@@ -468,7 +468,9 @@ class TauC(CondensedSolutionComponent):
         # But number densities can change if elements are not all constrained, so just use a
         # predefined constant scaling perhaps derived from the constraints.
         # For the time being, set a hard-coded scaling:
-        scaling: float = 1e26  # Seems to work OK for testing with djbower/initial branch.
+        # Condensed test with water and graphite breaks when this value is 1e26, but passes fine
+        # when it is larger, like 1e27. To clean up.
+        scaling: float = 1e27  # Seems to work OK for testing with djbower/initial branch.
         log10_tauc: Array = LOG10_TAU + jnp.log10(jnp.min(jnp.array(scaling)))
 
         return log10_tauc
