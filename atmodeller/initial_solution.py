@@ -483,7 +483,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
     def set_data(
         self, constraints: SystemConstraints, *, temperature: float, pressure: ArrayLike
     ) -> None:
-        evaluated_constraints_log10: dict[str, Array] = constraints.evaluate_log10(
+        evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
             temperature=temperature, pressure=pressure
         )
         values_constraints_log10: npt.NDArray = np.array(

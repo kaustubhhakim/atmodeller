@@ -83,7 +83,7 @@ class Output(UserDict):
         self,
         solution: Solution,
         residual_dict: dict[str, float],
-        constraints_dict: dict[str, ArrayLike],
+        constraints_dict: dict[str, float],
         extra_output: dict[str, float] | None = None,
     ) -> None:
         """Adds all outputs.
@@ -98,7 +98,7 @@ class Output(UserDict):
             data_list: list[dict[str, float]] = self.data.setdefault(key, [])
             data_list.append(value)
 
-        constraints_list: list[dict[str, ArrayLike]] = self.data.setdefault("constraints", [])
+        constraints_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
         constraints_list.append(constraints_dict)
         residual_list: list[dict[str, float]] = self.data.setdefault("residual", [])
         residual_list.append(residual_dict)

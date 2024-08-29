@@ -24,6 +24,7 @@ from abc import ABC, abstractmethod
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 import jax.numpy as jnp
+import numpy as np
 from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
@@ -495,8 +496,12 @@ class SystemConstraints(ImmutableList[ConstraintProtocol]):
         """Number of constraints related to the reaction network"""
         return len(self.reaction_network_constraints)
 
-    def evaluate(self, temperature: float, pressure: ArrayLike) -> dict[str, ArrayLike]:
+    def evaluate(self, temperature: float, pressure: ArrayLike) -> dict[str, float]:
         """Evaluates all constraints.
+
+        This method will not allow JAX to track gradients, but I think this is OK since it is only
+        used for output and to estimate the initial solution. This is because to estimate the
+        initial solution the temperature and pressure arguments are both floats, not JAX arrays.
 
         Args:
             temperature: Temperature in K
@@ -505,17 +510,24 @@ class SystemConstraints(ImmutableList[ConstraintProtocol]):
         Returns:
             A dictionary of the evaluated constraints in the same order as the constraints
         """
-        evaluated_constraints: dict[str, ArrayLike] = {}
+        evaluated_constraints: dict[str, float] = {}
         for constraint in self.data:
-            evaluated_constraints[constraint.name] = constraint.get_value(
-                temperature=temperature,
-                pressure=pressure,
-            )
+            evaluated_constraints[constraint.name] = jnp.asarray(
+                constraint.get_value(
+                    temperature=temperature,
+                    pressure=pressure,
+                )
+            ).item()
 
         return evaluated_constraints
 
-    def evaluate_log10(self, temperature: float, pressure: ArrayLike) -> dict[str, Array]:
+    def evaluate_log10(self, temperature: float, pressure: ArrayLike) -> dict[str, float]:
         """Evaluates all constraints and returns the log10 values.
+
+        This method will not allow JAX to track gradients, but I think this is OK since it is only
+        used for output and to estimate the initial solution. This is because to estimate the
+        initial solution the temperature and pressure arguments are both floats, not JAX arrays.
+
 
         Args:
             temperature: Temperature in K
@@ -525,5 +537,5 @@ class SystemConstraints(ImmutableList[ConstraintProtocol]):
             A dictionary of the log10 evaluated constraints in the same order as the constraints
         """
         return {
-            key: jnp.log10(value) for key, value in self.evaluate(temperature, pressure).items()
+            key: np.log10(value) for key, value in self.evaluate(temperature, pressure).items()
         }
