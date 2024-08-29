@@ -20,8 +20,9 @@
 
 import logging
 
-import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
+from jax import Array
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
@@ -32,8 +33,11 @@ from atmodeller.constraints import (
 )
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
 from atmodeller.initial_solution import (
+    FILL_LOG10_NUMBER_DENSITY,
+    FILL_LOG10_STABILITY,
     InitialSolutionDict,
     InitialSolutionLast,
+    InitialSolutionProtocol,
     InitialSolutionRegressor,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
@@ -60,65 +64,79 @@ def test_version():
 
 
 def test_default_dict():
-    """Tests a dict with no arguments and no constraints"""
+    """Tests a dict with no arguments"""
 
-    H2O_g = GasSpecies("H2O")
-    H2_g = GasSpecies("H2")
-    O2_g = GasSpecies("CO")
-    species = Species([H2O_g, H2_g, O2_g])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("CO")
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
     constraints: SystemConstraints = SystemConstraints([])
 
-    initial_solution = InitialSolutionDict(species=species, planet=planet)
-    result = initial_solution.get_log10_value(
+    initial_solution: InitialSolutionProtocol = InitialSolutionDict(species=species, planet=planet)
+    result: Array = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
 
-    assert np.all(result == 26)
+    assert np.all(result == FILL_LOG10_NUMBER_DENSITY)
 
 
 def test_constraint_fill_dict():
-    """Tests a dict with no arguments, but with constraints and a number density fill value."""
+    """Tests a dict with no arguments with a number density fill value."""
 
-    H2O_g = GasSpecies("H2O")
-    H2_g = GasSpecies("H2")
-    CO_g = GasSpecies("CO")
-    species = Species([H2O_g, H2_g, CO_g])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    CO_g: GasSpecies = GasSpecies("CO")
+    species: Species = Species([H2O_g, H2_g, CO_g])
 
-    constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
+    constraints: SystemConstraints = SystemConstraints([])
+    fill_log10_number_density: float = 20
 
-    initial_solution = InitialSolutionDict(
-        species=species, planet=planet, fill_log10_number_density=20
+    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+        species=species, planet=planet, fill_log10_number_density=fill_log10_number_density
     )
-    result = initial_solution.get_log10_value(
+    result: Array = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([25.25785673, 20, 20])
+    target: npt.NDArray[np.float_] = np.array([20, 20, 20])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
 
-    assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
+    assert np.all(result == fill_log10_number_density)
 
 
 def test_args_constraint_fill_dict():
-    """Tests a dict with arguments, constraints, and a number density fill value."""
+    """Tests a dict with arguments and a number density fill value."""
 
-    H2O_g = GasSpecies("H2O")
-    H2_g = GasSpecies("H2")
-    CO_g = GasSpecies("CO")
-    CO2_g = GasSpecies("CO2")
-    species = Species([H2O_g, H2_g, CO_g, CO2_g])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    species: Species = Species([H2O_g, H2_g, CO_g, CO2_g])
 
-    constraints = SystemConstraints([PressureConstraint(H2O_g, 5)])
+    constraints: SystemConstraints = SystemConstraints([])
+    CO2_g_value: float = 1e24
+    H2_g_value: float = 1e25
+    fill_log10_number_density: float = 26
 
-    initial_solution = InitialSolutionDict(
-        {CO_g: 1e24, H2_g: 1e25}, species=species, planet=planet, fill_log10_number_density=26
+    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+        {CO_g: CO2_g_value, H2_g: H2_g_value},
+        species=species,
+        planet=planet,
+        fill_log10_number_density=fill_log10_number_density,
     )
-    result = initial_solution.get_log10_value(
+    result: Array = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([25.25785673, 25, 24, 26])
+    target: npt.NDArray[np.float_] = np.array(
+        [
+            fill_log10_number_density,
+            np.log10(H2_g_value),
+            np.log10(CO2_g_value),
+            fill_log10_number_density,
+        ]
+    )
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -140,18 +158,43 @@ def test_args_fill_stability_dict():
     species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
 
     constraints = SystemConstraints([])
+    CO_g_value: float = 1e24
+    H2_g_value: float = 1e25
+    stability_C_cr_value: float = 2
+    H2O_l_value: float = 1e22
+    fill_log10_activity: float = np.log10(0.8)
 
-    initial_solution = InitialSolutionDict(
-        {CO_g: 1e24, H2_g: 1e25, "stability_C_cr": 2, H2O_l: 1e22},
+    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+        {
+            CO_g: CO_g_value,
+            H2_g: H2_g_value,
+            "stability_C_cr": stability_C_cr_value,
+            H2O_l: H2O_l_value,
+        },
         species=species,
         planet=planet,
-        fill_log10_activity=jnp.log10(0.8),
+        fill_log10_activity=fill_log10_activity,
     )
 
-    result = initial_solution.get_log10_value(
+    result: Array = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([26, 25, 26, 24, 26, 26, 0, 22, -15, 0, 26, 0.30103])
+    target: npt.NDArray[np.float_] = np.array(
+        [
+            FILL_LOG10_NUMBER_DENSITY,
+            np.log10(H2_g_value),
+            FILL_LOG10_NUMBER_DENSITY,
+            np.log10(CO_g_value),
+            FILL_LOG10_NUMBER_DENSITY,
+            FILL_LOG10_NUMBER_DENSITY,
+            fill_log10_activity,
+            np.log10(H2O_l_value),
+            FILL_LOG10_STABILITY,
+            fill_log10_activity,
+            FILL_LOG10_NUMBER_DENSITY,
+            np.log10(stability_C_cr_value),
+        ]
+    )
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)

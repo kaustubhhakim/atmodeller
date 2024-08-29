@@ -49,6 +49,10 @@ from atmodeller.solution import (
     SpeciesComponentSetterProtocol,
 )
 
+FILL_LOG10_NUMBER_DENSITY: float = 26
+FILL_LOG10_ACTIVITY: float = -TAU
+FILL_LOG10_STABILITY: ArrayLike = LOG10_TAU
+
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
@@ -98,9 +102,9 @@ class InitialSolution(ABC, Generic[T]):
         *,
         species: Species,
         planet: Planet,
-        fill_log10_number_density: float = 26.0,
-        fill_log10_activity: float = -TAU,
-        fill_log10_stability: ArrayLike = LOG10_TAU,
+        fill_log10_number_density: float = FILL_LOG10_NUMBER_DENSITY,
+        fill_log10_activity: float = FILL_LOG10_ACTIVITY,
+        fill_log10_stability: ArrayLike = FILL_LOG10_STABILITY,
     ):
         logger.debug("Creating %s", self.__class__.__name__)
         self.value: T = value
@@ -174,7 +178,7 @@ class InitialSolution(ABC, Generic[T]):
                 self.perturb(collection.abundance, perturb_log10_number_density)
 
         # In some cases applying the gas constraints can help put the initial solution closer to
-        # the real solution, but in other cases this seems to cause problems.
+        # the real solution, but in other cases this seems to cause problems with the solvers.
         # Gas constraints
         # for constraint in constraints.gas_constraints:
         #     self.solution.gas[constraint.species].abundance.value = constraint.get_log10_value(
@@ -271,7 +275,7 @@ class InitialSolutionDict(InitialSolution[dict]):
         try:
             output: Array | None = jnp.log10(self.value[key])
         except KeyError:
-            # Ignore missing keys. These are later filled with fill values.
+            # Ignore missing keys.
             output = None
 
         return output
@@ -344,7 +348,8 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         fit_batch_size: int = 100,
         partial_fit: bool = True,
         partial_fit_batch_size: int = 500,
-        solution_override: InitialSolutionDict | None = None,
+        # TODO: Might not be required anymore
+        # solution_override: InitialSolutionDict | None = None,
         **kwargs,
     ):
         super().__init__(value, species=species, planet=planet, **kwargs)
@@ -353,10 +358,11 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self.fit_batch_size: int = fit_batch_size if self.fit else 0
         self.partial_fit: bool = partial_fit
         self.partial_fit_batch_size: int = partial_fit_batch_size
-        if solution_override is None:
-            self._solution_override: InitialSolutionDict | None = None
-        else:
-            self._solution_override = solution_override
+        # TODO: Might not be required anymore
+        # if solution_override is None:
+        #    self._solution_override: InitialSolutionDict | None = None
+        # else:
+        #    self._solution_override = solution_override
         self._fit(self.value)
 
     @classmethod
@@ -475,9 +481,9 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
     @override
     def set_data(
-        self, constraints: SystemConstraints, *, temperature: float, pressure: float
+        self, constraints: SystemConstraints, *, temperature: float, pressure: ArrayLike
     ) -> None:
-        evaluated_constraints_log10: dict[str, float] = constraints.evaluate_log10(
+        evaluated_constraints_log10: dict[str, Array] = constraints.evaluate_log10(
             temperature=temperature, pressure=pressure
         )
         values_constraints_log10: npt.NDArray = np.array(
@@ -492,30 +498,23 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             npt.NDArray, self._solution_scalar.inverse_transform(solution_scaled)
         )
 
-        self.solution.value = solution_original.flatten()
+        self.solution.value = jnp.array(solution_original.flatten())
 
-        # FIXME: Regressor doesn't return a low enough log10 value
-        # if abs(self.solution.data[13]) < 1e-2:
-        #     logger.warning("Implementing hack")
-        #     self.solution.activity.data[self.species.get_species_from_name("H2O_l")] = -24
-        # if abs(self.solution.data[14]) < 1e-2:
-        #     logger.warning("Implementing hack")
-        #     self.solution.activity.data[self.species.get_species_from_name("C_cr")] = -24
+    # TODO: Might not be required anymore with the improved solvers
+    # @override
+    # def process_data(
+    #     self, constraints: SystemConstraints, *, temperature: float, pressure: ArrayLike, **kwargs
+    # ) -> None:
+    #     """Includes a user-specified override to the initial solution"""
+    #     super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
 
-    @override
-    def process_data(
-        self, constraints: SystemConstraints, *, temperature: float, pressure: float, **kwargs
-    ) -> None:
-        """Includes a user-specified override to the initial solution"""
-        super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
-
-        if self._solution_override is not None:
-            self._solution_override.set_data(
-                constraints,
-                temperature=temperature,
-                pressure=pressure,
-            )
-            self.solution.merge(self._solution_override.solution)
+    #     if self._solution_override is not None:
+    #         self._solution_override.set_data(
+    #             constraints,
+    #             temperature=temperature,
+    #             pressure=pressure,
+    #         )
+    #         self.solution.merge(self._solution_override.solution)
 
     def action_fit(self, output: Output) -> tuple[int, int] | None:
         """Checks if a fit is necessary.
