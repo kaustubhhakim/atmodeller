@@ -30,11 +30,13 @@ from collections import ChainMap, Counter
 from collections.abc import Mapping
 from typing import Generic, Iterator, Protocol, TypeVar, cast
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT, MACHEPS
+from atmodeller.constraints import SystemConstraints
 from atmodeller.core import GasSpecies, LiquidSpecies, Planet, Species
 from atmodeller.interfaces import (
     ChemicalSpecies,
@@ -374,7 +376,7 @@ class DissolvedNumberDensitySpecies(NumberDensitySpecies[GasSpecies]):
 
     @property
     def value(self) -> Array:
-        # TODO: Depending on testing, could switch this to a small number instead of inf
+        # This could be switched for a small number instead of inf if problems arise.
         small_value_for_gradient_stability: Array = jnp.array(-jnp.inf)  # jnp.array(-100.0)
 
         if isinstance(self.species.solubility, NoSolubility) or self.reservoir_mass() < MACHEPS:
@@ -451,29 +453,40 @@ class CondensedSolutionComponent(_ValueSetterMixin):
         self._species: CondensedSpecies = species
 
 
-class TauC(CondensedSolutionComponent):
+class TauC:
     """Tauc factor for the calculation of condensate stability :citep:`{e.g.,}KSP24{Equation 19}`
 
     Args:
         species: A condensed species
-        solution: The solution
     """
 
-    @property
-    def value(self) -> Array:
-        # FIXME: Previous was number densities
-        # element_number_densities: list[Array] = [
-        #    self._solution.number_density(element=element) for element in self._species.elements
-        # ]
-        # But number densities can change if elements are not all constrained, so just use a
-        # predefined constant scaling perhaps derived from the constraints.
-        # For the time being, set a hard-coded scaling:
-        # Condensed test with water and graphite breaks when this value is 1e26, but passes fine
-        # when it is larger, like 1e27. To clean up.
-        scaling: float = 1e27  # Seems to work OK for testing with djbower/initial branch.
-        log10_tauc: Array = LOG10_TAU + jnp.log10(jnp.min(jnp.array(scaling)))
+    def __init__(self, species: CondensedSpecies):
+        self._species: CondensedSpecies = species
 
-        return log10_tauc
+    def get_value(self, constraints: SystemConstraints, log10_atmosphere_volume: Array):
+        """Gets the value of tauc.
+
+        This effectively controls the minimum non-zero number density of the unstable condensates.
+
+        Args:
+            constraints: Constraints
+            log10_atmosphere_volume: Log10 volume of the atmosphere
+
+        Returns:
+            Value of tauc
+        """
+        log10_element_atoms: list[Array] = []
+
+        # Find the minimum number density of an element in the species
+        for mass_constraint in constraints.mass_constraints:
+            if mass_constraint.element in self._species.composition():
+                log10_element_atoms.append(mass_constraint.log10_number_of_molecules)
+
+        log10_element_number_density: Array = (
+            jnp.min(jnp.array(log10_element_atoms)) - log10_atmosphere_volume
+        )
+
+        return LOG10_TAU + log10_element_number_density
 
 
 class GasSpeciesContainer(NumberDensitySpeciesSetter[GasSpecies]):

@@ -168,7 +168,7 @@ def graphite_water_condensed() -> Solution:
     )
 
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(method="lm"),
+        solver=SolverScipy(method="lm", jac=True),
         constraints=constraints,
         initial_solution=initial_solution,
     )

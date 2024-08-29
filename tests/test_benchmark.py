@@ -517,7 +517,7 @@ def test_water_condensed(helper) -> None:
         species=species, planet=cool_planet
     )
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverOptimistix(), constraints=constraints
+        solver=SolverOptimistix(method="lm"), constraints=constraints
     )
 
     factsage_result: dict[str, float] = {
@@ -535,7 +535,8 @@ def test_water_condensed_O_abundance(helper) -> None:
     """Condensed water at 10 bar
 
     This is the same test as above, but this time constraining the total pressure and oxygen
-    abundance."""
+    abundance.
+    """
 
     H2_g: GasSpecies = GasSpecies("H2")
     H2O_g: GasSpecies = GasSpecies("H2O")

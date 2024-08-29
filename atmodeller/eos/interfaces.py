@@ -141,25 +141,6 @@ class RealGas(ABC):
         """
         return jnp.exp(self.ln_fugacity_coefficient(temperature, pressure))
 
-        # FIXME: This switch block is not JAX compliant, and may not be required anymore.
-        # if fugacity_coefficient == np.inf:
-        #     logger.debug("Fugacity coefficient has blown up (unphysical)")
-        #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-        #     logger.debug("Setting fugacity coefficient to unity (ideal gas)")
-        #     fugacity_coefficient = 1
-
-        # elif fugacity_coefficient == 0:
-        #     logger.debug("Fugacity coefficient is zero (unphysical)")
-        #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-        #     logger.debug("Setting fugacity coefficient to unity (ideal gas)")
-        #     fugacity_coefficient = 1
-
-        # elif fugacity_coefficient < 0:
-        #     logger.debug("Fugacity coefficient is negative (unphysical)")
-        #     logger.debug("Evaluation at temperature = %f, pressure = %f", temperature, pressure)
-        #     logger.debug("Setting fugacity coefficient to unity (ideal gas)")
-        #     fugacity_coefficient = 1
-
     def ideal_volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         r"""Ideal volume
 
