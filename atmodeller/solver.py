@@ -30,7 +30,6 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array
-from scipy.linalg import LinAlgError
 from scipy.optimize import OptimizeResult, root
 
 from atmodeller.constraints import SystemConstraints
@@ -55,8 +54,8 @@ class Solver(ABC):
         *,
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
-        pressure: float = 1.0,
         perturb_log10_number_density: float = 0,
+        pressure: float = 1.0,
     ) -> Array:
         """Gets the initial solution
 
@@ -64,9 +63,9 @@ class Solver(ABC):
             solve_me: System to solve
             constraints: Constraints for the system of equations
             initial_solution: Initial solution. Defaults to None.
-            pressure: Total pressure to evaluate the constraints. Defaults to 1.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
-                densities. Defaults to 0.0.
+                densities of the initial solution. Defaults to 0.
+            pressure: Total pressure to evaluate the constraints. Defaults to 1 bar.
 
         Returns:
             An array of the initial solution
@@ -123,9 +122,6 @@ class Solver(ABC):
 
         residual: Array = solve_me.get_residual(solution, constraints)
 
-        # jax.debug.print("solution into objective = {solution}", solution=solution.value)
-        # jax.debug.print("residual out of objective = {residual}", residual=residual)
-
         return residual
 
     @abstractmethod
@@ -136,7 +132,6 @@ class Solver(ABC):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-        pressure: float = 1.0,
         perturb_log10_number_density: float = 0,
     ) -> tuple[Solution, bool]:
         """Solve
@@ -146,9 +141,8 @@ class Solver(ABC):
             constraints: Constraints for the system of equations
             initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
-            pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
-                densities. Defaults to 0.0.
+                densities of the initial solution. Defaults to 0.
 
         Returns:
             Solution and a bool to indicate success
@@ -199,6 +193,7 @@ class SolverOptimistix(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
+        perturb_log10_number_density: float = 0,
     ) -> tuple[Solution, bool]:
         """Solve using Optimistix
 
@@ -207,12 +202,17 @@ class SolverOptimistix(Solver):
             constraints: Constraints for the system of equations
             initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
+            perturb_log10_number_density: Maximum log10 perturbation to apply to the number
+                densities of the initial solution. Defaults to 0.
 
         Returns:
             Solution and a bool to indicate success
         """
         initial_solution_guess: Array = self.get_initial_solution(
-            solve_me, constraints=constraints, initial_solution=initial_solution
+            solve_me,
+            constraints=constraints,
+            initial_solution=initial_solution,
+            perturb_log10_number_density=perturb_log10_number_density,
         )
         kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
 
@@ -244,7 +244,7 @@ class SolverOptimistix(Solver):
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
             success: bool = True
         else:
-            logger.warning("Optimistix solver failed with %s.", optx.RESULTS[sol.result])
+            logger.warning("Optimistix solver failed (message=%s).", optx.RESULTS[sol.result])
             success = False
 
         return solution, success
@@ -294,7 +294,6 @@ class SolverScipy(Solver):
         constraints: SystemConstraints,
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
-        pressure: float = 1.0,
         perturb_log10_number_density: float = 0,
     ) -> tuple[Solution, bool]:
         """Solve using Scipy
@@ -304,9 +303,8 @@ class SolverScipy(Solver):
             constraints: Constraints for the system of equations
             initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
-            pressure: Pressure to evaluate the constraints. Defaults to 1 bar.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
-                densities. Defaults to 0.0.
+                densities. Defaults to 0.
 
         Returns:
             Solution and a bool to indicate success
@@ -315,7 +313,6 @@ class SolverScipy(Solver):
             solve_me,
             constraints=constraints,
             initial_solution=initial_solution,
-            pressure=pressure,
             perturb_log10_number_density=perturb_log10_number_density,
         )
         kwargs: dict[str, Any] = {"solve_me": solve_me, "constraints": constraints}
@@ -337,7 +334,7 @@ class SolverScipy(Solver):
             residual: Array = solve_me.get_residual(solution, constraints)
             rmse: npt.NDArray[np.float_] = np.sqrt(np.sum(np.array(residual) ** 2))
             logger.info(
-                "Scipy success with %s and jac=%s. RMSE=%0.2e, steps=%d",
+                "Scipy success with %s and jac = %s. RMSE = %0.2e, steps = %d",
                 self.method,
                 self.jac if self.jac is False else True,
                 rmse,
@@ -347,21 +344,17 @@ class SolverScipy(Solver):
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
             success: bool = True
         else:
-            logger.warning("The solver failed (message=%s).", sol.message)
+            logger.warning("Scipy solver failed (message=%s).", sol.message)
             success = False
 
         return solution, success
 
 
-class SolverScipyTryAgain(Solver):
-    """Scipy solver that perturbs the initial solution on failure and tries again.
+class SolverTryAgain(Solver):
+    """Solver that perturbs the initial solution on failure and tries again.
 
     Args:
-        method: Type of solver. Defaults to `hybr`.
-        jac: Jacobian. If True uses the JAX autodiff jacobian, otherwise False uses a numerical
-            approximation. Note this differs from the definition of jac in the
-            scipy.optimize.root documentation. Defaults to False.
-        options: A dictionary of solver options. Defaults to None.
+        solver: Solver
         max_attempts: Maximum number of attempts to randomise the initial condition to find a
             solution if the initial guess fails. Defaults to 20.
         perturb_log10_number_density: Maximum log10 perturbation to apply to the number densities
@@ -371,16 +364,14 @@ class SolverScipyTryAgain(Solver):
     @override
     def __init__(
         self,
-        method: str = "hybr",
-        jac: bool = False,
-        options: dict | None = None,
+        solver: Solver,
         max_attempts: int = 20,
         perturb_log10_number_density: float = 2.0,
         errors: str = "ignore",
     ):
         super().__init__()
-        logger.debug("Creating %s with %s and jac = %s)", self.__class__.__name__, method, jac)
-        self._solver: Solver = SolverScipy(method, jac, options)
+        logger.debug("Creating %s with %s", self.__class__.__name__, solver.__class__.__name__)
+        self._solver: Solver = solver
         self._max_attempts: int = max_attempts
         self._perturb_log10_number_density: float = perturb_log10_number_density
         self._errors: str = errors
@@ -411,26 +402,13 @@ class SolverScipyTryAgain(Solver):
         for attempt in range(self._max_attempts):
             logger.info("Attempt %d/%d", attempt + 1, self._max_attempts)
 
-            try:
-                solution, success = self._solver.solve(
-                    solve_me,
-                    constraints=constraints,
-                    initial_solution=initial_solution,
-                    tol=tol,
-                    perturb_log10_number_density=perturb_log10_number_density,
-                )
-            except TypeError as exc:
-                msg: str = (
-                    f"{exc}\nAdditional context: Number of unknowns and constraints must be equal"
-                )
-                raise ValueError(msg) from exc
-
-            except LinAlgError:
-                if self._errors == "raise":
-                    raise
-                else:
-                    logger.warning("Linear algebra error")
-                    success = False
+            solution, success = self._solver.solve(
+                solve_me,
+                constraints=constraints,
+                initial_solution=initial_solution,
+                tol=tol,
+                perturb_log10_number_density=perturb_log10_number_density,
+            )
 
             if success:
                 return solution, success

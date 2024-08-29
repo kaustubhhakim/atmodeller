@@ -109,6 +109,8 @@ class InteriorAtmosphereSystem:
 
         if success:
             residual_dict = self._reaction_network.get_residual_dict(solution, constraints)
+            if residual_dict["rms"] > 1.0e-6:
+                logger.warning("Solver reports success but RMSE = %0.2e", residual_dict["rms"])
             constraint_dict = constraints.evaluate(
                 self.temperature, solution.atmosphere.pressure()
             )
