@@ -41,6 +41,7 @@ from atmodeller.initial_solution import (
     InitialSolutionRegressor,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.solver import SolverOptimistix
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -147,17 +148,17 @@ def test_args_constraint_fill_dict():
 def test_args_fill_stability_dict():
     """Tests a dict with arguments and an activity fill value for condensed phases."""
 
-    H2O_g = GasSpecies("H2O")
-    H2_g = GasSpecies("H2")
-    O2_g = GasSpecies("O2")
-    H2O_l = LiquidSpecies("H2O")
-    CO_g = GasSpecies("CO")
-    CO2_g = GasSpecies("CO2")
-    CH4_g = GasSpecies("CH4")
-    C_cr = SolidSpecies("C")
-    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O")
+    CO_g: GasSpecies = GasSpecies("CO")
+    CO2_g: GasSpecies = GasSpecies("CO2")
+    CH4_g: GasSpecies = GasSpecies("CH4")
+    C_cr: SolidSpecies = SolidSpecies("C")
+    species: Species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
 
-    constraints = SystemConstraints([])
+    constraints: SystemConstraints = SystemConstraints([])
     CO_g_value: float = 1e24
     H2_g_value: float = 1e25
     stability_C_cr_value: float = 2
@@ -210,15 +211,15 @@ def test_last_solution():
     O2_g: GasSpecies = GasSpecies("O2")
     species: Species = Species([H2_g, H2O_g, O2_g])
 
-    constraints = SystemConstraints([])
+    constraints: SystemConstraints = SystemConstraints([])
 
-    initial_solution = InitialSolutionLast(species=species, planet=planet)
+    initial_solution: InitialSolutionProtocol = InitialSolutionLast(species=species, planet=planet)
 
     # The first initial condition will return the fill value for the pressure
-    result = initial_solution.get_log10_value(
+    result: Array = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([26, 26, 26])
+    target: npt.NDArray[np.float_] = np.full(3, FILL_LOG10_NUMBER_DENSITY, dtype=np.float_)
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
@@ -226,26 +227,30 @@ def test_last_solution():
     assert np.allclose(result, target, rtol=RTOL, atol=ATOL)
 
     # This is the same as test_H_O in test_benchmark.py
-    oceans = 1
+    oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 6.25774e20
 
-    constraints = SystemConstraints(
+    constraints: SystemConstraints = SystemConstraints(
         [
             ElementMassConstraint("H", h_kg),
             ElementMassConstraint("O", o_kg),
         ]
     )
 
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
 
     # Following the solve we test that the initial condition returns the previous solution
-    system.solve(constraints=constraints, initial_solution=initial_solution)
+    _ = interior_atmosphere.solve(
+        solver=SolverOptimistix(), constraints=constraints, initial_solution=initial_solution
+    )
 
-    result = initial_solution.get_log10_value(
+    result: Array = initial_solution.get_log10_value(
         constraints, temperature=planet.surface_temperature, pressure=dummy_variable
     )
-    target = np.array([26.42725976, 26.44234405, 17.50993722])
+    target: npt.NDArray[np.float_] = np.array([26.42725976, 26.44234405, 17.50993722])
 
     logger.debug("result = %s", result)
     logger.debug("target = %s", target)
