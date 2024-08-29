@@ -486,44 +486,44 @@ class SystemConstraints(ImmutableList[ConstraintProtocol]):
         return tuple(constraints)
 
     @property
+    def number_total_pressure_constraints(self) -> int:
+        """Number of total pressure constraints"""
+        return len(self.total_pressure_constraint)
+
+    @property
     def number_reaction_network_constraints(self) -> int:
         """Number of constraints related to the reaction network"""
         return len(self.reaction_network_constraints)
 
-    # TODO: Check for immutability problems with jax
-    # def evaluate(
-    #     self, temperature: float, pressure: jnp.ndarray
-    # ) -> dict[str, jnp.ndarray | float]:
-    #     """Evaluates all constraints.
+    def evaluate(self, temperature: float, pressure: ArrayLike) -> dict[str, ArrayLike]:
+        """Evaluates all constraints.
 
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
-    #     Returns:
-    #         A dictionary of the evaluated constraints in the same order as the constraints
-    #     """
-    #     evaluated_constraints: dict[str, jnp.ndarray | float] = {}
-    #     for constraint in self.data:
-    #         evaluated_constraints[constraint.name] = constraint.get_value(
-    #             temperature=temperature,
-    #             pressure=pressure,
-    #         )
+        Returns:
+            A dictionary of the evaluated constraints in the same order as the constraints
+        """
+        evaluated_constraints: dict[str, ArrayLike] = {}
+        for constraint in self.data:
+            evaluated_constraints[constraint.name] = constraint.get_value(
+                temperature=temperature,
+                pressure=pressure,
+            )
 
-    #     return evaluated_constraints
+        return evaluated_constraints
 
-    # TODO: Check for immutability problems with jax
-    # def evaluate_log10(self, temperature: float, pressure: jnp.ndarray) ->
-    #   dict[str, jnp.ndarray]:
-    #     """Evaluates all constraints and returns the log10 values.
+    def evaluate_log10(self, temperature: float, pressure: ArrayLike) -> dict[str, Array]:
+        """Evaluates all constraints and returns the log10 values.
 
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
-    #     Returns:
-    #         A dictionary of the log10 evaluated constraints in the same order as the constraints
-    #     """
-    #     return {
-    #         key: jnp.log10(value) for key, value in self.evaluate(temperature, pressure).items()
-    #     }
+        Returns:
+            A dictionary of the log10 evaluated constraints in the same order as the constraints
+        """
+        return {
+            key: jnp.log10(value) for key, value in self.evaluate(temperature, pressure).items()
+        }

@@ -223,7 +223,7 @@ class SolverOptimistix(Solver):
             solver_optx,
             initial_solution_guess,
             args=kwargs,
-            throw=True,
+            throw=False,
             max_steps=self.max_steps,
         )
 
@@ -244,7 +244,7 @@ class SolverOptimistix(Solver):
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
             success: bool = True
         else:
-            logger.warning("The solver failed.")
+            logger.warning("Optimistix solver failed with %s.", optx.RESULTS[sol.result])
             success = False
 
         return solution, success

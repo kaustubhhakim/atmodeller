@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Hashable
 
 import pandas as pd
+from jax.typing import ArrayLike
 
 from atmodeller.solution import Solution
 
@@ -33,11 +34,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Output(UserDict):
-    """Stores inputs and outputs of the models.
-
-    Changing the dictionary keys or entries may require downstream changes to the Plotter class,
-    which uses Output to source data to plot.
-    """
+    """Stores inputs and outputs of the models."""
 
     @property
     def size(self) -> int:
@@ -82,47 +79,33 @@ class Output(UserDict):
 
         return cls(output_data)
 
-    def add(self, solution: Solution, extra_output: dict[str, float] | None = None) -> None:
+    def add(
+        self,
+        solution: Solution,
+        residual_dict: dict[str, float],
+        constraints_dict: dict[str, ArrayLike],
+        extra_output: dict[str, float] | None = None,
+    ) -> None:
         """Adds all outputs.
 
         Args:
             solution: Solution
+            residual_dict: Dictionary of residuals
+            constraints_dict: Dictionary of constraints
             extra_output: Extra data to write to the output. Defaults to None.
         """
         for key, value in solution.output_full().items():
             data_list: list[dict[str, float]] = self.data.setdefault(key, [])
             data_list.append(value)
 
-        # self._add_constraints(interior_atmosphere)
-        # self._add_residual(interior_atmosphere)
+        constraints_list: list[dict[str, ArrayLike]] = self.data.setdefault("constraints", [])
+        constraints_list.append(constraints_dict)
+        residual_list: list[dict[str, float]] = self.data.setdefault("residual", [])
+        residual_list.append(residual_dict)
 
         if extra_output is not None:
             data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
             data_list.append(extra_output)
-
-    # TODO: To reinstate
-    # def _add_constraints(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-    #     """Adds constraints.
-
-    #     Args:
-    #         interior_atmosphere: Interior atmosphere system
-    #     """
-    #     temperature: float = interior_atmosphere.solution.atmosphere.temperature()
-    #     pressure: float = interior_atmosphere.solution.atmosphere.pressure()
-    #     evaluate_dict: dict[str, float] = interior_atmosphere.constraints.evaluate(
-    #         temperature, pressure
-    #     )
-    #     data_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
-    #     data_list.append(evaluate_dict)
-
-    # def _add_residual(self, interior_atmosphere: InteriorAtmosphereSystem) -> None:
-    #     """Adds the residual.
-
-    #     Args:
-    #         interior_atmosphere: Interior atmosphere system
-    #     """
-    #     data_list: list[dict[str, float]] = self.data.setdefault("residual", [])
-    #     data_list.append(interior_atmosphere.residual_dict())
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Output as a dictionary of dataframes
@@ -248,36 +231,34 @@ class Output(UserDict):
     def __call__(
         self,
         file_prefix: Path | str = "atmodeller_out",
-        to_dict: bool = True,
-        to_dataframes: bool = False,
+        to_dataframes: bool = True,
         to_pickle: bool = False,
         to_excel: bool = False,
-    ) -> dict:
-        """Gets the output and/or optionally write it to a pickle or Excel file.
+    ) -> dict | None:
+        """Gets the output as a dict and/or optionally write it to a pickle or Excel file.
 
         Args:
             file_prefix: Prefix of the output file if writing to a pickle or Excel. Defaults to
                 atmodeller_out
-            to_dict: Returns the output data in a dictionary. Defaults to True.
             to_dataframes: Returns the output data in a dictionary of dataframes. Defaults to
-                False.
+                True.
             to_pickle: Writes a pickle file. Defaults to False.
             to_excel: Writes an Excel file. Defaults to False.
 
         Returns:
-            A dictionary of the output if `to_dict = True`, otherwise None.
+            A dictionary of the output or None if no data
         """
+        if self.size == 0:
+            logger.warning("There is no data to export")
+            return None
+
         if to_pickle:
             self.to_pickle(file_prefix)
 
         if to_excel:
             self.to_excel(file_prefix)
 
-        # Acts as an override if to_dict is also set.
         if to_dataframes:
             return self.to_dataframes()
-
-        if to_dict:
+        else:
             return self.data
-
-        raise ValueError("No output option(s) specified")

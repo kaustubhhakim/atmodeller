@@ -74,6 +74,10 @@ class InteriorAtmosphereSystem:
         """Output"""
         return self._output
 
+    @property
+    def temperature(self) -> float:
+        return self._planet.surface_temperature
+
     def solve(
         self,
         solver: Solver = SolverScipy(),
@@ -82,6 +86,7 @@ class InteriorAtmosphereSystem:
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
         errors: str = "ignore",
+        extra_output: dict[str, float] | None = None,
     ) -> Solution:
         """Solve
 
@@ -91,6 +96,7 @@ class InteriorAtmosphereSystem:
             initial_solution: Initial condition for this solve only. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
             errors: Either `raise` solver errors or `ignore`. Defaults to `ignore`.
+            extra_output: Extra output
         """
         logger.info("Solving system number %d", self.number_of_solves)
 
@@ -102,8 +108,11 @@ class InteriorAtmosphereSystem:
         )
 
         if success:
-            # TODO: Add extra output
-            self.output.add(solution)
+            residual_dict = self._reaction_network.get_residual_dict(solution, constraints)
+            constraint_dict = constraints.evaluate(
+                self.temperature, solution.atmosphere.pressure()
+            )
+            self.output.add(solution, residual_dict, constraint_dict, extra_output)
             # initial_solution.update(self.output)
         else:
             self._failed_solves = self._failed_solves + 1
@@ -119,34 +128,3 @@ class InteriorAtmosphereSystem:
                 logger.warning("Continuing ...")
 
         return solution
-
-
-#     def residual_dict(self) -> dict[str, float]:
-#         """Residual of the objective function
-
-#         The order of the constraints must align with the order in which they are assembled.
-#         """
-#         output: dict[str, float] = {}
-#         for index, reaction in enumerate(self._reaction_network.reactions().values()):
-#             output[reaction] = self._residual[index].item()
-#         for index, constraint in enumerate(self.constraints.reaction_network_constraints):
-#             row_index: int = self._reaction_network.number_reactions + index
-#             output[constraint.name] = self._residual[row_index].item()
-#         for index, constraint in enumerate(self.constraints.mass_constraints):
-#             row_index = (
-#                 self._reaction_network.number_reactions
-#                 + self.constraints.number_reaction_network_constraints
-#                 + index
-#             )
-#             output[constraint.name] = self._residual[row_index].item()
-#         for index, constraint in enumerate(self.constraints.total_pressure_constraint):
-#             output[constraint.name] = self._residual[-1].item()  # Always last index if applied
-
-#         output["rms"] = np.sqrt(np.mean(np.array(list(output.values())) ** 2))
-
-#         return output
-
-
-#     def output_solution(self) -> dict[str, float]:
-#         """Output the solution in a convenient form for comparison and benchmarking"""
-#         return self.solution.output_solution()

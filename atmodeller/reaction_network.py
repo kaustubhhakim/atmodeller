@@ -25,8 +25,8 @@ import pprint
 import sys
 from typing import Protocol
 
-import jax
 import jax.numpy as jnp
+import numpy as np
 from jax import Array, lax
 from jaxtyping import ArrayLike
 
@@ -50,6 +50,10 @@ class ResidualProtocol(Protocol):
     _planet: Planet
 
     def get_residual(self, solution: Solution, constraints: SystemConstraints) -> Array: ...
+
+    def get_residual_dict(
+        self, solution: Solution, constraints: SystemConstraints
+    ) -> dict[str, float]: ...
 
     @property
     def species(self) -> Species:
@@ -386,6 +390,30 @@ class ReactionNetwork(ResidualProtocol):
 
         return residual
 
+    def get_residual_dict(
+        self, solution: Solution, constraints: SystemConstraints
+    ) -> dict[str, float]:
+        """Gets the residual of the objective function in a dictionary.
+
+        Args:
+            solution: Solution
+            constraints: Constraints for the system of equations
+
+        Returns:
+            Dictionary of the residuals for the reaction network
+        """
+        output: dict[str, float] = {}
+        residual: Array = self.get_residual(solution, constraints)
+        for index, reaction in enumerate(self.reactions().values()):
+            output[reaction] = residual[index].item()
+        for index, constraint in enumerate(constraints.reaction_network_constraints):
+            row_index: int = self.number_reactions + index
+            output[constraint.name] = residual[row_index].item()
+
+        output["rms"] = np.sqrt(np.mean(np.array(list(output.values())) ** 2))
+
+        return output
+
 
 class ReactionNetworkWithCondensateStability(ReactionNetwork):
     """A chemical reaction network with condensate stability
@@ -489,6 +517,19 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
 
         return jnp.concatenate((residual, auxiliary_residual, pressure_residual))
 
+    @override
+    def get_residual_dict(
+        self, solution: Solution, constraints: SystemConstraints
+    ) -> dict[str, float]:
+        output: dict[str, float] = super().get_residual_dict(solution, constraints)
+        residual: Array = self.get_residual(solution, constraints)
+        for constraint in constraints.total_pressure_constraint:
+            output[constraint.name] = residual[-1].item()  # Always last index if applied
+
+        output["rms"] = output.pop("rms")
+
+        return output
+
 
 class ReactionNetworkWithMassBalance(ResidualProtocol):
     """A reaction network with condensate stability and mass balance
@@ -535,6 +576,34 @@ class ReactionNetworkWithMassBalance(ResidualProtocol):
         logger.debug("residual = %s", residual)
 
         return residual
+
+    @override
+    def get_residual_dict(
+        self, solution: Solution, constraints: SystemConstraints
+    ) -> dict[str, float]:
+        """Gets the residual of the objective function in a dictionary.
+
+        Args:
+            solution: Solution
+            constraints: Constraints for the system of equations
+
+        Returns:
+            Dictionary of the residuals
+        """
+        output: dict[str, float] = self._reaction_network.get_residual_dict(solution, constraints)
+        residual: Array = self.get_residual(solution, constraints)
+        for index, constraint in enumerate(constraints.mass_constraints):
+            row_index = (
+                self._reaction_network.number_reactions
+                + constraints.number_reaction_network_constraints
+                + constraints.number_total_pressure_constraints
+                + index
+            )
+            output[constraint.name] = residual[row_index].item()
+
+        output["rms"] = output.pop("rms")
+
+        return output
 
 
 def partial_rref(matrix: Array) -> Array:
