@@ -260,7 +260,7 @@ class _FugacityConstraint(_SpeciesConstraint[GasSpecies, T]):
         value: Object to compute the fugacity
     """
 
-    constraint_type: str = "fugacity"
+    constraint_type: str = "number_density"
 
     @abstractmethod
     def fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
@@ -346,7 +346,7 @@ class PressureConstraint(_SpeciesConstraint[GasSpecies, float]):
         value: The pressure in bar
     """
 
-    constraint_type: str = "pressure"
+    constraint_type: str = "number_density"
 
     def fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Value of the fugacity constraint in bar
@@ -393,8 +393,8 @@ class TotalPressureConstraint(ConstraintProtocol):
     @override
     def __init__(self, value: float):
         self._value: float = value
-        self._constraint: str = "total_pressure"
-        self._name: str = "total_pressure"
+        self._constraint: str = "total_number_density"
+        self._name: str = "total_number_density"
 
     @property
     def constraint(self) -> str:

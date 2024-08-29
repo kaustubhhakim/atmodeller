@@ -243,7 +243,7 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies_co]):
         """Output dictionary
 
         This must return a dictionary of summable values when the dictionary is converted to a
-        Counter(). TODO: Check this is still true or required.
+        Counter().
 
         Args:
             element: Element to compute the output for, or None to compute for the species.
@@ -254,7 +254,7 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies_co]):
         """
         output: dict[str, float] = {}
         output[f"{self.output_prefix}number_density"] = self.number_density(element).item()
-        output[f"{self.output_prefix}mass"] = self.mass(element).item()
+        output[f"{self.output_prefix}mass_kg"] = self.mass(element).item()
         output[f"{self.output_prefix}molecules"] = self.molecules(element).item()
         output[f"{self.output_prefix}moles"] = self.moles(element).item()
 
@@ -339,9 +339,9 @@ class GasNumberDensitySpeciesSetter(NumberDensitySpeciesSetter[GasSpecies]):
         output: dict[str, float] = super().output_dict(element)
 
         if element is None:
-            output["pressure"] = self.pressure().item()
+            output["pressure_bar"] = self.pressure().item()
             output["fugacity_coefficient"] = self.fugacity_coefficient().item()
-            output["fugacity"] = self.fugacity().item()
+            output["fugacity_bar"] = self.fugacity().item()
             output["volume_mixing_ratio"] = self.volume_mixing_ratio().item()
 
         return output
@@ -776,7 +776,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies_co, TypeNumberDensitySpec
         """
         output: dict[str, float] = {}
         output[f"{self.output_prefix}number_density"] = self.number_density(element).item()
-        output[f"{self.output_prefix}mass"] = self.mass(element).item()
+        output[f"{self.output_prefix}mass_kg"] = self.mass(element).item()
         output[f"{self.output_prefix}molecules"] = self.molecules(element).item()
         output[f"{self.output_prefix}moles"] = self.moles(element).item()
         output[f"{self.output_prefix}elements"] = self.elements().item()
@@ -805,9 +805,9 @@ class Atmosphere(
             Output dictionary
         """
         output: dict[str, float] = super().output_dict()
-        output[f"{self.output_prefix}pressure"] = self.pressure().item()
+        output[f"{self.output_prefix}pressure_bar"] = self.pressure().item()
         output[f"{self.output_prefix}temperature"] = self.temperature()
-        output[f"{self.output_prefix}volume"] = self.volume().item()
+        output[f"{self.output_prefix}volume_m3"] = self.volume().item()
 
         return output
 
@@ -929,7 +929,7 @@ class GasCollection(
     def output_solution(self) -> dict[str, float]:
         output: dict[str, float] = {}
         for species, container in self.data.items():
-            output[species.name] = container.abundance.pressure().item()
+            output[f"{species.name}_bar"] = container.abundance.pressure().item()
 
         return output
 
@@ -1115,7 +1115,7 @@ class Solution(CollectionMixin[ChemicalSpecies, SomeContainer]):
             element_dict: dict[str, float] = output_dict.setdefault(
                 f"{ELEMENT_PREFIX}{element}", {}
             )
-            element_dict["total_mass"] = self.mass(element=element).item()
+            element_dict["total_mass_kg"] = self.mass(element=element).item()
             total_moles = self.moles(element=element)
             element_dict["total_moles"] = total_moles.item()
             total_moles_hydrogen: Array | None = self.total_moles_hydrogen()

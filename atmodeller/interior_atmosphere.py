@@ -75,6 +75,16 @@ class InteriorAtmosphereSystem:
         return self._output
 
     @property
+    def planet(self) -> Planet:
+        """Planet"""
+        return self._planet
+
+    @property
+    def species(self) -> Species:
+        """Species"""
+        return self._species
+
+    @property
     def temperature(self) -> float:
         """Temperature"""
         return self._planet.surface_temperature
