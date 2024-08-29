@@ -36,6 +36,7 @@ from atmodeller.constraints import SystemConstraints
 from atmodeller.initial_solution import InitialSolutionProtocol
 from atmodeller.reaction_network import ResidualProtocol
 from atmodeller.solution import Solution
+from atmodeller.utilities import array_rmse_to_logger
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -236,6 +237,7 @@ class SolverOptimistix(Solver):
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
             success: bool = True
+            array_rmse_to_logger(initial_solution_guess, solution.value, "Initial solution")
         else:
             logger.warning("Optimistix solver failed (message=%s).", optx.RESULTS[sol.result])
             success = False
@@ -250,12 +252,12 @@ class SolverScipy(Solver):
         method: Type of solver. Defaults to `hybr`.
         jac: Jacobian. If True uses the JAX autodiff derived Jacobian, otherwise False uses a
             numerical approximation. Note this differs from the definition of jac in the
-            scipy.optimize.root documentation. Defaults to False.
+            scipy.optimize.root documentation. Defaults to True.
         options: A dictionary of solver options. Defaults to None.
     """
 
     @override
-    def __init__(self, method: str = "hybr", jac: bool = False, options: dict | None = None):
+    def __init__(self, method: str = "lm", jac: bool = True, options: dict | None = None):
         super().__init__()
         self.method: str = method
         if jac:
@@ -336,6 +338,7 @@ class SolverScipy(Solver):
             logger.info("Solution = %s", pprint.pformat(solution.output_solution()))
             logger.info("Raw solution = %s", pprint.pformat(solution.output_raw_solution()))
             success: bool = True
+            array_rmse_to_logger(initial_solution_guess, solution.value, "Initial solution")
         else:
             logger.warning("Scipy solver failed (message=%s).", sol.message)
             success = False

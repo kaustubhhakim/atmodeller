@@ -29,12 +29,14 @@ from typing import Any, Callable, Type, TypeVar
 
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
 from scipy.constants import kilo, mega
+from sklearn.metrics import mean_squared_error
 
-from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, MACHEPS, OCEAN_MASS_H2
+from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -245,10 +247,16 @@ def logsumexp_base10(log_values: ArrayLike, prefactors: ArrayLike = 1.0) -> Arra
     return max_log + jnp.log10(value_sum)
 
 
-def safe_log10(x: ArrayLike) -> Array:
-    """Computes log10 of x, safely adding machine epsilon to avoid log of zero."""
+def array_rmse_to_logger(array1: Array, array2: Array, prefix: str = "") -> None:
+    """Writes the RMSE of array1 versus array2 to the logger
 
-    return jnp.log10(x + MACHEPS)
+    Args:
+        array1: array1
+        array2: array2
+        msg: Prefix for the output
+    """
+    rmse: npt.NDArray[np.float_] = np.sqrt(mean_squared_error(np.array(array1), np.array(array2)))
+    logger.info("%s RMSE = %0.2e", prefix, rmse)
 
 
 @dataclass(frozen=True)

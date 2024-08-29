@@ -348,7 +348,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         fit_batch_size: int = 100,
         partial_fit: bool = True,
         partial_fit_batch_size: int = 500,
-        # TODO: Might not be required anymore
         # solution_override: InitialSolutionDict | None = None,
         **kwargs,
     ):
@@ -358,7 +357,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self.fit_batch_size: int = fit_batch_size if self.fit else 0
         self.partial_fit: bool = partial_fit
         self.partial_fit_batch_size: int = partial_fit_batch_size
-        # TODO: Might not be required anymore
         # if solution_override is None:
         #    self._solution_override: InitialSolutionDict | None = None
         # else:
@@ -367,7 +365,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
     @classmethod
     def from_pickle(
-        cls, pickle_file: Path | str, species: Species, **kwargs
+        cls, pickle_file: Path | str, species: Species, planet: Planet, **kwargs
     ) -> InitialSolutionRegressor:
         """Creates a regressor from output read from a pickle file.
 
@@ -375,6 +373,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             pickle_file: Pickle file of the output from a previous (or similar) model run. The
                 constraints must be the same as the new model and in the same order.
             species: Species
+            planet: Planet
             **kwargs: Arbitrary keyword arguments to pass through to the constructor
 
         Returns:
@@ -510,8 +509,6 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
     #     if self._solution_override is not None:
     #         self._solution_override.set_data(
-    #             constraints,
-    #             temperature=temperature,
     #             pressure=pressure,
     #         )
     #         self.solution.merge(self._solution_override.solution)

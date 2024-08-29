@@ -91,9 +91,9 @@ class InteriorAtmosphereSystem:
 
     def solve(
         self,
-        solver: Solver = SolverScipy(),
-        *,
         constraints: SystemConstraints,
+        *,
+        solver: Solver = SolverScipy(),
         initial_solution: InitialSolutionProtocol | None = None,
         tol: float = 1.0e-8,
         errors: str = "ignore",
@@ -102,9 +102,9 @@ class InteriorAtmosphereSystem:
         """Solve
 
         Args:
-            solver: Solver. Defaults to SolverScipy.
             constraints: Constraints for the system of equations
-            initial_solution: Initial condition for this solve only. Defaults to None.
+            solver: Solver. Defaults to SolverScipy.
+            initial_solution: Initial solution. Defaults to None.
             tol: Tolerance. Defaults to 1.0e-8.
             errors: Either `raise` solver errors or `ignore`. Defaults to `ignore`.
             extra_output: Extra output

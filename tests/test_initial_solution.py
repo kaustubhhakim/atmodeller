@@ -323,7 +323,7 @@ def test_regressor_override(generate_regressor_data):
     )
 
     initial_solution = InitialSolutionRegressor.from_pickle(
-        filename, species=species, solution_override=solution_override
+        filename, species=species, planet=planet, solution_override=solution_override
     )
 
     test_constraints = SystemConstraints(
