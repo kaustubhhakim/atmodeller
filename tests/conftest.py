@@ -119,8 +119,6 @@ def helper():
     return Helper()
 
 
-# FIXME: This failing test may indicate there is a bug with multiple condensates.  To debug line-
-# by-line via a comparison with another branch where this test is passing.
 @pytest.fixture
 def graphite_water_condensed() -> Solution:
     """C and water in equilibrium at 430 K and 10 bar
@@ -168,7 +166,7 @@ def graphite_water_condensed() -> Solution:
     )
 
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverScipy(method="lm", jac=True),
+        solver=SolverOptimistix(method="dogleg"),
         constraints=constraints,
         initial_solution=initial_solution,
     )

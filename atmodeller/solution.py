@@ -30,7 +30,6 @@ from collections import ChainMap, Counter
 from collections.abc import Mapping
 from typing import Generic, Iterator, Protocol, TypeVar, cast
 
-import jax
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
