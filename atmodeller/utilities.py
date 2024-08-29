@@ -384,12 +384,11 @@ class ExperimentalCalibration:
         Returns:
             A penalty value
         """
-        pressure_: Array = jnp.array(pressure)
+        pressure_: Array = jnp.asarray(pressure)
         temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
-        penalty = (
-            self.pressure_penalty * (pressure_clip - pressure_) ** 2
-            + self.temperature_penalty * (temperature_clip - temperature) ** 2
-        )
+        penalty = self.pressure_penalty * jnp.power(
+            pressure_clip - pressure_, 2
+        ) + self.temperature_penalty * jnp.power(temperature_clip - temperature, 2)
 
         return penalty
 

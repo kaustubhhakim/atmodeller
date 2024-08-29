@@ -38,7 +38,7 @@ from scipy.constants import kilo
 from scipy.ndimage import gaussian_filter1d
 
 from atmodeller.output import Output
-from atmodeller.utilities import UnitConversion
+from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -559,7 +559,7 @@ class Plotter:
             # Otherwise, get the species directly
             except KeyError:
                 totals = self.dataframes[entry]
-            atmos: pd.Series = UnitConversion.ppm_to_percent(totals[f"atmosphere_{suffix}"])
+            atmos: pd.Series = unit_conversion.ppm_to_percent * totals[f"atmosphere_{suffix}"]
             atmos.name = f"{entry} atmos ({units})"
             output.append(atmos)
 
@@ -663,7 +663,7 @@ class Plotter:
             if mass_or_moles == "pressure":
                 atmos: pd.Series = totals[f"atmosphere_{suffix}"]
             else:
-                atmos = UnitConversion.ppm_to_percent(totals[f"atmosphere_{suffix}"])
+                atmos = unit_conversion.ppm_to_percent * totals[f"atmosphere_{suffix}"]
             if log10_transform:
                 atmos = cast(pd.Series, np.log10(atmos))
             if name:

@@ -384,10 +384,6 @@ class ReactionNetwork(ResidualProtocol):
             - self._get_right_hand_side(pressure, constraints=constraints)
         )
 
-        # jax.debug.print("{out}", out=coeff_matrix)
-        # jax.debug.print("{out}", out=self._get_log_fugacity_coefficients(pressure))
-        # jax.debug.print("{out}", out=self._get_right_hand_side(pressure, constraints=constraints))
-
         return residual
 
     def get_residual_dict(
