@@ -33,7 +33,7 @@ from jax import Array
 from scipy.optimize import OptimizeResult, root
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
+from atmodeller.initial_solution import InitialSolutionProtocol
 from atmodeller.reaction_network import ResidualProtocol
 from atmodeller.solution import Solution
 
@@ -53,7 +53,7 @@ class Solver(ABC):
         solve_me: ResidualProtocol,
         *,
         constraints: SystemConstraints,
-        initial_solution: InitialSolutionProtocol | None = None,
+        initial_solution: InitialSolutionProtocol,
         perturb_log10_number_density: float = 0,
         pressure: float = 1.0,
     ) -> Array:
@@ -62,7 +62,7 @@ class Solver(ABC):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial solution. Defaults to None.
+            initial_solution: Initial solution.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities of the initial solution. Defaults to 0.
             pressure: Total pressure to evaluate the constraints. Defaults to 1 bar.
@@ -70,14 +70,7 @@ class Solver(ABC):
         Returns:
             An array of the initial solution
         """
-        if initial_solution is None:
-            initial_solution_ = InitialSolutionDict(
-                species=solve_me.species, planet=solve_me.planet
-            )
-        else:
-            initial_solution_ = initial_solution
-
-        initial_solution_guess: Array = initial_solution_.get_log10_value(
+        initial_solution_guess: Array = initial_solution.get_log10_value(
             constraints,
             temperature=solve_me.temperature(),
             pressure=pressure,
@@ -130,7 +123,7 @@ class Solver(ABC):
         solve_me: ResidualProtocol,
         *,
         constraints: SystemConstraints,
-        initial_solution: InitialSolutionProtocol | None = None,
+        initial_solution: InitialSolutionProtocol,
         tol: float = 1.0e-8,
         perturb_log10_number_density: float = 0,
     ) -> tuple[Solution, bool]:
@@ -139,7 +132,7 @@ class Solver(ABC):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial solution. Defaults to None.
+            initial_solution: Initial solution
             tol: Tolerance. Defaults to 1.0e-8.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities of the initial solution. Defaults to 0.
@@ -191,7 +184,7 @@ class SolverOptimistix(Solver):
         solve_me: ResidualProtocol,
         *,
         constraints: SystemConstraints,
-        initial_solution: InitialSolutionProtocol | None = None,
+        initial_solution: InitialSolutionProtocol,
         tol: float = 1.0e-8,
         perturb_log10_number_density: float = 0,
     ) -> tuple[Solution, bool]:
@@ -200,7 +193,7 @@ class SolverOptimistix(Solver):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial solution. Defaults to None.
+            initial_solution: Initial solution
             tol: Tolerance. Defaults to 1.0e-8.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities of the initial solution. Defaults to 0.
@@ -292,7 +285,7 @@ class SolverScipy(Solver):
         solve_me: ResidualProtocol,
         *,
         constraints: SystemConstraints,
-        initial_solution: InitialSolutionProtocol | None = None,
+        initial_solution: InitialSolutionProtocol,
         tol: float = 1.0e-8,
         perturb_log10_number_density: float = 0,
     ) -> tuple[Solution, bool]:
@@ -301,7 +294,7 @@ class SolverScipy(Solver):
         Args:
             solve_me: System to solve
             constraints: Constraints for the system of equations
-            initial_solution: Initial solution. Defaults to None.
+            initial_solution: Initial solution
             tol: Tolerance. Defaults to 1.0e-8.
             perturb_log10_number_density: Maximum log10 perturbation to apply to the number
                 densities. Defaults to 0.
@@ -382,7 +375,7 @@ class SolverTryAgain(Solver):
         solve_me: ResidualProtocol,
         *,
         constraints: SystemConstraints,
-        initial_solution: InitialSolutionProtocol | None = None,
+        initial_solution: InitialSolutionProtocol,
         tol: float = 1.0e-8,
     ) -> tuple[Solution, bool]:
         """Solve

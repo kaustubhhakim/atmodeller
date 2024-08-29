@@ -83,7 +83,6 @@ class SpeciesComponentProtocol(Protocol[TypeChemicalSpecies_co]):
     def value(self) -> Array: ...
 
 
-# TODO: This is used for the initial condition but might not be required now
 class SpeciesComponentSetterProtocol(SpeciesComponentProtocol, Protocol):
     """Species component with setter protocol"""
 

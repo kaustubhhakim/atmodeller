@@ -173,6 +173,8 @@ class InitialSolution(ABC, Generic[T]):
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
 
+        # In some cases applying the gas constraints can help put the initial solution closer to
+        # the real solution, but in other cases this seems to cause problems.
         # Gas constraints
         # for constraint in constraints.gas_constraints:
         #     self.solution.gas[constraint.species].abundance.value = constraint.get_log10_value(
@@ -185,11 +187,6 @@ class InitialSolution(ABC, Generic[T]):
             if perturb_log10_number_density:
                 self.perturb(collection.abundance, perturb_log10_number_density)
             self.fill(collection.stability, self._fill_log10_stability)
-
-        # Do not apply activity constraints because they only define the activity of a stable
-        # condensate (i.e. unity for a pure component), but whether or not the condensate is
-        # stable must be simultaneously solved for, giving rise to activity less than the stable
-        # value for unstable condensates.
 
     def get_log10_value(
         self,

@@ -22,7 +22,7 @@ import logging
 
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
-from atmodeller.initial_solution import InitialSolutionProtocol
+from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithMassBalance
 from atmodeller.solution import Solution
@@ -76,6 +76,7 @@ class InteriorAtmosphereSystem:
 
     @property
     def temperature(self) -> float:
+        """Temperature"""
         return self._planet.surface_temperature
 
     def solve(
@@ -100,10 +101,15 @@ class InteriorAtmosphereSystem:
         """
         logger.info("Solving system number %d", self.number_of_solves)
 
+        if initial_solution is None:
+            initial_solution_ = InitialSolutionDict(species=self._species, planet=self._planet)
+        else:
+            initial_solution_ = initial_solution
+
         solution, success = solver.solve(
             self._reaction_network,
             constraints=constraints,
-            initial_solution=initial_solution,
+            initial_solution=initial_solution_,
             tol=tol,
         )
 
@@ -115,7 +121,7 @@ class InteriorAtmosphereSystem:
                 self.temperature, solution.atmosphere.pressure()
             )
             self.output.add(solution, residual_dict, constraint_dict, extra_output)
-            # initial_solution.update(self.output)
+            initial_solution_.update(self.output)
         else:
             self._failed_solves = self._failed_solves + 1
             msg: str = f"{solver.__class__.__name__} failed"
