@@ -26,7 +26,6 @@ from pathlib import Path
 from typing import Hashable
 
 import pandas as pd
-from jax.typing import ArrayLike
 
 from atmodeller.solution import Solution
 

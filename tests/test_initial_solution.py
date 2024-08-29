@@ -22,6 +22,7 @@ import logging
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 from jax import Array
 
 from atmodeller import __version__, debug_logger
@@ -263,26 +264,28 @@ def test_regressor(generate_regressor_data):
 
     interior_atmosphere, filename = generate_regressor_data
 
-    species = interior_atmosphere.species
-    O2_g = species.get_species_from_name("O2_g")
-    H2O_g = species.get_species_from_name("H2O_g")
+    species: Species = interior_atmosphere.species
+    O2_g: GasSpecies = species.get_species_from_name("O2_g")  # type: ignore (is GasSpecies)
+    H2O_g: GasSpecies = species.get_species_from_name("H2O_g")  # type: ignore (is GasSpecies)
 
-    dataframes = interior_atmosphere.output(to_dataframes=True)
-    raw_solution = dataframes["raw_solution"]
-    solution = dataframes["solution"]
+    dataframes: dict[str, pd.DataFrame] = interior_atmosphere.output(to_dataframes=True)
+    raw_solution: pd.DataFrame = dataframes["raw_solution"]
+    solution: pd.DataFrame = dataframes["solution"]
 
-    initial_solution = InitialSolutionRegressor.from_pickle(filename, species=species)
+    initial_solution: InitialSolutionProtocol = InitialSolutionRegressor.from_pickle(
+        filename, species=species, planet=interior_atmosphere.planet
+    )
 
     for index in [0, 5, 10, 15, 20, 25, 30, 35]:
 
-        test_constraints = SystemConstraints(
+        test_constraints: SystemConstraints = SystemConstraints(
             [
-                FugacityConstraint(O2_g, solution.iloc[index]["O2_g"]),
-                PressureConstraint(H2O_g, solution.iloc[index]["H2O_g"]),
+                FugacityConstraint(O2_g, solution.iloc[index]["O2_g_bar"]),
+                PressureConstraint(H2O_g, solution.iloc[index]["H2O_g_bar"]),
             ]
         )
 
-        result = initial_solution.get_log10_value(
+        result: Array = initial_solution.get_log10_value(
             test_constraints, temperature=planet.surface_temperature, pressure=dummy_variable
         )
 
