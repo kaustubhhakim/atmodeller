@@ -25,6 +25,7 @@ import pprint
 import sys
 from typing import Protocol
 
+import jax
 import jax.numpy as jnp
 from jax import Array, lax
 from jaxtyping import ArrayLike
@@ -371,16 +372,17 @@ class ReactionNetwork(ResidualProtocol):
         Returns:
             Residual array
         """
+        coeff_matrix: Array = self.get_coefficient_matrix(constraints=constraints)
         pressure: Array = solution.atmosphere.pressure()
         residual: Array = (
-            self.get_coefficient_matrix(constraints=constraints).dot(
-                self._get_log_fugacity_coefficients(pressure)
-            )
-            + self.get_coefficient_matrix(constraints=constraints).dot(
-                solution.get_reaction_array()
-            )
+            coeff_matrix.dot(self._get_log_fugacity_coefficients(pressure))
+            + coeff_matrix.dot(solution.get_reaction_array())
             - self._get_right_hand_side(pressure, constraints=constraints)
         )
+
+        # jax.debug.print("{out}", out=coeff_matrix)
+        # jax.debug.print("{out}", out=self._get_log_fugacity_coefficients(pressure))
+        # jax.debug.print("{out}", out=self._get_right_hand_side(pressure, constraints=constraints))
 
         return residual
 
@@ -466,7 +468,9 @@ class ReactionNetworkWithCondensateStability(ReactionNetwork):
         )
         for index, collection in enumerate(solution.condensed.values()):
             value: Array = (
-                collection.stability.value - collection.tauc.value + collection.abundance.value
+                collection.stability.value
+                - collection.tauc.get_value(constraints, solution.atmosphere.log10_volume())
+                + collection.abundance.value
             )
             auxiliary_residual = auxiliary_residual.at[index].set(value)
 
