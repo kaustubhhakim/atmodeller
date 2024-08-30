@@ -257,19 +257,19 @@ class InitialSolutionDict(InitialSolution[dict]):
             value_dict = value
         super().__init__(value_dict, species=species, planet=planet, **kwargs)
 
-    def _get_log10_values(
+    def get_species_log10_value(
         self,
         species: ChemicalSpecies,
         prefix: str,
     ) -> Array | None:
-        """Gets log10 values.
+        """Gets the log10 value of a species or None if not available.
 
         Args:
-            species_list: List of species
-            prefix: Key prefix
+            species: A chemical species
+            prefix: Prefix of the key to locate the relevant quantity in the dictionary
 
         Returns:
-            Log10 values or None
+            Log10 value or None
         """
         key: ChemicalSpecies | str = f"{prefix}{species.name}" if prefix else species
         try:
@@ -286,18 +286,18 @@ class InitialSolutionDict(InitialSolution[dict]):
         del kwargs
 
         for gas_species, collection in self.solution.gas.items():
-            value: Array | None = self._get_log10_values(gas_species, "")
+            value: Array | None = self.get_species_log10_value(gas_species, "")
             if value is not None:
                 collection.abundance.value = value
 
         for condensed_species, collection in self.solution.condensed.items():
-            value = self._get_log10_values(condensed_species, ACTIVITY_PREFIX)
+            value = self.get_species_log10_value(condensed_species, ACTIVITY_PREFIX)
             if value is not None:
                 collection.activity.value = value
-            value = self._get_log10_values(condensed_species, "")
+            value = self.get_species_log10_value(condensed_species, "")
             if value is not None:
                 collection.abundance.value = value
-            value = self._get_log10_values(condensed_species, STABILITY_PREFIX)
+            value = self.get_species_log10_value(condensed_species, STABILITY_PREFIX)
             if value is not None:
                 collection.stability.value = value
 
@@ -319,6 +319,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         partial_fit: Partial fit the regressor during the model run. Defaults to True.
         partial_fit_batch_size: Number of solutions to calculate before partial refit of the
             regressor. Defaults to 500.
+        solution_override: Override some solution values. Defaults to None.
         **kwargs: Optional keyword arguments to pass through to the base class.
 
     Attributes:
@@ -348,7 +349,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         fit_batch_size: int = 100,
         partial_fit: bool = True,
         partial_fit_batch_size: int = 500,
-        # solution_override: InitialSolutionDict | None = None,
+        solution_override: InitialSolutionDict | None = None,
         **kwargs,
     ):
         super().__init__(value, species=species, planet=planet, **kwargs)
@@ -357,10 +358,10 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         self.fit_batch_size: int = fit_batch_size if self.fit else 0
         self.partial_fit: bool = partial_fit
         self.partial_fit_batch_size: int = partial_fit_batch_size
-        # if solution_override is None:
-        #    self._solution_override: InitialSolutionDict | None = None
-        # else:
-        #    self._solution_override = solution_override
+        if solution_override is None:
+            self._solution_override: InitialSolutionDict | None = None
+        else:
+            self._solution_override = solution_override
         self._fit(self.value)
 
     @classmethod
@@ -384,7 +385,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         except FileNotFoundError:
             output = Output.read_pickle(Path(pickle_file).with_suffix(".pkl"))
 
-        return cls(output, species=species, **kwargs)
+        return cls(output, species=species, planet=planet, **kwargs)
 
     def _get_select_values(
         self,
@@ -392,7 +393,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
         start_index: int | None,
         end_index: int | None,
     ) -> npt.NDArray[np.float_]:
-        """Gets select values from a dataframe
+        """Gets select values from a dataframe as a numpy array
 
         Args:
             data: A dataframe
@@ -400,7 +401,7 @@ class InitialSolutionRegressor(InitialSolution[Output]):
             end_index: End index. Defaults to None, meaning use all available data.
 
         Returns:
-            Select values from the dataframe
+            Select values from the dataframe as a numpy array
         """
         if start_index is not None and end_index is not None:
             data = data.iloc[start_index:end_index]
@@ -499,19 +500,41 @@ class InitialSolutionRegressor(InitialSolution[Output]):
 
         self.solution.value = jnp.array(solution_original.flatten())
 
-    # TODO: Might not be required anymore with the improved solvers
-    # @override
-    # def process_data(
-    #     self, constraints: SystemConstraints, *, temperature: float, pressure: ArrayLike, **kwargs
-    # ) -> None:
-    #     """Includes a user-specified override to the initial solution"""
-    #     super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
+    @override
+    def process_data(
+        self,
+        constraints: SystemConstraints,
+        *,
+        temperature: float,
+        pressure: ArrayLike,
+        **kwargs,
+    ) -> None:
+        """Includes a user-specified override to the initial solution"""
+        super().process_data(constraints, temperature=temperature, pressure=pressure, **kwargs)
 
-    #     if self._solution_override is not None:
-    #         self._solution_override.set_data(
-    #             pressure=pressure,
-    #         )
-    #         self.solution.merge(self._solution_override.solution)
+        if self._solution_override is not None:
+
+            for gas_species, collection in self.solution.gas.items():
+                value: Array | None = self._solution_override.get_species_log10_value(
+                    gas_species, ""
+                )
+                if value is not None:
+                    collection.abundance.value = value
+
+            for condensed_species, collection in self.solution.condensed.items():
+                value = self._solution_override.get_species_log10_value(
+                    condensed_species, ACTIVITY_PREFIX
+                )
+                if value is not None:
+                    collection.activity.value = value
+                value = self._solution_override.get_species_log10_value(condensed_species, "")
+                if value is not None:
+                    collection.abundance.value = value
+                value = self._solution_override.get_species_log10_value(
+                    condensed_species, STABILITY_PREFIX
+                )
+                if value is not None:
+                    collection.stability.value = value
 
     def action_fit(self, output: Output) -> tuple[int, int] | None:
         """Checks if a fit is necessary.
