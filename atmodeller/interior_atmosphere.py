@@ -36,15 +36,10 @@ class InteriorAtmosphereSystem:
 
     Args:
         species: Species
-        planet: Planet
-
-    Attributes:
-        species: Species
-        planet: Planet
-        output: Output
+        planet: Planet. Defaults to a molten Earth.
     """
 
-    def __init__(self, species: Species, planet: Planet):
+    def __init__(self, species: Species, planet: Planet = Planet()):
         logger.info("Creating an interior-atmosphere system")
         self._species: Species = species
         self._planet: Planet = planet
