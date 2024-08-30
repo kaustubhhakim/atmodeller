@@ -305,14 +305,14 @@ def test_regressor_override(generate_regressor_data):
 
     interior_atmosphere, filename = generate_regressor_data
 
-    species = interior_atmosphere.species
-    O2_g = species.get_species_from_name("O2_g")
-    H2O_g = species.get_species_from_name("H2O_g")
-    H2_g = species.get_species_from_name("H2_g")
+    species: Species = interior_atmosphere.species
+    O2_g: GasSpecies = species.get_species_from_name("O2_g")  # type: ignore (is GasSpecies)
+    H2O_g: GasSpecies = species.get_species_from_name("H2O_g")  # type: ignore (is GasSpecies)
+    H2_g: GasSpecies = species.get_species_from_name("H2_g")  # type: ignore (is GasSpecies)
 
-    dataframes = interior_atmosphere.output(to_dataframes=True)
-    raw_solution = dataframes["raw_solution"]
-    solution = dataframes["solution"]
+    dataframes: dict[str, pd.DataFrame] = interior_atmosphere.output(to_dataframes=True)
+    raw_solution: pd.DataFrame = dataframes["raw_solution"]
+    solution: pd.DataFrame = dataframes["solution"]
 
     # For the override we must restrict the species to the specific species we want to override
     number_density_H2: float = 1e30
@@ -328,8 +328,8 @@ def test_regressor_override(generate_regressor_data):
 
     test_constraints = SystemConstraints(
         [
-            FugacityConstraint(O2_g, solution.iloc[0]["O2_g"]),
-            PressureConstraint(H2O_g, solution.iloc[0]["H2O_g"]),
+            FugacityConstraint(O2_g, solution.iloc[0]["O2_g_bar"]),
+            PressureConstraint(H2O_g, solution.iloc[0]["H2O_g_bar"]),
         ]
     )
 
