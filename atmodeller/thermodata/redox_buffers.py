@@ -77,7 +77,6 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
             log10 of the fugacity at the buffer
         """
 
-    # TODO: Not sure how a penalty will behave with JAX,
     @override
     def get_log10_value(
         self, temperature: float, pressure: ArrayLike, penalty: bool = False, **kwargs
@@ -98,6 +97,8 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
         )
         log10_value = log10_value + self.log10_shift
 
+        # A penalty option may no longer be required now a Jacobian is prescribed to guide the
+        # solver.
         if penalty:
             log10_value = log10_value + self.calibration.get_penalty(temperature, pressure)
 
