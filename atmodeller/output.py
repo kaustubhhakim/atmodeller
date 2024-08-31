@@ -28,6 +28,7 @@ from typing import Hashable
 import pandas as pd
 
 from atmodeller.solution import Solution
+from atmodeller.thermodata.redox_buffers import solve_for_log10_dIW
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -93,7 +94,21 @@ class Output(UserDict):
             constraints_dict: Dictionary of constraints
             extra_output: Extra data to write to the output. Defaults to None.
         """
-        for key, value in solution.output_full().items():
+        output_full: dict[str, dict[str, float]] = solution.output_full()
+
+        # Back-compute and add the log10 shift relative to the default iron-wustite buffer
+        if "O2_g" in output_full:
+            temperature: float = output_full["atmosphere"]["temperature"]
+            pressure: float = output_full["atmosphere"]["pressure"]
+            # pylint: disable=invalid-name
+            O2_g_output: dict[str, float] = output_full["O2_g"]
+            O2_g_fugacity: float = O2_g_output["fugacity"]
+            O2_g_shift_at_1bar: float = solve_for_log10_dIW(O2_g_fugacity, temperature)
+            O2_g_output["log10dIW_1_bar)"] = O2_g_shift_at_1bar
+            O2_g_shift_at_P: float = solve_for_log10_dIW(O2_g_fugacity, temperature, pressure)
+            O2_g_output["log10dIW_P)"] = O2_g_shift_at_P
+
+        for key, value in output_full.items():
             data_list: list[dict[str, float]] = self.data.setdefault(key, [])
             data_list.append(value)
 
