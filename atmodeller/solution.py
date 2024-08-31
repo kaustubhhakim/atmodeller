@@ -339,9 +339,9 @@ class GasNumberDensitySpeciesSetter(NumberDensitySpeciesSetter[GasSpecies]):
         output: dict[str, float] = super().output_dict(element)
 
         if element is None:
-            output["pressure_bar"] = self.pressure().item()
+            output["pressure"] = self.pressure().item()
             output["fugacity_coefficient"] = self.fugacity_coefficient().item()
-            output["fugacity_bar"] = self.fugacity().item()
+            output["fugacity"] = self.fugacity().item()
             output["volume_mixing_ratio"] = self.volume_mixing_ratio().item()
 
         return output
@@ -805,9 +805,9 @@ class Atmosphere(
             Output dictionary
         """
         output: dict[str, float] = super().output_dict()
-        output[f"{self.output_prefix}pressure_bar"] = self.pressure().item()
+        output[f"{self.output_prefix}pressure"] = self.pressure().item()
         output[f"{self.output_prefix}temperature"] = self.temperature()
-        output[f"{self.output_prefix}volume_m3"] = self.volume().item()
+        output[f"{self.output_prefix}volume"] = self.volume().item()
 
         return output
 
@@ -929,7 +929,7 @@ class GasCollection(
     def output_solution(self) -> dict[str, float]:
         output: dict[str, float] = {}
         for species, container in self.data.items():
-            output[f"{species.name}_bar"] = container.abundance.pressure().item()
+            output[f"{species.name}"] = container.abundance.pressure().item()
 
         return output
 

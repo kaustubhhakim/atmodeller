@@ -280,8 +280,8 @@ def test_regressor(generate_regressor_data):
 
         test_constraints: SystemConstraints = SystemConstraints(
             [
-                FugacityConstraint(O2_g, solution.iloc[index]["O2_g_bar"]),
-                PressureConstraint(H2O_g, solution.iloc[index]["H2O_g_bar"]),
+                FugacityConstraint(O2_g, solution.iloc[index]["O2_g"]),
+                PressureConstraint(H2O_g, solution.iloc[index]["H2O_g"]),
             ]
         )
 
@@ -328,8 +328,8 @@ def test_regressor_override(generate_regressor_data):
 
     test_constraints = SystemConstraints(
         [
-            FugacityConstraint(O2_g, solution.iloc[0]["O2_g_bar"]),
-            PressureConstraint(H2O_g, solution.iloc[0]["H2O_g_bar"]),
+            FugacityConstraint(O2_g, solution.iloc[0]["O2_g"]),
+            PressureConstraint(H2O_g, solution.iloc[0]["H2O_g"]),
         ]
     )
 
