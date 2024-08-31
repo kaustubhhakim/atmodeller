@@ -20,6 +20,7 @@
 
 import logging
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 import numpy.typing as npt
@@ -36,7 +37,7 @@ from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Spe
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
 from atmodeller.solution import Solution
-from atmodeller.solver import SolverOptimistix
+from atmodeller.solver import Solver, SolverOptimistix, SolverScipy, SolverTryAgain
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -165,8 +166,11 @@ def graphite_water_condensed() -> Solution:
         {O2_g: 1e-48}, species=species, planet=cool_planet
     )
 
+    solver = SolverOptimistix(method="dogleg")
+    solver2 = SolverTryAgain(solver)
+
     solution: Solution = interior_atmosphere.solve(
-        solver=SolverOptimistix(method="lm"),
+        solver=solver2,
         constraints=constraints,
         initial_solution=initial_solution,
     )
@@ -181,17 +185,21 @@ def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
     """Generates data for testing the initial solution regressor"""
 
     # H2O pressures in bar
-    H2O_pressures = [1, 4, 7, 10]
+    H2O_pressures: list[float] = [1, 4, 7, 10]
     # fO2 shifts relative to the IW buffer
-    delta_IWs = range(-4, 5)
+    delta_IWs: Iterable = range(-4, 5)
 
-    H2O_g = GasSpecies("H2O")
-    H2_g = GasSpecies("H2")
-    O2_g = GasSpecies("O2")
-    species = Species([H2O_g, H2_g, O2_g])
+    H2O_g: GasSpecies = GasSpecies("H2O")
+    H2_g: GasSpecies = GasSpecies("H2")
+    O2_g: GasSpecies = GasSpecies("O2")
+    species: Species = Species([H2O_g, H2_g, O2_g])
 
-    planet = Planet()
-    system = InteriorAtmosphereSystem(species=species, planet=planet)
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+        species=species, planet=planet
+    )
+
+    solver: Solver = SolverOptimistix()
 
     # Generate some data
     for H2O_pressure in H2O_pressures:
@@ -202,9 +210,9 @@ def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
                     PressureConstraint(H2O_g, H2O_pressure),
                 ]
             )
-            system.solve(constraints=constraints)
+            interior_atmosphere.solve(solver=solver, constraints=constraints)
 
     filename = Path("ic_regressor_test_data")
-    system.output(filename, to_excel=True, to_pickle=True)
+    interior_atmosphere.output(filename, to_excel=True, to_pickle=True)
 
-    return system, filename
+    return interior_atmosphere, filename
