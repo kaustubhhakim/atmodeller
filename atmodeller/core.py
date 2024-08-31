@@ -20,17 +20,16 @@ from __future__ import annotations
 
 import logging
 import sys
-from dataclasses import asdict, dataclass, field
-from typing import Mapping
+from typing import Mapping, NamedTuple
 
-import numpy as np
+import jax.numpy as jnp
 
 from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies, ImmutableList
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.utilities import dataclass_to_logger, filter_by_type
+from atmodeller.utilities import filter_by_type
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -41,12 +40,10 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass(kw_only=True)
-class Planet:
+class Planet(NamedTuple):
     """The properties of a planet
 
-    Defines the properties of a planet that are relevant for interior modeling. It provides default
-    values suitable for modelling a fully molten Earth-like planet.
+    Defaults values are for a fully molten Earth.
 
     Args:
         planet_mass: Mass of the planet in kg. Defaults to Earth.
@@ -60,36 +57,49 @@ class Planet:
     planet_mass: float = 5.972e24
     """Mass of the planet in kg"""
     core_mass_fraction: float = 0.295334691460966
-    """Mass fraction of the core relative to the planetary mass (kg/kg)"""
+    """Mass fraction of the core relative to the planetary mass in kg/kg"""
     mantle_melt_fraction: float = 1.0
-    """Mass fraction of the molten mantle"""
+    """Mass fraction of the molten mantle in kg/kg"""
     surface_radius: float = 6371000.0
     """Radius of the surface in m"""
     surface_temperature: float = 2000.0
     """Temperature of the surface in K"""
-    mantle_mass: float = field(init=False)
-    """Mass of the mantle"""
-    mantle_melt_mass: float = field(init=False)
-    """Mass of the molten mantle"""
-    mantle_solid_mass: float = field(init=False)
-    """Mass of the solid mantle"""
-    surface_area: float = field(init=False)
-    """Surface area"""
-    surface_gravity: float = field(init=False)
-    """Surface gravity"""
 
-    def __post_init__(self):
-        self.mantle_mass = self.planet_mass * (1 - self.core_mass_fraction)
-        self.mantle_melt_mass = self.mantle_mass * self.mantle_melt_fraction
-        self.mantle_solid_mass = self.mantle_mass * (1 - self.mantle_melt_fraction)
-        self.surface_area = 4.0 * np.pi * self.surface_radius**2
-        self.surface_gravity = GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
-        logger.info("Creating a planet")
-        dataclass_to_logger(self, logger)
+    @property
+    def mantle_mass(self) -> float:
+        """Mantle mass"""
+        return self.planet_mass * (1.0 - self.core_mass_fraction)
 
-    def output_dict(self) -> dict:
-        """Output dictionary"""
-        return asdict(self)
+    @property
+    def mantle_melt_mass(self) -> float:
+        """Mass of the molten mantle"""
+        return self.mantle_mass * self.mantle_melt_fraction
+
+    @property
+    def mantle_solid_mass(self) -> float:
+        """Mass of the solid mantle"""
+        return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
+
+    @property
+    def surface_area(self) -> float:
+        """Surface area"""
+        return 4.0 * jnp.pi * self.surface_radius**2
+
+    @property
+    def surface_gravity(self) -> float:
+        """Surface gravity"""
+        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
+
+    def to_dict(self) -> dict:
+        """Gets a dictionary of the values"""
+        base_dict: dict = self._asdict()
+        base_dict["mantle_mass"] = self.mantle_mass
+        base_dict["mantle_melt_mass"] = self.mantle_melt_mass
+        base_dict["mantle_solid_mass"] = self.mantle_solid_mass
+        base_dict["surface_area"] = self.surface_area
+        base_dict["surface_gravity"] = self.surface_gravity
+
+        return base_dict
 
 
 class GasSpecies(ChemicalSpecies):

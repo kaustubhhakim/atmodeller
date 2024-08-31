@@ -1149,7 +1149,7 @@ class Solution(CollectionMixin[ChemicalSpecies, SomeContainer]):
             output[f"{SPECIES_PREFIX}{species.name}"] = collection.output_dict()
         output |= self._output_elements()
         output["atmosphere"] = self.atmosphere.output_dict()
-        output["planet"] = self.planet.output_dict()
+        output["planet"] = self.planet.to_dict()
         output["raw_solution"] = self.output_raw_solution()
         output["solution"] = self.output_solution()
 
