@@ -254,7 +254,7 @@ class NumberDensitySpecies(ABC, Generic[TypeChemicalSpecies_co]):
         """
         output: dict[str, float] = {}
         output[f"{self.output_prefix}number_density"] = self.number_density(element).item()
-        output[f"{self.output_prefix}mass_kg"] = self.mass(element).item()
+        output[f"{self.output_prefix}mass"] = self.mass(element).item()
         output[f"{self.output_prefix}molecules"] = self.molecules(element).item()
         output[f"{self.output_prefix}moles"] = self.moles(element).item()
 
@@ -776,7 +776,7 @@ class CollectionMixin(ABC, Generic[TypeChemicalSpecies_co, TypeNumberDensitySpec
         """
         output: dict[str, float] = {}
         output[f"{self.output_prefix}number_density"] = self.number_density(element).item()
-        output[f"{self.output_prefix}mass_kg"] = self.mass(element).item()
+        output[f"{self.output_prefix}mass"] = self.mass(element).item()
         output[f"{self.output_prefix}molecules"] = self.molecules(element).item()
         output[f"{self.output_prefix}moles"] = self.moles(element).item()
         output[f"{self.output_prefix}elements"] = self.elements().item()
@@ -1115,7 +1115,7 @@ class Solution(CollectionMixin[ChemicalSpecies, SomeContainer]):
             element_dict: dict[str, float] = output_dict.setdefault(
                 f"{ELEMENT_PREFIX}{element}", {}
             )
-            element_dict["total_mass_kg"] = self.mass(element=element).item()
+            element_dict["total_mass"] = self.mass(element=element).item()
             total_moles = self.moles(element=element)
             element_dict["total_moles"] = total_moles.item()
             total_moles_hydrogen: Array | None = self.total_moles_hydrogen()

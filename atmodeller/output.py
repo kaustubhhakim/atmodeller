@@ -104,9 +104,9 @@ class Output(UserDict):
             O2_g_output: dict[str, float] = output_full["O2_g"]
             O2_g_fugacity: float = O2_g_output["fugacity"]
             O2_g_shift_at_1bar: float = solve_for_log10_dIW(O2_g_fugacity, temperature)
-            O2_g_output["log10dIW_1_bar)"] = O2_g_shift_at_1bar
+            O2_g_output["log10dIW_1_bar"] = O2_g_shift_at_1bar
             O2_g_shift_at_P: float = solve_for_log10_dIW(O2_g_fugacity, temperature, pressure)
-            O2_g_output["log10dIW_P)"] = O2_g_shift_at_P
+            O2_g_output["log10dIW_P"] = O2_g_shift_at_P
 
         for key, value in output_full.items():
             data_list: list[dict[str, float]] = self.data.setdefault(key, [])
