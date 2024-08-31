@@ -24,6 +24,7 @@ from abc import ABC, abstractmethod
 from typing import Type
 
 import jax.numpy as jnp
+import optimistix as optx
 from jax import Array, lax
 from jax.typing import ArrayLike
 
@@ -54,11 +55,11 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
     @override
     def __init__(
         self,
-        log10_shift: float = 0,
+        log10_shift: ArrayLike = 0,
         *,
         calibration: ExperimentalCalibration = ExperimentalCalibration()
     ):
-        self.log10_shift: float = log10_shift
+        self.log10_shift: ArrayLike = log10_shift
         self.calibration: ExperimentalCalibration = calibration
         logger.debug("Setting experimental calibration = %s", calibration)
 
@@ -86,7 +87,7 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
-            penalty: Apply penalty function. Defaults to True.
+            penalty: Apply penalty function. Defaults to False.
             **kwargs: Arbitrary keyword arguments
 
         Returns:
@@ -106,14 +107,14 @@ class _RedoxBuffer(ABC, RedoxBufferProtocol):
 
     @override
     def get_value(
-        self, temperature: float, pressure: ArrayLike, penalty: bool = True, **kwargs
+        self, temperature: float, pressure: ArrayLike, penalty: bool = False, **kwargs
     ) -> ArrayLike:
         """Value including any shift
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
-            penalty: Apply penalty function. Defaults to True.
+            penalty: Apply penalty function. Defaults to False.
             **kwargs: Arbitrary keyword arguments
 
         Returns:
@@ -139,7 +140,7 @@ class IronWustiteBufferHirschmann08(_RedoxBuffer):
     @override
     def __init__(
         self,
-        log10_shift: float = 0,
+        log10_shift: ArrayLike = 0,
         *,
         calibration: ExperimentalCalibration = IronWustiteBufferHirschmann08Calibration
     ):
@@ -172,7 +173,7 @@ class IronWustiteBufferHirschmann21(_RedoxBuffer):
     @override
     def __init__(
         self,
-        log10_shift: float = 0,
+        log10_shift: ArrayLike = 0,
         *,
         calibration: ExperimentalCalibration = IronWustiteBufferHirschmann21Calibration
     ):
@@ -292,10 +293,21 @@ class IronWustiteBufferHirschmann(RedoxBufferProtocol):
     @override
     def __init__(
         self,
-        log10_shift: float = 0,
+        log10_shift: ArrayLike = 0,
     ):
+        self._log10_shift: ArrayLike = log10_shift
         self.low_temperature_buffer: _RedoxBuffer = IronWustiteBufferHirschmann08(log10_shift)
         self.high_temperature_buffer: _RedoxBuffer = IronWustiteBufferHirschmann21(log10_shift)
+
+    @property
+    def log10_shift(self) -> ArrayLike:
+        return self._log10_shift
+
+    @log10_shift.setter
+    def log10_shift(self, value: ArrayLike) -> None:
+        self._log10_shift = value
+        self.low_temperature_buffer.log10_shift = value
+        self.high_temperature_buffer.log10_shift = value
 
     @override
     def get_log10_value(self, temperature: float, pressure: ArrayLike, **kwargs) -> ArrayLike:
@@ -404,3 +416,55 @@ class IronWustiteBufferFischer(_RedoxBuffer):
 
 
 IronWustiteBuffer: Type[RedoxBufferProtocol] = IronWustiteBufferHirschmann
+
+
+def solve_for_log10_dIW(
+    target_fugacity: float, temperature: float, pressure: ArrayLike = 1.0, **kwargs
+) -> float:
+    """Solves for the log10 shift relative to the default Iron-wustite buffer
+
+    The shift is report relative to the standard state defined at temperature and 1 bar pressure.
+    If desired, the shift can be reported relative to a standard state defined at an alternative
+    pressure.
+
+    Args:
+        target_fugacity: Target fugacity in bar
+        temperature: Temperature in K
+        pressure: Pressure defining the standard state in bar. Defaults to 1 bar.
+        **kwargs: Arbitrary keyword arguments
+
+    Returns:
+        The required log10_shift to match the target fugacity
+    """
+    buffer: RedoxBufferProtocol = IronWustiteBuffer()
+
+    def objective_function(log10_shift: ArrayLike, args):
+        """Objective function
+
+        Args:
+            log10_shift: Log10 shift
+            args: Optional arguments (not used)
+
+        Returns:
+            Residual of the objective function
+        """
+        del args
+        buffer.log10_shift = log10_shift
+        calculated_log10_fugacity: ArrayLike = buffer.get_log10_value(
+            temperature, pressure, penalty=False, **kwargs
+        )
+
+        return calculated_log10_fugacity - jnp.log10(target_fugacity)
+
+    solver = optx.Bisection(rtol=1.0e-8, atol=1.0e-8)
+    sol = optx.root_find(
+        objective_function, solver, jnp.array(-20.0), options=dict(lower=-100, upper=100)
+    )
+
+    # Success is indicated by no message
+    if optx.RESULTS[sol.result] == "":
+        value: float = sol.value.item()
+    else:
+        raise ValueError("Root finding did not converge")
+
+    return value
