@@ -25,6 +25,7 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Protocol
 
+import jax.numpy as jnp
 from jax.typing import ArrayLike
 
 if sys.version_info < (3, 12):
@@ -92,7 +93,7 @@ class SolubilityPowerLaw(Solubility):
     def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
         del kwargs
 
-        return self.constant * fugacity**self.exponent
+        return self.constant * jnp.power(fugacity, self.exponent)
 
     # def __repr__(self) -> str:
     #     return (
