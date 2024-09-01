@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-"""Minimum working example (MWE) for comparing Scipy and Optimistix solvers.
+"""Minimum working example (MWE) for JAX vmap with atmodeller-like containers for parameters.
 
 Reproduces test_CHO_low_temperature in test_benchmark.py using some hard-coded parameters.
 """
-from typing import Dict
+from timeit import timeit
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -11,11 +12,12 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit
-from jax.tree_util import register_pytree_node_class
+from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from scipy.constants import Avogadro, Boltzmann, gas_constant
 
-# Scipy also fails if this is commented out. Evidently double precision is required regardless.
+from atmodeller.core import Planet
+
 jax.config.update("jax_enable_x64", True)
 
 MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
@@ -33,8 +35,10 @@ scaling: float = 1  # mole faction scaling
 log10_scaling: float = np.log10(scaling)
 log_scaling: float = np.log(scaling)
 
+# Species order is: H2, H2O, CO2, O2, CH4, CO
+
 # For testing solvers, this is the known solution of the system
-known_solution: Dict[str, float] = {
+known_solution: dict[str, float] = {
     "H2": 26.950804260065272,
     "H2O": 26.109794057030303,
     "CO2": 11.303173861822636,
@@ -45,17 +49,8 @@ known_solution: Dict[str, float] = {
 
 known_solution_array: npt.NDArray[np.float_] = np.array([val for val in known_solution.values()])
 
-# This should be kept at this temperature since the equilibrium constants for the reactions below
-# are hard-coded for this temperature
-temperature: float = 450
-planet_surface_area: float = 510064471909788.25  # SI units
-planet_surface_gravity: float = 9.819973426224687  # SI units
-
-# MWE for reaction network / mass balance
-# Species order is: H2, H2O, CO2, O2, CH4, CO
-
 # Species molar masses in kg/mol
-molar_masses_dict: Dict[str, float] = {
+molar_masses_dict: dict[str, float] = {
     "H2": 0.002015882,
     "H2O": 0.018015287,
     "CO2": 0.044009549999999995,
@@ -65,10 +60,12 @@ molar_masses_dict: Dict[str, float] = {
 }
 
 
+@jit
 def dimensional_to_scaled_base10(dimensional_number_density):
     return dimensional_number_density - log10_AVOGADRO + log10_scaling
 
 
+@jit
 def scaled_to_dimensional_base10(scaled_number_density):
     return scaled_number_density - dimensional_to_scaled_base10(0)
 
@@ -92,125 +89,63 @@ perturbation = np.random.normal(mean, std_dev, size=known_solution_array.shape)
 initial_solution = initial_solution_default
 initial_solution = dimensional_to_scaled_base10(initial_solution)
 
-# Reaction set is linearly independent (determined by Gaussian elimination in a previous step)
-# log10 equilibrium constants
-# 2 H2O = 2 H2 + 1 O2
-reaction0_lnKp: float = -118.38862269303881
-reaction0_delta_n: float = 1.0
-# 4 H2 + 1 CO2 = 2 H2O + 1 CH4
-reaction1_lnKp: float = 22.8840873584512
-reaction1_delta_n: float = -2.0
-# 1 H2 + 1 O2 = 1 H2O + 1 CO
-reaction2_lnKp: float = -6.001590516742649
-reaction2_delta_n: float = 0.0
+
+@jit
+def get_rhs(planet: Planet) -> Array:
+
+    temperature: ArrayLike = planet.surface_temperature
+
+    # Reaction set is linearly independent (determined by Gaussian elimination in a previous step)
+    # log10 equilibrium constants
+    # 2 H2O = 2 H2 + 1 O2
+    reaction0_lnKp: float = -118.38862269303881
+    reaction0_delta_n: float = 1.0
+    # 4 H2 + 1 CO2 = 2 H2O + 1 CH4
+    reaction1_lnKp: float = 22.8840873584512
+    reaction1_delta_n: float = -2.0
+    # 1 H2 + 1 O2 = 1 H2O + 1 CO
+    reaction2_lnKp: float = -6.001590516742649
+    reaction2_delta_n: float = 0.0
+
+    def log10Kc_from_lnKp(lnKp: float, delta_n: float, temperature: ArrayLike) -> Array:
+        # return (lnKp - delta_n * (np.log(GAS_CONSTANT_BAR) + np.log(temperature))) / np.log(10)
+        log10Kc: Array = lnKp - delta_n * (
+            jnp.log(BOLTZMANN_CONSTANT_BAR) + log_AVOGADRO - log_scaling + jnp.log(temperature)
+        )
+        log10Kc = log10Kc / jnp.log(10)
+
+        return log10Kc
+
+    reaction0_log10Kc: Array = log10Kc_from_lnKp(reaction0_lnKp, reaction0_delta_n, temperature)
+    reaction1_log10Kc: Array = log10Kc_from_lnKp(reaction1_lnKp, reaction1_delta_n, temperature)
+    reaction2_log10Kc: Array = log10Kc_from_lnKp(reaction2_lnKp, reaction2_delta_n, temperature)
+
+    # rhs constraints are the equilibrium constants of the reaction
+    rhs: Array = jnp.array([reaction0_log10Kc, reaction1_log10Kc, reaction2_log10Kc])
+
+    return rhs
 
 
-def log10Kc_from_lnKp(lnKp: float, delta_n: float) -> float:
-    # return (lnKp - delta_n * (np.log(GAS_CONSTANT_BAR) + np.log(temperature))) / np.log(10)
-    log10Kc: float = lnKp - delta_n * (
-        np.log(BOLTZMANN_CONSTANT_BAR) + log_AVOGADRO - log_scaling + np.log(temperature)
-    )
-    log10Kc = log10Kc / np.log(10)
+class SystemParams(NamedTuple):
 
-    return log10Kc
+    initial_solution: Array
 
 
-reaction0_log10Kc: float = log10Kc_from_lnKp(reaction0_lnKp, reaction0_delta_n)
-reaction1_log10Kc: float = log10Kc_from_lnKp(reaction1_lnKp, reaction1_delta_n)
-reaction2_log10Kc: float = log10Kc_from_lnKp(reaction2_lnKp, reaction2_delta_n)
+class AdditionalParams(NamedTuple):
 
-# Coefficient matrix (reaction stoichiometry)
-# Columns correspond to species: H2, H2O, CO, CO2, CH4, O2
-# Rows refer to reactions (three in total)
-coefficient_matrix: Array = jnp.array(
-    [
-        [2.0, -2.0, 0.0, 1.0, 0.0, 0.0],
-        [-4.0, 2.0, -1.0, 0.0, 1.0, 0.0],
-        [-1.0, 1.0, -1.0, 0.0, 0.0, 1.0],
-    ]
-)
-
-# rhs constraints are the equilibrium constants of the reaction
-rhs: Array = jnp.array([reaction0_log10Kc, reaction1_log10Kc, reaction2_log10Kc])
-
-
-# Register Pytree classes
-@register_pytree_node_class
-class SystemParams:
-    def __init__(self, initial_solution):
-        self.initial_solution = initial_solution
-
-    def tree_flatten(self):
-        children = (self.initial_solution,)
-        aux_data = None
-        return children, aux_data
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children):
-        return cls(*children)
-
-
-@register_pytree_node_class
-class AdditionalParams:
-    def __init__(self, coefficient_matrix, rhs, temperature):
-        self.coefficient_matrix = coefficient_matrix
-        self.rhs = rhs
-        self.temperature = temperature
-
-    def tree_flatten(self):
-        children = (self.coefficient_matrix, self.rhs, self.temperature)
-        aux_data = None
-        return children, aux_data
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children):
-        return cls(*children)
-
-
-system_params = SystemParams(initial_solution)
-additional_params = AdditionalParams(coefficient_matrix, rhs, temperature)
-
-
-# def solve_with_scipy(method="hybr", tol: float = 1.0e-8, jacobian: bool = True) -> None:
-#     """Solve the system with Scipy"""
-
-#     if jacobian:
-#         jacobian_function: Callable | None = jax.jacobian(objective_function)
-#     else:
-#         jacobian_function = None
-
-#     print("Solving with SciPy")
-#     sol: OptimizeResult = root(
-#         objective_function, initial_solution, method=method, jac=jacobian_function, tol=tol
-#     )
-
-#     # Shifted solution
-#     solution: npt.NDArray[np.float_] = scaled_to_dimensional_base10(sol.x)
-
-#     print(sol)
-
-#     if sol.success and np.isclose(solution, known_solution_array).all():
-#         print("SciPy success and agrees with known solution. Steps = %d" % sol["nfev"])
-
-#     print(solution)
+    coefficient_matrix: Array
+    planet: Planet
 
 
 @jit
 def solve_with_optimistix(system_params, additional_params) -> Array:
-    # , method="Dogleg", tol: float = 1.0e-8) -> None:
     """Solve the system with Optimistix"""
 
     tol: float = 1.0e-8
-    # if method == "Dogleg":
-    solver = optx.Dogleg(atol=tol, rtol=tol)
-    # elif method == "Newton":
-    #    solver = optx.Newton(atol=tol, rtol=tol)
-    # elif method == "LevenbergMarquardt":
-    #    solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
-    # else:
-    #    raise ValueError(f"Unknown method: {method}")
+    # solver = optx.Dogleg(atol=tol, rtol=tol)
+    # solver = optx.Newton(atol=tol, rtol=tol)
+    solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
 
-    print("Solving with Optimistix")
     sol = optx.root_find(
         objective_function,
         solver,
@@ -219,19 +154,12 @@ def solve_with_optimistix(system_params, additional_params) -> Array:
         throw=True,
     )
 
-    # Shifted solution
     solution: Array = scaled_to_dimensional_base10(sol.value)
-    # print(solution)
-
-    if optx.RESULTS[sol.result] == "" and np.isclose(solution, known_solution_array).all():
-        print(
-            "Optimistix success and agrees with known solution. Steps = %d"
-            % sol.stats["num_steps"]
-        )
 
     return solution
 
 
+@jit
 def atmosphere_log10_molar_mass(solution: Array) -> Array:
     """Log10 of the molar mass of the atmosphere"""
     molar_masses: Array = jnp.array([value for value in molar_masses_dict.values()])
@@ -240,30 +168,40 @@ def atmosphere_log10_molar_mass(solution: Array) -> Array:
     return molar_mass
 
 
-def atmosphere_log10_volume(solution: Array) -> Array:
+@jit
+def atmosphere_log10_volume(solution: Array, planet: Planet) -> Array:
     """Log10 of the volume of the atmosphere"""
     return (
         jnp.log10(gas_constant)
-        + jnp.log10(temperature)
+        + jnp.log10(planet.surface_temperature)
         # Units of solution don't matter because it just weights (unless numerical problems)
         - atmosphere_log10_molar_mass(solution)
-        + jnp.log10(planet_surface_area)
-        - jnp.log10(planet_surface_gravity)
+        + jnp.log10(planet.surface_area)
+        - jnp.log10(planet.surface_gravity)
     )
 
 
+# These argument specifications are fixed for Optimistix, so can conform the parameter passing
+# to adhere to this. Should return a pytree of arrays, not necessarily the same shape as the
+# solution.
 @jit
-def objective_function(solution: Array, additional_params) -> Array:
+def objective_function(solution: Array, additional_params: AdditionalParams) -> Array:
     """Residual of the reaction network and mass balance"""
     # Extract parameters from the pytree
     coefficient_matrix = additional_params.coefficient_matrix
-    rhs = additional_params.rhs
-    temperature = additional_params.temperature
+    planet = additional_params.planet
+
+    # jax.debug.print("{out}", out=coefficient_matrix)
+    # jax.debug.print("{out}", out=planet)
+
+    # RHS could depend on total pressure, which is part of the initial guess solution.
+    rhs = get_rhs(planet)
+    # jax.debug.print("{out}", out=rhs)
 
     # Reaction network
     reaction_residual: Array = coefficient_matrix.dot(solution) - rhs
 
-    log10_volume: Array = atmosphere_log10_volume(solution)
+    log10_volume: Array = atmosphere_log10_volume(solution, planet)
 
     # Mass balance residuals (stoichiometry coefficients are hard-coded for this MWE)
     oxygen_residual: Array = jnp.array(
@@ -314,32 +252,116 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
 
     value_sum: Array = jnp.sum(prefactors_ * jnp.power(10, log_values - max_log))
 
-    return max_log + safe_log10(value_sum)
+    return max_log + jnp.log10(value_sum)
 
 
-@jit
-def safe_log10(x: ArrayLike) -> Array:
-    """Computes log10 of x, safely adding machine epsilon to avoid log of zero."""
+def get_coefficient_matrix() -> Array:
+    """Coefficient matrix (reaction stoichiometry)
 
-    return jnp.log10(x)  #  + MACHEPS)
+    Columns correspond to species: H2, H2O, CO, CO2, CH4, O2. Rows refer to reactions
+    (three in total)
+    """
+    coefficient_matrix: Array = jnp.array(
+        [
+            [2.0, -2.0, 0.0, 1.0, 0.0, 0.0],
+            [-4.0, 2.0, -1.0, 0.0, 1.0, 0.0],
+            [-1.0, 1.0, -1.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    return coefficient_matrix
+
+
+def pytrees_stack(pytrees, axis=0):
+    """Stacks an iterable of pytrees along a specified axis."""
+    results = tree_map(lambda *values: jnp.stack(values, axis=axis), *pytrees)
+    return results
+
+
+def pytrees_vmap(fn):
+    """Vectorizes a function over a batch of pytrees."""
+
+    def g(pytrees):
+        stacked = pytrees_stack(pytrees)
+        results = jax.vmap(fn)(stacked)
+        return results
+
+    return g
+
+
+def solve_single():
+
+    # For a given set of species the coefficient matrix can be solely determined and is fixed.
+    coefficient_matrix: Array = get_coefficient_matrix()
+
+    planet: Planet = Planet(surface_temperature=450)
+    system_params = SystemParams(initial_solution)
+    additional_params = AdditionalParams(coefficient_matrix, planet)
+
+    out = solve_with_optimistix(system_params, additional_params)
+
+    return out
+
+
+def solve_batch():
+
+    # For a given set of species the coefficient matrix can be solely determined and is fixed.
+    coefficient_matrix: Array = get_coefficient_matrix()
+
+    planets: list[Planet] = []
+    for surface_temperature in range(450, 2001, 100):
+        planets.append(Planet(surface_temperature=surface_temperature))
+
+    # Stacks the entities into one named tuple
+    planets_for_vmap = pytrees_stack(planets)
+    # jax.debug.print("{out}", out=planets_for_vmap)
+
+    # Replicate the coefficient matrix to match the batch size of planets
+    coefficient_matrices_for_vmap = jnp.stack(
+        [coefficient_matrix] * len(planets_for_vmap.surface_temperature)
+    )
+
+    # Combine into AdditionalParams
+    additional_params = AdditionalParams(coefficient_matrices_for_vmap, planets_for_vmap)
+    # jax.debug.print("{out}", out=additional_params)
+
+    # For different initial solutions
+    # system_params = SystemParams(
+    #    jnp.stack([initial_solution] * len(planets_for_vmap.surface_temperature))
+    # )
+    # For the same initial solution
+    system_params = SystemParams(initial_solution)
+
+    # jax.debug.print("{out}", out=system_params)
+
+    # JIT compile the solve function
+    jit_solve = jax.jit(solve_with_optimistix)
+
+    vmap_solve = jax.vmap(jit_solve, in_axes=(None, 0))
+
+    solutions = vmap_solve(system_params, additional_params)
+
+    return solutions
 
 
 def main():
-    # Define the parameters
-    system_params = SystemParams(initial_solution)
-    additional_params = AdditionalParams(coefficient_matrix, rhs, temperature)
 
-    # Solve using scipy and a JAX-provided Jacobian
-    # solve_with_scipy(system_params, additional_params, jacobian=True)
+    # solutions = solve_single()
+    # solutions = solve_batch()
 
-    # Solve using Optimistix with Dogleg method
-    out = solve_with_optimistix(system_params, additional_params)  # , method="Dogleg")
+    solve_batch_jit = jax.jit(solve_batch)
+
+    # Pre-compile the function before timing...
+    solve_batch_jit().block_until_ready()
+
+    out = solve_batch_jit()
 
     print(out)
 
-    # You can uncomment the following to test other methods
-    # solve_with_optimistix(system_params, additional_params, method="LevenbergMarquardt")
-    # solve_with_optimistix(system_params, additional_params, method="Newton")
+    # out = timeit(solve_batch_jit().block_until_ready)
+
+    # print(out)
+    # print(solutions)
 
 
 if __name__ == "__main__":
