@@ -3,7 +3,6 @@
 
 Reproduces test_CHO_low_temperature in test_benchmark.py using some hard-coded parameters.
 """
-from functools import partial
 from timeit import timeit
 from typing import NamedTuple
 
@@ -77,7 +76,7 @@ known_solution: dict[str, float] = {
     "CO": 9.537726420793389,
 }
 
-known_solution_array: npt.NDArray[np.float_] = np.array([val for val in known_solution.values()])
+known_solution_array: Array = jnp.array([val for val in known_solution.values()])
 
 # Species molar masses in kg/mol
 molar_masses_dict: dict[str, float] = {
@@ -105,8 +104,8 @@ log10_oxygen_constraint: float = dimensional_to_scaled_base10(45.58848007858896)
 log10_hydrogen_constraint: float = dimensional_to_scaled_base10(46.96664792007732)
 log10_carbon_constraint: float = dimensional_to_scaled_base10(45.89051326565627)
 # Initial solution guess number density (molecules/m^3)
-# initial_solution_default: Array = jnp.array([26, 26, 12, -26, 26, 25], dtype=jnp.float_)
-initial_solution_default: Array = jnp.array([26, 26, 26, 26, 26, 26], dtype=jnp.float_)
+initial_solution_default: Array = jnp.array([26, 26, 12, -26, 26, 25], dtype=jnp.float_)
+# initial_solution_default: Array = jnp.array([26, 26, 26, 26, 26, 26], dtype=jnp.float_)
 
 # If we start somewhere close to the solution then Optimistix is OK
 # Parameters for the perturbation
@@ -115,12 +114,12 @@ std_dev = 5.0  # Standard deviation of the perturbation
 # Generate random perturbations
 perturbation = np.random.normal(mean, std_dev, size=known_solution_array.shape)
 
-initial_solution: Array = known_solution_array  # + perturbation
-# initial_solution = initial_solution_default
+# initial_solution: Array = jnp.array(known_solution_array) + perturbation
+initial_solution = initial_solution_default
 initial_solution = dimensional_to_scaled_base10(initial_solution)
 
 
-@partial(jit, static_argnames="planet")
+@jit
 def get_rhs(planet: Planet) -> Array:
 
     temperature: ArrayLike = planet.surface_temperature
@@ -167,7 +166,7 @@ class AdditionalParams(NamedTuple):
     planet: Planet
 
 
-@partial(jit, static_argnames="additional_params")
+@jit
 def solve_with_optimistix(system_params, additional_params) -> Array:
     """Solve the system with Optimistix"""
 
@@ -200,7 +199,7 @@ def atmosphere_log10_molar_mass(solution: Array) -> Array:
     return molar_mass
 
 
-@partial(jit, static_argnames="planet")
+@jit
 def atmosphere_log10_volume(solution: Array, planet: Planet) -> Array:
     """Log10 of the volume of the atmosphere"""
     return (
@@ -216,7 +215,7 @@ def atmosphere_log10_volume(solution: Array, planet: Planet) -> Array:
 # These argument specifications are fixed for Optimistix, so can conform the parameter passing
 # to adhere to this. Should return a pytree of arrays, not necessarily the same shape as the
 # solution.
-@partial(jit, static_argnames="additional_params")
+@jit
 def objective_function(solution: Array, additional_params: AdditionalParams) -> Array:
     """Residual of the reaction network and mass balance"""
 
@@ -332,7 +331,7 @@ def solve_batch(species: list[SpeciesData]) -> Array:
 def solve_batch_jax(coefficient_matrix: Array):
 
     planets: list[Planet] = []
-    for surface_temperature in range(450, 2001, 100):
+    for surface_temperature in range(450, 2001, 1):
         planets.append(Planet(surface_temperature=surface_temperature))
 
     # Stacks the entities into one named tuple

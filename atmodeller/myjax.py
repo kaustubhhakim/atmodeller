@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from jax import jit
+from jax import Array, jit
 from molmass import Formula
 
 from atmodeller.utilities import partial_rref, unit_conversion
@@ -202,7 +202,7 @@ class ReactionNetworkJAX:
 
         return formula_matrix
 
-    def reaction_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
+    def reaction_matrix(self, species: list[SpeciesData]) -> Array:
         """Reaction matrix
 
         Returns:
@@ -215,7 +215,7 @@ class ReactionNetworkJAX:
 
         transpose_formula_matrix: npt.NDArray = self.formula_matrix(species).T
 
-        return partial_rref(transpose_formula_matrix)
+        return jnp.array(partial_rref(transpose_formula_matrix))
 
 
 def test():

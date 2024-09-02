@@ -22,7 +22,8 @@ import logging
 import sys
 from typing import Mapping, NamedTuple
 
-import numpy as np
+import jax.numpy as jnp
+from jax.typing import ArrayLike
 
 from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
@@ -54,39 +55,39 @@ class Planet(NamedTuple):
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
     """
 
-    planet_mass: float = 5.972e24
+    planet_mass: ArrayLike = 5.972e24
     """Mass of the planet in kg"""
-    core_mass_fraction: float = 0.295334691460966
+    core_mass_fraction: ArrayLike = 0.295334691460966
     """Mass fraction of the core relative to the planetary mass in kg/kg"""
-    mantle_melt_fraction: float = 1.0
+    mantle_melt_fraction: ArrayLike = 1.0
     """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: float = 6371000.0
+    surface_radius: ArrayLike = 6371000.0
     """Radius of the surface in m"""
-    surface_temperature: float = 2000.0
+    surface_temperature: ArrayLike = 2000.0
     """Temperature of the surface in K"""
 
     @property
-    def mantle_mass(self) -> float:
+    def mantle_mass(self) -> ArrayLike:
         """Mantle mass"""
         return self.planet_mass * (1.0 - self.core_mass_fraction)
 
     @property
-    def mantle_melt_mass(self) -> float:
+    def mantle_melt_mass(self) -> ArrayLike:
         """Mass of the molten mantle"""
         return self.mantle_mass * self.mantle_melt_fraction
 
     @property
-    def mantle_solid_mass(self) -> float:
+    def mantle_solid_mass(self) -> ArrayLike:
         """Mass of the solid mantle"""
         return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
 
     @property
-    def surface_area(self) -> float:
+    def surface_area(self) -> ArrayLike:
         """Surface area"""
-        return 4.0 * np.pi * self.surface_radius**2
+        return 4.0 * jnp.pi * self.surface_radius**2
 
     @property
-    def surface_gravity(self) -> float:
+    def surface_gravity(self) -> ArrayLike:
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
