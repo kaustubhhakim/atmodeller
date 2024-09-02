@@ -3,6 +3,7 @@
 
 Reproduces test_CHO_low_temperature in test_benchmark.py using some hard-coded parameters.
 """
+from functools import partial
 from timeit import timeit
 from typing import NamedTuple
 
@@ -17,8 +18,20 @@ from jax.typing import ArrayLike
 from scipy.constants import Avogadro, Boltzmann, gas_constant
 
 from atmodeller.core import Planet
+from atmodeller.myjax import (
+    CH4_g,
+    CO2_g,
+    CO_g,
+    H2_g,
+    H2O_g,
+    O2_g,
+    ReactionNetworkJAX,
+    SpeciesData,
+)
 
 jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_debug_nans", True)
+# jax.config.update("jax_debug_dtypes", True)
 
 MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
 """Machine epsilon"""
@@ -35,7 +48,24 @@ scaling: float = 1  # mole faction scaling
 log10_scaling: float = np.log10(scaling)
 log_scaling: float = np.log(scaling)
 
+# import traceback
+# import warnings
+
+# # Create a custom warning handler
+# def warning_handler(message, category, filename, lineno, file=None, line=None):
+#     # Print the complete warning message
+#     print(f"Warning: {message}")
+#     print(f"Category: {category.__name__}")
+#     print(f"File: {filename}, Line: {lineno}")
+#     # Print stack trace for additional context
+#     print("Stack trace:")
+#     traceback.print_stack()
+
+# # Redirect warnings to the custom handler
+# warnings.showwarning = warning_handler
+
 # Species order is: H2, H2O, CO2, O2, CH4, CO
+species_list: list[SpeciesData] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
 
 # For testing solvers, this is the known solution of the system
 known_solution: dict[str, float] = {
@@ -61,12 +91,12 @@ molar_masses_dict: dict[str, float] = {
 
 
 @jit
-def dimensional_to_scaled_base10(dimensional_number_density):
+def dimensional_to_scaled_base10(dimensional_number_density: Array):
     return dimensional_number_density - log10_AVOGADRO + log10_scaling
 
 
 @jit
-def scaled_to_dimensional_base10(scaled_number_density):
+def scaled_to_dimensional_base10(scaled_number_density: Array):
     return scaled_number_density - dimensional_to_scaled_base10(0)
 
 
@@ -85,12 +115,12 @@ std_dev = 5.0  # Standard deviation of the perturbation
 # Generate random perturbations
 perturbation = np.random.normal(mean, std_dev, size=known_solution_array.shape)
 
-# initial_solution: Array = known_solution_array  + perturbation
-initial_solution = initial_solution_default
+initial_solution: Array = known_solution_array  # + perturbation
+# initial_solution = initial_solution_default
 initial_solution = dimensional_to_scaled_base10(initial_solution)
 
 
-@jit
+@partial(jit, static_argnames="planet")
 def get_rhs(planet: Planet) -> Array:
 
     temperature: ArrayLike = planet.surface_temperature
@@ -137,14 +167,16 @@ class AdditionalParams(NamedTuple):
     planet: Planet
 
 
-@jit
+@partial(jit, static_argnames="additional_params")
 def solve_with_optimistix(system_params, additional_params) -> Array:
     """Solve the system with Optimistix"""
 
     tol: float = 1.0e-8
-    # solver = optx.Dogleg(atol=tol, rtol=tol)
+    solver = optx.Dogleg(atol=tol, rtol=tol)
     # solver = optx.Newton(atol=tol, rtol=tol)
-    solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
+    # solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
+
+    system_params = SystemParams(initial_solution)
 
     sol = optx.root_find(
         objective_function,
@@ -168,7 +200,7 @@ def atmosphere_log10_molar_mass(solution: Array) -> Array:
     return molar_mass
 
 
-@jit
+@partial(jit, static_argnames="planet")
 def atmosphere_log10_volume(solution: Array, planet: Planet) -> Array:
     """Log10 of the volume of the atmosphere"""
     return (
@@ -184,13 +216,13 @@ def atmosphere_log10_volume(solution: Array, planet: Planet) -> Array:
 # These argument specifications are fixed for Optimistix, so can conform the parameter passing
 # to adhere to this. Should return a pytree of arrays, not necessarily the same shape as the
 # solution.
-@jit
+@partial(jit, static_argnames="additional_params")
 def objective_function(solution: Array, additional_params: AdditionalParams) -> Array:
     """Residual of the reaction network and mass balance"""
+
     # Extract parameters from the pytree
     coefficient_matrix = additional_params.coefficient_matrix
     planet = additional_params.planet
-
     # jax.debug.print("{out}", out=coefficient_matrix)
     # jax.debug.print("{out}", out=planet)
 
@@ -255,23 +287,6 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
     return max_log + jnp.log10(value_sum)
 
 
-def get_coefficient_matrix() -> Array:
-    """Coefficient matrix (reaction stoichiometry)
-
-    Columns correspond to species: H2, H2O, CO, CO2, CH4, O2. Rows refer to reactions
-    (three in total)
-    """
-    coefficient_matrix: Array = jnp.array(
-        [
-            [2.0, -2.0, 0.0, 1.0, 0.0, 0.0],
-            [-4.0, 2.0, -1.0, 0.0, 1.0, 0.0],
-            [-1.0, 1.0, -1.0, 0.0, 0.0, 1.0],
-        ]
-    )
-
-    return coefficient_matrix
-
-
 def pytrees_stack(pytrees, axis=0):
     """Stacks an iterable of pytrees along a specified axis."""
     results = tree_map(lambda *values: jnp.stack(values, axis=axis), *pytrees)
@@ -289,10 +304,10 @@ def pytrees_vmap(fn):
     return g
 
 
-def solve_single():
+def solve_single(species: list[SpeciesData]) -> Array:
 
-    # For a given set of species the coefficient matrix can be solely determined and is fixed.
-    coefficient_matrix: Array = get_coefficient_matrix()
+    reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
+    coefficient_matrix: Array = reaction_network.reaction_matrix(species)
 
     planet: Planet = Planet(surface_temperature=450)
     system_params = SystemParams(initial_solution)
@@ -303,10 +318,18 @@ def solve_single():
     return out
 
 
-def solve_batch():
+def solve_batch(species: list[SpeciesData]) -> Array:
 
-    # For a given set of species the coefficient matrix can be solely determined and is fixed.
-    coefficient_matrix: Array = get_coefficient_matrix()
+    reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
+    coefficient_matrix: Array = reaction_network.reaction_matrix(species)
+
+    out = solve_batch_jax(coefficient_matrix)
+
+    return out
+
+
+@jit
+def solve_batch_jax(coefficient_matrix: Array):
 
     planets: list[Planet] = []
     for surface_temperature in range(450, 2001, 100):
@@ -346,19 +369,21 @@ def solve_batch():
 
 def main():
 
-    # solutions = solve_single()
-    # solutions = solve_batch()
+    # out = solve_single(species_list)
+    # out = solve_batch(species_list)
 
-    solve_batch_jit = jax.jit(solve_batch)
+    # solve_batch_jit = jax.jit(solve_batch)
 
     # Pre-compile the function before timing...
-    solve_batch_jit().block_until_ready()
+    # solve_batch_jit(species_list).block_until_ready()
 
-    out = solve_batch_jit()
+    # out = solve_batch(species_list).block_until_ready()
+
+    out = solve_batch(species_list)
 
     print(out)
 
-    # out = timeit(solve_batch_jit().block_until_ready)
+    # out = timeit(solve_batch(species_list).block_until_ready)
 
     # print(out)
     # print(solutions)

@@ -21,6 +21,7 @@ Most likely these will migrate elsewhere in the code base eventually.
 # Convenient to use chemical symbol names so pylint: disable=invalid-name
 
 import sys
+from functools import partial
 from typing import NamedTuple
 
 import jax.numpy as jnp
@@ -84,7 +85,7 @@ class SpeciesData(NamedTuple):
         return f"{self.hill_formula}_{self.phase}"
 
 
-@jit
+@partial(jit, static_argnames="temperature")
 def gibbs_energy_of_formation(species_data: SpeciesData, temperature: float) -> Array:
     r"""Gibbs energy of formation
 
