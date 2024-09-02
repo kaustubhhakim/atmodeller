@@ -27,13 +27,14 @@ from typing import Protocol
 
 import jax.numpy as jnp
 import numpy as np
-from jax import Array, lax
+from jax import Array
 from jaxtyping import ArrayLike
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
 from atmodeller.solution import Solution
+from atmodeller.utilities_jax import partial_rref
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -63,7 +64,7 @@ class ResidualProtocol(Protocol):
     def planet(self) -> Planet:
         return self._planet
 
-    def temperature(self) -> float:
+    def temperature(self) -> ArrayLike:
         return self.planet.surface_temperature
 
 
@@ -600,85 +601,3 @@ class ReactionNetworkWithMassBalance(ResidualProtocol):
         output["rms"] = output.pop("rms")
 
         return output
-
-
-def partial_rref(matrix: Array) -> Array:
-    """Computes the partial reduced row echelon form to determine linear components.
-
-    Args:
-        matrix: The matrix to compute the reduced row echelon form.
-
-    Returns:
-        A matrix of linear components.
-    """
-    nrows, ncols = matrix.shape
-
-    # Augment the matrix with the identity matrix
-    augmented_matrix: Array = jnp.hstack((matrix, jnp.eye(nrows)))
-    logger.debug("augmented_matrix = \n%s", augmented_matrix)
-
-    def swap_rows(matrix: Array, row1: ArrayLike, row2: ArrayLike) -> Array:
-        """Swaps two rows in the matrix."""
-        # Extract rows to swap
-        row1_data: Array = lax.dynamic_slice(matrix, (row1, 0), (1, matrix.shape[1]))
-        row2_data: Array = lax.dynamic_slice(matrix, (row2, 0), (1, matrix.shape[1]))
-        # Update matrix
-        matrix = lax.dynamic_update_slice(matrix, row2_data, (row1, 0))
-        matrix = lax.dynamic_update_slice(matrix, row1_data, (row2, 0))
-
-        return matrix
-
-    # Forward elimination
-    def forward_step(i: int, matrix: Array) -> Array:
-        # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
-        pivot_value: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))
-        if pivot_value == 0:
-            nonzero_rows: Array = jnp.nonzero(matrix[i:, i])[0]
-            if nonzero_rows.size > 0:
-                nonzero_row: Array = nonzero_rows[0] + i
-                matrix = swap_rows(matrix, i, nonzero_row)
-
-        # Perform row operations to eliminate values below the pivot.
-        for j in range(i + 1, nrows):
-            pivot: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
-            ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
-            row_i: Array = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows))
-            row_j: Array = lax.dynamic_slice(matrix, (j, 0), (1, ncols + nrows))
-            matrix = lax.dynamic_update_slice(matrix, row_j - ratio * row_i, (j, 0))
-
-        return matrix
-
-    for i in range(ncols):
-        augmented_matrix = forward_step(i, augmented_matrix)
-
-    logger.debug("augmented_matrix after forward step = \n%s", augmented_matrix)
-
-    # Backward substitution
-    def backward_step(i: int, matrix: Array):
-        # Normalize the pivot row.
-        pivot: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
-        normalized_row = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows)) / pivot
-        matrix = lax.dynamic_update_slice(matrix, normalized_row, (i, 0))
-        # Eliminate values above the pivot.
-        for j in range(i - 1, -1, -1):
-            if lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] != 0:
-                # Scaled pivot row
-                pivot = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
-                ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
-                row_i: Array = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows))
-                row_j: Array = lax.dynamic_slice(matrix, (j, 0), (1, ncols + nrows))
-                matrix = lax.dynamic_update_slice(matrix, row_j - ratio * row_i, (j, 0))
-
-        return matrix
-
-    for i in range(ncols - 1, -1, -1):
-        augmented_matrix = backward_step(i, augmented_matrix)
-
-    logger.debug("augmented_matrix after backward step = \n%s", augmented_matrix)
-
-    reduced_matrix = lax.dynamic_slice(augmented_matrix, (0, 0), (nrows, ncols))
-    component_matrix = lax.dynamic_slice(augmented_matrix, (ncols, ncols), (nrows - ncols, nrows))
-    logger.debug("reduced_matrix = \n%s", reduced_matrix)
-    logger.debug("component_matrix = \n%s", component_matrix)
-
-    return component_matrix

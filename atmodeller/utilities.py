@@ -25,7 +25,7 @@ from cProfile import Profile
 from dataclasses import asdict, dataclass, field
 from functools import wraps
 from pstats import SortKey, Stats
-from typing import Any, Callable, Type, TypeVar
+from typing import Any, Callable, NamedTuple, Type, TypeVar
 
 import jax.numpy as jnp
 import numpy as np
@@ -402,8 +402,7 @@ class ExperimentalCalibration:
 
 
 # Convenient to use symbol names so pylint: disable=invalid-name
-@dataclass(frozen=True)
-class UnitConversion:
+class UnitConversion(NamedTuple):
     """Unit conversions"""
 
     atmosphere_to_bar: float = ATMOSPHERE
