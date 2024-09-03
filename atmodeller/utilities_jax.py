@@ -18,6 +18,7 @@
 
 import jax.numpy as jnp
 from jax import Array, jit, lax
+from jax.typing import ArrayLike
 
 
 @jit
@@ -188,3 +189,20 @@ def partial_rref(matrix: Array) -> Array:
     )
 
     return component_matrix
+
+
+@jit
+def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
+    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
+
+    Args:
+        log10_values: Array of log10 values to sum
+        prefactors: Array of prefactors corresponding to each log10 value
+
+    Returns:
+        The log10 of the sum of prefactors multiplied by exponentials of the input values.
+    """
+    max_log: Array = jnp.max(log_values)
+    value_sum: Array = jnp.sum(prefactors * jnp.power(10, log_values - max_log))
+
+    return max_log + jnp.log10(value_sum)

@@ -9,7 +9,6 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit
 from jax.tree_util import tree_map
@@ -27,6 +26,7 @@ from atmodeller.myjax import (
     ReactionNetworkJAX,
     SpeciesData,
 )
+from atmodeller.utilities_jax import logsumexp_base10
 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_debug_nans", True)
@@ -267,25 +267,6 @@ def objective_function(solution: Array, additional_params: AdditionalParams) -> 
     return residual
 
 
-@jit
-def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
-    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
-
-    Args:
-        log10_values: Array of log10 values to sum
-        prefactors: Array of prefactors corresponding to each log10 value
-
-    Returns:
-        The log10 of the sum of prefactors multiplied by exponentials of the input values.
-    """
-    max_log: Array = jnp.max(log_values)
-    prefactors_: Array = jnp.asarray(prefactors)
-
-    value_sum: Array = jnp.sum(prefactors_ * jnp.power(10, log_values - max_log))
-
-    return max_log + jnp.log10(value_sum)
-
-
 def pytrees_stack(pytrees, axis=0):
     """Stacks an iterable of pytrees along a specified axis."""
     results = tree_map(lambda *values: jnp.stack(values, axis=axis), *pytrees)
@@ -304,6 +285,11 @@ def pytrees_vmap(fn):
 
 
 def solve_single(species: list[SpeciesData]) -> Array:
+    """Solves a single system
+
+    This does the non-JAX parts, such as getting the reaction matrix which is assumed constant
+    for a calculation.
+    """
 
     reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
     coefficient_matrix: Array = reaction_network.reaction_matrix(species)
@@ -318,6 +304,11 @@ def solve_single(species: list[SpeciesData]) -> Array:
 
 
 def solve_batch(species: list[SpeciesData]) -> Array:
+    """Solves a batch system
+
+    This does the non-JAX parts, such as getting the reaction matrix which is assumed constant
+    for a batch of calculations.
+    """
 
     reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
     coefficient_matrix: Array = reaction_network.reaction_matrix(species)
