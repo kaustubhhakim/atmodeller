@@ -424,24 +424,27 @@ class UnitConversion(NamedTuple):
 unit_conversion = UnitConversion()
 
 
+# TODO: Output permutation matrix
 def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     """Computes the partial reduced row echelon form to determine linear components
 
     Returns:
         A matrix of linear components
     """
-    nrows: int = matrix.shape[0]
-    ncols: int = matrix.shape[1]
+    nrows, ncols = matrix.shape
 
     augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
     logger.debug("augmented_matrix = \n%s", augmented_matrix)
+    # Permutation matrix
+    P: npt.NDArray = np.eye(nrows)
 
-    # Forward elimination
+    # Forward elimination with partial pivoting
     for i in range(ncols):
         # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
         if augmented_matrix[i, i] == 0:
             nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
             augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
+            P[[i, nonzero_row], :] = P[[nonzero_row, i], :]
         # Perform row operations to eliminate values below the pivot.
         for j in range(i + 1, nrows):
             ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
@@ -463,5 +466,6 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
     logger.debug("reduced_matrix = \n%s", reduced_matrix)
     logger.debug("component_matrix = \n%s", component_matrix)
+    logger.debug("permutation_matrix = \n%s", P)
 
     return component_matrix
