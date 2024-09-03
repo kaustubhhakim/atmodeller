@@ -9,28 +9,39 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit
 from jax.tree_util import tree_map
 from jax.typing import ArrayLike
+from numpy.linalg import inv
 from scipy.constants import Avogadro, Boltzmann, gas_constant
+from scipy.linalg import lu
 
+from atmodeller import debug_logger
 from atmodeller.core import Planet
 from atmodeller.myjax import (
+    C_cr,
     CH4_g,
+    Cl2_g,
     CO2_g,
     CO_g,
     H2_g,
     H2O_g,
+    N2_g,
+    NH3_g,
     O2_g,
     ReactionNetworkJAX,
     SpeciesData,
 )
+from atmodeller.utilities import partial_rref
 from atmodeller.utilities_jax import logsumexp_base10
 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_dtypes", True)
+
+logger = debug_logger()
 
 MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
 """Machine epsilon"""
@@ -357,6 +368,31 @@ def solve_batch_jax(coefficient_matrix: Array):
     return solutions
 
 
+def simple_system():
+
+    # Species order is: H2, H2O, CO2, O2, CH4, CO
+    species_list: list[SpeciesData] = [H2O_g, CO2_g, CO_g, C_cr, H2_g, Cl2_g, O2_g, CH4_g, H2O_g]
+
+    reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
+
+    # With charge balance, Leal et al (2016) state that some of the mass-balance equations can be
+    # linearly dependent on the others. But this can't happen with just elements. Therefore we
+    # can directly translate the formula matrix of the system W = A and express the mass balance in
+    # matrix form as An=b, so for root finding we can solve An-b=0
+    # Hence below gives matrix A (Equation 11)
+    formula_matrix: npt.NDArray = reaction_network.formula_matrix(species_list)
+    logger.info("formula_matrix = %s", formula_matrix)
+
+    # For a general list of species we want to compute the primary and secondary species. We don't
+    # care which are which, just that the system removes linear components to determine a set of
+    # minimum, albeit non-unique, reactions that couple the production of secondary species to
+    # primary species. We can achieve this by performing row reduction on the transpose of the
+    # formula matrix. This is given in Appendix A.  Perform an LU decomposition of A^T, whose
+    # dimensions are N X C (number of species x number of linearly independent elements). Below
+    # is matrix nu where nu*A^T = 0.
+    reaction_matrix: npt.NDArray = partial_rref(formula_matrix.T)
+
+
 def main():
 
     # out = solve_single(species_list)
@@ -369,9 +405,11 @@ def main():
 
     # out = solve_batch(species_list).block_until_ready()
 
-    out = solve_batch(species_list)
+    # out = solve_batch(species_list)
 
-    print(out)
+    simple_system()
+
+    # print(out)
 
     # out = timeit(solve_batch(species_list).block_until_ready)
 
