@@ -33,8 +33,8 @@ from jaxtyping import ArrayLike
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Planet, Species
+from atmodeller.jax_utilities import partial_rref
 from atmodeller.solution import Solution
-from atmodeller.utilities_jax import partial_rref
 
 if sys.version_info < (3, 12):
     from typing_extensions import override

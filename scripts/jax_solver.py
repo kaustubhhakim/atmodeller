@@ -23,7 +23,7 @@ class LinearSystemParams:
 
 
 @register_pytree_node_class
-class AdditionalParams:
+class Parameters:
     def __init__(self, scale_factor):
         self.scale_factor = scale_factor
 
@@ -67,7 +67,7 @@ def main():
     b_list = jnp.array([[1, 4], [3, 4], [5, 2]])
 
     # Define the additional fixed parameters
-    additional_params = AdditionalParams(scale_factor=2.0)
+    additional_params = Parameters(scale_factor=2.0)
 
     # Create a list of pytree params
     params_list = [LinearSystemParams(A, b) for A, b in zip(A_list, b_list)]

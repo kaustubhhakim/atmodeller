@@ -28,6 +28,7 @@ from jax.typing import ArrayLike
 from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies, ImmutableList
+from atmodeller.jax_containers import Planet
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.utilities import filter_by_type
@@ -39,69 +40,6 @@ else:
 
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-class Planet(NamedTuple):
-    """The properties of a planet
-
-    Defaults values are for a fully molten Earth.
-
-    Args:
-        planet_mass: Mass of the planet in kg. Defaults to Earth.
-        core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to Earth.
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
-        surface_radius: Radius of the planetary surface in m. Defaults to Earth.
-        surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
-    """
-
-    planet_mass: ArrayLike = 5.972e24
-    """Mass of the planet in kg"""
-    core_mass_fraction: ArrayLike = 0.295334691460966
-    """Mass fraction of the core relative to the planetary mass in kg/kg"""
-    mantle_melt_fraction: ArrayLike = 1.0
-    """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: ArrayLike = 6371000.0
-    """Radius of the surface in m"""
-    surface_temperature: ArrayLike = 2000.0
-    """Temperature of the surface in K"""
-
-    @property
-    def mantle_mass(self) -> ArrayLike:
-        """Mantle mass"""
-        return self.planet_mass * (1.0 - self.core_mass_fraction)
-
-    @property
-    def mantle_melt_mass(self) -> ArrayLike:
-        """Mass of the molten mantle"""
-        return self.mantle_mass * self.mantle_melt_fraction
-
-    @property
-    def mantle_solid_mass(self) -> ArrayLike:
-        """Mass of the solid mantle"""
-        return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
-
-    @property
-    def surface_area(self) -> ArrayLike:
-        """Surface area"""
-        return 4.0 * jnp.pi * self.surface_radius**2
-
-    @property
-    def surface_gravity(self) -> ArrayLike:
-        """Surface gravity"""
-        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
-
-    # This does not generalise with pytree operations
-    def to_dict(self) -> dict:
-        """Gets a dictionary of the values"""
-        base_dict: dict = self._asdict()
-        base_dict["mantle_mass"] = self.mantle_mass
-        base_dict["mantle_melt_mass"] = self.mantle_melt_mass
-        base_dict["mantle_solid_mass"] = self.mantle_solid_mass
-        base_dict["surface_area"] = self.surface_area
-        base_dict["surface_gravity"] = self.surface_gravity
-
-        return base_dict
 
 
 class GasSpecies(ChemicalSpecies):

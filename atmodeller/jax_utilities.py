@@ -17,8 +17,161 @@
 """JAX functions"""
 
 import jax.numpy as jnp
-from jax import Array, jit, lax
+import numpy as np
+import numpy.typing as npt
+from jax import Array, jit, lax, vmap
+from jax.tree_util import tree_map
 from jax.typing import ArrayLike
+
+from atmodeller import AVOGADRO
+from atmodeller.jax_containers import SpeciesData
+
+log10_AVOGADRO: float = np.log10(AVOGADRO)
+
+
+@jit
+def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
+    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
+
+    Args:
+        log10_values: Array of log10 values to sum
+        prefactors: Array of prefactors corresponding to each log10 value
+
+    Returns:
+        The log10 of the sum of prefactors multiplied by exponentials of the input values.
+    """
+    max_log: Array = jnp.max(log_values)
+    value_sum: Array = jnp.sum(prefactors * jnp.power(10, log_values - max_log))
+
+    return max_log + jnp.log10(value_sum)
+
+
+# Previously
+# @jit
+# def dimensional_to_scaled_base10(dimensional_number_density: Array):
+#     return dimensional_number_density - log10_AVOGADRO + log10_scaling
+
+
+@jit
+def scale_number_density(number_density: Array, scaling: ArrayLike) -> Array:
+    """Scales the log10 number density
+
+    This is in log10 space and returns moles per m^3 by default.
+
+    Args:
+        number_density: Number density in molecules per m^3
+        scaling: Scaling
+
+    Return:
+        Scaled number density
+    """
+    return number_density - scaling
+
+
+# Previously
+# @jit
+# def scaled_to_dimensional_base10(scaled_number_density: Array):
+#     return scaled_number_density - dimensional_to_scaled_base10(0)
+
+
+@jit
+def unscale_number_density(number_density: Array, scaling: ArrayLike) -> Array:
+    """Unscales the scaled log10 number density
+
+    This is in log10 space and return molecules per m^3 by default.
+
+    Args:
+        number_density: Scaled number density
+        scaling: Scaling
+
+    Returns:
+        Unscaled number density
+    """
+    return number_density + scaling
+
+
+def pytrees_stack(pytrees, axis=0):
+    """Stacks an iterable of pytrees along a specified axis."""
+    results = tree_map(lambda *values: jnp.stack(values, axis=axis), *pytrees)
+    return results
+
+
+def pytrees_vmap(fn):
+    """Vectorizes a function over a batch of pytrees."""
+
+    def g(pytrees):
+        stacked = pytrees_stack(pytrees)
+        results = vmap(fn)(stacked)
+        return results
+
+    return g
+
+
+class ReactionNetworkJAX:
+    """Primary role is to assemble Python objects to generate JAX-compliants arrays for numerical
+    solution. In this regard, this should only generate arrays that are required once, and not
+    computed dynamically during the solve.
+
+    Ironically, since the species list will be treated as a static argument, this will all use
+    numpy since nothing here is traced.
+    """
+
+    @staticmethod
+    def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
+        """Unique elements in a list of species
+
+        Args:
+            species: A list of species
+
+        Returns:
+            Unique elements in the list of species
+        """
+        elements: list[str] = []
+        for species_ in species:
+            elements.extend(species_.elements)
+        unique_elements: list[str] = list(set(elements))
+        sorted_elements: list[str] = sorted(unique_elements)
+
+        return tuple(sorted_elements)
+
+    def formula_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
+        """Formula matrix
+
+        Elements are given in rows and species in columns following the convention in
+        :cite:t:`LKS17`.
+
+        Returns:
+            The formula matrix
+        """
+        unique_elements: tuple[str, ...] = self.unique_elements_in_species(species)
+
+        formula_matrix: npt.NDArray = np.zeros(
+            (len(unique_elements), len(species)), dtype=jnp.int_
+        )
+        for element_index, element in enumerate(unique_elements):
+            for species_index, species_ in enumerate(species):
+                try:
+                    count: int = species_.composition[element][0]
+                except KeyError:
+                    count = 0
+                formula_matrix[element_index, species_index] = count
+
+        return formula_matrix
+
+    def reaction_matrix(self, species: list[SpeciesData]) -> Array:
+        """Reaction matrix
+
+        Returns:
+            A matrix of linearly independent reactions or None
+        """
+        # TODO: Would prefer to always return an array
+        # if self._species.number == 1:
+        #    logger.debug("Only one species therefore no reactions")
+        #    return None
+
+        transpose_formula_matrix: npt.NDArray = self.formula_matrix(species).T
+
+        return jnp.array(partial_rref(transpose_formula_matrix))
 
 
 @jit
@@ -189,20 +342,3 @@ def partial_rref(matrix: Array) -> Array:
     )
 
     return component_matrix
-
-
-@jit
-def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
-    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
-
-    Args:
-        log10_values: Array of log10 values to sum
-        prefactors: Array of prefactors corresponding to each log10 value
-
-    Returns:
-        The log10 of the sum of prefactors multiplied by exponentials of the input values.
-    """
-    max_log: Array = jnp.max(log_values)
-    value_sum: Array = jnp.sum(prefactors * jnp.power(10, log_values - max_log))
-
-    return max_log + jnp.log10(value_sum)
