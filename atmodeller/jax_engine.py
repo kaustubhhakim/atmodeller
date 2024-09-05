@@ -23,10 +23,12 @@ import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
 
-from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.core import Planet
 from atmodeller.jax_containers import Parameters, SpeciesData
 from atmodeller.jax_utilities import logsumexp_base10, scale_number_density
+
+log_AVOGADRO = jnp.log(AVOGADRO)
 
 
 @jit
@@ -68,9 +70,12 @@ def get_rhs(planet: Planet, scaling: float) -> Array:
 
     def log10Kc_from_lnKp(lnKp: float, delta_n: float, temperature: ArrayLike) -> Array:
         # return (lnKp - delta_n * (np.log(GAS_CONSTANT_BAR) + np.log(temperature))) / np.log(10)
+        # log10Kc: Array = lnKp - delta_n * (
+        #     jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
+        # )
         log10Kc: Array = lnKp - delta_n * (
             jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
-        )  # removed -log_scaling from term in brackets after log_AVOGADRO
+        )
         log10Kc = log10Kc / jnp.log(10)
 
         return log10Kc
@@ -188,9 +193,8 @@ def atmosphere_log10_volume(solution: Array, species: list[SpeciesData], planet:
     )
 
 
-# TODO: Check this OK to remain as numpy operations and not JAX
 @jit
-def gibbs_energy_of_formation(species_data: SpeciesData, temperature: float) -> npt.NDArray:
+def gibbs_energy_of_formation(species_data: SpeciesData, temperature: ArrayLike) -> Array:
     r"""Gibbs energy of formation
 
     Args:
@@ -200,12 +204,12 @@ def gibbs_energy_of_formation(species_data: SpeciesData, temperature: float) -> 
     Returns:
         The standard Gibbs free energy of formation in :math:`\mathrm{J}\mathrm{mol}^{-1}`
     """
-    gibbs: npt.NDArray = (
+    gibbs: Array = (
         species_data.gibbs_coefficients[0] / temperature
-        + species_data.gibbs_coefficients[1] * np.log(temperature)
+        + species_data.gibbs_coefficients[1] * jnp.log(temperature)
         + species_data.gibbs_coefficients[2]
-        + species_data.gibbs_coefficients[3] * np.power(temperature, 1)
-        + species_data.gibbs_coefficients[4] * np.power(temperature, 2)
+        + species_data.gibbs_coefficients[3] * jnp.power(temperature, 1)
+        + species_data.gibbs_coefficients[4] * jnp.power(temperature, 2)
     )
 
     return gibbs * 1000.0  # kilo
