@@ -17,13 +17,11 @@
 """JAX-related functionality for solving the system of equations. Functions are jitted."""
 
 import jax.numpy as jnp
-import numpy as np
-import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.core import Planet
 from atmodeller.jax_containers import Parameters, SpeciesData
 from atmodeller.jax_utilities import logsumexp_base10, scale_number_density
@@ -69,10 +67,7 @@ def get_rhs(planet: Planet, scaling: float) -> Array:
     reaction2_delta_n: float = 0.0
 
     def log10Kc_from_lnKp(lnKp: float, delta_n: float, temperature: ArrayLike) -> Array:
-        # return (lnKp - delta_n * (np.log(GAS_CONSTANT_BAR) + np.log(temperature))) / np.log(10)
-        # log10Kc: Array = lnKp - delta_n * (
-        #     jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
-        # )
+
         log10Kc: Array = lnKp - delta_n * (
             jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
         )
@@ -105,7 +100,7 @@ def objective_function(solution: Array, additional_params: Parameters) -> Array:
     # jax.debug.print("{out}", out=planet)
 
     # TODO: Move constraints into the driver script
-    scaling: float = additional_params.scaling
+    scaling: ArrayLike = additional_params.scaling
     log10_scaling: Array = jnp.log10(scaling)
     # Element log10 number of total molecules constraints:
     log10_oxygen_constraint: float = scale_number_density(45.58848007858896, log10_scaling)
@@ -205,8 +200,9 @@ def gibbs_energy_of_formation(species_data: SpeciesData, temperature: ArrayLike)
         The standard Gibbs free energy of formation in :math:`\mathrm{J}\mathrm{mol}^{-1}`
     """
     gibbs: Array = (
-        species_data.gibbs_coefficients[0] / temperature
-        + species_data.gibbs_coefficients[1] * jnp.log(temperature)
+        # Leading with this term prevents the linter from complaining.
+        species_data.gibbs_coefficients[1] * jnp.log(temperature)
+        + species_data.gibbs_coefficients[0] / temperature
         + species_data.gibbs_coefficients[2]
         + species_data.gibbs_coefficients[3] * jnp.power(temperature, 1)
         + species_data.gibbs_coefficients[4] * jnp.power(temperature, 2)

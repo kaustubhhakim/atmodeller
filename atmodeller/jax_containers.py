@@ -25,22 +25,21 @@ import sys
 from typing import NamedTuple
 
 import jax.numpy as jnp
-from jax import Array
 from jax.typing import ArrayLike
-from molmass import Formula
+from molmass import Composition, Formula
 
 from atmodeller import AVOGADRO, GRAVITATIONAL_CONSTANT
+from atmodeller.jax_mappings import (
+    element_to_atomic_number,
+    inverse_phase_mapping,
+    phase_mapping,
+)
 from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
-
-phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
-"""Mapping for the JANAF phase string to an integer code"""
-inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
-"""Inverse mapping from the integer code to a JANAF phase string"""
 
 
 class Planet(NamedTuple):
@@ -121,7 +120,7 @@ class SpeciesData(NamedTuple):
         gibbs_coefficients: Gibbs coefficients
     """
 
-    composition: dict[str, tuple[int, float, float]]
+    composition: tuple
     phase_code: int
     molar_mass: float
     gibbs_coefficients: tuple[float, ...]
@@ -139,7 +138,10 @@ class SpeciesData(NamedTuple):
             An instance
         """
         mformula: Formula = Formula(formula)
-        composition: dict[str, tuple[int, float, float]] = mformula.composition().asdict()
+        mcomposition: Composition = mformula.composition()
+        composition: tuple[tuple[int, int, float, float]] = cls.map_elements_to_atomic_numbers(
+            mcomposition.astuple()
+        )
         molar_mass: float = mformula.mass * unit_conversion.g_to_kg
         phase_code: int = phase_mapping[phase]
 
@@ -150,36 +152,56 @@ class SpeciesData(NamedTuple):
             gibbs_coefficients,
         )
 
+    @staticmethod
+    def map_elements_to_atomic_numbers(tuples: tuple) -> tuple:
+        """Maps the element name to an atomic number.
+
+        Args:
+            tuples: Tuples with the element name as the first entry
+
+        Returns:
+            Tuples with all numerical data
+        """
+        return tuple([(element_to_atomic_number[element], *rest) for element, *rest in tuples])
+
     @property
     def elements(self) -> tuple[str, ...]:
         """Elements"""
-        return tuple(self.composition.keys())
+        return tuple(entry[0] for entry in self.composition)
 
-    def formula(self) -> Formula:
-        """Formula object"""
-        formula: str = ""
-        for element, values in self.composition.items():
-            count: int = values[0]
-            formula += element
-            if count > 1:
-                formula += str(count)
+    # TODO: Fix by mapping atomic number back to element string
+    # def formula(self) -> Formula:
+    #     """Formula object"""
+    #     formula: str = ""
+    #     for element, values in self.composition.items():
+    #         count: int = values[0]
+    #         formula += element
+    #         if count > 1:
+    #             formula += str(count)
 
-        return Formula(formula)
+    #     return Formula(formula)
+
+    # FIXME
+    # @property
+    # def name(self) -> str:
+    #     """Unique name by combining Hill notation and phase"""
+    #     return f"{self.hill_formula}_{self.phase}"
+
+    # FIXME
+    # @property
+    # def hill_formula(self) -> str:
+    #     """Hill formula"""
+    #     return self.formula().formula
+
+    @property
+    def stoichiometry(self) -> tuple[int]:
+        """Stoichiometry"""
+        return tuple([entry[1] for entry in self.composition])
 
     @property
     def phase(self) -> str:
         """JANAF phase"""
         return inverse_phase_mapping[self.phase_code]
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return f"{self.hill_formula}_{self.phase}"
-
-    @property
-    def hill_formula(self) -> str:
-        """Hill formula"""
-        return self.formula().formula
 
 
 class Solution(NamedTuple):
@@ -194,8 +216,8 @@ class Solution(NamedTuple):
         stability: Stability of species
     """
 
-    number_density: Array
-    stability: Array
+    number_density: ArrayLike
+    stability: ArrayLike
 
 
 class Parameters(NamedTuple):
@@ -215,10 +237,10 @@ class Parameters(NamedTuple):
         scaling: Scaling for the number density
     """
 
-    coefficient_matrix: Array
-    species: list[SpeciesData]
-    planet: Planet
-    scaling: float = AVOGADRO
+    coefficient_matrix: ArrayLike | None
+    species: list[SpeciesData] | None
+    planet: Planet | int | None
+    scaling: ArrayLike | None = AVOGADRO
 
 
 # TODO: Switch convention to use dG = S - Href/T as per the comment of Hugh. Then the

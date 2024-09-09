@@ -23,10 +23,7 @@ from jax import Array, jit, lax, vmap
 from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO
 from atmodeller.jax_containers import SpeciesData
-
-log10_AVOGADRO: float = np.log10(AVOGADRO)
 
 
 @jit
@@ -53,10 +50,10 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
 
 
 @jit
-def scale_number_density(number_density: Array, scaling: ArrayLike) -> Array:
+def scale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
     """Scales the log10 number density
 
-    This is in log10 space and returns moles per m^3 by default.
+    This is in log10 space.
 
     Args:
         number_density: Number density in molecules per m^3
@@ -75,10 +72,10 @@ def scale_number_density(number_density: Array, scaling: ArrayLike) -> Array:
 
 
 @jit
-def unscale_number_density(number_density: Array, scaling: ArrayLike) -> Array:
+def unscale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
     """Unscales the scaled log10 number density
 
-    This is in log10 space and return molecules per m^3 by default.
+    This is in log10 space.
 
     Args:
         number_density: Scaled number density
@@ -150,10 +147,10 @@ class ReactionNetworkJAX:
         )
         for element_index, element in enumerate(unique_elements):
             for species_index, species_ in enumerate(species):
-                try:
-                    count: int = species_.composition[element][0]
-                except KeyError:
-                    count = 0
+                count: int = 0
+                for nn, elements_in in enumerate(species_.elements):  # composition:
+                    if elements_in == element:
+                        count = species_.stoichiometry[nn]
                 formula_matrix[element_index, species_index] = count
 
         return formula_matrix

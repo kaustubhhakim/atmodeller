@@ -6,10 +6,10 @@ Reproduces test_CHO_low_temperature in test_benchmark.py using some hard-coded p
 from timeit import timeit
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from jax import Array, jit
+from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, debug_logger
 from atmodeller.core import Planet
@@ -35,14 +35,14 @@ from atmodeller.jax_utilities import (
 from atmodeller.utilities import partial_rref
 
 jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_debug_nans", True)
+# jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_dtypes", True)
 
 logger = debug_logger()
 
 # TODO: Move scaling factor definition to when the problem is setup by the user
 scaling: float = AVOGADRO
-log10_scaling: Array = jnp.log10(scaling)
+log10_scaling: Array = np.log10(scaling)
 
 # Species order is: H2, H2O, CO2, O2, CH4, CO
 species_list: list[SpeciesData] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
@@ -57,20 +57,10 @@ known_solution: dict[str, float] = {
     "CO": 9.537726420793389,
 }
 
-known_solution_array: Array = jnp.array([val for val in known_solution.values()])
-
-# Species molar masses in kg/mol
-molar_masses_dict: dict[str, float] = {
-    "H2": 0.002015882,
-    "H2O": 0.018015287,
-    "CO2": 0.044009549999999995,
-    "O2": 0.031998809999999996,
-    "CH4": 0.016042504000000003,
-    "CO": 0.028010145,
-}
+known_solution_array: ArrayLike = np.array([val for val in known_solution.values()])
 
 # Initial solution guess number density (molecules/m^3)
-initial_solution_default: Array = jnp.array([26, 26, 12, -26, 26, 25], dtype=jnp.float_)
+initial_solution_default: ArrayLike = np.array([26, 26, 12, -26, 26, 25], dtype=np.float_)
 # initial_solution_default: Array = jnp.array([26, 26, 26, 26, 26, 26], dtype=jnp.float_)
 
 # If we start somewhere close to the solution then Optimistix is OK
@@ -81,7 +71,7 @@ std_dev = 5.0  # Standard deviation of the perturbation
 perturbation = np.random.normal(mean, std_dev, size=known_solution_array.shape)
 
 # initial_solution: Array = jnp.array(known_solution_array) + perturbation
-initial_solution = initial_solution_default
+initial_solution: ArrayLike = initial_solution_default
 initial_solution = scale_number_density(initial_solution, log10_scaling)
 
 
@@ -100,7 +90,7 @@ def solve_single(species: list[SpeciesData]) -> Array:
     system_params: Solution = Solution(initial_solution, initial_solution)
     additional_params: Parameters = Parameters(coefficient_matrix, species, planet, scaling)
 
-    out = solve_with_optimistix(system_params, additional_params)
+    out: Array = solve_with_optimistix(system_params, additional_params)
 
     return unscale_number_density(out, log10_scaling)
 
@@ -113,15 +103,15 @@ def solve_batch(species: list[SpeciesData]) -> Array:
     """
 
     reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
-    coefficient_matrix: Array = reaction_network.reaction_matrix(species)
+    coefficient_matrix: ArrayLike = reaction_network.reaction_matrix(species)
 
-    out = solve_batch_jax(coefficient_matrix)
+    out = solve_batch_jax(coefficient_matrix, species)
 
     return unscale_number_density(out, log10_scaling)
 
 
 @jit
-def solve_batch_jax(coefficient_matrix: Array):
+def solve_batch_jax(coefficient_matrix: Array, species: list[SpeciesData]):
 
     planets: list[Planet] = []
     for surface_temperature in range(450, 2001, 1):
@@ -129,34 +119,30 @@ def solve_batch_jax(coefficient_matrix: Array):
 
     # Stacks the entities into one named tuple
     planets_for_vmap = pytrees_stack(planets)
-    # jax.debug.print("{out}", out=planets_for_vmap)
 
-    # Replicate the coefficient matrix to match the batch size of planets
-    coefficient_matrices_for_vmap = jnp.stack(
-        [coefficient_matrix] * len(planets_for_vmap.surface_temperature)
-    )
-
-    # Combine into Parameters
-    additional_params = Parameters(coefficient_matrices_for_vmap, planets_for_vmap)
+    additional_params = Parameters(coefficient_matrix, species, planets_for_vmap, scaling)
     # jax.debug.print("{out}", out=additional_params)
 
-    # For different initial solutions
-    # system_params = SystemParams(
-    #    jnp.stack([initial_solution] * len(planets_for_vmap.surface_temperature))
-    # )
     # For the same initial solution
     system_params = Solution(initial_solution, initial_solution)
-
     # jax.debug.print("{out}", out=system_params)
 
     # JIT compile the solve function
     jit_solve = jax.jit(solve_with_optimistix)
 
-    vmap_solve = jax.vmap(jit_solve, in_axes=(None, 0))
+    additional_for_vmap = Parameters(coefficient_matrix=None, species=None, planet=0, scaling=None)
+
+    vmap_solve = jax.vmap(
+        jit_solve,
+        in_axes=(
+            None,
+            additional_for_vmap,
+        ),
+    )
 
     solutions = vmap_solve(system_params, additional_params)
 
-    return unscale_number_density(solutions, log10_scaling)
+    return solutions
 
 
 def simple_system():
@@ -186,8 +172,8 @@ def simple_system():
 
 def main():
 
-    out = solve_single(species_list)
-    # out = solve_batch(species_list)
+    # out = solve_single(species_list)
+    out = solve_batch(species_list)
 
     # solve_batch_jit = jax.jit(solve_batch)
 
