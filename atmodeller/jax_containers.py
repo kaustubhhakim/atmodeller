@@ -26,14 +26,10 @@ from typing import NamedTuple
 
 import jax.numpy as jnp
 from jax.typing import ArrayLike
-from molmass import Composition, Formula
+from molmass import Formula
 
 from atmodeller import AVOGADRO, GRAVITATIONAL_CONSTANT
-from atmodeller.jax_mappings import (
-    element_to_atomic_number,
-    inverse_phase_mapping,
-    phase_mapping,
-)
+from atmodeller.jax_mappings import inverse_phase_mapping, phase_mapping
 from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 11):
@@ -108,19 +104,19 @@ class SpeciesData(NamedTuple):
     """Species data
 
     Args:
-        composition: Composition data
+        composition: Composition
         phase_code: Phase code
         molar_mass: Mass
         gibbs_coefficients: Gibbs coefficients
 
     Attributes:
-        composition: Composition data
+        composition: Composition
         phase_code: Phase code
         molar_mass: Mass
         gibbs_coefficients: Gibbs coefficients
     """
 
-    composition: dict[int, tuple[int, float, float]]
+    composition: dict[str, tuple[int, float, float]]
     phase_code: int
     molar_mass: float
     gibbs_coefficients: tuple[float, ...]
@@ -138,10 +134,7 @@ class SpeciesData(NamedTuple):
             An instance
         """
         mformula: Formula = Formula(formula)
-        mcomposition: Composition = mformula.composition()
-        composition: dict[int, tuple[int, float, float]] = cls.map_elements_to_atomic_numbers(
-            mcomposition.asdict()
-        )
+        composition: dict[str, tuple[int, float, float]] = mformula.composition().asdict()
         molar_mass: float = mformula.mass * unit_conversion.g_to_kg
         phase_code: int = phase_mapping[phase]
 
@@ -152,48 +145,31 @@ class SpeciesData(NamedTuple):
             gibbs_coefficients,
         )
 
-    @staticmethod
-    def map_elements_to_atomic_numbers(
-        composition: dict[str, tuple[int, float, float]]
-    ) -> dict[int, tuple[int, float, float]]:
-        """Maps the element name to an atomic number.
-
-        Args:
-            composition: Composition dictionary with the element name as keys
-
-        Returns:
-            Dictionary with the atomic number as keys
-        """
-        return {element_to_atomic_number[element]: value for element, value in composition.items()}
-
     @property
-    def elements(self) -> tuple[int, ...]:
+    def elements(self) -> tuple[str, ...]:
         """Elements"""
         return tuple(self.composition.keys())
 
-    # TODO: Fix by mapping atomic number back to element string
-    # def formula(self) -> Formula:
-    #     """Formula object"""
-    #     formula: str = ""
-    #     for element, values in self.composition.items():
-    #         count: int = values[0]
-    #         formula += element
-    #         if count > 1:
-    #             formula += str(count)
+    def formula(self) -> Formula:
+        """Formula object"""
+        formula: str = ""
+        for element, values in self.composition.items():
+            count: int = values[0]
+            formula += element
+            if count > 1:
+                formula += str(count)
 
-    #     return Formula(formula)
+        return Formula(formula)
 
-    # FIXME
-    # @property
-    # def name(self) -> str:
-    #     """Unique name by combining Hill notation and phase"""
-    #     return f"{self.hill_formula}_{self.phase}"
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and phase"""
+        return f"{self.hill_formula}_{self.phase}"
 
-    # FIXME
-    # @property
-    # def hill_formula(self) -> str:
-    #     """Hill formula"""
-    #     return self.formula().formula
+    @property
+    def hill_formula(self) -> str:
+        """Hill formula"""
+        return self.formula().formula
 
     @property
     def phase(self) -> str:
