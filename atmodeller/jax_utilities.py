@@ -114,7 +114,7 @@ class ReactionNetworkJAX:
     """
 
     @staticmethod
-    def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
+    def unique_elements_in_species(species: list[SpeciesData]) -> tuple[int, ...]:
         """Unique elements in a list of species
 
         Args:
@@ -123,11 +123,11 @@ class ReactionNetworkJAX:
         Returns:
             Unique elements in the list of species
         """
-        elements: list[str] = []
+        elements: list[int] = []
         for species_ in species:
             elements.extend(species_.elements)
-        unique_elements: list[str] = list(set(elements))
-        sorted_elements: list[str] = sorted(unique_elements)
+        unique_elements: list[int] = list(set(elements))
+        sorted_elements: list[int] = sorted(unique_elements)
 
         return tuple(sorted_elements)
 
@@ -140,7 +140,7 @@ class ReactionNetworkJAX:
         Returns:
             The formula matrix
         """
-        unique_elements: tuple[str, ...] = self.unique_elements_in_species(species)
+        unique_elements: tuple[int, ...] = self.unique_elements_in_species(species)
 
         formula_matrix: npt.NDArray = np.zeros(
             (len(unique_elements), len(species)), dtype=jnp.int_
@@ -148,9 +148,10 @@ class ReactionNetworkJAX:
         for element_index, element in enumerate(unique_elements):
             for species_index, species_ in enumerate(species):
                 count: int = 0
-                for nn, elements_in in enumerate(species_.elements):  # composition:
-                    if elements_in == element:
-                        count = species_.stoichiometry[nn]
+                try:
+                    count = species_.composition[element][0]
+                except KeyError:
+                    count = 0
                 formula_matrix[element_index, species_index] = count
 
         return formula_matrix

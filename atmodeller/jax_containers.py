@@ -120,7 +120,7 @@ class SpeciesData(NamedTuple):
         gibbs_coefficients: Gibbs coefficients
     """
 
-    composition: tuple
+    composition: dict[int, tuple[int, float, float]]
     phase_code: int
     molar_mass: float
     gibbs_coefficients: tuple[float, ...]
@@ -139,8 +139,8 @@ class SpeciesData(NamedTuple):
         """
         mformula: Formula = Formula(formula)
         mcomposition: Composition = mformula.composition()
-        composition: tuple[tuple[int, int, float, float]] = cls.map_elements_to_atomic_numbers(
-            mcomposition.astuple()
+        composition: dict[int, tuple[int, float, float]] = cls.map_elements_to_atomic_numbers(
+            mcomposition.asdict()
         )
         molar_mass: float = mformula.mass * unit_conversion.g_to_kg
         phase_code: int = phase_mapping[phase]
@@ -153,21 +153,23 @@ class SpeciesData(NamedTuple):
         )
 
     @staticmethod
-    def map_elements_to_atomic_numbers(tuples: tuple) -> tuple:
+    def map_elements_to_atomic_numbers(
+        composition: dict[str, tuple[int, float, float]]
+    ) -> dict[int, tuple[int, float, float]]:
         """Maps the element name to an atomic number.
 
         Args:
-            tuples: Tuples with the element name as the first entry
+            composition: Composition dictionary with the element name as keys
 
         Returns:
-            Tuples with all numerical data
+            Dictionary with the atomic number as keys
         """
-        return tuple([(element_to_atomic_number[element], *rest) for element, *rest in tuples])
+        return {element_to_atomic_number[element]: value for element, value in composition.items()}
 
     @property
-    def elements(self) -> tuple[str, ...]:
+    def elements(self) -> tuple[int, ...]:
         """Elements"""
-        return tuple(entry[0] for entry in self.composition)
+        return tuple(self.composition.keys())
 
     # TODO: Fix by mapping atomic number back to element string
     # def formula(self) -> Formula:
@@ -192,11 +194,6 @@ class SpeciesData(NamedTuple):
     # def hill_formula(self) -> str:
     #     """Hill formula"""
     #     return self.formula().formula
-
-    @property
-    def stoichiometry(self) -> tuple[int]:
-        """Stoichiometry"""
-        return tuple([entry[1] for entry in self.composition])
 
     @property
     def phase(self) -> str:
