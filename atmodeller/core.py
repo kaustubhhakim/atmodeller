@@ -20,15 +20,10 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Mapping, NamedTuple
+from typing import Mapping
 
-import jax.numpy as jnp
-from jax.typing import ArrayLike
-
-from atmodeller import GRAVITATIONAL_CONSTANT
 from atmodeller.eos.interfaces import IdealGas, RealGasProtocol
 from atmodeller.interfaces import ChemicalSpecies, CondensedSpecies, ImmutableList
-from atmodeller.jax_containers import Planet
 from atmodeller.solubility.compositions import composition_solubilities
 from atmodeller.solubility.interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.utilities import filter_by_type

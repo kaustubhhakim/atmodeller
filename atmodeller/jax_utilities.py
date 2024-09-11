@@ -43,12 +43,6 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
     return max_log + jnp.log10(value_sum)
 
 
-# Previously
-# @jit
-# def dimensional_to_scaled_base10(dimensional_number_density: Array):
-#     return dimensional_number_density - log10_AVOGADRO + log10_scaling
-
-
 @jit
 def scale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
     """Scales the log10 number density
@@ -62,13 +56,7 @@ def scale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> Array
     Return:
         Scaled number density
     """
-    return number_density - scaling
-
-
-# Previously
-# @jit
-# def scaled_to_dimensional_base10(scaled_number_density: Array):
-#     return scaled_number_density - dimensional_to_scaled_base10(0)
+    return number_density - scaling  # type: ignore since types are not bool
 
 
 @jit
@@ -93,12 +81,16 @@ def pytrees_stack(pytrees, axis=0):
     return results
 
 
-def pytrees_vmap(fn):
-    """Vectorizes a function over a batch of pytrees."""
+def pytrees_vmap(func):
+    """Vectorizes a function over a batch of pytrees.
+
+    Args:
+        func: Function
+    """
 
     def g(pytrees):
         stacked = pytrees_stack(pytrees)
-        results = vmap(fn)(stacked)
+        results = vmap(func)(stacked)
         return results
 
     return g

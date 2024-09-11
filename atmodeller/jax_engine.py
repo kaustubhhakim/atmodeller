@@ -17,16 +17,16 @@
 """JAX-related functionality for solving the system of equations. Functions are jitted."""
 
 import jax.numpy as jnp
+import numpy as np
 import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
-from atmodeller.core import Planet
-from atmodeller.jax_containers import Parameters, Solution, SpeciesData
+from atmodeller.jax_containers import Parameters, Planet, Solution, SpeciesData
 from atmodeller.jax_utilities import logsumexp_base10, scale_number_density
 
-log_AVOGADRO = jnp.log(AVOGADRO)
+log_AVOGADRO = np.log(AVOGADRO)
 
 
 @jit

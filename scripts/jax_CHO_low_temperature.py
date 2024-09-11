@@ -3,7 +3,7 @@
 
 Reproduces test_CHO_low_temperature in test_benchmark.py using some hard-coded parameters.
 """
-from timeit import timeit
+from typing import Callable
 
 import jax
 import numpy as np
@@ -12,7 +12,6 @@ from jax import Array, jit
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, debug_logger
-from atmodeller.core import Planet
 from atmodeller.jax_containers import (
     CH4_g,
     CO2_g,
@@ -22,6 +21,7 @@ from atmodeller.jax_containers import (
     H2O_l,
     O2_g,
     Parameters,
+    Planet,
     Solution,
     SpeciesData,
 )
@@ -83,12 +83,12 @@ def solve_single(species: list[SpeciesData]) -> Array:
     """
 
     reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
-    coefficient_matrix: Array = reaction_network.reaction_matrix(species)
+    reaction_matrix: Array = reaction_network.reaction_matrix(species)
 
     planet: Planet = Planet(surface_temperature=450)
     # Placeholder for stability
-    system_params: Solution = Solution(initial_solution, initial_solution)
-    parameters: Parameters = Parameters(coefficient_matrix, species, planet, scaling)
+    system_params: Solution = Solution(initial_solution, initial_solution)  # type: ignore
+    parameters: Parameters = Parameters(reaction_matrix, species, planet, scaling)
 
     out: Array = solve(system_params, parameters)
 
@@ -103,15 +103,15 @@ def solve_batch(species: list[SpeciesData]) -> Array:
     """
 
     reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
-    coefficient_matrix: ArrayLike = reaction_network.reaction_matrix(species)
+    reaction_matrix: ArrayLike = reaction_network.reaction_matrix(species)
 
-    out = solve_batch_jax(coefficient_matrix, species)
+    out = solve_batch_jax(reaction_matrix, species)
 
     return unscale_number_density(out, log10_scaling)
 
 
 @jit
-def solve_batch_jax(coefficient_matrix: Array, species: list[SpeciesData]):
+def solve_batch_jax(reaction_matrix: Array, species: list[SpeciesData]):
 
     planets: list[Planet] = []
     for surface_temperature in range(450, 2001, 1):
@@ -120,29 +120,29 @@ def solve_batch_jax(coefficient_matrix: Array, species: list[SpeciesData]):
     # Stacks the entities into one named tuple
     planets_for_vmap = pytrees_stack(planets)
 
-    parameters = Parameters(coefficient_matrix, species, planets_for_vmap, scaling)
+    parameters = Parameters(reaction_matrix, species, planets_for_vmap, scaling)
     # jax.debug.print("{out}", out=parameters)
 
     # For the same initial solution
-    system_params = Solution(initial_solution, initial_solution)
+    system_params = Solution(initial_solution, initial_solution)  # type: ignore
     # jax.debug.print("{out}", out=system_params)
 
     # JIT compile the solve function
-    jit_solve = jax.jit(solve)
+    # jit_solve = jax.jit(solve)
 
-    additional_for_vmap = Parameters(
+    additional_for_vmap: Parameters = Parameters(
         reaction_matrix=None, species=None, planet=0, scaling=None  # type: ignore
     )
 
-    vmap_solve = jax.vmap(
-        jit_solve,
+    vmap_solve: Callable = jax.vmap(
+        solve,
         in_axes=(
             None,
             additional_for_vmap,
         ),
     )
 
-    solutions = vmap_solve(system_params, parameters)
+    solutions: Array = vmap_solve(system_params, parameters)
 
     return solutions
 
