@@ -23,15 +23,23 @@ from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.core import Planet
-from atmodeller.jax_containers import Parameters, SpeciesData
+from atmodeller.jax_containers import Parameters, Solution, SpeciesData
 from atmodeller.jax_utilities import logsumexp_base10, scale_number_density
 
 log_AVOGADRO = jnp.log(AVOGADRO)
 
 
 @jit
-def solve_with_optimistix(system_params, additional_params) -> Array:
-    """Solve the system with Optimistix"""
+def solve(solution: Solution, parameters: Parameters) -> Array:
+    """Solves the system
+
+    Args:
+        solution: Solution
+        parameters: Parameters
+
+    Returns:
+        The solution
+    """
 
     tol: float = 1.0e-8
     solver = optx.Dogleg(atol=tol, rtol=tol)
@@ -41,8 +49,8 @@ def solve_with_optimistix(system_params, additional_params) -> Array:
     sol = optx.root_find(
         objective_function,
         solver,
-        system_params.number_density,
-        args=(additional_params),
+        solution.number_density,
+        args=(parameters),
         throw=True,
     )
 
@@ -85,22 +93,25 @@ def get_rhs(planet: Planet, scaling: float) -> Array:
     return rhs
 
 
-# These argument specifications are fixed for Optimistix, so can conform the parameter passing
-# to adhere to this. Should return a pytree of arrays, not necessarily the same shape as the
-# solution.
 @jit
-def objective_function(solution: Array, additional_params: Parameters) -> Array:
-    """Residual of the reaction network and mass balance"""
+def objective_function(solution: Array, parameters: Parameters) -> Array:
+    """Residual of the reaction network and mass balance
 
-    # Extract parameters from the pytree
-    coefficient_matrix: Array = additional_params.coefficient_matrix
-    planet: Planet = additional_params.planet
-    species: list[SpeciesData] = additional_params.species
+    Args:
+        solution: Solution
+        parameters: Parameters
+
+    Returns:
+        Residual of the objective function
+    """
+    coefficient_matrix: Array = parameters.reaction_matrix
+    planet: Planet = parameters.planet
+    species: list[SpeciesData] = parameters.species
     # jax.debug.print("{out}", out=coefficient_matrix)
     # jax.debug.print("{out}", out=planet)
 
     # TODO: Move constraints into the driver script
-    scaling: ArrayLike = additional_params.scaling
+    scaling: ArrayLike = parameters.scaling
     log10_scaling: Array = jnp.log10(scaling)
     # Element log10 number of total molecules constraints:
     log10_oxygen_constraint: float = scale_number_density(45.58848007858896, log10_scaling)
@@ -154,7 +165,7 @@ def atmosphere_log10_molar_mass(solution: Array, species: list[SpeciesData]) -> 
     """Log10 of the molar mass of the atmosphere
 
     Args:
-        solution: Number density solution array
+        solution: Number density solution array(s)
         species: Species
 
     Returns:
@@ -171,7 +182,7 @@ def atmosphere_log10_volume(solution: Array, species: list[SpeciesData], planet:
     """Log10 of the volume of the atmosphere"
 
     Args:
-        solution: Number density solution array
+        solution: Number density solution array(s)
         species: Species
         planet: Planet
 
@@ -181,7 +192,6 @@ def atmosphere_log10_volume(solution: Array, species: list[SpeciesData], planet:
     return (
         jnp.log10(GAS_CONSTANT)
         + jnp.log10(planet.surface_temperature)
-        # Units of solution don't matter because it just weights (unless numerical problems)
         - atmosphere_log10_molar_mass(solution, species)
         + jnp.log10(planet.surface_area)
         - jnp.log10(planet.surface_gravity)

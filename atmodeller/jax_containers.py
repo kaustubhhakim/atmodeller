@@ -25,11 +25,11 @@ import sys
 from typing import NamedTuple
 
 import jax.numpy as jnp
+from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
 
 from atmodeller import AVOGADRO, GRAVITATIONAL_CONSTANT
-from atmodeller.jax_mappings import inverse_phase_mapping, phase_mapping
 from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 11):
@@ -37,11 +37,16 @@ if sys.version_info < (3, 11):
 else:
     from typing import Self
 
+phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
+"""Mapping from the JANAF phase string to an integer code"""
+inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
+"""Inverse mapping from the integer code to a JANAF phase string"""
+
 
 class Planet(NamedTuple):
-    """The properties of a planet
+    """Planet properties
 
-    Defaults values are for a fully molten Earth.
+    Default values are for a fully molten Earth.
 
     Args:
         planet_mass: Mass of the planet in kg. Defaults to Earth.
@@ -88,7 +93,7 @@ class Planet(NamedTuple):
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
-    def to_dict(self) -> dict:
+    def asdict(self) -> dict:
         """Gets a dictionary of the values"""
         base_dict: dict = self._asdict()
         base_dict["mantle_mass"] = self.mantle_mass
@@ -108,18 +113,16 @@ class SpeciesData(NamedTuple):
         phase_code: Phase code
         molar_mass: Mass
         gibbs_coefficients: Gibbs coefficients
-
-    Attributes:
-        composition: Composition
-        phase_code: Phase code
-        molar_mass: Mass
-        gibbs_coefficients: Gibbs coefficients
     """
 
     composition: dict[str, tuple[int, float, float]]
+    """Composition"""
     phase_code: int
+    """Phase code"""
     molar_mass: float
+    """Molar mass"""
     gibbs_coefficients: tuple[float, ...]
+    """Gibbs coefficients"""
 
     @classmethod
     def create(cls, formula: str, phase: str, gibbs_coefficients: tuple[float, ...]) -> Self:
@@ -183,37 +186,39 @@ class Solution(NamedTuple):
     Args:
         number: Number density of species
         stability: Stability of species
-
-    Attributes:
-        number: Number density of species
-        stability: Stability of species
     """
 
-    number_density: ArrayLike
-    stability: ArrayLike
+    number_density: Array
+    """Number density of species"""
+    stability: Array
+    """Stability of species"""
 
 
 class Parameters(NamedTuple):
-    """Additional parameters
+    """Parameters
 
     Args:
-        coefficient_matrix: Coefficient matrix
+        reaction_matrix: Reaction matrix
         species: List of species
         planet: Planet
         scaling: Scaling for the number density. Defaults to the Avogadro constant, which converts
             molecules/m^3 to moles/m^3
 
     Attributes:
-        coefficient_matrix: Coefficient matrix
+        reaction_matrix: Reaction matrix
         species: List of species
         planet: Planet
         scaling: Scaling for the number density
     """
 
-    coefficient_matrix: ArrayLike | None
-    species: list[SpeciesData] | None
-    planet: Planet | int | None
-    scaling: ArrayLike | None = AVOGADRO
+    reaction_matrix: Array
+    """Reaction matrix"""
+    species: list[SpeciesData]
+    """List of species"""
+    planet: Planet
+    """Planet"""
+    scaling: ArrayLike = AVOGADRO
+    """Scaling"""
 
 
 # TODO: Switch convention to use dG = S - Href/T as per the comment of Hugh. Then the

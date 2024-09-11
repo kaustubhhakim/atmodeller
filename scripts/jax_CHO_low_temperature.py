@@ -25,7 +25,7 @@ from atmodeller.jax_containers import (
     Solution,
     SpeciesData,
 )
-from atmodeller.jax_engine import solve_with_optimistix
+from atmodeller.jax_engine import solve
 from atmodeller.jax_utilities import (
     ReactionNetworkJAX,
     pytrees_stack,
@@ -88,9 +88,9 @@ def solve_single(species: list[SpeciesData]) -> Array:
     planet: Planet = Planet(surface_temperature=450)
     # Placeholder for stability
     system_params: Solution = Solution(initial_solution, initial_solution)
-    additional_params: Parameters = Parameters(coefficient_matrix, species, planet, scaling)
+    parameters: Parameters = Parameters(coefficient_matrix, species, planet, scaling)
 
-    out: Array = solve_with_optimistix(system_params, additional_params)
+    out: Array = solve(system_params, parameters)
 
     return unscale_number_density(out, log10_scaling)
 
@@ -120,17 +120,19 @@ def solve_batch_jax(coefficient_matrix: Array, species: list[SpeciesData]):
     # Stacks the entities into one named tuple
     planets_for_vmap = pytrees_stack(planets)
 
-    additional_params = Parameters(coefficient_matrix, species, planets_for_vmap, scaling)
-    # jax.debug.print("{out}", out=additional_params)
+    parameters = Parameters(coefficient_matrix, species, planets_for_vmap, scaling)
+    # jax.debug.print("{out}", out=parameters)
 
     # For the same initial solution
     system_params = Solution(initial_solution, initial_solution)
     # jax.debug.print("{out}", out=system_params)
 
     # JIT compile the solve function
-    jit_solve = jax.jit(solve_with_optimistix)
+    jit_solve = jax.jit(solve)
 
-    additional_for_vmap = Parameters(coefficient_matrix=None, species=None, planet=0, scaling=None)
+    additional_for_vmap = Parameters(
+        reaction_matrix=None, species=None, planet=0, scaling=None  # type: ignore
+    )
 
     vmap_solve = jax.vmap(
         jit_solve,
@@ -140,7 +142,7 @@ def solve_batch_jax(coefficient_matrix: Array, species: list[SpeciesData]):
         ),
     )
 
-    solutions = vmap_solve(system_params, additional_params)
+    solutions = vmap_solve(system_params, parameters)
 
     return solutions
 

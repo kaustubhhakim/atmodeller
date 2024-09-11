@@ -37,13 +37,13 @@ class Parameters:
         return cls(*children)
 
 
-def solve_linear_system(A, b, additional_params):
+def solve_linear_system(A, b, parameters):
     x = jnp.linalg.solve(A, b)
-    x_scaled = x * additional_params.scale_factor
+    x_scaled = x * parameters.scale_factor
     return x_scaled
 
 
-def solve_batch(params_list, additional_params):
+def solve_batch(params_list, parameters):
     # Extract the arrays from the list of params and stack them
     A_batch = jnp.stack([params.A for params in params_list])
     b_batch = jnp.stack([params.b for params in params_list])
@@ -57,7 +57,7 @@ def solve_batch(params_list, additional_params):
     vmap_solve = jax.vmap(jit_solve, in_axes=(0, 0, None))
 
     # Apply the vectorized function to the batch of params
-    solutions = vmap_solve(A_batch, b_batch, additional_params)
+    solutions = vmap_solve(A_batch, b_batch, parameters)
     return solutions
 
 
@@ -67,13 +67,13 @@ def main():
     b_list = jnp.array([[1, 4], [3, 4], [5, 2]])
 
     # Define the additional fixed parameters
-    additional_params = Parameters(scale_factor=2.0)
+    parameters = Parameters(scale_factor=2.0)
 
     # Create a list of pytree params
     params_list = [LinearSystemParams(A, b) for A, b in zip(A_list, b_list)]
 
     # Solve the batch of linear systems
-    solutions = solve_batch(params_list, additional_params)
+    solutions = solve_batch(params_list, parameters)
 
     # Print the solutions
     print("Solutions x:", solutions)
