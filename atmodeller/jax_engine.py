@@ -123,6 +123,20 @@ def get_log10_activity(solution: Array, parameters: Parameters) -> Array:
 
 
 @jit
+def get_log10_extended_activity(solution: Array, parameters: Parameters) -> Array:
+    """Log10 extended activity
+
+    Args:
+        solution: Solution
+        parameters: Parameters
+
+    Returns:
+        Extended activity
+    """
+    activity: Array = get_log10_activity(solution, parameters)
+
+
+@jit
 def objective_function(solution: Array, parameters: Parameters) -> Array:
     """Residual of the reaction network and mass balance
 
