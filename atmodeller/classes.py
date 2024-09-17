@@ -23,33 +23,13 @@ import numpy as np
 import numpy.typing as npt
 
 from atmodeller.jax_containers import SpeciesData
-from atmodeller.utilities import partial_rref
+from atmodeller.utilities import partial_rref, unique_elements_in_species
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ReactionNetwork:
     """Reaction network"""
-
-    @staticmethod
-    def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
-        """Unique elements in a list of species
-
-        Args:
-            species: A list of species
-
-        Returns:
-            Unique elements in the species ordered alphabetically
-        """
-        elements: list[str] = []
-        for species_ in species:
-            elements.extend(species_.elements)
-        unique_elements: list[str] = list(set(elements))
-        sorted_elements: list[str] = sorted(unique_elements)
-
-        logger.debug("unique_elements_in_species = %s", sorted_elements)
-
-        return tuple(sorted_elements)
 
     def formula_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
         """Formula matrix
@@ -63,7 +43,7 @@ class ReactionNetwork:
         Returns:
             The formula matrix
         """
-        unique_elements: tuple[str, ...] = self.unique_elements_in_species(species)
+        unique_elements: tuple[str, ...] = unique_elements_in_species(species)
         formula_matrix: npt.NDArray = np.zeros(
             (len(unique_elements), len(species)), dtype=jnp.int_
         )

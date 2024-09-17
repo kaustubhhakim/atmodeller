@@ -18,7 +18,6 @@
 
 from collections.abc import Mapping
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx

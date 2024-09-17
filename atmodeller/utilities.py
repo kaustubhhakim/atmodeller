@@ -25,7 +25,7 @@ from cProfile import Profile
 from dataclasses import asdict, dataclass, field
 from functools import wraps
 from pstats import SortKey, Stats
-from typing import Any, Callable, NamedTuple, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Type, TypeVar
 
 import jax.numpy as jnp
 import numpy as np
@@ -37,6 +37,9 @@ from scipy.constants import kilo, mega
 from sklearn.metrics import mean_squared_error
 
 from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
+
+if TYPE_CHECKING:
+    from atmodeller.jax_containers import SpeciesData
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -422,6 +425,26 @@ class UnitConversion(NamedTuple):
 
 
 unit_conversion = UnitConversion()
+
+
+def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
+    """Unique elements in a list of species
+
+    Args:
+        species: A list of species
+
+    Returns:
+        Unique elements in the species ordered alphabetically
+    """
+    elements: list[str] = []
+    for species_ in species:
+        elements.extend(species_.elements)
+    unique_elements: list[str] = list(set(elements))
+    sorted_elements: list[str] = sorted(unique_elements)
+
+    logger.debug("unique_elements_in_species = %s", sorted_elements)
+
+    return tuple(sorted_elements)
 
 
 def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
