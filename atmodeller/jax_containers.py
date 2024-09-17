@@ -210,15 +210,12 @@ class Constraints(NamedTuple):
     """Log10 number of molecules constraints, ordered alphabetically by element name"""
 
     @classmethod
-    def create(
-        cls, species: list[SpeciesData], mass: Mapping[str, ArrayLike], log10_scaling: ArrayLike
-    ):
+    def create(cls, species: list[SpeciesData], mass: Mapping[str, ArrayLike]) -> Self:
         """Creates an instance
 
         Args:
             species: A list of species
-            mass: Dictionary of element name and mass constraint in kg in any order
-            log10_scaling: Scaling for the log10 number of molecules
+            mass: Mapping of element name and mass constraint in kg in any order
         """
         sorted_mass: dict[str, ArrayLike] = {k: mass[k] for k in sorted(mass)}
         log10_number_of_molecules: dict[str, ArrayLike] = {}
@@ -227,14 +224,19 @@ class Constraints(NamedTuple):
             log10_number_of_molecules_: Array = (
                 jnp.log10(mass_constraint) + jnp.log10(AVOGADRO) - jnp.log10(molar_mass)
             )
-            log10_number_of_molecules[element] = scale_number_density(
-                log10_number_of_molecules_, log10_scaling
-            )
+            log10_number_of_molecules[element] = log10_number_of_molecules_
 
         return cls(species, log10_number_of_molecules)
 
-    def array(self) -> Array:
-        return jnp.array(list(self.log10_molecules.values()))
+    def array(self, scaling: ArrayLike) -> Array:
+        """Scaled log10 number of molecules array
+
+        Args:
+            scaling: Scaling
+        """
+        return scale_number_density(
+            jnp.array(list(self.log10_molecules.values())), jnp.log10(scaling)
+        )
 
 
 class Parameters(NamedTuple):
@@ -245,7 +247,7 @@ class Parameters(NamedTuple):
         reaction_matrix: Reaction matrix
         species: List of species
         planet: Planet
-        constraints: Dictionary of mass constraints
+        constraints: Constraints
         scaling: Scaling for the number density. Defaults to the Avogadro constant, which converts
             molecules/m^3 to moles/m^3
 
@@ -254,7 +256,7 @@ class Parameters(NamedTuple):
         reaction_matrix: Reaction matrix
         species: List of species
         planet: Planet
-        constraints: Dictionary of mass constraints
+        constraints: Constraints
         scaling: Scaling for the number density
     """
 

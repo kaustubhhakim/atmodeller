@@ -14,8 +14,9 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""JAX-related functionality for solving the system of equations. Functions are jitted."""
+"""JAX-related functionality for solving the system of equations"""
 
+# import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
@@ -32,7 +33,7 @@ from atmodeller.jax_containers import (
 )
 from atmodeller.jax_utilities import logsumexp_base10
 
-log_AVOGADRO = np.log(AVOGADRO)
+log_AVOGADRO: ArrayLike = np.log(AVOGADRO)
 
 
 @jit
@@ -64,39 +65,39 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
 
 
 @jit
-def get_rhs(planet: Planet, scaling: float) -> Array:
+def get_rhs(
+    species: list[SpeciesData],
+    reaction_matrix: Array,
+    temperature: ArrayLike,
+    scaling: ArrayLike,
+) -> Array:
+    """Gets the right-hand side of the reaction network equations
 
-    temperature: ArrayLike = planet.surface_temperature
+    Args:
+        species: List of species
+        reaction_matrix: Reaction matrix
+        temperature: Temperature
+        scaling: Scaling
 
-    # Reaction set is linearly independent (determined by Gaussian elimination in a previous step)
-    # log10 equilibrium constants
-    # 2 H2O = 2 H2 + 1 O2
-    reaction0_lnKp: float = -118.38862269303881
-    reaction0_delta_n: float = 1.0
-    # 4 H2 + 1 CO2 = 2 H2O + 1 CH4
-    reaction1_lnKp: float = 22.8840873584512
-    reaction1_delta_n: float = -2.0
-    # 1 H2 + 1 O2 = 1 H2O + 1 CO
-    reaction2_lnKp: float = -6.001590516742649
-    reaction2_delta_n: float = 0.0
+    Returns:
+        Right-hand side of the reaction network equations
+    """
+    # pylint: disable=invalid-name
+    lnKp: Array = get_lnKp(species, reaction_matrix, temperature)
+    # jax.debug.print("lnKp = {out}", out=lnKp)
 
-    def log10Kc_from_lnKp(lnKp: float, delta_n: float, temperature: ArrayLike) -> Array:
+    delta_n: Array = jnp.sum(reaction_matrix, axis=1)
+    # jax.debug.print("delta_n = {out}", out=delta_n)
 
-        log10Kc: Array = lnKp - delta_n * (
-            jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
-        )
-        log10Kc = log10Kc / jnp.log(10)
+    log10Kc: Array = lnKp - delta_n * (
+        jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
+    )
+    log10Kc = log10Kc / jnp.log(10)
+    # jax.debug.print("log10Kc = {out}", out=log10Kc)
 
-        return log10Kc
+    # pylint: enable=invalid-name
 
-    reaction0_log10Kc: Array = log10Kc_from_lnKp(reaction0_lnKp, reaction0_delta_n, temperature)
-    reaction1_log10Kc: Array = log10Kc_from_lnKp(reaction1_lnKp, reaction1_delta_n, temperature)
-    reaction2_log10Kc: Array = log10Kc_from_lnKp(reaction2_lnKp, reaction2_delta_n, temperature)
-
-    # rhs constraints are the equilibrium constants of the reaction
-    rhs: Array = jnp.array([reaction0_log10Kc, reaction1_log10Kc, reaction2_log10Kc])
-
-    return rhs
+    return log10Kc
 
 
 @jit
@@ -108,22 +109,18 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
         parameters: Parameters
 
     Returns:
-        Residual of the objective function
+        Residual
     """
     formula_matrix: Array = parameters.formula_matrix
     reaction_matrix: Array = parameters.reaction_matrix
     planet: Planet = parameters.planet
     constraints: Constraints = parameters.constraints
     species: list[SpeciesData] = parameters.species
-    # jax.debug.print("{out}", out=reaction_matrix)
-    # jax.debug.print("{out}", out=planet)
-
-    # TODO: Move constraints into the driver script
+    temperature: ArrayLike = planet.surface_temperature
     scaling: ArrayLike = parameters.scaling
 
-    # RHS could depend on total pressure, which is part of the initial guess solution.
-    rhs = get_rhs(planet, scaling)
-    # jax.debug.print("{out}", out=rhs)
+    rhs: Array = get_rhs(species, reaction_matrix, temperature, scaling)
+    # jax.debug.print("rhs = {out}", out=rhs)
 
     # Reaction network residual
     reaction_residual: Array = reaction_matrix.dot(solution) - rhs
@@ -131,7 +128,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # Mass balance residual
     log10_volume: Array = atmosphere_log10_volume(solution, species, planet)
     mass_residual: Array = jnp.log10(formula_matrix.dot(jnp.power(10, solution)))
-    mass_residual = mass_residual - (constraints.array() - log10_volume)
+    mass_residual = mass_residual - (constraints.array(scaling) - log10_volume)
 
     residual: Array = jnp.concatenate(
         (
@@ -202,3 +199,31 @@ def gibbs_energy_of_formation(species_data: SpeciesData, temperature: ArrayLike)
     )
 
     return gibbs * 1000.0  # kilo
+
+
+# pylint: disable=invalid-name
+@jit
+def get_lnKp(species: list[SpeciesData], reaction_matrix: Array, temperature: ArrayLike) -> Array:
+    """Gets the natural log of the equilibrium constant in terms of partial pressures.
+
+    Args:
+        species: List of species
+        reaction_matrix: Reaction matrix
+        temperature: Temperature in K
+
+    Returns:
+        Natural log of the equilibrium constant in terms of partial pressures
+    """
+    gibbs_list: list[ArrayLike] = []
+    for species_ in species:
+        gibbs: ArrayLike = gibbs_energy_of_formation(species_, temperature)
+        gibbs_list.append(gibbs)
+
+    gibbs_array: Array = jnp.array(gibbs_list)
+
+    lnKp: Array = -1.0 * reaction_matrix.dot(gibbs_array) / (GAS_CONSTANT * temperature)
+
+    return lnKp
+
+
+# pylint: enable=invalid-name
