@@ -16,8 +16,6 @@
 #
 """JAX-related functionality for solving the system of equations. Functions are jitted."""
 
-from collections.abc import Mapping
-
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
@@ -25,7 +23,13 @@ from jax import Array, jit
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
-from atmodeller.jax_containers import Parameters, Planet, Solution, SpeciesData
+from atmodeller.jax_containers import (
+    Constraints,
+    Parameters,
+    Planet,
+    Solution,
+    SpeciesData,
+)
 from atmodeller.jax_utilities import logsumexp_base10, scale_number_density
 
 log_AVOGADRO = np.log(AVOGADRO)
@@ -109,29 +113,13 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     formula_matrix: Array = parameters.formula_matrix
     reaction_matrix: Array = parameters.reaction_matrix
     planet: Planet = parameters.planet
-    constraints: Mapping[str, ArrayLike] = parameters.constraints
+    constraints: Constraints = parameters.constraints
     species: list[SpeciesData] = parameters.species
     # jax.debug.print("{out}", out=reaction_matrix)
     # jax.debug.print("{out}", out=planet)
 
     # TODO: Move constraints into the driver script
     scaling: ArrayLike = parameters.scaling
-    log10_scaling: Array = jnp.log10(scaling)
-    # Element log10 number of total molecules constraints:
-
-    log10_carbon_constraint: ArrayLike = scale_number_density(
-        jnp.log10(constraints["C"]), log10_scaling
-    )
-    log10_hydrogen_constraint: ArrayLike = scale_number_density(
-        jnp.log10(constraints["H"]), log10_scaling
-    )
-    log10_oxygen_constraint: ArrayLike = scale_number_density(
-        jnp.log10(constraints["O"]), log10_scaling
-    )
-
-    constraints_array: Array = jnp.array(
-        (log10_carbon_constraint, log10_hydrogen_constraint, log10_oxygen_constraint)
-    )
 
     # RHS could depend on total pressure, which is part of the initial guess solution.
     rhs = get_rhs(planet, scaling)
@@ -143,7 +131,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # Mass balance residual
     log10_volume: Array = atmosphere_log10_volume(solution, species, planet)
     mass_residual: Array = jnp.log10(formula_matrix.dot(jnp.power(10, solution)))
-    mass_residual = mass_residual - (constraints_array - log10_volume)
+    mass_residual = mass_residual - (constraints.array() - log10_volume)
 
     residual: Array = jnp.concatenate(
         (

@@ -31,6 +31,7 @@ from jax.typing import ArrayLike
 from molmass import Formula
 
 from atmodeller import AVOGADRO, GRAVITATIONAL_CONSTANT
+from atmodeller.jax_utilities import scale_number_density
 from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 11):
@@ -195,6 +196,47 @@ class Solution(NamedTuple):
     """Stability of species"""
 
 
+class Constraints(NamedTuple):
+    """Log10 number of molecules constraints
+
+    Args:
+        species: A list of species
+        log10_molecules: Log10 number of molecules constraints, ordered alphabetically by element
+    """
+
+    species: list[SpeciesData]
+    """List of species"""
+    log10_molecules: dict[str, ArrayLike]
+    """Log10 number of molecules constraints, ordered alphabetically by element name"""
+
+    @classmethod
+    def create(
+        cls, species: list[SpeciesData], mass: Mapping[str, ArrayLike], log10_scaling: ArrayLike
+    ):
+        """Creates an instance
+
+        Args:
+            species: A list of species
+            mass: Dictionary of element name and mass constraint in kg in any order
+            log10_scaling: Scaling for the log10 number of molecules
+        """
+        sorted_mass: dict[str, ArrayLike] = {k: mass[k] for k in sorted(mass)}
+        log10_number_of_molecules: dict[str, ArrayLike] = {}
+        for element, mass_constraint in sorted_mass.items():
+            molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
+            log10_number_of_molecules_: Array = (
+                jnp.log10(mass_constraint) + jnp.log10(AVOGADRO) - jnp.log10(molar_mass)
+            )
+            log10_number_of_molecules[element] = scale_number_density(
+                log10_number_of_molecules_, log10_scaling
+            )
+
+        return cls(species, log10_number_of_molecules)
+
+    def array(self) -> Array:
+        return jnp.array(list(self.log10_molecules.values()))
+
+
 class Parameters(NamedTuple):
     """Parameters
 
@@ -224,46 +266,10 @@ class Parameters(NamedTuple):
     """List of species"""
     planet: Planet
     """Planet"""
-    constraints: Mapping[str, ArrayLike]
+    constraints: Constraints
     """Mass constraints"""
     scaling: ArrayLike = AVOGADRO
     """Scaling"""
-
-
-class Constraints(NamedTuple):
-    """Log10 number of molecules constraints
-
-    Args:
-        species: A list of species
-        log10_molecules: Log10 number of molecules constraints, ordered alphabetically by element
-    """
-
-    species: list[SpeciesData]
-    """List of species"""
-    log10_molecules: dict[str, ArrayLike]
-    """Log10 number of molecules constraints, ordered alphabetically by element name"""
-
-    @classmethod
-    def create(cls, species: list[SpeciesData], mass: dict[str, ArrayLike]):
-        """Creates an instance
-
-        Args:
-            species: A list of species
-            mass: Dictionary of element name and mass constraint in kg in any order
-        """
-        sorted_mass: dict[str, ArrayLike] = {k: mass[k] for k in sorted(mass)}
-        log10_number_of_molecules: dict[str, ArrayLike] = {}
-        for element, mass_constraint in sorted_mass.items():
-            molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log10_number_of_molecules_: Array = (
-                jnp.log10(mass_constraint) + jnp.log10(AVOGADRO) - jnp.log10(molar_mass)
-            )
-            log10_number_of_molecules[element] = log10_number_of_molecules_
-
-        return cls(species, log10_number_of_molecules)
-
-    def array(self) -> Array:
-        return jnp.array(list[self.log10_molecules.values()])
 
 
 # TODO: Switch convention to use dG = S - Href/T as per the comment of Hugh. Then the

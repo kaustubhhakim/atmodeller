@@ -18,6 +18,7 @@ from atmodeller.jax_containers import (
     CH4_g,
     CO2_g,
     CO_g,
+    Constraints,
     H2_g,
     H2O_g,
     H2O_l,
@@ -33,7 +34,7 @@ from atmodeller.jax_utilities import (
     scale_number_density,
     unscale_number_density,
 )
-from atmodeller.utilities import partial_rref
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass, partial_rref
 
 jax.config.update("jax_enable_x64", True)
 # jax.config.update("jax_debug_nans", True)
@@ -75,12 +76,17 @@ perturbation = np.random.normal(mean, std_dev, size=known_solution_array.shape)
 initial_solution: ArrayLike = initial_solution_default
 initial_solution = scale_number_density(initial_solution, log10_scaling)
 
+h_kg: float = earth_oceans_to_hydrogen_mass(1)
+c_kg: float = 1 * h_kg
+o_kg: float = 1.02999e20
+
 # Unscaled total molecules constraints in alphabetical order
-constraints = {
-    "C": 10**45.89051326565627,
-    "H": 10**46.96664792007732,
-    "O": 10**45.58848007858896,
+mass_constraints = {
+    "C": c_kg,  # 10**45.89051326565627,
+    "H": h_kg,  # 10**46.96664792007732,
+    "O": o_kg,  # 10**45.58848007858896,
 }
+constraints: Constraints = Constraints.create(species_list, mass_constraints, log10_scaling)
 
 reaction_network: ReactionNetwork = ReactionNetwork()
 formula_matrix: Array = jnp.array(reaction_network.formula_matrix(species_list))
