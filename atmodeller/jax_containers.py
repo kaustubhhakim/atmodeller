@@ -22,6 +22,7 @@ reconstruct other desired quantities, notably strings and other objects. This en
 functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
 """
 import sys
+from collections.abc import Mapping
 from typing import NamedTuple
 
 import jax.numpy as jnp
@@ -198,25 +199,33 @@ class Parameters(NamedTuple):
     """Parameters
 
     Args:
+        formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
         species: List of species
         planet: Planet
+        constraints: Dictionary of mass constraints
         scaling: Scaling for the number density. Defaults to the Avogadro constant, which converts
             molecules/m^3 to moles/m^3
 
     Attributes:
+        formula_matrix: Formula matrix
         reaction_matrix: Reaction matrix
         species: List of species
         planet: Planet
+        constraints: Dictionary of mass constraints
         scaling: Scaling for the number density
     """
 
+    formula_matrix: Array
+    """Formula matrix"""
     reaction_matrix: Array
     """Reaction matrix"""
     species: list[SpeciesData]
     """List of species"""
     planet: Planet
     """Planet"""
+    constraints: Mapping[str, ArrayLike]
+    """Mass constraints"""
     scaling: ArrayLike = AVOGADRO
     """Scaling"""
 

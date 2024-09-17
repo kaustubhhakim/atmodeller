@@ -6,6 +6,7 @@ Reproduces test_CHO_low_temperature in test_benchmark.py using some hard-coded p
 from typing import Callable
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from jax import Array, jit
@@ -74,6 +75,17 @@ perturbation = np.random.normal(mean, std_dev, size=known_solution_array.shape)
 initial_solution: ArrayLike = initial_solution_default
 initial_solution = scale_number_density(initial_solution, log10_scaling)
 
+# Unscaled total molecules constraints in alphabetical order
+constraints = {
+    "C": 10**45.89051326565627,
+    "H": 10**46.96664792007732,
+    "O": 10**45.58848007858896,
+}
+
+reaction_network: ReactionNetwork = ReactionNetwork()
+formula_matrix: Array = jnp.array(reaction_network.formula_matrix(species_list))
+reaction_matrix: Array = jnp.array(reaction_network.reaction_matrix(species_list))
+
 
 def solve_single(species: list[SpeciesData]) -> Array:
     """Solves a single system
@@ -82,13 +94,13 @@ def solve_single(species: list[SpeciesData]) -> Array:
     for a calculation.
     """
 
-    reaction_network: ReactionNetwork = ReactionNetwork()
-    reaction_matrix: Array = reaction_network.reaction_matrix(species)
-
     planet: Planet = Planet(surface_temperature=450)
     # Placeholder for stability
     system_params: Solution = Solution(initial_solution, initial_solution)  # type: ignore
-    parameters: Parameters = Parameters(reaction_matrix, species, planet, scaling)
+
+    parameters: Parameters = Parameters(
+        formula_matrix, reaction_matrix, species, planet, constraints, scaling
+    )
 
     out: Array = solve(system_params, parameters)
 
@@ -102,16 +114,13 @@ def solve_batch(species: list[SpeciesData]) -> Array:
     for a batch of calculations.
     """
 
-    reaction_network: ReactionNetwork = ReactionNetwork()
-    reaction_matrix: ArrayLike = reaction_network.reaction_matrix(species)
-
-    out = solve_batch_jax(reaction_matrix, species)
+    out = solve_batch_jax(species)
 
     return unscale_number_density(out, log10_scaling)
 
 
 @jit
-def solve_batch_jax(reaction_matrix: Array, species: list[SpeciesData]):
+def solve_batch_jax(species: list[SpeciesData]):
 
     planets: list[Planet] = []
     for surface_temperature in range(450, 2001, 1):
@@ -120,7 +129,9 @@ def solve_batch_jax(reaction_matrix: Array, species: list[SpeciesData]):
     # Stacks the entities into one named tuple
     planets_for_vmap = pytrees_stack(planets)
 
-    parameters = Parameters(reaction_matrix, species, planets_for_vmap, scaling)
+    parameters = Parameters(
+        formula_matrix, reaction_matrix, species, planets_for_vmap, constraints, scaling
+    )
     # jax.debug.print("{out}", out=parameters)
 
     # For the same initial solution
@@ -131,7 +142,12 @@ def solve_batch_jax(reaction_matrix: Array, species: list[SpeciesData]):
     # jit_solve = jax.jit(solve)
 
     additional_for_vmap: Parameters = Parameters(
-        reaction_matrix=None, species=None, planet=0, scaling=None  # type: ignore
+        formula_matrix=None,  # type: ignore
+        reaction_matrix=None,  # type: ignore
+        species=None,  # type: ignore
+        planet=0,  # type: ignore
+        constraints=None,  # type: ignore
+        scaling=None,  # type: ignore
     )
 
     vmap_solve: Callable = jax.vmap(

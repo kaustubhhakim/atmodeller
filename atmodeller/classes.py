@@ -21,7 +21,6 @@ import logging
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array
 
 from atmodeller.jax_containers import SpeciesData
 from atmodeller.utilities import partial_rref
@@ -65,10 +64,10 @@ class ReactionNetwork:
             The formula matrix
         """
         unique_elements: tuple[str, ...] = self.unique_elements_in_species(species)
-
         formula_matrix: npt.NDArray = np.zeros(
             (len(unique_elements), len(species)), dtype=jnp.int_
         )
+
         for element_index, element in enumerate(unique_elements):
             for species_index, species_ in enumerate(species):
                 count: int = 0
@@ -78,9 +77,11 @@ class ReactionNetwork:
                     count = 0
                 formula_matrix[element_index, species_index] = count
 
+        logger.debug("formula_matrix = %s", formula_matrix)
+
         return formula_matrix
 
-    def reaction_matrix(self, species: list[SpeciesData]) -> Array:
+    def reaction_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
         """Reaction matrix
 
         Returns:
@@ -92,5 +93,7 @@ class ReactionNetwork:
         #    return None
 
         transpose_formula_matrix: npt.NDArray = self.formula_matrix(species).T
+        reaction_matrix: npt.NDArray = partial_rref(transpose_formula_matrix)
+        logger.debug("reaction_matrix = %s", reaction_matrix)
 
-        return jnp.array(partial_rref(transpose_formula_matrix))
+        return reaction_matrix

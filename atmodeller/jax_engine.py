@@ -16,6 +16,9 @@
 #
 """JAX-related functionality for solving the system of equations. Functions are jitted."""
 
+from collections.abc import Mapping
+
+import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
@@ -104,30 +107,53 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     Returns:
         Residual of the objective function
     """
-    coefficient_matrix: Array = parameters.reaction_matrix
+    formula_matrix: Array = parameters.formula_matrix
+    reaction_matrix: Array = parameters.reaction_matrix
     planet: Planet = parameters.planet
+    constraints: Mapping[str, ArrayLike] = parameters.constraints
     species: list[SpeciesData] = parameters.species
-    # jax.debug.print("{out}", out=coefficient_matrix)
+    # jax.debug.print("{out}", out=reaction_matrix)
     # jax.debug.print("{out}", out=planet)
 
     # TODO: Move constraints into the driver script
     scaling: ArrayLike = parameters.scaling
     log10_scaling: Array = jnp.log10(scaling)
     # Element log10 number of total molecules constraints:
-    log10_oxygen_constraint: float = scale_number_density(45.58848007858896, log10_scaling)
-    log10_hydrogen_constraint: float = scale_number_density(46.96664792007732, log10_scaling)
-    log10_carbon_constraint: float = scale_number_density(45.89051326565627, log10_scaling)
+
+    log10_carbon_constraint: ArrayLike = scale_number_density(
+        jnp.log10(constraints["C"]), log10_scaling
+    )
+    log10_hydrogen_constraint: ArrayLike = scale_number_density(
+        jnp.log10(constraints["H"]), log10_scaling
+    )
+    log10_oxygen_constraint: ArrayLike = scale_number_density(
+        jnp.log10(constraints["O"]), log10_scaling
+    )
+
+    constraints_array: Array = jnp.array(
+        (log10_carbon_constraint, log10_hydrogen_constraint, log10_oxygen_constraint)
+    )
 
     # RHS could depend on total pressure, which is part of the initial guess solution.
     rhs = get_rhs(planet, scaling)
     # jax.debug.print("{out}", out=rhs)
 
     # Reaction network
-    reaction_residual: Array = coefficient_matrix.dot(solution) - rhs
+    reaction_residual: Array = reaction_matrix.dot(solution) - rhs
 
     log10_volume: Array = atmosphere_log10_volume(solution, species, planet)
 
     # Mass balance residuals (stoichiometry coefficients are hard-coded for this MWE)
+    carbon_residual: Array = jnp.array([solution[2], solution[4], solution[5]])
+    carbon_residual = logsumexp_base10(carbon_residual) - (log10_carbon_constraint - log10_volume)
+
+    hydrogen_residual: Array = jnp.array(
+        [jnp.log10(2) + solution[0], jnp.log10(2) + solution[1], jnp.log10(4) + solution[4]]
+    )
+    hydrogen_residual = logsumexp_base10(hydrogen_residual) - (
+        log10_hydrogen_constraint - log10_volume
+    )
+
     oxygen_residual: Array = jnp.array(
         [
             solution[1],
@@ -137,16 +163,6 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
         ]
     )
     oxygen_residual = logsumexp_base10(oxygen_residual) - (log10_oxygen_constraint - log10_volume)
-
-    hydrogen_residual: Array = jnp.array(
-        [jnp.log10(2) + solution[0], jnp.log10(2) + solution[1], jnp.log10(4) + solution[4]]
-    )
-    hydrogen_residual = logsumexp_base10(hydrogen_residual) - (
-        log10_hydrogen_constraint - log10_volume
-    )
-
-    carbon_residual: Array = jnp.array([solution[2], solution[4], solution[5]])
-    carbon_residual = logsumexp_base10(carbon_residual) - (log10_carbon_constraint - log10_volume)
 
     residual: Array = jnp.concatenate(
         (
