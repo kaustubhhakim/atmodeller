@@ -30,7 +30,7 @@ from atmodeller.jax_containers import (
     Solution,
     SpeciesData,
 )
-from atmodeller.jax_utilities import logsumexp_base10, scale_number_density
+from atmodeller.jax_utilities import logsumexp_base10
 
 log_AVOGADRO = np.log(AVOGADRO)
 

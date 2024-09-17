@@ -3,6 +3,7 @@
 
 Reproduces test_CHO_low_temperature in test_benchmark.py using some hard-coded parameters.
 """
+from timeit import timeit
 from typing import Callable
 
 import jax
@@ -99,7 +100,6 @@ def solve_single(species: list[SpeciesData]) -> Array:
     This does the non-JAX parts, such as getting the reaction matrix which is assumed constant
     for a calculation.
     """
-
     planet: Planet = Planet(surface_temperature=450)
     # Placeholder for stability
     system_params: Solution = Solution(initial_solution, initial_solution)  # type: ignore
@@ -108,7 +108,16 @@ def solve_single(species: list[SpeciesData]) -> Array:
         formula_matrix, reaction_matrix, species, planet, constraints, scaling
     )
 
-    out: Array = solve(system_params, parameters)
+    solve(system_params, parameters).block_until_ready()
+
+    # Define a wrapper function to be timed
+    def timed_func():
+        solve(system_params, parameters).block_until_ready()
+
+    execution_time = timeit(timed_func, number=1000)  # Run 1000 iterations
+    print(f"Execution time for 1000 iterations: {execution_time} seconds")
+
+    out: Array = solve(system_params, parameters).block_until_ready()
 
     return unscale_number_density(out, log10_scaling)
 
@@ -119,24 +128,24 @@ def solve_batch(species: list[SpeciesData]) -> Array:
     This does the non-JAX parts, such as getting the reaction matrix which is assumed constant
     for a batch of calculations.
     """
-
-    out = solve_batch_jax(species)
-
-    return unscale_number_density(out, log10_scaling)
-
-
-@jit
-def solve_batch_jax(species: list[SpeciesData]):
-
     planets: list[Planet] = []
-    for surface_temperature in range(450, 2001, 1):
+    for surface_temperature in range(450, 2001, 1000):
         planets.append(Planet(surface_temperature=surface_temperature))
 
     # Stacks the entities into one named tuple
     planets_for_vmap = pytrees_stack(planets)
 
+    mass_constraints_batch = {
+        "C": jnp.array((c_kg, c_kg * 1)),
+        "H": jnp.array((h_kg, h_kg * 1)),
+        "O": jnp.array((o_kg, o_kg * 1)),
+    }
+    constraints_batch = Constraints.create(species_list, mass_constraints_batch, log10_scaling)
+
+    constraints_for_vmap = Constraints(species=None, log10_molecules=0)
+
     parameters = Parameters(
-        formula_matrix, reaction_matrix, species, planets_for_vmap, constraints, scaling
+        formula_matrix, reaction_matrix, species, planets_for_vmap, constraints_batch, scaling
     )
     # jax.debug.print("{out}", out=parameters)
 
@@ -144,29 +153,82 @@ def solve_batch_jax(species: list[SpeciesData]):
     system_params = Solution(initial_solution, initial_solution)  # type: ignore
     # jax.debug.print("{out}", out=system_params)
 
-    # JIT compile the solve function
-    # jit_solve = jax.jit(solve)
-
     additional_for_vmap: Parameters = Parameters(
         formula_matrix=None,  # type: ignore
         reaction_matrix=None,  # type: ignore
         species=None,  # type: ignore
         planet=0,  # type: ignore
-        constraints=None,  # type: ignore
+        constraints=constraints_for_vmap,  # type: ignore
         scaling=None,  # type: ignore
     )
 
-    vmap_solve: Callable = jax.vmap(
-        solve,
-        in_axes=(
-            None,
-            additional_for_vmap,
-        ),
+    vmap_solve: Callable = jit(
+        jax.vmap(
+            solve,
+            in_axes=(
+                None,
+                additional_for_vmap,
+            ),
+        )
     )
 
-    solutions: Array = vmap_solve(system_params, parameters)
+    vmap_solve(system_params, parameters).block_until_ready()
 
-    return solutions
+    # Define a wrapper function to be timed
+    def timed_func():
+        vmap_solve(system_params, parameters).block_until_ready()
+
+    # Time the function using timeit
+    execution_time = timeit(timed_func, number=1000)  # Run 1000 iterations
+    print(f"Execution time for 1000 iterations: {execution_time} seconds")
+
+    out: Array = vmap_solve(system_params, parameters).block_until_ready()
+
+    return unscale_number_density(out, log10_scaling)
+
+
+# @jit
+# def solve_batch_jax(species: list[SpeciesData]):
+
+#     planets: list[Planet] = []
+#     for surface_temperature in range(450, 2001, 100):
+#         planets.append(Planet(surface_temperature=surface_temperature))
+
+#     # Stacks the entities into one named tuple
+#     planets_for_vmap = pytrees_stack(planets)
+
+#     parameters = Parameters(
+#         formula_matrix, reaction_matrix, species, planets_for_vmap, constraints, scaling
+#     )
+#     # jax.debug.print("{out}", out=parameters)
+
+#     # For the same initial solution
+#     system_params = Solution(initial_solution, initial_solution)  # type: ignore
+#     # jax.debug.print("{out}", out=system_params)
+
+#     # JIT compile the solve function
+#     # jit_solve = jax.jit(solve)
+
+#     additional_for_vmap: Parameters = Parameters(
+#         formula_matrix=None,  # type: ignore
+#         reaction_matrix=None,  # type: ignore
+#         species=None,  # type: ignore
+#         planet=0,  # type: ignore
+#         constraints=None,  # type: ignore
+#         scaling=None,  # type: ignore
+#     )
+
+#     vmap_solve: Callable = jax.vmap(
+#         solve,
+#         in_axes=(
+#             None,
+#             additional_for_vmap,
+#         ),
+#     )
+
+#     solutions: Array = vmap_solve(system_params, parameters)
+
+#     return solutions
 
 
 def simple_system():
