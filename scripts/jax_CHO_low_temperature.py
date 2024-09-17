@@ -12,6 +12,7 @@ from jax import Array, jit
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, debug_logger
+from atmodeller.classes import ReactionNetwork
 from atmodeller.jax_containers import (
     CH4_g,
     CO2_g,
@@ -27,7 +28,6 @@ from atmodeller.jax_containers import (
 )
 from atmodeller.jax_engine import solve
 from atmodeller.jax_utilities import (
-    ReactionNetworkJAX,
     pytrees_stack,
     scale_number_density,
     unscale_number_density,
@@ -82,7 +82,7 @@ def solve_single(species: list[SpeciesData]) -> Array:
     for a calculation.
     """
 
-    reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
+    reaction_network: ReactionNetwork = ReactionNetwork()
     reaction_matrix: Array = reaction_network.reaction_matrix(species)
 
     planet: Planet = Planet(surface_temperature=450)
@@ -102,7 +102,7 @@ def solve_batch(species: list[SpeciesData]) -> Array:
     for a batch of calculations.
     """
 
-    reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
+    reaction_network: ReactionNetwork = ReactionNetwork()
     reaction_matrix: ArrayLike = reaction_network.reaction_matrix(species)
 
     out = solve_batch_jax(reaction_matrix, species)
@@ -152,7 +152,7 @@ def simple_system():
     # Species order is: H2, H2O, CO2, O2, CH4, CO
     species_list: list[SpeciesData] = [H2_g, CO_g, H2O_g, H2O_l, CO2_g, O2_g, CH4_g]
 
-    reaction_network: ReactionNetworkJAX = ReactionNetworkJAX()
+    reaction_network: ReactionNetwork = ReactionNetwork()
 
     # With charge balance, Leal et al (2016) state that some of the mass-balance equations can be
     # linearly dependent on the others. But this can't happen with just elements. Therefore we

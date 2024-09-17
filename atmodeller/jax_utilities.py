@@ -17,13 +17,9 @@
 """JAX functions"""
 
 import jax.numpy as jnp
-import numpy as np
-import numpy.typing as npt
 from jax import Array, jit, lax, vmap
 from jax.tree_util import tree_map
 from jax.typing import ArrayLike
-
-from atmodeller.jax_containers import SpeciesData
 
 
 @jit
@@ -35,7 +31,7 @@ def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
         prefactors: Array of prefactors corresponding to each log10 value
 
     Returns:
-        The log10 of the sum of prefactors multiplied by exponentials of the input values.
+        The log10 of the sum of prefactors multiplied by exponentials of the input values
     """
     max_log: Array = jnp.max(log_values)
     value_sum: Array = jnp.sum(prefactors * jnp.power(10, log_values - max_log))
@@ -75,98 +71,11 @@ def unscale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> Arr
     return number_density + scaling
 
 
-def pytrees_stack(pytrees, axis=0):
-    """Stacks an iterable of pytrees along a specified axis."""
-    results = tree_map(lambda *values: jnp.stack(values, axis=axis), *pytrees)
-    return results
-
-
-def pytrees_vmap(func):
-    """Vectorizes a function over a batch of pytrees.
-
-    Args:
-        func: Function
-    """
-
-    def g(pytrees):
-        stacked = pytrees_stack(pytrees)
-        results = vmap(func)(stacked)
-        return results
-
-    return g
-
-
-class ReactionNetworkJAX:
-    """Primary role is to assemble Python objects to generate JAX-compliants arrays for numerical
-    solution. In this regard, this should only generate arrays that are required once, and not
-    computed dynamically during the solve.
-
-    Ironically, since the species list will be treated as a static argument, this will all use
-    numpy since nothing here is traced.
-    """
-
-    @staticmethod
-    def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
-        """Unique elements in a list of species
-
-        Args:
-            species: A list of species
-
-        Returns:
-            Unique elements in the list of species
-        """
-        elements: list[str] = []
-        for species_ in species:
-            elements.extend(species_.elements)
-        unique_elements: list[str] = list(set(elements))
-        sorted_elements: list[str] = sorted(unique_elements)
-
-        return tuple(sorted_elements)
-
-    def formula_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
-        """Formula matrix
-
-        Elements are given in rows and species in columns following the convention in
-        :cite:t:`LKS17`.
-
-        Returns:
-            The formula matrix
-        """
-        unique_elements: tuple[str, ...] = self.unique_elements_in_species(species)
-
-        formula_matrix: npt.NDArray = np.zeros(
-            (len(unique_elements), len(species)), dtype=jnp.int_
-        )
-        for element_index, element in enumerate(unique_elements):
-            for species_index, species_ in enumerate(species):
-                count: int = 0
-                try:
-                    count = species_.composition[element][0]
-                except KeyError:
-                    count = 0
-                formula_matrix[element_index, species_index] = count
-
-        return formula_matrix
-
-    def reaction_matrix(self, species: list[SpeciesData]) -> Array:
-        """Reaction matrix
-
-        Returns:
-            A matrix of linearly independent reactions or None
-        """
-        # TODO: Would prefer to always return an array
-        # if self._species.number == 1:
-        #    logger.debug("Only one species therefore no reactions")
-        #    return None
-
-        transpose_formula_matrix: npt.NDArray = self.formula_matrix(species).T
-
-        return jnp.array(partial_rref(transpose_formula_matrix))
-
-
 @jit
-def partial_rref(matrix: Array) -> Array:
+def partial_rref_jax(matrix: Array) -> Array:
     """Computes the partial reduced row echelon form to determine linear components.
+
+    This only uses JAX operations.
 
     Args:
         matrix: The matrix to compute the reduced row echelon form
@@ -332,3 +241,24 @@ def partial_rref(matrix: Array) -> Array:
     )
 
     return component_matrix
+
+
+def pytrees_stack(pytrees, axis=0):
+    """Stacks an iterable of pytrees along a specified axis."""
+    results = tree_map(lambda *values: jnp.stack(values, axis=axis), *pytrees)
+    return results
+
+
+def pytrees_vmap(func):
+    """Vectorizes a function over a batch of pytrees.
+
+    Args:
+        func: Function
+    """
+
+    def g(pytrees):
+        stacked = pytrees_stack(pytrees)
+        results = vmap(func)(stacked)
+        return results
+
+    return g

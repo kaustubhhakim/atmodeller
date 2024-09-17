@@ -424,7 +424,6 @@ class UnitConversion(NamedTuple):
 unit_conversion = UnitConversion()
 
 
-# TODO: Output permutation matrix
 def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     """Computes the partial reduced row echelon form to determine linear components
 
