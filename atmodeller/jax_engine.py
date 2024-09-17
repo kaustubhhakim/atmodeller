@@ -101,6 +101,28 @@ def get_rhs(
 
 
 @jit
+def get_log10_activity(solution: Array, parameters: Parameters) -> Array:
+    """Log10 activity
+
+    Args:
+        solution: Solution
+        parameters: Parameters
+
+    Returns:
+        Activity
+    """
+    species: list[SpeciesData] = parameters.species
+    phase_codes: Array = jnp.array([s.phase_code for s in species])
+
+    value_for_gas: Array = solution
+    value_for_condensed: Array = jnp.zeros(len(species))
+
+    activity_array = jnp.where(phase_codes == 0, value_for_gas, value_for_condensed)
+
+    return activity_array
+
+
+@jit
 def objective_function(solution: Array, parameters: Parameters) -> Array:
     """Residual of the reaction network and mass balance
 
@@ -123,12 +145,15 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # jax.debug.print("rhs = {out}", out=rhs)
 
     # Reaction network residual
-    reaction_residual: Array = reaction_matrix.dot(solution) - rhs
+    log10_activity: Array = get_log10_activity(solution, parameters)
+    reaction_residual: Array = reaction_matrix.dot(log10_activity) - rhs
+    # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
 
     # Mass balance residual
     log10_volume: Array = atmosphere_log10_volume(solution, species, planet)
     mass_residual: Array = jnp.log10(formula_matrix.dot(jnp.power(10, solution)))
     mass_residual = mass_residual - (constraints.array(scaling) - log10_volume)
+    # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
     residual: Array = jnp.concatenate(
         (
@@ -136,6 +161,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
             mass_residual,
         )
     )
+    # jax.debug.print("residual = {out}", out=residual)
 
     return residual
 

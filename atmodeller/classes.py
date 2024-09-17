@@ -29,7 +29,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ReactionNetwork:
-    """Reaction network"""
+    """Reaction network
+
+    This processing class takes a list of species and provides output related to reactions
+    """
 
     def formula_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
         """Formula matrix
@@ -64,6 +67,9 @@ class ReactionNetwork:
     def reaction_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
         """Reaction matrix
 
+        Args:
+            species: A list of species
+
         Returns:
             A matrix of linearly independent reactions or None # TODO: Still return None?
         """
@@ -77,3 +83,34 @@ class ReactionNetwork:
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
+
+    def reactions(self, species: list[SpeciesData]) -> dict[int, str]:
+        """The reactions as a dictionary
+
+        Args:
+            species: A list of species
+
+        Returns:
+            Reactions as a dictionary
+        """
+        reaction_matrix: npt.NDArray = self.reaction_matrix(species)
+        reactions: dict[int, str] = {}
+        # TODO: Would like to avoid below if possible
+        # if self.reaction_matrix is not None:
+        for reaction_index in range(reaction_matrix.shape[0]):
+            reactants: str = ""
+            products: str = ""
+            for species_index, species_ in enumerate(species):
+                coeff: float = reaction_matrix[reaction_index, species_index].item()
+                if coeff != 0:
+                    if coeff < 0:
+                        reactants += f"{abs(coeff)} {species_.name} + "
+                    else:
+                        products += f"{coeff} {species_.name} + "
+
+            reactants = reactants.rstrip(" + ")
+            products = products.rstrip(" + ")
+            reaction: str = f"{reactants} = {products}"
+            reactions[reaction_index] = reaction
+
+        return reactions
