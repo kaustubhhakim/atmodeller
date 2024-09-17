@@ -138,38 +138,18 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     rhs = get_rhs(planet, scaling)
     # jax.debug.print("{out}", out=rhs)
 
-    # Reaction network
+    # Reaction network residual
     reaction_residual: Array = reaction_matrix.dot(solution) - rhs
 
+    # Mass balance residual
     log10_volume: Array = atmosphere_log10_volume(solution, species, planet)
-
-    # Mass balance residuals (stoichiometry coefficients are hard-coded for this MWE)
-    carbon_residual: Array = jnp.array([solution[2], solution[4], solution[5]])
-    carbon_residual = logsumexp_base10(carbon_residual) - (log10_carbon_constraint - log10_volume)
-
-    hydrogen_residual: Array = jnp.array(
-        [jnp.log10(2) + solution[0], jnp.log10(2) + solution[1], jnp.log10(4) + solution[4]]
-    )
-    hydrogen_residual = logsumexp_base10(hydrogen_residual) - (
-        log10_hydrogen_constraint - log10_volume
-    )
-
-    oxygen_residual: Array = jnp.array(
-        [
-            solution[1],
-            jnp.log10(2) + solution[2],
-            jnp.log10(2) + solution[3],
-            solution[5],
-        ]
-    )
-    oxygen_residual = logsumexp_base10(oxygen_residual) - (log10_oxygen_constraint - log10_volume)
+    mass_residual: Array = jnp.log10(formula_matrix.dot(jnp.power(10, solution)))
+    mass_residual = mass_residual - (constraints_array - log10_volume)
 
     residual: Array = jnp.concatenate(
         (
             reaction_residual,
-            jnp.array([oxygen_residual]),
-            jnp.array([hydrogen_residual]),
-            jnp.array([carbon_residual]),
+            mass_residual,
         )
     )
 

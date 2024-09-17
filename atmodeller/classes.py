@@ -29,7 +29,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ReactionNetwork:
-    """Assembles Python objects to generate JAX-compliant arrays for numerical solution."""
+    """Reaction network"""
 
     @staticmethod
     def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
@@ -39,7 +39,7 @@ class ReactionNetwork:
             species: A list of species
 
         Returns:
-            Unique elements in the list of species
+            Unique elements in the species ordered alphabetically
         """
         elements: list[str] = []
         for species_ in species:
@@ -85,7 +85,7 @@ class ReactionNetwork:
         """Reaction matrix
 
         Returns:
-            A matrix of linearly independent reactions or None
+            A matrix of linearly independent reactions or None # TODO: Still return None?
         """
         # TODO: Would prefer to always return an array even in the absence of reactions?
         # if self._species.number == 1:
