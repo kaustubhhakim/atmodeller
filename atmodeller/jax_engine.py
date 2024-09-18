@@ -31,7 +31,7 @@ from atmodeller.jax_containers import (
     Solution,
     SpeciesData,
 )
-from atmodeller.jax_utilities import logsumexp_base10
+from atmodeller.jax_utilities import logsumexp
 
 log_AVOGADRO: ArrayLike = np.log(AVOGADRO)
 
@@ -49,8 +49,8 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
     """
 
     tol: float = 1.0e-8
-    solver = optx.Dogleg(atol=tol, rtol=tol)
-    # solver = optx.Newton(atol=tol, rtol=tol)
+    # solver = optx.Dogleg(atol=tol, rtol=tol)
+    solver = optx.Newton(atol=tol, rtol=tol)
     # solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
 
     sol = optx.root_find(
@@ -61,17 +61,22 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
         throw=True,
     )
 
+    jax.debug.print(
+        "Optimistix success with steps = {out}",
+        out=sol.stats["num_steps"],
+    )
+
     return sol.value
 
 
 @jit
-def get_rhs(
+def get_log_reaction_equilibrium_constant(
     species: list[SpeciesData],
     reaction_matrix: Array,
     temperature: ArrayLike,
     scaling: ArrayLike,
 ) -> Array:
-    """Gets the right-hand side of the reaction network equations
+    """Gets the log equilibrium constant of the reactions
 
     Args:
         species: List of species
@@ -80,65 +85,66 @@ def get_rhs(
         scaling: Scaling
 
     Returns:
-        Right-hand side of the reaction network equations
+        Log equilibrium constant of the reactions
     """
     # pylint: disable=invalid-name
-    lnKp: Array = get_lnKp(species, reaction_matrix, temperature)
+    log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
     # jax.debug.print("lnKp = {out}", out=lnKp)
 
     delta_n: Array = jnp.sum(reaction_matrix, axis=1)
     # jax.debug.print("delta_n = {out}", out=delta_n)
 
-    log10Kc: Array = lnKp - delta_n * (
+    log_Kc: Array = log_Kp - delta_n * (
         jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
     )
-    log10Kc = log10Kc / jnp.log(10)
     # jax.debug.print("log10Kc = {out}", out=log10Kc)
 
     # pylint: enable=invalid-name
 
-    return log10Kc
+    return log_Kc
 
 
 @jit
-def get_log10_activity(number_density: Array, parameters: Parameters) -> Array:
-    """Log10 activity
+def get_log_activity(log_number_density: Array, parameters: Parameters) -> Array:
+    """Log activity
 
     Args:
-        number_density: Number density
+        log_number_density: Log number density
         parameters: Parameters
 
     Returns:
-        Activity
+        Log activity
     """
     species: list[SpeciesData] = parameters.species
     phase_codes: Array = jnp.array([s.phase_code for s in species])
 
-    value_for_gas: Array = number_density
-    value_for_condensed: Array = jnp.zeros(len(species))
+    activity_for_gas: Array = log_number_density
+    activity_for_condensed: Array = jnp.zeros(len(species))
 
-    activity_array: Array = jnp.where(phase_codes == 0, value_for_gas, value_for_condensed)
+    log_activity: Array = jnp.where(phase_codes == 0, activity_for_gas, activity_for_condensed)
 
-    return activity_array
+    return log_activity
 
 
 @jit
-def get_log10_extended_activity(
-    number_density: Array, stability: Array, parameters: Parameters
+def get_log_extended_activity(
+    log_number_density: Array, log_stability: Array, parameters: Parameters
 ) -> Array:
-    """Log10 extended activity
+    """Log extended activity
 
     Args:
-        number_density: Number density
-        stability: Stability
+        log_number_density: Log number density
+        log_stability: Log stability
         parameters: Parameters
 
     Returns:
-        Extended activity
+        Log extended activity
     """
-    activity: Array = get_log10_activity(number_density, parameters) - jnp.power(10, stability)
+    log_extended_activity: Array = get_log_activity(log_number_density, parameters) - jnp.exp(
+        log_stability
+    )
 
-    return activity
+    return log_extended_activity
 
 
 @jit
@@ -162,45 +168,49 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
     number_density, stability = jnp.split(solution, 2)
 
-    rhs: Array = get_rhs(species, reaction_matrix, temperature, scaling)
+    log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
+        species, reaction_matrix, temperature, scaling
+    )
     # jax.debug.print("rhs = {out}", out=rhs)
 
     # Reaction network residual
-    log10_activity: Array = get_log10_activity(number_density, parameters)
+    log_activity: Array = get_log_activity(number_density, parameters)
     # log10_extended_activity: Array = get_log10_extended_activity(
     #    number_density, stability, parameters
     # )
-    reaction_residual: Array = reaction_matrix.dot(log10_activity) - rhs
+    reaction_residual: Array = (
+        reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
+    )
     # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
 
     # Modifications for stability. This is the same as dotting reaction matrix with extended
     # activity
-    reaction_residual = reaction_residual - reaction_matrix.dot(jnp.power(10, stability))
+    reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(stability))
 
     # Mass balance residual
-    log10_volume: Array = atmosphere_log10_volume(number_density, species, planet)
-    mass_residual: Array = jnp.log10(formula_matrix.dot(jnp.power(10, number_density)))
-    mass_residual = mass_residual - (constraints.array(scaling) - log10_volume)
+    log_volume: Array = atmosphere_log_volume(number_density, species, planet)
+    mass_residual: Array = jnp.log(formula_matrix.dot(jnp.exp(number_density)))
+    mass_residual = mass_residual - (constraints.array(scaling) - log_volume)
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
     # Get minimum scaled log10 number of molecules
-    log10_tau_min: Array = jnp.min(constraints.array(scaling))
-    jax.debug.print("log10_tau_min = {out}", out=log10_tau_min)
+    log_tau_min: Array = jnp.min(constraints.array(scaling))
+    jax.debug.print("log_tau_min = {out}", out=log_tau_min)
     # Get minimum number density
-    log10_tau_min = log10_tau_min - log10_volume
-    jax.debug.print("log10_tau_min = {out}", out=log10_tau_min)
+    log_tau_min = log_tau_min - log_volume
+    jax.debug.print("log10_tau_min = {out}", out=log_tau_min)
     # Fraction
-    tau_min = jnp.power(10, log10_tau_min)
+    tau_min = jnp.exp(log_tau_min)
     tau_min = tau_min * 1.0e-60
 
     # Stability residual
-    N: Array = jnp.diag(jnp.power(10, number_density))
+    N: Array = jnp.diag(jnp.exp(number_density))
     jax.debug.print("N = {out}", out=N)
-    Z: Array = jnp.diag(jnp.power(10, stability))
+    Z: Array = jnp.diag(jnp.exp(stability))
     jax.debug.print("Z = {out}", out=Z)
     e: Array = jnp.ones_like(stability)
     jax.debug.print("e = {out}", out=e)
-    stability_residual: Array = jnp.log10(N.dot(Z).dot(e)) - jnp.log10(tau_min * e)
+    stability_residual: Array = jnp.log(N.dot(Z).dot(e)) - jnp.log(tau_min * e)
     jax.debug.print("out = {out}", out=stability_residual)
 
     residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
@@ -210,25 +220,25 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
 
 @jit
-def atmosphere_log10_molar_mass(solution: Array, species: list[SpeciesData]) -> Array:
-    """Log10 of the molar mass of the atmosphere
+def atmosphere_log_molar_mass(solution: Array, species: list[SpeciesData]) -> Array:
+    """Log of the molar mass of the atmosphere
 
     Args:
         solution: Number density solution array(s)
         species: Species
 
     Returns:
-        Log10 molar mass of the atmosphere
+        Log molar mass of the atmosphere
     """
     molar_masses: Array = jnp.array([value.molar_mass for value in species])
-    molar_mass: Array = logsumexp_base10(solution, molar_masses) - logsumexp_base10(solution)
+    molar_mass: Array = logsumexp(solution, molar_masses) - logsumexp(solution)
 
     return molar_mass
 
 
 @jit
-def atmosphere_log10_volume(solution: Array, species: list[SpeciesData], planet: Planet) -> Array:
-    """Log10 of the volume of the atmosphere"
+def atmosphere_log_volume(solution: Array, species: list[SpeciesData], planet: Planet) -> Array:
+    """Log of the volume of the atmosphere"
 
     Args:
         solution: Number density solution array(s)
@@ -236,14 +246,14 @@ def atmosphere_log10_volume(solution: Array, species: list[SpeciesData], planet:
         planet: Planet
 
     Returns:
-        Log10 volume of the atmosphere
+        Log volume of the atmosphere
     """
     return (
-        jnp.log10(GAS_CONSTANT)
-        + jnp.log10(planet.surface_temperature)
-        - atmosphere_log10_molar_mass(solution, species)
-        + jnp.log10(planet.surface_area)
-        - jnp.log10(planet.surface_gravity)
+        jnp.log(GAS_CONSTANT)
+        + jnp.log(planet.surface_temperature)
+        - atmosphere_log_molar_mass(solution, species)
+        + jnp.log(planet.surface_area)
+        - jnp.log(planet.surface_gravity)
     )
 
 
@@ -272,7 +282,9 @@ def gibbs_energy_of_formation(species_data: SpeciesData, temperature: ArrayLike)
 
 # pylint: disable=invalid-name
 @jit
-def get_lnKp(species: list[SpeciesData], reaction_matrix: Array, temperature: ArrayLike) -> Array:
+def get_log_Kp(
+    species: list[SpeciesData], reaction_matrix: Array, temperature: ArrayLike
+) -> Array:
     """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
     Args:
@@ -290,9 +302,9 @@ def get_lnKp(species: list[SpeciesData], reaction_matrix: Array, temperature: Ar
 
     gibbs_array: Array = jnp.array(gibbs_list)
 
-    lnKp: Array = -1.0 * reaction_matrix.dot(gibbs_array) / (GAS_CONSTANT * temperature)
+    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_array) / (GAS_CONSTANT * temperature)
 
-    return lnKp
+    return log_Kp
 
 
 # pylint: enable=invalid-name

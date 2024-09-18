@@ -59,15 +59,15 @@ ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
 scaling: float = AVOGADRO
-log10_scaling: Array = np.log10(scaling)
+log_scaling: Array = np.log(scaling)
 
 # Initial solution guess number density (molecules/m^3)
-initial_number_density: ArrayLike = np.array([26, 26, 12, -26, 26, 25], dtype=np.float_)
-initial_number_density = scale_number_density(initial_number_density, log10_scaling)
+initial_number_density: ArrayLike = np.array([60, 60, 30, -60, 60, 30], dtype=np.float_)
+initial_number_density = scale_number_density(initial_number_density, log_scaling)
 logger.debug("initial_number_density = %s", initial_number_density)
 
 # Stability is a non-dimensional quantity
-initial_stability: ArrayLike = -1.0 * np.ones_like(initial_number_density)
+initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
 logger.debug("initial_stability = %s", initial_stability)
 
 
@@ -105,24 +105,19 @@ def test_CHO_low_temperature() -> None:
     out: Array = solve(solution, parameters)
 
     number_density, stability = jnp.split(out, 2)
-    number_density = unscale_number_density(number_density, log10_scaling)
+    number_density = unscale_number_density(number_density, log_scaling)
 
     out = jnp.concatenate((number_density, stability))
+    logger.debug("solution = %s", out)
 
     target: npt.NDArray = np.array(
         [
-            26.950804260065247,
-            26.109794057030317,
-            11.296925808461696,
-            -27.95101032817347,
-            26.411827244097612,
-            9.637881738184374,
-            #        -60.841010203034934,
-            #        -60.000000000000014,
-            #        -45.18713175143139,
-            #        -5.939195614796226,
-            #        -60.3020331870673,
-            #        -43.52808768115406,
+            62.05652013342668,
+            60.120022576862524,
+            26.01213296322353,
+            -64.35958121411358,
+            60.81547969099319,
+            22.19204281838283,
         ]
     )
 
@@ -134,8 +129,6 @@ def test_CHO_low_temperature() -> None:
     #     "CH4_g": 16.037,
     #     "CO_g": 2.12e-16,
     # }
-
-    print(out)
 
     isclose: np.bool_ = np.isclose(target, number_density, rtol=RTOL, atol=ATOL).all()
 

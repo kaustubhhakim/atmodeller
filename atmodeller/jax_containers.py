@@ -202,17 +202,17 @@ class Solution(NamedTuple):
 
 
 class Constraints(NamedTuple):
-    """Log10 number of molecules constraints
+    """Log number of molecules constraints
 
     Args:
         species: A list of species
-        log10_molecules: Log10 number of molecules constraints, ordered alphabetically by element
+        log_molecules: Log number of molecules constraints, ordered alphabetically by element
     """
 
     species: list[SpeciesData]
     """List of species"""
-    log10_molecules: dict[str, ArrayLike]
-    """Log10 number of molecules constraints, ordered alphabetically by element name"""
+    log_molecules: dict[str, ArrayLike]
+    """Log number of molecules constraints, ordered alphabetically by element name"""
 
     @classmethod
     def create(cls, species: list[SpeciesData], mass: Mapping[str, ArrayLike]) -> Self:
@@ -223,25 +223,23 @@ class Constraints(NamedTuple):
             mass: Mapping of element name and mass constraint in kg in any order
         """
         sorted_mass: dict[str, ArrayLike] = {k: mass[k] for k in sorted(mass)}
-        log10_number_of_molecules: dict[str, ArrayLike] = {}
+        log_number_of_molecules: dict[str, ArrayLike] = {}
         for element, mass_constraint in sorted_mass.items():
             molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log10_number_of_molecules_: Array = (
-                jnp.log10(mass_constraint) + jnp.log10(AVOGADRO) - jnp.log10(molar_mass)
+            log_number_of_molecules_: Array = (
+                jnp.log(mass_constraint) + jnp.log(AVOGADRO) - jnp.log(molar_mass)
             )
-            log10_number_of_molecules[element] = log10_number_of_molecules_
+            log_number_of_molecules[element] = log_number_of_molecules_
 
-        return cls(species, log10_number_of_molecules)
+        return cls(species, log_number_of_molecules)
 
     def array(self, scaling: ArrayLike) -> Array:
-        """Scaled log10 number of molecules array
+        """Scaled log number of molecules array
 
         Args:
             scaling: Scaling
         """
-        return scale_number_density(
-            jnp.array(list(self.log10_molecules.values())), jnp.log10(scaling)
-        )
+        return scale_number_density(jnp.array(list(self.log_molecules.values())), jnp.log(scaling))
 
 
 class Parameters(NamedTuple):

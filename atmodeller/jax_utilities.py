@@ -23,27 +23,27 @@ from jax.typing import ArrayLike
 
 
 @jit
-def logsumexp_base10(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
-    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
+def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
+    """Computes the log-sum-exp in a numerically stable way.
 
     Args:
-        log10_values: Array of log10 values to sum
-        prefactors: Array of prefactors corresponding to each log10 value
+        log_values: Array of log values to sum
+        prefactors: Array of prefactors corresponding to each log value
 
     Returns:
-        The log10 of the sum of prefactors multiplied by exponentials of the input values
+        The log of the sum of prefactors multiplied by exponentials of the input values
     """
     max_log: Array = jnp.max(log_values)
-    value_sum: Array = jnp.sum(prefactors * jnp.power(10, log_values - max_log))
+    value_sum: Array = jnp.sum(prefactors * jnp.exp(log_values - max_log))
 
-    return max_log + jnp.log10(value_sum)
+    return max_log + jnp.log(value_sum)
 
 
 @jit
 def scale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
-    """Scales the log10 number density
+    """Scales the log number density
 
-    This is in log10 space.
+    This is in log space.
 
     Args:
         number_density: Number density in molecules per m^3
@@ -57,9 +57,9 @@ def scale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> Array
 
 @jit
 def unscale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
-    """Unscales the scaled log10 number density
+    """Unscales the scaled log number density
 
-    This is in log10 space.
+    This is in log space.
 
     Args:
         number_density: Scaled number density
