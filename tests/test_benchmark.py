@@ -30,8 +30,9 @@ from atmodeller.constraints import (
     FugacityConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.jax_containers import Planet
 from atmodeller.solution import Solution
 from atmodeller.solver import SolverOptimistix, SolverScipy
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer

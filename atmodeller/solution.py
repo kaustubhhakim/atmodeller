@@ -36,7 +36,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT, MACHEPS
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import GasSpecies, LiquidSpecies, Planet, Species
+from atmodeller.core import GasSpecies, LiquidSpecies, Species
 from atmodeller.interfaces import (
     ChemicalSpecies,
     CondensedSpecies,
@@ -44,7 +44,7 @@ from atmodeller.interfaces import (
     TypeChemicalSpecies,
     TypeChemicalSpecies_co,
 )
-from atmodeller.solubility.interfaces import NoSolubility
+from atmodeller.jax_containers import Planet
 from atmodeller.utilities import get_molar_mass, logsumexp_base10, unit_conversion
 
 if sys.version_info < (3, 11):

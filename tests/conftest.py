@@ -33,11 +33,12 @@ from atmodeller.constraints import (
     PressureConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.jax_containers import Planet
 from atmodeller.solution import Solution
-from atmodeller.solver import Solver, SolverOptimistix, SolverScipy, SolverTryAgain
+from atmodeller.solver import Solver, SolverOptimistix, SolverTryAgain
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -16,7 +16,7 @@
 #
 """JAX-related functionality for solving the system of equations"""
 
-# import jax
+import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
@@ -56,7 +56,7 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
     sol = optx.root_find(
         objective_function,
         solver,
-        solution.number_density,
+        solution.data,
         args=(parameters),
         throw=True,
     )
@@ -101,11 +101,11 @@ def get_rhs(
 
 
 @jit
-def get_log10_activity(solution: Array, parameters: Parameters) -> Array:
+def get_log10_activity(number_density: Array, parameters: Parameters) -> Array:
     """Log10 activity
 
     Args:
-        solution: Solution
+        number_density: Number density
         parameters: Parameters
 
     Returns:
@@ -114,26 +114,31 @@ def get_log10_activity(solution: Array, parameters: Parameters) -> Array:
     species: list[SpeciesData] = parameters.species
     phase_codes: Array = jnp.array([s.phase_code for s in species])
 
-    value_for_gas: Array = solution
+    value_for_gas: Array = number_density
     value_for_condensed: Array = jnp.zeros(len(species))
 
-    activity_array = jnp.where(phase_codes == 0, value_for_gas, value_for_condensed)
+    activity_array: Array = jnp.where(phase_codes == 0, value_for_gas, value_for_condensed)
 
     return activity_array
 
 
 @jit
-def get_log10_extended_activity(solution: Array, parameters: Parameters) -> Array:
+def get_log10_extended_activity(
+    number_density: Array, stability: Array, parameters: Parameters
+) -> Array:
     """Log10 extended activity
 
     Args:
-        solution: Solution
+        number_density: Number density
+        stability: Stability
         parameters: Parameters
 
     Returns:
         Extended activity
     """
-    activity: Array = get_log10_activity(solution, parameters)
+    activity: Array = get_log10_activity(number_density, parameters) - jnp.power(10, stability)
+
+    return activity
 
 
 @jit
@@ -155,27 +160,51 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     temperature: ArrayLike = planet.surface_temperature
     scaling: ArrayLike = parameters.scaling
 
+    number_density, stability = jnp.split(solution, 2)
+
     rhs: Array = get_rhs(species, reaction_matrix, temperature, scaling)
     # jax.debug.print("rhs = {out}", out=rhs)
 
     # Reaction network residual
-    log10_activity: Array = get_log10_activity(solution, parameters)
+    log10_activity: Array = get_log10_activity(number_density, parameters)
+    # log10_extended_activity: Array = get_log10_extended_activity(
+    #    number_density, stability, parameters
+    # )
     reaction_residual: Array = reaction_matrix.dot(log10_activity) - rhs
     # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
 
+    # Modifications for stability. This is the same as dotting reaction matrix with extended
+    # activity
+    reaction_residual = reaction_residual - reaction_matrix.dot(jnp.power(10, stability))
+
     # Mass balance residual
-    log10_volume: Array = atmosphere_log10_volume(solution, species, planet)
-    mass_residual: Array = jnp.log10(formula_matrix.dot(jnp.power(10, solution)))
+    log10_volume: Array = atmosphere_log10_volume(number_density, species, planet)
+    mass_residual: Array = jnp.log10(formula_matrix.dot(jnp.power(10, number_density)))
     mass_residual = mass_residual - (constraints.array(scaling) - log10_volume)
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
-    residual: Array = jnp.concatenate(
-        (
-            reaction_residual,
-            mass_residual,
-        )
-    )
-    # jax.debug.print("residual = {out}", out=residual)
+    # Get minimum scaled log10 number of molecules
+    log10_tau_min: Array = jnp.min(constraints.array(scaling))
+    jax.debug.print("log10_tau_min = {out}", out=log10_tau_min)
+    # Get minimum number density
+    log10_tau_min = log10_tau_min - log10_volume
+    jax.debug.print("log10_tau_min = {out}", out=log10_tau_min)
+    # Fraction
+    tau_min = jnp.power(10, log10_tau_min)
+    tau_min = tau_min * 1.0e-60
+
+    # Stability residual
+    N: Array = jnp.diag(jnp.power(10, number_density))
+    jax.debug.print("N = {out}", out=N)
+    Z: Array = jnp.diag(jnp.power(10, stability))
+    jax.debug.print("Z = {out}", out=Z)
+    e: Array = jnp.ones_like(stability)
+    jax.debug.print("e = {out}", out=e)
+    stability_residual: Array = jnp.log10(N.dot(Z).dot(e)) - jnp.log10(tau_min * e)
+    jax.debug.print("out = {out}", out=stability_residual)
+
+    residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
+    jax.debug.print("residual = {out}", out=residual)
 
     return residual
 

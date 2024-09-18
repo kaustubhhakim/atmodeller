@@ -63,8 +63,8 @@ known_solution: dict[str, float] = {
 known_solution_array: ArrayLike = np.array([val for val in known_solution.values()])
 
 # Initial solution guess number density (molecules/m^3)
-initial_solution_default: ArrayLike = np.array([26, 26, 12, -26, 26, 25], dtype=np.float_)
-# initial_solution_default: Array = jnp.array([26, 26, 26, 26, 26, 26], dtype=jnp.float_)
+initial_number_density_default: ArrayLike = np.array([26, 26, 12, -26, 26, 25], dtype=np.float_)
+# initial_number_density_default: Array = jnp.array([26, 26, 26, 26, 26, 26], dtype=jnp.float_)
 
 # If we start somewhere close to the solution then Optimistix is OK
 # Parameters for the perturbation
@@ -73,9 +73,12 @@ std_dev = 5.0  # Standard deviation of the perturbation
 # Generate random perturbations
 perturbation = np.random.normal(mean, std_dev, size=known_solution_array.shape)
 
-# initial_solution: Array = jnp.array(known_solution_array) + perturbation
-initial_solution: ArrayLike = initial_solution_default
-initial_solution = scale_number_density(initial_solution, log10_scaling)
+# initial_number_density: Array = jnp.array(known_solution_array) + perturbation
+initial_number_density: ArrayLike = initial_number_density_default
+initial_number_density = scale_number_density(initial_number_density, log10_scaling)
+
+# Initial stability
+initial_stability: ArrayLike = np.zeros_like(initial_number_density)
 
 h_kg: float = earth_oceans_to_hydrogen_mass(1)
 c_kg: float = 1 * h_kg
@@ -102,7 +105,7 @@ def solve_single(species: list[SpeciesData]) -> Array:
     """
     planet: Planet = Planet(surface_temperature=450)
     # Placeholder for stability
-    solution: Solution = Solution(initial_solution, initial_solution)  # type: ignore
+    solution: Solution = Solution(initial_number_density, initial_stability)  # type: ignore
 
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, scaling
@@ -119,7 +122,12 @@ def solve_single(species: list[SpeciesData]) -> Array:
 
     out: Array = solve(solution, parameters).block_until_ready()
 
-    return unscale_number_density(out, log10_scaling)
+    number_density, stability = jnp.split(out, 2)
+    number_density = unscale_number_density(number_density, log10_scaling)
+
+    out = jnp.concatenate((number_density, stability))
+
+    return out
 
 
 def solve_batch(species: list[SpeciesData]) -> Array:
@@ -150,7 +158,7 @@ def solve_batch(species: list[SpeciesData]) -> Array:
     # jax.debug.print("{out}", out=parameters)
 
     # For the same initial solution
-    solution = Solution(initial_solution, initial_solution)  # type: ignore
+    solution = Solution(initial_number_density, initial_stability)  # type: ignore
     # jax.debug.print("{out}", out=solution)
 
     additional_for_vmap: Parameters = Parameters(
@@ -214,8 +222,8 @@ def simple_system():
 
 def main():
 
-    # out = solve_single(species_list)
-    out = solve_batch(species_list)
+    out = solve_single(species_list)
+    # out = solve_batch(species_list)
 
     # solve_batch_jit = jax.jit(solve_batch)
 

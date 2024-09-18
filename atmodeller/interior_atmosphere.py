@@ -21,8 +21,9 @@ from __future__ import annotations
 import logging
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Planet, Species
+from atmodeller.core import Species
 from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
+from atmodeller.jax_containers import Planet
 from atmodeller.output import Output
 from atmodeller.reaction_network import ReactionNetworkWithMassBalance
 from atmodeller.solution import Solution

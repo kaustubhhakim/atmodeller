@@ -37,8 +37,9 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
 from atmodeller.constraints import SystemConstraints
-from atmodeller.core import Planet, Species
+from atmodeller.core import Species
 from atmodeller.interfaces import ChemicalSpecies
+from atmodeller.jax_containers import Planet
 from atmodeller.output import Output
 from atmodeller.solution import (
     ACTIVITY_PREFIX,

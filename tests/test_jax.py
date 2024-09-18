@@ -25,26 +25,23 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
-import pytest
 from jax import Array
 
 from atmodeller import __version__, debug_logger
 from atmodeller.constraints import (
-    ActivityConstraint,
     BufferedFugacityConstraint,
     ElementMassConstraint,
     FugacityConstraint,
     SystemConstraints,
     TotalPressureConstraint,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
-from atmodeller.eos.chabrier import get_chabrier_eos_models
+from atmodeller.core import GasSpecies, Species
 from atmodeller.eos.holland import CO_CORK_HP91, H2_CORK_HP91, CO2_CORK_simple_HP91
 from atmodeller.eos.saxena import H2_SF87
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.jax_containers import Planet
 from atmodeller.solution import Solution
 from atmodeller.solver import SolverOptimistix
-from atmodeller.thermodata.holland import ThermodynamicDatasetHollandAndPowell
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 

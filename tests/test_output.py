@@ -30,8 +30,9 @@ from atmodeller.constraints import (
     SystemConstraints,
     TotalPressureConstraint,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.jax_containers import Planet
 from atmodeller.solution import ELEMENT_PREFIX
 
 logger: logging.Logger = debug_logger()

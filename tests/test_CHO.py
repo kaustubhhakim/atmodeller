@@ -33,10 +33,11 @@ from atmodeller.constraints import (
     SystemConstraints,
     TotalPressureConstraint,
 )
-from atmodeller.core import GasSpecies, Planet, Species
+from atmodeller.core import GasSpecies, Species
 from atmodeller.eos.holland import get_holland_eos_models
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.jax_containers import Planet
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import (
     H2_basalt_hirschmann,

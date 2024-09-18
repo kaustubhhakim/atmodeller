@@ -195,6 +195,11 @@ class Solution(NamedTuple):
     stability: Array
     """Stability of species"""
 
+    @property
+    def data(self) -> Array:
+        """Combined data in a single array"""
+        return jnp.concatenate((self.number_density, self.stability))
+
 
 class Constraints(NamedTuple):
     """Log10 number of molecules constraints

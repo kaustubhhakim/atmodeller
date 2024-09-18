@@ -32,7 +32,7 @@ from atmodeller.constraints import (
     PressureConstraint,
     SystemConstraints,
 )
-from atmodeller.core import GasSpecies, LiquidSpecies, Planet, SolidSpecies, Species
+from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
 from atmodeller.initial_solution import (
     FILL_LOG10_NUMBER_DENSITY,
     FILL_LOG10_STABILITY,
@@ -42,6 +42,7 @@ from atmodeller.initial_solution import (
     InitialSolutionRegressor,
 )
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
+from atmodeller.jax_containers import Planet
 from atmodeller.solver import SolverOptimistix
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
