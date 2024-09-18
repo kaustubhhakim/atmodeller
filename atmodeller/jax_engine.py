@@ -46,8 +46,8 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
     """
 
     tol: float = 1.0e-8
-    solver = optx.Dogleg(atol=tol, rtol=tol)
-    # solver = optx.Newton(atol=tol, rtol=tol)
+    # solver = optx.Dogleg(atol=tol, rtol=tol)
+    solver = optx.Newton(atol=tol, rtol=tol)
     # solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
 
     sol = optx.root_find(

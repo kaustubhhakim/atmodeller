@@ -42,7 +42,7 @@ from atmodeller.jax_containers import (
     Solution,
     SpeciesData,
 )
-from atmodeller.jax_engine import solve
+from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import scale_number_density, unscale_number_density
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -100,15 +100,15 @@ def test_CHO_low_temperature() -> None:
 
     out = solve(solution, parameters)
 
-    # if optx.RESULTS[sol.result] == "":
-    #    out: Array = sol.value
-    #    logger.info("Optimistix success with steps = %d", sol.stats["num_steps"])
-
     number_density, stability = jnp.split(out, 2)
     number_density = unscale_number_density(number_density, log_scaling)
 
+    log_extended_activity = get_log_extended_activity(number_density, stability, parameters)
+
     out = jnp.concatenate((number_density, stability))
     logger.debug("solution = %s", out)
+
+    logger.debug("log_extended_activity = %s", log_extended_activity)
 
     target: npt.NDArray = np.array(
         [
@@ -163,7 +163,7 @@ def test_graphite_condensed() -> None:
     logger.debug("initial_number_density = %s", initial_number_density)
 
     # Stability is a non-dimensional quantity
-    initial_stability: ArrayLike = -50.0 * np.ones_like(initial_number_density, dtype=np.float_)
+    initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density, dtype=np.float_)
     logger.debug("initial_stability = %s", initial_stability)
 
     solution: Solution = Solution(initial_number_density, initial_stability)  # type: ignore
@@ -180,8 +180,12 @@ def test_graphite_condensed() -> None:
     number_density, stability = jnp.split(out, 2)
     number_density = unscale_number_density(number_density, log_scaling)
 
+    log_extended_activity = get_log_extended_activity(number_density, stability, parameters)
+
     out = jnp.concatenate((number_density, stability))
     logger.debug("solution = %s", out)
+
+    logger.debug("log_extended_activity = %s", log_extended_activity)
 
     out = jnp.exp(out)
     logger.debug("exp solution = %s", out)
@@ -234,7 +238,7 @@ def test_graphite_unstable() -> None:
     logger.debug("initial_number_density = %s", initial_number_density)
 
     # Stability is a non-dimensional quantity
-    initial_stability: ArrayLike = -50.00 * np.ones_like(initial_number_density, dtype=np.float_)
+    initial_stability: ArrayLike = -50.0 * np.ones_like(initial_number_density, dtype=np.float_)
     logger.debug("initial_stability = %s", initial_stability)
 
     solution: Solution = Solution(initial_number_density, initial_stability)  # type: ignore
