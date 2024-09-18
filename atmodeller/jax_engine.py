@@ -18,12 +18,12 @@
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
+from optimistix import Solution as SolutionOptx
 
-from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.jax_containers import (
     Constraints,
     Parameters,
@@ -33,11 +33,9 @@ from atmodeller.jax_containers import (
 )
 from atmodeller.jax_utilities import logsumexp
 
-log_AVOGADRO: ArrayLike = np.log(AVOGADRO)
-
 
 @jit
-def solve(solution: Solution, parameters: Parameters) -> Array:
+def solve(solution: Solution, parameters: Parameters) -> SolutionOptx:
     """Solves the system
 
     Args:
@@ -61,12 +59,7 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
         throw=True,
     )
 
-    jax.debug.print(
-        "Optimistix success with steps = {out}",
-        out=sol.stats["num_steps"],
-    )
-
-    return sol.value
+    return sol
 
 
 @jit

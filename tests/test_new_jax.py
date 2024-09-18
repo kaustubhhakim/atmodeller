@@ -23,6 +23,7 @@ import logging
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+import optimistix as optx
 from jax import Array
 from jax.typing import ArrayLike
 
@@ -100,9 +101,13 @@ def test_CHO_low_temperature() -> None:
     )
 
     # Pre-compile
-    solve(solution, parameters).block_until_ready()
+    # solve(solution, parameters).value.block_until_ready()
 
-    out: Array = solve(solution, parameters)
+    sol = solve(solution, parameters)
+
+    if optx.RESULTS[sol.result] == "":
+        out: Array = sol.value
+        logger.info("Optimistix success with steps = %d", sol.stats["num_steps"])
 
     number_density, stability = jnp.split(out, 2)
     number_density = unscale_number_density(number_density, log_scaling)
