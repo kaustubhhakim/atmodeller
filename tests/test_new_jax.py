@@ -23,7 +23,6 @@ import logging
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-import optimistix as optx
 from jax import Array
 from jax.typing import ArrayLike
 
@@ -97,13 +96,13 @@ def test_CHO_low_temperature() -> None:
     )
 
     # Pre-compile
-    # solve(solution, parameters).value.block_until_ready()
+    # solve(solution, parameters).block_until_ready()
 
-    sol = solve(solution, parameters)
+    out = solve(solution, parameters)
 
-    if optx.RESULTS[sol.result] == "":
-        out: Array = sol.value
-        logger.info("Optimistix success with steps = %d", sol.stats["num_steps"])
+    # if optx.RESULTS[sol.result] == "":
+    #    out: Array = sol.value
+    #    logger.info("Optimistix success with steps = %d", sol.stats["num_steps"])
 
     number_density, stability = jnp.split(out, 2)
     number_density = unscale_number_density(number_density, log_scaling)
@@ -152,19 +151,19 @@ def test_graphite_condensed() -> None:
 
     # Unscaled total molecules constraints in alphabetical order
     mass_constraints = {
-        "C": c_kg,  # 10**45.89051326565627,
-        "H": h_kg,  # 10**46.96664792007732,
-        "O": o_kg,  # 10**45.58848007858896,
+        "C": c_kg,
+        "H": h_kg,
+        "O": o_kg,
     }
     constraints: Constraints = Constraints.create(species_list, mass_constraints)
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = np.array([1, 30, 30, 30, 30, 30, 30], dtype=np.float_)
+    initial_number_density: ArrayLike = np.array([1, 60, 60, 60, 60, 60, 60], dtype=np.float_)
     initial_number_density = scale_number_density(initial_number_density, log_scaling)
     logger.debug("initial_number_density = %s", initial_number_density)
 
     # Stability is a non-dimensional quantity
-    initial_stability: ArrayLike = -50 * np.ones_like(initial_number_density, dtype=np.float_)
+    initial_stability: ArrayLike = -50.0 * np.ones_like(initial_number_density, dtype=np.float_)
     logger.debug("initial_stability = %s", initial_stability)
 
     solution: Solution = Solution(initial_number_density, initial_stability)  # type: ignore
@@ -174,13 +173,9 @@ def test_graphite_condensed() -> None:
     )
 
     # Pre-compile
-    # solve(solution, parameters).value.block_until_ready()
+    # solve(solution, parameters).block_until_ready()
 
-    sol = solve(solution, parameters)
-
-    if optx.RESULTS[sol.result] == "":
-        out: Array = sol.value
-        logger.info("Optimistix success with steps = %d", sol.stats["num_steps"])
+    out = solve(solution, parameters)
 
     number_density, stability = jnp.split(out, 2)
     number_density = unscale_number_density(number_density, log_scaling)
@@ -227,19 +222,19 @@ def test_graphite_unstable() -> None:
 
     # Unscaled total molecules constraints in alphabetical order
     mass_constraints = {
-        "C": c_kg,  # 10**45.89051326565627,
-        "H": h_kg,  # 10**46.96664792007732,
-        "O": o_kg,  # 10**45.58848007858896,
+        "C": c_kg,
+        "H": h_kg,
+        "O": o_kg,
     }
     constraints: Constraints = Constraints.create(species_list, mass_constraints)
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = np.array([30, 30, 30, 30, 30, 1, 1], dtype=np.float_)
+    initial_number_density: ArrayLike = np.array([60, 60, 60, 60, 60, 1, 1], dtype=np.float_)
     initial_number_density = scale_number_density(initial_number_density, log_scaling)
     logger.debug("initial_number_density = %s", initial_number_density)
 
     # Stability is a non-dimensional quantity
-    initial_stability: ArrayLike = -50 * np.ones_like(initial_number_density, dtype=np.float_)
+    initial_stability: ArrayLike = -50.00 * np.ones_like(initial_number_density, dtype=np.float_)
     logger.debug("initial_stability = %s", initial_stability)
 
     solution: Solution = Solution(initial_number_density, initial_stability)  # type: ignore
@@ -249,13 +244,9 @@ def test_graphite_unstable() -> None:
     )
 
     # Pre-compile
-    # solve(solution, parameters).value.block_until_ready()
+    solve(solution, parameters).value.block_until_ready()
 
-    sol = solve(solution, parameters)
-
-    if optx.RESULTS[sol.result] == "":
-        out: Array = sol.value
-        logger.info("Optimistix success with steps = %d", sol.stats["num_steps"])
+    out = solve(solution, parameters)
 
     number_density, stability = jnp.split(out, 2)
     number_density = unscale_number_density(number_density, log_scaling)

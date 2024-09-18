@@ -21,7 +21,6 @@ import jax.numpy as jnp
 import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
-from optimistix import Solution as SolutionOptx
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.jax_containers import (
@@ -35,7 +34,7 @@ from atmodeller.jax_utilities import logsumexp
 
 
 @jit
-def solve(solution: Solution, parameters: Parameters) -> SolutionOptx:
+def solve(solution: Solution, parameters: Parameters) -> Array:
     """Solves the system
 
     Args:
@@ -47,8 +46,8 @@ def solve(solution: Solution, parameters: Parameters) -> SolutionOptx:
     """
 
     tol: float = 1.0e-8
-    # solver = optx.Dogleg(atol=tol, rtol=tol)
-    solver = optx.Newton(atol=tol, rtol=tol)
+    solver = optx.Dogleg(atol=tol, rtol=tol)
+    # solver = optx.Newton(atol=tol, rtol=tol)
     # solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
 
     sol = optx.root_find(
@@ -59,7 +58,9 @@ def solve(solution: Solution, parameters: Parameters) -> SolutionOptx:
         throw=True,
     )
 
-    return sol
+    jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+
+    return sol.value
 
 
 @jit

@@ -368,7 +368,7 @@ class DissolvedNumberDensitySpecies(NumberDensitySpecies[GasSpecies]):
             )
         )
 
-    def reservoir_mass(self) -> float:
+    def reservoir_mass(self) -> ArrayLike:
         """Mass of the reservoir"""
         return self.atmosphere.planet.mantle_melt_mass
 
@@ -433,7 +433,7 @@ class TrappedNumberDensitySpecies(DissolvedNumberDensitySpecies):
         return trapped_ppmw
 
     @override
-    def reservoir_mass(self) -> float:
+    def reservoir_mass(self) -> ArrayLike:
         """Mass of the reservoir"""
         return self.atmosphere.planet.mantle_solid_mass
 
@@ -806,7 +806,7 @@ class Atmosphere(
         """
         output: dict[str, float] = super().output_dict()
         output[f"{self.output_prefix}pressure"] = self.pressure().item()
-        output[f"{self.output_prefix}temperature"] = self.temperature()
+        output[f"{self.output_prefix}temperature"] = self.temperature()  # type: ignore
         output[f"{self.output_prefix}volume"] = self.volume().item()
 
         return output
@@ -844,7 +844,7 @@ class Atmosphere(
         )
         return jnp.power(10, log10_pressure)
 
-    def temperature(self) -> float:
+    def temperature(self) -> ArrayLike:
         """Temperature"""
         return self._planet.surface_temperature
 
@@ -1149,7 +1149,7 @@ class Solution(CollectionMixin[ChemicalSpecies, SomeContainer]):
             output[f"{SPECIES_PREFIX}{species.name}"] = collection.output_dict()
         output |= self._output_elements()
         output["atmosphere"] = self.atmosphere.output_dict()
-        output["planet"] = self.planet.to_dict()
+        output["planet"] = self.planet.asdict()
         output["raw_solution"] = self.output_raw_solution()
         output["solution"] = self.output_solution()
 
