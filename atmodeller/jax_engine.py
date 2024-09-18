@@ -46,9 +46,9 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
     """
 
     tol: float = 1.0e-8
-    # solver = optx.Dogleg(atol=tol, rtol=tol)
+    solver = optx.Dogleg(atol=tol, rtol=tol)
     # solver = optx.Newton(atol=tol, rtol=tol)
-    solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
+    # solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
 
     sol = optx.root_find(
         objective_function, solver, solution.data, args=(parameters), throw=True, max_steps=256
@@ -89,7 +89,7 @@ def get_log_reaction_equilibrium_constant(
     log_Kc: Array = log_Kp - delta_n * (
         jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
     )
-    # jax.debug.print("log10Kc = {out}", out=log10Kc)
+    # jax.debug.print("log10Kc = {out}", out=log_Kc)
 
     # pylint: enable=invalid-name
 
@@ -193,7 +193,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     jax.debug.print("log10_tau_min = {out}", out=log_tau_min)
     # Fraction
     tau_min = jnp.exp(log_tau_min)
-    tau_min = tau_min * 1.0e-60
+    tau_min = tau_min * 1.0e-15
 
     # Stability residual
     N: Array = jnp.diag(jnp.exp(number_density))

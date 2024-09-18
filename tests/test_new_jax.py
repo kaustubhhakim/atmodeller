@@ -230,6 +230,8 @@ def test_graphite_unstable() -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
+    # This test requires tau_min scaling factor around 1.0e-17 and a solver other than Newton
+
     species_list: list[SpeciesData] = [H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g, C_cr]
     reaction_network: ReactionNetwork = ReactionNetwork()
     formula_matrix: Array = jnp.array(reaction_network.formula_matrix(species_list))
@@ -250,12 +252,12 @@ def test_graphite_unstable() -> None:
     constraints: Constraints = Constraints.create(species_list, mass_constraints)
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = np.array([60, 60, 60, 60, 60, 10, 10], dtype=np.float_)
+    initial_number_density: ArrayLike = np.array([60, 60, 60, 60, 60, 30, 30], dtype=np.float_)
     initial_number_density = scale_number_density(initial_number_density, log_scaling)
     logger.debug("initial_number_density = %s", initial_number_density)
 
     # Stability is a non-dimensional quantity
-    initial_stability: ArrayLike = -50.0 * np.ones_like(initial_number_density, dtype=np.float_)
+    initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density, dtype=np.float_)
     logger.debug("initial_stability = %s", initial_stability)
 
     solution: Solution = Solution(initial_number_density, initial_stability)  # type: ignore
@@ -272,14 +274,30 @@ def test_graphite_unstable() -> None:
     number_density, stability = jnp.split(out, 2)
     number_density = unscale_number_density(number_density, log_scaling)
 
+    log_extended_activity = get_log_extended_activity(number_density, stability, parameters)
+
     out = jnp.concatenate((number_density, stability))
     logger.debug("solution = %s", out)
+
+    logger.debug("log_extended_activity = %s", log_extended_activity)
 
     out = jnp.exp(out)
     logger.debug("exp solution = %s", out)
 
     out = jnp.log10(out)
     logger.debug("log10 solution = %s", out)
+
+    target: npt.NDArray = np.array(
+        [
+            62.3771834542796,
+            62.70774275216296,
+            60.72474193369101,
+            60.31973944921249,
+            60.28597770208155,
+            28.581469786547984,
+            26.286485751156878,
+        ]
+    )
 
     # factsage_result: dict[str, float] = {
     #     "O2_g": 4.11e-13,
@@ -294,4 +312,6 @@ def test_graphite_unstable() -> None:
     #     "mass_C_cr": 941506.7454759097,
     # }
 
-    assert True
+    isclose: np.bool_ = np.isclose(target, number_density, rtol=RTOL, atol=ATOL).all()
+
+    assert isclose
