@@ -438,6 +438,8 @@ def test_graphite_condensed(helper) -> None:
         "mass_C_cr": 3.54162e20,
     }
 
+    interior_atmosphere.output(to_excel=True)
+
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
@@ -489,6 +491,8 @@ def test_graphite_unstable(helper) -> None:
         # the test knows to pass.
         "mass_C_cr": 941506.7454759097,
     }
+
+    interior_atmosphere.output(to_excel=True)
 
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 

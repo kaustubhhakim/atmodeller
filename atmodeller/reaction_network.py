@@ -34,6 +34,7 @@ from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.constraints import SystemConstraints
 from atmodeller.core import Species
 from atmodeller.jax_containers import Planet
+from atmodeller.jax_utilities import partial_rref_jax as partial_rref
 from atmodeller.solution import Solution
 
 if sys.version_info < (3, 12):

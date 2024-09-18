@@ -60,6 +60,7 @@ class ReactionNetwork:
                     count = 0
                 formula_matrix[element_index, species_index] = count
 
+        # logger.debug("species = %s", species)
         logger.debug("formula_matrix = %s", formula_matrix)
 
         return formula_matrix
@@ -80,6 +81,8 @@ class ReactionNetwork:
 
         transpose_formula_matrix: npt.NDArray = self.formula_matrix(species).T
         reaction_matrix: npt.NDArray = partial_rref(transpose_formula_matrix)
+
+        # logger.debug("species = %s", species)
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
