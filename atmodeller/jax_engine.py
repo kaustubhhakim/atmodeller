@@ -47,15 +47,11 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
 
     tol: float = 1.0e-8
     # solver = optx.Dogleg(atol=tol, rtol=tol)
-    solver = optx.Newton(atol=tol, rtol=tol)
-    # solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
+    # solver = optx.Newton(atol=tol, rtol=tol)
+    solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
 
     sol = optx.root_find(
-        objective_function,
-        solver,
-        solution.data,
-        args=(parameters),
-        throw=True,
+        objective_function, solver, solution.data, args=(parameters), throw=True, max_steps=256
     )
 
     jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
@@ -85,7 +81,9 @@ def get_log_reaction_equilibrium_constant(
     log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
     # jax.debug.print("lnKp = {out}", out=lnKp)
 
-    delta_n: Array = jnp.sum(reaction_matrix, axis=1)
+    phase_codes: Array = jnp.array([s.phase_code for s in species])
+    gas_phases: Array = (phase_codes == 0).astype(int)
+    delta_n: Array = jnp.sum(reaction_matrix * gas_phases, axis=1)
     # jax.debug.print("delta_n = {out}", out=delta_n)
 
     log_Kc: Array = log_Kp - delta_n * (

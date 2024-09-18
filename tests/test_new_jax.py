@@ -147,6 +147,9 @@ def test_graphite_condensed() -> None:
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 5 * h_kg
+    # Below is oxygen when C_cr is not present
+    # o_kg: float = 6.11072e20
+    # This is when C_cr is present
     o_kg: float = 2.73159e19
 
     # Unscaled total molecules constraints in alphabetical order
@@ -193,6 +196,18 @@ def test_graphite_condensed() -> None:
     out = jnp.log10(out)
     logger.debug("log10 solution = %s", out)
 
+    target: npt.NDArray = np.array(
+        [
+            -7.255672014277081e-02,
+            6.006944857339484e01,
+            5.471220406509149e01,
+            5.881303434479700e01,
+            5.443393222498312e01,
+            6.186698032315073e01,
+            6.171111646176269e01,
+        ]
+    )
+
     # factsage_result: dict[str, float] = {
     #     "O2_g": 1.27e-25,
     #     "H2_g": 14.564,
@@ -204,7 +219,9 @@ def test_graphite_condensed() -> None:
     #     "mass_C_cr": 3.54162e20,
     # }
 
-    assert True
+    isclose: np.bool_ = np.isclose(target, number_density, rtol=RTOL, atol=ATOL).all()
+
+    assert isclose
 
 
 def test_graphite_unstable() -> None:
@@ -222,7 +239,7 @@ def test_graphite_unstable() -> None:
 
     h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
-    o_kg: float = 2.57180041062294e21
+    o_kg: float = 2.57180041062295e21
 
     # Unscaled total molecules constraints in alphabetical order
     mass_constraints = {
@@ -233,7 +250,7 @@ def test_graphite_unstable() -> None:
     constraints: Constraints = Constraints.create(species_list, mass_constraints)
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = np.array([60, 60, 60, 60, 60, 1, 1], dtype=np.float_)
+    initial_number_density: ArrayLike = np.array([60, 60, 60, 60, 60, 10, 10], dtype=np.float_)
     initial_number_density = scale_number_density(initial_number_density, log_scaling)
     logger.debug("initial_number_density = %s", initial_number_density)
 
@@ -248,7 +265,7 @@ def test_graphite_unstable() -> None:
     )
 
     # Pre-compile
-    solve(solution, parameters).value.block_until_ready()
+    # solve(solution, parameters).block_until_ready()
 
     out = solve(solution, parameters)
 
