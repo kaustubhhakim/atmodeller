@@ -25,6 +25,7 @@ from jax.typing import ArrayLike
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.jax_containers import (
     Constraints,
+    OptxSolver,
     Parameters,
     Planet,
     Solution,
@@ -48,7 +49,7 @@ def solve(
     Returns:
         The solution
     """
-    solver: optx.AbstractRootFinder = solver_parameters.get_solver()
+    solver: OptxSolver = solver_parameters.get_solver()
 
     sol = optx.root_find(
         objective_function,
@@ -58,30 +59,6 @@ def solve(
         throw=solver_parameters.throw,
         max_steps=solver_parameters.max_steps,
         options=solver_parameters.options,
-        # options={
-        #     "lower": jnp.array(
-        #         [
-        #             -50,
-        #             -50,
-        #             -50,
-        #             -50,
-        #             -50,
-        #             -50,
-        #             -50,
-        #             -100,
-        #             -100,
-        #             -100,
-        #             -100,
-        #             -100,
-        #             -100,
-        #             -100,
-        #         ]
-        #     ),  # , -70, -70]
-        #     # ),
-        #     "upper": jnp.array(
-        #         [70, 70, 70, 70, 70, 70, 70, 20, 20, 20, 20, 20, 20, 20]
-        #     ),  # , 70, 70]),
-        # },
     )
 
     jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])

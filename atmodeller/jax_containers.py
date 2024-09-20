@@ -34,7 +34,7 @@ from molmass import Formula
 
 from atmodeller import AVOGADRO, GRAVITATIONAL_CONSTANT
 from atmodeller.jax_utilities import scale_number_density
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -267,9 +267,6 @@ class Constraints(NamedTuple):
         return jnp.array(list(self.log_molecules.values()))
 
 
-optx_solver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
-
-
 class SolverParameters(NamedTuple):
     """Solver parameters
 
@@ -283,7 +280,7 @@ class SolverParameters(NamedTuple):
         throw: How to report any failures. Defaults to True.
     """
 
-    solver_class: Type[optx_solver] = optx.Newton
+    solver_class: Type[OptxSolver] = optx.Newton
     """Solver class"""
     options: dict[str, ArrayLike] | None = None
     """Solver options"""
@@ -298,7 +295,7 @@ class SolverParameters(NamedTuple):
     throw: bool = True
     """How to report any failures"""
 
-    def get_solver(self) -> optx_solver:
+    def get_solver(self) -> OptxSolver:
         """Gets the solver"""
         return self.solver_class(rtol=self.rtol, atol=self.atol, norm=self.norm)
 

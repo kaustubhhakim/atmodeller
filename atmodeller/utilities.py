@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Type, TypeVar
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+import optimistix as optx
 from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
@@ -52,6 +53,8 @@ if TYPE_CHECKING:
 logger: logging.Logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
 
 
 def profile_decorator(func):
