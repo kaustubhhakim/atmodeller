@@ -25,40 +25,40 @@ from jax.typing import ArrayLike
 from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.jax_containers import (
     Constraints,
-    OptxSolver,
     Parameters,
     Planet,
     Solution,
-    SolverParameters,
     SpeciesData,
     gas_species_mask,
 )
 from atmodeller.jax_utilities import logsumexp
+from atmodeller.utilities import OptxSolver, get_solver_options
 
 
-def solve(
-    solution: Solution, parameters: Parameters, solver_parameters: SolverParameters
-) -> Array:
+@jit
+def solve(solution: Solution, parameters: Parameters) -> Array:
     """Solves the system
 
     Args:
         solution: Solution
         parameters: Parameters
-        solver: Solver parameters
 
     Returns:
         The solution
     """
-    solver: OptxSolver = solver_parameters.get_solver()
+
+    # FIXME: For batch calculations this will probably need to be a pytree.
+    options = get_solver_options(parameters.species)
+    solver: OptxSolver = optx.Newton(atol=1.0e-8, rtol=1.0e-8)
 
     sol = optx.root_find(
         objective_function,
         solver,
         solution.data,
         args=(parameters),
-        throw=solver_parameters.throw,
-        max_steps=solver_parameters.max_steps,
-        options=solver_parameters.options,
+        throw=True,
+        max_steps=256,
+        options=options,
     )
 
     jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])

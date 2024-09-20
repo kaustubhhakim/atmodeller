@@ -23,7 +23,6 @@ import logging
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-import optimistix as optx
 from jax import Array
 from jax.typing import ArrayLike
 
@@ -42,7 +41,6 @@ from atmodeller.jax_containers import (
     Parameters,
     Planet,
     Solution,
-    SolverParameters,
     SpeciesData,
 )
 from atmodeller.jax_engine import get_log_extended_activity, solve
@@ -62,6 +60,7 @@ ATOL: float = 1.0e-8
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage"""
 
+# FIXME: Changing the scaling does break the solver. Probably missing a factor somewhere.
 SCALING: float = 1.0  # AVOGADRO
 """Scale the numerical problem from molecules/m^3 to moles/m^3 if SCALING is AVODAGRO"""
 LOG_SCALING: ArrayLike = np.log(SCALING)
@@ -103,10 +102,6 @@ def test_CHO_low_temperature() -> None:
     )
     logger.debug("initial_solution = %s", initial_solution)
 
-    options: dict[str, ArrayLike] = get_solver_options(species)
-    solver_parameters: SolverParameters = SolverParameters(
-        solver_class=optx.Newton, atol=ATOL, rtol=RTOL, options=options
-    )
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
@@ -114,7 +109,7 @@ def test_CHO_low_temperature() -> None:
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
+    scaled_solution: Array = solve(initial_solution, parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -187,10 +182,6 @@ def test_graphite_condensed() -> None:
     )
     logger.debug("initial_solution = %s", initial_solution)
 
-    options: dict[str, ArrayLike] = get_solver_options(species)
-    solver_parameters: SolverParameters = SolverParameters(
-        solver_class=optx.Newton, atol=ATOL, rtol=RTOL, options=options
-    )
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
@@ -198,7 +189,7 @@ def test_graphite_condensed() -> None:
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
+    scaled_solution: Array = solve(initial_solution, parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -286,10 +277,6 @@ def test_graphite_unstable() -> None:
     )
     logger.debug("initial_solution = %s", initial_solution)
 
-    options: dict[str, ArrayLike] = get_solver_options(species)
-    solver_parameters: SolverParameters = SolverParameters(
-        solver_class=optx.Newton, atol=ATOL, rtol=RTOL, options=options
-    )
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
@@ -297,7 +284,7 @@ def test_graphite_unstable() -> None:
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
+    scaled_solution: Array = solve(initial_solution, parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -382,10 +369,6 @@ def test_water_condensed_O_abundance() -> None:
     )
     logger.debug("initial_solution = %s", initial_solution)
 
-    options: dict[str, ArrayLike] = get_solver_options(species)
-    solver_parameters: SolverParameters = SolverParameters(
-        solver_class=optx.Newton, atol=ATOL, rtol=RTOL, options=options
-    )
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
@@ -393,7 +376,7 @@ def test_water_condensed_O_abundance() -> None:
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
+    scaled_solution: Array = solve(initial_solution, parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -471,9 +454,6 @@ def test_graphite_water_condensed() -> None:
     logger.debug("initial_solution = %s", initial_solution)
 
     options: dict[str, ArrayLike] = get_solver_options(species)
-    solver_parameters: SolverParameters = SolverParameters(
-        solver_class=optx.Newton, atol=ATOL, rtol=RTOL, options=options
-    )
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
@@ -481,7 +461,7 @@ def test_graphite_water_condensed() -> None:
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
+    scaled_solution: Array = solve(initial_solution, parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
