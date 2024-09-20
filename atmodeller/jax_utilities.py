@@ -17,9 +17,12 @@
 """JAX functions"""
 
 import jax.numpy as jnp
+import numpy as np
 from jax import Array, jit, lax, vmap
 from jax.tree_util import tree_map
 from jax.typing import ArrayLike
+
+from atmodeller import BOLTZMANN_CONSTANT_BAR
 
 
 @jit
@@ -69,6 +72,24 @@ def unscale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> Arr
         Unscaled number density
     """
     return number_density + scaling
+
+
+@jit
+def pressure_from_log_number_density(log_number_density: Array, temperature: ArrayLike) -> Array:
+    """Calculates pressure from the log number density
+
+    Args:
+        log_number_density: Log number density
+        temperature: Temperature
+
+    Returns:
+        Pressure in bar
+    """
+    log_pressure: Array = (
+        log_number_density + np.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature)
+    )
+
+    return jnp.exp(log_pressure)
 
 
 @jit

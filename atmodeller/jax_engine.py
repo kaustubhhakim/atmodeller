@@ -28,30 +28,59 @@ from atmodeller.jax_containers import (
     Parameters,
     Planet,
     Solution,
+    SolverParameters,
     SpeciesData,
 )
 from atmodeller.jax_utilities import logsumexp
 
 
-@jit
-def solve(solution: Solution, parameters: Parameters) -> Array:
+def solve(
+    solution: Solution, parameters: Parameters, solver_parameters: SolverParameters
+) -> Array:
     """Solves the system
 
     Args:
         solution: Solution
         parameters: Parameters
+        solver: Solver parameters
 
     Returns:
         The solution
     """
-
-    tol: float = 1.0e-8
-    solver = optx.Dogleg(atol=tol, rtol=tol)
-    # solver = optx.Newton(atol=tol, rtol=tol)
-    # solver = optx.LevenbergMarquardt(atol=tol, rtol=tol)
+    solver: optx.AbstractRootFinder = solver_parameters.get_solver()
 
     sol = optx.root_find(
-        objective_function, solver, solution.data, args=(parameters), throw=True, max_steps=256
+        objective_function,
+        solver,
+        solution.data,
+        args=(parameters),
+        throw=solver_parameters.throw,
+        max_steps=solver_parameters.max_steps,
+        options=solver_parameters.options,
+        # options={
+        #     "lower": jnp.array(
+        #         [
+        #             -50,
+        #             -50,
+        #             -50,
+        #             -50,
+        #             -50,
+        #             -50,
+        #             -50,
+        #             -100,
+        #             -100,
+        #             -100,
+        #             -100,
+        #             -100,
+        #             -100,
+        #             -100,
+        #         ]
+        #     ),  # , -70, -70]
+        #     # ),
+        #     "upper": jnp.array(
+        #         [70, 70, 70, 70, 70, 70, 70, 20, 20, 20, 20, 20, 20, 20]
+        #     ),  # , 70, 70]),
+        # },
     )
 
     jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
@@ -158,52 +187,36 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     temperature: ArrayLike = planet.surface_temperature
     scaling: ArrayLike = parameters.scaling
 
+    jax.debug.print("solution in = {out}", out=solution)
+
     number_density, stability = jnp.split(solution, 2)
 
+    # Reaction network residual
     log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
         species, reaction_matrix, temperature, scaling
     )
-    # jax.debug.print("rhs = {out}", out=rhs)
-
-    # Reaction network residual
     log_activity: Array = get_log_activity(number_density, parameters)
-    # log10_extended_activity: Array = get_log10_extended_activity(
-    #    number_density, stability, parameters
-    # )
     reaction_residual: Array = (
         reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
     )
-    # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
-
-    # Modifications for stability. This is the same as dotting reaction matrix with extended
-    # activity
+    jax.debug.print("reaction_residual = {out}", out=reaction_residual)
+    # Account for species stability.
     reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(stability))
+    jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
     # Mass balance residual
     log_volume: Array = atmosphere_log_volume(number_density, species, planet)
-    mass_residual: Array = jnp.log(formula_matrix.dot(jnp.exp(number_density)))
-    mass_residual = mass_residual - (constraints.array(scaling) - log_volume)
-    # jax.debug.print("mass_residual = {out}", out=mass_residual)
-
-    # Get minimum scaled log10 number of molecules
-    log_tau_min: Array = jnp.min(constraints.array(scaling))
-    jax.debug.print("log_tau_min = {out}", out=log_tau_min)
-    # Get minimum number density
-    log_tau_min = log_tau_min - log_volume
-    jax.debug.print("log10_tau_min = {out}", out=log_tau_min)
-    # Fraction
-    tau_min = jnp.exp(log_tau_min)
-    tau_min = tau_min * 1.0e-15
+    log_density_matrix_product: Array = jnp.log(formula_matrix.dot(jnp.exp(number_density)))
+    mass_residual = log_density_matrix_product - (constraints.array() - log_volume)
+    jax.debug.print("mass_residual = {out}", out=mass_residual)
 
     # Stability residual
-    N: Array = jnp.diag(jnp.exp(number_density))
-    jax.debug.print("N = {out}", out=N)
-    Z: Array = jnp.diag(jnp.exp(stability))
-    jax.debug.print("Z = {out}", out=Z)
-    e: Array = jnp.ones_like(stability)
-    jax.debug.print("e = {out}", out=e)
-    stability_residual: Array = jnp.log(N.dot(Z).dot(e)) - jnp.log(tau_min * e)
-    jax.debug.print("out = {out}", out=stability_residual)
+    # Get minimum scaled log number of molecules
+    log_min_number_density: Array = (
+        jnp.min(constraints.array()) - log_volume - jnp.log(parameters.tau)
+    )
+    stability_residual: Array = number_density + stability - log_min_number_density
+    jax.debug.print("stability_residual = {out}", out=stability_residual)
 
     residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
     jax.debug.print("residual = {out}", out=residual)

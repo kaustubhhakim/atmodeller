@@ -488,6 +488,6 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
     logger.debug("reduced_matrix = \n%s", reduced_matrix)
     logger.debug("component_matrix = \n%s", component_matrix)
-    logger.debug("permutation_matrix = \n%s", P)
+    # logger.debug("permutation_matrix = \n%s", P)
 
     return component_matrix

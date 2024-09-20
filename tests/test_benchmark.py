@@ -546,7 +546,7 @@ def test_water_condensed_O_abundance(helper) -> None:
     H2_g: GasSpecies = GasSpecies("H2")
     H2O_g: GasSpecies = GasSpecies("H2O")
     O2_g: GasSpecies = GasSpecies("O2")
-    H2O_l: LiquidSpecies = LiquidSpecies("H2O", thermodata_name="Water, 10 Bar")
+    H2O_l: LiquidSpecies = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
 
     species: Species = Species([H2_g, H2O_g, O2_g, H2O_l])
 
@@ -576,6 +576,8 @@ def test_water_condensed_O_abundance(helper) -> None:
         "activity_H2O_l": 1.0,
         "mass_H2O_l": 1.247201e21,
     }
+
+    interior_atmosphere.output(to_excel=True)
 
     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 

@@ -23,9 +23,10 @@ functionality can remain together whilst accommodating the requirements of JAX-c
 """
 import sys
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Callable, NamedTuple, Type
 
 import jax.numpy as jnp
+import optimistix as optx
 from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
@@ -195,6 +196,24 @@ class Solution(NamedTuple):
     stability: Array
     """Stability of species"""
 
+    @classmethod
+    def create(
+        cls, number_density: ArrayLike, stability: ArrayLike, log_scaling: ArrayLike
+    ) -> Self:
+        """Creates an instance.
+
+        Args:
+            number_density: Number density
+            stability: Stability
+            log_scaling: Log scaling for the number density
+
+        Returns:
+            An instance
+        """
+        number_density_scaled: Array = scale_number_density(number_density, log_scaling)
+
+        return cls(number_density_scaled, jnp.asarray(stability))
+
     @property
     def data(self) -> Array:
         """Combined data in a single array"""
@@ -215,12 +234,15 @@ class Constraints(NamedTuple):
     """Log number of molecules constraints, ordered alphabetically by element name"""
 
     @classmethod
-    def create(cls, species: list[SpeciesData], mass: Mapping[str, ArrayLike]) -> Self:
+    def create(
+        cls, species: list[SpeciesData], mass: Mapping[str, ArrayLike], log_scaling: ArrayLike
+    ) -> Self:
         """Creates an instance
 
         Args:
             species: A list of species
             mass: Mapping of element name and mass constraint in kg in any order
+            log_scaling: Log scaling for the number density
         """
         sorted_mass: dict[str, ArrayLike] = {k: mass[k] for k in sorted(mass)}
         log_number_of_molecules: dict[str, ArrayLike] = {}
@@ -229,17 +251,51 @@ class Constraints(NamedTuple):
             log_number_of_molecules_: Array = (
                 jnp.log(mass_constraint) + jnp.log(AVOGADRO) - jnp.log(molar_mass)
             )
+            log_number_of_molecules_ = scale_number_density(log_number_of_molecules_, log_scaling)
             log_number_of_molecules[element] = log_number_of_molecules_
 
         return cls(species, log_number_of_molecules)
 
-    def array(self, scaling: ArrayLike) -> Array:
+    def array(self) -> Array:
         """Scaled log number of molecules array
 
         Args:
             scaling: Scaling
         """
-        return scale_number_density(jnp.array(list(self.log_molecules.values())), jnp.log(scaling))
+        return jnp.array(list(self.log_molecules.values()))
+
+
+class SolverParameters(NamedTuple):
+    """Solver parameters
+
+    Args:
+        solver: Solver class
+        options: Solver options
+        atol: Absolute tolerance. Defaults to 1.0E-8.
+        rtol: Relative tolerance. Defaults to 1.0e-8.
+        norm: Norm. Defaults to rms.
+        max_steps: Maximum number of steps. Defaults to 256.
+        throw: How to report any failures. Defaults to True.
+    """
+
+    solver_class: Type[optx.AbstractRootFinder] = optx.Newton
+    """Solver class"""
+    options: dict[str, ArrayLike] | None = None
+    """Solver options"""
+    atol: float = 1.0e-8
+    """Absolute tolerance"""
+    rtol: float = 1.0e-8
+    """Relative tolerance"""
+    norm: Callable = optx.rms_norm
+    """Norm"""
+    max_steps: int = 256
+    """Maximum number of steps"""
+    throw: bool = True
+    """How to report any failures"""
+
+    def get_solver(self) -> optx.AbstractRootFinder:
+        """Gets the solver"""
+        return self.solver_class(rtol=self.rtol, atol=self.atol, norm=self.norm)
 
 
 class Parameters(NamedTuple):
@@ -248,18 +304,20 @@ class Parameters(NamedTuple):
     Args:
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
-        species: List of species
+        species: A list of species
         planet: Planet
         constraints: Constraints
+        tau: Tau factor for species stability
         scaling: Scaling for the number density. Defaults to the Avogadro constant, which converts
             molecules/m^3 to moles/m^3
 
     Attributes:
         formula_matrix: Formula matrix
         reaction_matrix: Reaction matrix
-        species: List of species
+        species: A list of species
         planet: Planet
         constraints: Constraints
+        tau: Tau factor for species stability
         scaling: Scaling for the number density
     """
 
@@ -273,6 +331,8 @@ class Parameters(NamedTuple):
     """Planet"""
     constraints: Constraints
     """Mass constraints"""
+    tau: ArrayLike
+    """Tau factor for species"""
     scaling: ArrayLike = AVOGADRO
     """Scaling"""
 
