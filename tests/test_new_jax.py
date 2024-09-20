@@ -286,8 +286,13 @@ def test_graphite_unstable() -> None:
     )
     logger.debug("initial_solution = %s", initial_solution)
 
+    solver_options: dict[str, ArrayLike] = {
+        "upper": jnp.array([70, 70, 70, 70, 70, 70, 70, 10, 10, 10, 10, 10, 10, 10]),
+        "lower": jnp.array([1, 1, 1, 1, 1, 1, 1, -100, -100, -100, -100, -100, -100, -100]),
+    }
+
     solver_parameters: SolverParameters = SolverParameters(
-        solver_class=optx.Dogleg, atol=ATOL, rtol=RTOL
+        solver_class=optx.Newton, atol=ATOL, rtol=RTOL, options=solver_options, max_steps=1000
     )
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, tau, SCALING

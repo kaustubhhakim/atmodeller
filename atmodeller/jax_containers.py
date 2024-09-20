@@ -267,6 +267,9 @@ class Constraints(NamedTuple):
         return jnp.array(list(self.log_molecules.values()))
 
 
+optx_solver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
+
+
 class SolverParameters(NamedTuple):
     """Solver parameters
 
@@ -280,7 +283,7 @@ class SolverParameters(NamedTuple):
         throw: How to report any failures. Defaults to True.
     """
 
-    solver_class: Type[optx.AbstractRootFinder] = optx.Newton
+    solver_class: Type[optx_solver] = optx.Newton
     """Solver class"""
     options: dict[str, ArrayLike] | None = None
     """Solver options"""
@@ -295,7 +298,7 @@ class SolverParameters(NamedTuple):
     throw: bool = True
     """How to report any failures"""
 
-    def get_solver(self) -> optx.AbstractRootFinder:
+    def get_solver(self) -> optx_solver:
         """Gets the solver"""
         return self.solver_class(rtol=self.rtol, atol=self.atol, norm=self.norm)
 
