@@ -27,7 +27,7 @@ import optimistix as optx
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, debug_logger
+from atmodeller import AVOGADRO, debug_logger  # pylint: disable=unused-import
 from atmodeller.classes import ReactionNetwork
 from atmodeller.jax_containers import (
     C_cr,
@@ -63,8 +63,8 @@ ATOL: float = 1.0e-8
 TOLERANCE: float = 1.0e-5
 """Tolerance of log output to satisfy comparison with FactSage"""
 
-# Scale the numerical problem from molecules/m^3 to moles/m^3
-scaling: float = AVOGADRO
+# Scale the numerical problem from molecules/m^3 to moles/m^3 if scaling is AVODAGRO
+scaling: float = 1.0  # AVOGADRO
 log_scaling: ArrayLike = np.log(scaling)
 
 
@@ -80,15 +80,14 @@ def test_CHO_low_temperature() -> None:
     c_kg: float = 1 * h_kg
     o_kg: float = 1.02999e20
     mass_constraints: dict[str, float] = {
-        "C": c_kg,  # 10**45.89051326565627,
-        "H": h_kg,  # 10**46.96664792007732,
-        "O": o_kg,  # 10**45.58848007858896,
+        "C": c_kg,
+        "H": h_kg,
+        "O": o_kg,
     }
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([60, 60, 30, -60, 60, 30], dtype=np.float_)
     logger.debug("initial_number_density = %s", initial_number_density)
-    # Stability is a non-dimensional quantity
     initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
     logger.debug("initial_stability = %s", initial_stability)
 
@@ -110,15 +109,15 @@ def test_CHO_low_temperature() -> None:
     )
 
     # Pre-compile
-    solve(initial_solution, parameters, solver_parameters).block_until_ready()
+    # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
     scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
-    number_density, stability = jnp.split(scaled_solution, 2)
-    number_density: Array = unscale_number_density(number_density, log_scaling)
-    unscaled_solution = jnp.concatenate((number_density, stability))
+    unscaled_solution: Array = unscale_number_density(scaled_solution, log_scaling)
     logger.debug("unscaled_solution = %s", unscaled_solution)
+    number_density, stability = jnp.split(unscaled_solution, 2)
+
     pressure: Array = pressure_from_log_number_density(number_density, planet.surface_temperature)
     logger.debug("pressure = %s", pressure)
 

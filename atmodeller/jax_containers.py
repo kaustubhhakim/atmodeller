@@ -211,8 +211,9 @@ class Solution(NamedTuple):
             An instance
         """
         number_density_scaled: Array = scale_number_density(number_density, log_scaling)
+        stability_scaled: Array = scale_number_density(stability, log_scaling)
 
-        return cls(number_density_scaled, jnp.asarray(stability))
+        return cls(number_density_scaled, stability_scaled)
 
     @property
     def data(self) -> Array:

@@ -205,6 +205,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
     # Mass balance residual
+    # FIXME: atmosphere log volume is only for gas species not condensed
     log_volume: Array = atmosphere_log_volume(number_density, species, planet)
     log_density_matrix_product: Array = jnp.log(formula_matrix.dot(jnp.exp(number_density)))
     mass_residual = log_density_matrix_product - (constraints.array() - log_volume)
@@ -224,6 +225,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     return residual
 
 
+# FIXME: Should only be over gas species
 @jit
 def atmosphere_log_molar_mass(solution: Array, species: list[SpeciesData]) -> Array:
     """Log of the molar mass of the atmosphere
@@ -241,6 +243,7 @@ def atmosphere_log_molar_mass(solution: Array, species: list[SpeciesData]) -> Ar
     return molar_mass
 
 
+# FIXME: Should only be over gas species
 @jit
 def atmosphere_log_volume(solution: Array, species: list[SpeciesData], planet: Planet) -> Array:
     """Log of the volume of the atmosphere"
