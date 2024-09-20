@@ -48,7 +48,6 @@ from atmodeller.jax_containers import (
 from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import (
     pressure_from_log_number_density,
-    scale_number_density,
     unscale_number_density,
 )
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass, get_solver_options
@@ -236,7 +235,7 @@ def test_graphite_condensed() -> None:
             4.527,
             0.061195,
             96.74,
-            # Below is the "pressure" of the condensed species if it were a gas
+            # Below is the atmodeller "pressure" of the condensed species if it were a gas
             81.513,
             # "activity_C_cr": 1.0,
             # "mass_C_cr": 3.54162e20,
@@ -335,6 +334,7 @@ def test_graphite_unstable() -> None:
             46.42,
             30.88,
             28.66,
+            # Below is the atmodeller "pressure" of the condensed species if it were a gas
             5.038334863741620e-59,
             # "activity_C_cr": 0.12202,
             # FactSage also predicts no C, so these values are set close to the atmodeller output so
@@ -414,27 +414,30 @@ def test_water_condensed_O_abundance() -> None:
         [60.147414932111765, 59.42151086724804, -73.77323817273705, 62.69282187037022]
     )
 
-    # factsage_result: dict[str, float] = {
-    #     "H2O_g": 3.3596,
-    #     "H2_g": 6.5604,
-    #     "O2_g": 5.6433e-58,
-    #     "activity_H2O_l": 1.0,
-    #     "mass_H2O_l": 1.247201e21,
-    # }
+    factsage_result: npt.NDArray[np.float_] = np.array(
+        [
+            6.5604,
+            3.3596,
+            5.6433e-58,
+            95.90991,
+            # "activity_H2O_l": 1.0,
+            # "mass_H2O_l": 1.247201e21,
+        ]
+    )
 
     isclose_target: np.bool_ = np.isclose(target, log_number_density, rtol=RTOL, atol=ATOL).all()
+    isclose_factsage: np.bool_ = np.isclose(
+        np.log(factsage_result), np.log(pressure), rtol=TOLERANCE, atol=TOLERANCE
+    ).all()
 
     assert isclose_target
+    assert isclose_factsage
 
 
 def test_graphite_water_condensed() -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
-    species_list: list[SpeciesData] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
-    reaction_network: ReactionNetwork = ReactionNetwork()
-    formula_matrix: Array = jnp.array(reaction_network.formula_matrix(species_list))
-    reaction_matrix: Array = jnp.array(reaction_network.reaction_matrix(species_list))
-
+    species: list[SpeciesData] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
     planet: Planet = Planet(surface_temperature=430)
 
     h_kg: float = 3.10e20
@@ -442,51 +445,81 @@ def test_graphite_water_condensed() -> None:
     # Specify O, because otherwise a total pressure can give rise to different solutions (with
     # different total O), making it more difficult to compare with a known comparison case.
     o_kg: float = 2.48298883581636e21
-
-    # Unscaled total molecules constraints in alphabetical order
+    # Mass constraints in alphabetical order
     mass_constraints = {
         "C": c_kg,
         "H": h_kg,
         "O": o_kg,
     }
-    constraints: Constraints = Constraints.create(species_list, mass_constraints)
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array(
         [60, 60, -30, 60, 60, 60, 60, 60], dtype=np.float_
     )
-    initial_number_density = scale_number_density(initial_number_density, LOG_SCALING)
     logger.debug("initial_number_density = %s", initial_number_density)
-
-    # Stability is a non-dimensional quantity
-    initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density, dtype=np.float_)
+    initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density)
     logger.debug("initial_stability = %s", initial_stability)
 
-    solution: Solution = Solution(initial_number_density, initial_stability)  # type: ignore
+    reaction_network: ReactionNetwork = ReactionNetwork()
+    formula_matrix: Array = jnp.array(reaction_network.formula_matrix(species))
+    reaction_matrix: Array = jnp.array(reaction_network.reaction_matrix(species))
+    constraints: Constraints = Constraints.create(species, mass_constraints, LOG_SCALING)
 
+    initial_solution: Solution = Solution.create(
+        initial_number_density, initial_stability, LOG_SCALING
+    )
+    logger.debug("initial_solution = %s", initial_solution)
+
+    options: dict[str, ArrayLike] = get_solver_options(species)
+    solver_parameters: SolverParameters = SolverParameters(
+        solver_class=optx.Newton, atol=ATOL, rtol=RTOL, options=options
+    )
     parameters: Parameters = Parameters(
-        formula_matrix, reaction_matrix, species_list, planet, constraints, SCALING
+        formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
 
     # Pre-compile
-    # solve(solution, parameters).block_until_ready()
+    # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    out = solve(solution, parameters)
+    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
+    logger.debug("scaled_solution = %s", scaled_solution)
 
-    logger.debug("solution out = %s", out)
+    unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
+    logger.debug("unscaled_solution = %s", unscaled_solution)
+    log_number_density, log_stability = jnp.split(unscaled_solution, 2)
 
-    number_density, stability = jnp.split(out, 2)
-    number_density = unscale_number_density(number_density, LOG_SCALING)
+    pressure: Array = pressure_from_log_number_density(
+        log_number_density, planet.surface_temperature
+    )
+    logger.debug("pressure = %s", pressure)
 
-    log_extended_activity = get_log_extended_activity(number_density, stability, parameters)
-
-    out = jnp.concatenate((number_density, stability))
-    logger.debug("solution = %s", out)
-
+    log_extended_activity: Array = get_log_extended_activity(
+        log_number_density, log_stability, parameters
+    )
     logger.debug("log_extended_activity = %s", log_extended_activity)
 
-    out = jnp.exp(out)
-    logger.debug("exp solution = %s", out)
+    target: npt.NDArray[np.float_] = np.array(
+        [
+            59.84956737107164,
+            52.04446167407229,
+            -50.89936632480971,
+            45.47316828975361,
+            59.51686478781738,
+            56.89655030374509,
+            64.8157539595103,
+            61.88885111892189,
+        ]
+    )
 
-    out = jnp.log10(out)
-    logger.debug("log10 solution = %s", out)
+    # Last two entries are the atmodeller "pressure" of the condensed species if it were a gas
+    factsage_result: npt.NDArray[np.float_] = np.array(
+        [5.3672, 0.0023, 4.74e-48, 2.77e-6, 4.3064, 0.3241, 836.904, 44.82685]
+    )
+
+    isclose_target: np.bool_ = np.isclose(target, log_number_density, rtol=RTOL, atol=ATOL).all()
+    isclose_factsage: np.bool_ = np.isclose(
+        np.log(factsage_result), np.log(pressure), rtol=TOLERANCE, atol=TOLERANCE
+    ).all()
+
+    assert isclose_target
+    assert isclose_factsage
