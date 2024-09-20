@@ -25,9 +25,10 @@ import sys
 from collections.abc import Mapping
 from typing import Callable, NamedTuple, Type
 
+import jax
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array
+from jax import Array, jit
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -336,6 +337,25 @@ class Parameters(NamedTuple):
     """Tau factor for species"""
     scaling: ArrayLike = AVOGADRO
     """Scaling"""
+
+
+@jit
+def gas_species_mask(species: list[SpeciesData]) -> Array:
+    """Mask for gas species
+
+    Args:
+        species: A list of species
+
+    Returns:
+        Mask for gas species
+    """
+    phase_codes: Array = jnp.array([s.phase_code for s in species])
+    # TODO: Use a parameter name rather than hard-coded to 0.
+    gas_species: Array = (phase_codes == 0).astype(int)
+
+    jax.debug.print("gas_species = {out}", out=gas_species)
+
+    return gas_species
 
 
 # TODO: Switch convention to use dG = S - Href/T as per the comment of Hugh. Then the

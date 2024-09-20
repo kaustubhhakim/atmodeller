@@ -36,7 +36,8 @@ def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
     Returns:
         The log of the sum of prefactors multiplied by exponentials of the input values
     """
-    max_log: Array = jnp.max(log_values)
+    # Could break if all prefactors are zero
+    max_log: Array = jnp.max(log_values * (prefactors != 0).astype(int))  # type: ignore
     value_sum: Array = jnp.sum(prefactors * jnp.exp(log_values - max_log))
 
     return max_log + jnp.log(value_sum)

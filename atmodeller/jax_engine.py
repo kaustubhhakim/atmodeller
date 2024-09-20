@@ -30,6 +30,7 @@ from atmodeller.jax_containers import (
     Solution,
     SolverParameters,
     SpeciesData,
+    gas_species_mask,
 )
 from atmodeller.jax_utilities import logsumexp
 
@@ -110,9 +111,8 @@ def get_log_reaction_equilibrium_constant(
     log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
     # jax.debug.print("lnKp = {out}", out=lnKp)
 
-    phase_codes: Array = jnp.array([s.phase_code for s in species])
-    gas_phases: Array = (phase_codes == 0).astype(int)
-    delta_n: Array = jnp.sum(reaction_matrix * gas_phases, axis=1)
+    gas_mask: Array = gas_species_mask(species)
+    delta_n: Array = jnp.sum(reaction_matrix * gas_mask, axis=1)
     # jax.debug.print("delta_n = {out}", out=delta_n)
 
     log_Kc: Array = log_Kp - delta_n * (
@@ -137,12 +137,14 @@ def get_log_activity(log_number_density: Array, parameters: Parameters) -> Array
         Log activity
     """
     species: list[SpeciesData] = parameters.species
-    phase_codes: Array = jnp.array([s.phase_code for s in species])
+    gas_mask: Array = gas_species_mask(species)
 
     activity_for_gas: Array = log_number_density
     activity_for_condensed: Array = jnp.zeros(len(species))
 
-    log_activity: Array = jnp.where(phase_codes == 0, activity_for_gas, activity_for_condensed)
+    log_activity: Array = jnp.where(gas_mask == 1, activity_for_gas, activity_for_condensed)
+
+    jax.debug.print("log_activity = {out}", out=log_activity)
 
     return log_activity
 
@@ -164,6 +166,8 @@ def get_log_extended_activity(
     log_extended_activity: Array = get_log_activity(log_number_density, parameters) - jnp.exp(
         log_stability
     )
+
+    jax.debug.print("log_extended_activity = {out}", out=log_extended_activity)
 
     return log_extended_activity
 
@@ -189,25 +193,24 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
     jax.debug.print("solution in = {out}", out=solution)
 
-    number_density, stability = jnp.split(solution, 2)
+    log_number_density, log_stability = jnp.split(solution, 2)
 
     # Reaction network residual
     log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
         species, reaction_matrix, temperature, scaling
     )
-    log_activity: Array = get_log_activity(number_density, parameters)
+    log_activity: Array = get_log_activity(log_number_density, parameters)
     reaction_residual: Array = (
         reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
     )
     jax.debug.print("reaction_residual = {out}", out=reaction_residual)
     # Account for species stability.
-    reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(stability))
+    reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(log_stability))
     jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
     # Mass balance residual
-    # FIXME: atmosphere log volume is only for gas species not condensed
-    log_volume: Array = atmosphere_log_volume(number_density, species, planet)
-    log_density_matrix_product: Array = jnp.log(formula_matrix.dot(jnp.exp(number_density)))
+    log_volume: Array = atmosphere_log_volume(log_number_density, species, planet)
+    log_density_matrix_product: Array = jnp.log(formula_matrix.dot(jnp.exp(log_number_density)))
     mass_residual = log_density_matrix_product - (constraints.array() - log_volume)
     jax.debug.print("mass_residual = {out}", out=mass_residual)
 
@@ -216,7 +219,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     log_min_number_density: Array = (
         jnp.min(constraints.array()) - log_volume - jnp.log(parameters.tau)
     )
-    stability_residual: Array = number_density + stability - log_min_number_density
+    stability_residual: Array = log_number_density + log_stability - log_min_number_density
     jax.debug.print("stability_residual = {out}", out=stability_residual)
 
     residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
@@ -225,32 +228,40 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     return residual
 
 
-# FIXME: Should only be over gas species
 @jit
-def atmosphere_log_molar_mass(solution: Array, species: list[SpeciesData]) -> Array:
-    """Log of the molar mass of the atmosphere
+def atmosphere_log_molar_mass(log_number_density: Array, species: list[SpeciesData]) -> Array:
+    """Log molar mass of the atmosphere
 
     Args:
-        solution: Number density solution array(s)
-        species: Species
+        log_number_density: Log number density
+        species: List of species
 
     Returns:
         Log molar mass of the atmosphere
     """
     molar_masses: Array = jnp.array([value.molar_mass for value in species])
-    molar_mass: Array = logsumexp(solution, molar_masses) - logsumexp(solution)
+    gas_mask: Array = gas_species_mask(species)
+    gas_molar_masses = molar_masses * gas_mask
+
+    jax.debug.print("molar_masses = {out}", out=molar_masses)
+    jax.debug.print("gas_molar_masses = {out}", out=gas_molar_masses)
+
+    molar_mass: Array = logsumexp(log_number_density, gas_molar_masses) - logsumexp(
+        log_number_density, gas_mask
+    )
 
     return molar_mass
 
 
-# FIXME: Should only be over gas species
 @jit
-def atmosphere_log_volume(solution: Array, species: list[SpeciesData], planet: Planet) -> Array:
-    """Log of the volume of the atmosphere"
+def atmosphere_log_volume(
+    log_number_density: Array, species: list[SpeciesData], planet: Planet
+) -> Array:
+    """Log volume of the atmosphere"
 
     Args:
-        solution: Number density solution array(s)
-        species: Species
+        log_number_density: Log number density
+        species: List of species
         planet: Planet
 
     Returns:
@@ -259,7 +270,7 @@ def atmosphere_log_volume(solution: Array, species: list[SpeciesData], planet: P
     return (
         jnp.log(GAS_CONSTANT)
         + jnp.log(planet.surface_temperature)
-        - atmosphere_log_molar_mass(solution, species)
+        - atmosphere_log_molar_mass(log_number_density, species)
         + jnp.log(planet.surface_area)
         - jnp.log(planet.surface_gravity)
     )
