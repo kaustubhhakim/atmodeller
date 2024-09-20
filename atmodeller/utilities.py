@@ -36,7 +36,15 @@ from molmass import Formula
 from scipy.constants import kilo, mega
 from sklearn.metrics import mean_squared_error
 
-from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
+from atmodeller import (
+    ATMOSPHERE,
+    BOLTZMANN_CONSTANT_BAR,
+    NUMBER_DENSITY_LOWER,
+    NUMBER_DENSITY_UPPER,
+    OCEAN_MASS_H2,
+    STABILITY_LOWER,
+    STABILITY_UPPER,
+)
 
 if TYPE_CHECKING:
     from atmodeller.jax_containers import SpeciesData
@@ -491,3 +499,28 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     # logger.debug("permutation_matrix = \n%s", P)
 
     return component_matrix
+
+
+def get_solver_options(species: list[SpeciesData]) -> dict[str, ArrayLike]:
+    """Gets the solver options.
+
+    The options define the bounds of the hybercube which contains the root, and are used for the
+    optimistix Newton solver.
+
+    Args:
+        species: A list of species
+
+    Returns:
+        Solver options for the optimistix Newton solver
+    """
+    num_species: int = len(species)
+    options: dict[str, ArrayLike] = {}
+
+    options["lower"] = np.concatenate(
+        (NUMBER_DENSITY_LOWER * np.ones(num_species), STABILITY_LOWER * np.ones(num_species))
+    )
+    options["upper"] = np.concatenate(
+        (NUMBER_DENSITY_UPPER * np.ones(num_species), STABILITY_UPPER * np.ones(num_species))
+    )
+
+    return options

@@ -63,6 +63,12 @@ DEFAULT_SOLVER: str = "optimistix"  # or "scipy"
 MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
 """Machine epsilon"""
 
+# Lower and upper bounds on the hypercube which contains the root
+NUMBER_DENSITY_LOWER: float = -100
+NUMBER_DENSITY_UPPER: float = 70
+STABILITY_LOWER: float = -200
+STABILITY_UPPER: float = 10
+
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config
 logger: logging.Logger = logging.getLogger(__name__)
