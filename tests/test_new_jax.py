@@ -41,6 +41,7 @@ from atmodeller.jax_containers import (
     Parameters,
     Planet,
     Solution,
+    SolverParameters,
     SpeciesData,
 )
 from atmodeller.jax_engine import get_log_extended_activity, solve
@@ -105,11 +106,12 @@ def test_CHO_low_temperature() -> None:
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
+    solver_parameters: SolverParameters = SolverParameters()
 
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters)
+    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -185,11 +187,12 @@ def test_graphite_condensed() -> None:
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
+    solver_parameters: SolverParameters = SolverParameters()
 
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters)
+    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -280,11 +283,12 @@ def test_graphite_unstable() -> None:
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
+    solver_parameters: SolverParameters = SolverParameters()
 
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters)
+    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -372,11 +376,12 @@ def test_water_condensed_O_abundance() -> None:
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
+    solver_parameters: SolverParameters = SolverParameters()
 
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters)
+    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
@@ -457,11 +462,12 @@ def test_graphite_water_condensed() -> None:
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
+    solver_parameters: SolverParameters = SolverParameters()
 
     # Pre-compile
     # solve(initial_solution, parameters, solver_parameters).block_until_ready()
 
-    scaled_solution: Array = solve(initial_solution, parameters)
+    scaled_solution: Array = solve(initial_solution, parameters, solver_parameters)
     logger.debug("scaled_solution = %s", scaled_solution)
 
     unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)

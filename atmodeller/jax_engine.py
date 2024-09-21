@@ -16,6 +16,8 @@
 #
 """JAX-related functionality for solving the system of equations"""
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 import optimistix as optx
@@ -28,20 +30,24 @@ from atmodeller.jax_containers import (
     Parameters,
     Planet,
     Solution,
+    SolverParameters,
     SpeciesData,
     gas_species_mask,
 )
 from atmodeller.jax_utilities import logsumexp
-from atmodeller.utilities import OptxSolver, get_solver_options
+from atmodeller.utilities import get_solver_options
 
 
-@jit
-def solve(solution: Solution, parameters: Parameters) -> Array:
+@partial(jit, static_argnums=(2,))
+def solve(
+    solution: Solution, parameters: Parameters, solver_parameters: SolverParameters
+) -> Array:
     """Solves the system
 
     Args:
         solution: Solution
         parameters: Parameters
+        solver_parameters: Solver parameters
 
     Returns:
         The solution
@@ -49,15 +55,14 @@ def solve(solution: Solution, parameters: Parameters) -> Array:
 
     # FIXME: For batch calculations this will probably need to be a pytree.
     options = get_solver_options(parameters.species)
-    solver: OptxSolver = optx.Newton(atol=1.0e-8, rtol=1.0e-8)
 
     sol = optx.root_find(
         objective_function,
-        solver,
+        solver_parameters.get_solver(),
         solution.data,
         args=(parameters),
-        throw=True,
-        max_steps=256,
+        throw=solver_parameters.throw,
+        max_steps=solver_parameters.max_steps,
         options=options,
     )
 

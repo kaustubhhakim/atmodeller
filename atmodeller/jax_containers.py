@@ -23,17 +23,18 @@ functionality can remain together whilst accommodating the requirements of JAX-c
 """
 import sys
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Callable, NamedTuple, Type
 
 import jax
 import jax.numpy as jnp
+import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
 from molmass import Formula
 
 from atmodeller import AVOGADRO, GRAVITATIONAL_CONSTANT
 from atmodeller.jax_utilities import scale_number_density
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -268,37 +269,36 @@ class Constraints(NamedTuple):
 
 # TODO: Maybe to implement at some point, but not sure how to marry this with vmap (which is more
 # important to implement at this point).
-# class SolverParameters(NamedTuple):
-#     """Solver parameters
+class SolverParameters(NamedTuple):
+    """Solver parameters
 
-#     Args:
-#         solver: Solver class
-#         options: Solver options
-#         atol: Absolute tolerance. Defaults to 1.0E-8.
-#         rtol: Relative tolerance. Defaults to 1.0e-8.
-#         norm: Norm. Defaults to rms.
-#         max_steps: Maximum number of steps. Defaults to 256.
-#         throw: How to report any failures. Defaults to True.
-#     """
+    Args:
+        solver: Solver class
+        atol: Absolute tolerance. Defaults to 1.0E-8.
+        rtol: Relative tolerance. Defaults to 1.0e-8.
+        norm: Norm. Defaults to rms.
+        max_steps: Maximum number of steps. Defaults to 256.
+        throw: How to report any failures. Defaults to True.
+    """
 
-#     solver_class: Type[OptxSolver] = optx.Newton
-#     """Solver class"""
-#     options: dict[str, ArrayLike] | None = None
-#     """Solver options"""
-#     atol: float = 1.0e-8
-#     """Absolute tolerance"""
-#     rtol: float = 1.0e-8
-#     """Relative tolerance"""
-#     norm: Callable = optx.rms_norm
-#     """Norm"""
-#     max_steps: int = 256
-#     """Maximum number of steps"""
-#     throw: bool = True
-#     """How to report any failures"""
+    solver_class: Type[OptxSolver] = optx.Newton
+    """Solver class"""
+    # options: dict[str, ArrayLike] | None = None
+    # """Solver options"""
+    atol: float = 1.0e-8
+    """Absolute tolerance"""
+    rtol: float = 1.0e-8
+    """Relative tolerance"""
+    norm: Callable = optx.rms_norm
+    """Norm"""
+    max_steps: int = 256
+    """Maximum number of steps"""
+    throw: bool = True
+    """How to report any failures"""
 
-#     def get_solver(self) -> OptxSolver:
-#         """Gets the solver"""
-#         return self.solver_class(rtol=self.rtol, atol=self.atol, norm=self.norm)
+    def get_solver(self) -> OptxSolver:
+        """Gets the solver"""
+        return self.solver_class(rtol=self.rtol, atol=self.atol, norm=self.norm)
 
 
 class Parameters(NamedTuple):
