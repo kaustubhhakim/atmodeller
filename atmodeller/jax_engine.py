@@ -54,7 +54,7 @@ def solve(
     """
 
     # FIXME: For batch calculations this will probably need to be a pytree.
-    options = get_solver_options(parameters.species)
+    options = get_solver_options(parameters.species, parameters.scaling)
 
     sol = optx.root_find(
         objective_function,

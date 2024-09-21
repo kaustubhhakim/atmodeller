@@ -49,7 +49,7 @@ from atmodeller.jax_utilities import (
     pressure_from_log_number_density,
     unscale_number_density,
 )
-from atmodeller.utilities import earth_oceans_to_hydrogen_mass, get_solver_options
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
 # logger.setLevel(logging.INFO)
@@ -61,7 +61,6 @@ ATOL: float = 1.0e-8
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage"""
 
-# FIXME: Changing the scaling does break the solver. Probably missing a factor somewhere.
 SCALING: float = 1.0  # AVOGADRO
 """Scale the numerical problem from molecules/m^3 to moles/m^3 if SCALING is AVODAGRO"""
 LOG_SCALING: ArrayLike = np.log(SCALING)
@@ -458,7 +457,6 @@ def test_graphite_water_condensed() -> None:
     )
     logger.debug("initial_solution = %s", initial_solution)
 
-    options: dict[str, ArrayLike] = get_solver_options(species)
     parameters: Parameters = Parameters(
         formula_matrix, reaction_matrix, species, planet, constraints, TAU, SCALING
     )
