@@ -74,10 +74,10 @@ def solve(
     return sol.value
 
 
-def solver_wrapper(solver_parameters) -> Callable:
+def solve_set_solver(solver_parameters: SolverParameters) -> Callable:
 
     @jit
-    def wrapped_solve(solution, parameters):
+    def wrapped_solve(solution: Solution, parameters: Parameters) -> Callable:
         return solve(solution, parameters, solver_parameters)
 
     return wrapped_solve
