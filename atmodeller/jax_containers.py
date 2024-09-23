@@ -25,7 +25,6 @@ import sys
 from collections.abc import Mapping
 from typing import Callable, NamedTuple, Type
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
@@ -407,7 +406,7 @@ class Parameters(NamedTuple):
     """Mass constraints"""
     tau: ArrayLike
     """Tau factor for species"""
-    log_scaling: ArrayLike
+    log_scaling: float
     """Log scaling"""
 
 
@@ -425,7 +424,7 @@ def gas_species_mask(species: list[SpeciesData]) -> Array:
     # TODO: Use a parameter name rather than hard-coded to 0.
     gas_species: Array = (phase_codes == 0).astype(int)
 
-    jax.debug.print("gas_species = {out}", out=gas_species)
+    # jax.debug.print("gas_species = {out}", out=gas_species)
 
     return gas_species
 

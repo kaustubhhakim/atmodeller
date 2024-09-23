@@ -17,13 +17,14 @@
 """Classes"""
 
 import logging
-import timeit
+import time
 
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from jax import Array
 
+from atmodeller import TAU
 from atmodeller.jax_containers import (
     Constraints,
     Parameters,
@@ -59,7 +60,7 @@ class InteriorAtmosphere:
         mass_constraints: dict[str, float],
         initial_number_density: npt.NDArray[np.float_],
         initial_stability: npt.NDArray[np.float_],
-        tau: float = 1.0e60,
+        tau: float = TAU,
     ):
         self.planet: Planet = planet
         logger.debug("planet = %s", self.planet)
@@ -80,8 +81,12 @@ class InteriorAtmosphere:
             tau=tau,
             log_scaling=self.log_scaling,
         )
-        # Pre-compile
+
+        start_time = time.time()
         solve(self.initial_solution, self.parameters, self.solver_parameters).block_until_ready()
+        end_time = time.time()
+        compile_time = end_time - start_time
+        logger.info("Compile time: %.6f seconds", compile_time)
 
     def get_formula_matrix(self) -> npt.NDArray:
         """Formula matrix
@@ -168,4 +173,10 @@ class InteriorAtmosphere:
         return reactions
 
     def solve(self) -> Array:
-        return solve(self.initial_solution, self.parameters, self.solver_parameters)
+        start_time = time.time()
+        out: Array = solve(self.initial_solution, self.parameters, self.solver_parameters)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        logger.info("Execution time: %.6f seconds", execution_time)
+
+        return out

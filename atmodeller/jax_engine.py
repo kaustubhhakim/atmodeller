@@ -138,7 +138,7 @@ def get_log_activity(log_number_density: Array, parameters: Parameters) -> Array
 
     log_activity: Array = jnp.where(gas_mask == 1, activity_for_gas, activity_for_condensed)
 
-    jax.debug.print("log_activity = {out}", out=log_activity)
+    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     return log_activity
 
@@ -161,7 +161,7 @@ def get_log_extended_activity(
         log_stability
     )
 
-    jax.debug.print("log_extended_activity = {out}", out=log_extended_activity)
+    # jax.debug.print("log_extended_activity = {out}", out=log_extended_activity)
 
     return log_extended_activity
 
@@ -185,7 +185,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     temperature: ArrayLike = planet.surface_temperature
     log_scaling: float = parameters.log_scaling
 
-    jax.debug.print("solution in = {out}", out=solution)
+    # jax.debug.print("solution in = {out}", out=solution)
 
     log_number_density, log_stability = jnp.split(solution, 2)
 
@@ -197,16 +197,16 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     reaction_residual: Array = (
         reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
     )
-    jax.debug.print("reaction_residual = {out}", out=reaction_residual)
+    # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
     # Account for species stability.
     reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(log_stability))
-    jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
+    # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
     # Mass balance residual
     log_volume: Array = atmosphere_log_volume(log_number_density, species, planet)
     log_density_matrix_product: Array = jnp.log(formula_matrix.dot(jnp.exp(log_number_density)))
     mass_residual = log_density_matrix_product - (constraints.array() - log_volume)
-    jax.debug.print("mass_residual = {out}", out=mass_residual)
+    # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
     # Stability residual
     # Get minimum scaled log number of molecules
@@ -214,10 +214,10 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
         jnp.min(constraints.array()) - log_volume - jnp.log(parameters.tau)
     )
     stability_residual: Array = log_number_density + log_stability - log_min_number_density
-    jax.debug.print("stability_residual = {out}", out=stability_residual)
+    # jax.debug.print("stability_residual = {out}", out=stability_residual)
 
     residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
-    jax.debug.print("residual = {out}", out=residual)
+    # jax.debug.print("residual = {out}", out=residual)
 
     return residual
 
@@ -235,10 +235,10 @@ def atmosphere_log_molar_mass(log_number_density: Array, species: list[SpeciesDa
     """
     molar_masses: Array = jnp.array([value.molar_mass for value in species])
     gas_mask: Array = gas_species_mask(species)
-    gas_molar_masses = molar_masses * gas_mask
+    gas_molar_masses: Array = molar_masses * gas_mask
 
-    jax.debug.print("molar_masses = {out}", out=molar_masses)
-    jax.debug.print("gas_molar_masses = {out}", out=gas_molar_masses)
+    # jax.debug.print("molar_masses = {out}", out=molar_masses)
+    # jax.debug.print("gas_molar_masses = {out}", out=gas_molar_masses)
 
     molar_mass: Array = logsumexp(log_number_density, gas_molar_masses) - logsumexp(
         log_number_density, gas_mask

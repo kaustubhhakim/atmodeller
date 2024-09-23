@@ -65,9 +65,16 @@ MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
 
 # Lower and upper bounds on the hypercube which contains the root
 NUMBER_DENSITY_LOWER: float = -100
+"""Lower number density"""
 NUMBER_DENSITY_UPPER: float = 70
+"""Upper number density"""
 STABILITY_LOWER: float = -200
+"""Lower stability"""
 STABILITY_UPPER: float = 10
+"""Upper stability"""
+
+TAU: float = 1.0e60
+"""Tau scaling factor for condensate stability"""
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config
