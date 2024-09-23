@@ -33,16 +33,19 @@ from atmodeller.jax_containers import (
     SolverParameters,
     SpeciesData,
 )
-from atmodeller.jax_engine import solve
+from atmodeller.jax_engine import get_log_extended_activity, solve
+from atmodeller.jax_utilities import unscale_number_density
 from atmodeller.utilities import partial_rref, unique_elements_in_species
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class InteriorAtmosphere:
-    """Reaction network
+    """Interior atmosphere system
 
-    This processing class takes a list of species and provides output related to reactions
+    Args:
+        species: A list of species
+        log_scaling: Log scaling for the numerical solution
     """
 
     def __init__(self, species: list[SpeciesData], log_scaling: float):
@@ -88,7 +91,7 @@ class InteriorAtmosphere:
         compile_time = end_time - start_time
         logger.info("Compile time: %.6f seconds", compile_time)
 
-    def get_formula_matrix(self) -> npt.NDArray:
+    def get_formula_matrix(self) -> npt.NDArray[np.int_]:
         """Formula matrix
 
         Elements are given in rows and species in columns following the convention in
@@ -101,7 +104,7 @@ class InteriorAtmosphere:
             The formula matrix
         """
         unique_elements: tuple[str, ...] = unique_elements_in_species(self.species)
-        formula_matrix: npt.NDArray = np.zeros(
+        formula_matrix: npt.NDArray[np.int_] = np.zeros(
             (len(unique_elements), len(self.species)), dtype=jnp.int_
         )
 
@@ -114,12 +117,11 @@ class InteriorAtmosphere:
                     count = 0
                 formula_matrix[element_index, species_index] = count
 
-        # logger.debug("species = %s", species)
         logger.debug("formula_matrix = %s", formula_matrix)
 
         return formula_matrix
 
-    def get_reaction_matrix(self) -> npt.NDArray:
+    def get_reaction_matrix(self) -> npt.NDArray[np.float_]:
         """Reaction matrix
 
         Args:
@@ -133,8 +135,8 @@ class InteriorAtmosphere:
         #    logger.debug("Only one species therefore no reactions")
         #    return None
 
-        transpose_formula_matrix: npt.NDArray = self.get_formula_matrix().T
-        reaction_matrix: npt.NDArray = partial_rref(transpose_formula_matrix)
+        transpose_formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix().T
+        reaction_matrix: npt.NDArray[np.float_] = partial_rref(transpose_formula_matrix)
 
         # logger.debug("species = %s", species)
         logger.debug("reaction_matrix = %s", reaction_matrix)
@@ -150,7 +152,7 @@ class InteriorAtmosphere:
         Returns:
             Reactions as a dictionary
         """
-        reaction_matrix: npt.NDArray = self.get_reaction_matrix()
+        reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
         reactions: dict[int, str] = {}
         # TODO: Would like to avoid below if possible
         # if self.reaction_matrix is not None:
@@ -172,11 +174,26 @@ class InteriorAtmosphere:
 
         return reactions
 
-    def solve(self) -> Array:
+    def solve(self) -> tuple[npt.NDArray[np.float_], ...]:
         start_time = time.time()
-        out: Array = solve(self.initial_solution, self.parameters, self.solver_parameters)
+        out: Array = solve(
+            self.initial_solution, self.parameters, self.solver_parameters
+        ).block_until_ready()
         end_time = time.time()
         execution_time = end_time - start_time
         logger.info("Execution time: %.6f seconds", execution_time)
 
-        return out
+        # Split the array into two arrays along the middle column
+        scaled_number_density, stability = jnp.split(out, 2)  # , axis=1)
+        unscaled_number_density: Array = unscale_number_density(
+            scaled_number_density, self.log_scaling
+        )
+        number_density_numpy: npt.NDArray[np.float_] = np.array(unscaled_number_density)
+        logger.debug("log_number_density = %s", number_density_numpy)
+        extended_activity: Array = get_log_extended_activity(
+            unscaled_number_density, stability, self.parameters
+        )
+        extended_activity_numpy: npt.NDArray[np.float_] = np.array(extended_activity)
+        logger.debug("log_activity = %s", extended_activity_numpy)
+
+        return number_density_numpy, extended_activity_numpy

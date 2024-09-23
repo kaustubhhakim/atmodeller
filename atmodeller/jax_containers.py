@@ -199,9 +199,9 @@ class Solution(NamedTuple):
         stability: Stability of species
     """
 
-    number_density: Array
+    number_density: ArrayLike
     """Number density of species"""
-    stability: Array
+    stability: ArrayLike
     """Stability of species"""
 
     @classmethod
@@ -218,10 +218,9 @@ class Solution(NamedTuple):
         Returns:
             An instance
         """
-        number_density_scaled: Array = scale_number_density(number_density, log_scaling)
-        stability_scaled: Array = scale_number_density(stability, log_scaling)
+        number_density_scaled: ArrayLike = scale_number_density(number_density, log_scaling)
 
-        return cls(number_density_scaled, stability_scaled)
+        return cls(number_density_scaled, stability)
 
     @property
     def data(self) -> Array:
