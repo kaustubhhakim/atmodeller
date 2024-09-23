@@ -27,7 +27,6 @@ from functools import wraps
 from pstats import SortKey, Stats
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Type, TypeVar
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
@@ -38,16 +37,7 @@ from molmass import Formula
 from scipy.constants import kilo, mega
 from sklearn.metrics import mean_squared_error
 
-from atmodeller import (
-    ATMOSPHERE,
-    BOLTZMANN_CONSTANT_BAR,
-    NUMBER_DENSITY_LOWER,
-    NUMBER_DENSITY_UPPER,
-    OCEAN_MASS_H2,
-    STABILITY_LOWER,
-    STABILITY_UPPER,
-)
-from atmodeller.jax_utilities import scale_number_density
+from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 if TYPE_CHECKING:
     from atmodeller.jax_containers import SpeciesData
@@ -504,47 +494,3 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     # logger.debug("permutation_matrix = \n%s", P)
 
     return component_matrix
-
-
-# FIXME: For batch calculations this will probably need to be a pytree.
-def get_solver_options(species: list[SpeciesData], scaling: ArrayLike) -> dict[str, ArrayLike]:
-    """Gets the solver options.
-
-    The options define the bounds of the hybercube which contains the root, and are used for the
-    optimistix Newton solver.
-
-    Args:
-        species: A list of species
-        scaling: Scaling
-
-    Returns:
-        Solver options for the optimistix Newton solver
-    """
-    num_species: int = len(species)
-    options: dict[str, ArrayLike] = {}
-
-    number_density_lower: ArrayLike = NUMBER_DENSITY_LOWER * np.ones(num_species)
-    scaled_number_density_lower: Array = scale_number_density(
-        number_density_lower, jnp.log(scaling)
-    )
-    number_density_upper: ArrayLike = NUMBER_DENSITY_UPPER * np.ones(num_species)
-    scaled_number_density_upper: Array = scale_number_density(
-        number_density_upper, jnp.log(scaling)
-    )
-
-    options["lower"] = jnp.concatenate(
-        (
-            scaled_number_density_lower,
-            STABILITY_LOWER * np.ones(num_species),
-        )
-    )
-    options["upper"] = jnp.concatenate(
-        (
-            scaled_number_density_upper,
-            STABILITY_UPPER * np.ones(num_species),
-        )
-    )
-
-    jax.debug.print("options = {out}", out=options)
-
-    return options

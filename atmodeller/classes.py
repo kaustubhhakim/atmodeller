@@ -17,24 +17,73 @@
 """Classes"""
 
 import logging
+import timeit
 
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+from jax import Array
 
-from atmodeller.jax_containers import SpeciesData
+from atmodeller.jax_containers import (
+    Constraints,
+    Parameters,
+    Planet,
+    Solution,
+    SolverParameters,
+    SpeciesData,
+)
+from atmodeller.jax_engine import solve
 from atmodeller.utilities import partial_rref, unique_elements_in_species
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class ReactionNetwork:
+class InteriorAtmosphere:
     """Reaction network
 
     This processing class takes a list of species and provides output related to reactions
     """
 
-    def formula_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
+    def __init__(self, species: list[SpeciesData], log_scaling: float):
+        self.species: list[SpeciesData] = species
+        self.log_scaling: float = log_scaling
+        self.formula_matrix: Array = jnp.array(self.get_formula_matrix())
+        self.reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
+        self.solver_parameters: SolverParameters = SolverParameters.create(
+            self.species, self.log_scaling
+        )
+
+    def initialise_single(
+        self,
+        planet: Planet,
+        mass_constraints: dict[str, float],
+        initial_number_density: npt.NDArray[np.float_],
+        initial_stability: npt.NDArray[np.float_],
+        tau: float = 1.0e60,
+    ):
+        self.planet: Planet = planet
+        logger.debug("planet = %s", self.planet)
+        self.constraints: Constraints = Constraints.create(
+            self.species, mass_constraints, self.log_scaling
+        )
+        logger.debug("constraints = %s", self.constraints)
+        self.initial_solution: Solution = Solution.create(
+            initial_number_density, initial_stability, self.log_scaling
+        )
+        logger.debug("initial_solution = %s", self.initial_solution)
+        self.parameters: Parameters = Parameters(
+            formula_matrix=self.formula_matrix,
+            reaction_matrix=self.reaction_matrix,
+            species=self.species,
+            planet=self.planet,
+            constraints=self.constraints,
+            tau=tau,
+            log_scaling=self.log_scaling,
+        )
+        # Pre-compile
+        solve(self.initial_solution, self.parameters, self.solver_parameters).block_until_ready()
+
+    def get_formula_matrix(self) -> npt.NDArray:
         """Formula matrix
 
         Elements are given in rows and species in columns following the convention in
@@ -46,13 +95,13 @@ class ReactionNetwork:
         Returns:
             The formula matrix
         """
-        unique_elements: tuple[str, ...] = unique_elements_in_species(species)
+        unique_elements: tuple[str, ...] = unique_elements_in_species(self.species)
         formula_matrix: npt.NDArray = np.zeros(
-            (len(unique_elements), len(species)), dtype=jnp.int_
+            (len(unique_elements), len(self.species)), dtype=jnp.int_
         )
 
         for element_index, element in enumerate(unique_elements):
-            for species_index, species_ in enumerate(species):
+            for species_index, species_ in enumerate(self.species):
                 count: int = 0
                 try:
                     count = species_.composition[element][0]
@@ -65,7 +114,7 @@ class ReactionNetwork:
 
         return formula_matrix
 
-    def reaction_matrix(self, species: list[SpeciesData]) -> npt.NDArray:
+    def get_reaction_matrix(self) -> npt.NDArray:
         """Reaction matrix
 
         Args:
@@ -79,7 +128,7 @@ class ReactionNetwork:
         #    logger.debug("Only one species therefore no reactions")
         #    return None
 
-        transpose_formula_matrix: npt.NDArray = self.formula_matrix(species).T
+        transpose_formula_matrix: npt.NDArray = self.get_formula_matrix().T
         reaction_matrix: npt.NDArray = partial_rref(transpose_formula_matrix)
 
         # logger.debug("species = %s", species)
@@ -87,7 +136,7 @@ class ReactionNetwork:
 
         return reaction_matrix
 
-    def reactions(self, species: list[SpeciesData]) -> dict[int, str]:
+    def reactions(self) -> dict[int, str]:
         """The reactions as a dictionary
 
         Args:
@@ -96,14 +145,14 @@ class ReactionNetwork:
         Returns:
             Reactions as a dictionary
         """
-        reaction_matrix: npt.NDArray = self.reaction_matrix(species)
+        reaction_matrix: npt.NDArray = self.get_reaction_matrix()
         reactions: dict[int, str] = {}
         # TODO: Would like to avoid below if possible
         # if self.reaction_matrix is not None:
         for reaction_index in range(reaction_matrix.shape[0]):
             reactants: str = ""
             products: str = ""
-            for species_index, species_ in enumerate(species):
+            for species_index, species_ in enumerate(self.species):
                 coeff: float = reaction_matrix[reaction_index, species_index].item()
                 if coeff != 0:
                     if coeff < 0:
@@ -117,3 +166,6 @@ class ReactionNetwork:
             reactions[reaction_index] = reaction
 
         return reactions
+
+    def solve(self) -> Array:
+        return solve(self.initial_solution, self.parameters, self.solver_parameters)

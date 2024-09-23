@@ -17,9 +17,11 @@
 """JAX-related functionality for solving the system of equations"""
 
 from functools import partial
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
@@ -35,10 +37,9 @@ from atmodeller.jax_containers import (
     gas_species_mask,
 )
 from atmodeller.jax_utilities import logsumexp
-from atmodeller.utilities import get_solver_options
 
 
-@partial(jit, static_argnums=(2,))
+@partial(jit, static_argnames=["solver_parameters"])
 def solve(
     solution: Solution, parameters: Parameters, solver_parameters: SolverParameters
 ) -> Array:
@@ -53,12 +54,14 @@ def solve(
         The solution
     """
 
-    # FIXME: For batch calculations this will probably need to be a pytree.
-    options = get_solver_options(parameters.species, parameters.scaling)
+    options: dict[str, ArrayLike] = {
+        "lower": np.asarray(solver_parameters.lower),
+        "upper": np.asarray(solver_parameters.upper),
+    }
 
     sol = optx.root_find(
         objective_function,
-        solver_parameters.get_solver(),
+        solver_parameters.solver,
         solution.data,
         args=(parameters),
         throw=solver_parameters.throw,
@@ -71,12 +74,21 @@ def solve(
     return sol.value
 
 
+def solver_wrapper(solver_parameters) -> Callable:
+
+    @jit
+    def wrapped_solve(solution, parameters):
+        return solve(solution, parameters, solver_parameters)
+
+    return wrapped_solve
+
+
 @jit
 def get_log_reaction_equilibrium_constant(
     species: list[SpeciesData],
     reaction_matrix: Array,
     temperature: ArrayLike,
-    scaling: ArrayLike,
+    log_scaling: ArrayLike,
 ) -> Array:
     """Gets the log equilibrium constant of the reactions
 
@@ -84,7 +96,7 @@ def get_log_reaction_equilibrium_constant(
         species: List of species
         reaction_matrix: Reaction matrix
         temperature: Temperature
-        scaling: Scaling
+        log_scaling: Log scaling
 
     Returns:
         Log equilibrium constant of the reactions
@@ -98,7 +110,7 @@ def get_log_reaction_equilibrium_constant(
     # jax.debug.print("delta_n = {out}", out=delta_n)
 
     log_Kc: Array = log_Kp - delta_n * (
-        jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(scaling) + jnp.log(temperature)
+        jnp.log(BOLTZMANN_CONSTANT_BAR) + log_scaling + jnp.log(temperature)
     )
     # jax.debug.print("log10Kc = {out}", out=log_Kc)
 
@@ -171,7 +183,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     constraints: Constraints = parameters.constraints
     species: list[SpeciesData] = parameters.species
     temperature: ArrayLike = planet.surface_temperature
-    scaling: ArrayLike = parameters.scaling
+    log_scaling: float = parameters.log_scaling
 
     jax.debug.print("solution in = {out}", out=solution)
 
@@ -179,7 +191,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
     # Reaction network residual
     log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
-        species, reaction_matrix, temperature, scaling
+        species, reaction_matrix, temperature, log_scaling
     )
     log_activity: Array = get_log_activity(log_number_density, parameters)
     reaction_residual: Array = (

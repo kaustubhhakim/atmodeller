@@ -27,12 +27,20 @@ from typing import Callable, NamedTuple, Type
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
 from molmass import Formula
 
-from atmodeller import AVOGADRO, GRAVITATIONAL_CONSTANT
+from atmodeller import (
+    AVOGADRO,
+    GRAVITATIONAL_CONSTANT,
+    NUMBER_DENSITY_LOWER,
+    NUMBER_DENSITY_UPPER,
+    STABILITY_LOWER,
+    STABILITY_UPPER,
+)
 from atmodeller.jax_utilities import scale_number_density
 from atmodeller.utilities import OptxSolver, unit_conversion
 
@@ -267,38 +275,101 @@ class Constraints(NamedTuple):
         return jnp.array(list(self.log_molecules.values()))
 
 
-# TODO: Maybe to implement at some point, but not sure how to marry this with vmap (which is more
-# important to implement at this point).
 class SolverParameters(NamedTuple):
     """Solver parameters
 
     Args:
-        solver: Solver class
-        atol: Absolute tolerance. Defaults to 1.0E-8.
-        rtol: Relative tolerance. Defaults to 1.0e-8.
-        norm: Norm. Defaults to rms.
-        max_steps: Maximum number of steps. Defaults to 256.
-        throw: How to report any failures. Defaults to True.
+        solver: Solver
+        throw: How to report any failures
+        max_steps: The maximum number of steps the solver can take
+        lower: Lower bound on the hypercube which contains the root
+        upper: Upper bound on the hypercube which contains the root
     """
 
-    solver_class: Type[OptxSolver] = optx.Newton
-    """Solver class"""
-    # options: dict[str, ArrayLike] | None = None
-    # """Solver options"""
-    atol: float = 1.0e-8
-    """Absolute tolerance"""
-    rtol: float = 1.0e-8
-    """Relative tolerance"""
-    norm: Callable = optx.rms_norm
-    """Norm"""
-    max_steps: int = 256
-    """Maximum number of steps"""
-    throw: bool = True
+    solver: OptxSolver
+    """Solver"""
+    throw: bool
     """How to report any failures"""
+    max_steps: int
+    """Maximum number of steps the solver can take"""
+    lower: tuple[float, ...]
+    """Lower bound on the hypercube which contains the root"""
+    upper: tuple[float, ...]
+    """Upper bound on the hypercube which contains the root"""
 
-    def get_solver(self) -> OptxSolver:
-        """Gets the solver"""
-        return self.solver_class(rtol=self.rtol, atol=self.atol, norm=self.norm)
+    @classmethod
+    def create(
+        cls,
+        species: list[SpeciesData],
+        log_scaling: ArrayLike,
+        solver_class: Type[OptxSolver] = optx.Newton,
+        rtol: float = 1.0e-8,
+        atol: float = 1.0e-8,
+        throw: bool = True,
+        max_steps: int = 256,
+        norm: Callable = optx.rms_norm,
+    ) -> Self:
+        """Creates an instance
+
+        Args:
+            species: A list of species
+            log_scaling: Log scaling for the number density
+            solver_class: Solver class. Defaults to optimistix Newton.
+            rtol: Relative tolerance. Defaults to 1.0e-8.
+            atol: Absolute tolerance. Defaults to 1.0e-8.
+            throw. How to report any failures. Defaults to True.
+            max_steps: The maximum number of steps the solver can take. Defaults to 256.
+            norm: The norm. Defaults to optimistix RMS norm.
+        """
+        solver: OptxSolver = solver_class(rtol=rtol, atol=atol, norm=norm)
+        lower: tuple[float, ...] = cls._get_hypercube_bound(
+            species, log_scaling, NUMBER_DENSITY_LOWER, STABILITY_LOWER
+        )
+        upper: tuple[float, ...] = cls._get_hypercube_bound(
+            species, log_scaling, NUMBER_DENSITY_UPPER, STABILITY_UPPER
+        )
+
+        return cls(
+            solver,
+            throw=throw,
+            max_steps=max_steps,
+            lower=lower,
+            upper=upper,
+        )
+
+    @classmethod
+    def _get_hypercube_bound(
+        cls,
+        species: list[SpeciesData],
+        log_scaling: ArrayLike,
+        number_density_bound: float,
+        stability_bound: float,
+    ) -> tuple[float, ...]:
+        """Gets the bound on the hypercube
+
+        Args:
+            species: List of species
+            log_scaling: Log scaling for the number density
+            number_density_bound: Bound on the number density
+            stability_bound: Bound on the stability
+
+        Returns:
+            Bound on the hypercube which contains the root
+        """
+        num_species: int = len(species)
+        number_density: ArrayLike = number_density_bound * np.ones(num_species)
+        scaled_number_density: ArrayLike = scale_number_density(number_density, log_scaling)
+
+        bound: tuple[float, ...] = tuple(
+            np.concatenate(
+                (
+                    scaled_number_density,
+                    stability_bound * np.ones(num_species),
+                )
+            ).tolist()
+        )
+
+        return bound
 
 
 class Parameters(NamedTuple):
@@ -311,8 +382,8 @@ class Parameters(NamedTuple):
         planet: Planet
         constraints: Constraints
         tau: Tau factor for species stability
-        scaling: Scaling for the number density. Defaults to the Avogadro constant, which converts
-            molecules/m^3 to moles/m^3
+        log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which
+            converts molecules/m^3 to moles/m^3
 
     Attributes:
         formula_matrix: Formula matrix
@@ -321,7 +392,7 @@ class Parameters(NamedTuple):
         planet: Planet
         constraints: Constraints
         tau: Tau factor for species stability
-        scaling: Scaling for the number density
+        log_scaling: Log scaling for the number density
     """
 
     formula_matrix: Array
@@ -336,8 +407,8 @@ class Parameters(NamedTuple):
     """Mass constraints"""
     tau: ArrayLike
     """Tau factor for species"""
-    scaling: ArrayLike = AVOGADRO
-    """Scaling"""
+    log_scaling: ArrayLike
+    """Log scaling"""
 
 
 @jit
