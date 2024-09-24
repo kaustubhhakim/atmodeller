@@ -46,7 +46,7 @@ from atmodeller.jax_containers import (
     SolverParameters,
     SpeciesData,
 )
-from atmodeller.jax_engine import get_log_extended_activity, solve_set_solver
+from atmodeller.jax_engine import get_log_extended_activity
 from atmodeller.jax_utilities import (
     pressure_from_log_number_density,
     pytrees_stack,
@@ -378,77 +378,28 @@ def test_batch_planet() -> None:
     species: list[SpeciesData] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
 
     # Creates a list of planets with different surface temperatures
-    planets: list[Planet] = []
+    planet_list: list[Planet] = []
     for surface_temperature in range(450, 2001, 1000):
-        planets.append(Planet(surface_temperature=surface_temperature))
+        planet_list.append(Planet(surface_temperature=surface_temperature))
 
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
-
-    # Stacks the entities into one named tuple
-    # planets_batch = pytrees_stack(planets)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
     o_kg: float = 1.02999e20
 
-    mass_constraints_batch: dict[str, ArrayLike] = {
-        "C": jnp.array((c_kg, c_kg * 1)),
-        "H": jnp.array((h_kg, h_kg * 2)),
-        "O": jnp.array((o_kg, o_kg * 1)),
-    }
+    # Creates a list of mass constraints
+    mass_constraints1: dict[str, float] = {"C": c_kg, "H": h_kg, "O": o_kg}
+    mass_constraints2: dict[str, float] = {"C": c_kg, "H": h_kg * 2, "O": o_kg}
+    mass_constraints_list: list[dict[str, float]] = [mass_constraints1, mass_constraints2]
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([60, 60, 60, -30, 60, 60], dtype=np.float_)
     initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_batch(
-        planets, mass_constraints_batch, initial_number_density, initial_stability
+        planet_list, mass_constraints_list, initial_number_density, initial_stability
     )
     log_number_density, _ = interior_atmosphere.solve()
-
-    # reaction_network: ReactionNetwork = ReactionNetwork()
-    # formula_matrix: Array = jnp.array(reaction_network.formula_matrix(species))
-    # reaction_matrix: Array = jnp.array(reaction_network.reaction_matrix(species))
-    # constraints_batch: Constraints = Constraints.create(
-    #    species, mass_constraints_batch, LOG_SCALING
-    # )
-    # constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)
-
-    # initial_solution: Solution = Solution.create(
-    #    initial_number_density, initial_stability, LOG_SCALING
-    # )
-    # logger.debug("initial_solution = %s", initial_solution)
-
-    # parameters_batch: Parameters = Parameters(
-    ##    formula_matrix, reaction_matrix, species, planets_batch, constraints_batch, TAU, SCALING
-    # )
-    # parameters_vmap: Parameters = Parameters(
-    #    formula_matrix=None,
-    #    reaction_matrix=None,
-    #    species=None,
-    #    planet=0,
-    #    constraints=constraints_vmap,
-    #    tau=None,
-    #    scaling=None,
-    # )
-    # solver_parameters: SolverParameters = SolverParameters.create(species, LOG_SCALING)
-
-    # wrapper_to_vmap = solver_wrapper(solver_parameters)
-
-    # vmap_solve: Callable = jit(
-    #    jax.vmap(
-    #        wrapper_to_vmap,
-    #        in_axes=(None, parameters_vmap),
-    #    )
-    # )
-
-    # vmap_solve(initial_solution, parameters_batch).block_until_ready()
-
-    # scaled_solution: Array = vmap_solve(initial_solution, parameters_batch)
-    # logger.debug("scaled_solution = %s", scaled_solution)
-
-    # unscaled_solution: Array = unscale_number_density(scaled_solution, LOG_SCALING)
-    # logger.debug("unscaled_solution = %s", unscaled_solution)
-    # log_number_density, log_stability = jnp.split(unscaled_solution, 2)
 
     # pressure: Array = pressure_from_log_number_density(
     #     log_number_density, planets_batch.surface_temperature

@@ -17,7 +17,6 @@
 """JAX-related functionality for solving the system of equations"""
 
 from functools import partial
-from typing import Callable
 
 import jax
 import jax.numpy as jnp
@@ -43,7 +42,7 @@ from atmodeller.jax_utilities import logsumexp
 def solve(
     solution: Solution, parameters: Parameters, solver_parameters: SolverParameters
 ) -> Array:
-    """Solves the system
+    """Solves the system of non-linear equations
 
     Args:
         solution: Solution
@@ -72,15 +71,6 @@ def solve(
     jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
 
     return sol.value
-
-
-def solve_set_solver(solver_parameters: SolverParameters) -> Callable:
-
-    @jit
-    def wrapped_solve(solution: Solution, parameters: Parameters) -> Callable:
-        return solve(solution, parameters, solver_parameters)
-
-    return wrapped_solve
 
 
 @jit

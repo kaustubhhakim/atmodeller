@@ -36,7 +36,7 @@ from atmodeller.jax_containers import (
     SolverParameters,
     SpeciesData,
 )
-from atmodeller.jax_engine import get_log_extended_activity, solve_set_solver
+from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import pytrees_stack, unscale_number_density
 from atmodeller.utilities import partial_rref, unique_elements_in_species
 
@@ -68,14 +68,14 @@ class InteriorAtmosphere:
         initial_stability: npt.NDArray[np.float_],
         tau: float = TAU,
     ) -> None:
-        """Initialises a solve for a single system
+        """Initialises the solution for a single system
 
         Args:
             planet: Planet
             mass_constraints: Mass constraints
             initial_number_density: Initial number density
             initial_stability: Initial stability
-            tau: Tau factor for species stability
+            tau: Tau factor for species stability. Defaults to TAU.
         """
         self.planet: Planet = planet
         logger.debug("planet = %s", self.planet)
@@ -98,7 +98,7 @@ class InteriorAtmosphere:
         )
 
         start_time = time.time()
-        self._solve = solve_set_solver(self.solver_parameters)
+        self._solve: Callable = self.get_jit_solver()
         self._solve(self.initial_solution, self.parameters).block_until_ready()
         end_time = time.time()
         compile_time = end_time - start_time
@@ -107,6 +107,14 @@ class InteriorAtmosphere:
     def stack_mass_constraints(
         self, mass_constraints_list: list[dict[str, float]]
     ) -> dict[str, Array]:
+        """Stacks the mass constraints into a pytree
+
+        Args:
+            mass_constraints_list: A list of mass constraints
+
+        Returns:
+            A pytree of mass constraints
+        """
 
         stacked_mass_constraints: dict[str, Array] = {}
         keys: KeysView[str] = mass_constraints_list[0].keys()
@@ -127,21 +135,18 @@ class InteriorAtmosphere:
         """Initialises a solve for a batch system
 
         Args:
-            planet_batch: A list of planets
-            mass_constraints_batch: A list of mass constraints
+            planet_list: A list of planets
+            mass_constraints_list: A list of mass constraints
             initial_number_density: Initial number density
             initial_stability: Initial stability
             tau: Tau factor for species stability
         """
+        # Stack the planets and mass constraints into pytrees
         planets_batch = pytrees_stack(planet_list)
-        # TODO: Temporary hack to get something working
-        mass_constraints_batch = (
-            mass_constraints_list  # self.stack_mass_constraints(mass_constraints_list)
-        )
+        mass_constraints_batch = self.stack_mass_constraints(mass_constraints_list)
         self.constraints: Constraints = Constraints.create(
             self.species, mass_constraints_batch, self.log_scaling
         )
-        constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)  # type: ignore
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
@@ -154,6 +159,8 @@ class InteriorAtmosphere:
             tau=tau,
             log_scaling=self.log_scaling,
         )
+        # Define the structures to vectorize.
+        constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)  # type: ignore
         parameters_vmap: Parameters = Parameters(
             formula_matrix=None,  # type: ignore
             reaction_matrix=None,  # type: ignore
@@ -165,7 +172,7 @@ class InteriorAtmosphere:
         )
 
         self._solve: Callable = jax.jit(
-            jax.vmap(solve_set_solver(self.solver_parameters), in_axes=(None, parameters_vmap))
+            jax.vmap(self.get_jit_solver(), in_axes=(None, parameters_vmap))
         )
         start_time = time.time()
         self._solve(self.initial_solution, self.parameters).block_until_ready()
@@ -174,7 +181,7 @@ class InteriorAtmosphere:
         logger.info("Compile time: %.6f seconds", compile_time)
 
     def get_formula_matrix(self) -> npt.NDArray[np.int_]:
-        """Formula matrix
+        """Gets the formula matrix
 
         Elements are given in rows and species in columns following the convention in
         :cite:t:`LKS17`.
@@ -204,7 +211,7 @@ class InteriorAtmosphere:
         return formula_matrix
 
     def get_reaction_matrix(self) -> npt.NDArray[np.float_]:
-        """Reaction matrix
+        """Gets the reaction matrix
 
         Args:
             species: A list of species
@@ -224,6 +231,18 @@ class InteriorAtmosphere:
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
+
+    def get_jit_solver(self) -> Callable:
+        """Gets the jit solver
+
+        Returns:
+            The jit solver with solver parameters set
+        """
+
+        def wrapped_jit_solver(solution: Solution, parameters: Parameters) -> Callable:
+            return solve(solution, parameters, self.solver_parameters)
+
+        return wrapped_jit_solver
 
     def reactions(self) -> dict[int, str]:
         """The reactions as a dictionary
@@ -257,26 +276,30 @@ class InteriorAtmosphere:
         return reactions
 
     def solve(self) -> tuple[npt.NDArray[np.float_], ...]:
+        """Solves the system.
+
+        Returns:
+            Number density, extended activity
+        """
         start_time = time.time()
         out: Array = self._solve(self.initial_solution, self.parameters).block_until_ready()
         end_time = time.time()
         execution_time = end_time - start_time
         logger.info("Execution time: %.6f seconds", execution_time)
-
-        logger.info("out = %s", out)
+        logger.debug("out = %s", out)
 
         # Split the array into two arrays along the middle column
-        # FIXME: Needs to work with 1-D and 2-D data
-        scaled_number_density, stability = jnp.split(out, 2, axis=1)
+        axis: int = 0 if out.ndim == 1 else 1
+        scaled_number_density, stability = jnp.split(out, 2, axis=axis)
         unscaled_number_density: Array = unscale_number_density(
             scaled_number_density, self.log_scaling
         )
         number_density_numpy: npt.NDArray[np.float_] = np.array(unscaled_number_density)
-        logger.debug("log_number_density = %s", number_density_numpy)
+        logger.info("log_number_density = %s", number_density_numpy)
         extended_activity: Array = get_log_extended_activity(
             unscaled_number_density, stability, self.parameters
         )
         extended_activity_numpy: npt.NDArray[np.float_] = np.array(extended_activity)
-        logger.debug("log_activity = %s", extended_activity_numpy)
+        logger.info("log_activity = %s", extended_activity_numpy)
 
         return number_density_numpy, extended_activity_numpy
