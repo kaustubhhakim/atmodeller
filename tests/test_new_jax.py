@@ -19,13 +19,10 @@
 # Convenient to use naming convention so pylint: disable=C0103
 
 import logging
-from typing import Callable
 
-import jax
-import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array, jit
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, debug_logger  # pylint: disable=unused-import
@@ -35,23 +32,14 @@ from atmodeller.jax_containers import (
     CH4_g,
     CO2_g,
     CO_g,
-    Constraints,
     H2_g,
     H2O_g,
     H2O_l,
     O2_g,
-    Parameters,
     Planet,
-    Solution,
-    SolverParameters,
     SpeciesData,
 )
-from atmodeller.jax_engine import get_log_extended_activity
-from atmodeller.jax_utilities import (
-    pressure_from_log_number_density,
-    pytrees_stack,
-    unscale_number_density,
-)
+from atmodeller.jax_utilities import pressure_from_log_number_density
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
