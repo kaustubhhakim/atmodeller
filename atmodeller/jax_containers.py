@@ -42,7 +42,7 @@ from atmodeller import (
 )
 from atmodeller.jax_utilities import scale_number_density
 from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
-from atmodeller.solubility.jax_interfaces import NoSolubility, SolubilityPowerLaw
+from atmodeller.solubility.jax_interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
@@ -137,7 +137,7 @@ class SpeciesData(NamedTuple):
     """Molar mass"""
     gibbs_coefficients: tuple[float, ...]
     """Gibbs coefficients"""
-    solubility: SolubilityPowerLaw
+    solubility: SolubilityProtocol
     """Solubility"""
 
     @classmethod
@@ -146,7 +146,7 @@ class SpeciesData(NamedTuple):
         formula: str,
         phase: str,
         gibbs_coefficients: tuple[float, ...],
-        solubility: SolubilityPowerLaw = NoSolubility(),
+        solubility: SolubilityProtocol = NoSolubility(),
     ) -> Self:
         """Creates an instance
 
@@ -471,7 +471,7 @@ H2O_g_sossi: SpeciesData = SpeciesData.create(
     "H2O",
     "g",
     (-3.817134e-01, -4.469468e00, -2.213329e02, 5.975648e-02, 6.535070e-08),
-    H2O_peridotite_sossi(647, 0.5),  # FIXME: Want these set as defaults
+    H2O_peridotite_sossi,
 )
 H2O_l: SpeciesData = SpeciesData.create(
     "H2O",

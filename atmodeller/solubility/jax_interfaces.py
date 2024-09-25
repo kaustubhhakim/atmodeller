@@ -19,12 +19,40 @@
 from __future__ import annotations
 
 import logging
-from typing import NamedTuple
+from functools import partial
+from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
+from jax import Array, jit
 from jax.typing import ArrayLike
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+class SolubilityProtocol(Protocol):
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: float,
+        pressure: ArrayLike,
+        **kwargs,
+    ) -> ArrayLike: ...
+
+
+@partial(jit, static_argnames=["constant", "exponent"])
+def power_law(fugacity: ArrayLike, constant: float, exponent: float) -> Array:
+    """Power law
+
+    Args:
+        fugacity: Fugacity
+        constant: Constant for the power law
+        exponent: Exponent for the power law
+
+    Returns:
+        Evaluated power law
+    """
+    return constant * jnp.power(fugacity, exponent)
 
 
 class SolubilityPowerLaw(NamedTuple):
@@ -45,14 +73,14 @@ class SolubilityPowerLaw(NamedTuple):
 
         Args:
             fugacity: Fugacity
-            **kwargs: Arbitrary keyword arguments
+            **kwargs: Arbitrary unused keyword arguments
 
         Returns:
             Concentration
         """
         del kwargs
 
-        return self.constant * jnp.power(fugacity, self.exponent)
+        return power_law(fugacity, self.constant, self.exponent)
 
 
 class NoSolubility(NamedTuple):
@@ -63,4 +91,5 @@ class NoSolubility(NamedTuple):
         del args
         del kwargs
 
+        # Must be 0.0 (float) for JAX array type compliance
         return 0.0

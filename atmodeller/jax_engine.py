@@ -39,7 +39,6 @@ from atmodeller.jax_containers import (
 from atmodeller.jax_utilities import (
     log_pressure_from_log_number_density,
     logsumexp,
-    scale_number_density,
     unscale_number_density,
 )
 from atmodeller.utilities import unit_conversion
@@ -222,7 +221,6 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     ppmw: Array = vmap_apply_function(indices, pressure)
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
-    # TODO: Does this require scaling?
     species_melt_density: Array = (
         ppmw
         * unit_conversion.ppm_to_fraction
@@ -242,7 +240,6 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # log_density_melt_product: Array = jnp.where(non_zero_mask, jnp.log(density_melt_product), 0.0)
     # jax.debug.print("log_density_melt_product = {out}", out=log_density_melt_product)
 
-    # Finally, compute the mass residual with all terms
     mass_residual = log_element_density - (constraints.array() - log_volume)
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
