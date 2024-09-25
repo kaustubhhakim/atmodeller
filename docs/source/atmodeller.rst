@@ -7,13 +7,20 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   atmodeller.activity
    atmodeller.eos
    atmodeller.solubility
    atmodeller.thermodata
 
 Submodules
 ----------
+
+atmodeller.classes module
+-------------------------
+
+.. automodule:: atmodeller.classes
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 atmodeller.constraints module
 -----------------------------
@@ -55,6 +62,30 @@ atmodeller.interior\_atmosphere module
    :undoc-members:
    :show-inheritance:
 
+atmodeller.jax\_containers module
+---------------------------------
+
+.. automodule:: atmodeller.jax_containers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.jax\_engine module
+-----------------------------
+
+.. automodule:: atmodeller.jax_engine
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.jax\_utilities module
+--------------------------------
+
+.. automodule:: atmodeller.jax_utilities
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.output module
 ------------------------
 
@@ -75,6 +106,22 @@ atmodeller.reaction\_network module
 -----------------------------------
 
 .. automodule:: atmodeller.reaction_network
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.solution module
+--------------------------
+
+.. automodule:: atmodeller.solution
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.solver module
+------------------------
+
+.. automodule:: atmodeller.solver
    :members:
    :undoc-members:
    :show-inheritance:

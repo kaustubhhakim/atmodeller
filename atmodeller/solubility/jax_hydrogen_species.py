@@ -20,15 +20,11 @@
 
 from __future__ import annotations
 
-import logging
-
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.solubility.jax_interfaces import SolubilityPowerLaw, SolubilityProtocol
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 # TODO: Is this OK as a JAX container to have just a class?

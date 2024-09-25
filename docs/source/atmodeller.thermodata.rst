@@ -4,14 +4,6 @@ atmodeller.thermodata package
 Submodules
 ----------
 
-atmodeller.thermodata.combine module
-------------------------------------
-
-.. automodule:: atmodeller.thermodata.combine
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 atmodeller.thermodata.holland module
 ------------------------------------
 
@@ -32,6 +24,14 @@ atmodeller.thermodata.janaf module
 ----------------------------------
 
 .. automodule:: atmodeller.thermodata.janaf
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.thermodata.jax\_thermo module
+----------------------------------------
+
+.. automodule:: atmodeller.thermodata.jax_thermo
    :members:
    :undoc-members:
    :show-inheritance:
