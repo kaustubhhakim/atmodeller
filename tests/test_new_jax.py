@@ -34,12 +34,13 @@ from atmodeller.jax_containers import (
     CO_g,
     H2_g,
     H2O_g,
+    H2O_g_sossi,
     H2O_l,
     O2_g,
     Planet,
     SpeciesData,
 )
-from atmodeller.jax_utilities import pressure_from_log_number_density
+from atmodeller.jax_utilities import log_pressure_from_log_number_density
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -51,14 +52,12 @@ ATOL: float = 1.0e-8
 """Absolute tolerance"""
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage"""
-
 SCALING: float = AVOGADRO
 """Scale the numerical problem from molecules/m^3 to moles/m^3 if SCALING is AVODAGRO"""
 LOG_SCALING: float = np.log(SCALING)
 """Log scaling"""
-
 TAU: float = 1.0e60
-"""Tau scaling factor for condensate stability"""
+"""Tau scaling factor for species stability"""
 
 
 def test_CHO_low_temperature() -> None:
@@ -85,10 +84,10 @@ def test_CHO_low_temperature() -> None:
         planet, mass_constraints, initial_number_density, initial_stability
     )
     log_number_density, _ = interior_atmosphere.solve()
-    pressure: Array = pressure_from_log_number_density(
+    log_pressure: Array = log_pressure_from_log_number_density(
         log_number_density, planet.surface_temperature
     )
-    logger.debug("pressure = %s", pressure)
+    logger.debug("log_pressure = %s", log_pressure)
 
     target: npt.NDArray[np.float_] = np.array(
         [
@@ -107,7 +106,7 @@ def test_CHO_low_temperature() -> None:
 
     isclose_target: np.bool_ = np.isclose(target, log_number_density, rtol=RTOL, atol=ATOL).all()
     isclose_factsage: np.bool_ = np.isclose(
-        np.log(factsage_result), np.log(pressure), rtol=TOLERANCE, atol=TOLERANCE
+        np.log(factsage_result), log_pressure, rtol=TOLERANCE, atol=TOLERANCE
     ).all()
 
     assert isclose_target
@@ -138,10 +137,10 @@ def test_graphite_condensed() -> None:
         planet, mass_constraints, initial_number_density, initial_stability
     )
     log_number_density, _ = interior_atmosphere.solve()
-    pressure: Array = pressure_from_log_number_density(
+    log_pressure: Array = log_pressure_from_log_number_density(
         log_number_density, planet.surface_temperature
     )
-    logger.debug("pressure = %s", pressure)
+    logger.debug("log_pressure = %s", log_pressure)
 
     target: npt.NDArray[np.float_] = np.array(
         [
@@ -172,7 +171,7 @@ def test_graphite_condensed() -> None:
 
     isclose_target: np.bool_ = np.isclose(target, log_number_density, rtol=RTOL, atol=ATOL).all()
     isclose_factsage: np.bool_ = np.isclose(
-        np.log(factsage_result), np.log(pressure), rtol=TOLERANCE, atol=TOLERANCE
+        np.log(factsage_result), log_pressure, rtol=TOLERANCE, atol=TOLERANCE
     ).all()
 
     assert isclose_target
@@ -206,10 +205,10 @@ def test_graphite_unstable() -> None:
         planet, mass_constraints, initial_number_density, initial_stability
     )
     log_number_density, _ = interior_atmosphere.solve()
-    pressure: Array = pressure_from_log_number_density(
+    log_pressure: Array = log_pressure_from_log_number_density(
         log_number_density, planet.surface_temperature
     )
-    logger.debug("pressure = %s", pressure)
+    logger.debug("log_pressure = %s", log_pressure)
 
     target: npt.NDArray[np.float_] = np.array(
         [
@@ -242,7 +241,7 @@ def test_graphite_unstable() -> None:
 
     isclose_target: np.bool_ = np.isclose(target, log_number_density, rtol=RTOL, atol=ATOL).all()
     isclose_factsage: np.bool_ = np.isclose(
-        np.log(factsage_result), np.log(pressure), rtol=TOLERANCE, atol=TOLERANCE
+        np.log(factsage_result), log_pressure, rtol=TOLERANCE, atol=TOLERANCE
     ).all()
 
     assert isclose_target
@@ -271,10 +270,10 @@ def test_water_condensed_O_abundance() -> None:
         planet, mass_constraints, initial_number_density, initial_stability
     )
     log_number_density, _ = interior_atmosphere.solve()
-    pressure: Array = pressure_from_log_number_density(
+    log_pressure: Array = log_pressure_from_log_number_density(
         log_number_density, planet.surface_temperature
     )
-    logger.debug("pressure = %s", pressure)
+    logger.debug("log_pressure = %s", log_pressure)
 
     target: npt.NDArray = np.array(
         [60.147414932111765, 59.42151086724804, -73.77323817273705, 62.69282187037022]
@@ -293,7 +292,7 @@ def test_water_condensed_O_abundance() -> None:
 
     isclose_target: np.bool_ = np.isclose(target, log_number_density, rtol=RTOL, atol=ATOL).all()
     isclose_factsage: np.bool_ = np.isclose(
-        np.log(factsage_result), np.log(pressure), rtol=TOLERANCE, atol=TOLERANCE
+        np.log(factsage_result), log_pressure, rtol=TOLERANCE, atol=TOLERANCE
     ).all()
 
     assert isclose_target
@@ -328,10 +327,10 @@ def test_graphite_water_condensed() -> None:
         planet, mass_constraints, initial_number_density, initial_stability
     )
     log_number_density, _ = interior_atmosphere.solve()
-    pressure: Array = pressure_from_log_number_density(
+    log_pressure: Array = log_pressure_from_log_number_density(
         log_number_density, planet.surface_temperature
     )
-    logger.debug("pressure = %s", pressure)
+    logger.debug("log_pressure = %s", log_pressure)
 
     target: npt.NDArray[np.float_] = np.array(
         [
@@ -353,7 +352,7 @@ def test_graphite_water_condensed() -> None:
 
     isclose_target: np.bool_ = np.isclose(target, log_number_density, rtol=RTOL, atol=ATOL).all()
     isclose_factsage: np.bool_ = np.isclose(
-        np.log(factsage_result), np.log(pressure), rtol=TOLERANCE, atol=TOLERANCE
+        np.log(factsage_result), log_pressure, rtol=TOLERANCE, atol=TOLERANCE
     ).all()
 
     assert isclose_target
@@ -389,9 +388,46 @@ def test_batch_planet() -> None:
     )
     log_number_density, _ = interior_atmosphere.solve()
 
-    # pressure: Array = pressure_from_log_number_density(
+    # pressure: Array = log_pressure_from_log_number_density(
     #     log_number_density, planets_batch.surface_temperature
     # )
     # logger.debug("pressure = %s", pressure)
+
+    assert True
+
+
+def test_H_fO2() -> None:
+    """Tests H2-H2O at the IW buffer."""
+
+    species: list[SpeciesData] = [H2O_g_sossi, H2_g, O2_g]
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
+
+    oceans: float = 1
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    o_kg: float = 1.22814e21
+    # Mass constraints in alphabetical order
+    mass_constraints = {
+        "H": h_kg,
+        "O": o_kg,
+    }
+
+    # Initial solution guess number density (molecules/m^3)
+    initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)
+    initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
+    interior_atmosphere.initialise_single(
+        planet, mass_constraints, initial_number_density, initial_stability
+    )
+    log_number_density, _ = interior_atmosphere.solve()
+    log_pressure: Array = log_pressure_from_log_number_density(
+        log_number_density, planet.surface_temperature
+    )
+    logger.debug("log_pressure = %s", log_pressure)
+
+    target: dict[str, float] = {
+        "H2O_g": 0.2570770067190733,
+        "H2_g": 0.24964688044710354,
+        "O2_g": 8.838043080858959e-08,
+    }
 
     assert True

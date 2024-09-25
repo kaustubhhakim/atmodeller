@@ -76,21 +76,23 @@ def unscale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> Arr
 
 
 @jit
-def pressure_from_log_number_density(log_number_density: Array, temperature: ArrayLike) -> Array:
-    """Calculates pressure from the log number density
+def log_pressure_from_log_number_density(
+    log_number_density: Array, temperature: ArrayLike
+) -> Array:
+    """Calculates log pressure from the log number density
 
     Args:
         log_number_density: Log number density
         temperature: Temperature
 
     Returns:
-        Pressure in bar
+        Log pressure
     """
     log_pressure: Array = (
         log_number_density + np.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature)
     )
 
-    return jnp.exp(log_pressure)
+    return log_pressure
 
 
 @jit

@@ -17,15 +17,16 @@
 """JAX-related functionality for solving the system of equations"""
 
 from functools import partial
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jax import Array, jit
+from jax import Array, jit, lax
 from jax.typing import ArrayLike
 
-from atmodeller import BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.jax_containers import (
     Constraints,
     Parameters,
@@ -35,7 +36,13 @@ from atmodeller.jax_containers import (
     SpeciesData,
     gas_species_mask,
 )
-from atmodeller.jax_utilities import logsumexp
+from atmodeller.jax_utilities import (
+    log_pressure_from_log_number_density,
+    logsumexp,
+    scale_number_density,
+    unscale_number_density,
+)
+from atmodeller.utilities import unit_conversion
 
 
 @partial(jit, static_argnames=["solver_parameters"])
@@ -176,7 +183,6 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     log_scaling: float = parameters.log_scaling
 
     # jax.debug.print("solution in = {out}", out=solution)
-
     log_number_density, log_stability = jnp.split(solution, 2)
 
     # Reaction network residual
@@ -192,10 +198,52 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(log_stability))
     # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
-    # Mass balance residual
+    # Mass balance residual for elements
     log_volume: Array = atmosphere_log_volume(log_number_density, species, planet)
-    log_density_matrix_product: Array = jnp.log(formula_matrix.dot(jnp.exp(log_number_density)))
-    mass_residual = log_density_matrix_product - (constraints.array() - log_volume)
+    # Number density of elements in the gas phase
+    element_gas_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
+
+    log_pressure: Array = unscale_number_density(
+        log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
+    )
+    pressure: Array = jnp.exp(log_pressure)
+    # jax.debug.print("pressure = {out}", out=pressure)
+
+    solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]
+    molar_masses: Array = jnp.array([species_.molar_mass for species_ in species])
+    # jax.debug.print("molar_masses = {out}", out=molar_masses)
+
+    # Dispatcher function to select the appropriate solubility law
+    def apply_solubility_function(index: ArrayLike, x: ArrayLike):
+        return lax.switch(index, solubility_funcs, x)
+
+    vmap_apply_function: Callable = jax.vmap(apply_solubility_function, in_axes=(0, 0))
+    indices: ArrayLike = np.arange(len(species))
+    ppmw: Array = vmap_apply_function(indices, pressure)
+    # jax.debug.print("ppmw = {out}", out=ppmw)
+
+    # TODO: Does this require scaling?
+    species_melt_density: Array = (
+        ppmw
+        * unit_conversion.ppm_to_fraction
+        * AVOGADRO
+        * planet.mantle_melt_mass
+        / (molar_masses * jnp.exp(log_volume))
+    )
+    # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
+    element_melt_density: Array = formula_matrix.dot(species_melt_density)
+    # Scale back to the scaling of the numerical problem. Perform in regular space to enable
+    # addition before logging, hence avoiding any problems with NaNs
+    element_melt_density = element_melt_density / jnp.exp(log_scaling)
+    log_element_density: Array = jnp.log(element_gas_density + element_melt_density)
+
+    # Create a mask for non-zero values
+    # non_zero_mask: Array = density_melt_product != 0
+    # log_density_melt_product: Array = jnp.where(non_zero_mask, jnp.log(density_melt_product), 0.0)
+    # jax.debug.print("log_density_melt_product = {out}", out=log_density_melt_product)
+
+    # Finally, compute the mass residual with all terms
+    mass_residual = log_element_density - (constraints.array() - log_volume)
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
     # Stability residual
