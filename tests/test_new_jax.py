@@ -28,19 +28,19 @@ from jax.typing import ArrayLike
 from atmodeller import AVOGADRO, debug_logger  # pylint: disable=unused-import
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.jax_containers import (
-    C_cr,
-    CH4_g,
-    CO2_g,
-    CO_g,
-    H2_g,
-    H2O_g,
-    H2O_g_sossi,
-    H2O_l,
-    O2_g,
+    C_cr_data,
+    CH4_g_data,
+    CO2_g_data,
+    CO_g_data,
+    H2_g_data,
+    H2O_g_data,
+    H2O_l_data,
+    O2_g_data,
     Planet,
-    SpeciesData,
+    Species,
 )
 from atmodeller.jax_utilities import log_pressure_from_log_number_density
+from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -63,7 +63,14 @@ TAU: float = 1.0e60
 def test_CHO_low_temperature() -> None:
     """C-H-O system at 450 K"""
 
-    species: list[SpeciesData] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
+    H2_g: Species = Species(H2_g_data)
+    H2O_g: Species = Species(H2O_g_data)
+    CO2_g: Species = Species(CO2_g_data)
+    O2_g: Species = Species(O2_g_data)
+    CH4_g: Species = Species(CH4_g_data)
+    CO_g: Species = Species(CO_g_data)
+
+    species: list[Species] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
     planet: Planet = Planet(surface_temperature=450.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
@@ -116,7 +123,15 @@ def test_CHO_low_temperature() -> None:
 def test_graphite_condensed() -> None:
     """Graphite stable with around 50% condensed C mass fraction"""
 
-    species: list[SpeciesData] = [O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr]
+    O2_g: Species = Species(O2_g_data)
+    H2_g: Species = Species(H2_g_data)
+    CO_g: Species = Species(CO_g_data)
+    H2O_g: Species = Species(H2O_g_data)
+    CO2_g: Species = Species(CO2_g_data)
+    CH4_g: Species = Species(CH4_g_data)
+    C_cr: Species = Species(C_cr_data)
+
+    species: list[Species] = [O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr]
     planet: Planet = Planet(surface_temperature=873.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
@@ -184,7 +199,15 @@ def test_graphite_unstable() -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    species: list[SpeciesData] = [O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr]
+    O2_g: Species = Species(O2_g_data)
+    H2_g: Species = Species(H2_g_data)
+    CO_g: Species = Species(CO_g_data)
+    H2O_g: Species = Species(H2O_g_data)
+    CO2_g: Species = Species(CO2_g_data)
+    CH4_g: Species = Species(CH4_g_data)
+    C_cr: Species = Species(C_cr_data)
+
+    species: list[Species] = [O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr]
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
@@ -251,7 +274,12 @@ def test_graphite_unstable() -> None:
 def test_water_condensed_O_abundance() -> None:
     """Condensed water at 10 bar"""
 
-    species: list[SpeciesData] = [H2_g, H2O_g, O2_g, H2O_l]
+    H2_g: Species = Species(H2_g_data)
+    H2O_g: Species = Species(H2O_g_data)
+    O2_g: Species = Species(O2_g_data)
+    H2O_l: Species = Species(H2O_l_data)
+
+    species: list[Species] = [H2_g, H2O_g, O2_g, H2O_l]
     planet: Planet = Planet(surface_temperature=411.75)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
@@ -302,7 +330,16 @@ def test_water_condensed_O_abundance() -> None:
 def test_graphite_water_condensed() -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
-    species: list[SpeciesData] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
+    O2_g: Species = Species(O2_g_data)
+    H2_g: Species = Species(H2_g_data)
+    CO_g: Species = Species(CO_g_data)
+    H2O_g: Species = Species(H2O_g_data)
+    CO2_g: Species = Species(CO2_g_data)
+    CH4_g: Species = Species(CH4_g_data)
+    C_cr: Species = Species(C_cr_data)
+    H2O_l: Species = Species(H2O_l_data)
+
+    species: list[Species] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
     planet: Planet = Planet(surface_temperature=430.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
@@ -362,7 +399,14 @@ def test_graphite_water_condensed() -> None:
 def test_batch_planet() -> None:
     """Tests a batch calculation with different planets"""
 
-    species: list[SpeciesData] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
+    O2_g: Species = Species(O2_g_data)
+    H2_g: Species = Species(H2_g_data)
+    CO_g: Species = Species(CO_g_data)
+    H2O_g: Species = Species(H2O_g_data)
+    CO2_g: Species = Species(CO2_g_data)
+    CH4_g: Species = Species(CH4_g_data)
+
+    species: list[Species] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
 
     # Creates a list of planets with different surface temperatures
     planet_list: list[Planet] = []
@@ -399,7 +443,11 @@ def test_batch_planet() -> None:
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    species: list[SpeciesData] = [H2O_g_sossi, H2_g, O2_g]
+    O2_g: Species = Species(O2_g_data)
+    H2_g: Species = Species(H2_g_data)
+    H2O_g: Species = Species(H2O_g_data, H2O_peridotite_sossi)
+
+    species: list[Species] = [H2O_g, H2_g, O2_g]
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 

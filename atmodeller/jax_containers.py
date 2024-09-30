@@ -41,7 +41,6 @@ from atmodeller import (
     STABILITY_UPPER,
 )
 from atmodeller.jax_utilities import scale_number_density
-from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
 from atmodeller.solubility.jax_interfaces import NoSolubility, SolubilityProtocol
 from atmodeller.thermodata.condensates import C_cr_thermodata, H2O_l_thermodata
 from atmodeller.thermodata.gases import (
@@ -139,7 +138,6 @@ class SpeciesData(NamedTuple):
         phase_code: Phase code
         molar_mass: Molar mass
         thermodata: Thermodynamic data
-        solubility: Solubility
     """
 
     composition: dict[str, tuple[int, float, float]]
@@ -150,8 +148,6 @@ class SpeciesData(NamedTuple):
     """Molar mass"""
     thermodata: ThermoData
     """Thermodynamic data"""
-    solubility: SolubilityProtocol
-    """Solubility"""
 
     @classmethod
     def create(
@@ -159,7 +155,6 @@ class SpeciesData(NamedTuple):
         formula: str,
         phase: str,
         thermodata: ThermoData,
-        solubility: SolubilityProtocol = NoSolubility(),
     ) -> Self:
         """Creates an instance
 
@@ -167,7 +162,6 @@ class SpeciesData(NamedTuple):
             formula: Formula
             phase: Phase
             thermodata: Thermodynamic data
-            solubility: Solubility. Defaults to no solubility.
 
         Returns:
             An instance
@@ -177,7 +171,7 @@ class SpeciesData(NamedTuple):
         molar_mass: float = mformula.mass * unit_conversion.g_to_kg
         phase_code: int = phase_mapping[phase]
 
-        return cls(composition, phase_code, molar_mass, thermodata, solubility)
+        return cls(composition, phase_code, molar_mass, thermodata)
 
     @property
     def elements(self) -> tuple[str, ...]:
@@ -209,6 +203,21 @@ class SpeciesData(NamedTuple):
     def phase(self) -> str:
         """JANAF phase"""
         return inverse_phase_mapping[self.phase_code]
+
+
+class Species(NamedTuple):
+    """Species
+
+    Args:
+        data: Species data
+        solubility: Solubility. Defaults to no solubility.
+    """
+
+    data: SpeciesData
+    solubility: SolubilityProtocol = NoSolubility()
+    # TODO: Probably add an activity? But would need to default to something sensible like
+    # unity for a condensed phase and number density for a gas phase.
+    # activity: ActivityProtocol
 
 
 class Solution(NamedTuple):
@@ -256,14 +265,14 @@ class Constraints(NamedTuple):
         log_molecules: Log number of molecules constraints, ordered alphabetically by element
     """
 
-    species: list[SpeciesData]
+    species: list[Species]
     """List of species"""
     log_molecules: dict[str, ArrayLike]
     """Log number of molecules constraints, ordered alphabetically by element name"""
 
     @classmethod
     def create(
-        cls, species: list[SpeciesData], mass: Mapping[str, ArrayLike], log_scaling: ArrayLike
+        cls, species: list[Species], mass: Mapping[str, ArrayLike], log_scaling: ArrayLike
     ) -> Self:
         """Creates an instance
 
@@ -318,7 +327,7 @@ class SolverParameters(NamedTuple):
     @classmethod
     def create(
         cls,
-        species: list[SpeciesData],
+        species: list[Species],
         log_scaling: ArrayLike,
         solver_class: Type[OptxSolver] = optx.Newton,
         rtol: float = 1.0e-8,
@@ -358,7 +367,7 @@ class SolverParameters(NamedTuple):
     @classmethod
     def _get_hypercube_bound(
         cls,
-        species: list[SpeciesData],
+        species: list[Species],
         log_scaling: ArrayLike,
         number_density_bound: float,
         stability_bound: float,
@@ -417,7 +426,7 @@ class Parameters(NamedTuple):
     """Formula matrix"""
     reaction_matrix: Array
     """Reaction matrix"""
-    species: list[SpeciesData]
+    species: list[Species]
     """List of species"""
     planet: Planet
     """Planet"""
@@ -430,7 +439,7 @@ class Parameters(NamedTuple):
 
 
 @jit
-def gas_species_mask(species: list[SpeciesData]) -> Array:
+def gas_species_mask(species: list[Species]) -> Array:
     """Mask for gas species
 
     Args:
@@ -439,7 +448,7 @@ def gas_species_mask(species: list[SpeciesData]) -> Array:
     Returns:
         Mask for gas species
     """
-    phase_codes: Array = jnp.array([s.phase_code for s in species])
+    phase_codes: Array = jnp.array([s.data.phase_code for s in species])
     # TODO: Use a parameter name rather than hard-coded to 0.
     gas_species: Array = (phase_codes == 0).astype(int)
 
@@ -448,44 +457,38 @@ def gas_species_mask(species: list[SpeciesData]) -> Array:
     return gas_species
 
 
-CH4_g: SpeciesData = SpeciesData.create(
+CH4_g_data: SpeciesData = SpeciesData.create(
     "CH4",
     "g",
     CH4_g_thermodata,
 )
-Cl2_g: SpeciesData = SpeciesData.create("Cl2", "g", Cl2_g_thermodata)
-CO_g: SpeciesData = SpeciesData.create(
+Cl2_g_data: SpeciesData = SpeciesData.create("Cl2", "g", Cl2_g_thermodata)
+CO_g_data: SpeciesData = SpeciesData.create(
     "CO",
     "g",
     CO_g_thermodata,
 )
-CO2_g: SpeciesData = SpeciesData.create(
+CO2_g_data: SpeciesData = SpeciesData.create(
     "CO2",
     "g",
     CO2_g_thermodata,
 )
-C_cr: SpeciesData = SpeciesData.create("C", "cr", C_cr_thermodata)
-H2_g: SpeciesData = SpeciesData.create("H2", "g", H2_g_thermodata)
-H2O_g: SpeciesData = SpeciesData.create(
+C_cr_data: SpeciesData = SpeciesData.create("C", "cr", C_cr_thermodata)
+H2_g_data: SpeciesData = SpeciesData.create("H2", "g", H2_g_thermodata)
+H2O_g_data: SpeciesData = SpeciesData.create(
     "H2O",
     "g",
     H2O_g_thermodata,
 )
-H2O_g_sossi: SpeciesData = SpeciesData.create(
-    "H2O",
-    "g",
-    H2O_g_thermodata,
-    H2O_peridotite_sossi,
-)
-H2O_l: SpeciesData = SpeciesData.create(
+H2O_l_data: SpeciesData = SpeciesData.create(
     "H2O",
     "l",
     H2O_l_thermodata,
 )
-N2_g: SpeciesData = SpeciesData.create("N2", "g", N2_g_thermodata)
-NH3_g: SpeciesData = SpeciesData.create(
+N2_g_data: SpeciesData = SpeciesData.create("N2", "g", N2_g_thermodata)
+NH3_g_data: SpeciesData = SpeciesData.create(
     "NH3",
     "g",
     NH3_g_thermodata,
 )
-O2_g: SpeciesData = SpeciesData.create("O2", "g", O2_g_thermodata)
+O2_g_data: SpeciesData = SpeciesData.create("O2", "g", O2_g_thermodata)

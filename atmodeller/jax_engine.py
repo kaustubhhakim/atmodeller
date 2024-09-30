@@ -33,7 +33,7 @@ from atmodeller.jax_containers import (
     Planet,
     Solution,
     SolverParameters,
-    SpeciesData,
+    Species,
     gas_species_mask,
 )
 from atmodeller.jax_utilities import (
@@ -82,7 +82,7 @@ def solve(
 
 @jit
 def get_log_reaction_equilibrium_constant(
-    species: list[SpeciesData],
+    species: list[Species],
     reaction_matrix: Array,
     temperature: ArrayLike,
     log_scaling: ArrayLike,
@@ -127,7 +127,7 @@ def get_log_activity(log_number_density: Array, parameters: Parameters) -> Array
     Returns:
         Log activity
     """
-    species: list[SpeciesData] = parameters.species
+    species: list[Species] = parameters.species
     gas_mask: Array = gas_species_mask(species)
 
     activity_for_gas: Array = log_number_density
@@ -178,7 +178,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     reaction_matrix: Array = parameters.reaction_matrix
     planet: Planet = parameters.planet
     constraints: Constraints = parameters.constraints
-    species: list[SpeciesData] = parameters.species
+    species: list[Species] = parameters.species
     temperature: ArrayLike = planet.surface_temperature
     log_scaling: float = parameters.log_scaling
 
@@ -210,7 +210,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # jax.debug.print("pressure = {out}", out=pressure)
 
     solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]
-    molar_masses: Array = jnp.array([species_.molar_mass for species_ in species])
+    molar_masses: Array = jnp.array([species_.data.molar_mass for species_ in species])
     # jax.debug.print("molar_masses = {out}", out=molar_masses)
 
     # Dispatcher function to select the appropriate solubility law
@@ -254,7 +254,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
 
 @jit
-def atmosphere_log_molar_mass(log_number_density: Array, species: list[SpeciesData]) -> Array:
+def atmosphere_log_molar_mass(log_number_density: Array, species: list[Species]) -> Array:
     """Log molar mass of the atmosphere
 
     Args:
@@ -264,7 +264,7 @@ def atmosphere_log_molar_mass(log_number_density: Array, species: list[SpeciesDa
     Returns:
         Log molar mass of the atmosphere
     """
-    molar_masses: Array = jnp.array([value.molar_mass for value in species])
+    molar_masses: Array = jnp.array([value.data.molar_mass for value in species])
     gas_mask: Array = gas_species_mask(species)
     gas_molar_masses: Array = molar_masses * gas_mask
 
@@ -280,7 +280,7 @@ def atmosphere_log_molar_mass(log_number_density: Array, species: list[SpeciesDa
 
 @jit
 def atmosphere_log_volume(
-    log_number_density: Array, species: list[SpeciesData], planet: Planet
+    log_number_density: Array, species: list[Species], planet: Planet
 ) -> Array:
     """Log volume of the atmosphere"
 
@@ -303,9 +303,7 @@ def atmosphere_log_volume(
 
 # pylint: disable=invalid-name
 @jit
-def get_log_Kp(
-    species: list[SpeciesData], reaction_matrix: Array, temperature: ArrayLike
-) -> Array:
+def get_log_Kp(species: list[Species], reaction_matrix: Array, temperature: ArrayLike) -> Array:
     """Gets the natural log of the equilibrium constant in terms of partial pressures.
 
     Args:
@@ -317,8 +315,8 @@ def get_log_Kp(
         Natural log of the equilibrium constant in terms of partial pressures
     """
     gibbs_list: list[ArrayLike] = []
-    for species_data in species:
-        gibbs: ArrayLike = get_gibbs_over_RT(species_data.thermodata, temperature)
+    for species_ in species:
+        gibbs: ArrayLike = get_gibbs_over_RT(species_.data.thermodata, temperature)
         gibbs_list.append(gibbs)
 
     gibbs_array: Array = jnp.array(gibbs_list)

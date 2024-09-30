@@ -34,11 +34,11 @@ from atmodeller.jax_containers import (
     Planet,
     Solution,
     SolverParameters,
-    SpeciesData,
+    Species,
 )
 from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import pytrees_stack, unscale_number_density
-from atmodeller.utilities import partial_rref, unique_elements_in_species
+from atmodeller.utilities import partial_rref, unique_elements_in_species2
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -51,8 +51,8 @@ class InteriorAtmosphere:
         log_scaling: Log scaling for the numerical solution
     """
 
-    def __init__(self, species: list[SpeciesData], log_scaling: float):
-        self.species: list[SpeciesData] = species
+    def __init__(self, species: list[Species], log_scaling: float):
+        self.species: list[Species] = species
         self.log_scaling: float = log_scaling
         self.formula_matrix: Array = jnp.array(self.get_formula_matrix())
         self.reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
@@ -192,7 +192,7 @@ class InteriorAtmosphere:
         Returns:
             The formula matrix
         """
-        unique_elements: tuple[str, ...] = unique_elements_in_species(self.species)
+        unique_elements: tuple[str, ...] = unique_elements_in_species2(self.species)
         formula_matrix: npt.NDArray[np.int_] = np.zeros(
             (len(unique_elements), len(self.species)), dtype=jnp.int_
         )
@@ -201,7 +201,7 @@ class InteriorAtmosphere:
             for species_index, species_ in enumerate(self.species):
                 count: int = 0
                 try:
-                    count = species_.composition[element][0]
+                    count = species_.data.composition[element][0]
                 except KeyError:
                     count = 0
                 formula_matrix[element_index, species_index] = count
@@ -264,9 +264,9 @@ class InteriorAtmosphere:
                 coeff: float = reaction_matrix[reaction_index, species_index].item()
                 if coeff != 0:
                     if coeff < 0:
-                        reactants += f"{abs(coeff)} {species_.name} + "
+                        reactants += f"{abs(coeff)} {species_.data.name} + "
                     else:
-                        products += f"{coeff} {species_.name} + "
+                        products += f"{coeff} {species_.data.name} + "
 
             reactants = reactants.rstrip(" + ")
             products = products.rstrip(" + ")
