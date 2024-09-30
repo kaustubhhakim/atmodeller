@@ -43,6 +43,19 @@ from atmodeller import (
 from atmodeller.jax_utilities import scale_number_density
 from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
 from atmodeller.solubility.jax_interfaces import NoSolubility, SolubilityProtocol
+from atmodeller.thermodata.condensates import C_cr_thermodata, H2O_l_thermodata
+from atmodeller.thermodata.gases import (
+    CH4_g_thermodata,
+    Cl2_g_thermodata,
+    CO2_g_thermodata,
+    CO_g_thermodata,
+    H2_g_thermodata,
+    H2O_g_thermodata,
+    N2_g_thermodata,
+    NH3_g_thermodata,
+    O2_g_thermodata,
+)
+from atmodeller.thermodata.jax_thermo import ThermoData
 from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
@@ -125,7 +138,7 @@ class SpeciesData(NamedTuple):
         composition: Composition
         phase_code: Phase code
         molar_mass: Molar mass
-        gibbs_coefficients: Gibbs coefficients
+        thermodata: Thermodynamic data
         solubility: Solubility
     """
 
@@ -135,8 +148,8 @@ class SpeciesData(NamedTuple):
     """Phase code"""
     molar_mass: float
     """Molar mass"""
-    gibbs_coefficients: tuple[float, ...]
-    """Gibbs coefficients"""
+    thermodata: ThermoData
+    """Thermodynamic data"""
     solubility: SolubilityProtocol
     """Solubility"""
 
@@ -145,7 +158,7 @@ class SpeciesData(NamedTuple):
         cls,
         formula: str,
         phase: str,
-        gibbs_coefficients: tuple[float, ...],
+        thermodata: ThermoData,
         solubility: SolubilityProtocol = NoSolubility(),
     ) -> Self:
         """Creates an instance
@@ -153,7 +166,7 @@ class SpeciesData(NamedTuple):
         Args:
             formula: Formula
             phase: Phase
-            gibbs_coefficients: Gibbs coefficients
+            thermodata: Thermodynamic data
             solubility: Solubility. Defaults to no solubility.
 
         Returns:
@@ -164,7 +177,7 @@ class SpeciesData(NamedTuple):
         molar_mass: float = mformula.mass * unit_conversion.g_to_kg
         phase_code: int = phase_mapping[phase]
 
-        return cls(composition, phase_code, molar_mass, gibbs_coefficients, solubility)
+        return cls(composition, phase_code, molar_mass, thermodata, solubility)
 
     @property
     def elements(self) -> tuple[str, ...]:
@@ -435,51 +448,44 @@ def gas_species_mask(species: list[SpeciesData]) -> Array:
     return gas_species
 
 
-# TODO: Switch convention to use dG = S - Href/T as per the comment of Hugh. Then the
-# discontinuities associated with the Gibbs energy of formation are no longer a problem meaning
-# that a fit can be accurately made across the temperature range of interest. This will notably
-# fix problems with sulphur.
-
-# For all fits, "zero" temperature was set to 0.01 to avoid problems with fitting a/T
-number_of_coefficients: int = 5
-reference_gibbs: tuple[float, ...] = (0,) * 5
-
 CH4_g: SpeciesData = SpeciesData.create(
-    "CH4", "g", (-7.471666e-01, -9.118137e00, -3.418606e01, 1.176984e-01, -4.291384e-07)
+    "CH4",
+    "g",
+    CH4_g_thermodata,
 )
-Cl2_g: SpeciesData = SpeciesData.create("Cl2", "g", reference_gibbs)
+Cl2_g: SpeciesData = SpeciesData.create("Cl2", "g", Cl2_g_thermodata)
 CO_g: SpeciesData = SpeciesData.create(
-    "CO", "g", (-1.413961e-01, -1.125331e00, -1.048469e02, -8.915501e-02, 1.503998e-06)
+    "CO",
+    "g",
+    CO_g_thermodata,
 )
 CO2_g: SpeciesData = SpeciesData.create(
     "CO2",
     "g",
-    (-1.884621e-02, -2.387862e-01, -3.923660e02, -2.506878e-03, 7.017329e-07),
+    CO2_g_thermodata,
 )
-C_cr: SpeciesData = SpeciesData.create("C", "cr", reference_gibbs)
-H2_g: SpeciesData = SpeciesData.create(
-    "H2",
-    "g",
-    reference_gibbs,
-)
+C_cr: SpeciesData = SpeciesData.create("C", "cr", C_cr_thermodata)
+H2_g: SpeciesData = SpeciesData.create("H2", "g", H2_g_thermodata)
 H2O_g: SpeciesData = SpeciesData.create(
     "H2O",
     "g",
-    (-3.817134e-01, -4.469468e00, -2.213329e02, 5.975648e-02, 6.535070e-08),
+    H2O_g_thermodata,
 )
 H2O_g_sossi: SpeciesData = SpeciesData.create(
     "H2O",
     "g",
-    (-3.817134e-01, -4.469468e00, -2.213329e02, 5.975648e-02, 6.535070e-08),
+    H2O_g_thermodata,
     H2O_peridotite_sossi,
 )
 H2O_l: SpeciesData = SpeciesData.create(
     "H2O",
     "l",
-    (-9.885210e02, -3.519502e00, -2.658921e02, 1.856359e-01, -3.631301e-05),
+    H2O_l_thermodata,
 )
-N2_g: SpeciesData = SpeciesData.create("N2", "g", reference_gibbs)
+N2_g: SpeciesData = SpeciesData.create("N2", "g", N2_g_thermodata)
 NH3_g: SpeciesData = SpeciesData.create(
-    "NH3", "g", (-4.493772e-01, -5.741781e00, -2.041235e01, 1.233233e-01, -9.071982e-07)
+    "NH3",
+    "g",
+    NH3_g_thermodata,
 )
-O2_g: SpeciesData = SpeciesData.create("O2", "g", reference_gibbs)
+O2_g: SpeciesData = SpeciesData.create("O2", "g", O2_g_thermodata)

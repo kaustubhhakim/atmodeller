@@ -41,6 +41,7 @@ from atmodeller.jax_utilities import (
     logsumexp,
     unscale_number_density,
 )
+from atmodeller.thermodata.jax_thermo import get_gibbs_over_RT
 from atmodeller.utilities import unit_conversion
 
 
@@ -231,14 +232,9 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
     element_melt_density: Array = formula_matrix.dot(species_melt_density)
     # Scale back to the scaling of the numerical problem. Perform in regular space to enable
-    # addition before logging, hence avoiding any problems with NaNs
+    # addition before logging, hence avoiding any problems with NaNs.
     element_melt_density = element_melt_density / jnp.exp(log_scaling)
     log_element_density: Array = jnp.log(element_gas_density + element_melt_density)
-
-    # Create a mask for non-zero values
-    # non_zero_mask: Array = density_melt_product != 0
-    # log_density_melt_product: Array = jnp.where(non_zero_mask, jnp.log(density_melt_product), 0.0)
-    # jax.debug.print("log_density_melt_product = {out}", out=log_density_melt_product)
 
     mass_residual = log_element_density - (constraints.array() - log_volume)
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
@@ -305,29 +301,6 @@ def atmosphere_log_volume(
     )
 
 
-@jit
-def gibbs_energy_of_formation(species_data: SpeciesData, temperature: ArrayLike) -> Array:
-    r"""Gibbs energy of formation
-
-    Args:
-        species_data: Species data
-        temperature: Temperature in K
-
-    Returns:
-        The standard Gibbs free energy of formation in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-    """
-    gibbs: Array = (
-        # Leading with this term prevents the linter from complaining.
-        species_data.gibbs_coefficients[1] * jnp.log(temperature)
-        + species_data.gibbs_coefficients[0] / temperature
-        + species_data.gibbs_coefficients[2]
-        + species_data.gibbs_coefficients[3] * jnp.power(temperature, 1)
-        + species_data.gibbs_coefficients[4] * jnp.power(temperature, 2)
-    )
-
-    return gibbs * 1000.0  # kilo
-
-
 # pylint: disable=invalid-name
 @jit
 def get_log_Kp(
@@ -344,13 +317,12 @@ def get_log_Kp(
         Natural log of the equilibrium constant in terms of partial pressures
     """
     gibbs_list: list[ArrayLike] = []
-    for species_ in species:
-        gibbs: ArrayLike = gibbs_energy_of_formation(species_, temperature)
+    for species_data in species:
+        gibbs: ArrayLike = get_gibbs_over_RT(species_data.thermodata, temperature)
         gibbs_list.append(gibbs)
 
     gibbs_array: Array = jnp.array(gibbs_list)
-
-    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_array) / (GAS_CONSTANT * temperature)
+    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_array)
 
     return log_Kp
 

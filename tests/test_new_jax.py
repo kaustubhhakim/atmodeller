@@ -64,7 +64,7 @@ def test_CHO_low_temperature() -> None:
     """C-H-O system at 450 K"""
 
     species: list[SpeciesData] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
-    planet: Planet = Planet(surface_temperature=450)
+    planet: Planet = Planet(surface_temperature=450.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
@@ -91,12 +91,12 @@ def test_CHO_low_temperature() -> None:
 
     target: npt.NDArray[np.float_] = np.array(
         [
-            62.05652013342668,
+            62.05652013342669,
             60.120022576862524,
-            26.01213296322353,
-            -64.35958121411358,
+            26.068387536122835,
+            -64.2330163272133,
             60.81547969099319,
-            22.19204281838283,
+            22.015508278236624,
         ]
     )
 
@@ -117,7 +117,7 @@ def test_graphite_condensed() -> None:
     """Graphite stable with around 50% condensed C mass fraction"""
 
     species: list[SpeciesData] = [O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr]
-    planet: Planet = Planet(surface_temperature=873)
+    planet: Planet = Planet(surface_temperature=873.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
@@ -144,13 +144,13 @@ def test_graphite_condensed() -> None:
 
     target: npt.NDArray[np.float_] = np.array(
         [
-            -3.325643260498513e-03,
-            6.010618973418672e01,
-            5.474681960353263e01,
-            5.888439104403002e01,
-            5.450316330186538e01,
-            6.194046264473452e01,
-            6.177865797551661e01,
+            4.901997908084610e-02,
+            6.006235399383993e01,
+            5.475577477744803e01,
+            5.888892217538084e01,
+            5.456276038698600e01,
+            6.195032674577313e01,
+            6.177996484193057e01,
         ]
     )
 
@@ -185,7 +185,7 @@ def test_graphite_unstable() -> None:
     """
 
     species: list[SpeciesData] = [O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr]
-    planet: Planet = Planet(surface_temperature=1400)
+    planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(3)
@@ -212,13 +212,13 @@ def test_graphite_unstable() -> None:
 
     target: npt.NDArray[np.float_] = np.array(
         [
-            28.37080231828339,
-            62.37718345427961,
-            62.70774275216296,
-            60.72474193369101,
-            60.319739449212484,
-            60.28597770208156,
-            -77.32984343357518,
+            28.363706985121755,
+            62.371226090440025,
+            62.71169832106752,
+            60.73335397022391,
+            60.29832575363264,
+            60.297836444468736,
+            -77.33522428358012,
         ]
     )
 
@@ -276,7 +276,7 @@ def test_water_condensed_O_abundance() -> None:
     logger.debug("log_pressure = %s", log_pressure)
 
     target: npt.NDArray = np.array(
-        [60.147414932111765, 59.42151086724804, -73.77323817273705, 62.69282187037022]
+        [60.12043903355293, 59.339240557109925, -73.72900084543642, 62.66788570903491]
     )
 
     factsage_result: npt.NDArray[np.float_] = np.array(
@@ -303,7 +303,7 @@ def test_graphite_water_condensed() -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
     species: list[SpeciesData] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
-    planet: Planet = Planet(surface_temperature=430)
+    planet: Planet = Planet(surface_temperature=430.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = 3.10e20
@@ -334,14 +334,14 @@ def test_graphite_water_condensed() -> None:
 
     target: npt.NDArray[np.float_] = np.array(
         [
-            59.84956737107164,
-            52.04446167407229,
-            -50.89936632480971,
-            45.47316828975361,
-            59.51686478781738,
-            56.89655030374509,
-            64.8157539595103,
-            61.88885111892189,
+            59.777593890329186,
+            52.03357698384461,
+            -50.87409900184007,
+            45.301391021053625,
+            59.53599162929261,
+            56.92008067039274,
+            64.83514439811483,
+            61.907576626175874,
         ]
     )
 
@@ -367,7 +367,7 @@ def test_batch_planet() -> None:
     # Creates a list of planets with different surface temperatures
     planet_list: list[Planet] = []
     for surface_temperature in range(450, 2001, 1000):
-        planet_list.append(Planet(surface_temperature=surface_temperature))
+        planet_list.append(Planet(surface_temperature=float(surface_temperature)))
 
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 

@@ -21,7 +21,7 @@ from jax import Array
 
 from atmodeller.thermodata.jax_thermo import ThermoData, get_gibbs_over_RT
 
-C_g: ThermoData = ThermoData(
+C_g_thermodata: ThermoData = ThermoData(
     [8.545763110e4, 8.410597850e4, 2.355273444e6],
     [4.747924288, 4.130047418, -6.405123160e2],
     [
@@ -57,7 +57,7 @@ C_g: ThermoData = ThermoData(
     [1000, 6000, 20000],
 )
 
-CH4_g: ThermoData = ThermoData(
+CH4_g_thermodata: ThermoData = ThermoData(
     [-2.331314360e4, 7.532066910e4],
     [8.904322750e1, -1.219124889e2],
     [
@@ -84,7 +84,7 @@ CH4_g: ThermoData = ThermoData(
     [1000, 6000],
 )
 
-Cl2_g: ThermoData = ThermoData(
+Cl2_g_thermodata: ThermoData = ThermoData(
     [1.534069331e3, 1.212117724e5],
     [-9.438331107, -1.690778824e2],
     [
@@ -111,7 +111,7 @@ Cl2_g: ThermoData = ThermoData(
     [1000, 6000],
 )
 
-CO_g: ThermoData = ThermoData(
+CO_g_thermodata: ThermoData = ThermoData(
     [-1.303131878e4, -2.466261084e3, 5.701421130e6],
     [
         -7.859241350,
@@ -151,7 +151,7 @@ CO_g: ThermoData = ThermoData(
     [1000, 6000, 20000],
 )
 
-CO2_g: ThermoData = ThermoData(
+CO2_g_thermodata: ThermoData = ThermoData(
     [-4.528198460e4, -3.908350590e4, -8.043214510e6],
     [-7.048279440, -2.652669281e1, 2.254177493e3],
     [
@@ -187,7 +187,7 @@ CO2_g: ThermoData = ThermoData(
     [1000, 6000, 20000],
 )
 
-H2_g: ThermoData = ThermoData(
+H2_g_thermodata: ThermoData = ThermoData(
     [2.682484665e3, 5.339824410e3, 2.488433516e6],
     [-3.043788844e1, -2.202774769, -6.695728110e2],
     [
@@ -223,7 +223,7 @@ H2_g: ThermoData = ThermoData(
     [1000, 6000, 20000],
 )
 
-H2O_g: ThermoData = ThermoData(
+H2O_g_thermodata: ThermoData = ThermoData(
     [-3.303974310e4, -1.384286509e4],
     [1.724205775e1, -7.978148510],
     [
@@ -250,7 +250,7 @@ H2O_g: ThermoData = ThermoData(
     [1000, 6000],
 )
 
-H2S_g: ThermoData = ThermoData(
+H2S_g_thermodata: ThermoData = ThermoData(
     [-3.278457280e3, 2.908696214e4],
     [1.415194691, -4.349160391e1],
     [
@@ -277,7 +277,7 @@ H2S_g: ThermoData = ThermoData(
     [1000, 6000],
 )
 
-He_g: ThermoData = ThermoData(
+He_g_thermodata: ThermoData = ThermoData(
     [-7.453750000e2, -7.453750000e2, 1.650518960e4],
     [9.287239740e-1, 9.287239740e-1, -4.048814390],
     [
@@ -297,7 +297,7 @@ He_g: ThermoData = ThermoData(
     [1000, 6000, 20000],
 )
 
-N2_g: ThermoData = ThermoData(
+N2_g_thermodata: ThermoData = ThermoData(
     [7.108460860e2, 1.283210415e4, 4.938707040e6],
     [-1.076003744e1, -1.586640027e1, -1.672099740e3],
     [
@@ -333,7 +333,7 @@ N2_g: ThermoData = ThermoData(
     [1000, 6000, 20000],
 )
 
-NH3_g: ThermoData = ThermoData(
+NH3_g_thermodata: ThermoData = ThermoData(
     [-1.264886413e4, 4.386191960e4],
     [4.366014588e1, -6.462330602e1],
     [
@@ -360,7 +360,7 @@ NH3_g: ThermoData = ThermoData(
     [1000, 6000],
 )
 
-O2_g: ThermoData = ThermoData(
+O2_g_thermodata: ThermoData = ThermoData(
     [-3.391454870e3, -1.689010929e4, 2.293554027e6],
     [1.849699470e1, 1.738716506e1, -5.530621610e2],
     [
@@ -396,7 +396,7 @@ O2_g: ThermoData = ThermoData(
     [1000, 6000, 20000],
 )
 
-SO_g: ThermoData = ThermoData(
+SO_g_thermodata: ThermoData = ThermoData(
     [-3.371292190e3, -2.708838059e4],
     [3.093861963e1, 3.615358329e1],
     [
@@ -423,7 +423,7 @@ SO_g: ThermoData = ThermoData(
     [1000, 6000],
 )
 
-SO2_g: ThermoData = ThermoData(
+SO2_g_thermodata: ThermoData = ThermoData(
     [-4.113752080e4, -3.351308690e4],
     [4.045512519e1, -1.655776085e1],
     [
@@ -450,7 +450,7 @@ SO2_g: ThermoData = ThermoData(
     [1000, 6000],
 )
 
-S2_g: ThermoData = ThermoData(
+S2_g_thermodata: ThermoData = ThermoData(
     [1.654767715e4, 1.085508427e4],
     [-7.957279032e-1, 1.458544515e1],
     [
@@ -481,5 +481,5 @@ if __name__ == "__main__":
 
     # Example usage
     temperature: Array = jnp.array(20000.0)
-    gibbs: Array = get_gibbs_over_RT(CO_g, temperature)
+    gibbs: Array = get_gibbs_over_RT(CO_g_thermodata, temperature)
     print(gibbs)

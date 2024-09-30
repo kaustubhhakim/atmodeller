@@ -18,7 +18,7 @@
 
 from atmodeller.thermodata.jax_thermo import ThermoData
 
-C_cr: ThermoData = ThermoData(
+C_cr_thermodata: ThermoData = ThermoData(
     [8.943859760e3, 1.398412456e4, 5.848134850e3],
     [-7.295824740e1, -4.477183040e1, -2.350925275e1],
     [
@@ -54,7 +54,7 @@ C_cr: ThermoData = ThermoData(
     [600, 2000, 6000],
 )
 
-H2O_cr: ThermoData = ThermoData(
+H2O_cr_thermodata: ThermoData = ThermoData(
     [-5.530314990e4],
     [-1.902572063e2],
     [
@@ -72,7 +72,7 @@ H2O_cr: ThermoData = ThermoData(
     [273.1507],
 )
 
-H2O_l: ThermoData = ThermoData(
+H2O_l_thermodata: ThermoData = ThermoData(
     [1.101760476e8, 8.113176880e7],
     [-9.779700970e5, -5.134418080e5],
     [
@@ -99,7 +99,7 @@ H2O_l: ThermoData = ThermoData(
     [373.150, 600],
 )
 
-S_l: ThermoData = ThermoData(
+S_l_thermodata: ThermoData = ThermoData(
     [-6.356594920e5, -9.832222680e5, -2.638846929e4, 1.113013440e4, -8.284589830e2],
     [-1.186929589e4, -3.154806751e4, -7.681730097e2, 1.363174183e2, -1.736128237e1],
     [
@@ -113,7 +113,7 @@ S_l: ThermoData = ThermoData(
     [428.15, 432.25, 453.15, 717, 6000],
 )
 
-Si_cr: ThermoData = ThermoData(
+Si_cr_thermodata: ThermoData = ThermoData(
     [-7.850635210e2, -1.042947234e3],
     [-1.038427318e1, -1.438964187e1],
     [
@@ -125,7 +125,7 @@ Si_cr: ThermoData = ThermoData(
 )
 
 
-Si_l: ThermoData = ThermoData(
+Si_l_thermodata: ThermoData = ThermoData(
     [4.882667110e3],
     [-1.326611073e1],
     [
@@ -135,7 +135,7 @@ Si_l: ThermoData = ThermoData(
     [6000],
 )
 
-SiO2_l: ThermoData = ThermoData(
+SiO2_l_thermodata: ThermoData = ThermoData(
     [-1.140002976e5],
     [-5.554279592e1],
     [
