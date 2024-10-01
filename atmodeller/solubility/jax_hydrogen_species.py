@@ -20,42 +20,25 @@
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-from jax import Array
-from jax.typing import ArrayLike
+from atmodeller.solubility.jax_interfaces import (
+    SolubilityPowerLaw,
+    SolubilityPowerLawLog10,
+    SolubilityProtocol,
+)
 
-from atmodeller.solubility.jax_interfaces import SolubilityPowerLaw, SolubilityProtocol
+H2_andesite_hirschmann: SolubilityProtocol = SolubilityPowerLawLog10(1.01058631, 0.60128868)
+"""H2 in synthetic andesite :cite:p:`HWA12`
 
+Log-scale linear fit to fH2 vs H2 concentration for andesite in :cite:t:`HWA12{Table 2}`.
+Experiments conducted from 0.7-3 GPa at 1400 C.
+"""
 
-# TODO: Is this OK as a JAX container to have just a class?
-class H2_andesite_hirschmann:
-    """H2 in synthetic andesite :cite:p:`HWA12`
+H2_basalt_hirschmann: SolubilityProtocol = SolubilityPowerLawLog10(1.10083602, 0.52413928)
+"""H2 in synthetic basalt :cite:p:`HWA12`
 
-    Log-scale linear fit to fH2 vs H2 concentration for andesite in :cite:t:`HWA12{Table 2}`.
-    Experiments conducted from 0.7-3 GPa at 1400 C.
-    """
-
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
-        del kwargs
-        ppmw: Array = jnp.power(10, (0.60128868 * jnp.log10(fugacity) + 1.01058631))
-
-        return ppmw
-
-
-# TODO: Is this OK as a JAX container to have just a class?
-class H2_basalt_hirschmann:
-    """H2 in synthetic basalt :cite:p:`HWA12`
-
-    Log-scale linear fit to fH2 vs. H2 concentration for basalt in :cite:t:`HWA12{Table 2}`.
-    Experiments conducted from 0.7-3 GPa, 1400 C.
-    """
-
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
-        del kwargs
-        ppmw: Array = 10 ** (0.52413928 * jnp.log10(fugacity) + 1.10083602)
-
-        return ppmw
-
+Log-scale linear fit to fH2 vs. H2 concentration for basalt in :cite:t:`HWA12{Table 2}`.
+Experiments conducted from 0.7-3 GPa, 1400 C.
+"""
 
 H2_silicic_melts_gaillard: SolubilityProtocol = SolubilityPowerLaw(0.163, 1.252)
 """Fe-H redox exchange in silicate glasses :cite:p:`GSM03`

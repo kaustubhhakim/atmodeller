@@ -19,7 +19,6 @@
 from __future__ import annotations
 
 import logging
-from functools import partial
 from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
@@ -34,13 +33,13 @@ class SolubilityProtocol(Protocol):
         self,
         fugacity: ArrayLike,
         *,
-        temperature: float,
+        temperature: ArrayLike,
         pressure: ArrayLike,
         **kwargs,
     ) -> ArrayLike: ...
 
 
-@partial(jit, static_argnames=["constant", "exponent"])
+@jit
 def power_law(fugacity: ArrayLike, constant: float, exponent: float) -> Array:
     """Power law
 
@@ -81,6 +80,49 @@ class SolubilityPowerLaw(NamedTuple):
         del kwargs
 
         return power_law(fugacity, self.constant, self.exponent)
+
+
+@jit
+def power_law_log10(fugacity: ArrayLike, log10_constant: float, log10_exponent: float) -> Array:
+    """Power law with log10 constant and exponent
+
+    Args:
+        fugacity: Fugacity
+        log10_constant: Log10 constant for the power law
+        log10_exponent: Log10 exponent for the power law
+
+    Returns:
+        Evaluated power law
+    """
+    return jnp.power(10, (log10_constant + log10_exponent * jnp.log10(fugacity)))
+
+
+class SolubilityPowerLawLog10(NamedTuple):
+    """A solubility power law with log10 coefficients
+
+    Args:
+        log10_constant: Log10 constant
+        log10_exponent: Log10 exponent
+    """
+
+    log10_constant: float
+    """Constant"""
+    log10_exponent: float
+    """Exponent"""
+
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
+        """Concentration
+
+        Args:
+            fugacity: Fugacity
+            **kwargs: Arbitrary unused keyword arguments
+
+        Returns:
+            Concentration
+        """
+        del kwargs
+
+        return power_law_log10(fugacity, self.log10_constant, self.log10_exponent)
 
 
 class NoSolubility(NamedTuple):
