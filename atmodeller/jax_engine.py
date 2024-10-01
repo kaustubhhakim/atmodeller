@@ -219,6 +219,9 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
     vmap_apply_function: Callable = jax.vmap(apply_solubility_function, in_axes=(0, 0))
     indices: ArrayLike = np.arange(len(species))
+    # FIXME: Need to pass in fugacities not pressures. And also other fugacities like fO2. Can this
+    # be done somehow using a dictionary to pass fO2 for example?  How to use string key names and
+    # remain JAX compliant?
     ppmw: Array = vmap_apply_function(indices, pressure)
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
