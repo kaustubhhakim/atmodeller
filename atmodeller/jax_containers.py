@@ -399,43 +399,51 @@ class SolverParameters(NamedTuple):
         return bound
 
 
-class Parameters(NamedTuple):
-    """Parameters
+class FixedParameters(NamedTuple):
+    """Parameters that are always fixed for a calculation
 
     Args:
+        species: List of species
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
-        species: A list of species
-        planet: Planet
-        constraints: Constraints
+        gas_species_indices: Indices of gas species
+        gas_molar_masses: Molar masses of gas species
         tau: Tau factor for species stability
         log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which
             converts molecules/m^3 to moles/m^3
-
-    Attributes:
-        formula_matrix: Formula matrix
-        reaction_matrix: Reaction matrix
-        species: A list of species
-        planet: Planet
-        constraints: Constraints
-        tau: Tau factor for species stability
-        log_scaling: Log scaling for the number density
     """
 
+    species: list[Species]
+    """List of species """
     formula_matrix: Array
     """Formula matrix"""
     reaction_matrix: Array
     """Reaction matrix"""
-    species: list[Species]
-    """List of species"""
-    planet: Planet
-    """Planet"""
-    constraints: Constraints
-    """Mass constraints"""
+    gas_species_indices: Array
+    """Indices of gas species"""
+    gas_molar_masses: Array
+    """Molar masses of gas species"""
     tau: ArrayLike
     """Tau factor for species"""
     log_scaling: float
     """Log scaling"""
+
+
+class Parameters(NamedTuple):
+    """Parameters
+
+    Args:
+        fixed: Fixed parameters
+        planet: Planet
+        constraints: Constraints
+    """
+
+    fixed: FixedParameters
+    """Fixed parameters"""
+    planet: Planet
+    """Planet"""
+    constraints: Constraints
+    """Mass constraints"""
 
 
 @jit

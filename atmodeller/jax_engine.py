@@ -127,8 +127,11 @@ def get_log_activity(log_number_density: Array, parameters: Parameters) -> Array
     Returns:
         Log activity
     """
-    species: list[Species] = parameters.species
+    species: list[Species] = parameters.fixed.species
     gas_mask: Array = gas_species_mask(species)
+
+    # new_gas_mask: Array = jnp.take(log_number_density, parameters.gas_species_indices)
+    # jax.debug.print("new_gas_mask = {out}", out=new_gas_mask)
 
     activity_for_gas: Array = log_number_density
     activity_for_condensed: Array = jnp.zeros(len(species))
@@ -174,13 +177,15 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     Returns:
         Residual
     """
-    formula_matrix: Array = parameters.formula_matrix
-    reaction_matrix: Array = parameters.reaction_matrix
+    formula_matrix: Array = parameters.fixed.formula_matrix
+    reaction_matrix: Array = parameters.fixed.reaction_matrix
+    gas_species_indices: Array = parameters.fixed.gas_species_indices
+    gas_molar_masses: Array = parameters.fixed.gas_molar_masses
     planet: Planet = parameters.planet
     constraints: Constraints = parameters.constraints
-    species: list[Species] = parameters.species
+    species: list[Species] = parameters.fixed.species
     temperature: ArrayLike = planet.surface_temperature
-    log_scaling: float = parameters.log_scaling
+    log_scaling: float = parameters.fixed.log_scaling
 
     # jax.debug.print("solution in = {out}", out=solution)
     log_number_density, log_stability = jnp.split(solution, 2)
@@ -199,7 +204,8 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
     # Mass balance residual for elements
-    log_volume: Array = atmosphere_log_volume(log_number_density, species, planet)
+    gas_log_number_density: Array = jnp.take(log_number_density, gas_species_indices)
+    log_volume: Array = atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
     # Number density of elements in the gas phase
     element_gas_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
 
@@ -245,7 +251,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # Stability residual
     # Get minimum scaled log number of molecules
     log_min_number_density: Array = (
-        jnp.min(constraints.array()) - log_volume - jnp.log(parameters.tau)
+        jnp.min(constraints.array()) - log_volume - jnp.log(parameters.fixed.tau)
     )
     stability_residual: Array = log_number_density + log_stability - log_min_number_density
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
@@ -257,25 +263,18 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
 
 @jit
-def atmosphere_log_molar_mass(log_number_density: Array, species: list[Species]) -> Array:
+def atmosphere_log_molar_mass(gas_log_number_density: Array, gas_molar_masses: Array) -> Array:
     """Log molar mass of the atmosphere
 
     Args:
-        log_number_density: Log number density
-        species: List of species
+        gas_log_number_density: Log number density of gas species
+        gas_molar_masses: Molar masses of gas species
 
     Returns:
         Log molar mass of the atmosphere
     """
-    molar_masses: Array = jnp.array([value.data.molar_mass for value in species])
-    gas_mask: Array = gas_species_mask(species)
-    gas_molar_masses: Array = molar_masses * gas_mask
-
-    # jax.debug.print("molar_masses = {out}", out=molar_masses)
-    # jax.debug.print("gas_molar_masses = {out}", out=gas_molar_masses)
-
-    molar_mass: Array = logsumexp(log_number_density, gas_molar_masses) - logsumexp(
-        log_number_density, gas_mask
+    molar_mass: Array = logsumexp(gas_log_number_density, gas_molar_masses) - logsumexp(
+        gas_log_number_density
     )
 
     return molar_mass
@@ -283,13 +282,13 @@ def atmosphere_log_molar_mass(log_number_density: Array, species: list[Species])
 
 @jit
 def atmosphere_log_volume(
-    log_number_density: Array, species: list[Species], planet: Planet
+    gas_log_number_density: Array, gas_molar_masses: Array, planet: Planet
 ) -> Array:
     """Log volume of the atmosphere"
 
     Args:
-        log_number_density: Log number density
-        species: List of species
+        gas_log_number_density: Log number density of gas species
+        gas_molar_masses: Molar masses of gas species
         planet: Planet
 
     Returns:
@@ -298,7 +297,7 @@ def atmosphere_log_volume(
     return (
         jnp.log(GAS_CONSTANT)
         + jnp.log(planet.surface_temperature)
-        - atmosphere_log_molar_mass(log_number_density, species)
+        - atmosphere_log_molar_mass(gas_log_number_density, gas_molar_masses)
         + jnp.log(planet.surface_area)
         - jnp.log(planet.surface_gravity)
     )

@@ -30,6 +30,7 @@ from jax import Array
 from atmodeller import TAU
 from atmodeller.jax_containers import (
     Constraints,
+    FixedParameters,
     Parameters,
     Planet,
     Solution,
@@ -56,6 +57,8 @@ class InteriorAtmosphere:
         self.log_scaling: float = log_scaling
         self.formula_matrix: Array = jnp.array(self.get_formula_matrix())
         self.reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
+        self.gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
+        self.gas_molar_masses: Array = jnp.array(self.get_gas_molar_masses())
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
         )
@@ -77,24 +80,28 @@ class InteriorAtmosphere:
             initial_stability: Initial stability
             tau: Tau factor for species stability. Defaults to TAU.
         """
-        self.planet: Planet = planet
-        logger.debug("planet = %s", self.planet)
-        self.constraints: Constraints = Constraints.create(
+        logger.debug("planet = %s", planet)
+        constraints: Constraints = Constraints.create(
             self.species, mass_constraints, self.log_scaling
         )
-        logger.debug("constraints = %s", self.constraints)
+        logger.debug("constraints = %s", constraints)
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
         logger.debug("initial_solution = %s", self.initial_solution)
-        self.parameters: Parameters = Parameters(
+        fixed: FixedParameters = FixedParameters(
+            species=self.species,
             formula_matrix=self.formula_matrix,
             reaction_matrix=self.reaction_matrix,
-            species=self.species,
-            planet=self.planet,
-            constraints=self.constraints,
+            gas_species_indices=self.gas_species_indices,
+            gas_molar_masses=self.gas_molar_masses,
             tau=tau,
             log_scaling=self.log_scaling,
+        )
+        self.parameters: Parameters = Parameters(
+            fixed=fixed,
+            planet=planet,
+            constraints=constraints,
         )
 
         start_time = time.time()
@@ -144,31 +151,32 @@ class InteriorAtmosphere:
         # Stack the planets and mass constraints into pytrees
         planets_batch = pytrees_stack(planet_list)
         mass_constraints_batch = self.stack_mass_constraints(mass_constraints_list)
-        self.constraints: Constraints = Constraints.create(
+        constraints: Constraints = Constraints.create(
             self.species, mass_constraints_batch, self.log_scaling
         )
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
-        self.parameters: Parameters = Parameters(
+        fixed: FixedParameters = FixedParameters(
+            species=self.species,
             formula_matrix=self.formula_matrix,
             reaction_matrix=self.reaction_matrix,
-            species=self.species,
-            planet=planets_batch,
-            constraints=self.constraints,
+            gas_species_indices=self.gas_species_indices,
+            gas_molar_masses=self.gas_molar_masses,
             tau=tau,
             log_scaling=self.log_scaling,
+        )
+        self.parameters: Parameters = Parameters(
+            fixed=fixed,
+            planet=planets_batch,
+            constraints=constraints,
         )
         # Define the structures to vectorize.
         constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)  # type: ignore
         parameters_vmap: Parameters = Parameters(
-            formula_matrix=None,  # type: ignore
-            reaction_matrix=None,  # type: ignore
-            species=None,  # type: ignore
+            fixed=None,  # type: ignore
             planet=0,  # type: ignore
             constraints=constraints_vmap,  # type: ignore
-            tau=None,  # type: ignore
-            log_scaling=None,  # type: ignore
         )
 
         self._solve: Callable = jax.jit(
@@ -179,6 +187,34 @@ class InteriorAtmosphere:
         end_time = time.time()
         compile_time = end_time - start_time
         logger.info("Compile time: %.6f seconds", compile_time)
+
+    def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
+        """Gets the indices of gas species
+
+        Returns:
+            Indices of the gas species
+        """
+        indices: list[int] = []
+        for nn, species_ in enumerate(self.species):
+            if species_.data.phase == "g":
+                indices.append(nn)
+
+        return np.array(indices)
+
+    def get_gas_molar_masses(self) -> npt.NDArray[np.float_]:
+        """Gets the gas molar masses
+
+        Returns:
+            Molar masses of gas species
+        """
+        gas_species_indices: npt.NDArray[np.int_] = self.get_gas_species_indices()
+        molar_masses: npt.NDArray[np.float_] = np.array(
+            [value.data.molar_mass for value in self.species]
+        )
+        gas_molar_masses: npt.NDArray[np.float_] = molar_masses[gas_species_indices]
+        logger.debug("gas_molar_masses = %s", gas_molar_masses)
+
+        return gas_molar_masses
 
     def get_formula_matrix(self) -> npt.NDArray[np.int_]:
         """Gets the formula matrix
