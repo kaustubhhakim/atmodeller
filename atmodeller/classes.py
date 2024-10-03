@@ -55,10 +55,6 @@ class InteriorAtmosphere:
     def __init__(self, species: list[Species], log_scaling: float):
         self.species: list[Species] = species
         self.log_scaling: float = log_scaling
-        self.formula_matrix: Array = jnp.array(self.get_formula_matrix())
-        self.reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
-        self.gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
-        self.molar_masses: Array = jnp.array(self.get_molar_masses())
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
         )
@@ -89,15 +85,7 @@ class InteriorAtmosphere:
             initial_number_density, initial_stability, self.log_scaling
         )
         logger.debug("initial_solution = %s", self.initial_solution)
-        fixed: FixedParameters = FixedParameters(
-            species=self.species,
-            formula_matrix=self.formula_matrix,
-            reaction_matrix=self.reaction_matrix,
-            gas_species_indices=self.gas_species_indices,
-            molar_masses=self.molar_masses,
-            tau=tau,
-            log_scaling=self.log_scaling,
-        )
+        fixed: FixedParameters = self.get_fixed_parameters(tau)
         self.parameters: Parameters = Parameters(
             fixed=fixed,
             planet=planet,
@@ -157,15 +145,7 @@ class InteriorAtmosphere:
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
-        fixed: FixedParameters = FixedParameters(
-            species=self.species,
-            formula_matrix=self.formula_matrix,
-            reaction_matrix=self.reaction_matrix,
-            gas_species_indices=self.gas_species_indices,
-            molar_masses=self.molar_masses,
-            tau=tau,
-            log_scaling=self.log_scaling,
-        )
+        fixed: FixedParameters = self.get_fixed_parameters(tau)
         self.parameters: Parameters = Parameters(
             fixed=fixed,
             planet=planets_batch,
@@ -187,6 +167,32 @@ class InteriorAtmosphere:
         end_time = time.time()
         compile_time = end_time - start_time
         logger.info("Compile time: %.6f seconds", compile_time)
+
+    def get_fixed_parameters(self, tau: float = TAU) -> FixedParameters:
+        """Gets fixed parameters
+
+        Args:
+            tau: Tau factor for species stability. Defaults to TAU.
+
+        Returns:
+            Fixed parameters
+        """
+        formula_matrix: Array = jnp.array(self.get_formula_matrix())
+        reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
+        gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
+        molar_masses: Array = jnp.array(self.get_molar_masses())
+
+        fixed_parameters: FixedParameters = FixedParameters(
+            species=self.species,
+            formula_matrix=formula_matrix,
+            reaction_matrix=reaction_matrix,
+            gas_species_indices=gas_species_indices,
+            molar_masses=molar_masses,
+            tau=tau,
+            log_scaling=self.log_scaling,
+        )
+
+        return fixed_parameters
 
     def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of gas species
