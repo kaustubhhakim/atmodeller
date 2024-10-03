@@ -17,6 +17,7 @@
 """Classes"""
 
 import logging
+import pprint
 import time
 from collections.abc import KeysView
 from typing import Callable
@@ -58,6 +59,7 @@ class InteriorAtmosphere:
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
         )
+        logger.info("reactions = %s", pprint.pformat(self.reactions()))
 
     def initialise_single(
         self,
@@ -181,18 +183,36 @@ class InteriorAtmosphere:
         reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
         gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
         molar_masses: Array = jnp.array(self.get_molar_masses())
+        diatomic_oxygen_index: Array = jnp.array(self.get_diatomic_oxygen_index())
 
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=formula_matrix,
             reaction_matrix=reaction_matrix,
             gas_species_indices=gas_species_indices,
+            diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
             tau=tau,
             log_scaling=self.log_scaling,
         )
 
         return fixed_parameters
+
+    def get_diatomic_oxygen_index(self) -> int:
+        """Gets the species index corresponding to diatomic oxygen
+
+        Returns:
+            Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
+        """
+        for nn, species_ in enumerate(self.species):
+            if species_.data.hill_formula == "O2":
+                logger.info("Found O2 at index = %d", nn)
+                return nn
+
+        # TODO: Bad practice to return the first index because it could be wrong and therefore give
+        # rise to spurious results, but an index must be passed to evaluate the species solubility
+        # that may depend on fO2.
+        return 0
 
     def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of gas species

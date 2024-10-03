@@ -214,10 +214,34 @@ class Species(NamedTuple):
     """
 
     data: SpeciesData
+    # TODO: Move just to gas species? Need to adjust calculation of solubility for mass though.
     solubility: SolubilityProtocol = NoSolubility()
     # TODO: Probably add an activity? But would need to default to something sensible like
     # unity for a condensed phase and number density for a gas phase.
     # activity: ActivityProtocol
+
+
+# TODO: Working here
+class GasSpecies(Species):
+    """Gas species
+
+    Args:
+        data: Species data
+        solubility: Solubility. Defaults to no solubility
+        activity: Activity. Defaults to an ideal gas
+    """
+
+
+# TODO: Working here. Would be good to not include solubility which is meaningless for a condesed
+# species
+class CondensedSpecies(Species):
+    """Condensed species
+
+    Args:
+        data: Species data
+        solubility: Solubility. Defaults to no solubility
+        activity: Activity. Defaults to unity
+    """
 
 
 class Solution(NamedTuple):
@@ -407,6 +431,7 @@ class FixedParameters(NamedTuple):
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
         gas_species_indices: Indices of gas species
+        O2_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
         tau: Tau factor for species stability
         log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which
@@ -421,6 +446,8 @@ class FixedParameters(NamedTuple):
     """Reaction matrix"""
     gas_species_indices: Array
     """Indices of gas species"""
+    diatomic_oxygen_index: Array
+    """Index of diatomic oxygen"""
     molar_masses: Array
     """Molar masses of all species"""
     tau: ArrayLike

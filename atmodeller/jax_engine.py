@@ -181,6 +181,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     formula_matrix: Array = parameters.fixed.formula_matrix
     reaction_matrix: Array = parameters.fixed.reaction_matrix
     gas_species_indices: Array = parameters.fixed.gas_species_indices
+    diatomic_oxygen_index: Array = parameters.fixed.diatomic_oxygen_index
     molar_masses: Array = parameters.fixed.molar_masses
     planet: Planet = parameters.planet
     constraints: Constraints = parameters.constraints
@@ -216,28 +217,30 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     )
     pressure: Array = jnp.exp(log_pressure)
     # jax.debug.print("pressure = {out}", out=pressure)
+
+    # TODO: Compute species fugacities from their partial pressures
+
     total_pressure: Array = jnp.sum(pressure)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
+    # TODO: Curently partial pressure and not strictly oxygen fugacity
+    diatomic_oxygen_fugacity: Array = jnp.take(pressure, diatomic_oxygen_index)
+    jax.debug.print("diatomic_oxygen_fugacity = {out}", out=diatomic_oxygen_fugacity)
 
     solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]
 
     # Dispatcher function to select the appropriate solubility law
     def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike):
-        # FIXME: Need to swap out second total_pressure for fO2
         return lax.switch(
             index,
             solubility_funcs,
             fugacity,
             temperature,
             total_pressure,
-            total_pressure,
+            diatomic_oxygen_fugacity,
         )
 
     vmap_apply_function: Callable = jax.vmap(apply_solubility_function, in_axes=(0, 0))
     indices: ArrayLike = np.arange(len(species))
-    # FIXME: Need to pass in fugacities not pressures. And also other fugacities like fO2. Can this
-    # be done somehow using a dictionary to pass fO2 for example?  How to use string key names and
-    # remain JAX compliant?
     ppmw: Array = vmap_apply_function(indices, pressure)
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
