@@ -31,7 +31,7 @@ Pref: float = 1.0
 
 
 class ThermoData(NamedTuple):
-    """Container for thermochemical data"""
+    """Thermochemical data"""
 
     b1: Sequence
     """Enthalpy constant(s) of integration"""
@@ -43,6 +43,11 @@ class ThermoData(NamedTuple):
     """Minimum temperature(s) in the range"""
     T_max: Sequence
     """Maximum temperature(s) in the range"""
+
+    # TODO: Add a class method to spawn these objects using coefficients from:
+    # "NASA Glenn Coefficients for Calculating Thermodynamic Properties of Individual Species"
+    # Might involve using a LLM to tabulated the coefficients from the PDF? Or can an electronic
+    # version of the tabulated data be obtained?
 
 
 @jit
