@@ -58,7 +58,7 @@ class InteriorAtmosphere:
         self.formula_matrix: Array = jnp.array(self.get_formula_matrix())
         self.reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
         self.gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
-        self.gas_molar_masses: Array = jnp.array(self.get_gas_molar_masses())
+        self.molar_masses: Array = jnp.array(self.get_molar_masses())
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
         )
@@ -94,7 +94,7 @@ class InteriorAtmosphere:
             formula_matrix=self.formula_matrix,
             reaction_matrix=self.reaction_matrix,
             gas_species_indices=self.gas_species_indices,
-            gas_molar_masses=self.gas_molar_masses,
+            molar_masses=self.molar_masses,
             tau=tau,
             log_scaling=self.log_scaling,
         )
@@ -162,7 +162,7 @@ class InteriorAtmosphere:
             formula_matrix=self.formula_matrix,
             reaction_matrix=self.reaction_matrix,
             gas_species_indices=self.gas_species_indices,
-            gas_molar_masses=self.gas_molar_masses,
+            molar_masses=self.molar_masses,
             tau=tau,
             log_scaling=self.log_scaling,
         )
@@ -201,20 +201,18 @@ class InteriorAtmosphere:
 
         return np.array(indices)
 
-    def get_gas_molar_masses(self) -> npt.NDArray[np.float_]:
-        """Gets the gas molar masses
+    def get_molar_masses(self) -> npt.NDArray[np.float_]:
+        """Gets the molar masses of all species
 
         Returns:
-            Molar masses of gas species
+            Molar masses of all species
         """
-        gas_species_indices: npt.NDArray[np.int_] = self.get_gas_species_indices()
         molar_masses: npt.NDArray[np.float_] = np.array(
-            [value.data.molar_mass for value in self.species]
+            [species_.data.molar_mass for species_ in self.species]
         )
-        gas_molar_masses: npt.NDArray[np.float_] = molar_masses[gas_species_indices]
-        logger.debug("gas_molar_masses = %s", gas_molar_masses)
+        logger.debug("molar_masses = %s", molar_masses)
 
-        return gas_molar_masses
+        return molar_masses
 
     def get_formula_matrix(self) -> npt.NDArray[np.int_]:
         """Gets the formula matrix

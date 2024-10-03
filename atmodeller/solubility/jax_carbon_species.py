@@ -37,8 +37,15 @@ class _CH4_basalt_ardia(NamedTuple):
     for lnK0 and deltaV from the text.
     """
 
-    def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del temperature
+        del fO2
         pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
         one_bar_in_gpa: ArrayLike = unit_conversion.bar_to_GPa
         k: Array = jnp.exp(4.93 - (1.93 * (pressure_gpa - one_bar_in_gpa)))
@@ -59,8 +66,15 @@ class _CO_basalt_armstrong(NamedTuple):
     (experiments from 1-1.2 GPa).
     """
 
-    def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> Array:
+        del temperature
+        del fO2
         logco_ppm: Array = -0.738 + (0.876 * jnp.log10(fugacity)) - (5.44e-5 * pressure)
         ppmw: Array = jnp.power(10, logco_ppm)
 
@@ -78,8 +92,16 @@ class _CO_basalt_yoshioka(NamedTuple):
     MORB in the abstract.
     """
 
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> Array:
+        del temperature
+        del pressure
+        del fO2
         co_wtp: Array = jnp.power(10, (-5.20 + (0.8 * jnp.log10(fugacity))))
         ppmw: Array = co_wtp * unit_conversion.percent_to_ppm
 
@@ -97,8 +119,16 @@ class _CO_rhyolite_yoshioka(NamedTuple):
     rhyolite in the abstract.
     """
 
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> Array:
+        del temperature
+        del pressure
+        del fO2
         co_wtp: Array = jnp.power(10, (-4.08 + (0.52 * jnp.log10(fugacity))))
         ppmw: Array = co_wtp * unit_conversion.percent_to_ppm
 
@@ -117,9 +147,13 @@ class _CO2_basalt_dixon(NamedTuple):
     """
 
     def concentration(
-        self, fugacity: ArrayLike, *, temperature: ArrayLike, pressure: ArrayLike, **kwargs
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
     ) -> Array:
-        del kwargs
+        del fO2
         arg: Array = jnp.exp(-23 * (pressure - 1) / (83.15 * temperature)) * fugacity * 3.8e-7
         ppmw: Array = 1.0e4 * (4400 * arg) / (36.6 - 44 * arg)
 

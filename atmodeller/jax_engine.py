@@ -83,6 +83,7 @@ def solve(
 @jit
 def get_log_reaction_equilibrium_constant(
     species: list[Species],
+    gas_species_indices: Array,
     reaction_matrix: Array,
     temperature: ArrayLike,
     log_scaling: ArrayLike,
@@ -91,6 +92,7 @@ def get_log_reaction_equilibrium_constant(
 
     Args:
         species: List of species
+        gas_species_indices: Indices of gas species
         reaction_matrix: Reaction matrix
         temperature: Temperature
         log_scaling: Log scaling
@@ -102,8 +104,7 @@ def get_log_reaction_equilibrium_constant(
     log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
     # jax.debug.print("lnKp = {out}", out=lnKp)
 
-    gas_mask: Array = gas_species_mask(species)
-    delta_n: Array = jnp.sum(reaction_matrix * gas_mask, axis=1)
+    delta_n: Array = jnp.sum(jnp.take(reaction_matrix, gas_species_indices, axis=1), axis=1)
     # jax.debug.print("delta_n = {out}", out=delta_n)
 
     log_Kc: Array = log_Kp - delta_n * (
@@ -180,7 +181,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     formula_matrix: Array = parameters.fixed.formula_matrix
     reaction_matrix: Array = parameters.fixed.reaction_matrix
     gas_species_indices: Array = parameters.fixed.gas_species_indices
-    gas_molar_masses: Array = parameters.fixed.gas_molar_masses
+    molar_masses: Array = parameters.fixed.molar_masses
     planet: Planet = parameters.planet
     constraints: Constraints = parameters.constraints
     species: list[Species] = parameters.fixed.species
@@ -192,7 +193,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
     # Reaction network residual
     log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
-        species, reaction_matrix, temperature, log_scaling
+        species, gas_species_indices, reaction_matrix, temperature, log_scaling
     )
     log_activity: Array = get_log_activity(log_number_density, parameters)
     reaction_residual: Array = (
@@ -205,6 +206,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
 
     # Mass balance residual for elements
     gas_log_number_density: Array = jnp.take(log_number_density, gas_species_indices)
+    gas_molar_masses: Array = jnp.take(molar_masses, gas_species_indices)
     log_volume: Array = atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
     # Number density of elements in the gas phase
     element_gas_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
@@ -214,14 +216,22 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     )
     pressure: Array = jnp.exp(log_pressure)
     # jax.debug.print("pressure = {out}", out=pressure)
+    total_pressure: Array = jnp.sum(pressure)
+    # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]
-    molar_masses: Array = jnp.array([species_.data.molar_mass for species_ in species])
-    # jax.debug.print("molar_masses = {out}", out=molar_masses)
 
     # Dispatcher function to select the appropriate solubility law
-    def apply_solubility_function(index: ArrayLike, x: ArrayLike):
-        return lax.switch(index, solubility_funcs, x)
+    def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike):
+        # FIXME: Need to swap out second total_pressure for fO2
+        return lax.switch(
+            index,
+            solubility_funcs,
+            fugacity,
+            temperature,
+            total_pressure,
+            total_pressure,
+        )
 
     vmap_apply_function: Callable = jax.vmap(apply_solubility_function, in_axes=(0, 0))
     indices: ArrayLike = np.arange(len(species))

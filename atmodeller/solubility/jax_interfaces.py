@@ -16,26 +16,24 @@
 #
 """JAX interfaces for solubility laws"""
 
+# Convenient to use fO2 so pylint: disable=invalid-name
+
 from __future__ import annotations
 
-import logging
 from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
 from jax import Array, jit
 from jax.typing import ArrayLike
 
-logger: logging.Logger = logging.getLogger(__name__)
-
 
 class SolubilityProtocol(Protocol):
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
         temperature: ArrayLike,
         pressure: ArrayLike,
-        **kwargs,
+        fO2: ArrayLike,
     ) -> ArrayLike: ...
 
 
@@ -67,17 +65,16 @@ class SolubilityPowerLaw(NamedTuple):
     exponent: float
     """Exponent"""
 
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
-        """Concentration
-
-        Args:
-            fugacity: Fugacity
-            **kwargs: Arbitrary unused keyword arguments
-
-        Returns:
-            Concentration
-        """
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del temperature
+        del pressure
+        del fO2
 
         return power_law(fugacity, self.constant, self.exponent)
 
@@ -110,17 +107,16 @@ class SolubilityPowerLawLog10(NamedTuple):
     log10_exponent: float
     """Exponent"""
 
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
-        """Concentration
-
-        Args:
-            fugacity: Fugacity
-            **kwargs: Arbitrary unused keyword arguments
-
-        Returns:
-            Concentration
-        """
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del temperature
+        del pressure
+        del fO2
 
         return power_law_log10(fugacity, self.log10_constant, self.log10_exponent)
 
@@ -128,10 +124,17 @@ class SolubilityPowerLawLog10(NamedTuple):
 class NoSolubility(NamedTuple):
     """No solubility"""
 
-    def concentration(self, *args, **kwargs) -> ArrayLike:
-        """No concentration"""
-        del args
-        del kwargs
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del fugacity
+        del temperature
+        del pressure
+        del fO2
 
         # Must be 0.0 (float) for JAX array type compliance
         return 0.0

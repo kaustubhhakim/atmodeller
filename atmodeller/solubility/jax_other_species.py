@@ -27,8 +27,11 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.solubility.interfaces import Solubility, SolubilityPowerLaw
-from atmodeller.solubility.jax_interfaces import SolubilityProtocol, power_law
+from atmodeller.solubility.jax_interfaces import (
+    SolubilityPowerLaw,
+    SolubilityProtocol,
+    power_law,
+)
 from atmodeller.utilities import unit_conversion
 
 Cl2_ano_dio_for_thomas: SolubilityProtocol = SolubilityPowerLaw(
@@ -66,7 +69,7 @@ units to mol/g*bar.
 """
 
 
-class N2_basalt_bernadou(NamedTuple):
+class _N2_basalt_bernadou(NamedTuple):
     """N2 in basaltic silicate melt :cite:p:`BGF21`
 
     :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -79,26 +82,26 @@ class N2_basalt_bernadou(NamedTuple):
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
         temperature: ArrayLike,
         pressure: ArrayLike,
-        O2: ArrayLike,
-        **kwargs,
+        fO2: ArrayLike,
     ) -> Array:
-        del kwargs
         k13: Array = jnp.exp(
             -(29344 + 121 * temperature + 4 * pressure) / (GAS_CONSTANT * temperature)
         )
         k14: Array = jnp.exp(
             -(183733 + 172 * temperature - 5 * pressure) / (GAS_CONSTANT * temperature)
         )
-        molfrac: Array = (k13 * fugacity) + ((O2 ** (-3 / 4)) * k14 * (fugacity**0.5))
+        molfrac: Array = (k13 * fugacity) + ((fO2 ** (-3 / 4)) * k14 * (fugacity**0.5))
         ppmw: Array = molfrac * unit_conversion.fraction_to_ppm
 
         return ppmw
 
 
-class N2_basalt_dasgupta(NamedTuple):
+N2_basalt_bernadou: SolubilityProtocol = _N2_basalt_bernadou()
+
+
+class _N2_basalt_dasgupta(NamedTuple):
     """N2 in silicate melts :cite:p:`DFP22`
 
     Using :cite:t:`DFP22{Equation 10}`, composition parameters from :cite:t:`DFP22{Figure 8}`, and
@@ -121,22 +124,21 @@ class N2_basalt_dasgupta(NamedTuple):
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
-        temperature: float,
+        temperature: ArrayLike,
         pressure: ArrayLike,
-        O2: ArrayLike,
-        **kwargs,
+        fO2: ArrayLike,
     ) -> Array:
-        del kwargs
         fugacity_gpa: ArrayLike = fugacity * unit_conversion.bar_to_GPa
         pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
+        # TODO: Check. Should this be hard-coded or be self-consistent with any imposed buffer that
+        # the interior-atmosphere system uses?
         logiw_fugacity: ArrayLike = (
             -28776.8 / temperature
             + 14.057
             + 0.055 * (pressure - 1) / temperature
             - 0.8853 * jnp.log(temperature)
         )
-        fo2_shift: Array = jnp.log10(O2) - logiw_fugacity
+        fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity
         ppmw: Array = jnp.exp(
             (5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)
         ) * (fugacity_gpa**0.5)
@@ -147,7 +149,10 @@ class N2_basalt_dasgupta(NamedTuple):
         return ppmw
 
 
-class N2_basalt_libourel(NamedTuple):
+N2_basalt_dasgupta: SolubilityProtocol = _N2_basalt_dasgupta()
+
+
+class _N2_basalt_libourel(NamedTuple):
     """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
     :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
@@ -155,11 +160,21 @@ class N2_basalt_libourel(NamedTuple):
     and N2 gases.
     """
 
-    def concentration(self, fugacity: ArrayLike, *, O2: ArrayLike, **kwargs) -> ArrayLike:
-        del kwargs
-        ppmw: ArrayLike = power_law(fugacity, 0.0611, 1)
-        constant: ArrayLike = power_law(O2, 5.97e-10, -0.75)
-        ppmw2: ArrayLike = power_law(fugacity, constant, 0.5)
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> Array:
+        del temperature
+        del pressure
+        ppmw: Array = power_law(fugacity, 0.0611, 1)
+        constant: Array = power_law(fO2, 5.97e-10, -0.75)
+        ppmw2: Array = power_law(fugacity, constant, 0.5)
         ppmw = ppmw + ppmw2
 
         return ppmw
+
+
+N2_basalt_libourel: SolubilityProtocol = _N2_basalt_libourel()

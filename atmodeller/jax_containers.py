@@ -407,7 +407,7 @@ class FixedParameters(NamedTuple):
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
         gas_species_indices: Indices of gas species
-        gas_molar_masses: Molar masses of gas species
+        molar_masses: Molar masses of all species
         tau: Tau factor for species stability
         log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which
             converts molecules/m^3 to moles/m^3
@@ -421,8 +421,8 @@ class FixedParameters(NamedTuple):
     """Reaction matrix"""
     gas_species_indices: Array
     """Indices of gas species"""
-    gas_molar_masses: Array
-    """Molar masses of gas species"""
+    molar_masses: Array
+    """Molar masses of all species"""
     tau: ArrayLike
     """Tau factor for species"""
     log_scaling: float
