@@ -54,7 +54,12 @@ from atmodeller.thermodata.gases import (
     NH3_g_thermodata,
     O2_g_thermodata,
 )
-from atmodeller.thermodata.jax_thermo import ActivityProtocol, ThermoData, UnityActivity
+from atmodeller.thermodata.jax_thermo import (
+    ActivityProtocol,
+    CondensateActivity,
+    IdealGasActivity,
+    ThermoData,
+)
 from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
@@ -231,7 +236,7 @@ class GasSpecies(Species):
     def __new__(
         cls,
         data: SpeciesData,
-        activity: ActivityProtocol = UnityActivity(),  # FIXME: Setup ideal gas
+        activity: ActivityProtocol = IdealGasActivity(),
         solubility: SolubilityProtocol = NoSolubility(),
     ):
         return super().__new__(cls, data, activity, solubility)
@@ -242,14 +247,14 @@ class CondensedSpecies(Species):
 
     Args:
         data: Species data
-        activity: Activity. Defaults to unity.
+        activity: Activity. Defaults to unity for a condensate.
         solubility. Solubility. Defaults to no solubility.
     """
 
     def __new__(
         cls,
         data: SpeciesData,
-        activity: ActivityProtocol = UnityActivity(),
+        activity: ActivityProtocol = CondensateActivity(),
         solubility: SolubilityProtocol = NoSolubility(),
     ):
         return super().__new__(cls, data, activity, solubility)

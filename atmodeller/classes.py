@@ -357,7 +357,9 @@ class InteriorAtmosphere:
         number_density_numpy: npt.NDArray[np.float_] = np.array(unscaled_number_density)
         logger.info("log_number_density = %s", number_density_numpy)
         extended_activity: Array = get_log_extended_activity(
-            unscaled_number_density, stability, self.parameters
+            self.parameters,
+            unscaled_number_density,
+            stability,
         )
         extended_activity_numpy: npt.NDArray[np.float_] = np.array(extended_activity)
         logger.info("log_activity = %s", extended_activity_numpy)

@@ -32,22 +32,49 @@ Pref: float = 1.0
 
 class ActivityProtocol(Protocol):
 
-    def activity(
-        self, number_densities: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
+    def log_activity(
+        self,
+        log_number_density: ArrayLike,
+        species_index: Array,
+        temperature: ArrayLike,
+        total_pressure: ArrayLike,
     ) -> ArrayLike: ...
 
 
-class UnityActivity(NamedTuple):
-    """Unity activity for stable condensates"""
+class CondensateActivity(NamedTuple):
+    """Activity of a stable condensate"""
 
-    def activity(
-        self, number_densities: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
+    activity: ArrayLike = 1.0
+
+    def log_activity(
+        self,
+        log_number_density: ArrayLike,
+        species_index: Array,
+        temperature: ArrayLike,
+        total_pressure: ArrayLike,
     ) -> ArrayLike:
-        del number_densities
+        del log_number_density
+        del species_index
         del temperature
-        del pressure
+        del total_pressure
 
-        return 1.0
+        return jnp.log(self.activity)
+
+
+class IdealGasActivity(NamedTuple):
+    """Activity of an ideal gas"""
+
+    def log_activity(
+        self,
+        log_number_density: ArrayLike,
+        species_index: Array,
+        temperature: ArrayLike,
+        total_pressure: ArrayLike,
+    ) -> ArrayLike:
+        del temperature
+        del total_pressure
+
+        return jnp.take(log_number_density, species_index)
 
 
 class ThermoData(NamedTuple):
