@@ -181,7 +181,6 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     formula_matrix: Array = parameters.fixed.formula_matrix
     reaction_matrix: Array = parameters.fixed.reaction_matrix
     gas_species_indices: Array = parameters.fixed.gas_species_indices
-    diatomic_oxygen_index: Array = parameters.fixed.diatomic_oxygen_index
     molar_masses: Array = parameters.fixed.molar_masses
     planet: Planet = parameters.planet
     constraints: Constraints = parameters.constraints
@@ -209,8 +208,8 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     gas_log_number_density: Array = jnp.take(log_number_density, gas_species_indices)
     gas_molar_masses: Array = jnp.take(molar_masses, gas_species_indices)
     log_volume: Array = atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
-    # Number density of elements in the gas phase
-    element_gas_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
+    # Number density of elements in the condensed or gas phase
+    element_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
 
     log_pressure: Array = unscale_number_density(
         log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
@@ -218,13 +217,48 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     pressure: Array = jnp.exp(log_pressure)
     # jax.debug.print("pressure = {out}", out=pressure)
 
-    # TODO: Compute species fugacities from their partial pressures
+    element_melt_density: Array = element_density_in_melt(parameters, pressure, log_volume)
+    log_element_density: Array = jnp.log(element_density + element_melt_density)
+
+    mass_residual = log_element_density - (constraints.array() - log_volume)
+    # jax.debug.print("mass_residual = {out}", out=mass_residual)
+
+    # Stability residual
+    # Get minimum scaled log number of molecules
+    log_min_number_density: Array = (
+        jnp.min(constraints.array()) - log_volume - jnp.log(parameters.fixed.tau)
+    )
+    stability_residual: Array = log_number_density + log_stability - log_min_number_density
+    # jax.debug.print("stability_residual = {out}", out=stability_residual)
+
+    residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
+    # jax.debug.print("residual = {out}", out=residual)
+
+    return residual
+
+
+@jit
+def element_density_in_melt(parameters: Parameters, pressure: Array, log_volume: Array) -> Array:
+    """Number density of elements dissolved in melt due to species solubility
+
+    Args:
+        parameters: Parameters
+        pressure: Pressure
+        log_volume: Log volume of the atmosphere
+
+    Returns:
+        Number density of elements dissolved in melt
+    """
+    formula_matrix: Array = parameters.fixed.formula_matrix
+    diatomic_oxygen_index: Array = parameters.fixed.diatomic_oxygen_index
+    molar_masses: Array = parameters.fixed.molar_masses
+    planet: Planet = parameters.planet
+    species: list[Species] = parameters.fixed.species
+    temperature: ArrayLike = planet.surface_temperature
+    log_scaling: float = parameters.fixed.log_scaling
 
     total_pressure: Array = jnp.sum(pressure)
-    # jax.debug.print("total_pressure = {out}", out=total_pressure)
-    # TODO: Curently partial pressure and not strictly oxygen fugacity
     diatomic_oxygen_fugacity: Array = jnp.take(pressure, diatomic_oxygen_index)
-    jax.debug.print("diatomic_oxygen_fugacity = {out}", out=diatomic_oxygen_fugacity)
 
     solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]
 
@@ -256,23 +290,8 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # Scale back to the scaling of the numerical problem. Perform in regular space to enable
     # addition before logging, hence avoiding any problems with NaNs.
     element_melt_density = element_melt_density / jnp.exp(log_scaling)
-    log_element_density: Array = jnp.log(element_gas_density + element_melt_density)
 
-    mass_residual = log_element_density - (constraints.array() - log_volume)
-    # jax.debug.print("mass_residual = {out}", out=mass_residual)
-
-    # Stability residual
-    # Get minimum scaled log number of molecules
-    log_min_number_density: Array = (
-        jnp.min(constraints.array()) - log_volume - jnp.log(parameters.fixed.tau)
-    )
-    stability_residual: Array = log_number_density + log_stability - log_min_number_density
-    # jax.debug.print("stability_residual = {out}", out=stability_residual)
-
-    residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
-    # jax.debug.print("residual = {out}", out=residual)
-
-    return residual
+    return element_melt_density
 
 
 @jit

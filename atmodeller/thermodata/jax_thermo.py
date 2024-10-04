@@ -18,7 +18,7 @@
 
 # Convenient to use chemical formulas so pylint: disable=C0103
 
-from typing import NamedTuple, Sequence
+from typing import NamedTuple, Protocol, Sequence
 
 import jax.numpy as jnp
 from jax import Array, jit
@@ -28,6 +28,26 @@ Href: float = 298.15
 """Enthalpy reference temperature in K"""
 Pref: float = 1.0
 """Standard state pressure in bar"""
+
+
+class ActivityProtocol(Protocol):
+
+    def activity(
+        self, number_densities: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
+    ) -> ArrayLike: ...
+
+
+class UnityActivity(NamedTuple):
+    """Unity activity for stable condensates"""
+
+    def activity(
+        self, number_densities: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
+    ) -> ArrayLike:
+        del number_densities
+        del temperature
+        del pressure
+
+        return 1.0
 
 
 class ThermoData(NamedTuple):

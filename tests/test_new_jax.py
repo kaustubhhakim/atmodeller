@@ -32,6 +32,8 @@ from atmodeller.jax_containers import (
     CH4_g_data,
     CO2_g_data,
     CO_g_data,
+    CondensedSpecies,
+    GasSpecies,
     H2_g_data,
     H2O_g_data,
     H2O_l_data,
@@ -63,12 +65,12 @@ TAU: float = 1.0e60
 def test_CHO_low_temperature() -> None:
     """C-H-O system at 450 K"""
 
-    H2_g: Species = Species(H2_g_data)
-    H2O_g: Species = Species(H2O_g_data)
-    CO2_g: Species = Species(CO2_g_data)
-    O2_g: Species = Species(O2_g_data)
-    CH4_g: Species = Species(CH4_g_data)
-    CO_g: Species = Species(CO_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data)
+    CO2_g: Species = GasSpecies(CO2_g_data)
+    O2_g: Species = GasSpecies(O2_g_data)
+    CH4_g: Species = GasSpecies(CH4_g_data)
+    CO_g: Species = GasSpecies(CO_g_data)
 
     species: list[Species] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
     planet: Planet = Planet(surface_temperature=450.0)
@@ -123,13 +125,13 @@ def test_CHO_low_temperature() -> None:
 def test_graphite_condensed() -> None:
     """Graphite stable with around 50% condensed C mass fraction"""
 
-    O2_g: Species = Species(O2_g_data)
-    H2_g: Species = Species(H2_g_data)
-    CO_g: Species = Species(CO_g_data)
-    H2O_g: Species = Species(H2O_g_data)
-    CO2_g: Species = Species(CO2_g_data)
-    CH4_g: Species = Species(CH4_g_data)
-    C_cr: Species = Species(C_cr_data)
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    CO_g: Species = GasSpecies(CO_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data)
+    CO2_g: Species = GasSpecies(CO2_g_data)
+    CH4_g: Species = GasSpecies(CH4_g_data)
+    C_cr: Species = CondensedSpecies(C_cr_data)
 
     species: list[Species] = [O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr]
     planet: Planet = Planet(surface_temperature=873.0)
@@ -199,13 +201,13 @@ def test_graphite_unstable() -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    O2_g: Species = Species(O2_g_data)
-    H2_g: Species = Species(H2_g_data)
-    CO_g: Species = Species(CO_g_data)
-    H2O_g: Species = Species(H2O_g_data)
-    CO2_g: Species = Species(CO2_g_data)
-    CH4_g: Species = Species(CH4_g_data)
-    C_cr: Species = Species(C_cr_data)
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    CO_g: Species = GasSpecies(CO_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data)
+    CO2_g: Species = GasSpecies(CO2_g_data)
+    CH4_g: Species = GasSpecies(CH4_g_data)
+    C_cr: Species = CondensedSpecies(C_cr_data)
 
     species: list[Species] = [O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr]
     planet: Planet = Planet(surface_temperature=1400.0)
@@ -274,10 +276,10 @@ def test_graphite_unstable() -> None:
 def test_water_condensed_O_abundance() -> None:
     """Condensed water at 10 bar"""
 
-    H2_g: Species = Species(H2_g_data)
-    H2O_g: Species = Species(H2O_g_data)
-    O2_g: Species = Species(O2_g_data)
-    H2O_l: Species = Species(H2O_l_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data)
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2O_l: Species = CondensedSpecies(H2O_l_data)
 
     species: list[Species] = [H2_g, H2O_g, O2_g, H2O_l]
     planet: Planet = Planet(surface_temperature=411.75)
@@ -330,14 +332,14 @@ def test_water_condensed_O_abundance() -> None:
 def test_graphite_water_condensed() -> None:
     """C and water in equilibrium at 430 K and 10 bar"""
 
-    O2_g: Species = Species(O2_g_data)
-    H2_g: Species = Species(H2_g_data)
-    CO_g: Species = Species(CO_g_data)
-    H2O_g: Species = Species(H2O_g_data)
-    CO2_g: Species = Species(CO2_g_data)
-    CH4_g: Species = Species(CH4_g_data)
-    C_cr: Species = Species(C_cr_data)
-    H2O_l: Species = Species(H2O_l_data)
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    CO_g: Species = GasSpecies(CO_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data)
+    CO2_g: Species = GasSpecies(CO2_g_data)
+    CH4_g: Species = GasSpecies(CH4_g_data)
+    C_cr: Species = CondensedSpecies(C_cr_data)
+    H2O_l: Species = CondensedSpecies(H2O_l_data)
 
     species: list[Species] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
     planet: Planet = Planet(surface_temperature=430.0)
@@ -399,12 +401,12 @@ def test_graphite_water_condensed() -> None:
 def test_batch_planet() -> None:
     """Tests a batch calculation with different planets"""
 
-    O2_g: Species = Species(O2_g_data)
-    H2_g: Species = Species(H2_g_data)
-    CO_g: Species = Species(CO_g_data)
-    H2O_g: Species = Species(H2O_g_data)
-    CO2_g: Species = Species(CO2_g_data)
-    CH4_g: Species = Species(CH4_g_data)
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    CO_g: Species = GasSpecies(CO_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data)
+    CO2_g: Species = GasSpecies(CO2_g_data)
+    CH4_g: Species = GasSpecies(CH4_g_data)
 
     species: list[Species] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
 
@@ -443,9 +445,9 @@ def test_batch_planet() -> None:
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    O2_g: Species = Species(O2_g_data)
-    H2_g: Species = Species(H2_g_data)
-    H2O_g: Species = Species(H2O_g_data, H2O_peridotite_sossi)
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data, solubility=H2O_peridotite_sossi)
 
     species: list[Species] = [H2O_g, H2_g, O2_g]
     planet: Planet = Planet()
@@ -478,4 +480,5 @@ def test_H_fO2() -> None:
         "O2_g": 8.838043080858959e-08,
     }
 
+    # FIXME: Setup test comparison
     assert True

@@ -54,7 +54,7 @@ from atmodeller.thermodata.gases import (
     NH3_g_thermodata,
     O2_g_thermodata,
 )
-from atmodeller.thermodata.jax_thermo import ThermoData
+from atmodeller.thermodata.jax_thermo import ActivityProtocol, ThermoData, UnityActivity
 from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
@@ -210,38 +210,49 @@ class Species(NamedTuple):
 
     Args:
         data: Species data
-        solubility: Solubility. Defaults to no solubility.
+        activity: Activity
+        solubility: Solubility
     """
 
     data: SpeciesData
-    # TODO: Move just to gas species? Need to adjust calculation of solubility for mass though.
-    solubility: SolubilityProtocol = NoSolubility()
-    # TODO: Probably add an activity? But would need to default to something sensible like
-    # unity for a condensed phase and number density for a gas phase.
-    # activity: ActivityProtocol
+    activity: ActivityProtocol
+    solubility: SolubilityProtocol
 
 
-# TODO: Working here
 class GasSpecies(Species):
     """Gas species
 
     Args:
         data: Species data
-        solubility: Solubility. Defaults to no solubility
-        activity: Activity. Defaults to an ideal gas
+        activity: Activity. Defaults to an ideal gas.
+        solubility: Solubility. Defaults to no solubility.
     """
 
+    def __new__(
+        cls,
+        data: SpeciesData,
+        activity: ActivityProtocol = UnityActivity(),  # FIXME: Setup ideal gas
+        solubility: SolubilityProtocol = NoSolubility(),
+    ):
+        return super().__new__(cls, data, activity, solubility)
 
-# TODO: Working here. Would be good to not include solubility which is meaningless for a condesed
-# species
+
 class CondensedSpecies(Species):
     """Condensed species
 
     Args:
         data: Species data
-        solubility: Solubility. Defaults to no solubility
-        activity: Activity. Defaults to unity
+        activity: Activity. Defaults to unity.
+        solubility. Solubility. Defaults to no solubility.
     """
+
+    def __new__(
+        cls,
+        data: SpeciesData,
+        activity: ActivityProtocol = UnityActivity(),
+        solubility: SolubilityProtocol = NoSolubility(),
+    ):
+        return super().__new__(cls, data, activity, solubility)
 
 
 class Solution(NamedTuple):
