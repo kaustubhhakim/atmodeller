@@ -504,7 +504,7 @@ def test_H_fO2_buffer() -> None:
         "O": o_kg,
     }
     fugacity_constraints: FugacityConstraints = FugacityConstraints.create(
-        {"O2_g": 8.838043080858959e-08}
+        {O2_g.name: 8.838043080858959e-08}
     )
 
     # Initial solution guess number density (molecules/m^3)

@@ -145,6 +145,10 @@ class SpeciesData(NamedTuple):
         thermodata: Thermodynamic data
     """
 
+    # Because composition is a dict this object is not hashable. Python does not have a frozendict,
+    # so other options would be:
+    # https://flax.readthedocs.io/en/latest/api_reference/flax.core.frozen_dict.html
+    # https://github.com/GalacticDynamics/xmmutablemap
     composition: dict[str, tuple[int, float, float]]
     """Composition"""
     phase_code: int
@@ -222,6 +226,11 @@ class Species(NamedTuple):
     data: SpeciesData
     activity: ActivityProtocol
     solubility: SolubilityProtocol
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and phase"""
+        return self.data.name
 
 
 class GasSpecies(Species):
@@ -304,16 +313,16 @@ class FugacityConstraints(NamedTuple):
         log_fugacity: Log fugacity
     """
 
-    log_fugacity: dict[Species, Array]
+    log_fugacity: dict[str, Array]
 
     @classmethod
-    def create(cls, fugacity: Mapping[Species, ArrayLike]) -> Self:
+    def create(cls, fugacity: Mapping[str, ArrayLike]) -> Self:
         """Creates an instance
 
         Args:
             fugacity: Mapping of a Species and fugacity constraint in any order
         """
-        init_dict: dict[Species, Array] = {k: jnp.log(v) for k, v in fugacity.items()}
+        init_dict: dict[str, Array] = {k: jnp.log(v) for k, v in fugacity.items()}
         # FIXME: Deal with scaling somewhere
 
         return cls(init_dict)
