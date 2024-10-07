@@ -85,7 +85,7 @@ class ThermoData(NamedTuple):
     """Enthalpy constant(s) of integration"""
     b2: tuple[float, ...]
     """Entropy constant(s) of integration"""
-    cp_coeffs: tuple[tuple[float, ...], ...]
+    cp_coeffs: tuple[tuple[float, float, float, float, float, float, float], ...]
     """Heat capacity coefficients"""
     T_min: tuple[float, ...]
     """Minimum temperature(s) in the range"""
