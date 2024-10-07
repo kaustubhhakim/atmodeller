@@ -297,6 +297,32 @@ class Solution(NamedTuple):
         return jnp.concatenate((self.number_density, self.stability))
 
 
+class FugacityConstraints(NamedTuple):
+    """Log fugacity constraints
+
+    Args:
+        log_fugacity: Log fugacity
+    """
+
+    log_fugacity: dict[Species, Array]
+
+    @classmethod
+    def create(cls, fugacity: Mapping[Species, ArrayLike]) -> Self:
+        """Creates an instance
+
+        Args:
+            fugacity: Mapping of a Species and fugacity constraint in any order
+        """
+        init_dict: dict[Species, Array] = {k: jnp.log(v) for k, v in fugacity.items()}
+        # FIXME: Deal with scaling somewhere
+
+        return cls(init_dict)
+
+    def array(self) -> Array:
+        """Log fugacity"""
+        return jnp.array(list(self.log_fugacity.values()))
+
+
 class MassConstraints(NamedTuple):
     """Log number of molecules constraints
 
@@ -328,11 +354,7 @@ class MassConstraints(NamedTuple):
         return cls(log_number_of_molecules)
 
     def array(self) -> Array:
-        """Scaled log number of molecules array
-
-        Args:
-            scaling: Scaling
-        """
+        """Scaled log number of molecules array"""
         return jnp.array(list(self.log_molecules.values()))
 
 

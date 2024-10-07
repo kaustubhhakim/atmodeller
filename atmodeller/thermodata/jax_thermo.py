@@ -18,7 +18,7 @@
 
 # Convenient to use chemical formulas so pylint: disable=C0103
 
-from typing import NamedTuple, Protocol, Sequence
+from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
 from jax import Array, jit
@@ -81,15 +81,15 @@ class IdealGasActivity(NamedTuple):
 class ThermoData(NamedTuple):
     """Thermochemical data"""
 
-    b1: Sequence
+    b1: tuple[float, ...]
     """Enthalpy constant(s) of integration"""
-    b2: Sequence
+    b2: tuple[float, ...]
     """Entropy constant(s) of integration"""
-    cp_coeffs: Sequence
+    cp_coeffs: tuple[float, ...]
     """Heat capacity coefficients"""
-    T_min: Sequence
+    T_min: tuple[float, ...]
     """Minimum temperature(s) in the range"""
-    T_max: Sequence
+    T_max: tuple[float, ...]
     """Maximum temperature(s) in the range"""
 
     # TODO: Add a class method to spawn these objects using coefficients from:

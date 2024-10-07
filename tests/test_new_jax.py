@@ -37,6 +37,7 @@ from atmodeller.jax_containers import (
     CO2_g_data,
     CO_g_data,
     CondensedSpecies,
+    FugacityConstraints,
     GasSpecies,
     H2_g_data,
     H2O_g_data,
@@ -83,7 +84,6 @@ def test_CHO_low_temperature() -> None:
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
     o_kg: float = 1.02999e20
-    # Mass constraints in alphabetical order
     mass_constraints: dict[str, float] = {
         "C": c_kg,
         "H": h_kg,
@@ -144,7 +144,6 @@ def test_graphite_condensed() -> None:
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 5 * h_kg
     o_kg: float = 2.73159e19
-    # Mass constraints in alphabetical order
     mass_constraints = {
         "C": c_kg,
         "H": h_kg,
@@ -220,7 +219,6 @@ def test_graphite_unstable() -> None:
     h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
     o_kg: float = 2.57180041062295e21
-    # Mass constraints in alphabetical order
     mass_constraints = {
         "C": c_kg,
         "H": h_kg,
@@ -291,7 +289,6 @@ def test_water_condensed_O_abundance() -> None:
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     o_kg: float = 1.14375e21
-    # Mass constraints in alphabetical order
     mass_constraints = {
         "H": h_kg,
         "O": o_kg,
@@ -354,7 +351,6 @@ def test_graphite_water_condensed() -> None:
     # Specify O, because otherwise a total pressure can give rise to different solutions (with
     # different total O), making it more difficult to compare with a known comparison case.
     o_kg: float = 2.48298883581636e21
-    # Mass constraints in alphabetical order
     mass_constraints = {
         "C": c_kg,
         "H": h_kg,
@@ -460,11 +456,56 @@ def test_H_fO2() -> None:
     oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 1.22814e21
-    # Mass constraints in alphabetical order
     mass_constraints = {
         "H": h_kg,
         "O": o_kg,
     }
+
+    # Initial solution guess number density (molecules/m^3)
+    initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)
+    initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
+    interior_atmosphere.initialise_solve(
+        planet, mass_constraints, initial_number_density, initial_stability
+    )
+    log_number_density, _ = interior_atmosphere.solve()
+    log_pressure: Array = log_pressure_from_log_number_density(
+        log_number_density, planet.surface_temperature
+    )
+    logger.debug("log_pressure = %s", log_pressure)
+
+    target: dict[str, float] = {
+        "H2O_g": 0.2570770067190733,
+        "H2_g": 0.24964688044710354,
+        "O2_g": 8.838043080858959e-08,
+    }
+
+    # FIXME: Setup test comparison
+    assert True
+
+
+# TODO: Implement buffer
+def test_H_fO2_buffer() -> None:
+    """Tests H2-H2O at the IW buffer."""
+
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data, solubility=H2O_peridotite_sossi)
+
+    species: list[Species] = [H2O_g, H2_g, O2_g]
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+
+    oceans: float = 1
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    o_kg: float = 1.22814e21
+
+    mass_constraints = {
+        "H": h_kg,
+        "O": o_kg,
+    }
+    fugacity_constraints: FugacityConstraints = FugacityConstraints.create(
+        {"O2_g": 8.838043080858959e-08}
+    )
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)
