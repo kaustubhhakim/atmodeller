@@ -34,6 +34,7 @@ from molmass import Formula
 
 from atmodeller import (
     AVOGADRO,
+    BOLTZMANN_CONSTANT_BAR,
     GRAVITATIONAL_CONSTANT,
     NUMBER_DENSITY_LOWER,
     NUMBER_DENSITY_UPPER,
@@ -310,37 +311,52 @@ class FugacityConstraints(NamedTuple):
     """Log fugacity constraints
 
     Args:
-        log_fugacity: Log fugacity
+        log_fugacity: Scaled log fugacity in bar
     """
 
     log_fugacity: dict[str, Array]
+    """Scaled log fugacity in bar"""
 
     @classmethod
-    def create(cls, fugacity: Mapping[str, ArrayLike]) -> Self:
+    def create(cls, fugacity: Mapping[str, ArrayLike], log_scaling: ArrayLike) -> Self:
         """Creates an instance
 
         Args:
-            fugacity: Mapping of a Species and fugacity constraint in any order
+            fugacity: Mapping of a species name and fugacity constraint
+            log_scaling: Log scaling for the number density
         """
-        init_dict: dict[str, Array] = {k: jnp.log(v) for k, v in fugacity.items()}
-        # FIXME: Deal with scaling somewhere
+        init_dict: dict[str, Array] = {
+            k: scale_number_density(jnp.log(v), log_scaling) for k, v in fugacity.items()
+        }
 
         return cls(init_dict)
 
-    def array(self) -> Array:
-        """Log fugacity"""
-        return jnp.array(list(self.log_fugacity.values()))
+    def array(
+        self,
+        temperature: ArrayLike,
+    ) -> Array:
+        """Scaled log number of molecules as an array
+
+        Args:
+            temperature: Temperature
+        """
+        log_fugacity: Array = jnp.array(list(self.log_fugacity.values()))
+        log_number_density: Array = (
+            log_fugacity - np.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
+        )
+
+        return log_number_density
 
 
 class MassConstraints(NamedTuple):
     """Log number of molecules constraints
 
     Args:
-        log_molecules: Log number of molecules constraints, ordered alphabetically by element
+        log_molecules: Scaled log number of molecules constraints, alphabetically by element
     """
 
     log_molecules: dict[str, ArrayLike]
-    """Log number of molecules constraints, ordered alphabetically by element name"""
+    """Scaled log number of molecules constraints"""
 
     @classmethod
     def create(cls, mass: Mapping[str, ArrayLike], log_scaling: ArrayLike) -> Self:
@@ -363,7 +379,7 @@ class MassConstraints(NamedTuple):
         return cls(log_number_of_molecules)
 
     def array(self) -> Array:
-        """Scaled log number of molecules array"""
+        """Scaled log number of molecules as an array"""
         return jnp.array(list(self.log_molecules.values()))
 
 
@@ -471,7 +487,9 @@ class FixedParameters(NamedTuple):
         species: List of species
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
+        fugacity_matrix: Fugacity constraint matrix
         gas_species_indices: Indices of gas species
+        fugacity_species_indices: Indices of species to constrain the fugacity
         O2_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
         tau: Tau factor for species stability
@@ -485,8 +503,12 @@ class FixedParameters(NamedTuple):
     """Formula matrix"""
     reaction_matrix: Array
     """Reaction matrix"""
+    fugacity_matrix: Array
+    """Fugacity constraint matrix"""
     gas_species_indices: Array
     """Indices of gas species"""
+    fugacity_species_indices: Array
+    """Indices of species to constrain the fugacity"""
     diatomic_oxygen_index: Array
     """Index of diatomic oxygen"""
     molar_masses: Array
@@ -503,14 +525,17 @@ class Parameters(NamedTuple):
     Args:
         fixed: Fixed parameters
         planet: Planet
-        constraints: Constraints
+        fugacity_constraints: Fugacity constraints
+        mass_constraints: Mass constraints
     """
 
     fixed: FixedParameters
     """Fixed parameters"""
     planet: Planet
     """Planet"""
-    constraints: MassConstraints
+    fugacity_constraints: FugacityConstraints
+    """Fugacity constraints"""
+    mass_constraints: MassConstraints
     """Mass constraints"""
 
 

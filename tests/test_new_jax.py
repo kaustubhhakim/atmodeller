@@ -94,7 +94,7 @@ def test_CHO_low_temperature() -> None:
     initial_number_density: ArrayLike = np.array([60, 60, 30, -60, 60, 30], dtype=np.float_)
     initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_solve(
-        planet, mass_constraints, initial_number_density, initial_stability
+        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
     )
     log_number_density, _ = interior_atmosphere.solve()
     log_pressure: Array = log_pressure_from_log_number_density(
@@ -154,7 +154,7 @@ def test_graphite_condensed() -> None:
     initial_number_density: ArrayLike = np.array([30, 30, 30, 30, 30, 30, 30], dtype=np.float_)
     initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_solve(
-        planet, mass_constraints, initial_number_density, initial_stability
+        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
     )
     log_number_density, _ = interior_atmosphere.solve()
     log_pressure: Array = log_pressure_from_log_number_density(
@@ -229,7 +229,7 @@ def test_graphite_unstable() -> None:
     initial_number_density: ArrayLike = np.array([30, 60, 60, 60, 60, 60, 30], dtype=np.float_)
     initial_stability: ArrayLike = -50.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_solve(
-        planet, mass_constraints, initial_number_density, initial_stability
+        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
     )
     log_number_density, _ = interior_atmosphere.solve()
     log_pressure: Array = log_pressure_from_log_number_density(
@@ -298,7 +298,7 @@ def test_water_condensed_O_abundance() -> None:
     initial_number_density: ArrayLike = np.array([30, 30, -30, 30], dtype=np.float_)
     initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_solve(
-        planet, mass_constraints, initial_number_density, initial_stability
+        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
     )
     log_number_density, _ = interior_atmosphere.solve()
     log_pressure: Array = log_pressure_from_log_number_density(
@@ -363,7 +363,7 @@ def test_graphite_water_condensed() -> None:
     )
     initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_solve(
-        planet, mass_constraints, initial_number_density, initial_stability
+        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
     )
     log_number_density, _ = interior_atmosphere.solve()
     log_pressure: Array = log_pressure_from_log_number_density(
@@ -429,6 +429,7 @@ def test_batch_planet() -> None:
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([60, 60, 60, -30, 60, 60], dtype=np.float_)
     initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density)
+    # FIXME: New constraints list
     interior_atmosphere.initialise_solve(
         planet_list, mass_constraints_list, initial_number_density, initial_stability
     )
@@ -497,21 +498,22 @@ def test_H_fO2_buffer() -> None:
 
     oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
-    o_kg: float = 1.22814e21
+    # o_kg: float = 1.22814e21
 
     mass_constraints = {
         "H": h_kg,
-        "O": o_kg,
     }
-    fugacity_constraints: FugacityConstraints = FugacityConstraints.create(
-        {O2_g.name: 8.838043080858959e-08}
-    )
+    fugacity_constraints = {O2_g.name: 8.838043080858959e-08}
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)
     initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_solve(
-        planet, mass_constraints, initial_number_density, initial_stability
+        planet,
+        initial_number_density,
+        initial_stability,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
     )
     log_number_density, _ = interior_atmosphere.solve()
     log_pressure: Array = log_pressure_from_log_number_density(

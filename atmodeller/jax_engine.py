@@ -28,6 +28,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.jax_containers import (
+    FugacityConstraints,
     MassConstraints,
     Parameters,
     Planet,
@@ -129,10 +130,13 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     """
     formula_matrix: Array = parameters.fixed.formula_matrix
     reaction_matrix: Array = parameters.fixed.reaction_matrix
+    fugacity_matrix: Array = parameters.fixed.fugacity_matrix
     gas_species_indices: Array = parameters.fixed.gas_species_indices
+    fugacity_species_indices: Array = parameters.fixed.fugacity_species_indices
     molar_masses: Array = parameters.fixed.molar_masses
     planet: Planet = parameters.planet
-    constraints: MassConstraints = parameters.constraints
+    fugacity_constraints: FugacityConstraints = parameters.fugacity_constraints
+    mass_constraints: MassConstraints = parameters.mass_constraints
     species: list[Species] = parameters.fixed.species
     temperature: ArrayLike = planet.surface_temperature
     log_scaling: float = parameters.fixed.log_scaling
@@ -163,6 +167,12 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(log_stability))
     # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
+    # Fugacity constraints
+    fugacity_log_activity: Array = jnp.take(log_activity, fugacity_species_indices)
+    fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity)
+    fugacity_residual = fugacity_residual - fugacity_constraints.array(temperature)
+    # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+
     # Mass balance residual for elements
 
     # Number density of elements in the condensed or gas phase
@@ -171,18 +181,20 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     element_melt_density: Array = element_density_in_melt(parameters, pressure, log_volume)
     log_element_density: Array = jnp.log(element_density + element_melt_density)
 
-    mass_residual = log_element_density - (constraints.array() - log_volume)
+    mass_residual = log_element_density - (mass_constraints.array() - log_volume)
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
     # Stability residual
     # Get minimum scaled log number of molecules
     log_min_number_density: Array = (
-        jnp.min(constraints.array()) - log_volume - jnp.log(parameters.fixed.tau)
+        jnp.min(mass_constraints.array()) - log_volume - jnp.log(parameters.fixed.tau)
     )
     stability_residual: Array = log_number_density + log_stability - log_min_number_density
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
 
-    residual: Array = jnp.concatenate((reaction_residual, mass_residual, stability_residual))
+    residual: Array = jnp.concatenate(
+        (reaction_residual, fugacity_residual, mass_residual, stability_residual)
+    )
     # jax.debug.print("residual = {out}", out=residual)
 
     return residual
@@ -393,8 +405,8 @@ def get_log_Kp(species: list[Species], reaction_matrix: Array, temperature: Arra
         gibbs: ArrayLike = get_gibbs_over_RT(species_.data.thermodata, temperature)
         gibbs_list.append(gibbs)
 
-    gibbs_array: Array = jnp.array(gibbs_list)
-    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_array)
+    gibbs_jnp: Array = jnp.array(gibbs_list)
+    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_jnp)
 
     return log_Kp
 

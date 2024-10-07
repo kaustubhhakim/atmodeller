@@ -33,6 +33,7 @@ from jax import Array
 from atmodeller import TAU
 from atmodeller.jax_containers import (
     FixedParameters,
+    FugacityConstraints,
     MassConstraints,
     Parameters,
     Planet,
@@ -125,36 +126,50 @@ class InteriorAtmosphereABC(ABC):
         # that may depend on fO2.
         return 0
 
-    def get_fixed_parameters(self, mass_constraints: MassConstraints) -> FixedParameters:
+    def get_fixed_parameters(
+        self, fugacity_constraints: FugacityConstraints, mass_constraints: MassConstraints
+    ) -> FixedParameters:
         """Gets fixed parameters.
 
         Args:
+            fugacity_constraints: Fugacity constraints
             mass_constraints: Mass constraints
 
         Returns:
             Fixed parameters
         """
-        formula_matrix_np: npt.NDArray[np.int_] = self.get_formula_matrix()
-
-        # Only need the formula matrix rows for elements that are constrained by mass constraints
-        unique_elements: list[str] = self.get_unique_elements_in_species()
-        indices: list[int] = []
-        for element in mass_constraints.log_molecules.keys():
-            index: int = unique_elements.index(element)
-            indices.append(index)
-
-        formula_matrix_np = formula_matrix_np[indices, :]
-        formula_matrix: Array = jnp.array(formula_matrix_np)
         reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
         gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
         molar_masses: Array = jnp.array(self.get_molar_masses())
         diatomic_oxygen_index: Array = jnp.array(self.get_diatomic_oxygen_index())
 
+        # Formula matrix rows for elements that are constrained by mass constraints
+        formula_matrix_np: npt.NDArray[np.int_] = self.get_formula_matrix()
+        unique_elements: list[str] = self.get_unique_elements_in_species()
+        indices: list[int] = []
+        for element in mass_constraints.log_molecules.keys():
+            index: int = unique_elements.index(element)
+            indices.append(index)
+        formula_matrix_np = formula_matrix_np[indices, :]
+        formula_matrix: Array = jnp.array(formula_matrix_np)
+
+        # Fugacity constraint matrix and indices
+        number_fugacity_constraints: int = len(fugacity_constraints.log_fugacity)
+        fugacity_species_indices: list[int] = []
+        species_names: list[str] = self.get_species_names()
+        for species_name in fugacity_constraints.log_fugacity.keys():
+            index: int = species_names.index(species_name)
+            fugacity_species_indices.append(index)
+        fugacity_matrix: Array = jnp.array(np.identity(number_fugacity_constraints))
+        fugacity_species_indices_jnp = jnp.array(fugacity_species_indices)
+
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=formula_matrix,
             reaction_matrix=reaction_matrix,
+            fugacity_matrix=fugacity_matrix,
             gas_species_indices=gas_species_indices,
+            fugacity_species_indices=fugacity_species_indices_jnp,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
             tau=self.tau,
@@ -322,6 +337,14 @@ class InteriorAtmosphereABC(ABC):
 
         return reactions
 
+    def get_species_names(self) -> list[str]:
+        """Gets the names of all species
+
+        Returns:
+            Species names
+        """
+        return [species_.name for species_ in self.species]
+
 
 class InteriorAtmosphere(InteriorAtmosphereABC):
     """Interior atmosphere single system
@@ -336,22 +359,43 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
     def initialise_solve(
         self,
         planet: Planet,
-        mass_constraints: dict[str, float],
         initial_number_density: npt.NDArray[np.float_],
         initial_stability: npt.NDArray[np.float_],
+        fugacity_constraints: dict[str, float] | None = None,
+        mass_constraints: dict[str, float] | None = None,
     ) -> None:
         """Initialises the solve.
 
         Args:
             planet: Planet
-            mass_constraints: Mass constraints
             initial_number_density: Initial number density
             initial_stability: Initial stability
+            fugacity_constraints: Fugacity constraints. Defaults to None.
+            mass_constraints: Mass constraints. Defaults to None.
         """
         logger.debug("planet = %s", planet)
-        constraints: MassConstraints = MassConstraints.create(mass_constraints, self.log_scaling)
-        logger.debug("constraints = %s", constraints)
-        self.fixed: FixedParameters = self.get_fixed_parameters(constraints)
+
+        if fugacity_constraints is None:
+            init_fugacity_constraints: dict[str, float] = {}
+        else:
+            init_fugacity_constraints = fugacity_constraints
+        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
+            init_fugacity_constraints, self.log_scaling
+        )
+        logger.debug("fugacity_constraints = %s", fugacity_constraints_)
+
+        if mass_constraints is None:
+            init_mass_constraints: dict[str, float] = {}
+        else:
+            init_mass_constraints = mass_constraints
+        mass_constraints_: MassConstraints = MassConstraints.create(
+            init_mass_constraints, self.log_scaling
+        )
+        logger.debug("mass_constraints = %s", mass_constraints_)
+
+        self.fixed: FixedParameters = self.get_fixed_parameters(
+            fugacity_constraints_, mass_constraints_
+        )
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
@@ -359,7 +403,8 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
         self.parameters: Parameters = Parameters(
             fixed=self.fixed,
             planet=planet,
-            constraints=constraints,
+            fugacity_constraints=fugacity_constraints_,
+            mass_constraints=mass_constraints_,
         )
         logger.debug("parameters = %s", self.parameters)
         self._solver: Callable = self.get_solver()
