@@ -59,6 +59,7 @@ class InteriorAtmosphere:
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
         )
+        self.batch: bool = False
         logger.info("reactions = %s", pprint.pformat(self.reactions()))
 
     def initialise_single(
@@ -78,6 +79,7 @@ class InteriorAtmosphere:
             initial_stability: Initial stability
             tau: Tau factor for species stability. Defaults to TAU.
         """
+        self.batch = False
         logger.debug("planet = %s", planet)
         constraints: Constraints = Constraints.create(
             self.species, mass_constraints, self.log_scaling
@@ -138,6 +140,7 @@ class InteriorAtmosphere:
             initial_stability: Initial stability
             tau: Tau factor for species stability
         """
+        self.batch = True
         # Stack the planets and mass constraints into pytrees
         planets_batch = pytrees_stack(planet_list)
         mass_constraints_batch = self.stack_mass_constraints(mass_constraints_list)
@@ -155,14 +158,14 @@ class InteriorAtmosphere:
         )
         # Define the structures to vectorize.
         constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)  # type: ignore
-        parameters_vmap: Parameters = Parameters(
+        self.parameters_vmap: Parameters = Parameters(
             fixed=None,  # type: ignore
             planet=0,  # type: ignore
             constraints=constraints_vmap,  # type: ignore
         )
 
         self._solve: Callable = jax.jit(
-            jax.vmap(self.get_jit_solver(), in_axes=(None, parameters_vmap))
+            jax.vmap(self.get_jit_solver(), in_axes=(None, self.parameters_vmap))
         )
         start_time = time.time()
         self._solve(self.initial_solution, self.parameters).block_until_ready()
@@ -356,12 +359,20 @@ class InteriorAtmosphere:
         )
         number_density_numpy: npt.NDArray[np.float_] = np.array(unscaled_number_density)
         logger.info("log_number_density = %s", number_density_numpy)
-        extended_activity: Array = get_log_extended_activity(
-            self.parameters,
-            unscaled_number_density,
-            stability,
-        )
+        if self.batch:
+            vmap_get_log_extended_activity: Callable = jax.vmap(
+                get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0)
+            )
+            extended_activity: Array = vmap_get_log_extended_activity(
+                self.parameters, scaled_number_density, stability
+            )
+        else:
+            extended_activity = get_log_extended_activity(
+                self.parameters,
+                unscaled_number_density,
+                stability,
+            )
         extended_activity_numpy: npt.NDArray[np.float_] = np.array(extended_activity)
-        logger.info("log_activity = %s", extended_activity_numpy)
+        logger.info("extended_activity = %s", jnp.exp(extended_activity_numpy))
 
         return number_density_numpy, extended_activity_numpy

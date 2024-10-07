@@ -30,6 +30,7 @@ Pref: float = 1.0
 """Standard state pressure in bar"""
 
 
+# For all activity models recall that the log_number_density argument is scaled
 class ActivityProtocol(Protocol):
 
     def log_activity(

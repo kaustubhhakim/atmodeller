@@ -117,30 +117,6 @@ def get_log_reaction_equilibrium_constant(
 
 
 @jit
-def get_log_extended_activity(
-    parameters: Parameters,
-    log_number_density: Array,
-    log_stability: Array,
-) -> Array:
-    """Log extended activity
-
-    Args:
-        parameters: Parameters
-        log_number_density: Log number density
-        log_stability: Log stability
-
-    Returns:
-        Log extended activity
-    """
-    log_extended_activity: Array = get_log_activity(parameters, log_number_density) - jnp.exp(
-        log_stability
-    )
-    # jax.debug.print("log_extended_activity = {out}", out=log_extended_activity)
-
-    return log_extended_activity
-
-
-@jit
 def objective_function(solution: Array, parameters: Parameters) -> Array:
     """Residual of the reaction network and mass balance
 
@@ -251,6 +227,30 @@ def get_log_activity(parameters: Parameters, log_number_density: Array) -> Array
     )
 
     return log_activity
+
+
+@jit
+def get_log_extended_activity(
+    parameters: Parameters,
+    log_number_density: Array,
+    log_stability: Array,
+) -> Array:
+    """Log extended activity
+
+    Args:
+        parameters: Parameters
+        log_number_density: Log number density
+        log_stability: Log stability
+
+    Returns:
+        Log extended activity
+    """
+    log_extended_activity: Array = get_log_activity(parameters, log_number_density) - jnp.exp(
+        log_stability
+    )
+    # jax.debug.print("log_extended_activity = {out}", out=log_extended_activity)
+
+    return log_extended_activity
 
 
 @jit
