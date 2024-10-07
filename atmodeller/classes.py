@@ -18,7 +18,9 @@
 
 import logging
 import pprint
+import sys
 import time
+from abc import ABC, abstractmethod
 from collections.abc import KeysView
 from typing import Callable
 
@@ -42,142 +44,89 @@ from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import pytrees_stack, unscale_number_density
 from atmodeller.utilities import partial_rref, unique_elements_in_species2
 
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class InteriorAtmosphere:
-    """Interior atmosphere system
+class InteriorAtmosphereABC(ABC):
+    """Interior atmosphere base
 
     Args:
-        species: A list of species
+        species: List of species
         log_scaling: Log scaling for the numerical solution
+        tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    def __init__(self, species: list[Species], log_scaling: float):
+    # Attributes that are set later are included for typing
+    initial_solution: Solution
+    parameters: Parameters
+    _solver: Callable
+
+    def __init__(self, species: list[Species], log_scaling: float, tau: float = TAU):
         self.species: list[Species] = species
         self.log_scaling: float = log_scaling
+        self.tau: float = tau
+        self.fixed: FixedParameters = self.get_fixed_parameters()
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
         )
-        self.batch: bool = False
-        logger.info("reactions = %s", pprint.pformat(self.reactions()))
+        logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
-    def initialise_single(
-        self,
-        planet: Planet,
-        mass_constraints: dict[str, float],
-        initial_number_density: npt.NDArray[np.float_],
-        initial_stability: npt.NDArray[np.float_],
-        tau: float = TAU,
-    ) -> None:
-        """Initialises the solution for a single system
+    @abstractmethod
+    def initialise_solve(self, *args, **kwargs) -> None:
+        """Initialises the solve."""
+        del args
+        del kwargs
 
-        Args:
-            planet: Planet
-            mass_constraints: Mass constraints
-            initial_number_density: Initial number density
-            initial_stability: Initial stability
-            tau: Tau factor for species stability. Defaults to TAU.
-        """
-        self.batch = False
-        logger.debug("planet = %s", planet)
-        constraints: Constraints = Constraints.create(
-            self.species, mass_constraints, self.log_scaling
-        )
-        logger.debug("constraints = %s", constraints)
-        self.initial_solution: Solution = Solution.create(
-            initial_number_density, initial_stability, self.log_scaling
-        )
-        logger.debug("initial_solution = %s", self.initial_solution)
-        fixed: FixedParameters = self.get_fixed_parameters(tau)
-        self.parameters: Parameters = Parameters(
-            fixed=fixed,
-            planet=planet,
-            constraints=constraints,
-        )
+    @abstractmethod
+    def get_solver(self, *args, **kwargs) -> Callable:
+        """Gets the solver."""
+        del args
+        del kwargs
 
-        start_time = time.time()
-        self._solve: Callable = self.get_jit_solver()
-        self._solve(self.initial_solution, self.parameters).block_until_ready()
-        end_time = time.time()
-        compile_time = end_time - start_time
-        logger.info("Compile time: %.6f seconds", compile_time)
+    @abstractmethod
+    def solve(self, *args, **kwargs) -> Callable:
+        """Solves the system with processing"""
+        del args
+        del kwargs
 
-    def stack_mass_constraints(
-        self, mass_constraints_list: list[dict[str, float]]
-    ) -> dict[str, Array]:
-        """Stacks the mass constraints into a pytree
-
-        Args:
-            mass_constraints_list: A list of mass constraints
+    def solve_raw_output(self) -> Array:
+        """Solves the system and returns the raw (unprocessed) solution
 
         Returns:
-            A pytree of mass constraints
+            Solution
         """
-
-        stacked_mass_constraints: dict[str, Array] = {}
-        keys: KeysView[str] = mass_constraints_list[0].keys()
-
-        for key in keys:
-            stacked_mass_constraints[key] = jnp.array([d[key] for d in mass_constraints_list])
-
-        return stacked_mass_constraints
-
-    def initialise_batch(
-        self,
-        planet_list: list[Planet],
-        mass_constraints_list: list[dict[str, float]],
-        initial_number_density: npt.NDArray[np.float_],
-        initial_stability: npt.NDArray[np.float_],
-        tau: float = TAU,
-    ) -> None:
-        """Initialises a solve for a batch system
-
-        Args:
-            planet_list: A list of planets
-            mass_constraints_list: A list of mass constraints
-            initial_number_density: Initial number density
-            initial_stability: Initial stability
-            tau: Tau factor for species stability
-        """
-        self.batch = True
-        # Stack the planets and mass constraints into pytrees
-        planets_batch = pytrees_stack(planet_list)
-        mass_constraints_batch = self.stack_mass_constraints(mass_constraints_list)
-        constraints: Constraints = Constraints.create(
-            self.species, mass_constraints_batch, self.log_scaling
-        )
-        self.initial_solution: Solution = Solution.create(
-            initial_number_density, initial_stability, self.log_scaling
-        )
-        fixed: FixedParameters = self.get_fixed_parameters(tau)
-        self.parameters: Parameters = Parameters(
-            fixed=fixed,
-            planet=planets_batch,
-            constraints=constraints,
-        )
-        # Define the structures to vectorize.
-        constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)  # type: ignore
-        self.parameters_vmap: Parameters = Parameters(
-            fixed=None,  # type: ignore
-            planet=0,  # type: ignore
-            constraints=constraints_vmap,  # type: ignore
-        )
-
-        self._solve: Callable = jax.jit(
-            jax.vmap(self.get_jit_solver(), in_axes=(None, self.parameters_vmap))
-        )
         start_time = time.time()
-        self._solve(self.initial_solution, self.parameters).block_until_ready()
+        out: Array = self._solver(self.initial_solution, self.parameters).block_until_ready()
         end_time = time.time()
-        compile_time = end_time - start_time
-        logger.info("Compile time: %.6f seconds", compile_time)
+        execution_time = end_time - start_time
+        logger.info("Execution time: %.6f seconds", execution_time)
+        logger.debug("out = %s", out)
 
-    def get_fixed_parameters(self, tau: float = TAU) -> FixedParameters:
-        """Gets fixed parameters
+        return out
 
-        Args:
-            tau: Tau factor for species stability. Defaults to TAU.
+    def get_diatomic_oxygen_index(self) -> int:
+        """Gets the species index corresponding to diatomic oxygen.
+
+        Returns:
+            Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
+        """
+        for nn, species_ in enumerate(self.species):
+            if species_.data.hill_formula == "O2":
+                logger.info("Found O2 at index = %d", nn)
+                return nn
+
+        # TODO: Bad practice to return the first index because it could be wrong and therefore give
+        # rise to spurious results, but an index must be passed to evaluate the species solubility
+        # that may depend on fO2.
+        return 0
+
+    def get_fixed_parameters(self) -> FixedParameters:
+        """Gets fixed parameters.
 
         Returns:
             Fixed parameters
@@ -195,65 +144,20 @@ class InteriorAtmosphere:
             gas_species_indices=gas_species_indices,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
-            tau=tau,
+            tau=self.tau,
             log_scaling=self.log_scaling,
         )
 
         return fixed_parameters
 
-    def get_diatomic_oxygen_index(self) -> int:
-        """Gets the species index corresponding to diatomic oxygen
-
-        Returns:
-            Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
-        """
-        for nn, species_ in enumerate(self.species):
-            if species_.data.hill_formula == "O2":
-                logger.info("Found O2 at index = %d", nn)
-                return nn
-
-        # TODO: Bad practice to return the first index because it could be wrong and therefore give
-        # rise to spurious results, but an index must be passed to evaluate the species solubility
-        # that may depend on fO2.
-        return 0
-
-    def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
-        """Gets the indices of gas species
-
-        Returns:
-            Indices of the gas species
-        """
-        indices: list[int] = []
-        for nn, species_ in enumerate(self.species):
-            if species_.data.phase == "g":
-                indices.append(nn)
-
-        return np.array(indices)
-
-    def get_molar_masses(self) -> npt.NDArray[np.float_]:
-        """Gets the molar masses of all species
-
-        Returns:
-            Molar masses of all species
-        """
-        molar_masses: npt.NDArray[np.float_] = np.array(
-            [species_.data.molar_mass for species_ in self.species]
-        )
-        logger.debug("molar_masses = %s", molar_masses)
-
-        return molar_masses
-
     def get_formula_matrix(self) -> npt.NDArray[np.int_]:
-        """Gets the formula matrix
+        """Gets the formula matrix.
 
         Elements are given in rows and species in columns following the convention in
         :cite:t:`LKS17`.
 
-        Args:
-            species: A list of species
-
         Returns:
-            The formula matrix
+            Formula matrix
         """
         unique_elements: tuple[str, ...] = unique_elements_in_species2(self.species)
         formula_matrix: npt.NDArray[np.int_] = np.zeros(
@@ -273,11 +177,75 @@ class InteriorAtmosphere:
 
         return formula_matrix
 
-    def get_reaction_matrix(self) -> npt.NDArray[np.float_]:
-        """Gets the reaction matrix
+    def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
+        """Gets the indices of gas species
+
+        Returns:
+            Indices of the gas species
+        """
+        indices: list[int] = []
+        for nn, species_ in enumerate(self.species):
+            if species_.data.phase == "g":
+                indices.append(nn)
+
+        return np.array(indices)
+
+    def get_wrapped_jit_solver(self) -> Callable:
+        """Gets the jit solver with solver parameters set.
+
+        Returns:
+            jit solver with solver parameters set
+        """
+
+        def wrapped_jit_solver(solution: Solution, parameters: Parameters) -> Callable:
+            return solve(solution, parameters, self.solver_parameters)
+
+        return wrapped_jit_solver
+
+    def get_molar_masses(self) -> npt.NDArray[np.float_]:
+        """Gets the molar masses of all species.
+
+        Returns:
+            Molar masses of all species
+        """
+        molar_masses: npt.NDArray[np.float_] = np.array(
+            [species_.data.molar_mass for species_ in self.species]
+        )
+        logger.debug("molar_masses = %s", molar_masses)
+
+        return molar_masses
+
+    def get_processed_output(
+        self, raw_out: Array, axis: int, extended_activity_func: Callable
+    ) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
+        """Gets processed output
 
         Args:
-            species: A list of species
+            raw_out: Raw output from the solver
+            axis: Axis along which to separate the number density from stability
+            extended_activity_func: Function to evaluate the extended activity
+
+        Returns:
+            Number density, extended activity
+        """
+        scaled_number_density, stability = jnp.split(raw_out, 2, axis=axis)
+        unscaled_number_density: Array = unscale_number_density(
+            scaled_number_density, self.log_scaling
+        )
+        number_density_numpy: npt.NDArray[np.float_] = np.array(unscaled_number_density)
+        logger.info("log_number_density = %s", number_density_numpy)
+        extended_activity: Array = extended_activity_func(
+            self.parameters,
+            unscaled_number_density,
+            stability,
+        )
+        extended_activity_numpy: npt.NDArray[np.float_] = np.array(extended_activity)
+        logger.info("log_extended_activity = %s", extended_activity_numpy)
+
+        return number_density_numpy, extended_activity_numpy
+
+    def get_reaction_matrix(self) -> npt.NDArray[np.float_]:
+        """Gets the reaction matrix.
 
         Returns:
             A matrix of linearly independent reactions or None # TODO: Still return None?
@@ -290,28 +258,12 @@ class InteriorAtmosphere:
         transpose_formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix().T
         reaction_matrix: npt.NDArray[np.float_] = partial_rref(transpose_formula_matrix)
 
-        # logger.debug("species = %s", species)
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
 
-    def get_jit_solver(self) -> Callable:
-        """Gets the jit solver
-
-        Returns:
-            The jit solver with solver parameters set
-        """
-
-        def wrapped_jit_solver(solution: Solution, parameters: Parameters) -> Callable:
-            return solve(solution, parameters, self.solver_parameters)
-
-        return wrapped_jit_solver
-
-    def reactions(self) -> dict[int, str]:
-        """The reactions as a dictionary
-
-        Args:
-            species: A list of species
+    def get_reaction_dictionary(self) -> dict[int, str]:
+        """Gets reactions as a dictionary.
 
         Returns:
             Reactions as a dictionary
@@ -338,41 +290,185 @@ class InteriorAtmosphere:
 
         return reactions
 
-    def solve(self) -> tuple[npt.NDArray[np.float_], ...]:
+
+class InteriorAtmosphere(InteriorAtmosphereABC):
+    """Interior atmosphere single system
+
+    Args:
+        species: List of species
+        log_scaling: Log scaling for the numerical solution
+        tau: Tau factor for species stability. Defaults to TAU.
+    """
+
+    @override
+    def initialise_solve(
+        self,
+        planet: Planet,
+        mass_constraints: dict[str, float],
+        initial_number_density: npt.NDArray[np.float_],
+        initial_stability: npt.NDArray[np.float_],
+    ) -> None:
+        """Initialises the solve.
+
+        Args:
+            planet: Planet
+            mass_constraints: Mass constraints
+            initial_number_density: Initial number density
+            initial_stability: Initial stability
+        """
+        logger.debug("planet = %s", planet)
+        constraints: Constraints = Constraints.create(
+            self.species, mass_constraints, self.log_scaling
+        )
+        logger.debug("constraints = %s", constraints)
+        self.initial_solution: Solution = Solution.create(
+            initial_number_density, initial_stability, self.log_scaling
+        )
+        logger.debug("initial_solution = %s", self.initial_solution)
+        self.parameters: Parameters = Parameters(
+            fixed=self.fixed,
+            planet=planet,
+            constraints=constraints,
+        )
+        logger.debug("parameters = %s", self.parameters)
+        self._solver: Callable = self.get_solver()
+
+    @override
+    def get_solver(self) -> Callable:
+        return self.get_wrapped_jit_solver()
+
+    @override
+    def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
         """Solves the system.
 
         Returns:
             Number density, extended activity
         """
-        start_time = time.time()
-        out: Array = self._solve(self.initial_solution, self.parameters).block_until_ready()
-        end_time = time.time()
-        execution_time = end_time - start_time
-        logger.info("Execution time: %.6f seconds", execution_time)
-        logger.debug("out = %s", out)
-
-        # Split the array into two arrays along the middle column
-        axis: int = 0 if out.ndim == 1 else 1
-        scaled_number_density, stability = jnp.split(out, 2, axis=axis)
-        unscaled_number_density: Array = unscale_number_density(
-            scaled_number_density, self.log_scaling
+        out: Array = self.solve_raw_output()
+        number_density_numpy, extended_activity_numpy = self.get_processed_output(
+            out, axis=0, extended_activity_func=get_log_extended_activity
         )
-        number_density_numpy: npt.NDArray[np.float_] = np.array(unscaled_number_density)
-        logger.info("log_number_density = %s", number_density_numpy)
-        if self.batch:
-            vmap_get_log_extended_activity: Callable = jax.vmap(
-                get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0)
-            )
-            extended_activity: Array = vmap_get_log_extended_activity(
-                self.parameters, scaled_number_density, stability
-            )
-        else:
-            extended_activity = get_log_extended_activity(
-                self.parameters,
-                unscaled_number_density,
-                stability,
-            )
-        extended_activity_numpy: npt.NDArray[np.float_] = np.array(extended_activity)
-        logger.info("extended_activity = %s", jnp.exp(extended_activity_numpy))
+
+        return number_density_numpy, extended_activity_numpy
+
+
+class InteriorAtmosphereBatch(InteriorAtmosphereABC):
+    """Interior atmosphere batch system
+
+    Args:
+        species: A list of species
+        log_scaling: Log scaling for the numerical solution
+        tau: Tau factor for species stability. Defaults to TAU.
+    """
+
+    # For typing
+    constraints_vmap: Constraints
+    parameters_vmap: Parameters
+
+    @override
+    def initialise_solve(
+        self,
+        planet_list: list[Planet],
+        mass_constraints_list: list[dict[str, float]],
+        initial_number_density: npt.NDArray[np.float_],
+        initial_stability: npt.NDArray[np.float_],
+    ) -> None:
+        """Initialises the solve.
+
+        Args:
+            planet_list: List of planets
+            mass_constraints_list: List of mass constraints
+            initial_number_density: Initial number density
+            initial_stability: Initial stability
+        """
+        planets_pytree: Planet = self._get_planets_pytree(planet_list)
+        logger.debug("planets_pytree = %s", planets_pytree)
+        mass_constraints_pytree = self._get_mass_constraints_pytree(mass_constraints_list)
+        logger.debug("mass_constraints_pytree = %s", mass_constraints_pytree)
+        constraints: Constraints = Constraints.create(
+            self.species, mass_constraints_pytree, self.log_scaling
+        )
+        logger.debug("constraints = %s", constraints)
+        self.initial_solution: Solution = Solution.create(
+            initial_number_density, initial_stability, self.log_scaling
+        )
+        logger.debug("initial_solution = %s", self.initial_solution)
+        self.parameters: Parameters = Parameters(
+            fixed=self.fixed,
+            planet=planets_pytree,
+            constraints=constraints,
+        )
+        logger.debug("parameters = %s", self.parameters)
+        self._solver: Callable = self.get_solver()
+
+        # Compile
+        start_time = time.time()
+        # self._solver is callable so pylint: disable=not-callable
+        self._solver(self.initial_solution, self.parameters).block_until_ready()
+        end_time = time.time()
+        compile_time = end_time - start_time
+        logger.info("Compile time: %.6f seconds", compile_time)
+
+    @override
+    def get_solver(self) -> Callable:
+        # Define the structures to vectorize.
+        self.constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)  # type: ignore
+        self.parameters_vmap: Parameters = Parameters(
+            fixed=None,  # type: ignore
+            planet=0,  # type: ignore
+            constraints=self.constraints_vmap,  # type: ignore
+        )
+        solver: Callable = jax.jit(
+            jax.vmap(self.get_wrapped_jit_solver(), in_axes=(None, self.parameters_vmap))
+        )
+
+        return solver
+
+    def _get_planets_pytree(self, planets: list[Planet]) -> Planet:
+        """Gets planets as a pytree.
+
+        Args:
+            planets: List of planets
+
+        Returns:
+            Planets as a pytree
+        """
+        planets_pytree: Planet = pytrees_stack(planets)
+
+        return planets_pytree
+
+    def _get_mass_constraints_pytree(
+        self, mass_constraints_list: list[dict[str, float]]
+    ) -> dict[str, Array]:
+        """Gets mass constraints as a pytree
+
+        Args:
+            mass_constraints_list: List of mass constraints
+
+        Returns:
+            Mass constraints as a pytree
+        """
+        stacked_mass_constraints: dict[str, Array] = {}
+        keys: KeysView[str] = mass_constraints_list[0].keys()
+
+        for key in keys:
+            stacked_mass_constraints[key] = jnp.array([d[key] for d in mass_constraints_list])
+
+        return stacked_mass_constraints
+
+    def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
+        """Solves the system.
+
+        Returns:
+            Number density, extended activity
+        """
+        out: Array = self.solve_raw_output()
+        # Must vmap the function to enable it to be used in batch mode.
+        vmap_get_log_extended_activity: Callable = jax.vmap(
+            get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0)
+        )
+        number_density_numpy, extended_activity_numpy = self.get_processed_output(
+            out, axis=1, extended_activity_func=vmap_get_log_extended_activity
+        )
 
         return number_density_numpy, extended_activity_numpy
