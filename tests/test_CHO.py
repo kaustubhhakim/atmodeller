@@ -128,6 +128,8 @@ def test_H_fO2(helper) -> None:
         "O2_g": 8.838043080858959e-08,
     }
 
+    interior_atmosphere.output(to_excel=True)
+
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 

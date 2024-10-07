@@ -28,7 +28,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.jax_containers import (
-    Constraints,
+    MassConstraints,
     Parameters,
     Planet,
     Solution,
@@ -132,7 +132,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     gas_species_indices: Array = parameters.fixed.gas_species_indices
     molar_masses: Array = parameters.fixed.molar_masses
     planet: Planet = parameters.planet
-    constraints: Constraints = parameters.constraints
+    constraints: MassConstraints = parameters.constraints
     species: list[Species] = parameters.fixed.species
     temperature: ArrayLike = planet.surface_temperature
     log_scaling: float = parameters.fixed.log_scaling

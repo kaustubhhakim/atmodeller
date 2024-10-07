@@ -32,8 +32,8 @@ from jax import Array
 
 from atmodeller import TAU
 from atmodeller.jax_containers import (
-    Constraints,
     FixedParameters,
+    MassConstraints,
     Parameters,
     Planet,
     Solution,
@@ -42,7 +42,7 @@ from atmodeller.jax_containers import (
 )
 from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import pytrees_stack, unscale_number_density
-from atmodeller.utilities import partial_rref, unique_elements_in_species2
+from atmodeller.utilities import partial_rref
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -61,7 +61,8 @@ class InteriorAtmosphereABC(ABC):
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    # Attributes that are set later are included for typing
+    # Attributes that are set during initialise_solve are included for typing
+    fixed: FixedParameters
     initial_solution: Solution
     parameters: Parameters
     _solver: Callable
@@ -70,7 +71,6 @@ class InteriorAtmosphereABC(ABC):
         self.species: list[Species] = species
         self.log_scaling: float = log_scaling
         self.tau: float = tau
-        self.fixed: FixedParameters = self.get_fixed_parameters()
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
         )
@@ -125,13 +125,26 @@ class InteriorAtmosphereABC(ABC):
         # that may depend on fO2.
         return 0
 
-    def get_fixed_parameters(self) -> FixedParameters:
+    def get_fixed_parameters(self, mass_constraints: MassConstraints) -> FixedParameters:
         """Gets fixed parameters.
+
+        Args:
+            mass_constraints: Mass constraints
 
         Returns:
             Fixed parameters
         """
-        formula_matrix: Array = jnp.array(self.get_formula_matrix())
+        formula_matrix_np: npt.NDArray[np.int_] = self.get_formula_matrix()
+
+        # Only need the formula matrix rows for elements that are constrained by mass constraints
+        unique_elements: list[str] = self.get_unique_elements_in_species()
+        indices: list[int] = []
+        for element in mass_constraints.log_molecules.keys():
+            index: int = unique_elements.index(element)
+            indices.append(index)
+
+        formula_matrix_np = formula_matrix_np[indices, :]
+        formula_matrix: Array = jnp.array(formula_matrix_np)
         reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
         gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
         molar_masses: Array = jnp.array(self.get_molar_masses())
@@ -159,7 +172,7 @@ class InteriorAtmosphereABC(ABC):
         Returns:
             Formula matrix
         """
-        unique_elements: tuple[str, ...] = unique_elements_in_species2(self.species)
+        unique_elements: list[str] = self.get_unique_elements_in_species()
         formula_matrix: npt.NDArray[np.int_] = np.zeros(
             (len(unique_elements), len(self.species)), dtype=jnp.int_
         )
@@ -189,6 +202,25 @@ class InteriorAtmosphereABC(ABC):
                 indices.append(nn)
 
         return np.array(indices)
+
+    def get_unique_elements_in_species(self) -> list[str]:
+        """Gets unique elements
+
+        Args:
+            species: A list of species
+
+        Returns:
+            Unique elements in the species ordered alphabetically
+        """
+        elements: list[str] = []
+        for species_ in self.species:
+            elements.extend(species_.data.elements)
+        unique_elements: list[str] = list(set(elements))
+        sorted_elements: list[str] = sorted(unique_elements)
+
+        logger.debug("unique_elements_in_species = %s", sorted_elements)
+
+        return sorted_elements
 
     def get_wrapped_jit_solver(self) -> Callable:
         """Gets the jit solver with solver parameters set.
@@ -232,17 +264,17 @@ class InteriorAtmosphereABC(ABC):
         unscaled_number_density: Array = unscale_number_density(
             scaled_number_density, self.log_scaling
         )
-        number_density_numpy: npt.NDArray[np.float_] = np.array(unscaled_number_density)
-        logger.info("log_number_density = %s", number_density_numpy)
+        number_density_np: npt.NDArray[np.float_] = np.array(unscaled_number_density)
+        logger.info("log_number_density = %s", number_density_np)
         extended_activity: Array = extended_activity_func(
             self.parameters,
             unscaled_number_density,
             stability,
         )
-        extended_activity_numpy: npt.NDArray[np.float_] = np.array(extended_activity)
-        logger.info("log_extended_activity = %s", extended_activity_numpy)
+        extended_activity_np: npt.NDArray[np.float_] = np.array(extended_activity)
+        logger.info("log_extended_activity = %s", extended_activity_np)
 
-        return number_density_numpy, extended_activity_numpy
+        return number_density_np, extended_activity_np
 
     def get_reaction_matrix(self) -> npt.NDArray[np.float_]:
         """Gets the reaction matrix.
@@ -317,10 +349,9 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
             initial_stability: Initial stability
         """
         logger.debug("planet = %s", planet)
-        constraints: Constraints = Constraints.create(
-            self.species, mass_constraints, self.log_scaling
-        )
+        constraints: MassConstraints = MassConstraints.create(mass_constraints, self.log_scaling)
         logger.debug("constraints = %s", constraints)
+        self.fixed: FixedParameters = self.get_fixed_parameters(constraints)
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
@@ -345,11 +376,11 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
             Number density, extended activity
         """
         out: Array = self.solve_raw_output()
-        number_density_numpy, extended_activity_numpy = self.get_processed_output(
+        number_density_np, extended_activity_np = self.get_processed_output(
             out, axis=0, extended_activity_func=get_log_extended_activity
         )
 
-        return number_density_numpy, extended_activity_numpy
+        return number_density_np, extended_activity_np
 
 
 class InteriorAtmosphereBatch(InteriorAtmosphereABC):
@@ -362,7 +393,7 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
     """
 
     # For typing
-    constraints_vmap: Constraints
+    constraints_vmap: MassConstraints
     parameters_vmap: Parameters
 
     @override
@@ -385,10 +416,11 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
         logger.debug("planets_pytree = %s", planets_pytree)
         mass_constraints_pytree = self._get_mass_constraints_pytree(mass_constraints_list)
         logger.debug("mass_constraints_pytree = %s", mass_constraints_pytree)
-        constraints: Constraints = Constraints.create(
-            self.species, mass_constraints_pytree, self.log_scaling
+        constraints: MassConstraints = MassConstraints.create(
+            mass_constraints_pytree, self.log_scaling
         )
         logger.debug("constraints = %s", constraints)
+        self.fixed: FixedParameters = self.get_fixed_parameters(constraints)
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
@@ -412,7 +444,7 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
     @override
     def get_solver(self) -> Callable:
         # Define the structures to vectorize.
-        self.constraints_vmap: Constraints = Constraints(species=None, log_molecules=0)  # type: ignore
+        self.constraints_vmap: MassConstraints = MassConstraints(log_molecules=0)  # type: ignore
         self.parameters_vmap: Parameters = Parameters(
             fixed=None,  # type: ignore
             planet=0,  # type: ignore
@@ -467,8 +499,8 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
         vmap_get_log_extended_activity: Callable = jax.vmap(
             get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0)
         )
-        number_density_numpy, extended_activity_numpy = self.get_processed_output(
+        number_density_np, extended_activity_np = self.get_processed_output(
             out, axis=1, extended_activity_func=vmap_get_log_extended_activity
         )
 
-        return number_density_numpy, extended_activity_numpy
+        return number_density_np, extended_activity_np

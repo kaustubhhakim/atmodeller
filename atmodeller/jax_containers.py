@@ -28,7 +28,7 @@ from typing import Callable, NamedTuple, Type
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jax import Array, jit
+from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -297,27 +297,21 @@ class Solution(NamedTuple):
         return jnp.concatenate((self.number_density, self.stability))
 
 
-class Constraints(NamedTuple):
+class MassConstraints(NamedTuple):
     """Log number of molecules constraints
 
     Args:
-        species: A list of species
         log_molecules: Log number of molecules constraints, ordered alphabetically by element
     """
 
-    species: list[Species]
-    """List of species"""
     log_molecules: dict[str, ArrayLike]
     """Log number of molecules constraints, ordered alphabetically by element name"""
 
     @classmethod
-    def create(
-        cls, species: list[Species], mass: Mapping[str, ArrayLike], log_scaling: ArrayLike
-    ) -> Self:
+    def create(cls, mass: Mapping[str, ArrayLike], log_scaling: ArrayLike) -> Self:
         """Creates an instance
 
         Args:
-            species: A list of species
             mass: Mapping of element name and mass constraint in kg in any order
             log_scaling: Log scaling for the number density
         """
@@ -326,12 +320,12 @@ class Constraints(NamedTuple):
         for element, mass_constraint in sorted_mass.items():
             molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
             log_number_of_molecules_: Array = (
-                jnp.log(mass_constraint) + jnp.log(AVOGADRO) - jnp.log(molar_mass)
+                jnp.log(mass_constraint) + np.log(AVOGADRO) - jnp.log(molar_mass)
             )
             log_number_of_molecules_ = scale_number_density(log_number_of_molecules_, log_scaling)
             log_number_of_molecules[element] = log_number_of_molecules_
 
-        return cls(species, log_number_of_molecules)
+        return cls(log_number_of_molecules)
 
     def array(self) -> Array:
         """Scaled log number of molecules array
@@ -485,27 +479,8 @@ class Parameters(NamedTuple):
     """Fixed parameters"""
     planet: Planet
     """Planet"""
-    constraints: Constraints
+    constraints: MassConstraints
     """Mass constraints"""
-
-
-@jit
-def gas_species_mask(species: list[Species]) -> Array:
-    """Mask for gas species
-
-    Args:
-        species: A list of species
-
-    Returns:
-        Mask for gas species
-    """
-    phase_codes: Array = jnp.array([s.data.phase_code for s in species])
-    # TODO: Use a parameter name rather than hard-coded to 0.
-    gas_species: Array = (phase_codes == 0).astype(int)
-
-    # jax.debug.print("gas_species = {out}", out=gas_species)
-
-    return gas_species
 
 
 CH4_g_data: SpeciesData = SpeciesData.create(

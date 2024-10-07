@@ -450,26 +450,6 @@ def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
     return tuple(sorted_elements)
 
 
-def unique_elements_in_species2(species: list[Species]) -> tuple[str, ...]:
-    """Unique elements in a list of species
-
-    Args:
-        species: A list of species
-
-    Returns:
-        Unique elements in the species ordered alphabetically
-    """
-    elements: list[str] = []
-    for species_ in species:
-        elements.extend(species_.data.elements)
-    unique_elements: list[str] = list(set(elements))
-    sorted_elements: list[str] = sorted(unique_elements)
-
-    logger.debug("unique_elements_in_species = %s", sorted_elements)
-
-    return tuple(sorted_elements)
-
-
 def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     """Computes the partial reduced row echelon form to determine linear components
 
