@@ -153,6 +153,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
         log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
     )
     pressure: Array = jnp.exp(log_pressure)
+    total_pressure: Array = atmosphere_pressure(parameters, log_number_density)
 
     # Reaction network residual
     log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
@@ -178,7 +179,9 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # Number density of elements in the condensed or gas phase
     element_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
 
-    element_melt_density: Array = element_density_in_melt(parameters, pressure, log_volume)
+    element_melt_density: Array = element_density_in_melt(
+        parameters, log_number_density, pressure, log_volume
+    )
     log_element_density: Array = jnp.log(element_density + element_melt_density)
 
     mass_residual = log_element_density - mass_constraints.array(log_volume)
@@ -266,11 +269,14 @@ def get_log_extended_activity(
 
 
 @jit
-def element_density_in_melt(parameters: Parameters, pressure: Array, log_volume: Array) -> Array:
+def element_density_in_melt(
+    parameters: Parameters, log_number_density: Array, pressure: Array, log_volume: Array
+) -> Array:
     """Number density of elements dissolved in melt due to species solubility
 
     Args:
         parameters: Parameters
+        log_number_density: Log number density
         pressure: Pressure
         log_volume: Log volume of the atmosphere
 
@@ -285,7 +291,7 @@ def element_density_in_melt(parameters: Parameters, pressure: Array, log_volume:
     temperature: ArrayLike = planet.surface_temperature
     log_scaling: float = parameters.fixed.log_scaling
 
-    total_pressure: Array = jnp.sum(pressure)
+    total_pressure: Array = atmosphere_pressure(parameters, log_number_density)
     diatomic_oxygen_fugacity: Array = jnp.take(pressure, diatomic_oxygen_index)
 
     solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]

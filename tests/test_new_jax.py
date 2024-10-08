@@ -44,6 +44,7 @@ from atmodeller.thermodata.jax_species_data import (
     H2O_l_data,
     O2_g_data,
 )
+from atmodeller.thermodata.jax_thermo import ConstantBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -499,7 +500,8 @@ def test_H_fO2_buffer() -> None:
     mass_constraints = {
         "H": h_kg,
     }
-    fugacity_constraints = {O2_g.name: 8.838043080858959e-08}
+    fO2: RedoxBufferProtocol = ConstantBuffer(8.838043080858959e-08)
+    fugacity_constraints = {O2_g.name: fO2}
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)

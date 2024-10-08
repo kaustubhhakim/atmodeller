@@ -61,6 +61,22 @@ class RedoxBufferProtocol(Protocol):
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
+class ConstantBuffer(NamedTuple):
+    """Constant buffer
+
+    Args:
+        log10_fugacity: Log10 fugacity
+    """
+
+    log10_fugacity: ArrayLike
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        del temperature
+        del pressure
+
+        return self.log10_fugacity * np.log(10)
+
+
 class IronWustiteBufferHirschmann08(NamedTuple):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`
 
