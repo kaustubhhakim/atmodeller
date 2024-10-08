@@ -25,29 +25,25 @@ import numpy.typing as npt
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, debug_logger  # pylint: disable=unused-import
+from atmodeller import AVOGADRO, debug_logger
 from atmodeller.classes import (
     InteriorAtmosphere,
     InteriorAtmosphereABC,
     InteriorAtmosphereBatch,
 )
-from atmodeller.jax_containers import (
+from atmodeller.jax_containers import CondensedSpecies, GasSpecies, Planet, Species
+from atmodeller.jax_utilities import log_pressure_from_log_number_density
+from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
+from atmodeller.thermodata.jax_species_data import (
     C_cr_data,
     CH4_g_data,
     CO2_g_data,
     CO_g_data,
-    CondensedSpecies,
-    FugacityConstraints,
-    GasSpecies,
     H2_g_data,
     H2O_g_data,
     H2O_l_data,
     O2_g_data,
-    Planet,
-    Species,
 )
-from atmodeller.jax_utilities import log_pressure_from_log_number_density
-from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -424,14 +420,14 @@ def test_batch_planet() -> None:
     # Creates a list of mass constraints
     mass_constraints1: dict[str, float] = {"C": c_kg, "H": h_kg, "O": o_kg}
     mass_constraints2: dict[str, float] = {"C": c_kg, "H": h_kg * 2, "O": o_kg}
-    mass_constraints_list: list[dict[str, float]] = [mass_constraints1, mass_constraints2]
+    mass_constraints: list[dict[str, float]] = [mass_constraints1, mass_constraints2]
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([60, 60, 60, -30, 60, 60], dtype=np.float_)
     initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density)
     # FIXME: New constraints list
     interior_atmosphere.initialise_solve(
-        planet_list, mass_constraints_list, initial_number_density, initial_stability
+        planet_list, initial_number_density, initial_stability, mass_constraints=mass_constraints
     )
     log_number_density, _ = interior_atmosphere.solve()
 
@@ -466,7 +462,7 @@ def test_H_fO2() -> None:
     initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)
     initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
     interior_atmosphere.initialise_solve(
-        planet, mass_constraints, initial_number_density, initial_stability
+        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
     )
     log_number_density, _ = interior_atmosphere.solve()
     log_pressure: Array = log_pressure_from_log_number_density(

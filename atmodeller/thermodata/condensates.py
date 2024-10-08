@@ -124,7 +124,6 @@ Si_cr_thermodata: ThermoData = ThermoData(
     (298.15, 1690),
 )
 
-
 Si_l_thermodata: ThermoData = ThermoData(
     (4.882667110e3,),
     (-1.326611073e1,),

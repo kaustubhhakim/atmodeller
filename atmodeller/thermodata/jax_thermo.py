@@ -18,16 +18,29 @@
 
 # Convenient to use chemical formulas so pylint: disable=C0103
 
+import sys
 from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
 from jax import Array, jit
 from jax.typing import ArrayLike
+from molmass import Formula
+
+from atmodeller.utilities import unit_conversion
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 Href: float = 298.15
 """Enthalpy reference temperature in K"""
 Pref: float = 1.0
 """Standard state pressure in bar"""
+phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
+"""Mapping from the JANAF phase string to an integer code"""
+inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
+"""Inverse mapping from the integer code to a JANAF phase string"""
 
 
 # For all activity models recall that the log_number_density argument is scaled
@@ -96,6 +109,85 @@ class ThermoData(NamedTuple):
     # "NASA Glenn Coefficients for Calculating Thermodynamic Properties of Individual Species"
     # Might involve using a LLM to tabulated the coefficients from the PDF? Or can an electronic
     # version of the tabulated data be obtained?
+
+
+class SpeciesData(NamedTuple):
+    """Species data
+
+    Args:
+        composition: Composition
+        phase_code: Phase code
+        molar_mass: Molar mass
+        thermodata: Thermodynamic data
+    """
+
+    # Because composition is a dict this object is not hashable. Python does not have a frozendict,
+    # so other options would be:
+    # https://flax.readthedocs.io/en/latest/api_reference/flax.core.frozen_dict.html
+    # https://github.com/GalacticDynamics/xmmutablemap
+    composition: dict[str, tuple[int, float, float]]
+    """Composition"""
+    phase_code: int
+    """Phase code"""
+    molar_mass: float
+    """Molar mass"""
+    thermodata: ThermoData
+    """Thermodynamic data"""
+
+    @classmethod
+    def create(
+        cls,
+        formula: str,
+        phase: str,
+        thermodata: ThermoData,
+    ) -> Self:
+        """Creates an instance
+
+        Args:
+            formula: Formula
+            phase: Phase
+            thermodata: Thermodynamic data
+
+        Returns:
+            An instance
+        """
+        mformula: Formula = Formula(formula)
+        composition: dict[str, tuple[int, float, float]] = mformula.composition().asdict()
+        molar_mass: float = mformula.mass * unit_conversion.g_to_kg
+        phase_code: int = phase_mapping[phase]
+
+        return cls(composition, phase_code, molar_mass, thermodata)
+
+    @property
+    def elements(self) -> tuple[str, ...]:
+        """Elements"""
+        return tuple(self.composition.keys())
+
+    def formula(self) -> Formula:
+        """Formula object"""
+        formula: str = ""
+        for element, values in self.composition.items():
+            count: int = values[0]
+            formula += element
+            if count > 1:
+                formula += str(count)
+
+        return Formula(formula)
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and phase"""
+        return f"{self.hill_formula}_{self.phase}"
+
+    @property
+    def hill_formula(self) -> str:
+        """Hill formula"""
+        return self.formula().formula
+
+    @property
+    def phase(self) -> str:
+        """JANAF phase"""
+        return inverse_phase_mapping[self.phase_code]
 
 
 @jit

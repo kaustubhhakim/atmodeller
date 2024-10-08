@@ -62,7 +62,7 @@ class InteriorAtmosphereABC(ABC):
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    # Attributes that are set during initialise_solve are included for typing
+    # Attributes that are set during initialise_solve and included for typing
     fixed: FixedParameters
     initial_solution: Solution
     parameters: Parameters
@@ -382,7 +382,7 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             init_fugacity_constraints, self.log_scaling
         )
-        logger.debug("fugacity_constraints = %s", fugacity_constraints_)
+        logger.debug("fugacity_constraints_ = %s", fugacity_constraints_)
 
         if mass_constraints is None:
             init_mass_constraints: dict[str, float] = {}
@@ -391,7 +391,7 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
         mass_constraints_: MassConstraints = MassConstraints.create(
             init_mass_constraints, self.log_scaling
         )
-        logger.debug("mass_constraints = %s", mass_constraints_)
+        logger.debug("mass_constraints_ = %s", mass_constraints_)
 
         self.fixed: FixedParameters = self.get_fixed_parameters(
             fugacity_constraints_, mass_constraints_
@@ -437,35 +437,59 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    # For typing
-    constraints_vmap: MassConstraints
+    # Attributes that are set during initialise_solve and included for typing
+    fugacity_constraints_vmap: FugacityConstraints
+    fugacity_constraints_axis: int | None
+    mass_constraints_vmap: MassConstraints
+    mass_constraints_axis: int | None
     parameters_vmap: Parameters
 
     @override
     def initialise_solve(
         self,
-        planet_list: list[Planet],
-        mass_constraints_list: list[dict[str, float]],
+        planets: list[Planet],
         initial_number_density: npt.NDArray[np.float_],
         initial_stability: npt.NDArray[np.float_],
+        fugacity_constraints: list[dict[str, float]] | None = None,
+        mass_constraints: list[dict[str, float]] | None = None,
     ) -> None:
         """Initialises the solve.
 
         Args:
-            planet_list: List of planets
-            mass_constraints_list: List of mass constraints
+            planets: List of planets
             initial_number_density: Initial number density
             initial_stability: Initial stability
+            fugacity_constraints: List of fugacity constraints. Defaults to None.
+            mass_constraints: List of mass constraints. Defaults to None.
         """
-        planets_pytree: Planet = self._get_planets_pytree(planet_list)
+        planets_pytree: Planet = self._get_planets_pytree(planets)
         logger.debug("planets_pytree = %s", planets_pytree)
-        mass_constraints_pytree = self._get_mass_constraints_pytree(mass_constraints_list)
-        logger.debug("mass_constraints_pytree = %s", mass_constraints_pytree)
-        constraints: MassConstraints = MassConstraints.create(
-            mass_constraints_pytree, self.log_scaling
+
+        if fugacity_constraints is None:
+            init_fugacity_constraints: dict[str, Array] = {}
+            self.fugacity_constraints_axis = None
+        else:
+            init_fugacity_constraints = self._get_constraints_pytree(fugacity_constraints)
+            self.fugacity_constraints_axis = 0
+        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
+            init_fugacity_constraints, self.log_scaling
         )
-        logger.debug("constraints = %s", constraints)
-        self.fixed: FixedParameters = self.get_fixed_parameters(constraints)
+        logger.debug("fugacity_constraints_ = %s", fugacity_constraints_)
+
+        if mass_constraints is None:
+            init_mass_constraints: dict[str, Array] = {}
+            self.mass_constraints_axis = None
+        else:
+            init_mass_constraints = self._get_constraints_pytree(mass_constraints)
+            self.mass_constraints_axis = 0
+        mass_constraints_: MassConstraints = MassConstraints.create(
+            init_mass_constraints, self.log_scaling
+        )
+        logger.debug("mass_constraints_ = %s", mass_constraints_)
+
+        self.fixed: FixedParameters = self.get_fixed_parameters(
+            fugacity_constraints_, mass_constraints_
+        )
         self.initial_solution: Solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
@@ -473,7 +497,8 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
         self.parameters: Parameters = Parameters(
             fixed=self.fixed,
             planet=planets_pytree,
-            constraints=constraints,
+            fugacity_constraints=fugacity_constraints_,
+            mass_constraints=mass_constraints_,
         )
         logger.debug("parameters = %s", self.parameters)
         self._solver: Callable = self.get_solver()
@@ -489,11 +514,17 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
     @override
     def get_solver(self) -> Callable:
         # Define the structures to vectorize.
-        self.constraints_vmap: MassConstraints = MassConstraints(log_molecules=0)  # type: ignore
+        self.fugacity_constraints_vmap: FugacityConstraints = FugacityConstraints(
+            log_fugacity=self.fugacity_constraints_axis, log_scaling=None  # type: ignore
+        )
+        self.mass_constraints_vmap: MassConstraints = MassConstraints(
+            log_molecules=self.mass_constraints_axis, log_scaling=None  # type: ignore
+        )
         self.parameters_vmap: Parameters = Parameters(
             fixed=None,  # type: ignore
             planet=0,  # type: ignore
-            constraints=self.constraints_vmap,  # type: ignore
+            fugacity_constraints=self.fugacity_constraints_vmap,  # type: ignore
+            mass_constraints=self.mass_constraints_vmap,  # type: ignore
         )
         solver: Callable = jax.jit(
             jax.vmap(self.get_wrapped_jit_solver(), in_axes=(None, self.parameters_vmap))
@@ -514,24 +545,27 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
 
         return planets_pytree
 
-    def _get_mass_constraints_pytree(
-        self, mass_constraints_list: list[dict[str, float]]
+    def _get_constraints_pytree(
+        self, constraints_list: list[dict[str, float]]
     ) -> dict[str, Array]:
-        """Gets mass constraints as a pytree
+        """Gets constraints as a pytree
 
         Args:
-            mass_constraints_list: List of mass constraints
+            constraints_list: List of constraints
 
         Returns:
-            Mass constraints as a pytree
+            Constraints as a pytree
         """
-        stacked_mass_constraints: dict[str, Array] = {}
-        keys: KeysView[str] = mass_constraints_list[0].keys()
+        if len(constraints_list) == 0:
+            return {}
+
+        stacked_constraints: dict[str, Array] = {}
+        keys: KeysView[str] = constraints_list[0].keys()
 
         for key in keys:
-            stacked_mass_constraints[key] = jnp.array([d[key] for d in mass_constraints_list])
+            stacked_constraints[key] = jnp.array([d[key] for d in constraints_list])
 
-        return stacked_mass_constraints
+        return stacked_constraints
 
     def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
         """Solves the system.

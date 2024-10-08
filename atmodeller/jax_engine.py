@@ -181,13 +181,13 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     element_melt_density: Array = element_density_in_melt(parameters, pressure, log_volume)
     log_element_density: Array = jnp.log(element_density + element_melt_density)
 
-    mass_residual = log_element_density - (mass_constraints.array() - log_volume)
+    mass_residual = log_element_density - mass_constraints.array(log_volume)
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
 
     # Stability residual
     # Get minimum scaled log number of molecules
-    log_min_number_density: Array = (
-        jnp.min(mass_constraints.array()) - log_volume - jnp.log(parameters.fixed.tau)
+    log_min_number_density: Array = jnp.min(mass_constraints.array(log_volume)) - jnp.log(
+        parameters.fixed.tau
     )
     stability_residual: Array = log_number_density + log_stability - log_min_number_density
     # jax.debug.print("stability_residual = {out}", out=stability_residual)

@@ -43,23 +43,11 @@ from atmodeller import (
 )
 from atmodeller.jax_utilities import scale_number_density
 from atmodeller.solubility.jax_interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.thermodata.condensates import C_cr_thermodata, H2O_l_thermodata
-from atmodeller.thermodata.gases import (
-    CH4_g_thermodata,
-    Cl2_g_thermodata,
-    CO2_g_thermodata,
-    CO_g_thermodata,
-    H2_g_thermodata,
-    H2O_g_thermodata,
-    N2_g_thermodata,
-    NH3_g_thermodata,
-    O2_g_thermodata,
-)
 from atmodeller.thermodata.jax_thermo import (
     ActivityProtocol,
     CondensateActivity,
     IdealGasActivity,
-    ThermoData,
+    SpeciesData,
 )
 from atmodeller.utilities import OptxSolver, unit_conversion
 
@@ -67,11 +55,6 @@ if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
-
-phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
-"""Mapping from the JANAF phase string to an integer code"""
-inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
-"""Inverse mapping from the integer code to a JANAF phase string"""
 
 
 class Planet(NamedTuple):
@@ -134,85 +117,6 @@ class Planet(NamedTuple):
         base_dict["surface_gravity"] = self.surface_gravity
 
         return base_dict
-
-
-class SpeciesData(NamedTuple):
-    """Species data
-
-    Args:
-        composition: Composition
-        phase_code: Phase code
-        molar_mass: Molar mass
-        thermodata: Thermodynamic data
-    """
-
-    # Because composition is a dict this object is not hashable. Python does not have a frozendict,
-    # so other options would be:
-    # https://flax.readthedocs.io/en/latest/api_reference/flax.core.frozen_dict.html
-    # https://github.com/GalacticDynamics/xmmutablemap
-    composition: dict[str, tuple[int, float, float]]
-    """Composition"""
-    phase_code: int
-    """Phase code"""
-    molar_mass: float
-    """Molar mass"""
-    thermodata: ThermoData
-    """Thermodynamic data"""
-
-    @classmethod
-    def create(
-        cls,
-        formula: str,
-        phase: str,
-        thermodata: ThermoData,
-    ) -> Self:
-        """Creates an instance
-
-        Args:
-            formula: Formula
-            phase: Phase
-            thermodata: Thermodynamic data
-
-        Returns:
-            An instance
-        """
-        mformula: Formula = Formula(formula)
-        composition: dict[str, tuple[int, float, float]] = mformula.composition().asdict()
-        molar_mass: float = mformula.mass * unit_conversion.g_to_kg
-        phase_code: int = phase_mapping[phase]
-
-        return cls(composition, phase_code, molar_mass, thermodata)
-
-    @property
-    def elements(self) -> tuple[str, ...]:
-        """Elements"""
-        return tuple(self.composition.keys())
-
-    def formula(self) -> Formula:
-        """Formula object"""
-        formula: str = ""
-        for element, values in self.composition.items():
-            count: int = values[0]
-            formula += element
-            if count > 1:
-                formula += str(count)
-
-        return Formula(formula)
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return f"{self.hill_formula}_{self.phase}"
-
-    @property
-    def hill_formula(self) -> str:
-        """Hill formula"""
-        return self.formula().formula
-
-    @property
-    def phase(self) -> str:
-        """JANAF phase"""
-        return inverse_phase_mapping[self.phase_code]
 
 
 class Species(NamedTuple):
@@ -308,14 +212,19 @@ class Solution(NamedTuple):
 
 
 class FugacityConstraints(NamedTuple):
-    """Log fugacity constraints
+    """Fugacity constraints
+
+    These are applied as constraints on the gas activity.
 
     Args:
-        log_fugacity: Scaled log fugacity in bar
+        log_fugacity: Log fugacity in bar
+        log_scaling: Log scaling for the number density
     """
 
     log_fugacity: dict[str, Array]
-    """Scaled log fugacity in bar"""
+    """Log fugacity in bar"""
+    log_scaling: ArrayLike
+    """Log scaling"""
 
     @classmethod
     def create(cls, fugacity: Mapping[str, ArrayLike], log_scaling: ArrayLike) -> Self:
@@ -325,38 +234,44 @@ class FugacityConstraints(NamedTuple):
             fugacity: Mapping of a species name and fugacity constraint
             log_scaling: Log scaling for the number density
         """
-        init_dict: dict[str, Array] = {
-            k: scale_number_density(jnp.log(v), log_scaling) for k, v in fugacity.items()
-        }
+        init_dict: dict[str, Array] = {k: jnp.log(v) for k, v in fugacity.items()}
 
-        return cls(init_dict)
+        return cls(init_dict, log_scaling)
 
     def array(
         self,
         temperature: ArrayLike,
     ) -> Array:
-        """Scaled log number of molecules as an array
+        """Scaled log number density as an array
 
         Args:
             temperature: Temperature
+
+        Returns:
+            Scaled log number density as an array
         """
         log_fugacity: Array = jnp.array(list(self.log_fugacity.values()))
         log_number_density: Array = (
             log_fugacity - np.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
         )
+        scaled_log_number_density: Array = scale_number_density(
+            log_number_density, self.log_scaling
+        )
 
-        return log_number_density
+        return scaled_log_number_density
 
 
 class MassConstraints(NamedTuple):
-    """Log number of molecules constraints
+    """Mass constraints
 
     Args:
-        log_molecules: Scaled log number of molecules constraints, alphabetically by element
+        log_molecules: Log number of molecules of the species
     """
 
     log_molecules: dict[str, ArrayLike]
-    """Scaled log number of molecules constraints"""
+    """Log number of molecules"""
+    log_scaling: ArrayLike
+    """Log scaling"""
 
     @classmethod
     def create(cls, mass: Mapping[str, ArrayLike], log_scaling: ArrayLike) -> Self:
@@ -373,14 +288,24 @@ class MassConstraints(NamedTuple):
             log_number_of_molecules_: Array = (
                 jnp.log(mass_constraint) + np.log(AVOGADRO) - jnp.log(molar_mass)
             )
-            log_number_of_molecules_ = scale_number_density(log_number_of_molecules_, log_scaling)
             log_number_of_molecules[element] = log_number_of_molecules_
 
-        return cls(log_number_of_molecules)
+        return cls(log_number_of_molecules, log_scaling)
 
-    def array(self) -> Array:
-        """Scaled log number of molecules as an array"""
-        return jnp.array(list(self.log_molecules.values()))
+    def array(self, log_atmosphere_volume: Array) -> Array:
+        """Scaled log number density as an array
+
+        Args:
+            log_atmosphere_volume: Log volume of the atmosphere
+
+        Returns:
+            Scaled log number density as an array
+        """
+        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
+        log_scaled_molecules: Array = scale_number_density(log_molecules, self.log_scaling)
+        log_number_density: Array = log_scaled_molecules - log_atmosphere_volume
+
+        return log_number_density
 
 
 class SolverParameters(NamedTuple):
@@ -537,40 +462,3 @@ class Parameters(NamedTuple):
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
-
-
-CH4_g_data: SpeciesData = SpeciesData.create(
-    "CH4",
-    "g",
-    CH4_g_thermodata,
-)
-Cl2_g_data: SpeciesData = SpeciesData.create("Cl2", "g", Cl2_g_thermodata)
-CO_g_data: SpeciesData = SpeciesData.create(
-    "CO",
-    "g",
-    CO_g_thermodata,
-)
-CO2_g_data: SpeciesData = SpeciesData.create(
-    "CO2",
-    "g",
-    CO2_g_thermodata,
-)
-C_cr_data: SpeciesData = SpeciesData.create("C", "cr", C_cr_thermodata)
-H2_g_data: SpeciesData = SpeciesData.create("H2", "g", H2_g_thermodata)
-H2O_g_data: SpeciesData = SpeciesData.create(
-    "H2O",
-    "g",
-    H2O_g_thermodata,
-)
-H2O_l_data: SpeciesData = SpeciesData.create(
-    "H2O",
-    "l",
-    H2O_l_thermodata,
-)
-N2_g_data: SpeciesData = SpeciesData.create("N2", "g", N2_g_thermodata)
-NH3_g_data: SpeciesData = SpeciesData.create(
-    "NH3",
-    "g",
-    NH3_g_thermodata,
-)
-O2_g_data: SpeciesData = SpeciesData.create("O2", "g", O2_g_thermodata)
