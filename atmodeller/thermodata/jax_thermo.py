@@ -22,6 +22,7 @@ import sys
 from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
+import numpy as np
 from jax import Array, jit
 from jax.typing import ArrayLike
 from molmass import Formula
@@ -51,8 +52,36 @@ class ActivityProtocol(Protocol):
         log_number_density: ArrayLike,
         species_index: Array,
         temperature: ArrayLike,
-        total_pressure: ArrayLike,
+        pressure: ArrayLike,
     ) -> ArrayLike: ...
+
+
+class RedoxBufferProtocol(Protocol):
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+
+class IronWustiteBufferHirschmann08(NamedTuple):
+    """Iron-wustite buffer :cite:p:`OP93,HGD08`
+
+    Args:
+        log10_shift: Log10 shift relative to the buffer.
+    """
+
+    log10_shift: ArrayLike
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        log10_fugacity: Array = (
+            -0.8853 * jnp.log(temperature)
+            - 28776.8 / temperature
+            + 14.057
+            + 0.055 * (pressure - 1) / temperature
+        )
+
+        return log10_fugacity + self.log10_shift
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        return self.log10_fugacity(temperature, pressure) * np.log(10)
 
 
 class CondensateActivity(NamedTuple):
@@ -65,12 +94,12 @@ class CondensateActivity(NamedTuple):
         log_number_density: ArrayLike,
         species_index: Array,
         temperature: ArrayLike,
-        total_pressure: ArrayLike,
+        pressure: ArrayLike,
     ) -> ArrayLike:
         del log_number_density
         del species_index
         del temperature
-        del total_pressure
+        del pressure
 
         return jnp.log(self.activity)
 
@@ -83,10 +112,10 @@ class IdealGasActivity(NamedTuple):
         log_number_density: ArrayLike,
         species_index: Array,
         temperature: ArrayLike,
-        total_pressure: ArrayLike,
+        pressure: ArrayLike,
     ) -> ArrayLike:
         del temperature
-        del total_pressure
+        del pressure
 
         return jnp.take(log_number_density, species_index)
 
