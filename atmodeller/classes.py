@@ -55,6 +55,8 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+# TODO: Make flag to check if vmap active in initialise_solve, then push solve etc. through
+# appropriate function
 class InteriorAtmosphereABC(ABC):
     """Interior atmosphere base
 
@@ -131,6 +133,9 @@ class InteriorAtmosphereABC(ABC):
             mass_constraints=self.mass_constraints,
         )
         logger.debug("parameters = %s", self.parameters)
+
+        # TODO: Check if fugacity or mass constraints or planet are vmapped, and select appropriate
+        # solver accordingly. Similarly, set solve function.
         self._solver = self.get_solver()
 
         # Compile
