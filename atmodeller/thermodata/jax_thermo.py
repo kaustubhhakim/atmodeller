@@ -58,6 +58,8 @@ class ActivityProtocol(Protocol):
 
 class RedoxBufferProtocol(Protocol):
 
+    log10_shift: ArrayLike
+
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 

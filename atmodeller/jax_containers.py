@@ -219,7 +219,7 @@ class FugacityConstraints(NamedTuple):
     These are applied as constraints on the gas activity.
 
     Args:
-        fugacity_constraints: Fugacity constraints
+        constraints: Fugacity constraints
         log_scaling: Log scaling for the number density
     """
 
@@ -230,17 +230,37 @@ class FugacityConstraints(NamedTuple):
 
     @classmethod
     def create(
-        cls, fugacity_constraints: Mapping[str, RedoxBufferProtocol], log_scaling: ArrayLike
+        cls,
+        log_scaling: ArrayLike,
+        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
     ) -> Self:
         """Creates an instance
 
         Args:
-            fugacity_constraints: Mapping of a species name and a fugacity constraint
             log_scaling: Log scaling for the number density
+            fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
+                None.
         """
-        init_dict = dict(fugacity_constraints)
+        if fugacity_constraints is None:
+            init_dict: dict[str, RedoxBufferProtocol] = {}
+        else:
+            init_dict = dict(fugacity_constraints)
 
         return cls(init_dict, log_scaling)
+
+    @property
+    def vmap_axis(self) -> int | None:
+        """Axis value for vmap"""
+        try:
+            number_entries: int = len(list(self.constraints.values())[0].log10_shift)  # type: ignore
+            if number_entries > 1:
+                vmap_axis: int | None = 0
+            else:
+                vmap_axis = None
+        except TypeError:
+            vmap_axis = None
+
+        return vmap_axis
 
     def array(self, temperature: ArrayLike, pressure: Array) -> Array:
         """Scaled log number density as an array
@@ -287,6 +307,7 @@ class MassConstraints(NamedTuple):
 
     Args:
         log_molecules: Log number of molecules of the species
+        log_scaling: Log scaling for the number density
     """
 
     log_molecules: dict[str, ArrayLike]
@@ -295,15 +316,23 @@ class MassConstraints(NamedTuple):
     """Log scaling"""
 
     @classmethod
-    def create(cls, mass: Mapping[str, ArrayLike], log_scaling: ArrayLike) -> Self:
+    def create(
+        cls, log_scaling: ArrayLike, mass_constraints: Mapping[str, ArrayLike] | None = None
+    ) -> Self:
         """Creates an instance
 
         Args:
-            mass: Mapping of element name and mass constraint in kg in any order
             log_scaling: Log scaling for the number density
+            mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
         """
-        sorted_mass: dict[str, ArrayLike] = {k: mass[k] for k in sorted(mass)}
+        if mass_constraints is None:
+            init_dict: dict[str, ArrayLike] = {}
+        else:
+            init_dict = dict(mass_constraints)
+
+        sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
         log_number_of_molecules: dict[str, ArrayLike] = {}
+
         for element, mass_constraint in sorted_mass.items():
             molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
             log_number_of_molecules_: Array = (
@@ -312,6 +341,20 @@ class MassConstraints(NamedTuple):
             log_number_of_molecules[element] = log_number_of_molecules_
 
         return cls(log_number_of_molecules, log_scaling)
+
+    @property
+    def vmap_axis(self) -> int | None:
+        """Axis value for vmap"""
+        try:
+            number_entries: int = len(list(self.log_molecules.values())[0])  # type: ignore
+            if number_entries > 1:
+                vmap_axis: int | None = 0
+            else:
+                vmap_axis = None
+        except TypeError:
+            vmap_axis = None
+
+        return vmap_axis
 
     def array(self, log_atmosphere_volume: Array) -> Array:
         """Scaled log number density as an array

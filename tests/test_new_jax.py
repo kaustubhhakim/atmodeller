@@ -19,6 +19,7 @@
 # Convenient to use naming convention so pylint: disable=C0103
 
 import logging
+from collections.abc import Mapping
 
 import numpy as np
 import numpy.typing as npt
@@ -481,12 +482,9 @@ def test_H_fO2() -> None:
     assert True
 
 
-# TODO: Implement buffer
 def test_H_fO2_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
-    # TODO: Here, can just specify the redox buffer as an activity model for O2 and then avoid
-    # specifying any fugacity constraints separately?
     O2_g: Species = GasSpecies(O2_g_data)
     H2_g: Species = GasSpecies(H2_g_data)
     H2O_g: Species = GasSpecies(H2O_g_data, solubility=H2O_peridotite_sossi)
@@ -507,6 +505,60 @@ def test_H_fO2_buffer() -> None:
     # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
     fO2: RedoxBufferProtocol = IronWustiteBuffer(0.0)
     fugacity_constraints = {O2_g.name: fO2}
+
+    # Initial solution guess number density (molecules/m^3)
+    initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)
+    initial_stability: ArrayLike = -100.0 * np.ones_like(initial_number_density)
+    interior_atmosphere.initialise_solve(
+        planet,
+        initial_number_density,
+        initial_stability,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+    )
+    log_number_density, _ = interior_atmosphere.solve()
+    log_pressure: Array = log_pressure_from_log_number_density(
+        log_number_density, planet.surface_temperature
+    )
+    logger.debug("log_pressure = %s", log_pressure)
+
+    target: dict[str, float] = {
+        "H2O_g": 0.2570770067190733,
+        "H2_g": 0.24964688044710354,
+        "O2_g": 8.838043080858959e-08,
+    }
+
+    # FIXME: Setup test comparison
+    assert True
+
+
+def test_H_fO2_buffer_batch() -> None:
+    """Tests H2-H2O at the IW buffer."""
+
+    O2_g: Species = GasSpecies(O2_g_data)
+    H2_g: Species = GasSpecies(H2_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data, solubility=H2O_peridotite_sossi)
+
+    species: list[Species] = [H2O_g, H2_g, O2_g]
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphereBatch(species, LOG_SCALING)
+
+    num: int = 10
+
+    oceans: float = 1
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    # o_kg: float = 1.22814e21
+
+    h_kg_np: npt.NDArray = h_kg * np.arange(1, num + 1)
+
+    mass_constraints: Mapping[str, ArrayLike] = {"H": h_kg_np}
+
+    # Original argument was:
+    # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+    # fO2: RedoxBufferProtocol = IronWustiteBuffer(0.0)
+
+    fO2_batch: RedoxBufferProtocol = IronWustiteBuffer(np.arange(-5, 5))
+    fugacity_constraints = {O2_g.name: fO2_batch}
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = np.array([30, 30, 30], dtype=np.float_)

@@ -21,7 +21,7 @@ import pprint
 import sys
 import time
 from abc import ABC, abstractmethod
-from collections.abc import KeysView, Mapping
+from collections.abc import Mapping
 from typing import Callable
 
 import jax
@@ -29,6 +29,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from jax import Array
+from jaxtyping import ArrayLike
 
 from atmodeller import TAU
 from atmodeller.jax_containers import (
@@ -42,7 +43,7 @@ from atmodeller.jax_containers import (
     Species,
 )
 from atmodeller.jax_engine import get_log_extended_activity, solve
-from atmodeller.jax_utilities import pytrees_stack, unscale_number_density
+from atmodeller.jax_utilities import unscale_number_density
 from atmodeller.thermodata.jax_thermo import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref
 
@@ -59,13 +60,15 @@ class InteriorAtmosphereABC(ABC):
 
     Args:
         species: List of species
-        log_scaling: Log scaling for the numerical solution
+        log_scaling: Log scaling for the number density
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
     # Attributes that are set during initialise_solve and included for typing
     fixed: FixedParameters
+    fugacity_constraints: FugacityConstraints
     initial_solution: Solution
+    mass_constraints: MassConstraints
     parameters: Parameters
     _solver: Callable
 
@@ -79,22 +82,57 @@ class InteriorAtmosphereABC(ABC):
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @abstractmethod
-    def initialise_solve(self, *args, **kwargs) -> None:
-        """Initialises the solve."""
-        del args
-        del kwargs
-
-    @abstractmethod
     def get_solver(self, *args, **kwargs) -> Callable:
         """Gets the solver."""
         del args
         del kwargs
 
     @abstractmethod
-    def solve(self, *args, **kwargs) -> Callable:
+    def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
         """Solves the system with processing"""
-        del args
-        del kwargs
+
+    def initialise_solve(
+        self,
+        planet: Planet,
+        initial_number_density: npt.NDArray[np.float_],
+        initial_stability: npt.NDArray[np.float_],
+        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+    ) -> None:
+        """Initialises the solve.
+
+        Args:
+            planet: Planet
+            initial_number_density: Initial number density
+            initial_stability: Initial stability
+            fugacity_constraints: Fugacity constraints. Defaults to None.
+            mass_constraints: Mass constraints. Defaults to None.
+        """
+        self.fugacity_constraints: FugacityConstraints = FugacityConstraints.create(
+            self.log_scaling, fugacity_constraints
+        )
+        logger.debug("fugacity_constraints = %s", self.fugacity_constraints)
+
+        self.mass_constraints: MassConstraints = MassConstraints.create(
+            self.log_scaling, mass_constraints
+        )
+        logger.debug("mass_constraints = %s", self.mass_constraints)
+
+        self.fixed: FixedParameters = self.get_fixed_parameters(
+            self.fugacity_constraints, self.mass_constraints
+        )
+        self.initial_solution: Solution = Solution.create(
+            initial_number_density, initial_stability, self.log_scaling
+        )
+        logger.debug("initial_solution = %s", self.initial_solution)
+        self.parameters: Parameters = Parameters(
+            fixed=self.fixed,
+            planet=planet,
+            fugacity_constraints=self.fugacity_constraints,
+            mass_constraints=self.mass_constraints,
+        )
+        logger.debug("parameters = %s", self.parameters)
+        self._solver: Callable = self.get_solver()
 
     def solve_raw_output(self) -> Array:
         """Solves the system and returns the raw (unprocessed) solution
@@ -352,63 +390,9 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
 
     Args:
         species: List of species
-        log_scaling: Log scaling for the numerical solution
+        log_scaling: Log scaling for the number density
         tau: Tau factor for species stability. Defaults to TAU.
     """
-
-    @override
-    def initialise_solve(
-        self,
-        planet: Planet,
-        initial_number_density: npt.NDArray[np.float_],
-        initial_stability: npt.NDArray[np.float_],
-        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
-        mass_constraints: dict[str, float] | None = None,
-    ) -> None:
-        """Initialises the solve.
-
-        Args:
-            planet: Planet
-            initial_number_density: Initial number density
-            initial_stability: Initial stability
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-        """
-        logger.debug("planet = %s", planet)
-
-        if fugacity_constraints is None:
-            init_fugacity_constraints: Mapping[str, RedoxBufferProtocol] = {}
-        else:
-            init_fugacity_constraints = fugacity_constraints
-        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            init_fugacity_constraints, self.log_scaling
-        )
-        logger.debug("fugacity_constraints_ = %s", fugacity_constraints_)
-
-        if mass_constraints is None:
-            init_mass_constraints: dict[str, float] = {}
-        else:
-            init_mass_constraints = mass_constraints
-        mass_constraints_: MassConstraints = MassConstraints.create(
-            init_mass_constraints, self.log_scaling
-        )
-        logger.debug("mass_constraints_ = %s", mass_constraints_)
-
-        self.fixed: FixedParameters = self.get_fixed_parameters(
-            fugacity_constraints_, mass_constraints_
-        )
-        self.initial_solution: Solution = Solution.create(
-            initial_number_density, initial_stability, self.log_scaling
-        )
-        logger.debug("initial_solution = %s", self.initial_solution)
-        self.parameters: Parameters = Parameters(
-            fixed=self.fixed,
-            planet=planet,
-            fugacity_constraints=fugacity_constraints_,
-            mass_constraints=mass_constraints_,
-        )
-        logger.debug("parameters = %s", self.parameters)
-        self._solver: Callable = self.get_solver()
 
     @override
     def get_solver(self) -> Callable:
@@ -434,76 +418,18 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
 
     Args:
         species: A list of species
-        log_scaling: Log scaling for the numerical solution
+        log_scaling: Log scaling for the number density
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    # Attributes that are set during initialise_solve and included for typing
     fugacity_constraints_vmap: FugacityConstraints
-    fugacity_constraints_axis: int | None
     mass_constraints_vmap: MassConstraints
-    mass_constraints_axis: int | None
     parameters_vmap: Parameters
 
     @override
-    def initialise_solve(
-        self,
-        planets: list[Planet],
-        initial_number_density: npt.NDArray[np.float_],
-        initial_stability: npt.NDArray[np.float_],
-        fugacity_constraints: list[dict[str, float]] | None = None,
-        mass_constraints: list[dict[str, float]] | None = None,
-    ) -> None:
-        """Initialises the solve.
+    def initialise_solve(self, *args, **kwargs) -> None:
 
-        Args:
-            planets: List of planets
-            initial_number_density: Initial number density
-            initial_stability: Initial stability
-            fugacity_constraints: List of fugacity constraints. Defaults to None.
-            mass_constraints: List of mass constraints. Defaults to None.
-        """
-        planets_pytree: Planet = self._get_planets_pytree(planets)
-        logger.debug("planets_pytree = %s", planets_pytree)
-
-        # TODO: Need to map fugacities into a single pytree within the dict (I think)
-        if fugacity_constraints is None:
-            init_fugacity_constraints: Mapping[str, RedoxBufferProtocol] = {}
-            self.fugacity_constraints_axis = None
-        else:
-            init_fugacity_constraints = self._get_constraints_pytree(fugacity_constraints)
-            self.fugacity_constraints_axis = 0
-        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            init_fugacity_constraints, self.log_scaling
-        )
-        logger.debug("fugacity_constraints_ = %s", fugacity_constraints_)
-
-        if mass_constraints is None:
-            init_mass_constraints: dict[str, Array] = {}
-            self.mass_constraints_axis = None
-        else:
-            init_mass_constraints = self._get_constraints_pytree(mass_constraints)
-            self.mass_constraints_axis = 0
-        mass_constraints_: MassConstraints = MassConstraints.create(
-            init_mass_constraints, self.log_scaling
-        )
-        logger.debug("mass_constraints_ = %s", mass_constraints_)
-
-        self.fixed: FixedParameters = self.get_fixed_parameters(
-            fugacity_constraints_, mass_constraints_
-        )
-        self.initial_solution: Solution = Solution.create(
-            initial_number_density, initial_stability, self.log_scaling
-        )
-        logger.debug("initial_solution = %s", self.initial_solution)
-        self.parameters: Parameters = Parameters(
-            fixed=self.fixed,
-            planet=planets_pytree,
-            fugacity_constraints=fugacity_constraints_,
-            mass_constraints=mass_constraints_,
-        )
-        logger.debug("parameters = %s", self.parameters)
-        self._solver: Callable = self.get_solver()
+        super().initialise_solve(*args, **kwargs)
 
         # Compile
         start_time = time.time()
@@ -517,14 +443,14 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
     def get_solver(self) -> Callable:
         # Define the structures to vectorize.
         self.fugacity_constraints_vmap: FugacityConstraints = FugacityConstraints(
-            log_fugacity=self.fugacity_constraints_axis, log_scaling=None  # type: ignore
+            constraints=self.fugacity_constraints.vmap_axis, log_scaling=None  # type: ignore
         )
         self.mass_constraints_vmap: MassConstraints = MassConstraints(
-            log_molecules=self.mass_constraints_axis, log_scaling=None  # type: ignore
+            log_molecules=self.mass_constraints.vmap_axis, log_scaling=None  # type: ignore
         )
         self.parameters_vmap: Parameters = Parameters(
             fixed=None,  # type: ignore
-            planet=0,  # type: ignore
+            planet=None,  # type: ignore
             fugacity_constraints=self.fugacity_constraints_vmap,  # type: ignore
             mass_constraints=self.mass_constraints_vmap,  # type: ignore
         )
@@ -533,41 +459,6 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
         )
 
         return solver
-
-    def _get_planets_pytree(self, planets: list[Planet]) -> Planet:
-        """Gets planets as a pytree.
-
-        Args:
-            planets: List of planets
-
-        Returns:
-            Planets as a pytree
-        """
-        planets_pytree: Planet = pytrees_stack(planets)
-
-        return planets_pytree
-
-    def _get_constraints_pytree(
-        self, constraints_list: list[dict[str, float]]
-    ) -> dict[str, Array]:
-        """Gets constraints as a pytree
-
-        Args:
-            constraints_list: List of constraints
-
-        Returns:
-            Constraints as a pytree
-        """
-        if len(constraints_list) == 0:
-            return {}
-
-        stacked_constraints: dict[str, Array] = {}
-        keys: KeysView[str] = constraints_list[0].keys()
-
-        for key in keys:
-            stacked_constraints[key] = jnp.array([d[key] for d in constraints_list])
-
-        return stacked_constraints
 
     def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
         """Solves the system.

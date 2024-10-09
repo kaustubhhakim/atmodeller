@@ -169,6 +169,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
 
     # Fugacity constraints
+    # TODO: Add jax lax statement to decide whether to do this or not
     fugacity_log_activity: Array = jnp.take(log_activity, fugacity_species_indices)
     fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity)
     fugacity_residual = fugacity_residual - fugacity_constraints.array(temperature, total_pressure)
@@ -177,6 +178,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # Mass balance residual for elements
 
     # Number density of elements in the condensed or gas phase
+    # TODO: Add JAX statement to decide whether to do this or not
     element_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
 
     element_melt_density: Array = element_density_in_melt(
