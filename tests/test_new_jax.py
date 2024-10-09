@@ -540,24 +540,23 @@ def test_H_fO2_buffer_batch() -> None:
     H2O_g: Species = GasSpecies(H2O_g_data, solubility=H2O_peridotite_sossi)
 
     species: list[Species] = [H2O_g, H2_g, O2_g]
-    planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphereBatch(species, LOG_SCALING)
 
-    num: int = 10
+    num: int = 1000
+
+    surface_temperature: npt.NDArray = 2000.0 + np.arange(1, num + 1)
+    planet: Planet = Planet(surface_temperature=surface_temperature)
+    logger.info("planet = %s", planet)
 
     oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
     # o_kg: float = 1.22814e21
 
-    h_kg_np: npt.NDArray = h_kg * np.arange(1, num + 1)
+    h_kg_np: npt.NDArray = h_kg * np.arange(1, num + 1) / 100
 
     mass_constraints: Mapping[str, ArrayLike] = {"H": h_kg_np}
 
-    # Original argument was:
-    # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
-    # fO2: RedoxBufferProtocol = IronWustiteBuffer(0.0)
-
-    fO2_batch: RedoxBufferProtocol = IronWustiteBuffer(np.arange(-5, 5))
+    fO2_batch: RedoxBufferProtocol = IronWustiteBuffer(np.linspace(-5, 5, num))
     fugacity_constraints = {O2_g.name: fO2_batch}
 
     # Initial solution guess number density (molecules/m^3)
@@ -571,10 +570,11 @@ def test_H_fO2_buffer_batch() -> None:
         mass_constraints=mass_constraints,
     )
     log_number_density, _ = interior_atmosphere.solve()
-    log_pressure: Array = log_pressure_from_log_number_density(
-        log_number_density, planet.surface_temperature
-    )
-    logger.debug("log_pressure = %s", log_pressure)
+    # TODO: This needs to be made to work with batched output, including planet
+    # log_pressure: Array = log_pressure_from_log_number_density(
+    #     log_number_density, planet.surface_temperature
+    # )
+    # logger.debug("log_pressure = %s", log_pressure)
 
     target: dict[str, float] = {
         "H2O_g": 0.2570770067190733,

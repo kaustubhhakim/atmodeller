@@ -109,6 +109,27 @@ class Planet(NamedTuple):
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
+        vmap_axes: list[int | None] = []
+        # Loop over the attributes
+        for field in self._fields:
+            value: ArrayLike = getattr(self, field)
+            try:
+                if value.size > 1:  # type: ignore since AttributeError is dealt with by except
+                    vmap_axis: int | None = 0
+                else:
+                    vmap_axis = None
+            except AttributeError:
+                vmap_axis = None
+            vmap_axes.append(vmap_axis)
+
+        return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
+
     def asdict(self) -> dict:
         """Gets a dictionary of the values"""
         base_dict: dict = self._asdict()
@@ -240,6 +261,9 @@ class FugacityConstraints(NamedTuple):
             log_scaling: Log scaling for the number density
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 None.
+
+        Returns:
+            An instance
         """
         if fugacity_constraints is None:
             init_dict: dict[str, RedoxBufferProtocol] = {}
@@ -248,19 +272,22 @@ class FugacityConstraints(NamedTuple):
 
         return cls(init_dict, log_scaling)
 
-    @property
-    def vmap_axis(self) -> int | None:
-        """Axis value for vmap"""
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
         try:
-            number_entries: int = len(list(self.constraints.values())[0].log10_shift)  # type: ignore
-            if number_entries > 1:
+            num_entries: int = len(list(self.constraints.values())[0].log10_shift)  # type: ignore
+            if num_entries > 1:
                 vmap_axis: int | None = 0
             else:
                 vmap_axis = None
         except TypeError:
             vmap_axis = None
 
-        return vmap_axis
+        return FugacityConstraints(vmap_axis, None)  # type: ignore - container types are for data
 
     def array(self, temperature: ArrayLike, pressure: Array) -> Array:
         """Scaled log number density as an array
@@ -324,6 +351,9 @@ class MassConstraints(NamedTuple):
         Args:
             log_scaling: Log scaling for the number density
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
+
+        Returns:
+            An instance
         """
         if mass_constraints is None:
             init_dict: dict[str, ArrayLike] = {}
@@ -342,9 +372,12 @@ class MassConstraints(NamedTuple):
 
         return cls(log_number_of_molecules, log_scaling)
 
-    @property
-    def vmap_axis(self) -> int | None:
-        """Axis value for vmap"""
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
         try:
             number_entries: int = len(list(self.log_molecules.values())[0])  # type: ignore
             if number_entries > 1:
@@ -354,7 +387,7 @@ class MassConstraints(NamedTuple):
         except TypeError:
             vmap_axis = None
 
-        return vmap_axis
+        return MassConstraints(vmap_axis, None)  # type: ignore - container types are for data
 
     def array(self, log_atmosphere_volume: Array) -> Array:
         """Scaled log number density as an array
@@ -479,7 +512,7 @@ class FixedParameters(NamedTuple):
         fugacity_matrix: Fugacity constraint matrix
         gas_species_indices: Indices of gas species
         fugacity_species_indices: Indices of species to constrain the fugacity
-        O2_index: Index of diatomic oxygen
+        diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
         tau: Tau factor for species stability
         log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which

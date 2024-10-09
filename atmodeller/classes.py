@@ -70,6 +70,7 @@ class InteriorAtmosphereABC(ABC):
     initial_solution: Solution
     mass_constraints: MassConstraints
     parameters: Parameters
+    planet: Planet
     _solver: Callable
 
     def __init__(self, species: list[Species], log_scaling: float, tau: float = TAU):
@@ -82,10 +83,8 @@ class InteriorAtmosphereABC(ABC):
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @abstractmethod
-    def get_solver(self, *args, **kwargs) -> Callable:
+    def get_solver(self) -> Callable:
         """Gets the solver."""
-        del args
-        del kwargs
 
     @abstractmethod
     def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
@@ -98,7 +97,7 @@ class InteriorAtmosphereABC(ABC):
         initial_stability: npt.NDArray[np.float_],
         fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
-    ) -> None:
+    ) -> Callable:
         """Initialises the solve.
 
         Args:
@@ -107,32 +106,42 @@ class InteriorAtmosphereABC(ABC):
             initial_stability: Initial stability
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
+
+        Returns:
+            Solver callable
         """
-        self.fugacity_constraints: FugacityConstraints = FugacityConstraints.create(
+        self.planet = planet
+        self.fugacity_constraints = FugacityConstraints.create(
             self.log_scaling, fugacity_constraints
         )
         logger.debug("fugacity_constraints = %s", self.fugacity_constraints)
 
-        self.mass_constraints: MassConstraints = MassConstraints.create(
-            self.log_scaling, mass_constraints
-        )
+        self.mass_constraints = MassConstraints.create(self.log_scaling, mass_constraints)
         logger.debug("mass_constraints = %s", self.mass_constraints)
 
-        self.fixed: FixedParameters = self.get_fixed_parameters(
-            self.fugacity_constraints, self.mass_constraints
-        )
-        self.initial_solution: Solution = Solution.create(
+        self.fixed = self.get_fixed_parameters(self.fugacity_constraints, self.mass_constraints)
+        self.initial_solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
         logger.debug("initial_solution = %s", self.initial_solution)
-        self.parameters: Parameters = Parameters(
+        self.parameters = Parameters(
             fixed=self.fixed,
-            planet=planet,
+            planet=self.planet,
             fugacity_constraints=self.fugacity_constraints,
             mass_constraints=self.mass_constraints,
         )
         logger.debug("parameters = %s", self.parameters)
-        self._solver: Callable = self.get_solver()
+        self._solver = self.get_solver()
+
+        # Compile
+        start_time = time.time()
+        # self._solver is callable so pylint: disable=not-callable
+        self._solver(self.initial_solution, self.parameters).block_until_ready()
+        end_time = time.time()
+        compile_time = end_time - start_time
+        logger.info("Compile time: %.6f seconds", compile_time)
+
+        return self._solver
 
     def solve_raw_output(self) -> Array:
         """Solves the system and returns the raw (unprocessed) solution
@@ -422,37 +431,17 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    fugacity_constraints_vmap: FugacityConstraints
-    mass_constraints_vmap: MassConstraints
+    # For typing
     parameters_vmap: Parameters
-
-    @override
-    def initialise_solve(self, *args, **kwargs) -> None:
-
-        super().initialise_solve(*args, **kwargs)
-
-        # Compile
-        start_time = time.time()
-        # self._solver is callable so pylint: disable=not-callable
-        self._solver(self.initial_solution, self.parameters).block_until_ready()
-        end_time = time.time()
-        compile_time = end_time - start_time
-        logger.info("Compile time: %.6f seconds", compile_time)
 
     @override
     def get_solver(self) -> Callable:
         # Define the structures to vectorize.
-        self.fugacity_constraints_vmap: FugacityConstraints = FugacityConstraints(
-            constraints=self.fugacity_constraints.vmap_axis, log_scaling=None  # type: ignore
-        )
-        self.mass_constraints_vmap: MassConstraints = MassConstraints(
-            log_molecules=self.mass_constraints.vmap_axis, log_scaling=None  # type: ignore
-        )
         self.parameters_vmap: Parameters = Parameters(
             fixed=None,  # type: ignore
-            planet=None,  # type: ignore
-            fugacity_constraints=self.fugacity_constraints_vmap,  # type: ignore
-            mass_constraints=self.mass_constraints_vmap,  # type: ignore
+            planet=self.planet.vmap_axes(),  # type: ignore
+            fugacity_constraints=self.fugacity_constraints.vmap_axes(),  # type: ignore
+            mass_constraints=self.mass_constraints.vmap_axes(),  # type: ignore
         )
         solver: Callable = jax.jit(
             jax.vmap(self.get_wrapped_jit_solver(), in_axes=(None, self.parameters_vmap))
