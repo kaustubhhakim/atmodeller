@@ -44,7 +44,7 @@ from atmodeller.thermodata.jax_species_data import (
     H2O_l_data,
     O2_g_data,
 )
-from atmodeller.thermodata.jax_thermo import ConstantBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.jax_thermo import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -485,6 +485,8 @@ def test_H_fO2() -> None:
 def test_H_fO2_buffer() -> None:
     """Tests H2-H2O at the IW buffer."""
 
+    # TODO: Here, can just specify the redox buffer as an activity model for O2 and then avoid
+    # specifying any fugacity constraints separately?
     O2_g: Species = GasSpecies(O2_g_data)
     H2_g: Species = GasSpecies(H2_g_data)
     H2O_g: Species = GasSpecies(H2O_g_data, solubility=H2O_peridotite_sossi)
@@ -500,7 +502,10 @@ def test_H_fO2_buffer() -> None:
     mass_constraints = {
         "H": h_kg,
     }
-    fO2: RedoxBufferProtocol = ConstantBuffer(8.838043080858959e-08)
+
+    # Original argument was:
+    # BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
+    fO2: RedoxBufferProtocol = IronWustiteBuffer(0.0)
     fugacity_constraints = {O2_g.name: fO2}
 
     # Initial solution guess number density (molecules/m^3)

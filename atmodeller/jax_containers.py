@@ -25,10 +25,11 @@ import sys
 from collections.abc import Mapping
 from typing import Callable, NamedTuple, Type
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jax import Array
+from jax import Array, lax
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -47,6 +48,7 @@ from atmodeller.thermodata.jax_thermo import (
     ActivityProtocol,
     CondensateActivity,
     IdealGasActivity,
+    RedoxBufferProtocol,
     SpeciesData,
 )
 from atmodeller.utilities import OptxSolver, unit_conversion
@@ -217,40 +219,59 @@ class FugacityConstraints(NamedTuple):
     These are applied as constraints on the gas activity.
 
     Args:
-        log_fugacity: Log fugacity in bar
+        fugacity_constraints: Fugacity constraints
         log_scaling: Log scaling for the number density
     """
 
-    log_fugacity: dict[str, Array]
-    """Log fugacity in bar"""
+    constraints: dict[str, RedoxBufferProtocol]
+    """Fugacity constraints"""
     log_scaling: ArrayLike
     """Log scaling"""
 
     @classmethod
-    def create(cls, fugacity: Mapping[str, ArrayLike], log_scaling: ArrayLike) -> Self:
+    def create(
+        cls, fugacity_constraints: Mapping[str, RedoxBufferProtocol], log_scaling: ArrayLike
+    ) -> Self:
         """Creates an instance
 
         Args:
-            fugacity: Mapping of a species name and fugacity constraint
+            fugacity_constraints: Mapping of a species name and a fugacity constraint
             log_scaling: Log scaling for the number density
         """
-        init_dict: dict[str, Array] = {k: jnp.log(v) for k, v in fugacity.items()}
+        init_dict = dict(fugacity_constraints)
 
         return cls(init_dict, log_scaling)
 
-    def array(
-        self,
-        temperature: ArrayLike,
-    ) -> Array:
+    def array(self, temperature: ArrayLike, pressure: Array) -> Array:
         """Scaled log number density as an array
 
         Args:
             temperature: Temperature
+            pressure: Pressure
 
         Returns:
             Scaled log number density as an array
         """
-        log_fugacity: Array = jnp.array(list(self.log_fugacity.values()))
+        # TODO: This works but feels a bit hacky
+        if not self.constraints:
+            return jnp.array(0.0)
+
+        fugacity_funcs: list[Callable] = [
+            constraint.log_fugacity for constraint in self.constraints.values()
+        ]
+
+        def apply_fugacity_function(index: ArrayLike, temperature: ArrayLike, pressure: Array):
+            return lax.switch(
+                index,
+                fugacity_funcs,
+                temperature,
+                pressure,
+            )
+
+        vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
+        indices: ArrayLike = jnp.arange(len(self.constraints))
+        log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
+
         log_number_density: Array = (
             log_fugacity - np.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
         )

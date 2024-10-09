@@ -61,23 +61,25 @@ class RedoxBufferProtocol(Protocol):
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
-class ConstantBuffer(NamedTuple):
-    """Constant buffer
+# TODO: First get buffer working, then can reimplement this if required.
+# class ConstantBuffer(NamedTuple):
+#     """Constant buffer
 
-    Args:
-        log10_fugacity: Log10 fugacity
-    """
+#     Args:
+#         log10_fugacity: Log10 fugacity
+#     """
 
-    log10_fugacity: ArrayLike
+#     log10_fugacity: ArrayLike
 
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        del temperature
-        del pressure
+#     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+#         del temperature
+#         del pressure
 
-        return self.log10_fugacity * np.log(10)
+#         return self.log10_fugacity * np.log(10)
 
 
-class IronWustiteBufferHirschmann08(NamedTuple):
+# TODO: Add in Hirschmann 2021 high pressure extension
+class IronWustiteBuffer(NamedTuple):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`
 
     Args:
@@ -87,6 +89,7 @@ class IronWustiteBufferHirschmann08(NamedTuple):
     log10_shift: ArrayLike
 
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        # TODO: Eventually make this a jitted function that this method calls.
         log10_fugacity: Array = (
             -0.8853 * jnp.log(temperature)
             - 28776.8 / temperature

@@ -21,7 +21,7 @@ import pprint
 import sys
 import time
 from abc import ABC, abstractmethod
-from collections.abc import KeysView
+from collections.abc import KeysView, Mapping
 from typing import Callable
 
 import jax
@@ -43,6 +43,7 @@ from atmodeller.jax_containers import (
 )
 from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import pytrees_stack, unscale_number_density
+from atmodeller.thermodata.jax_thermo import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref
 
 if sys.version_info < (3, 12):
@@ -154,10 +155,10 @@ class InteriorAtmosphereABC(ABC):
         formula_matrix: Array = jnp.array(formula_matrix_np)
 
         # Fugacity constraint matrix and indices
-        number_fugacity_constraints: int = len(fugacity_constraints.log_fugacity)
+        number_fugacity_constraints: int = len(fugacity_constraints.constraints)
         fugacity_species_indices: list[int] = []
         species_names: list[str] = self.get_species_names()
-        for species_name in fugacity_constraints.log_fugacity.keys():
+        for species_name in fugacity_constraints.constraints.keys():
             index: int = species_names.index(species_name)
             fugacity_species_indices.append(index)
         fugacity_matrix: Array = jnp.array(np.identity(number_fugacity_constraints))
@@ -361,7 +362,7 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
         planet: Planet,
         initial_number_density: npt.NDArray[np.float_],
         initial_stability: npt.NDArray[np.float_],
-        fugacity_constraints: dict[str, float] | None = None,
+        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
         mass_constraints: dict[str, float] | None = None,
     ) -> None:
         """Initialises the solve.
@@ -376,7 +377,7 @@ class InteriorAtmosphere(InteriorAtmosphereABC):
         logger.debug("planet = %s", planet)
 
         if fugacity_constraints is None:
-            init_fugacity_constraints: dict[str, float] = {}
+            init_fugacity_constraints: Mapping[str, RedoxBufferProtocol] = {}
         else:
             init_fugacity_constraints = fugacity_constraints
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
@@ -465,8 +466,9 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
         planets_pytree: Planet = self._get_planets_pytree(planets)
         logger.debug("planets_pytree = %s", planets_pytree)
 
+        # TODO: Need to map fugacities into a single pytree within the dict (I think)
         if fugacity_constraints is None:
-            init_fugacity_constraints: dict[str, Array] = {}
+            init_fugacity_constraints: Mapping[str, RedoxBufferProtocol] = {}
             self.fugacity_constraints_axis = None
         else:
             init_fugacity_constraints = self._get_constraints_pytree(fugacity_constraints)

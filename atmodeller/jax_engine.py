@@ -171,7 +171,7 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     # Fugacity constraints
     fugacity_log_activity: Array = jnp.take(log_activity, fugacity_species_indices)
     fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity)
-    fugacity_residual = fugacity_residual - fugacity_constraints.array(temperature)
+    fugacity_residual = fugacity_residual - fugacity_constraints.array(temperature, total_pressure)
     # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
 
     # Mass balance residual for elements
