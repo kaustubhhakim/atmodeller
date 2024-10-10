@@ -58,7 +58,8 @@ class ActivityProtocol(Protocol):
 
 class RedoxBufferProtocol(Protocol):
 
-    log10_shift: ArrayLike
+    @property
+    def log10_shift(self) -> ArrayLike: ...
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
@@ -85,10 +86,10 @@ class IronWustiteBuffer(NamedTuple):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`
 
     Args:
-        log10_shift: Log10 shift relative to the buffer.
+        log10_shift: Log10 shift relative to the buffer. Defaults to zero.
     """
 
-    log10_shift: ArrayLike
+    log10_shift: ArrayLike = 0.0
 
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         # TODO: Eventually make this a jitted function that this method calls.

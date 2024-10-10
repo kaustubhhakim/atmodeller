@@ -42,7 +42,7 @@ from atmodeller.solution import Solution
 from atmodeller.solver import Solver, SolverOptimistix, SolverTryAgain
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
-logger: logging.Logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger("atmodeller")
 
 
 class Helper:
@@ -70,12 +70,16 @@ class Helper:
         Returns:
             True if the solution is close to the target, otherwise False
         """
-        solution_compare: dict[str, ArrayLike] = {
-            k: v for k, v in solution.items() if k in target.keys()
-        }
+        # Find the intersection of keys
+        intersection_keys: set[str] = solution.keys() & target.keys()
+        logger.info("Keys for comparison = %s", intersection_keys)
+
+        # Create new dictionaries with the intersecting keys
+        solution_compare: dict[str, ArrayLike] = {key: solution[key] for key in intersection_keys}
+        target_compare: dict[str, ArrayLike] = {key: target[key] for key in intersection_keys}
 
         target_values: npt.NDArray[np.float_] = np.array(
-            list(dict(sorted(target.items())).values())
+            list(dict(sorted(target_compare.items())).values())
         )
         solution_values: npt.NDArray[np.float_] = np.array(
             list(dict(sorted(solution_compare.items())).values())

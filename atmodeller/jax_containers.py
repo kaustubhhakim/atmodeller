@@ -160,6 +160,42 @@ class Species(NamedTuple):
         """Unique name by combining Hill notation and phase"""
         return self.data.name
 
+    @classmethod
+    def create_condensed(
+        cls,
+        data: SpeciesData,
+        activity: ActivityProtocol = CondensateActivity(),
+    ) -> Self:
+        """Creates a condensate
+
+        Args:
+            data: Species data
+            activity: Activity. Defaults to unity activity.
+
+        Returns:
+            A condensed species
+        """
+        return cls(data, activity, NoSolubility())
+
+    @classmethod
+    def create_gas(
+        cls,
+        data: SpeciesData,
+        activity: ActivityProtocol = IdealGasActivity(),
+        solubility: SolubilityProtocol = NoSolubility(),
+    ) -> Self:
+        """Creates a gas species
+
+        Args:
+            data: Species data
+            activity: Activity. Defaults to ideal gas.
+            solubility: Solubility. Defaults to no solubility.
+
+        Returns:
+            A gas species
+        """
+        return cls(data, activity, solubility)
+
 
 class GasSpecies(Species):
     """Gas species
@@ -185,15 +221,15 @@ class CondensedSpecies(Species):
     Args:
         data: Species data
         activity: Activity. Defaults to unity for a condensate.
-        solubility. Solubility. Defaults to no solubility.
     """
 
     def __new__(
         cls,
         data: SpeciesData,
         activity: ActivityProtocol = CondensateActivity(),
-        solubility: SolubilityProtocol = NoSolubility(),
     ):
+        # A condensed species does not have a solubility
+        solubility: SolubilityProtocol = NoSolubility()
         return super().__new__(cls, data, activity, solubility)
 
 
