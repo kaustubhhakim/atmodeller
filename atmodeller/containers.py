@@ -188,49 +188,13 @@ class Species(NamedTuple):
 
         Args:
             data: Species data
-            activity: Activity. Defaults to ideal gas.
+            activity: Activity. Defaults to an ideal gas.
             solubility: Solubility. Defaults to no solubility.
 
         Returns:
             A gas species
         """
         return cls(data, activity, solubility)
-
-
-class GasSpecies(Species):
-    """Gas species
-
-    Args:
-        data: Species data
-        activity: Activity. Defaults to an ideal gas.
-        solubility: Solubility. Defaults to no solubility.
-    """
-
-    def __new__(
-        cls,
-        data: SpeciesData,
-        activity: ActivityProtocol = IdealGasActivity(),
-        solubility: SolubilityProtocol = NoSolubility(),
-    ):
-        return super().__new__(cls, data, activity, solubility)
-
-
-class CondensedSpecies(Species):
-    """Condensed species
-
-    Args:
-        data: Species data
-        activity: Activity. Defaults to unity for a condensate.
-    """
-
-    def __new__(
-        cls,
-        data: SpeciesData,
-        activity: ActivityProtocol = CondensateActivity(),
-    ):
-        # A condensed species does not have a solubility
-        solubility: SolubilityProtocol = NoSolubility()
-        return super().__new__(cls, data, activity, solubility)
 
 
 class Solution(NamedTuple):

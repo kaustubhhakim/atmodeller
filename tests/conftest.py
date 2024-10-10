@@ -19,28 +19,11 @@
 # Want to use chemistry symbols so pylint: disable=invalid-name
 
 import logging
-from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import numpy.typing as npt
 import pytest
 from jaxtyping import ArrayLike
-
-from atmodeller.constraints import (
-    ActivityConstraint,
-    BufferedFugacityConstraint,
-    ElementMassConstraint,
-    PressureConstraint,
-    SystemConstraints,
-)
-from atmodeller.core import GasSpecies, LiquidSpecies, SolidSpecies, Species
-from atmodeller.initial_solution import InitialSolutionDict, InitialSolutionProtocol
-from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
-from atmodeller.jax_containers import Planet
-from atmodeller.solution import Solution
-from atmodeller.solver import Solver, SolverOptimistix, SolverTryAgain
-from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 
 logger: logging.Logger = logging.getLogger("atmodeller")
 
@@ -91,139 +74,11 @@ class Helper:
         isclose: npt.NDArray[np.bool_] = np.isclose(
             target_values, solution_values, rtol=rtol, atol=atol
         )
-
         logger.debug("isclose = %s", isclose)
 
         return isclose.all()
-
-    @classmethod
-    def isclose_tolerance(
-        cls,
-        solution: dict[str, ArrayLike],
-        target: dict[str, ArrayLike],
-        log: bool = False,
-        message: str = "",
-    ) -> float | None:
-        """Writes a log message with the tightest tolerance satisfied.
-
-        Args:
-            solution: Dictionary of the solution values
-            target: Dictionary of the target values
-            log: Compare closeness in log-space. Defaults to False.
-            message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
-                to an empty string.
-
-        Returns:
-            The tightest tolerance satisfied
-        """
-        for log_tolerance in (-6, -5, -4, -3, -2, -1):
-            tol: float = 10**log_tolerance
-            if cls.isclose(solution, target, log=log, rtol=tol, atol=tol):
-                logger.info("%s (tol = %f)".lstrip(), message, tol)
-                return tol
-
-        logger.info("%s (no tolerance < 0.1 satisfied)".lstrip(), message)
 
 
 @pytest.fixture
 def helper():
     return Helper()
-
-
-# TODO: Remove
-# @pytest.fixture
-# def graphite_water_condensed() -> Solution:
-#     """C and water in equilibrium at 430 K and 10 bar
-
-#     This system is convenient for testing several parts of the code, so it is a fixture so it can
-#     be accessed throughout the test suite.
-#     """
-
-#     H2O_g = GasSpecies("H2O")
-#     H2_g = GasSpecies("H2")
-#     O2_g = GasSpecies("O2")
-#     # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
-#     H2O_l = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
-#     CO_g = GasSpecies("CO")
-#     CO2_g = GasSpecies("CO2")
-#     CH4_g = GasSpecies("CH4")
-#     C_cr = SolidSpecies("C")
-
-#     species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
-
-#     cool_planet: Planet = Planet(surface_temperature=430)  # 411.75)
-
-#     h_kg: float = 3.10e20
-#     c_kg: float = 1.08e20
-#     # Specify O, because otherwise a total pressure can give rise to different solutions (with
-#     # different total O), making it more difficult to compare with a known comparison case.
-#     o_kg: float = 2.48298883581636e21
-
-#     constraints = SystemConstraints(
-#         [
-#             ElementMassConstraint("H", h_kg),
-#             ElementMassConstraint("C", c_kg),
-#             ElementMassConstraint("O", o_kg),
-#             ActivityConstraint(H2O_l, 1),
-#             ActivityConstraint(C_cr, 1),
-#         ]
-#     )
-#     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-#         species=species, planet=cool_planet
-#     )
-
-#     # Help the solver with an improved initial guess
-#     initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-#         {O2_g: 1e-48}, species=species, planet=cool_planet
-#     )
-
-#     solver = SolverOptimistix(method="dogleg")
-#     solver2 = SolverTryAgain(solver)
-
-#     solution: Solution = interior_atmosphere.solve(
-#         solver=solver2,
-#         constraints=constraints,
-#         initial_solution=initial_solution,
-#     )
-
-#     interior_atmosphere.output(to_excel=True)
-
-#     return solution
-
-# TODO: Remove
-# @pytest.fixture
-# def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
-#     """Generates data for testing the initial solution regressor"""
-
-#     # H2O pressures in bar
-#     H2O_pressures: list[float] = [1, 4, 7, 10]
-#     # fO2 shifts relative to the IW buffer
-#     delta_IWs: Iterable = range(-4, 5)
-
-#     H2O_g: GasSpecies = GasSpecies("H2O")
-#     H2_g: GasSpecies = GasSpecies("H2")
-#     O2_g: GasSpecies = GasSpecies("O2")
-#     species: Species = Species([H2O_g, H2_g, O2_g])
-
-#     planet: Planet = Planet()
-#     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-#         species=species, planet=planet
-#     )
-
-#     solver: Solver = SolverOptimistix()
-
-#     # Generate some data
-#     for H2O_pressure in H2O_pressures:
-#         for delta_IW in delta_IWs:
-#             constraints = SystemConstraints(
-#                 [
-#                     BufferedFugacityConstraint(O2_g, IronWustiteBuffer(delta_IW)),
-#                     PressureConstraint(H2O_g, H2O_pressure),
-#                 ]
-#             )
-#             interior_atmosphere.solve(solver=solver, constraints=constraints)
-
-#     filename = Path("ic_regressor_test_data")
-#     interior_atmosphere.output(filename, to_excel=True, to_pickle=True)
-
-#     return interior_atmosphere, filename

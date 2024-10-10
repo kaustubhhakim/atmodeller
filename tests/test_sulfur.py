@@ -29,9 +29,9 @@ from atmodeller.constraints import (
     FugacityConstraint,
     SystemConstraints,
 )
+from atmodeller.containers import Planet
 from atmodeller.core import GasSpecies, Species
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
-from atmodeller.jax_containers import Planet
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import (
     H2_basalt_hirschmann,

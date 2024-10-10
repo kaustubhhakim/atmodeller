@@ -26,7 +26,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
-from atmodeller.jax_containers import Planet, Species
+from atmodeller.containers import Planet, Species
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.thermodata.species_data import (
     C_cr_data,

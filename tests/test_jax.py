@@ -35,11 +35,11 @@ from atmodeller.constraints import (
     SystemConstraints,
     TotalPressureConstraint,
 )
+from atmodeller.containers import Planet
 from atmodeller.core import GasSpecies, Species
 from atmodeller.eos.holland import CO_CORK_HP91, H2_CORK_HP91, CO2_CORK_simple_HP91
 from atmodeller.eos.saxena import H2_SF87
 from atmodeller.interior_atmosphere import InteriorAtmosphereSystem
-from atmodeller.jax_containers import Planet
 from atmodeller.solution import Solution
 from atmodeller.solver import SolverOptimistix
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer

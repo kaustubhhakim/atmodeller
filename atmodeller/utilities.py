@@ -40,7 +40,7 @@ from sklearn.metrics import mean_squared_error
 from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 if TYPE_CHECKING:
-    from atmodeller.jax_containers import Species, SpeciesData
+    from atmodeller.containers import Species, SpeciesData
 
 logger: logging.Logger = logging.getLogger(__name__)
 

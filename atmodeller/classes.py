@@ -30,7 +30,7 @@ from jax import Array
 from jaxtyping import ArrayLike
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, TAU
-from atmodeller.jax_containers import (
+from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
     MassConstraints,
@@ -40,7 +40,7 @@ from atmodeller.jax_containers import (
     SolverParameters,
     Species,
 )
-from atmodeller.jax_engine import get_log_extended_activity, solve
+from atmodeller.engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import unscale_number_density
 from atmodeller.thermodata.core import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref

@@ -27,7 +27,7 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
-from atmodeller.jax_containers import (
+from atmodeller.containers import (
     FugacityConstraints,
     MassConstraints,
     Parameters,

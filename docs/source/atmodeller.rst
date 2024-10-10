@@ -65,7 +65,7 @@ atmodeller.interior\_atmosphere module
 atmodeller.jax\_containers module
 ---------------------------------
 
-.. automodule:: atmodeller.jax_containers
+.. automodule:: atmodeller.containers
    :members:
    :undoc-members:
    :show-inheritance:
@@ -73,7 +73,7 @@ atmodeller.jax\_containers module
 atmodeller.jax\_engine module
 -----------------------------
 
-.. automodule:: atmodeller.jax_engine
+.. automodule:: atmodeller.engine
    :members:
    :undoc-members:
    :show-inheritance:
