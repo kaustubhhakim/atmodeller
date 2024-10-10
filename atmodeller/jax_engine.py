@@ -148,7 +148,8 @@ def objective_function(solution: Array, parameters: Parameters) -> Array:
     log_volume: Array = atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
 
     # Need pressures in bar for subsequent operations so unscale. This includes condensate
-    # pressures, which are non-physical but are ignored in future calculations.
+    # pressures, which are non-physical but are effectively ignored in future calculations because
+    # condensates have zero solubility.
     log_pressure: Array = unscale_number_density(
         log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
     )

@@ -454,7 +454,7 @@ class InteriorAtmosphere:
                 initialise the solver are used.
 
         Returns:
-            Solution
+            Number density, extended activity
         """
         out: Array = self.solve_raw_output(initial_solution, parameters)
 
