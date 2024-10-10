@@ -108,51 +108,58 @@ def test_H_O(helper) -> None:
     assert helper.isclose(solution, fastchem_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-# def test_CHO_reduced(helper) -> None:
-#     """C-H-O system at IW-2
+def test_CHO_reduced(helper) -> None:
+    """C-H-O system at IW-2
 
-#     Similar to :cite:p:`BHS22{Table E, row 1}`
-#     """
+    Similar to :cite:p:`BHS22{Table E, row 1}`
+    """
 
-#     H2_g: GasSpecies = GasSpecies("H2")
-#     H2O_g: GasSpecies = GasSpecies("H2O")
-#     CO_g: GasSpecies = GasSpecies("CO")
-#     CO2_g: GasSpecies = GasSpecies("CO2")
-#     CH4_g: GasSpecies = GasSpecies("CH4")
-#     O2_g: GasSpecies = GasSpecies("O2")
+    H2_g: Species = GasSpecies(H2_g_data)
+    H2O_g: Species = GasSpecies(H2O_g_data)
+    CO_g: Species = GasSpecies(CO_g_data)
+    CO2_g: Species = GasSpecies(CO2_g_data)
+    CH4_g: Species = GasSpecies(CH4_g_data)
+    O2_g: Species = GasSpecies(O2_g_data)
 
-#     species: Species = Species([H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g])
+    species: list[Species] = [H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g]
+    warm_planet: Planet = Planet(surface_temperature=1400.0)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
-#     warm_planet: Planet = Planet(surface_temperature=1400)
+    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-2)}
 
-#     h_kg: float = earth_oceans_to_hydrogen_mass(3)
-#     c_kg: float = 1 * h_kg
+    oceans: float = 3
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    c_kg: float = 1 * h_kg
+    mass_constraints: dict[str, float] = {
+        "H": h_kg,
+        "C": c_kg,
+    }
 
-#     constraints: SystemConstraints = SystemConstraints(
-#         [
-#             BufferedFugacityConstraint(O2_g, IronWustiteBuffer(-2)),
-#             # FugacityConstraint(O2_g, 1.25e-15),
-#             ElementMassConstraint("H", h_kg),
-#             ElementMassConstraint("C", c_kg),
-#         ]
-#     )
-#     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-#         species=species, planet=warm_planet
-#     )
-#     solution: Solution = interior_atmosphere.solve(
-#         solver=SolverOptimistix(), constraints=constraints
-#     )
+    # Initial solution guess number density (molecules/m^3)
+    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
 
-#     factsage_result: dict[str, float] = {
-#         "H2_g": 175.5,
-#         "H2O_g": 13.8,
-#         "CO_g": 6.21,
-#         "CO2_g": 0.228,
-#         "CH4_g": 38.07,
-#         "O2_g": 1.25e-15,
-#     }
+    interior_atmosphere.initialise_solve(
+        warm_planet,
+        initial_number_density,
+        initial_stability,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+    )
+    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
-#     assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
+    factsage_result: dict[str, float] = {
+        "H2_g": 175.5,
+        "H2O_g": 13.8,
+        "CO_g": 6.21,
+        "CO2_g": 0.228,
+        "CH4_g": 38.07,
+        "O2_g": 1.25e-15,
+    }
+
+    assert helper.isclose(solution, factsage_result, log=True, rtol=TOLERANCE, atol=TOLERANCE)
 
 
 # def test_CHO_IW(helper) -> None:
