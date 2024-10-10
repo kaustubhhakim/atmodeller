@@ -18,8 +18,6 @@
 
 # Want to use chemistry symbols so pylint: disable=invalid-name
 
-from __future__ import annotations
-
 import logging
 
 import numpy as np
@@ -29,7 +27,6 @@ from jax.typing import ArrayLike
 from atmodeller import AVOGADRO, __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.jax_containers import Planet, Species
-from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
 from atmodeller.thermodata.jax_species_data import (
     C_cr_data,
     CH4_g_data,
