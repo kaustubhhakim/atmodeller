@@ -19,7 +19,7 @@
 import jax.numpy as jnp
 from jax import Array
 
-from atmodeller.thermodata.jax_thermo import ThermoData, get_gibbs_over_RT
+from atmodeller.thermodata.core import ThermoData, get_gibbs_over_RT
 
 C_g_thermodata: ThermoData = ThermoData(
     (8.545763110e4, 8.410597850e4, 2.355273444e6),
@@ -476,10 +476,3 @@ S2_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
-
-if __name__ == "__main__":
-
-    # Example usage
-    temperature: Array = jnp.array(20000.0)
-    gibbs: Array = get_gibbs_over_RT(CO_g_thermodata, temperature)
-    print(gibbs)

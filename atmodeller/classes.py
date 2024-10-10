@@ -42,7 +42,7 @@ from atmodeller.jax_containers import (
 )
 from atmodeller.jax_engine import get_log_extended_activity, solve
 from atmodeller.jax_utilities import unscale_number_density
-from atmodeller.thermodata.jax_thermo import RedoxBufferProtocol
+from atmodeller.thermodata.core import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref
 
 logger: logging.Logger = logging.getLogger(__name__)

@@ -16,7 +16,7 @@
 #
 """Thermochemical data for condensates"""
 
-from atmodeller.thermodata.jax_thermo import ThermoData
+from atmodeller.thermodata.core import ThermoData
 
 C_cr_thermodata: ThermoData = ThermoData(
     (8.943859760e3, 1.398412456e4, 5.848134850e3),

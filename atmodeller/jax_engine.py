@@ -41,7 +41,7 @@ from atmodeller.jax_utilities import (
     logsumexp,
     unscale_number_density,
 )
-from atmodeller.thermodata.jax_thermo import get_gibbs_over_RT
+from atmodeller.thermodata.core import get_gibbs_over_RT
 from atmodeller.utilities import unit_conversion
 
 

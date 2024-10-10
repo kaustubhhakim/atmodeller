@@ -31,7 +31,7 @@ atmodeller.thermodata.janaf module
 atmodeller.thermodata.jax\_thermo module
 ----------------------------------------
 
-.. automodule:: atmodeller.thermodata.jax_thermo
+.. automodule:: atmodeller.thermodata.core
    :members:
    :undoc-members:
    :show-inheritance:

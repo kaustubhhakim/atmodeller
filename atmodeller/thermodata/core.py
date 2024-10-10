@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core classes and functions for thermochemical data"""
+"""JAX thermochemical data"""
 
 # Convenient to use chemical formulas so pylint: disable=C0103
 

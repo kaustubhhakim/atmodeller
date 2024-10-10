@@ -27,7 +27,8 @@ from jax.typing import ArrayLike
 from atmodeller import AVOGADRO, __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.jax_containers import Planet, Species
-from atmodeller.thermodata.jax_species_data import (
+from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.species_data import (
     C_cr_data,
     CH4_g_data,
     CO2_g_data,
@@ -37,7 +38,6 @@ from atmodeller.thermodata.jax_species_data import (
     H2O_l_data,
     O2_g_data,
 )
-from atmodeller.thermodata.jax_thermo import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()

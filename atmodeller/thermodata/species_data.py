@@ -16,7 +16,6 @@
 #
 """Species data"""
 
-
 from atmodeller.thermodata.condensates import (
     C_cr_thermodata,
     H2O_l_thermodata,
@@ -25,6 +24,7 @@ from atmodeller.thermodata.condensates import (
     Si_l_thermodata,
     SiO2_l_thermodata,
 )
+from atmodeller.thermodata.core import SpeciesData
 from atmodeller.thermodata.gases import (
     C_g_thermodata,
     CH4_g_thermodata,
@@ -42,7 +42,6 @@ from atmodeller.thermodata.gases import (
     SO2_g_thermodata,
     SO_g_thermodata,
 )
-from atmodeller.thermodata.jax_thermo import SpeciesData
 
 C_g: SpeciesData = SpeciesData.create(
     "C",

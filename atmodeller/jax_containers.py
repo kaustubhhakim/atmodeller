@@ -44,7 +44,7 @@ from atmodeller import (
 )
 from atmodeller.jax_utilities import scale_number_density
 from atmodeller.solubility.jax_interfaces import NoSolubility, SolubilityProtocol
-from atmodeller.thermodata.jax_thermo import (
+from atmodeller.thermodata.core import (
     ActivityProtocol,
     CondensateActivity,
     IdealGasActivity,
