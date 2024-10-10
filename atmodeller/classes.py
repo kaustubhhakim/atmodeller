@@ -18,11 +18,9 @@
 
 import logging
 import pprint
-import sys
 import time
-from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Callable
+from typing import Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -47,18 +45,11 @@ from atmodeller.jax_utilities import unscale_number_density
 from atmodeller.thermodata.jax_thermo import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-# TODO: Make flag to check if vmap active in initialise_solve, then push solve etc. through
-# appropriate function
-class InteriorAtmosphereABC(ABC):
-    """Interior atmosphere base
+class InteriorAtmosphere:
+    """Interior atmosphere
 
     Args:
         species: List of species
@@ -66,7 +57,7 @@ class InteriorAtmosphereABC(ABC):
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    # Attributes that are set during initialise_solve and included for typing
+    # Attributes that are set during initialise_solve are included for typing
     fixed: FixedParameters
     fugacity_constraints: FugacityConstraints
     initial_solution: Solution
@@ -74,6 +65,8 @@ class InteriorAtmosphereABC(ABC):
     parameters: Parameters
     planet: Planet
     _solver: Callable
+    # Used for vmapping (if relevant)
+    parameters_vmap: Parameters
 
     def __init__(self, species: list[Species], log_scaling: float, tau: float = TAU):
         self.species: list[Species] = species
@@ -84,13 +77,27 @@ class InteriorAtmosphereABC(ABC):
         )
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
-    @abstractmethod
-    def get_solver(self) -> Callable:
-        """Gets the solver."""
+    @property
+    def _is_batch(self) -> bool:
+        """Returns if any parameters are batched, thereby necessitating a vmap solve"""
+        return self.contains_zero(
+            [
+                self.planet.vmap_axes(),
+                self.fugacity_constraints.vmap_axes(),
+                self.mass_constraints.vmap_axes(),
+            ]
+        )
 
-    @abstractmethod
-    def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
-        """Solves the system with processing"""
+    def contains_zero(self, tuples_list: list[NamedTuple]) -> bool:
+        """Checks if any tuples in a list contain a zero
+
+        Args:
+            tuples_list: List of tuples
+
+        Returns:
+            True if any
+        """
+        return any(0 in tup for tup in tuples_list)
 
     def initialise_solve(
         self,
@@ -134,34 +141,19 @@ class InteriorAtmosphereABC(ABC):
         )
         logger.debug("parameters = %s", self.parameters)
 
-        # TODO: Check if fugacity or mass constraints or planet are vmapped, and select appropriate
-        # solver accordingly. Similarly, set solve function.
-        self._solver = self.get_solver()
+        if self._is_batch:
+            self._solver = self._get_solver_vmap()
+        else:
+            self._solver = self._get_solver_single()
 
         # Compile
         start_time = time.time()
-        # self._solver is callable so pylint: disable=not-callable
         self._solver(self.initial_solution, self.parameters).block_until_ready()
         end_time = time.time()
         compile_time = end_time - start_time
         logger.info("Compile time: %.6f seconds", compile_time)
 
         return self._solver
-
-    def solve_raw_output(self) -> Array:
-        """Solves the system and returns the raw (unprocessed) solution
-
-        Returns:
-            Solution
-        """
-        start_time = time.time()
-        out: Array = self._solver(self.initial_solution, self.parameters).block_until_ready()
-        end_time = time.time()
-        execution_time = end_time - start_time
-        logger.info("Execution time: %.6f seconds", execution_time)
-        logger.debug("out = %s", out)
-
-        return out
 
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
@@ -398,49 +390,12 @@ class InteriorAtmosphereABC(ABC):
         """
         return [species_.name for species_ in self.species]
 
-
-class InteriorAtmosphere(InteriorAtmosphereABC):
-    """Interior atmosphere single system
-
-    Args:
-        species: List of species
-        log_scaling: Log scaling for the number density
-        tau: Tau factor for species stability. Defaults to TAU.
-    """
-
-    @override
-    def get_solver(self) -> Callable:
+    def _get_solver_single(self) -> Callable:
+        """Gets the solver for a single solve."""
         return self.get_wrapped_jit_solver()
 
-    @override
-    def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
-        """Solves the system.
-
-        Returns:
-            Number density, extended activity
-        """
-        out: Array = self.solve_raw_output()
-        number_density_np, extended_activity_np = self.get_processed_output(
-            out, axis=0, extended_activity_func=get_log_extended_activity
-        )
-
-        return number_density_np, extended_activity_np
-
-
-class InteriorAtmosphereBatch(InteriorAtmosphereABC):
-    """Interior atmosphere batch system
-
-    Args:
-        species: A list of species
-        log_scaling: Log scaling for the number density
-        tau: Tau factor for species stability. Defaults to TAU.
-    """
-
-    # For typing
-    parameters_vmap: Parameters
-
-    @override
-    def get_solver(self) -> Callable:
+    def _get_solver_vmap(self) -> Callable:
+        """Gets the solver for a batch solve."""
         # Define the structures to vectorize.
         self.parameters_vmap: Parameters = Parameters(
             fixed=None,  # type: ignore
@@ -454,19 +409,66 @@ class InteriorAtmosphereBatch(InteriorAtmosphereABC):
 
         return solver
 
-    def solve(self) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
-        """Solves the system.
+    def solve_raw_output(
+        self, initial_solution: Solution | None = None, parameters: Parameters | None = None
+    ) -> Array:
+        """Solves the system and returns the raw (unprocessed) solution
+
+        Args:
+            initial_solution: Initial solution. Defaults to None, meaning that the initial solution
+                used to initialise the solver is used.
+            parameters: Parameters. Defaults to None, meaning that the parameters used to
+                initialise the solver are used.
 
         Returns:
-            Number density, extended activity
+            Solution
         """
-        out: Array = self.solve_raw_output()
-        # Must vmap the function to enable it to be used in batch mode.
-        vmap_get_log_extended_activity: Callable = jax.vmap(
-            get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0)
-        )
-        number_density_np, extended_activity_np = self.get_processed_output(
-            out, axis=1, extended_activity_func=vmap_get_log_extended_activity
-        )
+        if initial_solution is None:
+            initial_solution_: Solution = self.initial_solution
+        else:
+            initial_solution_ = initial_solution
+
+        if parameters is None:
+            parameters_: Parameters = self.parameters
+        else:
+            parameters_ = parameters
+
+        start_time = time.time()
+        out: Array = self._solver(initial_solution_, parameters_).block_until_ready()
+        end_time = time.time()
+        execution_time = end_time - start_time
+        logger.info("Execution time: %.6f seconds", execution_time)
+        logger.debug("out = %s", out)
+
+        return out
+
+    def solve(
+        self, initial_solution: Solution | None = None, parameters: Parameters | None = None
+    ) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
+        """Solves the system and returns the processed solution
+
+        Args:
+            initial_solution: Initial solution. Defaults to None, meaning that the initial solution
+                used to initialise the solver is used.
+            parameters: Parameters. Defaults to None, meaning that the parameters used to
+                initialise the solver are used.
+
+        Returns:
+            Solution
+        """
+        out: Array = self.solve_raw_output(initial_solution, parameters)
+
+        if self._is_batch:
+            # Must vmap the function to enable it to be used in batch mode.
+            vmap_get_log_extended_activity: Callable = jax.vmap(
+                get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0)
+            )
+            number_density_np, extended_activity_np = self.get_processed_output(
+                out, axis=1, extended_activity_func=vmap_get_log_extended_activity
+            )
+        else:
+            number_density_np, extended_activity_np = self.get_processed_output(
+                out, axis=0, extended_activity_func=get_log_extended_activity
+            )
 
         return number_density_np, extended_activity_np

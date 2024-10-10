@@ -27,11 +27,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, debug_logger
-from atmodeller.classes import (
-    InteriorAtmosphere,
-    InteriorAtmosphereABC,
-    InteriorAtmosphereBatch,
-)
+from atmodeller.classes import InteriorAtmosphere
 from atmodeller.jax_containers import CondensedSpecies, GasSpecies, Planet, Species
 from atmodeller.jax_utilities import log_pressure_from_log_number_density
 from atmodeller.solubility.jax_hydrogen_species import H2O_peridotite_sossi
@@ -77,7 +73,7 @@ def test_CHO_low_temperature() -> None:
 
     species: list[Species] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
     planet: Planet = Planet(surface_temperature=450.0)
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 1 * h_kg
@@ -137,7 +133,7 @@ def test_graphite_condensed() -> None:
 
     species: list[Species] = [O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr]
     planet: Planet = Planet(surface_temperature=873.0)
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     c_kg: float = 5 * h_kg
@@ -212,7 +208,7 @@ def test_graphite_unstable() -> None:
 
     species: list[Species] = [O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr]
     planet: Planet = Planet(surface_temperature=1400.0)
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(3)
     c_kg: float = 1 * h_kg
@@ -283,7 +279,7 @@ def test_water_condensed_O_abundance() -> None:
 
     species: list[Species] = [H2_g, H2O_g, O2_g, H2O_l]
     planet: Planet = Planet(surface_temperature=411.75)
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = earth_oceans_to_hydrogen_mass(1)
     o_kg: float = 1.14375e21
@@ -342,7 +338,7 @@ def test_graphite_water_condensed() -> None:
 
     species: list[Species] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
     planet: Planet = Planet(surface_temperature=430.0)
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
@@ -396,51 +392,6 @@ def test_graphite_water_condensed() -> None:
     assert isclose_factsage
 
 
-def test_batch_planet() -> None:
-    """Tests a batch calculation with different planets"""
-
-    O2_g: Species = GasSpecies(O2_g_data)
-    H2_g: Species = GasSpecies(H2_g_data)
-    CO_g: Species = GasSpecies(CO_g_data)
-    H2O_g: Species = GasSpecies(H2O_g_data)
-    CO2_g: Species = GasSpecies(CO2_g_data)
-    CH4_g: Species = GasSpecies(CH4_g_data)
-
-    species: list[Species] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
-
-    # Creates a list of planets with different surface temperatures
-    planet_list: list[Planet] = []
-    for surface_temperature in range(450, 2001, 1000):
-        planet_list.append(Planet(surface_temperature=float(surface_temperature)))
-
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphereBatch(species, LOG_SCALING)
-
-    h_kg: float = earth_oceans_to_hydrogen_mass(1)
-    c_kg: float = 1 * h_kg
-    o_kg: float = 1.02999e20
-
-    # Creates a list of mass constraints
-    mass_constraints1: dict[str, float] = {"C": c_kg, "H": h_kg, "O": o_kg}
-    mass_constraints2: dict[str, float] = {"C": c_kg, "H": h_kg * 2, "O": o_kg}
-    mass_constraints: list[dict[str, float]] = [mass_constraints1, mass_constraints2]
-
-    # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = np.array([60, 60, 60, -30, 60, 60], dtype=np.float_)
-    initial_stability: ArrayLike = -40.0 * np.ones_like(initial_number_density)
-    # FIXME: New constraints list
-    interior_atmosphere.initialise_solve(
-        planet_list, initial_number_density, initial_stability, mass_constraints=mass_constraints
-    )
-    log_number_density, _ = interior_atmosphere.solve()
-
-    # pressure: Array = log_pressure_from_log_number_density(
-    #     log_number_density, planets_batch.surface_temperature
-    # )
-    # logger.debug("pressure = %s", pressure)
-
-    assert True
-
-
 def test_H_fO2() -> None:
     """Tests H2-H2O at the IW buffer."""
 
@@ -450,7 +401,7 @@ def test_H_fO2() -> None:
 
     species: list[Species] = [H2O_g, H2_g, O2_g]
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
@@ -491,7 +442,7 @@ def test_H_fO2_buffer() -> None:
 
     species: list[Species] = [H2O_g, H2_g, O2_g]
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphere(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
@@ -540,7 +491,7 @@ def test_H_fO2_buffer_batch() -> None:
     H2O_g: Species = GasSpecies(H2O_g_data, solubility=H2O_peridotite_sossi)
 
     species: list[Species] = [H2O_g, H2_g, O2_g]
-    interior_atmosphere: InteriorAtmosphereABC = InteriorAtmosphereBatch(species, LOG_SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, LOG_SCALING)
 
     num: int = 1000
 

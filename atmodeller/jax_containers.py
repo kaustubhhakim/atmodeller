@@ -278,14 +278,16 @@ class FugacityConstraints(NamedTuple):
         Returns:
             vmap axes
         """
-        try:
-            num_entries: int = len(list(self.constraints.values())[0].log10_shift)  # type: ignore
-            if num_entries > 1:
-                vmap_axis: int | None = 0
-            else:
-                vmap_axis = None
-        except TypeError:
-            vmap_axis = None
+        values_list: list[RedoxBufferProtocol] = list(self.constraints.values())
+        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
+        if values_list:
+            try:
+                num_entries: int = len(values_list[0].log10_shift)  # type: ignore
+                if num_entries > 1:
+                    vmap_axis = 0
+            except TypeError:  # Just a single value, which means no vmapping required.
+                # vmap_axis = None
+                pass
 
         return FugacityConstraints(vmap_axis, None)  # type: ignore - container types are for data
 
@@ -378,14 +380,16 @@ class MassConstraints(NamedTuple):
         Returns:
             vmap axes
         """
-        try:
-            number_entries: int = len(list(self.log_molecules.values())[0])  # type: ignore
-            if number_entries > 1:
-                vmap_axis: int | None = 0
-            else:
-                vmap_axis = None
-        except TypeError:
-            vmap_axis = None
+        values_list: list[ArrayLike] = list(self.log_molecules.values())
+        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
+        if values_list:
+            try:
+                number_entries: int = len(values_list[0])  # type: ignore
+                if number_entries > 1:
+                    vmap_axis = 0
+            except TypeError:  # Just a single value, which means no vmapping required.
+                # vmap_axis = None
+                pass
 
         return MassConstraints(vmap_axis, None)  # type: ignore - container types are for data
 
