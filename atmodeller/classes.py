@@ -29,7 +29,7 @@ import numpy.typing as npt
 from jax import Array
 from jaxtyping import ArrayLike
 
-from atmodeller import TAU
+from atmodeller import BOLTZMANN_CONSTANT_BAR, TAU
 from atmodeller.jax_containers import (
     FixedParameters,
     FugacityConstraints,
@@ -53,7 +53,7 @@ class InteriorAtmosphere:
 
     Args:
         species: List of species
-        log_scaling: Log scaling for the number density
+        scaling: Scaling for the number density
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
@@ -68,9 +68,9 @@ class InteriorAtmosphere:
     # Used for vmapping (if relevant)
     parameters_vmap: Parameters
 
-    def __init__(self, species: list[Species], log_scaling: float, tau: float = TAU):
+    def __init__(self, species: list[Species], scaling: float, tau: float = TAU):
         self.species: list[Species] = species
-        self.log_scaling: float = log_scaling
+        self.log_scaling: float = np.log(scaling)
         self.tau: float = tau
         self.solver_parameters: SolverParameters = SolverParameters.create(
             self.species, self.log_scaling
@@ -444,7 +444,7 @@ class InteriorAtmosphere:
 
     def solve(
         self, initial_solution: Solution | None = None, parameters: Parameters | None = None
-    ) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
+    ) -> dict[str, ArrayLike]:
         """Solves the system and returns the processed solution
 
         Args:
@@ -471,4 +471,50 @@ class InteriorAtmosphere:
                 out, axis=0, extended_activity_func=get_log_extended_activity
             )
 
-        return number_density_np, extended_activity_np
+        output_dict: dict[str, ArrayLike] = self.output_dict(
+            number_density_np, extended_activity_np
+        )
+        logger.info("output_dict = %s", pprint.pformat(output_dict))
+
+        return output_dict
+
+    def output_dict(
+        self,
+        number_density: npt.NDArray[np.float_],
+        extended_activity: npt.NDArray[np.float_],
+    ) -> dict[str, ArrayLike]:
+        """Output dictionary to quickly assess the solution.
+
+        This is intended for a quick first glance of the output with convenient units and to ease
+        comparison with test or benchmark data. A more complete output of the data is available in
+        TODO.
+
+        Args:
+            number_density: Log number density
+            extended_activity: Log extended activity
+        """
+
+        def collapse_single_entry_values(
+            input_dictionary: dict[str, ArrayLike]
+        ) -> dict[str, ArrayLike]:
+            for key, value in input_dictionary.items():
+                if value.size == 1:  # type: ignore
+                    input_dictionary[key] = float(value[0])  # type: ignore
+
+            return input_dictionary
+
+        output_dict: dict[str, ArrayLike] = {}
+
+        for nn, species_ in enumerate(self.species):
+            species_density: ArrayLike = np.exp(np.atleast_2d(number_density)[:, nn])
+            species_activity: ArrayLike = np.exp(np.atleast_2d(extended_activity)[:, nn])
+            if nn in self.get_gas_species_indices():
+                # TODO: Check this works for real gas EOS as well
+                # Convert gas number densities to pressure/fugacity in bar
+                species_density *= BOLTZMANN_CONSTANT_BAR * self.planet.surface_temperature
+                species_activity *= BOLTZMANN_CONSTANT_BAR * self.planet.surface_temperature
+
+            output_dict[species_.name] = species_density
+            output_dict[f"{species_.name}_activity"] = species_activity
+
+        return collapse_single_entry_values(output_dict)

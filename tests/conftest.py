@@ -25,6 +25,7 @@ from typing import Iterable
 import numpy as np
 import numpy.typing as npt
 import pytest
+from jaxtyping import ArrayLike
 
 from atmodeller.constraints import (
     ActivityConstraint,
@@ -50,8 +51,8 @@ class Helper:
     @classmethod
     def isclose(
         cls,
-        solution: Solution,
-        target: dict[str, float],
+        solution: dict[str, ArrayLike],
+        target: dict[str, ArrayLike],
         *,
         log: bool = False,
         rtol: float = 1.0e-6,
@@ -60,25 +61,24 @@ class Helper:
         """Determines if the solution is close to a target solution within a tolerance.
 
         Args:
-            solution: Solution
-            target: Dictionary of the target values, which should adhere to the format of
-                :meth:`solution.Solution.output_solution()`
+            solution: Dictionary of the solution values
+            target: Dictionary of the target values
+            log: Compare closeness in log-space. Defaults to False.
             rtol: Relative tolerance. Defaults to 1.0e-6.
             atol: Absolute tolerance. Defaults to 1.0e-6.
 
         Returns:
             True if the solution is close to the target, otherwise False
         """
-        output: dict[str, float] = solution.output_solution()
-
-        if len(output) != len(target):
-            return np.bool_(False)
+        solution_compare: dict[str, ArrayLike] = {
+            k: v for k, v in solution.items() if k in target.keys()
+        }
 
         target_values: npt.NDArray[np.float_] = np.array(
             list(dict(sorted(target.items())).values())
         )
         solution_values: npt.NDArray[np.float_] = np.array(
-            list(dict(sorted(output.items())).values())
+            list(dict(sorted(solution_compare.items())).values())
         )
         if log:
             target_values = np.log10(target_values)
@@ -94,13 +94,18 @@ class Helper:
 
     @classmethod
     def isclose_tolerance(
-        cls, solution: Solution, target: dict[str, float], log: bool = False, message: str = ""
+        cls,
+        solution: dict[str, ArrayLike],
+        target: dict[str, ArrayLike],
+        log: bool = False,
+        message: str = "",
     ) -> float | None:
         """Writes a log message with the tightest tolerance satisfied.
 
         Args:
-            target: Dictionary of the target values, which should adhere to the format of
-                :meth:`solution.Solution.output_solution()`
+            solution: Dictionary of the solution values
+            target: Dictionary of the target values
+            log: Compare closeness in log-space. Defaults to False.
             message: Message prefix to write to the logger when a tolerance is satisfied. Defaults
                 to an empty string.
 
@@ -121,99 +126,100 @@ def helper():
     return Helper()
 
 
-@pytest.fixture
-def graphite_water_condensed() -> Solution:
-    """C and water in equilibrium at 430 K and 10 bar
+# TODO: Remove
+# @pytest.fixture
+# def graphite_water_condensed() -> Solution:
+#     """C and water in equilibrium at 430 K and 10 bar
 
-    This system is convenient for testing several parts of the code, so it is a fixture so it can
-    be accessed throughout the test suite.
-    """
+#     This system is convenient for testing several parts of the code, so it is a fixture so it can
+#     be accessed throughout the test suite.
+#     """
 
-    H2O_g = GasSpecies("H2O")
-    H2_g = GasSpecies("H2")
-    O2_g = GasSpecies("O2")
-    # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
-    H2O_l = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
-    CO_g = GasSpecies("CO")
-    CO2_g = GasSpecies("CO2")
-    CH4_g = GasSpecies("CH4")
-    C_cr = SolidSpecies("C")
+#     H2O_g = GasSpecies("H2O")
+#     H2_g = GasSpecies("H2")
+#     O2_g = GasSpecies("O2")
+#     # TODO: Using the 10 bar thermo data pushes the atmodeller result away from FactSage. Why?
+#     H2O_l = LiquidSpecies("H2O")  # , thermodata_name="Water, 10 Bar")
+#     CO_g = GasSpecies("CO")
+#     CO2_g = GasSpecies("CO2")
+#     CH4_g = GasSpecies("CH4")
+#     C_cr = SolidSpecies("C")
 
-    species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
+#     species = Species([H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr])
 
-    cool_planet: Planet = Planet(surface_temperature=430)  # 411.75)
+#     cool_planet: Planet = Planet(surface_temperature=430)  # 411.75)
 
-    h_kg: float = 3.10e20
-    c_kg: float = 1.08e20
-    # Specify O, because otherwise a total pressure can give rise to different solutions (with
-    # different total O), making it more difficult to compare with a known comparison case.
-    o_kg: float = 2.48298883581636e21
+#     h_kg: float = 3.10e20
+#     c_kg: float = 1.08e20
+#     # Specify O, because otherwise a total pressure can give rise to different solutions (with
+#     # different total O), making it more difficult to compare with a known comparison case.
+#     o_kg: float = 2.48298883581636e21
 
-    constraints = SystemConstraints(
-        [
-            ElementMassConstraint("H", h_kg),
-            ElementMassConstraint("C", c_kg),
-            ElementMassConstraint("O", o_kg),
-            ActivityConstraint(H2O_l, 1),
-            ActivityConstraint(C_cr, 1),
-        ]
-    )
-    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, planet=cool_planet
-    )
+#     constraints = SystemConstraints(
+#         [
+#             ElementMassConstraint("H", h_kg),
+#             ElementMassConstraint("C", c_kg),
+#             ElementMassConstraint("O", o_kg),
+#             ActivityConstraint(H2O_l, 1),
+#             ActivityConstraint(C_cr, 1),
+#         ]
+#     )
+#     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+#         species=species, planet=cool_planet
+#     )
 
-    # Help the solver with an improved initial guess
-    initial_solution: InitialSolutionProtocol = InitialSolutionDict(
-        {O2_g: 1e-48}, species=species, planet=cool_planet
-    )
+#     # Help the solver with an improved initial guess
+#     initial_solution: InitialSolutionProtocol = InitialSolutionDict(
+#         {O2_g: 1e-48}, species=species, planet=cool_planet
+#     )
 
-    solver = SolverOptimistix(method="dogleg")
-    solver2 = SolverTryAgain(solver)
+#     solver = SolverOptimistix(method="dogleg")
+#     solver2 = SolverTryAgain(solver)
 
-    solution: Solution = interior_atmosphere.solve(
-        solver=solver2,
-        constraints=constraints,
-        initial_solution=initial_solution,
-    )
+#     solution: Solution = interior_atmosphere.solve(
+#         solver=solver2,
+#         constraints=constraints,
+#         initial_solution=initial_solution,
+#     )
 
-    interior_atmosphere.output(to_excel=True)
+#     interior_atmosphere.output(to_excel=True)
 
-    return solution
+#     return solution
 
+# TODO: Remove
+# @pytest.fixture
+# def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
+#     """Generates data for testing the initial solution regressor"""
 
-@pytest.fixture
-def generate_regressor_data() -> tuple[InteriorAtmosphereSystem, Path]:
-    """Generates data for testing the initial solution regressor"""
+#     # H2O pressures in bar
+#     H2O_pressures: list[float] = [1, 4, 7, 10]
+#     # fO2 shifts relative to the IW buffer
+#     delta_IWs: Iterable = range(-4, 5)
 
-    # H2O pressures in bar
-    H2O_pressures: list[float] = [1, 4, 7, 10]
-    # fO2 shifts relative to the IW buffer
-    delta_IWs: Iterable = range(-4, 5)
+#     H2O_g: GasSpecies = GasSpecies("H2O")
+#     H2_g: GasSpecies = GasSpecies("H2")
+#     O2_g: GasSpecies = GasSpecies("O2")
+#     species: Species = Species([H2O_g, H2_g, O2_g])
 
-    H2O_g: GasSpecies = GasSpecies("H2O")
-    H2_g: GasSpecies = GasSpecies("H2")
-    O2_g: GasSpecies = GasSpecies("O2")
-    species: Species = Species([H2O_g, H2_g, O2_g])
+#     planet: Planet = Planet()
+#     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
+#         species=species, planet=planet
+#     )
 
-    planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-        species=species, planet=planet
-    )
+#     solver: Solver = SolverOptimistix()
 
-    solver: Solver = SolverOptimistix()
+#     # Generate some data
+#     for H2O_pressure in H2O_pressures:
+#         for delta_IW in delta_IWs:
+#             constraints = SystemConstraints(
+#                 [
+#                     BufferedFugacityConstraint(O2_g, IronWustiteBuffer(delta_IW)),
+#                     PressureConstraint(H2O_g, H2O_pressure),
+#                 ]
+#             )
+#             interior_atmosphere.solve(solver=solver, constraints=constraints)
 
-    # Generate some data
-    for H2O_pressure in H2O_pressures:
-        for delta_IW in delta_IWs:
-            constraints = SystemConstraints(
-                [
-                    BufferedFugacityConstraint(O2_g, IronWustiteBuffer(delta_IW)),
-                    PressureConstraint(H2O_g, H2O_pressure),
-                ]
-            )
-            interior_atmosphere.solve(solver=solver, constraints=constraints)
+#     filename = Path("ic_regressor_test_data")
+#     interior_atmosphere.output(filename, to_excel=True, to_pickle=True)
 
-    filename = Path("ic_regressor_test_data")
-    interior_atmosphere.output(filename, to_excel=True, to_pickle=True)
-
-    return interior_atmosphere, filename
+#     return interior_atmosphere, filename
