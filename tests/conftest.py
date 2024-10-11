@@ -23,11 +23,13 @@ import logging
 import numpy as np
 import numpy.typing as npt
 import pytest
-from jaxtyping import ArrayLike
+from jax.typing import ArrayLike
+
+logger: logging.Logger = logging.getLogger("atmodeller.tests")
 
 
 class Helper:
-    """Helper class for tests"""
+    """Helper for integral tests"""
 
     @classmethod
     def isclose(
@@ -39,7 +41,7 @@ class Helper:
         rtol: float = 1.0e-6,
         atol: float = 1.0e-6,
     ) -> np.bool_:
-        """Determines if the solution is close to a target solution within a tolerance.
+        """Determines if the solution is close to a target within tolerance.
 
         Args:
             solution: Dictionary of the solution values

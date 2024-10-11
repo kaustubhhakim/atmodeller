@@ -64,66 +64,91 @@ logger.info("TEST_FO2 = %e bar", TEST_FO2)
 logger.info("TEST_FO2_GPA = %e bar", TEST_FO2_GPA)
 
 
-def test_CH4_basalt_ardia(helper) -> None:
+def test_CH4_basalt_ardia(check_values) -> None:
     """Tests CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    model: SolubilityProtocol = CH4_basalt_ardia
-    concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
+    solubility_model: SolubilityProtocol = CH4_basalt_ardia
+    target_concentration: ArrayLike = 0.0005831884445042942
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE_GPA,
+        TEST_FO2_GPA,
     )
-    helper.concentration_to_logger(function_name, concentration)
-
-    assert np.isclose(concentration, 0.0005831884445042942, rtol=RTOL, atol=ATOL).all()
 
 
-def test_CO_basalt_armstrong(helper) -> None:
+def test_CO_basalt_armstrong(check_values) -> None:
     """Tests volatiles in mafic melts under reduced conditions :cite:p:`AHS15`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    model: SolubilityProtocol = CO_basalt_armstrong
-    concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
+    solubility_model: SolubilityProtocol = CO_basalt_armstrong
+    target_concentration: ArrayLike = 0.027396953726422667
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE_GPA,
+        TEST_FO2_GPA,
     )
-    helper.concentration_to_logger(function_name, concentration)
-
-    assert np.isclose(concentration, 0.027396953726422667, rtol=RTOL, atol=ATOL).all()
 
 
-def test_CO_basalt_yoshioka(helper) -> None:
+def test_CO_basalt_yoshioka(check_values) -> None:
     """Tests carbon in silicate melts :cite:p:`YNN19`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    model: SolubilityProtocol = CO_basalt_yoshioka
-    concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
+    solubility_model: SolubilityProtocol = CO_basalt_yoshioka
+    target_concentration: ArrayLike = 0.1098560543306116
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE_GPA,
+        TEST_FO2_GPA,
     )
-    helper.concentration_to_logger(function_name, concentration)
-
-    assert np.isclose(concentration, 0.1098560543306116, rtol=RTOL, atol=ATOL).all()
 
 
-def test_CO_rhyolite_yoshioka(helper) -> None:
+def test_CO_rhyolite_yoshioka(check_values) -> None:
     """Tests carbon in silicate melts :cite:p:`YNN19`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    model: SolubilityProtocol = CO_rhyolite_yoshioka
-    concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
+    solubility_model: SolubilityProtocol = CO_rhyolite_yoshioka
+    target_concentration: ArrayLike = 1.19271202468211
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE_GPA,
+        TEST_FO2_GPA,
     )
-    helper.concentration_to_logger(function_name, concentration)
-
-    assert np.isclose(concentration, 1.19271202468211, rtol=RTOL, atol=ATOL).all()
 
 
-def test_CO2_basalt_dixon(helper) -> None:
+def test_CO2_basalt_dixon(check_values) -> None:
     """Tests CO2 in MORB liquids :cite:p:`DSH95`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    model: SolubilityProtocol = CO2_basalt_dixon
-    concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
-    )
-    helper.concentration_to_logger(function_name, concentration)
+    solubility_model: SolubilityProtocol = CO2_basalt_dixon
+    target_concentration: ArrayLike = 0.8527333099685608
 
-    assert np.isclose(concentration, 0.8527333099685608, rtol=RTOL, atol=ATOL).all()
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )

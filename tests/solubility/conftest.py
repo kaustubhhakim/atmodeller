@@ -36,7 +36,7 @@ ATOL: float = 1.0e-8
 
 
 class CheckValues:
-    """Helper class with methods to check and confirm values"""
+    """Helper to check and confirm values"""
 
     @classmethod
     def concentration(
