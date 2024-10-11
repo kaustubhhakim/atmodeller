@@ -19,6 +19,8 @@
 from atmodeller.thermodata.condensates import (
     C_cr_thermodata,
     H2O_l_thermodata,
+    S_alpha_thermodata,
+    S_beta_thermodata,
     S_l_thermodata,
     Si_cr_thermodata,
     Si_l_thermodata,
@@ -93,6 +95,8 @@ NH3_g_data: SpeciesData = SpeciesData.create(
     NH3_g_thermodata,
 )
 O2_g_data: SpeciesData = SpeciesData.create("O2", "g", O2_g_thermodata)
+S_alpha_data: SpeciesData = SpeciesData.create("S", "alpha", S_alpha_thermodata)
+S_beta_data: SpeciesData = SpeciesData.create("S", "beta", S_beta_thermodata)
 S_l_data: SpeciesData = SpeciesData.create(
     "S",
     "l",

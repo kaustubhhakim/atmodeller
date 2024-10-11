@@ -38,7 +38,7 @@ Href: float = 298.15
 """Enthalpy reference temperature in K"""
 Pref: float = 1.0
 """Standard state pressure in bar"""
-phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
+phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2, "alpha": 3, "beta": 4}
 """Mapping from the JANAF phase string to an integer code"""
 inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
 """Inverse mapping from the integer code to a JANAF phase string"""
