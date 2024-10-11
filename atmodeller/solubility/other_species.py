@@ -14,7 +14,10 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Solubility laws for other species"""
+"""Solubility laws for other species
+
+For every law there should be a test in the test suite.
+"""
 
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 

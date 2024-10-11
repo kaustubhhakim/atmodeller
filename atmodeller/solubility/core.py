@@ -16,7 +16,7 @@
 #
 """Core classes and functionality"""
 
-# Convenient to use fO2 so pylint: disable=invalid-name
+# Convenient to use chemical formulas so pylint: disable=invalid-name
 
 from __future__ import annotations
 

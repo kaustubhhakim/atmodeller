@@ -41,9 +41,8 @@ from atmodeller.containers import (
     Species,
 )
 from atmodeller.engine import get_log_extended_activity, solve
-from atmodeller.jax_utilities import unscale_number_density
 from atmodeller.thermodata.core import RedoxBufferProtocol
-from atmodeller.utilities import partial_rref
+from atmodeller.utilities import partial_rref, unscale_number_density
 
 logger: logging.Logger = logging.getLogger(__name__)
 

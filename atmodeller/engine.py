@@ -36,13 +36,13 @@ from atmodeller.containers import (
     SolverParameters,
     Species,
 )
-from atmodeller.jax_utilities import (
+from atmodeller.thermodata.core import get_gibbs_over_RT
+from atmodeller.utilities import (
     log_pressure_from_log_number_density,
     logsumexp,
+    unit_conversion,
     unscale_number_density,
 )
-from atmodeller.thermodata.core import get_gibbs_over_RT
-from atmodeller.utilities import unit_conversion
 
 
 @partial(jit, static_argnames=["solver_parameters"])

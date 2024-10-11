@@ -42,7 +42,6 @@ from atmodeller import (
     STABILITY_LOWER,
     STABILITY_UPPER,
 )
-from atmodeller.jax_utilities import scale_number_density
 from atmodeller.solubility.core import NoSolubility, SolubilityProtocol
 from atmodeller.thermodata.core import (
     ActivityProtocol,
@@ -51,7 +50,7 @@ from atmodeller.thermodata.core import (
     RedoxBufferProtocol,
     SpeciesData,
 )
-from atmodeller.utilities import OptxSolver, unit_conversion
+from atmodeller.utilities import OptxSolver, scale_number_density, unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self

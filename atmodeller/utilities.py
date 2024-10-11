@@ -16,85 +16,336 @@
 #
 """Utilities"""
 
-from __future__ import annotations
-
-import functools
 import logging
-from collections.abc import Collection, MutableMapping
-from cProfile import Profile
-from dataclasses import asdict, dataclass, field
-from functools import wraps
-from pstats import SortKey, Stats
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Type, TypeVar
+from dataclasses import dataclass, field
+from typing import Callable, NamedTuple
 
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array
+from jax import Array, jit, lax
 from jax.typing import ArrayLike
-from molmass import Formula
 from scipy.constants import kilo, mega
-from sklearn.metrics import mean_squared_error
 
 from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
-if TYPE_CHECKING:
-    from atmodeller.containers import Species, SpeciesData
-
 logger: logging.Logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
 
 OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
 
 
-def profile_decorator(func):
-    """Decorator to profile a function"""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with Profile() as profile:
-            result = func(*args, **kwargs)
-        stats = Stats(profile).strip_dirs().sort_stats(SortKey.TIME)
-        stats.print_stats()
-        return result
-
-    return wrapper
-
-
-def debug_decorator(logger_in: logging.Logger) -> Callable:
-    """A decorator to print the result of a function to a debug logger."""
-
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            # logger.info(f"Executing {func.__name__}")
-            result: Any = func(*args, **kwargs)
-            logger_in.debug("%s = %s", func.__name__, result)
-            # logger.info(f"Finished executing {func.__name__}")
-            return result
-
-        return wrapper
-
-    return decorator
-
-
-def filter_by_type(some_collection: Collection, class_type: Type[T]) -> dict[int, T]:
-    """Filters entries of a collection according to the class type
+@jit
+def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
+    """Computes the log-sum-exp in a numerically stable way.
 
     Args:
-        some_collection: A collection (e.g. a list) to filter
-        class_type: Class type to filter
+        log_values: Array of log values to sum
+        prefactors: Array of prefactors corresponding to each log value
 
     Returns:
-        A dictionary with indices in some_collection as keys and filtered entries as values
+        The log of the sum of prefactors multiplied by exponentials of the input values
     """
-    filtered: dict[int, T] = {
-        ii: value for ii, value in enumerate(some_collection) if isinstance(value, class_type)
-    }
+    max_log: Array = jnp.max(log_values)
+    value_sum: Array = jnp.sum(prefactors * jnp.exp(log_values - max_log))
 
-    return filtered
+    return max_log + jnp.log(value_sum)
+
+
+@jit
+def scale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
+    """Scales the log number density
+
+    This is in log space.
+
+    Args:
+        number_density: Number density in molecules per m^3
+        scaling: Scaling
+
+    Return:
+        Scaled number density
+    """
+    return number_density - scaling  # type: ignore since types are not bool
+
+
+@jit
+def unscale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
+    """Unscales the scaled log number density
+
+    This is in log space.
+
+    Args:
+        number_density: Scaled number density
+        scaling: Scaling
+
+    Returns:
+        Unscaled number density
+    """
+    return number_density + scaling
+
+
+@jit
+def log_pressure_from_log_number_density(
+    log_number_density: Array, temperature: ArrayLike
+) -> Array:
+    """Calculates log pressure from the log number density
+
+    Args:
+        log_number_density: Log number density
+        temperature: Temperature
+
+    Returns:
+        Log pressure
+    """
+    log_pressure: Array = (
+        log_number_density + np.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature)
+    )
+
+    return log_pressure
+
+
+@jit
+def partial_rref_jax(matrix: Array) -> Array:
+    """Computes the partial reduced row echelon form to determine linear components.
+
+    This function is currently not used, since the reduction of matrices is performed prior to
+    JAX operations. But since this function took some time to figure out, it is retained for
+    potential future use!
+
+    Args:
+        matrix: The matrix to compute the reduced row echelon form
+
+    Returns:
+        A matrix of linear components.
+    """
+    nrows, ncols = matrix.shape
+    augmented_matrix: Array = jnp.hstack((matrix, jnp.eye(nrows)))
+
+    def swap_rows(matrix: Array, row1: int, row2: int) -> Array:
+        """Swaps two rows in a matrix.
+
+        Args:
+            matrix: Matrix
+            row1: Row1 index
+            row2: Row2 index
+
+        Returns:
+            Matrix with the rows swapped
+        """
+        row1_data: Array = lax.dynamic_slice(matrix, (row1, 0), (1, matrix.shape[1]))
+        row2_data: Array = lax.dynamic_slice(matrix, (row2, 0), (1, matrix.shape[1]))
+        matrix = lax.dynamic_update_slice(matrix, row2_data, (row1, 0))
+        matrix = lax.dynamic_update_slice(matrix, row1_data, (row2, 0))
+        return matrix
+
+    def find_nonzero_row(matrix: Array, i: int) -> int:
+        """Finds the first non-zero element in the column below the pivot.
+
+        Args:
+            matrix: Matrix
+            i: Row index
+
+        Returns:
+            Relative row index of the first non-zero element below row i
+        """
+
+        def body_fun(j: int, nonzero_row: int) -> int:
+            """Body function
+
+            Args:
+                j: Row offset from row i
+                nonzero_row: Non-zero row index found
+
+            Returns:
+                The minimum row offset with a non-zero element
+            """
+            value: Array = lax.dynamic_slice(matrix, (i + j, i), (1, 1))[0, 0]
+            # nonzero_row == -1 indicates that no non-zero element has been found yet
+            return lax.cond(
+                (value != 0) & (nonzero_row == -1),
+                lambda _: j,
+                lambda _: nonzero_row,
+                operand=None,
+            )
+
+        nonzero_row: Array = lax.fori_loop(0, nrows - i, body_fun, -1)
+        return lax.cond(nonzero_row == -1, lambda _: i, lambda _: nonzero_row + i, operand=None)
+
+    def forward_step(i: int, matrix: Array) -> Array:
+        """Forward step
+
+        Args:
+            i: Current row
+            matrix: Matrix
+
+        Returns:
+            Matrix
+        """
+        # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
+        pivot_value: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
+        # jax.debug.print("pivot_value = {out}", out=pivot_value)
+        nonzero_row: int = lax.cond(
+            pivot_value == 0, lambda _: find_nonzero_row(matrix, i), lambda _: i, operand=None
+        )
+        matrix = lax.cond(
+            nonzero_row != i,
+            lambda _: swap_rows(matrix, i, nonzero_row),
+            lambda _: matrix,
+            operand=None,
+        )
+
+        def eliminate_below_row(j: int, matrix: Array) -> Array:
+            """Eliminates below the row
+
+            Args:
+                j: Row offset from row i
+                matrix: Matrix
+
+            Returns:
+                Matrix
+            """
+            pivot: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
+            ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
+            row_i: Array = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows))
+            row_j: Array = lax.dynamic_slice(matrix, (j, 0), (1, ncols + nrows))
+            return lax.dynamic_update_slice(matrix, row_j - ratio * row_i, (j, 0))
+
+        def loop_body(j: int, matrix: Array) -> Array:
+            return eliminate_below_row(j, matrix)
+
+        matrix = lax.fori_loop(i + 1, nrows, loop_body, matrix)
+
+        return matrix
+
+    def backward_step(i: int, matrix: Array) -> Array:
+        """Backward step
+
+        Args:
+            i: Current row
+            matrix: Matrix
+
+        Returns:
+            Matrix
+        """
+        # Normalize the pivot row.
+        pivot: Array = lax.dynamic_slice(matrix, (i, i), (1, 1))[0, 0]
+        normalized_row = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows)) / pivot
+        matrix = lax.dynamic_update_slice(matrix, normalized_row, (i, 0))
+
+        def eliminate_above_row(j: int, matrix: Array) -> Array:
+            """Eliminates above the row
+
+            Args:
+                j: Row offset from row i
+                matrix: Matrix
+
+            Returns:
+                Matrix
+            """
+            is_nonzero: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] != 0
+
+            def eliminate_row(matrix: Array) -> Array:
+                ratio: Array = lax.dynamic_slice(matrix, (j, i), (1, 1))[0, 0] / pivot
+                row_i: Array = lax.dynamic_slice(matrix, (i, 0), (1, ncols + nrows))
+                row_j: Array = lax.dynamic_slice(matrix, (j, 0), (1, ncols + nrows))
+                return lax.dynamic_update_slice(matrix, row_j - ratio * row_i, (j, 0))
+
+            return lax.cond(is_nonzero, eliminate_row, lambda matrix: matrix, matrix)
+
+        def loop_body(j: int, matrix: Array) -> Array:
+            return eliminate_above_row(j, matrix)
+
+        matrix = lax.fori_loop(0, i, loop_body, matrix)
+
+        return matrix
+
+    def forward_elimination_body(i: int, matrix: Array) -> Array:
+        return forward_step(i, matrix)
+
+    augmented_matrix = lax.fori_loop(0, ncols, forward_elimination_body, augmented_matrix)
+
+    def backward_elimination_body(i: int, matrix: Array) -> Array:
+        return backward_step(ncols - 1 - i, matrix)
+
+    augmented_matrix = lax.fori_loop(0, ncols, backward_elimination_body, augmented_matrix)
+
+    # Don't need the reduced matrix, but maybe useful for debugging
+    # reduced_matrix = lax.dynamic_slice(augmented_matrix, (0, 0), (nrows, ncols))
+    component_matrix: Array = lax.dynamic_slice(
+        augmented_matrix, (ncols, ncols), (nrows - ncols, nrows)
+    )
+
+    return component_matrix
+
+
+def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
+    """Computes the partial reduced row echelon form to determine linear components
+
+    Returns:
+        A matrix of linear components
+    """
+    nrows, ncols = matrix.shape
+
+    augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
+    logger.debug("augmented_matrix = \n%s", augmented_matrix)
+    # Permutation matrix
+    # P: npt.NDArray = np.eye(nrows)
+
+    # Forward elimination with partial pivoting
+    for i in range(ncols):
+        # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
+        if augmented_matrix[i, i] == 0:
+            nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
+            augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
+            # P[[i, nonzero_row], :] = P[[nonzero_row, i], :]
+        # Perform row operations to eliminate values below the pivot.
+        for j in range(i + 1, nrows):
+            ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
+            augmented_matrix[j] -= ratio * augmented_matrix[i]
+    logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
+
+    # Backward substitution
+    for i in range(ncols - 1, -1, -1):
+        # Normalize the pivot row.
+        augmented_matrix[i] /= augmented_matrix[i, i]
+        # Eliminate values above the pivot.
+        for j in range(i - 1, -1, -1):
+            if augmented_matrix[j, i] != 0:
+                ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
+                augmented_matrix[j] -= ratio * augmented_matrix[i]
+    logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
+
+    reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
+    component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
+    logger.debug("reduced_matrix = \n%s", reduced_matrix)
+    logger.debug("component_matrix = \n%s", component_matrix)
+    # logger.debug("permutation_matrix = \n%s", P)
+
+    return component_matrix
+
+
+class UnitConversion(NamedTuple):
+    """Unit conversions"""
+
+    # pylint: disable=invalid-name
+    atmosphere_to_bar: float = ATMOSPHERE
+    bar_to_Pa: float = 1.0e5
+    bar_to_GPa: float = 1.0e-4
+    Pa_to_bar: float = 1.0e-5
+    GPa_to_bar: float = 1.0e4
+    fraction_to_ppm: float = mega
+    g_to_kg: float = 1 / kilo
+    ppm_to_fraction: float = 1 / mega
+    ppm_to_percent: float = 100 / mega
+    percent_to_ppm: float = 1.0e4
+    cm3_to_m3: float = 1.0e-6
+    m3_bar_to_J: float = 1.0e5
+    J_to_m3_bar: float = 1.0e-5
+    litre_to_m3: float = 1.0e-3
+    # pylint: enable=invalid-name
+
+
+unit_conversion = UnitConversion()
 
 
 def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
@@ -122,147 +373,6 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: float = 1) -> float:
     h_grams: float = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: float = h_grams * unit_conversion.g_to_kg
     return h_kg
-
-
-def flatten(
-    dictionary: MutableMapping[Any, Any], parent_key: str = "", separator: str = "_"
-) -> dict[Any, Any]:
-    """Flattens a nested dictionary and compresses keys
-
-    https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
-
-    Args:
-        dictionary: A MutableMapping
-        parent_key: Parent key
-        separator: Separator for keys
-
-    Returns:
-        A flattened dictionary
-    """
-    items: list = []
-    for key, value in dictionary.items():
-        new_key: str = parent_key + separator + key if parent_key else key
-        if isinstance(value, MutableMapping):
-            items.extend(flatten(value, new_key, separator=separator).items())
-        else:
-            items.append((new_key, value))
-
-    return dict(items)
-
-
-def dataclass_to_logger(data_instance, logger_in: logging.Logger, log_level=logging.INFO) -> None:
-    """Logs the attributes of a dataclass.
-
-    Args:
-        data_instance: A dataclass
-        logger: The logger to log to
-        log_level: Log level to use. Defaults to INFO.
-    """
-    data: dict[Any, Any] = flatten(asdict(data_instance))
-
-    for key, value in data.items():
-        logger_in.log(log_level, "%s = %s", key, value)
-
-
-def delete_entries_with_suffix(input_dict: dict[Any, Any], suffix: str) -> dict[Any, Any]:
-    """Deletes entries from a dictionary for keys that have a particular suffix
-
-    Args:
-        input_dict: Input dictionary
-        suffix: Suffix of the keys that defines the entries to remove
-
-    Returns:
-        A dictionary with the entries removed
-    """
-
-    return {key: value for key, value in input_dict.items() if not key.endswith(suffix)}
-
-
-def reorder_dict(original_dict: dict[Any, Any], key_to_move_first: Any) -> dict:
-    """Reorders a dictionary to put a particular key first
-
-    Args:
-        original_dict: Original dictionary
-        key_to_move_first: Key to move first in the returned dictionary
-
-    Returns:
-        The reordered dictionary and a bool, the later to indicate if reordering occurred
-    """
-    if key_to_move_first not in original_dict:
-        return original_dict
-
-    return {
-        key_to_move_first: original_dict[key_to_move_first],
-        **{k: v for k, v in original_dict.items() if k != key_to_move_first},
-    }
-
-
-def get_molar_mass(species: str) -> float:
-    r"""Get molar mass
-
-    Args:
-        species: A species
-
-    Returns:
-        Molar mass in kg m\ :sup:`-3`
-    """
-    return Formula(species).mass * unit_conversion.g_to_kg
-
-
-def get_number_density(temperature: float, pressure: ArrayLike) -> ArrayLike:
-    r"""Pressure to number density
-
-    Args:
-        temperature: Temperature in K
-        pressure: Pressure in bar
-
-    Returns:
-        Number density in molecules m\ :sup:`-3`
-    """
-    return pressure / (BOLTZMANN_CONSTANT_BAR * temperature)
-
-
-def get_log10_number_density(*args, **kwargs) -> Array:
-    r"""Pressure to log10 number density
-
-    Args:
-        temperature: Temperature in K
-        pressure: Pressure in bar
-
-    Returns:
-        Log10 number density
-    """
-    return jnp.log10(get_number_density(*args, **kwargs))
-
-
-def logsumexp_base10(log_values: ArrayLike, prefactors: ArrayLike = 1.0) -> Array:
-    """Computes the log-sum-exp using base-10 exponentials in a numerically stable way.
-
-    Args:
-        log10_values: Array of log10 values to sum
-        prefactors: Array of prefactors corresponding to each log10 value
-
-    Returns:
-        The log10 of the sum of prefactors multiplied by exponentials of the input values.
-    """
-    max_log: Array = jnp.max(log_values)
-    prefactors_: Array = jnp.asarray(prefactors)
-
-    value_sum: Array = jnp.sum(prefactors_ * jnp.power(10, log_values - max_log))
-
-    return max_log + jnp.log10(value_sum)
-
-
-def array_rmse_to_logger(array1: Array, array2: Array, prefix: str = "") -> None:
-    """Writes the RMSE of array1 versus array2 to the logger
-
-    Args:
-        array1: array1
-        array2: array2
-        msg: Prefix for the output
-    """
-    rmse: npt.NDArray[np.float_] = np.sqrt(mean_squared_error(np.array(array1), np.array(array2)))
-    logger.info("%s RMSE = %0.2e", prefix, rmse)
 
 
 @dataclass(frozen=True)
@@ -405,92 +515,3 @@ class ExperimentalCalibration:
         ) + self.temperature_penalty * jnp.power(temperature_clip - temperature, 2)
 
         return penalty
-
-
-# Convenient to use symbol names so pylint: disable=invalid-name
-class UnitConversion(NamedTuple):
-    """Unit conversions"""
-
-    atmosphere_to_bar: float = ATMOSPHERE
-    bar_to_Pa: float = 1.0e5
-    bar_to_GPa: float = 1.0e-4
-    Pa_to_bar: float = 1.0e-5
-    GPa_to_bar: float = 1.0e4
-    fraction_to_ppm: float = mega
-    g_to_kg: float = 1 / kilo
-    ppm_to_fraction: float = 1 / mega
-    ppm_to_percent: float = 100 / mega
-    percent_to_ppm: float = 1.0e4
-    cm3_to_m3: float = 1.0e-6
-    m3_bar_to_J: float = 1.0e5
-    J_to_m3_bar: float = 1.0e-5
-    litre_to_m3: float = 1.0e-3
-
-
-unit_conversion = UnitConversion()
-
-
-def unique_elements_in_species(species: list[SpeciesData]) -> tuple[str, ...]:
-    """Unique elements in a list of species
-
-    Args:
-        species: A list of species
-
-    Returns:
-        Unique elements in the species ordered alphabetically
-    """
-    elements: list[str] = []
-    for species_ in species:
-        elements.extend(species_.elements)
-    unique_elements: list[str] = list(set(elements))
-    sorted_elements: list[str] = sorted(unique_elements)
-
-    logger.debug("unique_elements_in_species = %s", sorted_elements)
-
-    return tuple(sorted_elements)
-
-
-def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
-    """Computes the partial reduced row echelon form to determine linear components
-
-    Returns:
-        A matrix of linear components
-    """
-    nrows, ncols = matrix.shape
-
-    augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
-    logger.debug("augmented_matrix = \n%s", augmented_matrix)
-    # Permutation matrix
-    P: npt.NDArray = np.eye(nrows)
-
-    # Forward elimination with partial pivoting
-    for i in range(ncols):
-        # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
-        if augmented_matrix[i, i] == 0:
-            nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
-            augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
-            P[[i, nonzero_row], :] = P[[nonzero_row, i], :]
-        # Perform row operations to eliminate values below the pivot.
-        for j in range(i + 1, nrows):
-            ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
-            augmented_matrix[j] -= ratio * augmented_matrix[i]
-    logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
-
-    # Backward substitution
-    for i in range(ncols - 1, -1, -1):
-        # Normalize the pivot row.
-        augmented_matrix[i] /= augmented_matrix[i, i]
-        # Eliminate values above the pivot.
-        for j in range(i - 1, -1, -1):
-            if augmented_matrix[j, i] != 0:
-                ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
-                augmented_matrix[j] -= ratio * augmented_matrix[i]
-    logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
-
-    reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
-    component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
-    logger.debug("reduced_matrix = \n%s", reduced_matrix)
-    logger.debug("component_matrix = \n%s", component_matrix)
-    # logger.debug("permutation_matrix = \n%s", P)
-
-    return component_matrix
