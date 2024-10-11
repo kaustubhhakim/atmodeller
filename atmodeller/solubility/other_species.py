@@ -33,7 +33,6 @@ from atmodeller import GAS_CONSTANT
 from atmodeller.solubility.core import SolubilityPowerLaw, SolubilityProtocol, power_law
 from atmodeller.utilities import unit_conversion
 
-# TODO: Maggie to check. This seems to give huge values
 Cl2_ano_dio_for_thomas: SolubilityProtocol = SolubilityPowerLaw(
     140.52 * unit_conversion.percent_to_ppm, 0.5
 )
@@ -44,7 +43,6 @@ and Cl fugacity for CMAS composition (An50Di28Fo22 (anorthite-diopside-forsterit
 low-degree mantle melt) at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 1200-1500 C.
 """
 
-# TODO: Maggie to check. This seems to give huge values
 Cl2_basalt_thomas: SolubilityProtocol = SolubilityPowerLaw(
     78.56 * unit_conversion.percent_to_ppm, 0.5
 )

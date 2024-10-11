@@ -485,8 +485,7 @@ class InteriorAtmosphere:
         """Output dictionary to quickly assess the solution.
 
         This is intended for a quick first glance of the output with convenient units and to ease
-        comparison with test or benchmark data. A more complete output of the data is available in
-        TODO.
+        comparison with test or benchmark data.
 
         Args:
             number_density: Log number density

@@ -441,11 +441,6 @@ class ThermoData(NamedTuple):
     T_max: tuple[float, ...]
     """Maximum temperature(s) in the range"""
 
-    # TODO: Add a class method to spawn these objects using coefficients from:
-    # "NASA Glenn Coefficients for Calculating Thermodynamic Properties of Individual Species"
-    # Might involve using a LLM to tabulated the coefficients from the PDF? Or can an electronic
-    # version of the tabulated data be obtained?
-
 
 class SpeciesData(NamedTuple):
     """Species data

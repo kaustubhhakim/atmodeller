@@ -300,7 +300,7 @@ class FugacityConstraints(NamedTuple):
         Returns:
             Scaled log number density as an array
         """
-        # TODO: This works but feels a bit hacky
+        # Short-cut if no constraints are applied
         if not self.constraints:
             return jnp.array(0.0)
 
