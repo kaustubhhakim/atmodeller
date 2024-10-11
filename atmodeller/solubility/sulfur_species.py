@@ -38,6 +38,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+# TODO: Needs to be refreshed for JAX
 class S2_sulfate_andesite_boulliung(Solubility):
     """Sulfur as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`
 

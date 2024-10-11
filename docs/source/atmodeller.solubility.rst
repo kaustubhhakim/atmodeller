@@ -39,7 +39,7 @@ atmodeller.solubility.interfaces module
 atmodeller.solubility.jax\_hydrogen\_species module
 ---------------------------------------------------
 
-.. automodule:: atmodeller.solubility.jax_hydrogen_species
+.. automodule:: atmodeller.solubility.hydrogen_species
    :members:
    :undoc-members:
    :show-inheritance:

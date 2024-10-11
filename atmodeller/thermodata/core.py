@@ -89,7 +89,7 @@ class IronWustiteBuffer(NamedTuple):
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
     """
 
-    log10_shift: ArrayLike = 0.0
+    log10_shift: ArrayLike = 0
 
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         # TODO: Eventually make this a jitted function that this method calls.
