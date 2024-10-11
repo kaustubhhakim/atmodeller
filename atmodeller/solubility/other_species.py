@@ -34,20 +34,22 @@ from atmodeller.solubility.jax_interfaces import (
 )
 from atmodeller.utilities import unit_conversion
 
+# TODO: Maggie to check. This seems to give huge values
 Cl2_ano_dio_for_thomas: SolubilityProtocol = SolubilityPowerLaw(
     140.52 * unit_conversion.percent_to_ppm, 0.5
 )
-"""Solubility of chlorine in silicate melts :cite:p:`TW21`
+"""Cl in silicate melts :cite:p:`TW21`
 
 Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl concentration
 and Cl fugacity for CMAS composition (An50Di28Fo22 (anorthite-diopside-forsterite), Fe-free 
 low-degree mantle melt) at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 1200-1500 C.
 """
 
+# TODO: Maggie to check. This seems to give huge values
 Cl2_basalt_thomas: SolubilityProtocol = SolubilityPowerLaw(
     78.56 * unit_conversion.percent_to_ppm, 0.5
 )
-"""Solubility of chlorine in silicate melts :cite:p:`TW21`
+"""Cl in silicate melts :cite:p:`TW21`
 
 Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl concentration
 and Cl fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 
