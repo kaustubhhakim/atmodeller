@@ -32,7 +32,7 @@ from atmodeller.solubility.carbon_species import (
     CO_basalt_yoshioka,
     CO_rhyolite_yoshioka,
 )
-from atmodeller.solubility.jax_interfaces import SolubilityProtocol
+from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 

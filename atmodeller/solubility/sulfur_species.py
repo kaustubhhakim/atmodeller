@@ -25,8 +25,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.solubility.interfaces import Solubility
-from atmodeller.solubility.jax_interfaces import SolubilityProtocol
+from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -132,7 +131,7 @@ class _S2_sulfate_basalt_boulliung(NamedTuple):
 S2_sulfate_basalt_boulliung: SolubilityProtocol = _S2_sulfate_basalt_boulliung()
 
 
-class _S2_sulfide_basalt_boulliung(Solubility):
+class _S2_sulfide_basalt_boulliung(NamedTuple):
     """Sulfur in basalt as sulfide (S^2-) :cite:p:`BW23`
 
     Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for

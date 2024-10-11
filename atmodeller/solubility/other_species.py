@@ -27,11 +27,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.solubility.jax_interfaces import (
-    SolubilityPowerLaw,
-    SolubilityProtocol,
-    power_law,
-)
+from atmodeller.solubility.core import SolubilityPowerLaw, SolubilityProtocol, power_law
 from atmodeller.utilities import unit_conversion
 
 # TODO: Maggie to check. This seems to give huge values

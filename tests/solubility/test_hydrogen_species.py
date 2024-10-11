@@ -25,6 +25,7 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from atmodeller import __version__, debug_logger
+from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.solubility.hydrogen_species import (
     H2_andesite_hirschmann,
     H2_basalt_hirschmann,
@@ -36,7 +37,6 @@ from atmodeller.solubility.hydrogen_species import (
     H2O_lunar_glass_newcombe,
     H2O_peridotite_sossi,
 )
-from atmodeller.solubility.jax_interfaces import SolubilityProtocol
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
 
 logger: logging.Logger = debug_logger()

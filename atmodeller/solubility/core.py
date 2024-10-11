@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""JAX interfaces for solubility laws"""
+"""Interfaces for solubility laws"""
 
 # Convenient to use fO2 so pylint: disable=invalid-name
 

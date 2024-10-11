@@ -21,7 +21,7 @@ For every law there should be a test in the test suite.
 
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
-from atmodeller.solubility.jax_interfaces import (
+from atmodeller.solubility.core import (
     SolubilityPowerLaw,
     SolubilityPowerLawLog10,
     SolubilityProtocol,

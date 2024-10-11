@@ -27,7 +27,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.solubility.jax_interfaces import SolubilityProtocol
+from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.utilities import unit_conversion
 
 

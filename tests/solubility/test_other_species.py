@@ -25,7 +25,7 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from atmodeller import __version__, debug_logger
-from atmodeller.solubility.jax_interfaces import SolubilityProtocol
+from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.solubility.other_species import (
     Cl2_ano_dio_for_thomas,
     Cl2_basalt_thomas,
