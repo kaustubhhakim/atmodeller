@@ -23,7 +23,7 @@ from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
 import numpy as np
-from jax import Array, jit
+from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -56,10 +56,26 @@ class ActivityProtocol(Protocol):
     ) -> ArrayLike: ...
 
 
+# TODO: Eventually rename to ExperimentalCalibration once the old class is removed.
+class ExperimentalCalibrationNew(NamedTuple):
+
+    temperature_min: float | None = None
+    temperature_max: float | None = None
+    pressure_min: float | None = None
+    pressure_max: float | None = None
+    log10_fO2_min: float | None = None
+    log10_fO2_max: float | None = None
+
+
 class RedoxBufferProtocol(Protocol):
 
     @property
+    def calibration(self) -> ExperimentalCalibrationNew: ...
+
+    @property
     def log10_shift(self) -> ArrayLike: ...
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
@@ -81,18 +97,31 @@ class RedoxBufferProtocol(Protocol):
 #         return self.log10_fugacity * np.log(10)
 
 
-# TODO: Add in Hirschmann 2021 high pressure extension
-class IronWustiteBuffer(NamedTuple):
+class IronWustiteBufferHirschmann08(NamedTuple):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`
+
+    Experimental calibration is provided in the abstract of :cite:t:`HGD08`.
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
+        calibration: Experimental calibration
     """
 
     log10_shift: ArrayLike = 0
+    calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+        pressure_max=27.5 * unit_conversion.GPa_to_bar
+    )
 
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        # TODO: Eventually make this a jitted function that this method calls.
+        """Gets the log10 fugacity
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log10 fugacity
+        """
         log10_fugacity: Array = (
             -0.8853 * jnp.log(temperature)
             - 28776.8 / temperature
@@ -103,7 +132,262 @@ class IronWustiteBuffer(NamedTuple):
         return log10_fugacity + self.log10_shift
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Gets the log fugacity
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity
+        """
         return self.log10_fugacity(temperature, pressure) * np.log(10)
+
+
+class IronWustiteBufferHirschmann21(NamedTuple):
+    """Iron-wustite buffer :cite:p:`H21`
+
+    Regarding the calibration, :cite:t:`H21` states that: "It extrapolates smoothly to higher
+    temperature, though not calibrated above 3000 K. Extrapolation to lower temperatures (<1000 K)
+    or higher pressures (>100 GPa) is not recommended.
+    """
+
+    log10_shift: ArrayLike = 0
+    calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+        temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
+    )
+    a: tuple[float, ...] = (6.844864, 1.175691e-1, 1.143873e-3, 0, 0)
+    b: tuple[float, ...] = (5.791364e-4, -2.891434e-4, -2.737171e-7, 0.0, 0.0)
+    c: tuple[float, ...] = (-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7)
+    d: tuple[float, ...] = (-2.769002e4, 5.285977e2, -2.919275, 0, 0)
+    e: tuple[float, ...] = (8.463095, -3.000307e-3, 7.213445e-5, 0, 0)
+    f: tuple[float, ...] = (1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0)
+    g: tuple[float, ...] = (-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4)
+    h: tuple[float, ...] = (-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0)
+
+    def _evaluate_m(self, pressure: ArrayLike, coefficients: tuple[float, ...]) -> Array:
+        """Evaluates an m parameter
+
+        Args:
+            pressure: Pressure in GPa
+            coefficients: Coefficients
+
+        Return:
+            m parameter
+        """
+        m: Array = (
+            coefficients[4] * jnp.power(pressure, 0.5)
+            + coefficients[0]
+            + coefficients[1] * pressure
+            + coefficients[2] * jnp.power(pressure, 2)
+            + coefficients[3] * jnp.power(pressure, 3)
+        )
+
+        return m
+
+    def _evaluate_fO2(
+        self,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        coefficients: tuple[tuple[float, ...], ...],
+    ) -> Array:
+        """Evaluates the fO2
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+            coefficients: Coefficients
+
+        Returns:
+            log10fO2
+        """
+        log10fO2: Array = (
+            self._evaluate_m(pressure, coefficients[0])
+            + self._evaluate_m(pressure, coefficients[1]) * temperature
+            + self._evaluate_m(pressure, coefficients[2]) * temperature * jnp.log(temperature)
+            + self._evaluate_m(pressure, coefficients[3]) / temperature
+        )
+
+        return log10fO2
+
+    def _fcc_bcc_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """log10fO2 for fcc and bcc iron
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+
+        Return:
+            log10fO2 for fcc and bcc iron
+        """
+        log10fO2: Array = self._evaluate_fO2(
+            temperature, pressure, (self.a, self.b, self.c, self.d)
+        )
+
+        return log10fO2
+
+    def _hcp_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """log10fO2 for hcp iron
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+
+        Return:
+            log10fO2 for hcp iron
+        """
+        log10fO2: Array = self._evaluate_fO2(
+            temperature, pressure, (self.e, self.f, self.g, self.h)
+        )
+
+        return log10fO2
+
+    def _use_hcp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Check to use hcp iron formulation for fO2
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in GPa
+
+        Returns:
+            True/False whether to use the hcp iron formulation
+        """
+        x: tuple[float, ...] = (-18.64, 0.04359, -5.069e-6)
+        threshold: Array = x[2] * jnp.power(temperature, 2) + x[1] * temperature + x[0]
+
+        return jnp.array(pressure) > threshold
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Gets the log10 fugacity
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log10 fugacity
+        """
+        pressure_GPa: ArrayLike = pressure * unit_conversion.bar_to_GPa
+
+        def hcp_case() -> Array:
+            return self._hcp_iron(temperature, pressure_GPa)
+
+        def fcc_bcc_case() -> Array:
+            return self._fcc_bcc_iron(temperature, pressure_GPa)
+
+        buffer_value: Array = lax.cond(
+            self._use_hcp(temperature, pressure_GPa), hcp_case, fcc_bcc_case
+        )
+
+        return buffer_value + self.log10_shift
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Gets the log fugacity
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity
+        """
+        return self.log10_fugacity(temperature, pressure) * np.log(10)
+
+
+class IronWustiteBufferHirschmann(NamedTuple):
+    """Composite iron-wustite buffer using :cite:t:`OP93,HGD08` and :cite:t:`H21`"""
+
+    log10_shift: ArrayLike = 0
+    calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+        pressure_max=100 * unit_conversion.GPa_to_bar
+    )
+
+    def low_temperature_buffer(self) -> RedoxBufferProtocol:
+        """Gets the low temperature buffer"""
+        return IronWustiteBufferHirschmann08(self.log10_shift)
+
+    def high_temperature_buffer(self) -> RedoxBufferProtocol:
+        """Gets the high temperature buffer"""
+        return IronWustiteBufferHirschmann21(self.log10_shift)
+
+    def log10_fugacity_low_temperature(
+        self, temperature: ArrayLike, pressure: ArrayLike
+    ) -> ArrayLike:
+        """Log10 fugacity for the low temperature buffer
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log10 fugacity for the low temperature buffer
+        """
+        return self.low_temperature_buffer().log10_fugacity(temperature, pressure)
+
+    def log10_fugacity_high_temperature(
+        self, temperature: ArrayLike, pressure: ArrayLike
+    ) -> ArrayLike:
+        """Log10 fugacity for the high temperature buffer
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log10 fugacity for the high temperature buffer
+        """
+        return self.high_temperature_buffer().log10_fugacity(temperature, pressure)
+
+    def _use_low_temperature(self, temperature: ArrayLike) -> Array:
+        """Check to use the low temperature buffer for fO2
+
+        Args:
+            temperature: Temperature
+
+        Returns:
+            True/False whether to use the low temperature formulation
+        """
+        return (
+            jnp.asarray(temperature) < self.high_temperature_buffer().calibration.temperature_min
+        )
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Gets the log10 fugacity
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log10 fugacity
+        """
+
+        def low_temperature_case() -> ArrayLike:
+            return self.log10_fugacity_low_temperature(temperature, pressure)
+
+        def high_temperature_case() -> ArrayLike:
+            return self.log10_fugacity_high_temperature(temperature, pressure)
+
+        buffer_value: Array = lax.cond(
+            self._use_low_temperature(temperature), low_temperature_case, high_temperature_case
+        )
+
+        return buffer_value + self.log10_shift
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Gets the log fugacity
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity
+        """
+        return self.log10_fugacity(temperature, pressure) * np.log(10)
+
+
+IronWustiteBuffer = IronWustiteBufferHirschmann
 
 
 class CondensateActivity(NamedTuple):
@@ -400,3 +684,57 @@ def get_gibbs_over_RT(thermodata: ThermoData, temperature: ArrayLike) -> Array:
     gibbs: Array = G_over_RT(cp_coeffs, b1, b2, temperature)
 
     return gibbs
+
+
+# TODO: Clean up this function which back-computes the log10 fO2 shift for a given fugacity. Will
+# be required for output.
+# def solve_for_log10_dIW(
+#     target_fugacity: float, temperature: float, pressure: ArrayLike = 1.0, **kwargs
+# ) -> float:
+#     """Solves for the log10 shift relative to the default Iron-wustite buffer
+
+#     The shift is report relative to the standard state defined at temperature and 1 bar pressure.
+#     If desired, the shift can be reported relative to a standard state defined at an alternative
+#     pressure.
+
+#     Args:
+#         target_fugacity: Target fugacity in bar
+#         temperature: Temperature in K
+#         pressure: Pressure defining the standard state in bar. Defaults to 1 bar.
+#         **kwargs: Arbitrary keyword arguments
+
+#     Returns:
+#         The required log10_shift to match the target fugacity
+#     """
+#     buffer: RedoxBufferProtocol = IronWustiteBuffer()
+
+#     def objective_function(log10_shift: ArrayLike, args):
+#         """Objective function
+
+#         Args:
+#             log10_shift: Log10 shift
+#             args: Optional arguments (not used)
+
+#         Returns:
+#             Residual of the objective function
+#         """
+#         del args
+#         buffer.log10_shift = log10_shift
+#         calculated_log10_fugacity: ArrayLike = buffer.get_log10_value(
+#             temperature, pressure, penalty=False, **kwargs
+#         )
+
+#         return calculated_log10_fugacity - jnp.log10(target_fugacity)
+
+#     solver = optx.Bisection(rtol=1.0e-8, atol=1.0e-8)
+#     sol = optx.root_find(
+#         objective_function, solver, jnp.array(-20.0), options=dict(lower=-100, upper=100)
+#     )
+
+#     # Success is indicated by no message
+#     if optx.RESULTS[sol.result] == "":
+#         value: float = sol.value.item()
+#     else:
+#         raise ValueError("Root finding did not converge")
+
+#     return value
