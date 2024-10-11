@@ -62,7 +62,7 @@ logger.info("TEST_PRESSURE = %e bar", TEST_PRESSURE)
 logger.info("TEST_FO2 = %e bar", TEST_FO2)
 
 
-def test_H2_andesite_hirschmann() -> None:
+def test_H2_andesite_hirschmann(helper) -> None:
     """Tests H2 in synthetic andesite :cite:p:`HWA12`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -70,12 +70,12 @@ def test_H2_andesite_hirschmann() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 15.545054132817002, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2_basalt_hirschmann() -> None:
+def test_H2_basalt_hirschmann(helper) -> None:
     """Tests H2 in synthetic basalt :cite:p:`HWA12`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -83,12 +83,12 @@ def test_H2_basalt_hirschmann() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 18.13918061563441, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2_silicic_melts_gaillard() -> None:
+def test_H2_silicic_melts_gaillard(helper) -> None:
     """Tests Fe-H redox exchange in silicate glasses :cite:p:`GSM03`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -96,12 +96,12 @@ def test_H2_silicic_melts_gaillard() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 0.38821933289297966, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2O_ano_dio_newcombe() -> None:
+def test_H2O_ano_dio_newcombe(helper) -> None:
     """Tests H2O in anorthite-diopside-eutectic compositions :cite:p:`NBB17`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -109,12 +109,12 @@ def test_H2O_ano_dio_newcombe() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 1028.1332598452402, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2O_basalt_dixon() -> None:
+def test_H2O_basalt_dixon(helper) -> None:
     """Tests H2O in MORB liquids :cite:p:`DSH95`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -122,12 +122,12 @@ def test_H2O_basalt_dixon() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 1364.7160876900368, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2O_basalt_mitchell() -> None:
+def test_H2O_basalt_mitchell(helper) -> None:
     """Tests H2O in basaltic melt :cite:p:`MGO17`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -135,12 +135,12 @@ def test_H2O_basalt_mitchell() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 411.7165015844662, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2O_basalt_wilson() -> None:
+def test_H2O_basalt_wilson(helper) -> None:
     """Tests H2O in basalt :cite:p:`WH81,HBO64`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -148,12 +148,12 @@ def test_H2O_basalt_wilson() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 349.26853043318124, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2O_lunar_glass_newcombe() -> None:
+def test_H2O_lunar_glass_newcombe(helper) -> None:
     """Tests H2O in lunar basalt :cite:p:`NBB17`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -161,12 +161,12 @@ def test_H2O_lunar_glass_newcombe() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 965.907863100824, rtol=RTOL, atol=ATOL).all()
 
 
-def test_H2O_peridotite_sossi() -> None:
+def test_H2O_peridotite_sossi(helper) -> None:
     """Tests H2O in peridotite liquids :cite:p:`STB23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -174,16 +174,6 @@ def test_H2O_peridotite_sossi() -> None:
     concentration: ArrayLike = model.concentration(
         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE, TEST_FO2
     )
-    output_concentration_to_logger(function_name, concentration)
+    helper.concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 914.9961748553926, rtol=RTOL, atol=ATOL).all()
-
-
-def output_concentration_to_logger(function_name: str, concentration: ArrayLike) -> None:
-    """Outputs the concentration to the logger
-
-    Args:
-        function_name: Function name
-        concentration: Concentration
-    """
-    logger.debug("%s, concentration = %s ppmw", function_name, concentration)

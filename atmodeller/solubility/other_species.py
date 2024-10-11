@@ -14,87 +14,62 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Solubility laws for other species"""
+"""JAX solubility laws for other species"""
 
 # Convenient to use chemical formulas so pylint: disable=C0103
 
 from __future__ import annotations
 
-import logging
-import sys
+from typing import NamedTuple
 
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.solubility.interfaces import Solubility, SolubilityPowerLaw
+from atmodeller.solubility.jax_interfaces import (
+    SolubilityPowerLaw,
+    SolubilityProtocol,
+    power_law,
+)
 from atmodeller.utilities import unit_conversion
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
+Cl2_ano_dio_for_thomas: SolubilityProtocol = SolubilityPowerLaw(
+    140.52 * unit_conversion.percent_to_ppm, 0.5
+)
+"""Solubility of chlorine in silicate melts :cite:p:`TW21`
 
-logger: logging.Logger = logging.getLogger(__name__)
+Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl concentration
+and Cl fugacity for CMAS composition (An50Di28Fo22 (anorthite-diopside-forsterite), Fe-free 
+low-degree mantle melt) at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 1200-1500 C.
+"""
 
+Cl2_basalt_thomas: SolubilityProtocol = SolubilityPowerLaw(
+    78.56 * unit_conversion.percent_to_ppm, 0.5
+)
+"""Solubility of chlorine in silicate melts :cite:p:`TW21`
 
-class Cl2_ano_dio_for_thomas(Solubility):
-    """Solubility of chlorine in silicate melts :cite:p:`TW21`
+Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl concentration
+and Cl fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 
+1200-1500 C.
+"""
 
-    Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl
-    concentration and Cl fugacity for CMAS composition (An50Di28Fo22
-    (anorthite-diopside-forsterite), Fe-free low-degree mantle melt) at 1400 C and 1.5 GPa.
-    Experiments from 0.5-2 GPa and 1200-1500 C
-    """
+_He_henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
+# Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
+# Convert He conc from mol/g to g H2/g total and then to ppmw
+_He_henry_sol_constant = (
+    (_He_henry_sol_constant / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
+)
+He_basalt: SolubilityProtocol = SolubilityPowerLaw(_He_henry_sol_constant, 1)
+"""Solubility of He in tholeittic basalt melt :cite:p:`JWB86`
 
-    @override
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
-        del kwargs
-        cl_wtp: Array = 140.52 * jnp.sqrt(fugacity)
-        ppmw: Array = cl_wtp * unit_conversion.percent_to_ppm
-
-        return ppmw
-
-
-class Cl2_basalt_thomas(Solubility):
-    """Solubility of chlorine in silicate melts :cite:p:`TW21`
-
-    Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl
-    concentration and Cl fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from
-    0.5-2 GPa and 1200-1500 C
-    """
-
-    @override
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
-        del kwargs
-        cl_wtp: Array = 78.56 * jnp.sqrt(fugacity)
-        ppmw: Array = cl_wtp * unit_conversion.percent_to_ppm
-
-        return ppmw
+Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
+1250-1600 C. Using Henry's Law solubility constant for He from the abstract, convert from STP
+units to mol/g*bar.
+"""
 
 
-class He_basalt(Solubility):
-    """Solubility of He in tholeittic basalt melt :cite:p:`JWB86`
-
-    Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
-    1250-1600 C. Using Henry's Law solubility constant for He from the abstract, convert from STP
-    units to mol/g*bar.
-    """
-
-    @override
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
-        del kwargs
-        henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
-        # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
-        he_conc: ArrayLike = (henry_sol_constant / 2.24e4) * fugacity
-        # Convert He conc from mol/g to g H2/g total and then to ppmw
-        ppmw: ArrayLike = he_conc * 4.0026 * 1e6
-
-        return ppmw
-
-
-class N2_basalt_bernadou(Solubility):
+class _N2_basalt_bernadou(NamedTuple):
     """N2 in basaltic silicate melt :cite:p:`BGF21`
 
     :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -104,30 +79,29 @@ class N2_basalt_bernadou(Solubility):
     concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solubility law.
     """
 
-    @override
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
-        temperature: float,
+        temperature: ArrayLike,
         pressure: ArrayLike,
-        O2: ArrayLike,
-        **kwargs,
+        fO2: ArrayLike,
     ) -> Array:
-        del kwargs
         k13: Array = jnp.exp(
             -(29344 + 121 * temperature + 4 * pressure) / (GAS_CONSTANT * temperature)
         )
         k14: Array = jnp.exp(
             -(183733 + 172 * temperature - 5 * pressure) / (GAS_CONSTANT * temperature)
         )
-        molfrac: Array = (k13 * fugacity) + ((O2 ** (-3 / 4)) * k14 * (fugacity**0.5))
+        molfrac: Array = (k13 * fugacity) + ((fO2 ** (-3 / 4)) * k14 * (fugacity**0.5))
         ppmw: Array = molfrac * unit_conversion.fraction_to_ppm
 
         return ppmw
 
 
-class N2_basalt_dasgupta(Solubility):
+N2_basalt_bernadou: SolubilityProtocol = _N2_basalt_bernadou()
+
+
+class _N2_basalt_dasgupta(NamedTuple):
     """N2 in silicate melts :cite:p:`DFP22`
 
     Using :cite:t:`DFP22{Equation 10}`, composition parameters from :cite:t:`DFP22{Figure 8}`, and
@@ -138,36 +112,33 @@ class N2_basalt_dasgupta(Solubility):
     their N solubility law.
 
     Args:
-        xsio2: Mole fraction of SiO2
-        xal2o3: Mole fraction of Al2O3
-        xtio2: Mole fraction of TiO2
+        xsio2: Mole fraction of SiO2. Defaults to 0.56.
+        xal2o3: Mole fraction of Al2O3. Defaults to 0.11.
+        xtio2: Mole fraction of TiO2. Defaults to 0.01.
     """
 
-    def __init__(self, xsio2: float = 0.56, xal2o3: float = 0.11, xtio2: float = 0.01):
-        self.xsio2: float = xsio2
-        self.xal2o3: float = xal2o3
-        self.xtio2: float = xtio2
+    xsio2: float = 0.56
+    xal2o3: float = 0.11
+    xtio2: float = 0.01
 
-    @override
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
-        temperature: float,
+        temperature: ArrayLike,
         pressure: ArrayLike,
-        O2: ArrayLike,
-        **kwargs,
+        fO2: ArrayLike,
     ) -> Array:
-        del kwargs
         fugacity_gpa: ArrayLike = fugacity * unit_conversion.bar_to_GPa
         pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
+        # TODO: Check. Should this be hard-coded or be self-consistent with any imposed buffer that
+        # the interior-atmosphere system uses?
         logiw_fugacity: ArrayLike = (
             -28776.8 / temperature
             + 14.057
             + 0.055 * (pressure - 1) / temperature
             - 0.8853 * jnp.log(temperature)
         )
-        fo2_shift: Array = jnp.log10(O2) - logiw_fugacity
+        fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity
         ppmw: Array = jnp.exp(
             (5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)
         ) * (fugacity_gpa**0.5)
@@ -178,7 +149,10 @@ class N2_basalt_dasgupta(Solubility):
         return ppmw
 
 
-class N2_basalt_libourel(Solubility):
+N2_basalt_dasgupta: SolubilityProtocol = _N2_basalt_dasgupta()
+
+
+class _N2_basalt_libourel(NamedTuple):
     """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
     :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
@@ -186,15 +160,21 @@ class N2_basalt_libourel(Solubility):
     and N2 gases.
     """
 
-    def __init__(self):
-        self._power_law: SolubilityPowerLaw = SolubilityPowerLaw(constant=0.0611, exponent=1)
-
-    @override
-    def concentration(self, fugacity: ArrayLike, *, O2: ArrayLike, **kwargs) -> ArrayLike:
-        del kwargs
-        ppmw: ArrayLike = self._power_law.concentration(fugacity)
-        constant: ArrayLike = (O2**-0.75) * 5.97e-10
-        power_law: SolubilityPowerLaw = SolubilityPowerLaw(constant=constant, exponent=0.5)
-        ppmw = ppmw + power_law.concentration(fugacity)
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> Array:
+        del temperature
+        del pressure
+        ppmw: Array = power_law(fugacity, 0.0611, 1)
+        constant: Array = power_law(fO2, 5.97e-10, -0.75)
+        ppmw2: Array = power_law(fugacity, constant, 0.5)
+        ppmw = ppmw + ppmw2
 
         return ppmw
+
+
+N2_basalt_libourel: SolubilityProtocol = _N2_basalt_libourel()

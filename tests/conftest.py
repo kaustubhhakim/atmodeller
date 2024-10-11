@@ -25,7 +25,7 @@ import numpy.typing as npt
 import pytest
 from jaxtyping import ArrayLike
 
-logger: logging.Logger = logging.getLogger("atmodeller")
+logger: logging.Logger = logging.getLogger("atmodeller.tests.solubility")
 
 
 class Helper:
@@ -77,6 +77,16 @@ class Helper:
         logger.debug("isclose = %s", isclose)
 
         return isclose.all()
+
+    @classmethod
+    def concentration_to_logger(cls, function_name: str, concentration: ArrayLike) -> None:
+        """Outputs the concentration to the logger
+
+        Args:
+            function_name: Function name
+            concentration: Concentration
+        """
+        logger.debug("%s, concentration = %s ppmw", function_name, concentration)
 
 
 @pytest.fixture
