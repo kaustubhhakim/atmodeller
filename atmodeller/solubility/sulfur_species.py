@@ -249,8 +249,9 @@ class _S2_trachybasalt_boulliung(NamedTuple):
 S2_trachybasalt_boulliung: SolubilityProtocol = _S2_trachybasalt_boulliung()
 
 
-# TODO: Maggie to check.  Like all of the above, the relevant fugacity for this calculation is
-# S2 right?
+# FIXME: input fugacity there should actually be the total pressure. unfortunately when they did
+# their fitting to include the melt composition, they got rid of the fS2 dependency and have
+# instead the dependency of T, P and fO2.
 class _S2_mercury_magma_namur(NamedTuple):
     """S in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`
 

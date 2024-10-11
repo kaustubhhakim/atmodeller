@@ -16,7 +16,7 @@
 #
 """Core classes and functions for thermochemical data"""
 
-# Convenient to use chemical formulas so pylint: disable=C0103
+# Convenient to use chemical formulas so pylint: disable=invalid-name
 
 import sys
 from typing import NamedTuple, Protocol
@@ -368,11 +368,12 @@ class IronWustiteBufferHirschmann(NamedTuple):
         def high_temperature_case() -> ArrayLike:
             return self.log10_fugacity_high_temperature(temperature, pressure)
 
-        buffer_value: Array = lax.cond(
+        # Shift has already been added by the component buffers
+        fO2: ArrayLike = lax.cond(
             self._use_low_temperature(temperature), low_temperature_case, high_temperature_case
         )
 
-        return buffer_value + self.log10_shift
+        return fO2
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log fugacity

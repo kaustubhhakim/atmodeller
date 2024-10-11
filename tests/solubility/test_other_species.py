@@ -124,7 +124,7 @@ def test_N2_basalt_bernadou(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = N2_basalt_bernadou
-    target_concentration: ArrayLike = 0.7297393276509421
+    target_concentration: ArrayLike = 0.6844302758688818
 
     check_values.concentration(
         function_name,
@@ -142,7 +142,7 @@ def test_N2_basalt_dasgupta(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = N2_basalt_dasgupta
-    target_concentration: ArrayLike = 1.003542953698781
+    target_concentration: ArrayLike = 0.9502724120546588
 
     check_values.concentration(
         function_name,
@@ -160,7 +160,7 @@ def test_N2_basalt_libourel(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = N2_basalt_libourel
-    target_concentration: ArrayLike = 0.12236665867110082
+    target_concentration: ArrayLike = 0.12236469243947536
 
     check_values.concentration(
         function_name,
