@@ -54,10 +54,11 @@ from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import (
     CombinedEOSModel,
     CorrespondingStatesMixin,
+    ExperimentalCalibration,
     RealGas,
     critical_parameters,
 )
-from atmodeller.utilities import ExperimentalCalibration, unit_conversion
+from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override

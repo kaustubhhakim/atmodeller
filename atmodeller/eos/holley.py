@@ -44,8 +44,8 @@ import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
-from atmodeller.eos.interfaces import RealGas
-from atmodeller.utilities import ExperimentalCalibration, unit_conversion
+from atmodeller.eos.interfaces import ExperimentalCalibration, RealGas
+from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
