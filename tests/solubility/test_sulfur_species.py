@@ -26,15 +26,18 @@ from jax.typing import ArrayLike
 
 from atmodeller import __version__, debug_logger
 from atmodeller.solubility.jax_interfaces import SolubilityProtocol
-from atmodeller.solubility.other_species import (
-    Cl2_ano_dio_for_thomas,
-    Cl2_basalt_thomas,
-    He_basalt,
-    N2_basalt_bernadou,
-    N2_basalt_dasgupta,
-    N2_basalt_libourel,
+from atmodeller.solubility.sulfur_species import (
+    S2_andesite_boulliung,
+    S2_basalt_boulliung,
+    S2_mercury_magma_namur,
+    S2_sulfate_andesite_boulliung,
+    S2_sulfate_basalt_boulliung,
+    S2_sulfate_trachybasalt_boulliung,
+    S2_sulfide_andesite_boulliung,
+    S2_sulfide_basalt_boulliung,
+    S2_sulfide_trachybasalt_boulliung,
+    S2_trachybasalt_boulliung,
 )
-from atmodeller.solubility.sulfur_species import S2_andesite_boulliung as old_model
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
@@ -66,125 +69,181 @@ logger.info("TEST_FO2 = %e bar", TEST_FO2)
 logger.info("TEST_FO2_GPA = %e bar", TEST_FO2_GPA)
 
 
-# def test_Cl2_ano_dio_for_thomas(check_values) -> None:
-#     """Tests Cl in silicate melts :cite:p:`TW21`"""
+def test_S2_sulfate_andesite_boulliung(check_values) -> None:
+    """Tests S as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`"""
 
-#     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-#     solubility_model: SolubilityProtocol = Cl2_ano_dio_for_thomas
-#     target_concentration: ArrayLike = 1987252.8978466734
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_sulfate_andesite_boulliung
+    target_concentration: ArrayLike = 0.00025407239220567775
 
-#     check_values.concentration(
-#         function_name,
-#         solubility_model,
-#         target_concentration,
-#         TEST_FUGACITY,
-#         TEST_TEMPERATURE,
-#         TEST_PRESSURE_GPA,
-#         TEST_FO2_GPA,
-#     )
-
-
-# def test_Cl2_basalt_thomas(check_values) -> None:
-#     """Tests Cl in silicate melts :cite:p:`TW21`"""
-
-#     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-#     solubility_model: SolubilityProtocol = Cl2_basalt_thomas
-#     target_concentration: ArrayLike = 1111006.1746003036
-
-#     check_values.concentration(
-#         function_name,
-#         solubility_model,
-#         target_concentration,
-#         TEST_FUGACITY,
-#         TEST_TEMPERATURE,
-#         TEST_PRESSURE_GPA,
-#         TEST_FO2_GPA,
-#     )
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
 
 
-# def test_He_basalt(check_values) -> None:
-#     """He in tholeittic basalt melt :cite:p:`JWB86`"""
+def test_S2_sulfide_andesite_boulliung(check_values) -> None:
+    """Tests S as sulfide (S^2-) in andesite :cite:p:`BW23`"""
 
-#     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-#     solubility_model: SolubilityProtocol = He_basalt
-#     target_concentration: ArrayLike = 0.20013
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_sulfide_andesite_boulliung
+    target_concentration: ArrayLike = 2787.368395825942
 
-#     check_values.concentration(
-#         function_name,
-#         solubility_model,
-#         target_concentration,
-#         TEST_FUGACITY,
-#         TEST_TEMPERATURE,
-#         TEST_PRESSURE,
-#         TEST_FO2,
-#     )
-
-
-# def test_N2_basalt_bernadou(check_values) -> None:
-#     """Tests N2 in basaltic silicate melt :cite:p:`BGF21`"""
-
-#     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-#     solubility_model: SolubilityProtocol = N2_basalt_bernadou
-#     target_concentration: ArrayLike = 0.7297393276509421
-
-#     check_values.concentration(
-#         function_name,
-#         solubility_model,
-#         target_concentration,
-#         TEST_FUGACITY,
-#         TEST_TEMPERATURE,
-#         TEST_PRESSURE_GPA,
-#         TEST_FO2_GPA,
-#     )
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
 
 
-# def test_N2_basalt_dasgupta(check_values) -> None:
-#     """Tests N2 in silicate melts :cite:p:`DFP22`"""
+def test_S2_andesite_boulliung(check_values) -> None:
+    """Tests S in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
-#     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-#     solubility_model: SolubilityProtocol = N2_basalt_dasgupta
-#     target_concentration: ArrayLike = 1.003542953698781
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_andesite_boulliung
+    target_concentration: ArrayLike = 2787.3686498983343
 
-#     check_values.concentration(
-#         function_name,
-#         solubility_model,
-#         target_concentration,
-#         TEST_FUGACITY,
-#         TEST_TEMPERATURE,
-#         TEST_PRESSURE_GPA,
-#         TEST_FO2_GPA,
-#     )
-
-
-# def test_N2_basalt_libourel(check_values) -> None:
-#     """Tests N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`"""
-
-#     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-#     solubility_model: SolubilityProtocol = N2_basalt_libourel
-#     target_concentration: ArrayLike = 0.12236665867110082
-
-#     check_values.concentration(
-#         function_name,
-#         solubility_model,
-#         target_concentration,
-#         TEST_FUGACITY,
-#         TEST_TEMPERATURE,
-#         TEST_PRESSURE,
-#         TEST_FO2,
-#     )
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
 
 
-# def test_CH4_basalt_ardia(helper) -> None:
-#     """Tests CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`"""
+def test_S2_sulfate_basalt_boulliung(check_values) -> None:
+    """Tests S in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`"""
 
-#     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-#     model: SolubilityProtocol = CH4_basalt_ardia
-#     concentration: ArrayLike = model.concentration(
-#         TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2
-#     )
-#     helper.concentration_to_logger(function_name, concentration)
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_sulfate_basalt_boulliung
+    target_concentration: ArrayLike = 0.0002004971661509047
 
-#     assert np.isclose(concentration, 0.0005831884445042942, rtol=RTOL, atol=ATOL).all()
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
 
-# solubility2 = old_model().concentration(TEST_FUGACITY)
-# logger.debug("solubility2 = %s", solubility2)
+
+def test_S2_sulfide_basalt_boulliung(check_values) -> None:
+    """Tests S in basalt as sulfide (S^2-) :cite:p:`BW23`"""
+
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_sulfide_basalt_boulliung
+    target_concentration: ArrayLike = 7636.02728510278
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
+
+
+def test_S2_basalt_boulliung(check_values) -> None:
+    """Tests S in basalt due to sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
+
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_basalt_boulliung
+    target_concentration: ArrayLike = 7636.027485599947
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
+
+
+def test_S2_sulfate_trachybasalt_boulliung(check_values) -> None:
+    """Tests S as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`"""
+
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_sulfate_trachybasalt_boulliung
+    target_concentration: ArrayLike = 0.0006839444451945131
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
+
+
+def test_S2_sulfide_trachybasalt_boulliung(check_values) -> None:
+    """Tests S as sulfide (S^2-) in trachybasalt :cite:p:`BW23`"""
+
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_sulfide_trachybasalt_boulliung
+    target_concentration: ArrayLike = 9649.1869665264
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
+
+
+def test_S2_trachybasalt_boulliung(check_values) -> None:
+    """Tests S in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
+
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_trachybasalt_boulliung
+    target_concentration: ArrayLike = 9649.187650470845
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )
+
+
+def test_S2_mercury_magma_namur(check_values) -> None:
+    """Tests S in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`"""
+
+    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
+    solubility_model: SolubilityProtocol = S2_mercury_magma_namur
+    target_concentration: ArrayLike = 1834.7969850380755
+
+    check_values.concentration(
+        function_name,
+        solubility_model,
+        target_concentration,
+        TEST_FUGACITY,
+        TEST_TEMPERATURE,
+        TEST_PRESSURE,
+        TEST_FO2,
+    )

@@ -18,28 +18,21 @@
 
 # Convenient to use chemical formulas so pylint: disable=C0103
 
-from __future__ import annotations
-
 import logging
-import sys
+from typing import NamedTuple
 
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.solubility.interfaces import Solubility
+from atmodeller.solubility.jax_interfaces import SolubilityProtocol
 from atmodeller.utilities import unit_conversion
-
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-# TODO: Needs to be refreshed for JAX
-class S2_sulfate_andesite_boulliung(Solubility):
+class _S2_sulfate_andesite_boulliung(NamedTuple):
     """Sulfur as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -48,21 +41,26 @@ class S2_sulfate_andesite_boulliung(Solubility):
     equilibrated with Air/SO2 mixtures.
     """
 
-    @override
     def concentration(
-        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
-    ) -> Array:
-        # Fugacity is fS2
-        del kwargs
-        logcs: float = -12.948 + (31586.2393 / temperature)
-        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
-        s_wtp: Array = 10**logs_wtp
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del pressure
+        logcs: Array = -12.948 + (31586.2393 / jnp.asarray(temperature))
+        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
+        s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
 
-class S2_sulfide_andesite_boulliung(Solubility):
+S2_sulfate_andesite_boulliung: SolubilityProtocol = _S2_sulfate_andesite_boulliung()
+
+
+class _S2_sulfide_andesite_boulliung(NamedTuple):
     """Sulfur as sulfide (S^2-) in andesite :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -70,47 +68,42 @@ class S2_sulfide_andesite_boulliung(Solubility):
     controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit below FMQ.
     """
 
-    @override
     def concentration(
-        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
-    ) -> Array:
-        del kwargs
-        logcs: float = 0.225 - (8921.0927 / temperature)
-        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
-        s_wtp: Array = 10**logs_wtp
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del pressure
+        logcs: Array = 0.225 - (8921.0927 / jnp.asarray(temperature))
+        logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
+        s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
 
-class S2_andesite_boulliung(Solubility):
+S2_sulfide_andesite_boulliung: SolubilityProtocol = _S2_sulfide_andesite_boulliung()
+
+
+class _S2_andesite_boulliung(NamedTuple):
     """S2 in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
-    def __init__(self):
-        self.sulfide: Solubility = S2_sulfide_andesite_boulliung()
-        self.sulfate: Solubility = S2_sulfate_andesite_boulliung()
+    sulfide: SolubilityProtocol = S2_sulfide_andesite_boulliung
+    sulfate: SolubilityProtocol = S2_sulfate_andesite_boulliung
 
-    @override
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        *,
-        temperature: float,
-        O2: ArrayLike,
-        **kwargs,
-    ) -> ArrayLike:
-        del kwargs
-        concentration: ArrayLike = self.sulfide.concentration(
-            fugacity, temperature=temperature, O2=O2
-        )
-        concentration = concentration + self.sulfate.concentration(
-            fugacity, temperature=temperature, O2=O2
-        )
+    def concentration(self, *args, **kwargs) -> ArrayLike:
+        concentration: ArrayLike = self.sulfide.concentration(*args, **kwargs)
+        concentration = concentration + self.sulfate.concentration(*args, **kwargs)
 
         return concentration
 
 
-class S2_sulfate_basalt_boulliung(Solubility):
+S2_andesite_boulliung: SolubilityProtocol = _S2_andesite_boulliung()
+
+
+class _S2_sulfate_basalt_boulliung(NamedTuple):
     """Sulfur in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract and the corrected expression for sulfate capacity
@@ -119,22 +112,27 @@ class S2_sulfate_basalt_boulliung(Solubility):
     Air/SO2 mixtures.
     """
 
-    @override
     def concentration(
-        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
-    ) -> Array:
-        # Fugacity is fS2
-        del kwargs
-        logcs: float = -12.948 + (32333.5635 / temperature)
-        logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
-        so4_wtp: Array = 10**logso4_wtp
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del pressure
+        logcs: Array = -12.948 + (32333.5635 / jnp.asarray(temperature))
+        logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
+        so4_wtp: Array = jnp.power(10, logso4_wtp)
         s_wtp: Array = so4_wtp * (32.065 / 96.06)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
 
-class S2_sulfide_basalt_boulliung(Solubility):
+S2_sulfate_basalt_boulliung: SolubilityProtocol = _S2_sulfate_basalt_boulliung()
+
+
+class _S2_sulfide_basalt_boulliung(Solubility):
     """Sulfur in basalt as sulfide (S^2-) :cite:p:`BW23`
 
     Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for
@@ -143,50 +141,42 @@ class S2_sulfide_basalt_boulliung(Solubility):
     unit below FMQ.
     """
 
-    @override
     def concentration(
-        self, fugacity: ArrayLike, *, temperature: float, O2: ArrayLike, **kwargs
-    ) -> Array:
-        # Fugacity is fS2
-        del kwargs
-        logcs: float = 0.225 - (8045.7465 / temperature)
-        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
-        s_wtp: Array = 10**logs_wtp
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del pressure
+        logcs: Array = 0.225 - (8045.7465 / jnp.asarray(temperature))
+        logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
+        s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
 
-class S2_basalt_boulliung(Solubility):
-    """Total sulfur in basalt due to both sulfide and sulfate dissolution
-    :cite:p:`BW22,BW23corr,BW23`
-    """
+S2_sulfide_basalt_boulliung: SolubilityProtocol = _S2_sulfide_basalt_boulliung()
 
-    def __init__(self):
-        self.sulfide_solubility: Solubility = S2_sulfide_basalt_boulliung()
-        self.sulfate_solubility: Solubility = S2_sulfate_basalt_boulliung()
 
-    @override
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        *,
-        temperature: float,
-        O2: ArrayLike,
-        **kwargs,
-    ) -> ArrayLike:
-        del kwargs
-        concentration: ArrayLike = self.sulfide_solubility.concentration(
-            fugacity, temperature=temperature, O2=O2
-        )
-        concentration = concentration + self.sulfate_solubility.concentration(
-            fugacity, temperature=temperature, O2=O2
-        )
+class _S2_basalt_boulliung(NamedTuple):
+    """Sulfur in basalt due to sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
+
+    sulfide: SolubilityProtocol = S2_sulfide_basalt_boulliung
+    sulfate: SolubilityProtocol = S2_sulfate_basalt_boulliung
+
+    def concentration(self, *args, **kwargs) -> ArrayLike:
+        concentration: ArrayLike = self.sulfide.concentration(*args, **kwargs)
+        concentration = concentration + self.sulfate.concentration(*args, **kwargs)
 
         return concentration
 
 
-class S2_sulfate_trachybasalt_boulliung(Solubility):
+S2_basalt_boulliung: SolubilityProtocol = _S2_basalt_boulliung()
+
+
+class _S2_sulfate_trachybasalt_boulliung(NamedTuple):
     """Sulfur as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -195,26 +185,26 @@ class S2_sulfate_trachybasalt_boulliung(Solubility):
     equilibrated with Air/SO2 mixtures.
     """
 
-    @override
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
-        temperature: float,
-        O2: ArrayLike,
-        **kwargs,
-    ) -> Array:
-        # Fugacity is fS2
-        del kwargs
-        logcs: float = -12.948 + (32446.366 / temperature)
-        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(O2))
-        s_wtp: Array = 10**logs_wtp
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del pressure
+        logcs: Array = -12.948 + (32446.366 / jnp.asarray(temperature))
+        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
+        s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
 
-class S2_sulfide_trachybasalt_boulliung(Solubility):
+S2_sulfate_trachybasalt_boulliung: SolubilityProtocol = _S2_sulfate_trachybasalt_boulliung()
+
+
+class _S2_sulfide_trachybasalt_boulliung(NamedTuple):
     """Sulfur as sulfide (S^2-) in trachybasalt :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -222,27 +212,45 @@ class S2_sulfide_trachybasalt_boulliung(Solubility):
     controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit below FMQ.
     """
 
-    @override
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
-        temperature: float,
-        O2: ArrayLike,
-        **kwargs,
-    ) -> Array:
-        # Fugacity is fS2
-        del kwargs
-        logcs: float = 0.225 - (7842.5 / temperature)
-        logs_wtp: Array = logcs - (0.5 * (jnp.log10(O2) - jnp.log10(fugacity)))
-        s_wtp: Array = 10**logs_wtp
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del pressure
+        logcs: Array = 0.225 - (7842.5 / jnp.asarray(temperature))
+        logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
+        s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
 
 
-class S_mercury_magma_namur(Solubility):
-    """Sulfur solubility in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`
+S2_sulfide_trachybasalt_boulliung: SolubilityProtocol = _S2_sulfide_trachybasalt_boulliung()
+
+
+class _S2_trachybasalt_boulliung(NamedTuple):
+    """Sulfur in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
+
+    sulfide: SolubilityProtocol = S2_sulfide_trachybasalt_boulliung
+    sulfate: SolubilityProtocol = S2_sulfate_trachybasalt_boulliung
+
+    def concentration(self, *args, **kwargs) -> ArrayLike:
+        concentration: ArrayLike = self.sulfide.concentration(*args, **kwargs)
+        concentration = concentration + self.sulfate.concentration(*args, **kwargs)
+
+        return concentration
+
+
+S2_trachybasalt_boulliung: SolubilityProtocol = _S2_trachybasalt_boulliung()
+
+
+# TODO: Maggie to check.  Like all of the above, the relevant fugacity for this calculation is
+# S2 right?
+class _S2_mercury_magma_namur(NamedTuple):
+    """S in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`
 
     Dissolved S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like
     magmas :cite:t:`NCH16{Equation 10}`, with coefficients from :cite:t:`NCH16{Table 2}`, assumed
@@ -251,26 +259,26 @@ class S_mercury_magma_namur(Solubility):
     sulfide and metallic melts at reducing conditions (fO2 at IW-1.5 to IW-9.4).
     """
 
-    def __init__(self):
-        self.coefficients: Array = jnp.array([7.25, -2.54e4, 0.04, -0.551])
+    coefficients: tuple[float, float, float, float] = (7.25, -2.54e4, 0.04, -0.551)
 
-    @override
     def concentration(
         self,
         fugacity: ArrayLike,
-        *,
-        temperature: float,
-        O2: ArrayLike,
-        **kwargs,
-    ) -> Array:
-        del kwargs
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike:
+        del pressure
         wt_perc: Array = jnp.exp(
             self.coefficients[0]
             + (self.coefficients[1] / temperature)
             + ((self.coefficients[2] * fugacity) / temperature)
-            + (self.coefficients[3] * jnp.log10(O2))
+            + (self.coefficients[3] * jnp.log10(fO2))
             - 0.136
         )
         ppmw: Array = wt_perc * unit_conversion.percent_to_ppm
 
         return ppmw
+
+
+S2_mercury_magma_namur: SolubilityProtocol = _S2_mercury_magma_namur()
