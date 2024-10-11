@@ -24,7 +24,7 @@ import logging
 import numpy as np
 from jax.typing import ArrayLike
 
-from atmodeller import __version__, debug_logger
+from atmodeller import debug_logger
 from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.solubility.hydrogen_species import (
     H2_andesite_hirschmann,

@@ -24,7 +24,7 @@ import logging
 import numpy as np
 from jax.typing import ArrayLike
 
-from atmodeller import __version__, debug_logger
+from atmodeller import debug_logger
 from atmodeller.solubility.carbon_species import (
     CH4_basalt_ardia,
     CO2_basalt_dixon,

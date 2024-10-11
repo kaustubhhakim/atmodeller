@@ -24,7 +24,7 @@ import logging
 import numpy as np
 from jax.typing import ArrayLike
 
-from atmodeller import __version__, debug_logger
+from atmodeller import debug_logger
 from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.solubility.sulfur_species import (
     S2_andesite_boulliung,
