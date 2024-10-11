@@ -37,7 +37,6 @@ from atmodeller.solubility.hydrogen_species import (
     H2O_peridotite_sossi,
 )
 from atmodeller.solubility.jax_interfaces import SolubilityProtocol
-from atmodeller.solubility.old_hydrogen_species import H2O_peridotite_sossi as old_model
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
 
 logger: logging.Logger = debug_logger()
@@ -178,9 +177,6 @@ def test_H2O_peridotite_sossi() -> None:
     output_concentration_to_logger(function_name, concentration)
 
     assert np.isclose(concentration, 914.9961748553926, rtol=RTOL, atol=ATOL).all()
-
-    # solubility2 = old_model().concentration(TEST_FUGACITY)
-    # logger.debug("solubility2 = %s", solubility2)
 
 
 def output_concentration_to_logger(function_name: str, concentration: ArrayLike) -> None:
