@@ -44,22 +44,24 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
-# Test a non-unity fugacity so the exponent is relevant for a power law solubility.
-TEST_FUGACITY: ArrayLike = 2
-TEST_TEMPERATURE: ArrayLike = 2000
-TEST_PRESSURE: ArrayLike = 500  # bar, for Dixon experimental range
-# Several models are calibrated in the low GPa range, so use this instead
-TEST_PRESSURE_GPA: ArrayLike = 2 * unit_conversion.GPa_to_bar  # GPa
-
 LOG10_SHIFT: ArrayLike = 0
 IW: RedoxBufferProtocol = IronWustiteBuffer(LOG10_SHIFT)
+
+# Test a non-unity fugacity so the exponent is relevant for a power law solubility.
+TEST_FUGACITY: ArrayLike = 2  # bar
+TEST_TEMPERATURE: ArrayLike = 2000  # K
+TEST_PRESSURE: ArrayLike = 500  # bar, motivated by Dixon experimental range
 TEST_FO2: ArrayLike = np.exp(IW.log_fugacity(TEST_TEMPERATURE, TEST_PRESSURE))
+# Several models are calibrated in the low GPa range, so use this instead for testing
+TEST_PRESSURE_GPA: ArrayLike = 2 * unit_conversion.GPa_to_bar  # GPa
+TEST_FO2_GPA: ArrayLike = np.exp(IW.log_fugacity(TEST_TEMPERATURE, TEST_PRESSURE_GPA))
 
 logger.info("TEST_FUGACITY = %e bar", TEST_FUGACITY)
 logger.info("TEST_TEMPERATURE = %e K", TEST_TEMPERATURE)
 logger.info("TEST_PRESSURE = %e bar", TEST_PRESSURE)
 logger.info("TEST_PRESSURE_GPA = %e bar", TEST_PRESSURE_GPA)
 logger.info("TEST_FO2 = %e bar", TEST_FO2)
+logger.info("TEST_FO2_GPA = %e bar", TEST_FO2_GPA)
 
 
 def test_CH4_basalt_ardia(helper) -> None:
@@ -68,7 +70,7 @@ def test_CH4_basalt_ardia(helper) -> None:
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     model: SolubilityProtocol = CH4_basalt_ardia
     concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2
+        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
     )
     helper.concentration_to_logger(function_name, concentration)
 
@@ -81,7 +83,7 @@ def test_CO_basalt_armstrong(helper) -> None:
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     model: SolubilityProtocol = CO_basalt_armstrong
     concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2
+        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
     )
     helper.concentration_to_logger(function_name, concentration)
 
@@ -94,7 +96,7 @@ def test_CO_basalt_yoshioka(helper) -> None:
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     model: SolubilityProtocol = CO_basalt_yoshioka
     concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2
+        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
     )
     helper.concentration_to_logger(function_name, concentration)
 
@@ -107,7 +109,7 @@ def test_CO_rhyolite_yoshioka(helper) -> None:
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     model: SolubilityProtocol = CO_rhyolite_yoshioka
     concentration: ArrayLike = model.concentration(
-        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2
+        TEST_FUGACITY, TEST_TEMPERATURE, TEST_PRESSURE_GPA, TEST_FO2_GPA
     )
     helper.concentration_to_logger(function_name, concentration)
 

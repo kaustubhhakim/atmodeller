@@ -30,7 +30,7 @@ ATOL: float = 1.0e-8
 
 
 class CheckValues:
-    """Helper class with methods to check and confirm values."""
+    """Helper class with methods to check and confirm values"""
 
     @staticmethod
     def compressibility(

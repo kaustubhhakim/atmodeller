@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""JAX solubility laws for other species"""
+"""Solubility laws for other species"""
 
-# Convenient to use chemical formulas so pylint: disable=C0103
+# Convenient to use chemical formulas so pylint: disable=invalid-name
 
 from __future__ import annotations
 

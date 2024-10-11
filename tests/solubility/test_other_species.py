@@ -26,8 +26,9 @@ from jax.typing import ArrayLike
 
 from atmodeller import __version__, debug_logger
 from atmodeller.solubility.jax_interfaces import SolubilityProtocol
-from atmodeller.solubility.old_carbon_species import CO2_basalt_dixon as old_model
-from atmodeller.solubility.other_species import N2_basalt_bernadou
+
+# from atmodeller.solubility.old_other_species import CO2_basalt_dixon as old_model
+# from atmodeller.solubility.other_species import N2_basalt_bernadou
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
@@ -42,19 +43,19 @@ ATOL: float = 1.0e-8
 # Test a non-unity fugacity so the exponent is relevant for a power law solubility.
 TEST_FUGACITY: ArrayLike = 2
 TEST_TEMPERATURE: ArrayLike = 2000
-TEST_PRESSURE: ArrayLike = 500  # bar, for Dixon experimental range
+# TEST_PRESSURE: ArrayLike = 500  # bar, for Dixon experimental range
 # Several models are calibrated in the low GPa range, so use this instead
 TEST_PRESSURE_GPA: ArrayLike = 2 * unit_conversion.GPa_to_bar  # GPa
 
 LOG10_SHIFT: ArrayLike = 0
 IW: RedoxBufferProtocol = IronWustiteBuffer(LOG10_SHIFT)
-TEST_FO2: ArrayLike = np.exp(IW.log_fugacity(TEST_TEMPERATURE, TEST_PRESSURE))
+# TEST_FO2: ArrayLike = np.exp(IW.log_fugacity(TEST_TEMPERATURE, TEST_PRESSURE))
 
 logger.info("TEST_FUGACITY = %e bar", TEST_FUGACITY)
 logger.info("TEST_TEMPERATURE = %e K", TEST_TEMPERATURE)
-logger.info("TEST_PRESSURE = %e bar", TEST_PRESSURE)
+# logger.info("TEST_PRESSURE = %e bar", TEST_PRESSURE)
 logger.info("TEST_PRESSURE_GPA = %e bar", TEST_PRESSURE_GPA)
-logger.info("TEST_FO2 = %e bar", TEST_FO2)
+# logger.info("TEST_FO2 = %e bar", TEST_FO2)
 
 
 # def test_CH4_basalt_ardia(helper) -> None:
