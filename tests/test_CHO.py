@@ -218,19 +218,17 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
     # Set up a range of fO2 shifts
-    fO2_shifts: npt.NDArray[np.float_] = np.array([-1, 0, 1], dtype=np.float_)
+    fO2_shifts: npt.NDArray[np.float_] = np.array([0], dtype=np.float_)
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {
         O2_g.name: IronWustiteBuffer(fO2_shifts)
     }
 
     oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
-    mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
+    mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, h_kg])}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
+    initial_number_density: ArrayLike = 30 * np.ones(len(species), dtype=np.float_)
     initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
 
     interior_atmosphere.initialise_solve(
@@ -251,6 +249,46 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     # }
 
     # assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+
+
+def test_H_fO2_batch_H_mass(helper) -> None:
+    """Tests H2-H2O at the IW buffer with H2O solubility for a range of H budgets."""
+
+    H2O_g: Species = Species.create_gas(H2O_g_data, solubility=H2O_peridotite_sossi)
+    H2_g: Species = Species.create_gas(H2_g_data)
+    O2_g: Species = Species.create_gas(O2_g_data)
+
+    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+
+    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
+
+    oceans: float = 1
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    # Set up a range of H masses
+    mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
+
+    # Initial solution guess number density (molecules/m^3)
+    initial_number_density: ArrayLike = 30 * np.ones(len(species), dtype=np.float_)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+
+    interior_atmosphere.initialise_solve(
+        planet,
+        initial_number_density,
+        initial_stability,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+    )
+    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+
+    target: dict[str, ArrayLike] = {
+        "H2O_g": np.array([2.570800334225988e-01, 2.426344578243460e01, 1.661069629540155e03]),
+        "H2_g": np.array([2.491577248312551e-01, 2.347358252845090e01, 1.448607479781265e03]),
+        "O2_g": np.array([8.838042581380630e-08, 8.869809838835624e-08, 1.091546738162749e-07]),
+    }
+
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C(helper) -> None:

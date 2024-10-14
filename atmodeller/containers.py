@@ -227,10 +227,10 @@ class FugacityConstraints(NamedTuple):
             None, None
         )  # vmap_test)  # type: ignore - container types are for data
 
-        return FugacityConstraints(
-            log_scaling=None,
-            constraints={"O2_g": IronWustiteBufferHirschmann(log10_shift=0, calibration=None)},
-        )
+        # return FugacityConstraints(
+        #    log_scaling=None,
+        #    constraints={"O2_g": IronWustiteBufferHirschmann(log10_shift=0, calibration=None)},
+        # )
 
     def array(self, temperature: ArrayLike, pressure: Array) -> Array:
         """Scaled log number density as an array
@@ -328,7 +328,7 @@ class MassConstraints(NamedTuple):
                 # vmap_axis = None
                 pass
 
-        return MassConstraints(vmap_axis, None)  # type: ignore - container types are for data
+        return MassConstraints(None, vmap_axis)  # type: ignore - container types are for data
 
     def array(self, log_atmosphere_volume: Array) -> Array:
         """Scaled log number density as an array

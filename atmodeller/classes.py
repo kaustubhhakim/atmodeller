@@ -469,6 +469,7 @@ class InteriorAtmosphere:
         out: Array = self.solve_raw_output(initial_solution, traced_parameters)
 
         if self._is_batch:
+            logger.debug("Batch calculation")
             # Must vmap the function to enable it to be used in batch mode.
             vmap_get_log_extended_activity: Callable = jax.vmap(
                 get_log_extended_activity, in_axes=(self.parameters_vmap, None, 0, 0)
@@ -477,6 +478,7 @@ class InteriorAtmosphere:
                 out, axis=1, extended_activity_func=vmap_get_log_extended_activity
             )
         else:
+            logger.debug("Single calculation")
             number_density_np, extended_activity_np = self.get_processed_output(
                 out, axis=0, extended_activity_func=get_log_extended_activity
             )
