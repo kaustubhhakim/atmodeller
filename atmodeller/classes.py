@@ -347,12 +347,11 @@ class InteriorAtmosphere:
         """Gets the reaction matrix.
 
         Returns:
-            A matrix of linearly independent reactions or None # TODO: Still return None?
+            A matrix of linearly independent reactions or an empty array if no reactions
         """
-        # TODO: Would prefer to always return an array even in the absence of reactions?
-        # if len(self.species) == 1:
-        #    logger.debug("Only one species therefore no reactions")
-        #    return np.zeros((0, 0))
+        if len(self.species) == 1:
+            logger.debug("Only one species therefore no reactions")
+            return np.array([])
 
         transpose_formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix().T
         reaction_matrix: npt.NDArray[np.float_] = partial_rref(transpose_formula_matrix)

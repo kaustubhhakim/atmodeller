@@ -230,11 +230,6 @@ class FugacityConstraints(NamedTuple):
         Returns:
             Scaled log number density as an array
         """
-        # Short-cut if no constraints are applied
-        # TODO: Could possible drop this if fixed_parameters has a flag
-        if not self.constraints:
-            return jnp.array([0.0])  # returns 1-D array
-
         fugacity_funcs: list[Callable] = [
             constraint.log_fugacity for constraint in self.constraints.values()
         ]
@@ -345,6 +340,8 @@ class MassConstraints(NamedTuple):
 # region: Containers for fixed parameters
 class FixedParameters(NamedTuple):
     """Parameters that are always fixed for a calculation
+
+    This container and all objects within it must be hashable.
 
     Args:
         species: Tuple of species
