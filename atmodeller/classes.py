@@ -20,7 +20,7 @@ import logging
 import pprint
 import time
 from collections.abc import Mapping
-from typing import Callable, NamedTuple
+from typing import Callable, Iterable, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -34,11 +34,11 @@ from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
     MassConstraints,
-    Parameters,
     Planet,
     Solution,
     SolverParameters,
     Species,
+    TracedParameters,
 )
 from atmodeller.engine import get_log_extended_activity, solve
 from atmodeller.thermodata.core import RedoxBufferProtocol
@@ -51,21 +51,21 @@ class InteriorAtmosphere:
     """Interior atmosphere
 
     Args:
-        species: List of species
+        species: Tuple of species
         scaling: Scaling for the number density
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
     # Attributes that are set during initialise_solve are included for typing
-    fixed_parameters: FixedParameters
-    fugacity_constraints: FugacityConstraints
-    initial_solution: Solution
-    mass_constraints: MassConstraints
-    parameters: Parameters
+    traced_parameters: TracedParameters
     planet: Planet
+    fugacity_constraints: FugacityConstraints
+    mass_constraints: MassConstraints
+    fixed_parameters: FixedParameters
+    initial_solution: Solution
     _solver: Callable
     # Used for vmapping (if relevant)
-    parameters_vmap: Parameters
+    traced_parameters_vmap: TracedParameters
 
     def __init__(self, species: tuple[Species, ...], scaling: float, tau: float = TAU):
         self.species: tuple[Species, ...] = species
@@ -87,16 +87,16 @@ class InteriorAtmosphere:
             ]
         )
 
-    def contains_zero(self, tuples_list: list[NamedTuple]) -> bool:
-        """Checks if any tuples in a list contain a zero
+    def contains_zero(self, tuples: Iterable[NamedTuple]) -> bool:
+        """Checks if any tuples in an iterable contain a zero
 
         Args:
-            tuples_list: List of tuples
+            tuples: Iterable of tuples
 
         Returns:
             True if any
         """
-        return any(0 in tup for tup in tuples_list)
+        return any(0 in tup for tup in tuples)
 
     def initialise_solve(
         self,
@@ -136,12 +136,12 @@ class InteriorAtmosphere:
             initial_number_density, initial_stability, self.log_scaling
         )
         logger.debug("initial_solution = %s", self.initial_solution)
-        self.parameters = Parameters(
+        self.traced_parameters = TracedParameters(
             planet=self.planet,
             fugacity_constraints=self.fugacity_constraints,
             mass_constraints=self.mass_constraints,
         )
-        logger.debug("parameters = %s", self.parameters)
+        logger.debug("traced_parameters = %s", self.traced_parameters)
 
         if self._is_batch:
             self._solver = self._get_solver_vmap()
@@ -150,7 +150,7 @@ class InteriorAtmosphere:
 
         # Compile
         start_time = time.time()
-        self._solver(self.initial_solution, self.parameters).block_until_ready()
+        self._solver(self.initial_solution, self.traced_parameters).block_until_ready()
         end_time = time.time()
         compile_time = end_time - start_time
         logger.info("Compile time: %.6f seconds", compile_time)
@@ -186,13 +186,13 @@ class InteriorAtmosphere:
             Fixed parameters
         """
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
-        gas_species_indices: npt.NDArray[np.int_] = self.get_gas_species_indices()
-        molar_masses: npt.NDArray[np.float_] = self.get_molar_masses()
+        gas_species_indices: tuple[int, ...] = self.get_gas_species_indices()
+        molar_masses: tuple[float, ...] = self.get_molar_masses()
         diatomic_oxygen_index: int = self.get_diatomic_oxygen_index()
 
         # Formula matrix rows for elements that are constrained by mass constraints
         formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
-        unique_elements: list[str] = self.get_unique_elements_in_species()
+        unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
         indices: list[int] = []
         for element in mass_constraints.log_molecules.keys():
             index: int = unique_elements.index(element)
@@ -202,22 +202,22 @@ class InteriorAtmosphere:
         # Fugacity constraint matrix and indices
         number_fugacity_constraints: int = len(fugacity_constraints.constraints)
         fugacity_species_indices: list[int] = []
-        species_names: list[str] = self.get_species_names()
+        species_names: tuple[str, ...] = self.get_species_names()
         for species_name in fugacity_constraints.constraints.keys():
             index: int = species_names.index(species_name)
             fugacity_species_indices.append(index)
         fugacity_matrix: npt.NDArray[np.float_] = np.identity(number_fugacity_constraints)
-        fugacity_species_indices_np: npt.NDArray[np.int_] = np.array(fugacity_species_indices)
 
+        # For fixed parameters all objects must be hashable.
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=tuple(map(tuple, formula_matrix)),
             reaction_matrix=tuple(map(tuple, reaction_matrix)),
             fugacity_matrix=tuple(map(tuple, fugacity_matrix)),
-            gas_species_indices=tuple(gas_species_indices),
-            fugacity_species_indices=tuple(fugacity_species_indices_np),
+            gas_species_indices=gas_species_indices,
+            fugacity_species_indices=tuple(fugacity_species_indices),
             diatomic_oxygen_index=diatomic_oxygen_index,
-            molar_masses=tuple(molar_masses),
+            molar_masses=molar_masses,
             tau=self.tau,
             log_scaling=self.log_scaling,
         )
@@ -233,7 +233,7 @@ class InteriorAtmosphere:
         Returns:
             Formula matrix
         """
-        unique_elements: list[str] = self.get_unique_elements_in_species()
+        unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
         formula_matrix: npt.NDArray[np.int_] = np.zeros(
             (len(unique_elements), len(self.species)), dtype=jnp.int_
         )
@@ -251,7 +251,7 @@ class InteriorAtmosphere:
 
         return formula_matrix
 
-    def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
+    def get_gas_species_indices(self) -> tuple[int, ...]:
         """Gets the indices of gas species
 
         Returns:
@@ -262,9 +262,9 @@ class InteriorAtmosphere:
             if species_.data.phase == "g":
                 indices.append(nn)
 
-        return np.array(indices)
+        return tuple(indices)
 
-    def get_unique_elements_in_species(self) -> list[str]:
+    def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements
 
         Args:
@@ -281,7 +281,7 @@ class InteriorAtmosphere:
 
         logger.debug("unique_elements_in_species = %s", sorted_elements)
 
-        return sorted_elements
+        return tuple(sorted_elements)
 
     def get_wrapped_jit_solver(self) -> Callable:
         """Gets the jit solver with solver parameters set.
@@ -290,20 +290,25 @@ class InteriorAtmosphere:
             jit solver with solver parameters set
         """
 
-        def wrapped_jit_solver(solution: Solution, parameters: Parameters) -> Callable:
-            return solve(solution, parameters, self.fixed_parameters, self.solver_parameters)
+        def wrapped_jit_solver(
+            solution: Solution, traced_parameters: TracedParameters
+        ) -> Callable:
+            return solve(
+                solution, traced_parameters, self.fixed_parameters, self.solver_parameters
+            )
 
         return wrapped_jit_solver
 
-    def get_molar_masses(self) -> npt.NDArray[np.float_]:
+    def get_molar_masses(self) -> tuple[float, ...]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: npt.NDArray[np.float_] = np.array(
+        molar_masses: tuple[float, ...] = tuple(
             [species_.data.molar_mass for species_ in self.species]
         )
+
         logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
@@ -328,7 +333,7 @@ class InteriorAtmosphere:
         number_density_np: npt.NDArray[np.float_] = np.array(unscaled_number_density)
         logger.info("log_number_density = %s", number_density_np)
         extended_activity: Array = extended_activity_func(
-            self.parameters,
+            self.traced_parameters,
             self.fixed_parameters,
             unscaled_number_density,
             stability,
@@ -383,13 +388,13 @@ class InteriorAtmosphere:
 
         return reactions
 
-    def get_species_names(self) -> list[str]:
+    def get_species_names(self) -> tuple[str, ...]:
         """Gets the names of all species
 
         Returns:
             Species names
         """
-        return [species_.name for species_ in self.species]
+        return tuple([species_.name for species_ in self.species])
 
     def _get_solver_single(self) -> Callable:
         """Gets the solver for a single solve."""
@@ -398,8 +403,7 @@ class InteriorAtmosphere:
     def _get_solver_vmap(self) -> Callable:
         """Gets the solver for a batch solve."""
         # Define the structures to vectorize.
-        self.parameters_vmap: Parameters = Parameters(
-            fixed=None,  # type: ignore
+        self.parameters_vmap = TracedParameters(
             planet=self.planet.vmap_axes(),  # type: ignore
             fugacity_constraints=self.fugacity_constraints.vmap_axes(),  # type: ignore
             mass_constraints=self.mass_constraints.vmap_axes(),  # type: ignore
@@ -411,15 +415,17 @@ class InteriorAtmosphere:
         return solver
 
     def solve_raw_output(
-        self, initial_solution: Solution | None = None, parameters: Parameters | None = None
+        self,
+        initial_solution: Solution | None = None,
+        traced_parameters: TracedParameters | None = None,
     ) -> Array:
         """Solves the system and returns the raw (unprocessed) solution
 
         Args:
             initial_solution: Initial solution. Defaults to None, meaning that the initial solution
                 used to initialise the solver is used.
-            parameters: Parameters. Defaults to None, meaning that the parameters used to
-                initialise the solver are used.
+            traced_parameters: Traced parameters. Defaults to None, meaning that the traced
+                parameters used to initialise the solver are used.
 
         Returns:
             Solution
@@ -429,13 +435,13 @@ class InteriorAtmosphere:
         else:
             initial_solution_ = initial_solution
 
-        if parameters is None:
-            parameters_: Parameters = self.parameters
+        if traced_parameters is None:
+            traced_parameters_: TracedParameters = self.traced_parameters
         else:
-            parameters_ = parameters
+            traced_parameters_ = traced_parameters
 
         start_time = time.time()
-        out: Array = self._solver(initial_solution_, parameters_).block_until_ready()
+        out: Array = self._solver(initial_solution_, traced_parameters_).block_until_ready()
         end_time = time.time()
         execution_time = end_time - start_time
         logger.info("Execution time: %.6f seconds", execution_time)
@@ -444,20 +450,22 @@ class InteriorAtmosphere:
         return out
 
     def solve(
-        self, initial_solution: Solution | None = None, parameters: Parameters | None = None
+        self,
+        initial_solution: Solution | None = None,
+        traced_parameters: TracedParameters | None = None,
     ) -> dict[str, ArrayLike]:
         """Solves the system and returns the processed solution
 
         Args:
             initial_solution: Initial solution. Defaults to None, meaning that the initial solution
                 used to initialise the solver is used.
-            parameters: Parameters. Defaults to None, meaning that the parameters used to
-                initialise the solver are used.
+            traced_parameters: Traced parameters. Defaults to None, meaning that the traced
+                parameters used to initialise the solver are used.
 
         Returns:
             Number density, extended activity
         """
-        out: Array = self.solve_raw_output(initial_solution, parameters)
+        out: Array = self.solve_raw_output(initial_solution, traced_parameters)
 
         if self._is_batch:
             # Must vmap the function to enable it to be used in batch mode.

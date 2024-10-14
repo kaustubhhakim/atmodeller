@@ -21,6 +21,8 @@ approach is to encode the data as JAX-compatible types and provide properties an
 reconstruct other desired quantities, notably strings and other objects. This ensures that similar 
 functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
 """
+from __future__ import annotations
+
 import sys
 from collections.abc import Mapping
 from typing import Callable, NamedTuple, Type
@@ -56,6 +58,26 @@ if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
+
+
+# region: Containers for traced parameters
+
+
+class TracedParameters(NamedTuple):
+    """Traced parameters
+
+    Args:
+        planet: Planet
+        fugacity_constraints: Fugacity constraints
+        mass_constraints: Mass constraints
+    """
+
+    planet: Planet
+    """Planet"""
+    fugacity_constraints: FugacityConstraints
+    """Fugacity constraints"""
+    mass_constraints: MassConstraints
+    """Mass constraints"""
 
 
 class Planet(NamedTuple):
@@ -141,6 +163,225 @@ class Planet(NamedTuple):
         return base_dict
 
 
+class FugacityConstraints(NamedTuple):
+    """Fugacity constraints
+
+    These are applied as constraints on the gas activity.
+
+    Args:
+        log_scaling: Log scaling for the number density
+        constraints: Fugacity constraints
+    """
+
+    log_scaling: float
+    """Log scaling"""
+    constraints: dict[str, RedoxBufferProtocol]
+    """Fugacity constraints"""
+
+    @classmethod
+    def create(
+        cls,
+        log_scaling: float,
+        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
+    ) -> Self:
+        """Creates an instance
+
+        Args:
+            log_scaling: Log scaling for the number density
+            fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
+                None.
+
+        Returns:
+            An instance
+        """
+        if fugacity_constraints is None:
+            init_dict: dict[str, RedoxBufferProtocol] = {}
+        else:
+            init_dict = dict(fugacity_constraints)
+
+        return cls(log_scaling, init_dict)
+
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
+        values_list: list[RedoxBufferProtocol] = list(self.constraints.values())
+        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
+        if values_list:
+            try:
+                num_entries: int = len(values_list[0].log10_shift)  # type: ignore
+                if num_entries > 1:
+                    vmap_axis = 0
+            except TypeError:  # Just a single value, which means no vmapping required.
+                # vmap_axis = None
+                pass
+
+        return FugacityConstraints(vmap_axis, None)  # type: ignore - container types are for data
+
+    def array(self, temperature: ArrayLike, pressure: Array) -> Array:
+        """Scaled log number density as an array
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Scaled log number density as an array
+        """
+        # Short-cut if no constraints are applied
+        # TODO: Could possible drop this if fixed_parameters has a flag
+        if not self.constraints:
+            return jnp.array([0.0])  # returns 1-D array
+
+        fugacity_funcs: list[Callable] = [
+            constraint.log_fugacity for constraint in self.constraints.values()
+        ]
+
+        def apply_fugacity_function(index: ArrayLike, temperature: ArrayLike, pressure: Array):
+            return lax.switch(
+                index,
+                fugacity_funcs,
+                temperature,
+                pressure,
+            )
+
+        vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
+        indices: ArrayLike = jnp.arange(len(self.constraints))
+        log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
+
+        log_number_density: Array = (
+            log_fugacity - np.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
+        )
+        scaled_log_number_density: Array = scale_number_density(
+            log_number_density, self.log_scaling
+        )
+
+        return scaled_log_number_density
+
+
+class MassConstraints(NamedTuple):
+    """Mass constraints
+
+    Args:
+        log_scaling: Log scaling for the number density
+        log_molecules: Log number of molecules of the species
+    """
+
+    log_scaling: ArrayLike
+    """Log scaling"""
+    log_molecules: dict[str, ArrayLike]
+    """Log number of molecules"""
+
+    @classmethod
+    def create(
+        cls, log_scaling: ArrayLike, mass_constraints: Mapping[str, ArrayLike] | None = None
+    ) -> Self:
+        """Creates an instance
+
+        Args:
+            log_scaling: Log scaling for the number density
+            mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
+
+        Returns:
+            An instance
+        """
+        if mass_constraints is None:
+            init_dict: dict[str, ArrayLike] = {}
+        else:
+            init_dict = dict(mass_constraints)
+
+        sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
+        log_number_of_molecules: dict[str, ArrayLike] = {}
+
+        for element, mass_constraint in sorted_mass.items():
+            molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
+            log_number_of_molecules_: Array = (
+                jnp.log(mass_constraint) + np.log(AVOGADRO) - jnp.log(molar_mass)
+            )
+            log_number_of_molecules[element] = log_number_of_molecules_
+
+        return cls(log_scaling, log_number_of_molecules)
+
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
+        values_list: list[ArrayLike] = list(self.log_molecules.values())
+        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
+        if values_list:
+            try:
+                number_entries: int = len(values_list[0])  # type: ignore
+                if number_entries > 1:
+                    vmap_axis = 0
+            except TypeError:  # Just a single value, which means no vmapping required.
+                # vmap_axis = None
+                pass
+
+        return MassConstraints(vmap_axis, None)  # type: ignore - container types are for data
+
+    def array(self, log_atmosphere_volume: Array) -> Array:
+        """Scaled log number density as an array
+
+        Args:
+            log_atmosphere_volume: Log volume of the atmosphere
+
+        Returns:
+            Scaled log number density as an array
+        """
+        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
+        log_scaled_molecules: Array = scale_number_density(log_molecules, self.log_scaling)
+        log_number_density: Array = log_scaled_molecules - log_atmosphere_volume
+
+        return log_number_density
+
+
+# endregion
+
+
+# region: Containers for fixed parameters
+class FixedParameters(NamedTuple):
+    """Parameters that are always fixed for a calculation
+
+    Args:
+        species: Tuple of species
+        formula_matrix; Formula matrix
+        reaction_matrix: Reaction matrix
+        fugacity_matrix: Fugacity constraint matrix
+        gas_species_indices: Indices of gas species
+        fugacity_species_indices: Indices of species to constrain the fugacity
+        diatomic_oxygen_index: Index of diatomic oxygen
+        molar_masses: Molar masses of all species
+        tau: Tau factor for species stability
+        log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which
+            converts molecules/m^3 to moles/m^3
+    """
+
+    species: tuple[Species, ...]
+    """Tuple of species """
+    formula_matrix: tuple[tuple[float, ...], ...]
+    """Formula matrix"""
+    reaction_matrix: tuple[tuple[float, ...], ...]
+    """Reaction matrix"""
+    fugacity_matrix: tuple[tuple[float, ...], ...]
+    """Fugacity constraint matrix"""
+    gas_species_indices: tuple[int, ...]
+    """Indices of gas species"""
+    fugacity_species_indices: tuple[int, ...]
+    """Indices of species to constrain the fugacity"""
+    diatomic_oxygen_index: int
+    """Index of diatomic oxygen"""
+    molar_masses: tuple[float, ...]
+    """Molar masses of all species"""
+    tau: float
+    """Tau factor for species"""
+    log_scaling: float
+    """Log scaling"""
+
+
 class Species(NamedTuple):
     """Species
 
@@ -202,6 +443,7 @@ class Solution(NamedTuple):
     Args:
         number: Number density of species
         stability: Stability of species
+        log_scaling: Log scaling
     """
 
     number_density: ArrayLike
@@ -231,181 +473,6 @@ class Solution(NamedTuple):
     def data(self) -> Array:
         """Combined data in a single array"""
         return jnp.concatenate((self.number_density, self.stability))
-
-
-class FugacityConstraints(NamedTuple):
-    """Fugacity constraints
-
-    These are applied as constraints on the gas activity.
-
-    Args:
-        constraints: Fugacity constraints
-        log_scaling: Log scaling for the number density
-    """
-
-    constraints: dict[str, RedoxBufferProtocol]
-    """Fugacity constraints"""
-    log_scaling: ArrayLike
-    """Log scaling"""
-
-    @classmethod
-    def create(
-        cls,
-        log_scaling: ArrayLike,
-        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
-    ) -> Self:
-        """Creates an instance
-
-        Args:
-            log_scaling: Log scaling for the number density
-            fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
-                None.
-
-        Returns:
-            An instance
-        """
-        if fugacity_constraints is None:
-            init_dict: dict[str, RedoxBufferProtocol] = {}
-        else:
-            init_dict = dict(fugacity_constraints)
-
-        return cls(init_dict, log_scaling)
-
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        values_list: list[RedoxBufferProtocol] = list(self.constraints.values())
-        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
-        if values_list:
-            try:
-                num_entries: int = len(values_list[0].log10_shift)  # type: ignore
-                if num_entries > 1:
-                    vmap_axis = 0
-            except TypeError:  # Just a single value, which means no vmapping required.
-                # vmap_axis = None
-                pass
-
-        return FugacityConstraints(vmap_axis, None)  # type: ignore - container types are for data
-
-    def array(self, temperature: ArrayLike, pressure: Array) -> Array:
-        """Scaled log number density as an array
-
-        Args:
-            temperature: Temperature
-            pressure: Pressure
-
-        Returns:
-            Scaled log number density as an array
-        """
-        # Short-cut if no constraints are applied
-        if not self.constraints:
-            return jnp.array(0.0)
-
-        fugacity_funcs: list[Callable] = [
-            constraint.log_fugacity for constraint in self.constraints.values()
-        ]
-
-        def apply_fugacity_function(index: ArrayLike, temperature: ArrayLike, pressure: Array):
-            return lax.switch(
-                index,
-                fugacity_funcs,
-                temperature,
-                pressure,
-            )
-
-        vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
-        indices: ArrayLike = jnp.arange(len(self.constraints))
-        log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
-
-        log_number_density: Array = (
-            log_fugacity - np.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
-        )
-        scaled_log_number_density: Array = scale_number_density(
-            log_number_density, self.log_scaling
-        )
-
-        return scaled_log_number_density
-
-
-class MassConstraints(NamedTuple):
-    """Mass constraints
-
-    Args:
-        log_molecules: Log number of molecules of the species
-        log_scaling: Log scaling for the number density
-    """
-
-    log_molecules: dict[str, ArrayLike]
-    """Log number of molecules"""
-    log_scaling: ArrayLike
-    """Log scaling"""
-
-    @classmethod
-    def create(
-        cls, log_scaling: ArrayLike, mass_constraints: Mapping[str, ArrayLike] | None = None
-    ) -> Self:
-        """Creates an instance
-
-        Args:
-            log_scaling: Log scaling for the number density
-            mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
-
-        Returns:
-            An instance
-        """
-        if mass_constraints is None:
-            init_dict: dict[str, ArrayLike] = {}
-        else:
-            init_dict = dict(mass_constraints)
-
-        sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
-        log_number_of_molecules: dict[str, ArrayLike] = {}
-
-        for element, mass_constraint in sorted_mass.items():
-            molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log_number_of_molecules_: Array = (
-                jnp.log(mass_constraint) + np.log(AVOGADRO) - jnp.log(molar_mass)
-            )
-            log_number_of_molecules[element] = log_number_of_molecules_
-
-        return cls(log_number_of_molecules, log_scaling)
-
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        values_list: list[ArrayLike] = list(self.log_molecules.values())
-        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
-        if values_list:
-            try:
-                number_entries: int = len(values_list[0])  # type: ignore
-                if number_entries > 1:
-                    vmap_axis = 0
-            except TypeError:  # Just a single value, which means no vmapping required.
-                # vmap_axis = None
-                pass
-
-        return MassConstraints(vmap_axis, None)  # type: ignore - container types are for data
-
-    def array(self, log_atmosphere_volume: Array) -> Array:
-        """Scaled log number density as an array
-
-        Args:
-            log_atmosphere_volume: Log volume of the atmosphere
-
-        Returns:
-            Scaled log number density as an array
-        """
-        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
-        log_scaled_molecules: Array = scale_number_density(log_molecules, self.log_scaling)
-        log_number_density: Array = log_scaled_molecules - log_atmosphere_volume
-
-        return log_number_density
 
 
 class SolverParameters(NamedTuple):
@@ -445,7 +512,7 @@ class SolverParameters(NamedTuple):
         """Creates an instance
 
         Args:
-            species: A list of species
+            species: A tuple of species
             log_scaling: Log scaling for the number density
             solver_class: Solver class. Defaults to optimistix Newton.
             rtol: Relative tolerance. Defaults to 1.0e-8.
@@ -481,7 +548,7 @@ class SolverParameters(NamedTuple):
         """Gets the bound on the hypercube
 
         Args:
-            species: List of species
+            species: Tuple of species
             log_scaling: Log scaling for the number density
             number_density_bound: Bound on the number density
             stability_bound: Bound on the stability
@@ -505,57 +572,4 @@ class SolverParameters(NamedTuple):
         return bound
 
 
-class FixedParameters(NamedTuple):
-    """Parameters that are always fixed for a calculation
-
-    Args:
-        species: Tuple of species
-        formula_matrix; Formula matrix
-        reaction_matrix: Reaction matrix
-        fugacity_matrix: Fugacity constraint matrix
-        gas_species_indices: Indices of gas species
-        fugacity_species_indices: Indices of species to constrain the fugacity
-        diatomic_oxygen_index: Index of diatomic oxygen
-        molar_masses: Molar masses of all species
-        tau: Tau factor for species stability
-        log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which
-            converts molecules/m^3 to moles/m^3
-    """
-
-    species: tuple[Species, ...]
-    """Tuple of species """
-    formula_matrix: tuple[tuple[float, ...], ...]
-    """Formula matrix"""
-    reaction_matrix: tuple[tuple[float, ...], ...]
-    """Reaction matrix"""
-    fugacity_matrix: tuple[tuple[float, ...], ...]
-    """Fugacity constraint matrix"""
-    gas_species_indices: tuple[int, ...]
-    """Indices of gas species"""
-    fugacity_species_indices: tuple[int, ...]
-    """Indices of species to constrain the fugacity"""
-    diatomic_oxygen_index: int
-    """Index of diatomic oxygen"""
-    molar_masses: tuple[float]
-    """Molar masses of all species"""
-    tau: float
-    """Tau factor for species"""
-    log_scaling: float
-    """Log scaling"""
-
-
-class Parameters(NamedTuple):
-    """Parameters
-
-    Args:
-        planet: Planet
-        fugacity_constraints: Fugacity constraints
-        mass_constraints: Mass constraints
-    """
-
-    planet: Planet
-    """Planet"""
-    fugacity_constraints: FugacityConstraints
-    """Fugacity constraints"""
-    mass_constraints: MassConstraints
-    """Mass constraints"""
+# endregion

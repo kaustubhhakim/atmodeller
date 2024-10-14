@@ -16,10 +16,7 @@
 #
 """Thermochemical data for gases"""
 
-import jax.numpy as jnp
-from jax import Array
-
-from atmodeller.thermodata.core import ThermoData, get_gibbs_over_RT
+from atmodeller.thermodata.core import ThermoData
 
 C_g_thermodata: ThermoData = ThermoData(
     (8.545763110e4, 8.410597850e4, 2.355273444e6),
