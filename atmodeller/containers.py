@@ -49,7 +49,7 @@ from atmodeller.thermodata.core import (
     ActivityProtocol,
     CondensateActivity,
     IdealGasActivity,
-    IronWustiteBufferHirschmann,
+    IronWustiteBuffer,
     RedoxBufferProtocol,
     SpeciesData,
 )
@@ -220,16 +220,16 @@ class FugacityConstraints(NamedTuple):
                 pass
 
         print(self)
-        vmap_test: dict[str, RedoxBufferProtocol] = {"O2_g": (vmap_axis, None)}
+        vmap_test: dict[str, RedoxBufferProtocol] = {
+            "O2_g": IronWustiteBuffer(log10_shift=0, calibration=None)
+        }
 
-        # This works for batch temperature
-        return FugacityConstraints(
-            None, None
-        )  # vmap_test)  # type: ignore - container types are for data
+        # This works for batch temperature and mass
+        return FugacityConstraints(None, None)  # type: ignore - container types are for data
 
         # return FugacityConstraints(
         #    log_scaling=None,
-        #    constraints={"O2_g": IronWustiteBufferHirschmann(log10_shift=0, calibration=None)},
+        #    constraints={"O2_g": IronWustiteBuffer(log10_shift=0, calibration=None)},
         # )
 
     def array(self, temperature: ArrayLike, pressure: Array) -> Array:
