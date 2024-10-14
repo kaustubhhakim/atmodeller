@@ -1,30 +1,36 @@
-# #
-# # Copyright 2024 Dan J. Bower
-# #
-# # This file is part of Atmodeller.
-# #
-# # Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
-# # General Public License as published by the Free Software Foundation, either version 3 of the
-# # License, or (at your option) any later version.
-# #
-# # Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
-# # even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# # General Public License for more details.
-# #
-# # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
-# # see <https://www.gnu.org/licenses/>.
-# #
-# """Tests for ideal C-H-O systems"""
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Tests for C-H-O systems to test some of the main functionality of atmodeller"""
 
-# # Convenient to use naming convention so pylint: disable=C0103
+# Want to use chemistry symbols so pylint: disable=invalid-name
 
-# from __future__ import annotations
+import logging
 
-# import logging
+import numpy as np
+import pytest
+from jax.typing import ArrayLike
 
-# import pytest
+from atmodeller import AVOGADRO, __version__, debug_logger
+from atmodeller.classes import InteriorAtmosphere
+from atmodeller.containers import Planet, Species
+from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
+from atmodeller.thermodata.species_data import H2O_g_data
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
-# from atmodeller import __version__, debug_logger
 # from atmodeller.constraints import (
 #     BufferedFugacityConstraint,
 #     ElementMassConstraint,
@@ -49,52 +55,61 @@
 # from atmodeller.thermodata.redox_buffers import IronWustiteBuffer
 # from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
-# RTOL: float = 1.0e-6
-# """Relative tolerance"""
-# ATOL: float = 1.0e-6
-# """Absolute tolerance"""
-
-# logger: logging.Logger = debug_logger()
+logger: logging.Logger = debug_logger()
 # logger.setLevel(logging.INFO)
-# # logger.setLevel(logging.WARNING)
+
+RTOL: float = 1.0e-6
+"""Relative tolerance"""
+ATOL: float = 1.0e-6
+"""Absolute tolerance"""
+SCALING: float = AVOGADRO
+"""Scale the numerical problem from molecules/m^3 to moles/m^3 if SCALING is AVODAGRO"""
+TAU: float = 1.0e60
+"""Tau scaling factor for species stability"""
+
+INITIAL_NUMBER_DENSITY: float = 30.0
+"""Initial number density"""
+INITIAL_STABILITY: float = -100.0
+"""Initial stability"""
+
 
 # eos_holland: dict[str, RealGas] = get_holland_eos_models()
-# planet: Planet = Planet()
 
 
-# def test_version():
-#     """Test version."""
-#     assert __version__ == "0.1.0"
+def test_version():
+    """Test version."""
+    assert __version__ == "0.1.0"
 
 
-# def test_H2O(helper) -> None:
-#     """Tests H2O (a single species)"""
+def test_H2O(helper) -> None:
+    """Tests a single species (H2O)"""
 
-#     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
+    H2O_g: Species = Species.create_gas(H2O_g_data, solubility=H2O_peridotite_sossi)
 
-#     species: Species = Species([H2O_g])
+    species: list[Species] = [H2O_g]
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
-#     oceans: float = 2
-#     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    oceans: ArrayLike = 2
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-#     constraints: SystemConstraints = SystemConstraints(
-#         [
-#             ElementMassConstraint("H", h_kg),
-#         ]
-#     )
+    # Initial solution guess number density (molecules/m^3)
+    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
 
-#     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-#         species=species, planet=planet
-#     )
-#     solution: Solution = interior_atmosphere.solve(
-#         solver=SolverOptimistix(), constraints=constraints
-#     )
+    interior_atmosphere.initialise_solve(
+        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
+    )
+    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
-#     target: dict[str, float] = {
-#         "H2O_g": 1.0312913336898137,
-#     }
+    target: dict[str, float] = {
+        "H2O_g": 1.0312913336898137,
+    }
 
-#     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 # def test_H_fO2(helper) -> None:

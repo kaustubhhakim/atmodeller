@@ -24,7 +24,7 @@ import numpy as np
 import pytest
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, __version__, debug_logger
+from atmodeller import AVOGADRO, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
@@ -55,12 +55,9 @@ TAU: float = 1.0e60
 """Tau scaling factor for species stability"""
 
 INITIAL_NUMBER_DENSITY: float = 30.0
+"""Initial number density"""
 INITIAL_STABILITY: float = -100.0
-
-
-def test_version():
-    """Test version."""
-    assert __version__ == "0.1.0"
+"""Initial stability"""
 
 
 def test_H_O(helper) -> None:
