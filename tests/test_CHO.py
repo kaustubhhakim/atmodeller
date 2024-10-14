@@ -218,14 +218,14 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
     # Set up a range of fO2 shifts
-    fO2_shifts: npt.NDArray[np.float_] = np.array([0], dtype=np.float_)
+    fO2_shifts: npt.NDArray[np.float_] = np.array([0, 1], dtype=np.float_)
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {
         O2_g.name: IronWustiteBuffer(fO2_shifts)
     }
 
     oceans: float = 1
     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
-    mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, h_kg])}
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = 30 * np.ones(len(species), dtype=np.float_)
