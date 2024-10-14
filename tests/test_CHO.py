@@ -86,7 +86,7 @@ def test_H2O(helper) -> None:
 
     H2O_g: Species = Species.create_gas(H2O_g_data, solubility=H2O_peridotite_sossi)
 
-    species: list[Species] = [H2O_g]
+    species: tuple[Species, ...] = (H2O_g,)
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 

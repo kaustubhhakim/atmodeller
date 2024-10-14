@@ -57,7 +57,7 @@ class InteriorAtmosphere:
     """
 
     # Attributes that are set during initialise_solve are included for typing
-    fixed: FixedParameters
+    fixed_parameters: FixedParameters
     fugacity_constraints: FugacityConstraints
     initial_solution: Solution
     mass_constraints: MassConstraints
@@ -67,8 +67,8 @@ class InteriorAtmosphere:
     # Used for vmapping (if relevant)
     parameters_vmap: Parameters
 
-    def __init__(self, species: list[Species], scaling: float, tau: float = TAU):
-        self.species: list[Species] = species
+    def __init__(self, species: tuple[Species, ...], scaling: float, tau: float = TAU):
+        self.species: tuple[Species, ...] = species
         self.log_scaling: float = np.log(scaling)
         self.tau: float = tau
         self.solver_parameters: SolverParameters = SolverParameters.create(
@@ -127,13 +127,16 @@ class InteriorAtmosphere:
         self.mass_constraints = MassConstraints.create(self.log_scaling, mass_constraints)
         logger.debug("mass_constraints = %s", self.mass_constraints)
 
-        self.fixed = self.get_fixed_parameters(self.fugacity_constraints, self.mass_constraints)
+        self.fixed_parameters = self.get_fixed_parameters(
+            self.fugacity_constraints, self.mass_constraints
+        )
+        logger.debug("fixed_parameters = %s", self.fixed_parameters)
+
         self.initial_solution = Solution.create(
             initial_number_density, initial_stability, self.log_scaling
         )
         logger.debug("initial_solution = %s", self.initial_solution)
         self.parameters = Parameters(
-            fixed=self.fixed,
             planet=self.planet,
             fugacity_constraints=self.fugacity_constraints,
             mass_constraints=self.mass_constraints,
@@ -182,20 +185,19 @@ class InteriorAtmosphere:
         Returns:
             Fixed parameters
         """
-        reaction_matrix: Array = jnp.array(self.get_reaction_matrix())
-        gas_species_indices: Array = jnp.array(self.get_gas_species_indices())
-        molar_masses: Array = jnp.array(self.get_molar_masses())
-        diatomic_oxygen_index: Array = jnp.array(self.get_diatomic_oxygen_index())
+        reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
+        gas_species_indices: npt.NDArray[np.int_] = self.get_gas_species_indices()
+        molar_masses: npt.NDArray[np.float_] = self.get_molar_masses()
+        diatomic_oxygen_index: int = self.get_diatomic_oxygen_index()
 
         # Formula matrix rows for elements that are constrained by mass constraints
-        formula_matrix_np: npt.NDArray[np.int_] = self.get_formula_matrix()
+        formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
         unique_elements: list[str] = self.get_unique_elements_in_species()
         indices: list[int] = []
         for element in mass_constraints.log_molecules.keys():
             index: int = unique_elements.index(element)
             indices.append(index)
-        formula_matrix_np = formula_matrix_np[indices, :]
-        formula_matrix: Array = jnp.array(formula_matrix_np)
+        formula_matrix = formula_matrix[indices, :]
 
         # Fugacity constraint matrix and indices
         number_fugacity_constraints: int = len(fugacity_constraints.constraints)
@@ -204,18 +206,18 @@ class InteriorAtmosphere:
         for species_name in fugacity_constraints.constraints.keys():
             index: int = species_names.index(species_name)
             fugacity_species_indices.append(index)
-        fugacity_matrix: Array = jnp.array(np.identity(number_fugacity_constraints))
-        fugacity_species_indices_jnp = jnp.array(fugacity_species_indices)
+        fugacity_matrix: npt.NDArray[np.float_] = np.identity(number_fugacity_constraints)
+        fugacity_species_indices_np: npt.NDArray[np.int_] = np.array(fugacity_species_indices)
 
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
-            formula_matrix=formula_matrix,
-            reaction_matrix=reaction_matrix,
-            fugacity_matrix=fugacity_matrix,
-            gas_species_indices=gas_species_indices,
-            fugacity_species_indices=fugacity_species_indices_jnp,
+            formula_matrix=tuple(map(tuple, formula_matrix)),
+            reaction_matrix=tuple(map(tuple, reaction_matrix)),
+            fugacity_matrix=tuple(map(tuple, fugacity_matrix)),
+            gas_species_indices=tuple(gas_species_indices),
+            fugacity_species_indices=tuple(fugacity_species_indices_np),
             diatomic_oxygen_index=diatomic_oxygen_index,
-            molar_masses=molar_masses,
+            molar_masses=tuple(molar_masses),
             tau=self.tau,
             log_scaling=self.log_scaling,
         )
@@ -289,7 +291,7 @@ class InteriorAtmosphere:
         """
 
         def wrapped_jit_solver(solution: Solution, parameters: Parameters) -> Callable:
-            return solve(solution, parameters, self.solver_parameters)
+            return solve(solution, parameters, self.fixed_parameters, self.solver_parameters)
 
         return wrapped_jit_solver
 
@@ -327,6 +329,7 @@ class InteriorAtmosphere:
         logger.info("log_number_density = %s", number_density_np)
         extended_activity: Array = extended_activity_func(
             self.parameters,
+            self.fixed_parameters,
             unscaled_number_density,
             stability,
         )
@@ -342,9 +345,9 @@ class InteriorAtmosphere:
             A matrix of linearly independent reactions or None # TODO: Still return None?
         """
         # TODO: Would prefer to always return an array even in the absence of reactions?
-        # if self._species.number == 1:
+        # if len(self.species) == 1:
         #    logger.debug("Only one species therefore no reactions")
-        #    return None
+        #    return np.zeros((0, 0))
 
         transpose_formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix().T
         reaction_matrix: npt.NDArray[np.float_] = partial_rref(transpose_formula_matrix)
@@ -361,23 +364,22 @@ class InteriorAtmosphere:
         """
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
         reactions: dict[int, str] = {}
-        # TODO: Would like to avoid below if possible
-        # if self.reaction_matrix is not None:
-        for reaction_index in range(reaction_matrix.shape[0]):
-            reactants: str = ""
-            products: str = ""
-            for species_index, species_ in enumerate(self.species):
-                coeff: float = reaction_matrix[reaction_index, species_index].item()
-                if coeff != 0:
-                    if coeff < 0:
-                        reactants += f"{abs(coeff)} {species_.data.name} + "
-                    else:
-                        products += f"{coeff} {species_.data.name} + "
+        if reaction_matrix.size != 0:
+            for reaction_index in range(reaction_matrix.shape[0]):
+                reactants: str = ""
+                products: str = ""
+                for species_index, species_ in enumerate(self.species):
+                    coeff: float = reaction_matrix[reaction_index, species_index].item()
+                    if coeff != 0:
+                        if coeff < 0:
+                            reactants += f"{abs(coeff)} {species_.data.name} + "
+                        else:
+                            products += f"{coeff} {species_.data.name} + "
 
-            reactants = reactants.rstrip(" + ")
-            products = products.rstrip(" + ")
-            reaction: str = f"{reactants} = {products}"
-            reactions[reaction_index] = reaction
+                reactants = reactants.rstrip(" + ")
+                products = products.rstrip(" + ")
+                reaction: str = f"{reactants} = {products}"
+                reactions[reaction_index] = reaction
 
         return reactions
 
@@ -460,7 +462,7 @@ class InteriorAtmosphere:
         if self._is_batch:
             # Must vmap the function to enable it to be used in batch mode.
             vmap_get_log_extended_activity: Callable = jax.vmap(
-                get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0)
+                get_log_extended_activity, in_axes=(self.parameters_vmap, 0, 0, 0)
             )
             number_density_np, extended_activity_np = self.get_processed_output(
                 out, axis=1, extended_activity_func=vmap_get_log_extended_activity

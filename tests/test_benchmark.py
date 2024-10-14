@@ -67,7 +67,7 @@ def test_H_O(helper) -> None:
     H2O_g: Species = Species.create_gas(H2O_g_data)
     O2_g: Species = Species.create_gas(O2_g_data)
 
-    species: list[Species] = [H2_g, H2O_g, O2_g]
+    species: tuple[Species, ...] = (H2_g, H2O_g, O2_g)
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -113,7 +113,7 @@ def test_CHO_reduced(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     O2_g: Species = Species.create_gas(O2_g_data)
 
-    species: list[Species] = [H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g]
+    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -167,7 +167,7 @@ def test_CHO_IW(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     O2_g: Species = Species.create_gas(O2_g_data)
 
-    species: list[Species] = [H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g]
+    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -232,7 +232,7 @@ def test_CHO_oxidised(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     O2_g: Species = Species.create_gas(O2_g_data)
 
-    species: list[Species] = [H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g]
+    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -287,7 +287,7 @@ def test_CHO_highly_oxidised(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     O2_g: Species = Species.create_gas(O2_g_data)
 
-    species: list[Species] = [H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g]
+    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -337,7 +337,7 @@ def test_CHO_middle_temperature(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     O2_g: Species = Species.create_gas(O2_g_data)
 
-    species: list[Species] = [H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g]
+    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=873.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -388,7 +388,7 @@ def test_CHO_low_temperature(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     CO_g: Species = Species.create_gas(CO_g_data)
 
-    species: list[Species] = [H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g]
+    species: tuple[Species, ...] = (H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g)
     planet: Planet = Planet(surface_temperature=450.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -438,7 +438,7 @@ def test_graphite_condensed(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     C_cr: Species = Species.create_condensed(C_cr_data)
 
-    species: list[Species] = [O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr]
+    species: tuple[Species, ...] = (O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr)
     planet: Planet = Planet(surface_temperature=873.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -491,7 +491,7 @@ def test_graphite_unstable(helper) -> None:
     CH4_g: Species = Species.create_gas(CH4_g_data)
     C_cr: Species = Species.create_condensed(C_cr_data)
 
-    species: list[Species] = [O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr]
+    species: tuple[Species, ...] = (O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr)
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -542,7 +542,7 @@ def test_water_condensed(helper) -> None:
     O2_g: Species = Species.create_gas(O2_g_data)
     H2O_l: Species = Species.create_condensed(H2O_l_data)
 
-    species: list[Species] = [H2_g, H2O_g, O2_g, H2O_l]
+    species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, H2O_l)
     planet: Planet = Planet(surface_temperature=411.75)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
@@ -593,7 +593,7 @@ def test_graphite_water_condensed(helper) -> None:
     C_cr: Species = Species.create_condensed(C_cr_data)
     H2O_l: Species = Species.create_condensed(H2O_l_data)
 
-    species: list[Species] = [H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr]
+    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr)
     planet: Planet = Planet(surface_temperature=430.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 

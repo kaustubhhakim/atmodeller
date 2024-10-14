@@ -433,7 +433,7 @@ class SolverParameters(NamedTuple):
     @classmethod
     def create(
         cls,
-        species: list[Species],
+        species: tuple[Species, ...],
         log_scaling: ArrayLike,
         solver_class: Type[OptxSolver] = optx.Newton,
         rtol: float = 1.0e-8,
@@ -473,7 +473,7 @@ class SolverParameters(NamedTuple):
     @classmethod
     def _get_hypercube_bound(
         cls,
-        species: list[Species],
+        species: tuple[Species, ...],
         log_scaling: ArrayLike,
         number_density_bound: float,
         stability_bound: float,
@@ -509,7 +509,7 @@ class FixedParameters(NamedTuple):
     """Parameters that are always fixed for a calculation
 
     Args:
-        species: List of species
+        species: Tuple of species
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
         fugacity_matrix: Fugacity constraint matrix
@@ -522,23 +522,23 @@ class FixedParameters(NamedTuple):
             converts molecules/m^3 to moles/m^3
     """
 
-    species: list[Species]
-    """List of species """
-    formula_matrix: Array
+    species: tuple[Species, ...]
+    """Tuple of species """
+    formula_matrix: tuple[tuple[float, ...], ...]
     """Formula matrix"""
-    reaction_matrix: Array
+    reaction_matrix: tuple[tuple[float, ...], ...]
     """Reaction matrix"""
-    fugacity_matrix: Array
+    fugacity_matrix: tuple[tuple[float, ...], ...]
     """Fugacity constraint matrix"""
-    gas_species_indices: Array
+    gas_species_indices: tuple[int, ...]
     """Indices of gas species"""
-    fugacity_species_indices: Array
+    fugacity_species_indices: tuple[int, ...]
     """Indices of species to constrain the fugacity"""
-    diatomic_oxygen_index: Array
+    diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
-    molar_masses: Array
+    molar_masses: tuple[float]
     """Molar masses of all species"""
-    tau: ArrayLike
+    tau: float
     """Tau factor for species"""
     log_scaling: float
     """Log scaling"""
@@ -548,14 +548,11 @@ class Parameters(NamedTuple):
     """Parameters
 
     Args:
-        fixed: Fixed parameters
         planet: Planet
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
     """
 
-    fixed: FixedParameters
-    """Fixed parameters"""
     planet: Planet
     """Planet"""
     fugacity_constraints: FugacityConstraints

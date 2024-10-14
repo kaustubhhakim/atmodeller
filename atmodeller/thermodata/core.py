@@ -26,6 +26,7 @@ import numpy as np
 from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from molmass import Formula
+from xmmutablemap import ImmutableMap
 
 from atmodeller.utilities import unit_conversion
 
@@ -456,7 +457,7 @@ class SpeciesData(NamedTuple):
     # so other options would be:
     # https://flax.readthedocs.io/en/latest/api_reference/flax.core.frozen_dict.html
     # https://github.com/GalacticDynamics/xmmutablemap
-    composition: dict[str, tuple[int, float, float]]
+    composition: ImmutableMap[str, tuple[int, float, float]]
     """Composition"""
     phase_code: int
     """Phase code"""
@@ -483,7 +484,9 @@ class SpeciesData(NamedTuple):
             An instance
         """
         mformula: Formula = Formula(formula)
-        composition: dict[str, tuple[int, float, float]] = mformula.composition().asdict()
+        composition: ImmutableMap[str, tuple[int, float, float]] = ImmutableMap(
+            mformula.composition().asdict()
+        )
         molar_mass: float = mformula.mass * unit_conversion.g_to_kg
         phase_code: int = phase_mapping[phase]
 
