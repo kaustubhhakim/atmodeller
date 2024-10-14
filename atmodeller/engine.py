@@ -164,6 +164,9 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         traced_parameters, fixed_parameters, log_number_density
     )
 
+    # FIXME Debugging here to try to get fO2 to vmap. When it vmaps temperature and mass it
+    # basically repeats this structure and doesn't directly assemble a 2-D array. Implies a 2-D
+    # array is probably not needed, and that I am still not vmapping fO2 correctly.
     # Initialise residual array
     # residual: Array = jnp.array([])
     # residual: Array = jnp.zeros((1, 1))
