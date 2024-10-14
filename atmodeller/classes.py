@@ -407,6 +407,8 @@ class InteriorAtmosphere:
             fugacity_constraints=self.fugacity_constraints.vmap_axes(),  # type: ignore
             mass_constraints=self.mass_constraints.vmap_axes(),  # type: ignore
         )
+        logger.debug("parameters_vmap = %s", self.parameters_vmap)
+
         solver: Callable = jax.jit(
             jax.vmap(self.get_wrapped_jit_solver(), in_axes=(None, self.parameters_vmap))
         )

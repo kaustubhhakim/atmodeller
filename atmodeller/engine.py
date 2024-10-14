@@ -165,7 +165,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     )
 
     # Initialise residual array
-    residual: Array = jnp.array([])
+    # residual: Array = jnp.array([])
+    # residual: Array = jnp.zeros((1, 1))
 
     # Reaction network residual
     if reaction_matrix.size > 0:
@@ -182,7 +183,10 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         # Account for species stability.
         reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(log_stability))
         # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
-        residual = jnp.concatenate((residual, reaction_residual))
+        # residual = jnp.concatenate([residual, jnp.atleast_2d(reaction_residual)])
+        # jax.debug.print("residual = {out}", out=residual)
+    else:
+        reaction_residual = jnp.array([])
 
     # Fugacity constraints residual
     if fugacity_matrix.size > 0:
@@ -194,7 +198,11 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         fugacity_residual = fugacity_residual - fugacity_constraints.array(
             temperature, total_pressure
         )
-        residual = jnp.concatenate((residual, fugacity_residual))
+        jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+    else:
+        fugacity_residual = jnp.array([])
+
+        # residual = jnp.concatenate([residual, jnp.atleast_2d(fugacity_residual)])
         # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
         # fugacity_residual = jnp.atleast_1d(fugacity_residual)
         # jax.debug.print("fugacity_residual.ndim = {out}", out=fugacity_residual.ndim)
@@ -217,7 +225,16 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         )
         stability_residual: Array = log_number_density + log_stability - log_min_number_density
         # jax.debug.print("stability_residual = {out}", out=stability_residual)
-        residual = jnp.concatenate((residual, mass_residual, stability_residual))
+        # residual = jnp.concatenate(
+        #    [residual.T, jnp.atleast_2d(mass_residual), jnp.atleast_2d(stability_residual)]
+        # )
+    else:
+        mass_residual = jnp.array([])
+        stability_residual = jnp.array([])
+
+    residual = jnp.concatenate(
+        [reaction_residual, mass_residual, stability_residual, fugacity_residual]
+    )
 
     return residual
 

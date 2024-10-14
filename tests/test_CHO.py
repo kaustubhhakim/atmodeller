@@ -162,7 +162,7 @@ def test_H_fO2(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-def test_H_fO2_batch(helper) -> None:
+def test_H_fO2_batch_temperature(helper) -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of surface temperatures."""
 
     H2O_g: Species = Species.create_gas(H2O_g_data, solubility=H2O_peridotite_sossi)
@@ -204,6 +204,53 @@ def test_H_fO2_batch(helper) -> None:
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+
+
+def test_H_fO2_batch_fO2_shift(helper) -> None:
+    """Tests H2-H2O at the IW buffer with H2O solubility for a range of fO2 shifts."""
+
+    H2O_g: Species = Species.create_gas(H2O_g_data, solubility=H2O_peridotite_sossi)
+    H2_g: Species = Species.create_gas(H2_g_data)
+    O2_g: Species = Species.create_gas(O2_g_data)
+
+    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+
+    # Set up a range of fO2 shifts
+    fO2_shifts: npt.NDArray[np.float_] = np.array([-1, 0, 1], dtype=np.float_)
+    fugacity_constraints: dict[str, RedoxBufferProtocol] = {
+        O2_g.name: IronWustiteBuffer(fO2_shifts)
+    }
+
+    oceans: float = 1
+    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
+
+    # Initial solution guess number density (molecules/m^3)
+    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+
+    interior_atmosphere.initialise_solve(
+        planet,
+        initial_number_density,
+        initial_stability,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+    )
+    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+
+    print(solution)
+
+    # target: dict[str, ArrayLike] = {
+    #    "H2O_g": np.array([0.257080033422599, 0.25721776694131, 0.257274566532843]),
+    #    "H2_g": np.array([0.249157724831255, 0.226576661188286, 0.219958433575132]),
+    #    "O2_g": np.array([8.838042581380630e-08, 4.544719798221670e-05, 2.739265090516618e-03]),
+    # }
+
+    # assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_and_C(helper) -> None:
