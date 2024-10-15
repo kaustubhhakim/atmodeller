@@ -245,15 +245,29 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
-    print(solution)
+    target: dict[str, ArrayLike] = {
+        "H2O_g": np.array(
+            [0.000295447749728, 0.160441029451668, 0.258301849611004, 0.258540268423591]
+        ),
+        "H2_g": np.array(
+            [
+                2.883510101423592e01,
+                7.273060048911787e00,
+                5.436188377412098e-03,
+                2.452903991944046e-06,
+            ]
+        ),
+        "O2_g": np.array(
+            [
+                8.715383981510243e-18,
+                4.039844423373401e-11,
+                1.874278588322265e-04,
+                9.222812891459293e02,
+            ]
+        ),
+    }
 
-    # target: dict[str, ArrayLike] = {
-    #    "H2O_g": np.array([0.257080033422599, 0.25721776694131, 0.257274566532843]),
-    #    "H2_g": np.array([0.249157724831255, 0.226576661188286, 0.219958433575132]),
-    #    "O2_g": np.array([8.838042581380630e-08, 4.544719798221670e-05, 2.739265090516618e-03]),
-    # }
-
-    # assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_H_mass(helper) -> None:
