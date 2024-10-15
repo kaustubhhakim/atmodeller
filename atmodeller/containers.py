@@ -219,13 +219,7 @@ class FugacityConstraints(NamedTuple):
                 # vmap_axis = None
                 pass
 
-        print(self)
-        vmap_test: dict[str, RedoxBufferProtocol] = {
-            "O2_g": IronWustiteBuffer(log10_shift=0, calibration=None)
-        }
-
-        # This works for batch temperature and mass
-        return FugacityConstraints(None, None)  # type: ignore - container types are for data
+        return FugacityConstraints(None, vmap_axis)  # type: ignore - container types are for data  # type: ignore - container types are for data
 
         # return FugacityConstraints(
         #    log_scaling=None,

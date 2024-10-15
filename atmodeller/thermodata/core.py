@@ -98,6 +98,32 @@ class RedoxBufferProtocol(Protocol):
 #         return self.log10_fugacity * np.log(10)
 
 
+# This is copied from the branch that works for batch fO2 calculations
+class IronWustiteBufferWorkingBranch(NamedTuple):
+    """Iron-wustite buffer :cite:p:`OP93,HGD08`
+
+    Args:
+        log10_shift: Log10 shift relative to the buffer.
+    """
+
+    log10_shift: ArrayLike
+    calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew()
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        # TODO: Eventually make this a jitted function that this method calls.
+        log10_fugacity: Array = (
+            -0.8853 * jnp.log(temperature)
+            - 28776.8 / temperature
+            + 14.057
+            + 0.055 * (pressure - 1) / temperature
+        )
+
+        return log10_fugacity + self.log10_shift
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        return self.log10_fugacity(temperature, pressure) * np.log(10)
+
+
 class IronWustiteBufferHirschmann08(NamedTuple):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`
 

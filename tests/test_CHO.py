@@ -30,7 +30,11 @@ from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
-from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.core import (
+    IronWustiteBuffer,
+    IronWustiteBufferWorkingBranch,
+    RedoxBufferProtocol,
+)
 from atmodeller.thermodata.species_data import (
     CO2_g_data,
     CO_g_data,
@@ -218,9 +222,10 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
     # Set up a range of fO2 shifts
-    fO2_shifts: npt.NDArray[np.float_] = np.array([0, 1], dtype=np.float_)
+    num: int = 50
+    fO2_shifts: npt.NDArray[np.float_] = np.linspace(-5, 5, num, dtype=np.float_)
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {
-        O2_g.name: IronWustiteBuffer(fO2_shifts)
+        O2_g.name: IronWustiteBufferWorkingBranch(fO2_shifts)
     }
 
     oceans: float = 1
