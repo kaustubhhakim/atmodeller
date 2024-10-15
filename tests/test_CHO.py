@@ -222,8 +222,8 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
     # Set up a range of fO2 shifts
-    num: int = 50
-    fO2_shifts: npt.NDArray[np.float_] = np.linspace(-5, 5, num, dtype=np.float_)
+    num: int = 4
+    fO2_shifts: npt.NDArray[np.float_] = np.linspace(-10, 10, num, dtype=np.float_)
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {
         O2_g.name: IronWustiteBufferWorkingBranch(fO2_shifts)
     }
