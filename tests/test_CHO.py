@@ -352,41 +352,6 @@ def test_H_and_C(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-# TODO: Kept to repurpose with a batch solve to test surface temperature
-# def test_H_1500K(helper) -> None:
-#     """Tests H2-H2O at a different temperature."""
-
-#     H2O_g: GasSpecies = GasSpecies("H2O", solubility=H2O_peridotite_sossi())
-#     H2_g: GasSpecies = GasSpecies("H2")
-#     O2_g: GasSpecies = GasSpecies("O2")
-
-#     species: Species = Species([H2O_g, H2_g, O2_g])
-
-#     oceans: float = 1
-#     warm_planet: Planet = Planet(surface_temperature=1500)
-#     h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
-
-#     constraints: SystemConstraints = SystemConstraints(
-#         [
-#             ElementMassConstraint("H", h_kg),
-#             BufferedFugacityConstraint(O2_g, IronWustiteBuffer()),
-#         ]
-#     )
-#     interior_atmosphere: InteriorAtmosphereSystem = InteriorAtmosphereSystem(
-#         species=species, planet=warm_planet
-#     )
-#     solution: Solution = interior_atmosphere.solve(
-#         solver=SolverOptimistix(), constraints=constraints
-#     )
-
-#     target: dict[str, float] = {
-#         "H2O_g": 0.25666635568842355,
-#         "H2_g": 0.31320683835217444,
-#         "O2_g": 2.3940728554564946e-12,
-#     }
-
-#     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
-
 # TODO: Kept for real gas testing when the EOSs have been setup for JAX
 # @pytest.mark.skip(reason="Holland H2O model is not configured for JAX")
 # def test_pH2_fO2_real_gas(helper) -> None:
