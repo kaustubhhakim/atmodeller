@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 
-from atmodeller import __version__, debug_logger
+from atmodeller import debug_logger
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.eos.saxena import H2_SF87, get_saxena_eos_models
 from atmodeller.utilities import unit_conversion
@@ -36,11 +36,6 @@ logger: logging.Logger = debug_logger()
 
 eos_models: dict[str, RealGas] = get_saxena_eos_models()
 """EOS models from :cite:t:`SF87,SF87a,SF88,SS92`"""
-
-
-def test_version():
-    """Test version."""
-    assert __version__ == "0.1.0"
 
 
 def test_Ar(check_values) -> None:

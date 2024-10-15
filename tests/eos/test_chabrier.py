@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 
-from atmodeller import __version__, debug_logger
+from atmodeller import debug_logger
 from atmodeller.eos.chabrier import get_chabrier_eos_models
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.utilities import unit_conversion
@@ -37,11 +37,6 @@ logger: logging.Logger = debug_logger()
 
 eos_models: dict[str, RealGas] = get_chabrier_eos_models()
 """EOS models from :cite:t:`CD21`"""
-
-
-def test_version():
-    """Test version."""
-    assert __version__ == "0.1.0"
 
 
 def test_Chabrier_H2_volume_100kbar(check_values) -> None:

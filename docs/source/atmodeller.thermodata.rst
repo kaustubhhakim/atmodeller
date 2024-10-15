@@ -4,42 +4,34 @@ atmodeller.thermodata package
 Submodules
 ----------
 
-atmodeller.thermodata.holland module
-------------------------------------
-
-.. automodule:: atmodeller.thermodata.holland
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-atmodeller.thermodata.interfaces module
----------------------------------------
-
-.. automodule:: atmodeller.thermodata.interfaces
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-atmodeller.thermodata.janaf module
-----------------------------------
-
-.. automodule:: atmodeller.thermodata.janaf
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-atmodeller.thermodata.jax\_thermo module
+atmodeller.thermodata.condensates module
 ----------------------------------------
+
+.. automodule:: atmodeller.thermodata.condensates
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.thermodata.core module
+---------------------------------
 
 .. automodule:: atmodeller.thermodata.core
    :members:
    :undoc-members:
    :show-inheritance:
 
-atmodeller.thermodata.redox\_buffers module
--------------------------------------------
+atmodeller.thermodata.gases module
+----------------------------------
 
-.. automodule:: atmodeller.thermodata.redox_buffers
+.. automodule:: atmodeller.thermodata.gases
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.thermodata.species\_data module
+------------------------------------------
+
+.. automodule:: atmodeller.thermodata.species_data
    :members:
    :undoc-members:
    :show-inheritance:

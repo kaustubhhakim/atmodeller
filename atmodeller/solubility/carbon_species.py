@@ -56,6 +56,11 @@ class _CH4_basalt_ardia(NamedTuple):
 
 
 CH4_basalt_ardia: SolubilityProtocol = _CH4_basalt_ardia()
+"""CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`
+
+Experiments conducted at 0.7-3 GPa and 1400-1450 C. :cite:t:`AHW13{Equations 7a, 8}`, values
+for lnK0 and deltaV from the text.
+"""
 
 
 class _CO_basalt_armstrong(NamedTuple):
@@ -83,6 +88,13 @@ class _CO_basalt_armstrong(NamedTuple):
 
 
 CO_basalt_armstrong: SolubilityProtocol = _CO_basalt_armstrong()
+"""Volatiles in mafic melts under reduced conditions :cite:p:`AHS15`
+
+Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
+IW-3.65 to IW+1.46. :cite:t:`AHS15{Equation 10}`, log-scale linear fit for CO and includes
+dependence on total pressure. The fitting coefficients also use data from :cite:p:`SHW14`
+(experiments from 1-1.2 GPa).
+"""
 
 
 class _CO_basalt_yoshioka(NamedTuple):
@@ -110,6 +122,12 @@ class _CO_basalt_yoshioka(NamedTuple):
 
 
 CO_basalt_yoshioka: SolubilityProtocol = _CO_basalt_yoshioka()
+"""Carbon in silicate melts :cite:p:`YNN19`
+
+Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
+CO-CO2 fluid phase at 3 GPa and 1500 C. Log-scale linear expression for solubility of CO in
+MORB in the abstract.
+"""
 
 
 class _CO_rhyolite_yoshioka(NamedTuple):
@@ -137,6 +155,12 @@ class _CO_rhyolite_yoshioka(NamedTuple):
 
 
 CO_rhyolite_yoshioka: SolubilityProtocol = _CO_rhyolite_yoshioka()
+"""Carbon in silicate melts :cite:p:`YNN19`
+
+Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
+CO-CO2 fluid phase at 3 GPa and 1500 C. Henry's Law, their expression for solubility of CO in
+rhyolite in the abstract.
+"""
 
 
 class _CO2_basalt_dixon(NamedTuple):
@@ -162,3 +186,9 @@ class _CO2_basalt_dixon(NamedTuple):
 
 
 CO2_basalt_dixon: SolubilityProtocol = _CO2_basalt_dixon()
+"""CO2 in MORB liquids :cite:p:`DSH95`
+
+:cite:t:`DSH95{Equation 6}` for mole fraction of dissolved carbonate (CO3^2-) and then
+converting to ppmw for CO2 experiments conducted at 1200 C, 210-980 bars with mixed H2O-CO2
+vapor phase (CO2 vapor mole fraction varied from 0.42-0.97).
+"""

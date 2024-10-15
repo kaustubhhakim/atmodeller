@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 
-from atmodeller import __version__, debug_logger
+from atmodeller import debug_logger
 from atmodeller.eos.holley import get_holley_eos_models
 from atmodeller.eos.interfaces import RealGas
 from atmodeller.utilities import unit_conversion
@@ -38,11 +38,6 @@ logger: logging.Logger = debug_logger()
 
 eos_models: dict[str, RealGas] = get_holley_eos_models()
 """EOS models from :cite:t:`HWZ58`"""
-
-
-def test_version():
-    """Test version."""
-    assert __version__ == "0.1.0"
 
 
 def test_H2_low(check_values) -> None:

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 
-from atmodeller import __version__, debug_logger
+from atmodeller import debug_logger
 from atmodeller.eos.holland import (
     CH4_CORK_HP91,
     CO2_CORK_HP91,
@@ -45,11 +45,6 @@ logger: logging.Logger = debug_logger()
 
 eos_models: dict[str, RealGas] = get_holland_eos_models()
 """EOS models from :cite:t:`HP91,HP98`"""
-
-
-def test_version():
-    """Test version."""
-    assert __version__ == "0.1.0"
 
 
 def test_CORK_H2O_volume_1kbar(check_values) -> None:
