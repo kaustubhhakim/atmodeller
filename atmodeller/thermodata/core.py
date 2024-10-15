@@ -59,6 +59,16 @@ class ActivityProtocol(Protocol):
 
 # TODO: Eventually rename to ExperimentalCalibration once the old class is removed.
 class ExperimentalCalibrationNew(NamedTuple):
+    """Experimental calibration
+
+    Args:
+        temperature_min: Minimum calibrated temperature
+        temperature_max: Maximum calibrated temperature
+        pressure_min: Minimum calibrated pressure
+        pressure_max: Maximum calibrated pressure
+        log10_fO2_min: Minimum calibrated log10 fO2
+        log10_fO2_max: Maximum calibrated log10 fO2
+    """
 
     temperature_min: float | None = None
     temperature_max: float | None = None

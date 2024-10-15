@@ -207,20 +207,19 @@ class FugacityConstraints(NamedTuple):
         Returns:
             vmap axes
         """
-        values_list: list[RedoxBufferProtocol] = list(self.constraints.values())
-        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
-        if values_list:
+        constraints_vmap: dict[str, RedoxBufferProtocol] = {}
+
+        for key, constraint in self.constraints.items():
+            vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
+            values: ArrayLike = constraint.log10_shift
             try:
-                num_entries: int = len(values_list[0].log10_shift)  # type: ignore
+                num_entries: int = len(values)  # type: ignore - exception dealt with subsequently
                 if num_entries > 1:
                     vmap_axis = 0
             except TypeError:  # Just a single value, which means no vmapping required.
                 # vmap_axis = None
                 pass
-
-        constraints_vmap: dict[str, RedoxBufferProtocol] = {}
-        for key, constraint in self.constraints.items():
-            constraints_vmap[key] = type(constraint)(vmap_axis, None)  # type: ignore
+            constraints_vmap[key] = type(constraint)(vmap_axis, None)  # type: ignore - container
 
         return FugacityConstraints(None, constraints_vmap)  # type: ignore
 

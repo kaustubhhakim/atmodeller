@@ -22,7 +22,6 @@ import logging
 
 import numpy as np
 import numpy.typing as npt
-import pytest
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, __version__, debug_logger
