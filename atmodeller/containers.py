@@ -49,7 +49,6 @@ from atmodeller.thermodata.core import (
     ActivityProtocol,
     CondensateActivity,
     IdealGasActivity,
-    IronWustiteBuffer,
     RedoxBufferProtocol,
     SpeciesData,
 )
@@ -219,12 +218,11 @@ class FugacityConstraints(NamedTuple):
                 # vmap_axis = None
                 pass
 
-        return FugacityConstraints(None, vmap_axis)  # type: ignore - container types are for data  # type: ignore - container types are for data
+        constraints_vmap: dict[str, RedoxBufferProtocol] = {}
+        for key, constraint in self.constraints.items():
+            constraints_vmap[key] = type(constraint)(vmap_axis, None)  # type: ignore
 
-        # return FugacityConstraints(
-        #    log_scaling=None,
-        #    constraints={"O2_g": IronWustiteBuffer(log10_shift=0, calibration=None)},
-        # )
+        return FugacityConstraints(None, constraints_vmap)  # type: ignore
 
     def array(self, temperature: ArrayLike, pressure: Array) -> Array:
         """Scaled log number density as an array

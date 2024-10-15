@@ -155,7 +155,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
     # Need pressures in bar for subsequent operations so unscale. This includes condensate
     # pressures, which are non-physical but are effectively ignored in future calculations because
-    # condensates have zero solubility.
+    # condensates always have zero solubility by construction.
     log_pressure: Array = unscale_number_density(
         log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
     )
@@ -164,12 +164,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         traced_parameters, fixed_parameters, log_number_density
     )
 
-    # FIXME Debugging here to try to get fO2 to vmap. When it vmaps temperature and mass it
-    # basically repeats this structure and doesn't directly assemble a 2-D array. Implies a 2-D
-    # array is probably not needed, and that I am still not vmapping fO2 correctly.
-    # Initialise residual array
-    # residual: Array = jnp.array([])
-    # residual: Array = jnp.zeros((1, 1))
+    residual: Array = jnp.array([])
 
     # Reaction network residual
     if reaction_matrix.size > 0:
@@ -185,11 +180,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
         # Account for species stability.
         reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(log_stability))
-        jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
-        # residual = jnp.concatenate([residual, jnp.atleast_2d(reaction_residual)])
-        # jax.debug.print("residual = {out}", out=residual)
-    else:
-        reaction_residual = jnp.array([])
+        # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
+        residual = jnp.concatenate([residual, reaction_residual])
 
     # Fugacity constraints residual
     if fugacity_matrix.size > 0:
@@ -201,14 +193,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         fugacity_residual = fugacity_residual - fugacity_constraints.array(
             temperature, total_pressure
         )
-        jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-    else:
-        fugacity_residual = jnp.array([])
-
-        # residual = jnp.concatenate([residual, jnp.atleast_2d(fugacity_residual)])
         # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-        # fugacity_residual = jnp.atleast_1d(fugacity_residual)
-        # jax.debug.print("fugacity_residual.ndim = {out}", out=fugacity_residual.ndim)
+        residual = jnp.concatenate([residual, fugacity_residual])
 
     # Elemental mass balance residual
     if formula_matrix.size > 0:
@@ -219,46 +205,17 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         )
         log_element_density: Array = jnp.log(element_density + element_melt_density)
         mass_residual = log_element_density - mass_constraints.array(log_volume)
-        jax.debug.print("mass_residual = {out}", out=mass_residual)
-
+        # jax.debug.print("mass_residual = {out}", out=mass_residual)
         # Stability residual
         # Get minimum scaled log number of molecules
         log_min_number_density: Array = jnp.min(mass_constraints.array(log_volume)) - jnp.log(
             fixed_parameters.tau
         )
         stability_residual: Array = log_number_density + log_stability - log_min_number_density
-        jax.debug.print("stability_residual = {out}", out=stability_residual)
-        # residual = jnp.concatenate(
-        #    [residual.T, jnp.atleast_2d(mass_residual), jnp.atleast_2d(stability_residual)]
-        # )
-    else:
-        mass_residual = jnp.array([])
-        stability_residual = jnp.array([])
+        # jax.debug.print("stability_residual = {out}", out=stability_residual)
+        residual = jnp.concatenate([residual, mass_residual, stability_residual])
 
-    residual = jnp.concatenate(
-        [
-            jnp.atleast_2d(reaction_residual),
-            jnp.atleast_2d(mass_residual),
-            jnp.atleast_2d(stability_residual),
-            # ],
-            jnp.atleast_2d(fugacity_residual),
-        ],
-        axis=1,
-        # ]
-    )
-    jax.debug.print("residual = {out}", out=residual)
-
-    # num_rows_b = fugacity_residual.shape[1]  # This will be 2
-
-    # Repeat array_a to match the number of rows in array_b
-    # We need to create a 2-D array with the same number of rows as array_b
-    # Here we repeat array_a vertically (adding more rows)
-    # array_a_repeated = jnp.tile(residual, (num_rows_b, 1))  # shape (2, 3)
-    # jax.debug.print("array_a_repeated = {out}", out=array_a_repeated)
-
-    # Now concatenate along the row axis (axis=0)
-    # residual = jnp.concatenate((array_a_repeated, fugacity_residual.T), axis=0)
-    # jax.debug.print("combined_residual = {out}", out=residual)
+    # jax.debug.print("residual = {out}", out=residual)
 
     return residual
 

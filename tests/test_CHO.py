@@ -30,11 +30,7 @@ from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
-from atmodeller.thermodata.core import (
-    IronWustiteBuffer,
-    IronWustiteBufferWorkingBranch,
-    RedoxBufferProtocol,
-)
+from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.thermodata.species_data import (
     CO2_g_data,
     CO_g_data,
@@ -225,7 +221,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     num: int = 4
     fO2_shifts: npt.NDArray[np.float_] = np.linspace(-10, 10, num, dtype=np.float_)
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {
-        O2_g.name: IronWustiteBufferWorkingBranch(fO2_shifts)
+        O2_g.name: IronWustiteBuffer(fO2_shifts)
     }
 
     oceans: float = 1
@@ -247,22 +243,22 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array(
-            [0.000295447749728, 0.160441029451668, 0.258301849611004, 0.258540268423591]
+            [0.00029780832006, 0.160943544377939, 0.258302012780794, 0.258540269218237]
         ),
         "H2_g": np.array(
             [
-                2.883510101423592e01,
-                7.273060048911787e00,
-                5.436188377412098e-03,
-                2.452903991944046e-06,
+                2.883109764678719e01,
+                7.237950850551736e00,
+                5.393537121196381e-03,
+                2.425598009366862e-06,
             ]
         ),
         "O2_g": np.array(
             [
-                8.715383981510243e-18,
-                4.039844423373401e-11,
-                1.874278588322265e-04,
-                9.222812891459293e02,
+                8.857668173953893e-18,
+                4.104724093203387e-11,
+                1.904041209642506e-04,
+                9.431631962648368e02,
             ]
         ),
     }

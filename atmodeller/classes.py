@@ -20,13 +20,14 @@ import logging
 import pprint
 import time
 from collections.abc import Mapping
-from typing import Callable, Iterable, NamedTuple
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from jax import Array
+from jax.tree_util import tree_flatten
 from jaxtyping import ArrayLike
 
 from atmodeller import BOLTZMANN_CONSTANT_BAR, TAU
@@ -79,24 +80,17 @@ class InteriorAtmosphere:
     @property
     def _is_batch(self) -> bool:
         """Returns if any parameters are batched, thereby necessitating a vmap solve"""
-        return self.contains_zero(
-            [
-                self.planet.vmap_axes(),
-                self.fugacity_constraints.vmap_axes(),
-                self.mass_constraints.vmap_axes(),
-            ]
-        )
+        vmap_axes: list = [
+            self.planet.vmap_axes(),
+            self.fugacity_constraints.vmap_axes(),
+            self.mass_constraints.vmap_axes(),
+        ]
+        leaves, _ = tree_flatten(vmap_axes)
 
-    def contains_zero(self, tuples: Iterable[NamedTuple]) -> bool:
-        """Checks if any tuples in an iterable contain a zero
+        # Check if any of the axes should be vmapped, which is defined by an entry of zero
+        contains_zero: bool = any(np.array(leaves) == 0)
 
-        Args:
-            tuples: Iterable of tuples
-
-        Returns:
-            True if any
-        """
-        return any(0 in tup for tup in tuples)
+        return contains_zero
 
     def initialise_solve(
         self,
