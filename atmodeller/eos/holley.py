@@ -206,6 +206,18 @@ class BeattieBridgeman(NamedTuple):
 
         return log_fugacity
 
+    def log_fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log of the fugacity coefficient
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log of the fugacity coefficient
+        """
+        return -jnp.log(pressure) + self.log_fugacity(temperature, pressure)
+
 
 # Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure
 # in bar). Using the original table values below allows easy visual comparison and ensures that
