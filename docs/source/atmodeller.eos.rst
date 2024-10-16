@@ -20,6 +20,14 @@ atmodeller.eos.chabrier module
    :undoc-members:
    :show-inheritance:
 
+atmodeller.eos.core module
+--------------------------
+
+.. automodule:: atmodeller.eos.core
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.eos.holland module
 -----------------------------
 
@@ -40,6 +48,14 @@ atmodeller.eos.interfaces module
 --------------------------------
 
 .. automodule:: atmodeller.eos.interfaces
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.eos.jax\_holley module
+---------------------------------
+
+.. automodule:: atmodeller.eos.jax_holley
    :members:
    :undoc-members:
    :show-inheritance:

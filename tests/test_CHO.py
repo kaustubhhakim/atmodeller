@@ -127,7 +127,7 @@ def test_H_fO2(helper) -> None:
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
     oceans: float = 1
-    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     # Initial solution guess number density (molecules/m^3)
@@ -171,7 +171,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
     oceans: float = 1
-    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     # Initial solution guess number density (molecules/m^3)
@@ -217,7 +217,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     }
 
     oceans: float = 1
-    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
     # Initial solution guess number density (molecules/m^3)
@@ -272,7 +272,7 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
     oceans: float = 1
-    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     # Set up a range of H masses
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
@@ -315,8 +315,8 @@ def test_H_and_C(helper) -> None:
 
     oceans: float = 1
     ch_ratio: float = 1
-    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
-    c_kg: float = ch_ratio * h_kg
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
     # Initial solution guess number density (molecules/m^3)

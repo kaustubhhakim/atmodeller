@@ -537,7 +537,7 @@ def test_water_condensed(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
     oceans: float = 1
-    h_kg: float = earth_oceans_to_hydrogen_mass(oceans)
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 1.14375e21
     mass_constraints = {
         "H": h_kg,

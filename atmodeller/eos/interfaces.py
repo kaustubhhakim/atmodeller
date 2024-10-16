@@ -256,6 +256,7 @@ class RealGas(ABC):
             Fugacity in bar
         """
         fugacity: Array = jnp.exp(self.ln_fugacity(temperature, pressure))
+        logger.debug("fugacity = %s", fugacity)
 
         return fugacity
 

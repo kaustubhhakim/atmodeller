@@ -23,8 +23,8 @@ from __future__ import annotations
 import logging
 
 from atmodeller import debug_logger
+from atmodeller.eos.core import RealGasProtocol
 from atmodeller.eos.holley import get_holley_eos_models
-from atmodeller.eos.interfaces import RealGas
 from atmodeller.utilities import unit_conversion
 
 # Probably due to rounding of the model parameters in the paper, some compressibilities in the
@@ -36,7 +36,7 @@ ATOL: float = 1.0e-4
 
 logger: logging.Logger = debug_logger()
 
-eos_models: dict[str, RealGas] = get_holley_eos_models()
+eos_models: dict[str, RealGasProtocol] = get_holley_eos_models()
 """EOS models from :cite:t:`HWZ58`"""
 
 

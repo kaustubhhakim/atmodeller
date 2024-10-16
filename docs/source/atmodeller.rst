@@ -46,14 +46,6 @@ atmodeller.output module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.plot module
-----------------------
-
-.. automodule:: atmodeller.plot
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 atmodeller.utilities module
 ---------------------------
 
