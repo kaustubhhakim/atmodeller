@@ -109,7 +109,7 @@ def partial_rref_jax(matrix: Array) -> Array:
 
     This function is currently not used, since the reduction of matrices is performed prior to
     JAX operations. But since this function took some time to figure out, it is retained for
-    potential future use!
+    potential future use.
 
     Args:
         matrix: The matrix to compute the reduced row echelon form
@@ -368,7 +368,7 @@ def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
     return earth_bse
 
 
-def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: float = 1) -> float:
-    h_grams: float = number_of_earth_oceans * OCEAN_MASS_H2
-    h_kg: float = h_grams * unit_conversion.g_to_kg
+def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> ArrayLike:
+    h_grams: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
+    h_kg: ArrayLike = h_grams * unit_conversion.g_to_kg
     return h_kg
