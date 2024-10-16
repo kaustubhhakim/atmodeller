@@ -28,16 +28,6 @@ from atmodeller import AVOGADRO, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
-from atmodeller.thermodata.species_data import (
-    C_cr_data,
-    CH4_g_data,
-    CO2_g_data,
-    CO_g_data,
-    H2_g_data,
-    H2O_g_data,
-    H2O_l_data,
-    O2_g_data,
-)
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
@@ -63,9 +53,9 @@ INITIAL_STABILITY: float = -100.0
 def test_H_O(helper) -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint."""
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g)
     planet: Planet = Planet()
@@ -106,12 +96,12 @@ def test_CHO_reduced(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 1}`.
     """
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
@@ -160,12 +150,12 @@ def test_CHO_IW(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`.
     """
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
@@ -225,12 +215,12 @@ def test_CHO_oxidised(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 3}`.
     """
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
@@ -280,12 +270,12 @@ def test_CHO_highly_oxidised(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 4}`.
     """
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
@@ -330,12 +320,12 @@ def test_CHO_highly_oxidised(helper) -> None:
 def test_CHO_middle_temperature(helper) -> None:
     """Tests C-H-O system at 873 K"""
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=873.0)
@@ -381,12 +371,12 @@ def test_CHO_middle_temperature(helper) -> None:
 def test_CHO_low_temperature(helper) -> None:
     """Tests C-H-O system at 450 K"""
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    O2_g: Species = Species.create_gas("O2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    CO_g: Species = Species.create_gas("CO_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g)
     planet: Planet = Planet(surface_temperature=450.0)
@@ -430,13 +420,13 @@ def test_CHO_low_temperature(helper) -> None:
 def test_graphite_condensed(helper) -> None:
     """Tests graphite stable with around 50% condensed C mass fraction"""
 
-    O2_g: Species = Species.create_gas(O2_g_data)
-    H2_g: Species = Species.create_gas(H2_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    C_cr: Species = Species.create_condensed(C_cr_data)
+    O2_g: Species = Species.create_gas("O2_g")
+    H2_g: Species = Species.create_gas("H2_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    C_cr: Species = Species.create_condensed("C_cr")
 
     species: tuple[Species, ...] = (O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr)
     planet: Planet = Planet(surface_temperature=873.0)
@@ -483,13 +473,13 @@ def test_graphite_unstable(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    O2_g: Species = Species.create_gas(O2_g_data)
-    H2_g: Species = Species.create_gas(H2_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    C_cr: Species = Species.create_condensed(C_cr_data)
+    O2_g: Species = Species.create_gas("O2_g")
+    H2_g: Species = Species.create_gas("H2_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    C_cr: Species = Species.create_condensed("C_cr")
 
     species: tuple[Species, ...] = (O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr)
     planet: Planet = Planet(surface_temperature=1400.0)
@@ -537,10 +527,10 @@ def test_graphite_unstable(helper) -> None:
 def test_water_condensed(helper) -> None:
     """Condensed water at 10 bar"""
 
-    H2_g: Species = Species.create_gas(H2_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    O2_g: Species = Species.create_gas(O2_g_data)
-    H2O_l: Species = Species.create_condensed(H2O_l_data)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    O2_g: Species = Species.create_gas("O2_g")
+    H2O_l: Species = Species.create_condensed("H2O_l")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, H2O_l)
     planet: Planet = Planet(surface_temperature=411.75)
@@ -584,14 +574,14 @@ def test_water_condensed(helper) -> None:
 def test_graphite_water_condensed(helper) -> None:
     """Tests C and water in equilibrium at 430 K and 10 bar"""
 
-    O2_g: Species = Species.create_gas(O2_g_data)
-    H2_g: Species = Species.create_gas(H2_g_data)
-    CO_g: Species = Species.create_gas(CO_g_data)
-    H2O_g: Species = Species.create_gas(H2O_g_data)
-    CO2_g: Species = Species.create_gas(CO2_g_data)
-    CH4_g: Species = Species.create_gas(CH4_g_data)
-    C_cr: Species = Species.create_condensed(C_cr_data)
-    H2O_l: Species = Species.create_condensed(H2O_l_data)
+    O2_g: Species = Species.create_gas("O2_g")
+    H2_g: Species = Species.create_gas("H2_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    C_cr: Species = Species.create_condensed("C_cr")
+    H2O_l: Species = Species.create_condensed("H2O_l")
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr)
     planet: Planet = Planet(surface_temperature=430.0)

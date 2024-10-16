@@ -149,6 +149,14 @@ class _N2_basalt_dasgupta(NamedTuple):
 
 
 N2_basalt_dasgupta: SolubilityProtocol = _N2_basalt_dasgupta()
+"""N2 in basaltic silicate melt :cite:p:`BGF21`
+
+:cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
+thermodynamic constants from :cite:t:`BGF21{Table 6}`. Experiments on basaltic samples at fluid
+saturation in C-H-O-N system, pressure range: 0.8-10 kbar, temperature range: 1200-1300 C;
+fO2 range: IW+4.9 to IW-4.7. Using their experimental results and a database for N
+concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solubility law.
+"""
 
 
 class _N2_basalt_libourel(NamedTuple):
@@ -177,3 +185,9 @@ class _N2_basalt_libourel(NamedTuple):
 
 
 N2_basalt_libourel: SolubilityProtocol = _N2_basalt_libourel()
+"""N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
+
+:cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
+atm and 1425 C (two experiments at 1400 C), fO2 from IW-8.3 to IW+8.7 using mixtures of CO, CO2
+and N2 gases.
+"""

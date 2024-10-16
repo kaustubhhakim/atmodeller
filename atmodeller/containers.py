@@ -23,6 +23,7 @@ functionality can remain together whilst accommodating the requirements of JAX-c
 """
 from __future__ import annotations
 
+import logging
 import sys
 from collections.abc import Mapping
 from typing import Callable, NamedTuple, Type
@@ -52,6 +53,7 @@ from atmodeller.thermodata.core import (
     RedoxBufferProtocol,
     SpeciesData,
 )
+from atmodeller.thermodata.species_data import get_species_data
 from atmodeller.utilities import OptxSolver, scale_number_density, unit_conversion
 
 if sys.version_info < (3, 11):
@@ -59,6 +61,7 @@ if sys.version_info < (3, 11):
 else:
     from typing import Self
 
+logger: logging.Logger = logging.getLogger(__name__)
 
 # region: Containers for traced parameters
 
@@ -308,18 +311,20 @@ class MassConstraints(NamedTuple):
         Returns:
             vmap axes
         """
-        values_list: list[ArrayLike] = list(self.log_molecules.values())
-        vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
-        if values_list:
+        log_molecules_vmap: dict[str, int | None] = {}
+
+        for key, log_molecules in self.log_molecules.items():
+            vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
             try:
-                number_entries: int = len(values_list[0])  # type: ignore
-                if number_entries > 1:
+                num_entries: int = len(log_molecules)  # type: ignore - exception dealt with later.
+                if num_entries > 1:
                     vmap_axis = 0
             except TypeError:  # Just a single value, which means no vmapping required.
                 # vmap_axis = None
                 pass
+            log_molecules_vmap[key] = vmap_axis
 
-        return MassConstraints(None, vmap_axis)  # type: ignore - container types are for data
+        return MassConstraints(None, log_molecules_vmap)  # type: ignore - container types for data
 
     def array(self, log_atmosphere_volume: Array) -> Array:
         """Scaled log number density as an array
@@ -403,38 +408,42 @@ class Species(NamedTuple):
     @classmethod
     def create_condensed(
         cls,
-        data: SpeciesData,
+        species_name: str,
         activity: ActivityProtocol = CondensateActivity(),
     ) -> Self:
         """Creates a condensate
 
         Args:
-            data: Species data
+            species_name: Species name, as it appears in the species dictionary
             activity: Activity. Defaults to unity activity.
 
         Returns:
             A condensed species
         """
-        return cls(data, activity, NoSolubility())
+        species_data: SpeciesData = get_species_data(species_name)
+
+        return cls(species_data, activity, NoSolubility())
 
     @classmethod
     def create_gas(
         cls,
-        data: SpeciesData,
+        species_name: str,
         activity: ActivityProtocol = IdealGasActivity(),
         solubility: SolubilityProtocol = NoSolubility(),
     ) -> Self:
         """Creates a gas species
 
         Args:
-            data: Species data
+            species_name: Species name, as it appears in the species dictionary
             activity: Activity. Defaults to an ideal gas.
             solubility: Solubility. Defaults to no solubility.
 
         Returns:
             A gas species
         """
-        return cls(data, activity, solubility)
+        species_data: SpeciesData = get_species_data(species_name)
+
+        return cls(species_data, activity, solubility)
 
 
 class Solution(NamedTuple):

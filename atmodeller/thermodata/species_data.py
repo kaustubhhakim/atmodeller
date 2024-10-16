@@ -16,6 +16,8 @@
 #
 """Species data"""
 
+import logging
+
 from atmodeller.thermodata.condensates import (
     C_cr_thermodata,
     H2O_l_thermodata,
@@ -45,78 +47,173 @@ from atmodeller.thermodata.gases import (
     SO_g_thermodata,
 )
 
-C_g: SpeciesData = SpeciesData.create(
+logger: logging.Logger = logging.getLogger(__name__)
+
+C_g_data: SpeciesData = SpeciesData.create(
     "C",
     "g",
     C_g_thermodata,
 )
+"Species data for C_g"
+
 CH4_g_data: SpeciesData = SpeciesData.create(
     "CH4",
     "g",
     CH4_g_thermodata,
 )
+"Species data for CH4_g"
+
 Cl2_g_data: SpeciesData = SpeciesData.create("Cl2", "g", Cl2_g_thermodata)
+"Species data for Cl2_g"
+
 CO_g_data: SpeciesData = SpeciesData.create(
     "CO",
     "g",
     CO_g_thermodata,
 )
+"Species data for CO_g"
+
 CO2_g_data: SpeciesData = SpeciesData.create(
     "CO2",
     "g",
     CO2_g_thermodata,
 )
+"Species data for CO2_g"
+
 C_cr_data: SpeciesData = SpeciesData.create("C", "cr", C_cr_thermodata)
+"Species data for C_cr"
+
 H2_g_data: SpeciesData = SpeciesData.create("H2", "g", H2_g_thermodata)
+"Species data for H2_g"
+
 H2O_g_data: SpeciesData = SpeciesData.create(
     "H2O",
     "g",
     H2O_g_thermodata,
 )
+"Species data for H2O_g"
+
 H2O_l_data: SpeciesData = SpeciesData.create(
     "H2O",
     "l",
     H2O_l_thermodata,
 )
+"Species data for H2O_l"
+
 H2S_g_data: SpeciesData = SpeciesData.create(
     "H2S",
     "g",
     H2S_g_thermodata,
 )
+"Species data for H2S_g"
+
 He_g_data: SpeciesData = SpeciesData.create(
     "He",
     "g",
     He_g_thermodata,
 )
+"Species data for He_g"
+
 N2_g_data: SpeciesData = SpeciesData.create("N2", "g", N2_g_thermodata)
+"Species data for N2_g"
+
 NH3_g_data: SpeciesData = SpeciesData.create(
     "NH3",
     "g",
     NH3_g_thermodata,
 )
+"Species data for NH3_g"
+
 O2_g_data: SpeciesData = SpeciesData.create("O2", "g", O2_g_thermodata)
+"Species data for O2_g"
+
 S_alpha_data: SpeciesData = SpeciesData.create("S", "alpha", S_alpha_thermodata)
+"Species data for S_alpha"
+
 S_beta_data: SpeciesData = SpeciesData.create("S", "beta", S_beta_thermodata)
+"Species data for S_beta"
+
 S_l_data: SpeciesData = SpeciesData.create(
     "S",
     "l",
     S_l_thermodata,
 )
+"Species data for S_l"
+
 S2_g_data: SpeciesData = SpeciesData.create("S2", "g", S2_g_thermodata)
+"Species data for S2_g"
+
 Si_cr_data: SpeciesData = SpeciesData.create(
     "Si",
     "cr",
     Si_cr_thermodata,
 )
+"Species data for Si_cr"
+
 Si_l_data: SpeciesData = SpeciesData.create(
     "Si",
     "l",
     Si_l_thermodata,
 )
+"Species data for Si_l"
+
 SiO2_l_data: SpeciesData = SpeciesData.create(
     "SiO2",
     "l",
     SiO2_l_thermodata,
 )
+"Species data for SiO2_l"
+
 SO_g_data: SpeciesData = SpeciesData.create("SO", "g", SO_g_thermodata)
+"Species data for SO_g"
+
 SO2_g_data: SpeciesData = SpeciesData.create("SO2", "g", SO2_g_thermodata)
+"Species data for SO2_g"
+
+species_data: dict[str, SpeciesData] = {
+    "C_g": C_g_data,
+    "CH4_g": CH4_g_data,
+    "Cl2_g": Cl2_g_data,
+    "CO_g": CO_g_data,
+    "CO2_g": CO2_g_data,
+    "C_cr": C_cr_data,
+    "H2_g": H2_g_data,
+    "H2O_g": H2O_g_data,
+    "H2O_l": H2O_l_data,
+    "H2S_g": H2S_g_data,
+    "He_g": He_g_data,
+    "N2_g": N2_g_data,
+    "NH3_g": NH3_g_data,
+    "O2_g": O2_g_data,
+    "S_alpha": S_alpha_data,
+    "S_beta": S_beta_data,
+    "S_l": S_l_data,
+    "S2_g": S2_g_data,
+    "Si_cr": Si_cr_data,
+    "Si_l": Si_l_data,
+    "SiO2_l": SiO2_l_data,
+    "SO_g": SO_g_data,
+    "SO2_g": SO2_g_data,
+}
+"""Species data"""
+
+
+def get_species_data(species_name: str) -> SpeciesData:
+    """Gets the species data.
+
+    Args:
+        species_name: Name of the species
+
+    Returns:
+        Species data
+    """
+    try:
+        data: SpeciesData = species_data[species_name]
+
+    except KeyError as exc:
+        msg: str = f"Species data for '{species_name}' is not available"
+        logger.warning(msg)
+        logger.warning("Must choose from: %s", list(species_data.keys()))
+        raise ValueError(msg) from exc
+
+    return data

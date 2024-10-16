@@ -14,7 +14,10 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Thermochemical data for condensates"""
+"""Thermochemical data for condensates from :cite:t:`MZG02`.
+
+https://ntrs.nasa.gov/citations/20020085330
+"""
 
 from atmodeller.thermodata.core import ThermoData
 
@@ -53,6 +56,7 @@ C_cr_thermodata: ThermoData = ThermoData(
     (200, 600, 2000),
     (600, 2000, 6000),
 )
+"""Thermodata for C_cr"""
 
 H2O_cr_thermodata: ThermoData = ThermoData(
     (-5.530314990e4,),
@@ -71,6 +75,7 @@ H2O_cr_thermodata: ThermoData = ThermoData(
     (200,),
     (273.1507,),
 )
+"""Thermodata for H2O_cr"""
 
 H2O_l_thermodata: ThermoData = ThermoData(
     (1.101760476e8, 8.113176880e7),
@@ -98,6 +103,7 @@ H2O_l_thermodata: ThermoData = ThermoData(
     (273.150, 373.150),
     (373.150, 600),
 )
+"""Thermodata for H2O_l"""
 
 S_alpha_thermodata: ThermoData = ThermoData(
     (-7.516389580e2,),
@@ -106,6 +112,7 @@ S_alpha_thermodata: ThermoData = ThermoData(
     (200,),
     (368.3,),
 )
+"""Thermodata for S_alpha"""
 
 S_beta_thermodata: ThermoData = ThermoData(
     (-6.852714730e2,),
@@ -114,6 +121,7 @@ S_beta_thermodata: ThermoData = ThermoData(
     (368.3,),
     (388.36,),
 )
+"""Thermodata for S_beta"""
 
 S_l_thermodata: ThermoData = ThermoData(
     (-6.356594920e5, -9.832222680e5, -2.638846929e4, 1.113013440e4, -8.284589830e2),
@@ -128,6 +136,7 @@ S_l_thermodata: ThermoData = ThermoData(
     (388.36, 428.15, 432.25, 453.15, 717),
     (428.15, 432.25, 453.15, 717, 6000),
 )
+"""Thermodata for S_l"""
 
 Si_cr_thermodata: ThermoData = ThermoData(
     (-7.850635210e2, -1.042947234e3),
@@ -139,6 +148,7 @@ Si_cr_thermodata: ThermoData = ThermoData(
     (200, 298.15),
     (298.15, 1690),
 )
+"""Thermodata for Si_cr"""
 
 Si_l_thermodata: ThermoData = ThermoData(
     (4.882667110e3,),
@@ -147,6 +157,7 @@ Si_l_thermodata: ThermoData = ThermoData(
     (1690,),
     (6000,),
 )
+"""Thermodata for Si_l"""
 
 SiO2_l_thermodata: ThermoData = ThermoData(
     (-1.140002976e5,),
@@ -155,3 +166,4 @@ SiO2_l_thermodata: ThermoData = ThermoData(
     (1996,),
     (6000,),
 )
+"""Thermodata for SiO2_l"""

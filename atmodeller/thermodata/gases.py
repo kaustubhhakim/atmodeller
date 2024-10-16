@@ -14,7 +14,10 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Thermochemical data for gases"""
+"""Thermochemical data for gases from :cite:t:`MZG02`
+
+https://ntrs.nasa.gov/citations/20020085330
+"""
 
 from atmodeller.thermodata.core import ThermoData
 
@@ -53,6 +56,7 @@ C_g_thermodata: ThermoData = ThermoData(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
+"""Thermodata for C_g"""
 
 CH4_g_thermodata: ThermoData = ThermoData(
     (-2.331314360e4, 7.532066910e4),
@@ -80,6 +84,7 @@ CH4_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for CH4_g"""
 
 Cl2_g_thermodata: ThermoData = ThermoData(
     (1.534069331e3, 1.212117724e5),
@@ -107,6 +112,7 @@ Cl2_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for Cl2_g"""
 
 CO_g_thermodata: ThermoData = ThermoData(
     (-1.303131878e4, -2.466261084e3, 5.701421130e6),
@@ -147,6 +153,7 @@ CO_g_thermodata: ThermoData = ThermoData(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
+"""Thermodata for CO_g"""
 
 CO2_g_thermodata: ThermoData = ThermoData(
     (-4.528198460e4, -3.908350590e4, -8.043214510e6),
@@ -183,6 +190,7 @@ CO2_g_thermodata: ThermoData = ThermoData(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
+"""Thermodata for CO2_g"""
 
 H2_g_thermodata: ThermoData = ThermoData(
     (2.682484665e3, 5.339824410e3, 2.488433516e6),
@@ -219,6 +227,7 @@ H2_g_thermodata: ThermoData = ThermoData(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
+"""Thermodata for H2_g"""
 
 H2O_g_thermodata: ThermoData = ThermoData(
     (-3.303974310e4, -1.384286509e4),
@@ -246,6 +255,7 @@ H2O_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for H2O_g"""
 
 H2S_g_thermodata: ThermoData = ThermoData(
     (-3.278457280e3, 2.908696214e4),
@@ -273,6 +283,7 @@ H2S_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for H2S_g"""
 
 He_g_thermodata: ThermoData = ThermoData(
     (-7.453750000e2, -7.453750000e2, 1.650518960e4),
@@ -293,6 +304,7 @@ He_g_thermodata: ThermoData = ThermoData(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
+"""Thermodata for He_g"""
 
 N2_g_thermodata: ThermoData = ThermoData(
     (7.108460860e2, 1.283210415e4, 4.938707040e6),
@@ -329,6 +341,7 @@ N2_g_thermodata: ThermoData = ThermoData(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
+"""Thermodata for N2_g"""
 
 NH3_g_thermodata: ThermoData = ThermoData(
     (-1.264886413e4, 4.386191960e4),
@@ -356,6 +369,7 @@ NH3_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for NH3_g"""
 
 O2_g_thermodata: ThermoData = ThermoData(
     (-3.391454870e3, -1.689010929e4, 2.293554027e6),
@@ -392,6 +406,7 @@ O2_g_thermodata: ThermoData = ThermoData(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
+"""Thermodata for O2_g"""
 
 SO_g_thermodata: ThermoData = ThermoData(
     (-3.371292190e3, -2.708838059e4),
@@ -419,6 +434,7 @@ SO_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for SO_g"""
 
 SO2_g_thermodata: ThermoData = ThermoData(
     (-4.113752080e4, -3.351308690e4),
@@ -446,6 +462,7 @@ SO2_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for SO2_g"""
 
 S2_g_thermodata: ThermoData = ThermoData(
     (1.654767715e4, 1.085508427e4),
@@ -473,3 +490,4 @@ S2_g_thermodata: ThermoData = ThermoData(
     (200, 1000),
     (1000, 6000),
 )
+"""Thermodata for S2_g"""
