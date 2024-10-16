@@ -20,11 +20,33 @@
 
 from __future__ import annotations
 
+import sys
 from typing import NamedTuple, Protocol
 
 import jax.numpy as jnp
 from jax import Array, jit
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
+
+
+class PyTreeNoData:
+    """A PyTree with no data"""
+
+    def tree_flatten(self) -> tuple[tuple, None]:
+        children = ()
+        aux_data = None
+        return children, aux_data
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del aux_data
+        del children
+        return cls()
 
 
 class SolubilityProtocol(Protocol):
@@ -52,19 +74,24 @@ def power_law(fugacity: ArrayLike, constant: float, exponent: float) -> Array:
     return constant * jnp.power(fugacity, exponent)
 
 
-class SolubilityPowerLaw(NamedTuple):
+@register_pytree_node_class
+class SolubilityPowerLaw:
     """A solubility power law
 
     Args:
         constant: Constant
         exponent: Exponent
+
+    Attributes:
+        constant: Constant
+        exponent: Exponent
     """
 
-    constant: float
-    """Constant"""
-    exponent: float
-    """Exponent"""
+    def __init__(self, constant: float, exponent: float):
+        self.constant: float = constant
+        self.exponent: float = exponent
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -77,6 +104,16 @@ class SolubilityPowerLaw(NamedTuple):
         del fO2
 
         return power_law(fugacity, self.constant, self.exponent)
+
+    def tree_flatten(self) -> tuple[tuple[float, float], None]:
+        children = (self.constant, self.exponent)
+        aux_data = None
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del aux_data
+        return cls(*children)
 
 
 @jit

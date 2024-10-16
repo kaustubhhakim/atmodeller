@@ -21,23 +21,24 @@ For every law there should be a test in the test suite.
 
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
-from typing import NamedTuple
-
 import jax.numpy as jnp
-from jax import Array
+from jax import Array, jit
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller.solubility.core import SolubilityProtocol
+from atmodeller.solubility.core import PyTreeNoData, SolubilityProtocol
 from atmodeller.utilities import unit_conversion
 
 
-class _CH4_basalt_ardia(NamedTuple):
+@register_pytree_node_class
+class _CH4_basalt_ardia(PyTreeNoData):
     """CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`
 
     Experiments conducted at 0.7-3 GPa and 1400-1450 C. :cite:t:`AHW13{Equations 7a, 8}`, values
     for lnK0 and deltaV from the text.
     """
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -63,7 +64,8 @@ for lnK0 and deltaV from the text.
 """
 
 
-class _CO_basalt_armstrong(NamedTuple):
+@register_pytree_node_class
+class _CO_basalt_armstrong(PyTreeNoData):
     """Volatiles in mafic melts under reduced conditions :cite:p:`AHS15`
 
     Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
@@ -72,6 +74,7 @@ class _CO_basalt_armstrong(NamedTuple):
     (experiments from 1-1.2 GPa).
     """
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -97,7 +100,8 @@ dependence on total pressure. The fitting coefficients also use data from :cite:
 """
 
 
-class _CO_basalt_yoshioka(NamedTuple):
+@register_pytree_node_class
+class _CO_basalt_yoshioka(PyTreeNoData):
     """Carbon in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -105,6 +109,7 @@ class _CO_basalt_yoshioka(NamedTuple):
     MORB in the abstract.
     """
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -130,7 +135,8 @@ MORB in the abstract.
 """
 
 
-class _CO_rhyolite_yoshioka(NamedTuple):
+@register_pytree_node_class
+class _CO_rhyolite_yoshioka(PyTreeNoData):
     """Carbon in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -138,6 +144,7 @@ class _CO_rhyolite_yoshioka(NamedTuple):
     rhyolite in the abstract.
     """
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -163,7 +170,8 @@ rhyolite in the abstract.
 """
 
 
-class _CO2_basalt_dixon(NamedTuple):
+@register_pytree_node_class
+class _CO2_basalt_dixon(PyTreeNoData):
     """CO2 in MORB liquids :cite:p:`DSH95`
 
     :cite:t:`DSH95{Equation 6}` for mole fraction of dissolved carbonate (CO3^2-) and then
@@ -171,6 +179,7 @@ class _CO2_basalt_dixon(NamedTuple):
     vapor phase (CO2 vapor mole fraction varied from 0.42-0.97).
     """
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,

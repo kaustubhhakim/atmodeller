@@ -26,11 +26,17 @@ from __future__ import annotations
 from typing import NamedTuple
 
 import jax.numpy as jnp
-from jax import Array
+from jax import Array, jit
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.solubility.core import SolubilityPowerLaw, SolubilityProtocol, power_law
+from atmodeller.solubility.core import (
+    PyTreeNoData,
+    SolubilityPowerLaw,
+    SolubilityProtocol,
+    power_law,
+)
 from atmodeller.utilities import unit_conversion
 
 Cl2_ano_dio_for_thomas: SolubilityProtocol = SolubilityPowerLaw(
@@ -68,7 +74,8 @@ units to mol/g*bar.
 """
 
 
-class _N2_basalt_bernadou(NamedTuple):
+@register_pytree_node_class
+class _N2_basalt_bernadou(PyTreeNoData):
     """N2 in basaltic silicate melt :cite:p:`BGF21`
 
     :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -78,6 +85,7 @@ class _N2_basalt_bernadou(NamedTuple):
     concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solubility law.
     """
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -159,7 +167,8 @@ concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solub
 """
 
 
-class _N2_basalt_libourel(NamedTuple):
+@register_pytree_node_class
+class _N2_basalt_libourel(PyTreeNoData):
     """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
     :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
@@ -167,6 +176,7 @@ class _N2_basalt_libourel(NamedTuple):
     and N2 gases.
     """
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
