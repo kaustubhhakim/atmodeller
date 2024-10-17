@@ -239,6 +239,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
     or higher pressures (>100 GPa) is not recommended."
     """
 
+    @override
     def __init__(
         self,
         log10_shift: ArrayLike = 0,
@@ -380,102 +381,62 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         return buffer_value
 
 
-# class IronWustiteBufferHirschmann(NamedTuple):
-#     """Composite iron-wustite buffer using :cite:t:`OP93,HGD08` and :cite:t:`H21`"""
+@register_pytree_node_class
+class IronWustiteBufferHirschmann(RedoxBuffer):
+    """Composite iron-wustite buffer using :cite:t:`OP93,HGD08` and :cite:t:`H21`"""
 
-#     log10_shift: ArrayLike = 0
-#     calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
-#         pressure_max=100 * unit_conversion.GPa_to_bar
-#     )
+    @override
+    def __init__(
+        self,
+        log10_shift: ArrayLike = 0,
+    ):
+        super().__init__(log10_shift)
+        self._low_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann08(
+            log10_shift
+        )
+        self._high_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann21(
+            log10_shift
+        )
+        self._calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+            pressure_max=100 * unit_conversion.GPa_to_bar
+        )
 
-#     def low_temperature_buffer(self) -> RedoxBufferProtocol:
-#         """Gets the low temperature buffer"""
-#         return IronWustiteBufferHirschmann08(self.log10_shift)
+    def _use_low_temperature(self, temperature: ArrayLike) -> Array:
+        """Check to use the low temperature buffer for fO2
 
-#     def high_temperature_buffer(self) -> RedoxBufferProtocol:
-#         """Gets the high temperature buffer"""
-#         return IronWustiteBufferHirschmann21(self.log10_shift)
+        Args:
+            temperature: Temperature
 
-#     def log10_fugacity_low_temperature(
-#         self, temperature: ArrayLike, pressure: ArrayLike
-#     ) -> ArrayLike:
-#         """Log10 fugacity for the low temperature buffer
+        Returns:
+            True/False whether to use the low temperature formulation
+        """
+        return jnp.asarray(temperature) < self._high_temperature_buffer.calibration.temperature_min
 
-#         Args:
-#             temperature: Temperature
-#             pressure: Pressure
+    @override
+    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Gets the log10 fugacity at the buffer
 
-#         Returns:
-#             Log10 fugacity for the low temperature buffer
-#         """
-#         return self.low_temperature_buffer().log10_fugacity(temperature, pressure)
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#     def log10_fugacity_high_temperature(
-#         self, temperature: ArrayLike, pressure: ArrayLike
-#     ) -> ArrayLike:
-#         """Log10 fugacity for the high temperature buffer
+        Returns:
+            Log10 fugacity at the buffer
+        """
 
-#         Args:
-#             temperature: Temperature
-#             pressure: Pressure
+        def low_temperature_case() -> ArrayLike:
+            return self._low_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
 
-#         Returns:
-#             Log10 fugacity for the high temperature buffer
-#         """
-#         return self.high_temperature_buffer().log10_fugacity(temperature, pressure)
+        def high_temperature_case() -> ArrayLike:
+            return self._high_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
 
-#     def _use_low_temperature(self, temperature: ArrayLike) -> Array:
-#         """Check to use the low temperature buffer for fO2
+        buffer_value: ArrayLike = lax.cond(
+            self._use_low_temperature(temperature), low_temperature_case, high_temperature_case
+        )
 
-#         Args:
-#             temperature: Temperature
-
-#         Returns:
-#             True/False whether to use the low temperature formulation
-#         """
-#         return (
-#             jnp.asarray(temperature) < self.high_temperature_buffer().calibration.temperature_min
-#         )
-
-#     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-#         """Gets the log10 fugacity
-
-#         Args:
-#             temperature: Temperature
-#             pressure: Pressure
-
-#         Returns:
-#             Log10 fugacity
-#         """
-
-#         def low_temperature_case() -> ArrayLike:
-#             return self.log10_fugacity_low_temperature(temperature, pressure)
-
-#         def high_temperature_case() -> ArrayLike:
-#             return self.log10_fugacity_high_temperature(temperature, pressure)
-
-#         # Shift has already been added by the component buffers
-#         fO2: ArrayLike = lax.cond(
-#             self._use_low_temperature(temperature), low_temperature_case, high_temperature_case
-#         )
-
-#         return fO2
-
-#     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-#         """Gets the log fugacity
-
-#         Args:
-#             temperature: Temperature
-#             pressure: Pressure
-
-#         Returns:
-#             Log fugacity
-#         """
-#         return self.log10_fugacity(temperature, pressure) * jnp.log(10)
+        return buffer_value
 
 
-# TODO: For testing pytree structure
-IronWustiteBufferHirschmann = IronWustiteBufferHirschmann21
 IronWustiteBuffer = IronWustiteBufferHirschmann
 
 
@@ -540,10 +501,6 @@ class SpeciesData(NamedTuple):
         thermodata: Thermodynamic data
     """
 
-    # Because composition is a dict this object is not hashable. Python does not have a frozendict,
-    # so other options would be:
-    # https://flax.readthedocs.io/en/latest/api_reference/flax.core.frozen_dict.html
-    # https://github.com/GalacticDynamics/xmmutablemap
     composition: ImmutableMap[str, tuple[int, float, float]]
     """Composition"""
     phase_code: int
