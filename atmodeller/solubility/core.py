@@ -18,10 +18,8 @@
 
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
-from __future__ import annotations
-
 import sys
-from typing import NamedTuple, Protocol
+from typing import Protocol
 
 import jax.numpy as jnp
 from jax import Array, jit
@@ -105,45 +103,35 @@ class SolubilityPowerLaw:
 
         return power_law(fugacity, self.constant, self.exponent)
 
-    def tree_flatten(self) -> tuple[tuple[float, float], None]:
-        children = (self.constant, self.exponent)
-        aux_data = None
+    def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
+        children: tuple = ()
+        aux_data = {"constant": self.constant, "exponent": self.exponent}
         return (children, aux_data)
 
     @classmethod
     def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        return cls(*children)
+        del children
+        return cls(**aux_data)
 
 
-@jit
-def power_law_log10(fugacity: ArrayLike, log10_constant: float, log10_exponent: float) -> Array:
-    """Power law with log10 constant and exponent
-
-    Args:
-        fugacity: Fugacity
-        log10_constant: Log10 constant for the power law
-        log10_exponent: Log10 exponent for the power law
-
-    Returns:
-        Evaluated power law
-    """
-    return jnp.power(10, (log10_constant + log10_exponent * jnp.log10(fugacity)))
-
-
-class SolubilityPowerLawLog10(NamedTuple):
+@register_pytree_node_class
+class SolubilityPowerLawLog10:
     """A solubility power law with log10 coefficients
 
     Args:
         log10_constant: Log10 constant
         log10_exponent: Log10 exponent
+
+    Attributes:
+        log10_constant: Log10 constant
+        log10_exponent: Log10 exponent
     """
 
-    log10_constant: float
-    """Constant"""
-    log10_exponent: float
-    """Exponent"""
+    def __init__(self, log10_constant: float, log10_exponent: float):
+        self.log10_constant: float = log10_constant
+        self.log10_exponent: float = log10_exponent
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -155,12 +143,24 @@ class SolubilityPowerLawLog10(NamedTuple):
         del pressure
         del fO2
 
-        return power_law_log10(fugacity, self.log10_constant, self.log10_exponent)
+        return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
+        children: tuple = ()
+        aux_data = {"log10_constant": self.log10_constant, "log10_exponent": self.log10_exponent}
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
 
 
-class NoSolubility(NamedTuple):
+@register_pytree_node_class
+class NoSolubility(PyTreeNoData):
     """No solubility"""
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,

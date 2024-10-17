@@ -21,9 +21,7 @@ For every law there should be a test in the test suite.
 
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
-from __future__ import annotations
-
-from typing import NamedTuple
+import sys
 
 import jax.numpy as jnp
 from jax import Array, jit
@@ -38,6 +36,11 @@ from atmodeller.solubility.core import (
     power_law,
 )
 from atmodeller.utilities import unit_conversion
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 Cl2_ano_dio_for_thomas: SolubilityProtocol = SolubilityPowerLaw(
     140.52 * unit_conversion.percent_to_ppm, 0.5
@@ -108,7 +111,8 @@ class _N2_basalt_bernadou(PyTreeNoData):
 N2_basalt_bernadou: SolubilityProtocol = _N2_basalt_bernadou()
 
 
-class _N2_basalt_dasgupta(NamedTuple):
+@register_pytree_node_class
+class _N2_basalt_dasgupta:
     """N2 in silicate melts :cite:p:`DFP22`
 
     Using :cite:t:`DFP22{Equation 10}`, composition parameters from :cite:t:`DFP22{Figure 8}`, and
@@ -122,12 +126,19 @@ class _N2_basalt_dasgupta(NamedTuple):
         xsio2: Mole fraction of SiO2. Defaults to 0.56.
         xal2o3: Mole fraction of Al2O3. Defaults to 0.11.
         xtio2: Mole fraction of TiO2. Defaults to 0.01.
+
+    Attributes:
+        xsio2: Mole fraction of SiO2
+        xal2o3: Mole fraction of Al2O3
+        xtio2: Mole fraction of TiO2
     """
 
-    xsio2: float = 0.56
-    xal2o3: float = 0.11
-    xtio2: float = 0.01
+    def __init__(self, xsio2: float = 0.56, xal2o3: float = 0.11, xtio2: float = 0.01):
+        self.xsio2: float = xsio2
+        self.xal2o3: float = xal2o3
+        self.xtio2: float = xtio2
 
+    @jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -154,6 +165,16 @@ class _N2_basalt_dasgupta(NamedTuple):
         )
 
         return ppmw
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
+        children: tuple = ()
+        aux_data = {"xsio2": self.xsio2, "xal2o3": self.xal2o3, "xtio2": self.xtio2}
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
 
 
 N2_basalt_dasgupta: SolubilityProtocol = _N2_basalt_dasgupta()
