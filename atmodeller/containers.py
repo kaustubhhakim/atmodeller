@@ -222,9 +222,9 @@ class FugacityConstraints(NamedTuple):
             except TypeError:  # Just a single value, which means no vmapping required.
                 # vmap_axis = None
                 pass
-            constraints_vmap[key] = type(constraint)(vmap_axis, None)  # type: ignore - container
+            constraints_vmap[key] = type(constraint)(vmap_axis)  # type: ignore - container
 
-        return FugacityConstraints(None, constraints_vmap)  # type: ignore
+        return FugacityConstraints(None, constraints_vmap)  # type: ignore - container
 
     def array(self, temperature: ArrayLike, pressure: Array) -> Array:
         """Scaled log number density as an array
