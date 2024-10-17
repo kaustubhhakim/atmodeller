@@ -253,7 +253,7 @@ class FugacityConstraints(NamedTuple):
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
 
         log_number_density: Array = (
-            log_fugacity - np.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
+            log_fugacity - jnp.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
         )
         scaled_log_number_density: Array = scale_number_density(
             log_number_density, self.log_scaling
@@ -299,7 +299,7 @@ class MassConstraints(NamedTuple):
         for element, mass_constraint in sorted_mass.items():
             molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
             log_number_of_molecules_: Array = (
-                jnp.log(mass_constraint) + np.log(AVOGADRO) - jnp.log(molar_mass)
+                jnp.log(mass_constraint) + jnp.log(AVOGADRO) - jnp.log(molar_mass)
             )
             log_number_of_molecules[element] = log_number_of_molecules_
 

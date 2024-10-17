@@ -108,7 +108,7 @@ class RedoxBufferProtocol(Protocol):
 #         del temperature
 #         del pressure
 
-#         return self.log10_fugacity * np.log(10)
+#         return self.log10_fugacity * jnp.log(10)
 
 
 class IronWustiteBufferHirschmann08(NamedTuple):
@@ -155,7 +155,7 @@ class IronWustiteBufferHirschmann08(NamedTuple):
         Returns:
             Log fugacity
         """
-        return self.log10_fugacity(temperature, pressure) * np.log(10)
+        return self.log10_fugacity(temperature, pressure) * jnp.log(10)
 
 
 class IronWustiteBufferHirschmann21(NamedTuple):
@@ -305,7 +305,7 @@ class IronWustiteBufferHirschmann21(NamedTuple):
         Returns:
             Log fugacity
         """
-        return self.log10_fugacity(temperature, pressure) * np.log(10)
+        return self.log10_fugacity(temperature, pressure) * jnp.log(10)
 
 
 class IronWustiteBufferHirschmann(NamedTuple):
@@ -399,7 +399,7 @@ class IronWustiteBufferHirschmann(NamedTuple):
         Returns:
             Log fugacity
         """
-        return self.log10_fugacity(temperature, pressure) * np.log(10)
+        return self.log10_fugacity(temperature, pressure) * jnp.log(10)
 
 
 IronWustiteBuffer = IronWustiteBufferHirschmann

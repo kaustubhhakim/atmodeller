@@ -97,7 +97,7 @@ def log_pressure_from_log_number_density(
         Log pressure
     """
     log_pressure: Array = (
-        log_number_density + np.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature)
+        log_number_density + jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature)
     )
 
     return log_pressure
