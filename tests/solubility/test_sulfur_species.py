@@ -38,7 +38,7 @@ from atmodeller.solubility.sulfur_species import (
     S2_sulfide_trachybasalt_boulliung,
     S2_trachybasalt_boulliung,
 )
-from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = debug_logger()

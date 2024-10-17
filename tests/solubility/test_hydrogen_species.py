@@ -37,7 +37,7 @@ from atmodeller.solubility.hydrogen_species import (
     H2O_lunar_glass_newcombe,
     H2O_peridotite_sossi,
 )
-from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 
 logger: logging.Logger = debug_logger()
 # logger.setLevel(logging.INFO)

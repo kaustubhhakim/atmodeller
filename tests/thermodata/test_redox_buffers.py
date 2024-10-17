@@ -24,7 +24,7 @@ from jax.typing import ArrayLike
 from pytest import approx
 
 from atmodeller import debug_logger
-from atmodeller.thermodata.core import (
+from atmodeller.thermodata.redox_buffers import (
     IronWustiteBufferHirschmann,
     IronWustiteBufferHirschmann08,
     IronWustiteBufferHirschmann21,

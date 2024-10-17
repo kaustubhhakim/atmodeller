@@ -29,7 +29,7 @@ from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.solubility.carbon_species import CO2_basalt_dixon
 from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
-from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 # from atmodeller.constraints import (

@@ -33,7 +33,7 @@ from atmodeller.solubility.carbon_species import (
     CO_rhyolite_yoshioka,
 )
 from atmodeller.solubility.core import SolubilityProtocol
-from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = debug_logger()

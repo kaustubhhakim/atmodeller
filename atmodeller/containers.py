@@ -50,9 +50,9 @@ from atmodeller.thermodata.core import (
     ActivityProtocol,
     CondensateActivity,
     IdealGasActivity,
-    RedoxBufferProtocol,
     SpeciesData,
 )
+from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.thermodata.species_data import get_species_data
 from atmodeller.utilities import OptxSolver, scale_number_density, unit_conversion
 

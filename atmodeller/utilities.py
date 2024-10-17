@@ -332,7 +332,7 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
 class UnitConversion(NamedTuple):
     """Unit conversions"""
 
-    # pylint: disable=invalid-name
+    # Convenient to use scientific abbreviation so pylint: disable=invalid-name
     atmosphere_to_bar: float = ATMOSPHERE
     bar_to_Pa: float = 1.0e5
     bar_to_GPa: float = 1.0e-4

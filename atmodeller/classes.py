@@ -42,7 +42,7 @@ from atmodeller.containers import (
     TracedParameters,
 )
 from atmodeller.engine import get_log_extended_activity, solve
-from atmodeller.thermodata.core import RedoxBufferProtocol
+from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref, unscale_number_density
 
 logger: logging.Logger = logging.getLogger(__name__)

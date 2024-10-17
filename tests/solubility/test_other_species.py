@@ -34,7 +34,7 @@ from atmodeller.solubility.other_species import (
     N2_basalt_dasgupta,
     N2_basalt_libourel,
 )
-from atmodeller.thermodata.core import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = debug_logger()
