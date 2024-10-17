@@ -149,11 +149,13 @@ class BeattieBridgeman(NamedTuple):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        # FIXME: Start with a reasonable guess, say some factor larger than the ideal gas volume to
-        # always hit the highest bound, which seems to be correct for the Holley model. Must
-        # approach the highest solution top down
+        # Start with a large initial guess, say some factor of the ideal gas volume, to guide the
+        # Newton solver to the largest root, which gives agreement with the tabulated data in the
+        # paper. The choice of 10 below is somewhat arbitrary, but based on the calibration data
+        # for the Holley model should comfortably be larger than the actual volume.
+        scaling_factor: float = 10
         initial_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
-        initial_volume = 10 * initial_volume
+        initial_volume = scaling_factor * initial_volume
 
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
