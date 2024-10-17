@@ -26,25 +26,12 @@ from jax import Array, jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
+from atmodeller.utilities import PyTreeNoData
+
 if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
-
-
-class PyTreeNoData:
-    """A PyTree with no data"""
-
-    def tree_flatten(self) -> tuple[tuple, None]:
-        children = ()
-        aux_data = None
-        return children, aux_data
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        del children
-        return cls()
 
 
 class SolubilityProtocol(Protocol):

@@ -17,6 +17,7 @@
 """Utilities"""
 
 import logging
+import sys
 from typing import NamedTuple
 
 import jax.numpy as jnp
@@ -28,6 +29,11 @@ from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
 from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -372,3 +378,41 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> Arra
     h_grams: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: ArrayLike = h_grams * unit_conversion.g_to_kg
     return h_kg
+
+
+# TODO: Eventually rename to ExperimentalCalibration once the old class is removed.
+class ExperimentalCalibrationNew(NamedTuple):
+    """Experimental calibration
+
+    Args:
+        temperature_min: Minimum calibrated temperature
+        temperature_max: Maximum calibrated temperature
+        pressure_min: Minimum calibrated pressure
+        pressure_max: Maximum calibrated pressure
+        log10_fO2_min: Minimum calibrated log10 fO2
+        log10_fO2_max: Maximum calibrated log10 fO2
+    """
+
+    temperature_min: float | None = None
+    temperature_max: float | None = None
+    pressure_min: float | None = None
+    pressure_max: float | None = None
+    # convenient to use fO2 so pylint: disable=invalid-name
+    log10_fO2_min: float | None = None
+    log10_fO2_max: float | None = None
+    # pylint: enable=invalid-name
+
+
+class PyTreeNoData:
+    """A PyTree with no data"""
+
+    def tree_flatten(self) -> tuple[tuple, None]:
+        children = ()
+        aux_data = None
+        return children, aux_data
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del aux_data
+        del children
+        return cls()

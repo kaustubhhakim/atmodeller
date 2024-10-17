@@ -33,22 +33,34 @@ Examples:
 # Use symbols from the paper for consistency so pylint: disable=invalid-name
 
 import logging
-from typing import Callable, NamedTuple
+import sys
+from typing import Any, Callable
 
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array
+from jax import Array, jit
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
-from atmodeller.eos.core import RealGasProtocol
-from atmodeller.thermodata.core import ExperimentalCalibrationNew
-from atmodeller.utilities import unit_conversion
+from atmodeller.eos.core import RealGas, RealGasProtocol
+from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class BeattieBridgeman(NamedTuple):
+@register_pytree_node_class
+class BeattieBridgeman(RealGas):
     r"""Beattie-Bridgeman equation :cite:p:`HWZ58{Equation 1}`.
 
     .. math::
@@ -63,22 +75,34 @@ class BeattieBridgeman(NamedTuple):
         b: b empirical constant determined experimentally
         c: c empirical constant determined experimentally
         calibration: Experimental calibration. Defaults to empty.
+
+    Attributes:
+        A0: A0 empirical constant determined experimentally
+        a: a empirical constant determined experimentally
+        B0: B0 empirical constant determined experimentally
+        b: b empirical constant determined experimentally
+        c: c empirical constant determined experimentally
+        calibration: Experimental calibration. Defaults to empty.
     """
 
-    A0: float
-    """A0 empirical constant determined experimentally"""
-    a: float
-    """a empirical constant determined experimentally"""
-    B0: float
-    """B0 empirical constant determined experimentally"""
-    b: float
-    """b empirical constant determined experimentally"""
-    c: float
-    """c empirical constant determined experimentally"""
-    calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew()
-    """Experimental calibration"""
+    def __init__(
+        self,
+        A0: float,
+        a: float,
+        B0: float,
+        b: float,
+        c: float,
+        calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(),
+    ):
+        self.A0: float = A0
+        self.a: float = a
+        self.B0: float = B0
+        self.b: float = b
+        self.c: float = c
+        self._calibration: ExperimentalCalibrationNew = calibration
 
-    def _objective_function(self, volume: ArrayLike, kwargs) -> Array:
+    @jit
+    def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
         r"""Objective function to solve for the volume :cite:p:`HWZ58{Equation 2}`
 
         .. math::
@@ -119,57 +143,8 @@ class BeattieBridgeman(NamedTuple):
 
         return residual
 
-    def compressibility_parameter(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        """Compressibility parameter
-
-        Args:
-            temperature: Temperature
-            pressure: Pressure
-
-        Returns:
-            Compressibility parameter
-        """
-        ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
-        volume: ArrayLike = self.volume(temperature, pressure)
-        compressibility: ArrayLike = volume / ideal_volume
-
-        return compressibility
-
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Volume
-
-        :cite:t:`HWZ58` doesn't say which root to take, but one real root is very small and the
-        maximum real root gives a volume that agrees with the tabulated compressibility factor for
-        all species.
-
-        Args:
-            temperature: Temperature
-            pressure: Pressure
-
-        Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-        """
-        # Start with a large initial guess, say some factor of the ideal gas volume, to guide the
-        # Newton solver to the largest root, which gives agreement with the tabulated data in the
-        # paper. The choice of 10 below is somewhat arbitrary, but based on the calibration data
-        # for the Holley model should comfortably be larger than the actual volume.
-        scaling_factor: float = 10
-        initial_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
-        initial_volume = scaling_factor * initial_volume
-
-        kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
-
-        solver = optx.Newton(rtol=1.0e-8, atol=1.0e-8)
-        sol = optx.root_find(
-            self._objective_function,
-            solver,
-            initial_volume,
-            args=kwargs,
-        )
-        volume: ArrayLike = sol.value
-
-        return volume
-
+    @override
+    @jit
     def log_fugacity(
         self,
         temperature: ArrayLike,
@@ -208,17 +183,58 @@ class BeattieBridgeman(NamedTuple):
 
         return log_fugacity
 
-    def log_fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log of the fugacity coefficient
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Volume
+
+        :cite:t:`HWZ58` doesn't say which root to take, but one real root is very small and the
+        maximum real root gives a volume that agrees with the tabulated compressibility parameter
+        for all species.
 
         Args:
             temperature: Temperature
             pressure: Pressure
 
         Returns:
-            Log of the fugacity coefficient
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        return -jnp.log(pressure) + self.log_fugacity(temperature, pressure)
+        # Start with a large initial guess, say some factor of the ideal gas volume, to guide the
+        # Newton solver to the largest root, which agrees with the tabulated data in the paper.
+        # The choice of 10 below is somewhat arbitrary, but based on the calibration data for the
+        # Holley model should be comfortably larger than the actual volume.
+        scaling_factor: float = 10
+        initial_volume = scaling_factor * self.ideal_volume(temperature, pressure)
+
+        kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
+
+        solver = optx.Newton(rtol=1.0e-8, atol=1.0e-8)
+        sol = optx.root_find(
+            self._objective_function,
+            solver,
+            initial_volume,
+            args=kwargs,
+        )
+        volume: ArrayLike = sol.value
+
+        return volume
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
+        children: tuple = ()
+        aux_data = {
+            "A0": self.A0,
+            "a": self.a,
+            "B0": self.B0,
+            "b": self.b,
+            "c": self.c,
+            "calibration": self.calibration,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
 
 
 # Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure

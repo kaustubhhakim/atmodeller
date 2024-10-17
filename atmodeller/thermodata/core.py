@@ -29,7 +29,7 @@ from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -61,27 +61,6 @@ class ActivityProtocol(Protocol):
         temperature: ArrayLike,
         pressure: ArrayLike,
     ) -> ArrayLike: ...
-
-
-# TODO: Eventually rename to ExperimentalCalibration once the old class is removed.
-class ExperimentalCalibrationNew(NamedTuple):
-    """Experimental calibration
-
-    Args:
-        temperature_min: Minimum calibrated temperature
-        temperature_max: Maximum calibrated temperature
-        pressure_min: Minimum calibrated pressure
-        pressure_max: Maximum calibrated pressure
-        log10_fO2_min: Minimum calibrated log10 fO2
-        log10_fO2_max: Maximum calibrated log10 fO2
-    """
-
-    temperature_min: float | None = None
-    temperature_max: float | None = None
-    pressure_min: float | None = None
-    pressure_max: float | None = None
-    log10_fO2_min: float | None = None
-    log10_fO2_max: float | None = None
 
 
 class RedoxBufferProtocol(Protocol):

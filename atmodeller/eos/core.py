@@ -23,172 +23,178 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import Callable, Protocol
 
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array, lax
+from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.thermodata.core import ActivityProtocol
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import (
+    ExperimentalCalibrationNew,
+    PyTreeNoData,
+    unit_conversion,
+)
 
-# if sys.version_info < (3, 12):
-#    from typing_extensions import override
-# else:
-#    from typing import override
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-# TODO: This might collapse to the ActivityProtocol
+# TODO: This might be consolidated with RedoxBufferProtocol or ActivityProtocol
 class RealGasProtocol(Protocol):
+    """Real gas protocol"""
 
-    def compressibility_parameter(
-        self, temperature: ArrayLike, pressure: ArrayLike
-    ) -> ArrayLike: ...
+    _calibration: ExperimentalCalibrationNew
 
-    def log_fugacity(
-        self,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-    ) -> Array: ...
+    @property
+    def calibration(self) -> ExperimentalCalibrationNew: ...
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
-# def log_activity(
-#    self,
-#    log_number_density: ArrayLike,
-#    species_index: Array,
-#    temperature: ArrayLike,
-#    pressure: ArrayLike,
-# ) -> ArrayLike: ...
+class RealGas(ABC, RealGasProtocol):
+    r"""A real gas equation of state (EOS)
 
-# def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike: ...
+    Fugacity is computed using the standard relation:
 
+    .. math::
 
-# @dataclass(kw_only=True)
-# class RealGas(ABC):
-#     r"""A real gas equation of state (EOS)
+        R T \ln f = \int V dP
 
-#     Fugacity is computed using the standard relation:
+    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
+    is volume, and :math:`P` is pressure.
 
-#     .. math::
+    Child classes must additionally set self._calibration.
+    """
 
-#         R T \ln f = \int V dP
+    @property
+    def calibration(self) -> ExperimentalCalibrationNew:
+        """Experimental calibration"""
+        return self._calibration
 
-#     where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
-#     is volume, and :math:`P` is pressure.
+    @abstractmethod
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log fugacity
 
-#     Args:
-#         calibration: Calibration temperature and pressure range. Defaults to empty.
-#     """
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#     calibration: ExperimentalCalibration = field(
-#         default_factory=ExperimentalCalibration, repr=False
-#     )
-#     """Calibration range of the temperature and pressure"""
+        Returns:
+            Log fugacity
+        """
 
-#     def compressibility_parameter(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
-#         """Compressibility parameter
+    #     def ln_fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    #         """Natural log of the fugacity
 
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
+    #         Args:
+    #             temperature: Temperature in K
+    #             pressure: Pressure in bar
 
-#         Returns:
-#             The compressibility parameter, which is dimensionless
-#         """
-#         volume: ArrayLike = self.volume(temperature, pressure)
-#         volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
-#         compressibility_parameter: ArrayLike = volume / volume_ideal
+    #         Returns:
+    #             Natural log of the fugacity
+    #         """
+    #         ln_fugacity: ArrayLike = self.volume_integral(temperature, pressure) / (
+    #             GAS_CONSTANT * temperature
+    #         )
 
-#         return compressibility_parameter
+    #         return ln_fugacity
 
-#     def ln_fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
-#         """Natural log of the fugacity
+    @abstractmethod
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume
 
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#         Returns:
-#             Natural log of the fugacity
-#         """
-#         ln_fugacity: ArrayLike = self.volume_integral(temperature, pressure) / (
-#             GAS_CONSTANT * temperature
-#         )
+        Returns:
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+        """
 
-#         return ln_fugacity
+    @jit
+    def compressibility_parameter(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Compressibility parameter
 
-#     def fugacity(self, temperature: float, pressure: ArrayLike) -> Array:
-#         """Fugacity
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
+        Returns:
+            The compressibility parameter, which is dimensionless
+        """
+        volume: ArrayLike = self.volume(temperature, pressure)
+        volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
+        compressibility_parameter: ArrayLike = volume / volume_ideal
 
-#         Returns:
-#             Fugacity in bar
-#         """
-#         fugacity: Array = jnp.exp(self.ln_fugacity(temperature, pressure))
+        return compressibility_parameter
 
-#         return fugacity
+    @jit
+    def fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Fugacity
 
-#     def ln_fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> Array:
-#         """Natural log of the fugacity coefficient
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
+        Returns:
+            Fugacity
+        """
+        fugacity: Array = jnp.exp(self.log_fugacity(temperature, pressure))
 
-#         Returns:
-#             Natural log of the fugacity coefficient
-#         """
-#         return -jnp.log(pressure) + self.ln_fugacity(temperature, pressure)
+        return fugacity
 
-#     def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> Array:
-#         """Fugacity coefficient
+    @jit
+    def log_fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log of the fugacity coefficient
 
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#         Returns:
-#             fugacity coefficient, which is non-dimensional
-#         """
-#         return jnp.exp(self.ln_fugacity_coefficient(temperature, pressure))
+        Returns:
+            Log of the fugacity coefficient
+        """
+        return -jnp.log(pressure) + self.log_fugacity(temperature, pressure)
 
-#     def ideal_volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
-#         r"""Ideal volume
+    @jit
+    def fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Fugacity coefficient
 
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#         Returns:
-#             Ideal volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-#         """
-#         volume_ideal: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
+        Returns:
+            fugacity coefficient, which is non-dimensional
+        """
+        return jnp.exp(self.log_fugacity_coefficient(temperature, pressure))
 
-#         return volume_ideal
+    @jit
+    def ideal_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Ideal volume
 
-#     @abstractmethod
-#     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-#         r"""Volume
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
+        Returns:
+            Ideal volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+        """
+        ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
 
-#         Returns:
-#             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-#         """
+        return ideal_volume
+
 
 #     @abstractmethod
 #     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
