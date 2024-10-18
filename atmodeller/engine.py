@@ -266,16 +266,7 @@ def get_log_activity(
     )
 
     log_activity = jnp.where(mask, scaled_log_activity, log_activity)
-    # jax.debug.print("log_activity = {out}", out=log_activity)
-
-    # def scale_entries(a: jnp.ndarray, b: jnp.ndarray, factor: float) -> jnp.ndarray:
-    #    # Create a mask of the same shape as a, initialized to False
-    #    mask = jnp.zeros_like(a, dtype=bool)
-    #    # Set the positions in mask corresponding to indices in b to True
-    #    mask = mask.at[b].set(True)
-    #    # Scale the entries in a that correspond to the mask
-    #    scaled_a = jnp.where(mask, a * factor, a)
-    #    return scaled_a
+    jax.debug.print("log_activity = {out}", out=log_activity)
 
     return log_activity
 
