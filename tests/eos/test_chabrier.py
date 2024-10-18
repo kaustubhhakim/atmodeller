@@ -14,40 +14,71 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-# TODO: Update reference to Chabier.
-"""Tests for the EOS models from :cite:t:`HP91,HP98`"""
+"""Tests for the EOS models from :cite:t:`CD21`"""
 
-# Convenient to use acroynms and symbol names so pylint: disable=invalid-name
+# Convenient to use scientific abbreviations so pylint: disable=invalid-name
 
-from __future__ import annotations
-
-import logging
-
-from atmodeller import debug_logger
-from atmodeller.eos.chabrier import get_chabrier_eos_models
-from atmodeller.eos.interfaces import RealGas
 from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
-
-logger: logging.Logger = debug_logger()
-
-eos_models: dict[str, RealGas] = get_chabrier_eos_models()
-"""EOS models from :cite:t:`CD21`"""
+MODEL_SUFFIX: str = "chabrier21"
+"""Suffix of the :cite:t:`CD21` models"""
 
 
 def test_Chabrier_H2_volume_100kbar(check_values) -> None:
-    """Test Chabrier"""
+    """Tests Chabrier volume at 100 kbar"""
     expected: float = 9.005066169376918
     expected *= unit_conversion.cm3_to_m3
-    check_values.volume(3000, 100e3, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
+    check_values.volume(
+        3000,
+        100e3,
+        check_values.get_eos_model("H2", MODEL_SUFFIX),
+        expected,
+        rtol=RTOL,
+        atol=ATOL,
+    )
+
+
+def test_Chabrier_H2_fugacity_coefficient_100kbar(check_values) -> None:
+    """Tests Chabrier fugacity coefficient at 100 kbar"""
+    expected: float = 32.84516697626837
+    check_values.fugacity_coefficient(
+        3000,
+        100e3,
+        check_values.get_eos_model("H2", MODEL_SUFFIX),
+        expected,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_Chabrier_H2_volume_1000kbar(check_values) -> None:
-    """Test Chabrier 2"""
+    """Tests Chabrier volume at 1000 kbar"""
     expected: float = 3.0100820540769166
     expected *= unit_conversion.cm3_to_m3
-    check_values.volume(5000, 1000e3, eos_models["H2"], expected, rtol=RTOL, atol=ATOL)
+    check_values.volume(
+        5000,
+        1000e3,
+        check_values.get_eos_model("H2", MODEL_SUFFIX),
+        expected,
+        rtol=RTOL,
+        atol=ATOL,
+    )
+
+
+# TODO: The fugacity coefficient seems extremely large. If this P-T range is beyond the calibration
+# the test should be updated to more reasonable P-T estimates.
+def test_Chabrier_H2_fugacity_coefficient_1000kbar(check_values) -> None:
+    """Tests Chabrier fugacity coefficient at 1000 kbar"""
+    expected: float = 451196.92186256585
+    check_values.fugacity_coefficient(
+        5000,
+        1000e3,
+        check_values.get_eos_model("H2", MODEL_SUFFIX),
+        expected,
+        rtol=RTOL,
+        atol=ATOL,
+    )

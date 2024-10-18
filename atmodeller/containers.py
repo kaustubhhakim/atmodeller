@@ -45,13 +45,10 @@ from atmodeller import (
     STABILITY_LOWER,
     STABILITY_UPPER,
 )
-from atmodeller.solubility.core import NoSolubility, SolubilityProtocol
-from atmodeller.thermodata.core import (
-    ActivityProtocol,
-    CondensateActivity,
-    IdealGasActivity,
-    SpeciesData,
-)
+from atmodeller.eos.classes import IdealGas
+from atmodeller.interfaces import ActivityProtocol, SolubilityProtocol
+from atmodeller.solubility.core import NoSolubility
+from atmodeller.thermodata.core import CondensateActivity, SpeciesData
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.thermodata.species_data import get_species_data
 from atmodeller.utilities import OptxSolver, scale_number_density, unit_conversion
@@ -428,7 +425,7 @@ class Species(NamedTuple):
     def create_gas(
         cls,
         species_name: str,
-        activity: ActivityProtocol = IdealGasActivity(),
+        activity: ActivityProtocol = IdealGas(),
         solubility: SolubilityProtocol = NoSolubility(),
     ) -> Self:
         """Creates a gas species

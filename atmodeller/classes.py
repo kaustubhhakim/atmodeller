@@ -462,6 +462,7 @@ class InteriorAtmosphere:
         """
         out: Array = self.solve_raw_output(initial_solution, traced_parameters)
 
+        # FIXME: get_log_extended_activity is broken. Now needs pressure as arg.
         if self._is_batch:
             logger.debug("Batch calculation")
             # Must vmap the function to enable it to be used in batch mode.

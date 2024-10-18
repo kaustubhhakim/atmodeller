@@ -25,14 +25,14 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
+from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.carbon_species import (
-    CH4_basalt_ardia,
-    CO2_basalt_dixon,
-    CO_basalt_armstrong,
-    CO_basalt_yoshioka,
-    CO_rhyolite_yoshioka,
+    CH4_basalt_ardia13,
+    CO2_basalt_dixon95,
+    CO_basalt_armstrong15,
+    CO_basalt_yoshioka19,
+    CO_rhyolite_yoshioka19,
 )
-from atmodeller.solubility.core import SolubilityProtocol
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
@@ -68,7 +68,7 @@ def test_CH4_basalt_ardia(check_values) -> None:
     """Tests CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = CH4_basalt_ardia
+    solubility_model: SolubilityProtocol = CH4_basalt_ardia13
     target_concentration: ArrayLike = 0.0005831884445042942
 
     check_values.concentration(
@@ -86,7 +86,7 @@ def test_CO_basalt_armstrong(check_values) -> None:
     """Tests volatiles in mafic melts under reduced conditions :cite:p:`AHS15`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = CO_basalt_armstrong
+    solubility_model: SolubilityProtocol = CO_basalt_armstrong15
     target_concentration: ArrayLike = 0.027396953726422667
 
     check_values.concentration(
@@ -104,7 +104,7 @@ def test_CO_basalt_yoshioka(check_values) -> None:
     """Tests carbon in silicate melts :cite:p:`YNN19`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = CO_basalt_yoshioka
+    solubility_model: SolubilityProtocol = CO_basalt_yoshioka19
     target_concentration: ArrayLike = 0.1098560543306116
 
     check_values.concentration(
@@ -122,7 +122,7 @@ def test_CO_rhyolite_yoshioka(check_values) -> None:
     """Tests carbon in silicate melts :cite:p:`YNN19`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = CO_rhyolite_yoshioka
+    solubility_model: SolubilityProtocol = CO_rhyolite_yoshioka19
     target_concentration: ArrayLike = 1.19271202468211
 
     check_values.concentration(
@@ -140,7 +140,7 @@ def test_CO2_basalt_dixon(check_values) -> None:
     """Tests CO2 in MORB liquids :cite:p:`DSH95`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = CO2_basalt_dixon
+    solubility_model: SolubilityProtocol = CO2_basalt_dixon95
     target_concentration: ArrayLike = 0.8527333099685608
 
     check_values.concentration(

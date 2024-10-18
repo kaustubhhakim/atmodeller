@@ -18,13 +18,6 @@
 
 # Convenient to use species chemical formulae so pylint: disable=invalid-name
 
-from __future__ import annotations
-
-import logging
-
-from atmodeller import debug_logger
-from atmodeller.eos.core import RealGasProtocol
-from atmodeller.eos.library import get_eos_models
 from atmodeller.utilities import unit_conversion
 
 # Probably due to rounding of the model parameters in the paper, some compressibilities in the
@@ -36,103 +29,184 @@ ATOL: float = 1.0e-4
 MODEL_SUFFIX: str = "beattie_holley58"
 """Suffix of the :cite:t:`HWZ58` models"""
 
-logger: logging.Logger = debug_logger()
-
-eos_models: dict[str, RealGasProtocol] = get_eos_models()
-"""EOS models from :cite:t:`HWZ58`"""
-
-
-def get_model(species_name: str) -> RealGasProtocol:
-    """Gets an model for a species
-
-    Args:
-        species_name: Species name
-
-    Returns:
-        EOS model
-    """
-    return eos_models[f"{species_name}_{MODEL_SUFFIX}"]
-
 
 def test_H2_low(check_values) -> None:
     """:cite:t:`HWZ58{Table II}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(300, pressure, get_model("H2"), 1.06217, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        300,
+        pressure,
+        check_values.get_eos_model("H2", MODEL_SUFFIX),
+        1.06217,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_H2_high(check_values) -> None:
     """:cite:t:`HWZ58{Table II}`"""
     pressure: float = 1000 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(1000, pressure, get_model("H2"), 1.26294, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        1000,
+        pressure,
+        check_values.get_eos_model("H2", MODEL_SUFFIX),
+        1.26294,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_N2_low(check_values) -> None:
     """:cite:t:`HWZ58{Table III}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(300, pressure, get_model("N2"), 1.00464, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        300,
+        pressure,
+        check_values.get_eos_model("N2", MODEL_SUFFIX),
+        1.00464,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_N2_high(check_values) -> None:
     """:cite:t:`HWZ58{Table III}`"""
     pressure: float = 1000 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(1000, pressure, get_model("N2"), 1.36551, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        1000,
+        pressure,
+        check_values.get_eos_model("N2", MODEL_SUFFIX),
+        1.36551,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_O2_low(check_values) -> None:
     """:cite:t:`HWZ58{Table IV}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(300, pressure, get_model("O2"), 0.95454, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        300,
+        pressure,
+        check_values.get_eos_model("O2", MODEL_SUFFIX),
+        0.95454,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_O2_high(check_values) -> None:
     """:cite:t:`HWZ58{Table IV}`"""
     pressure: float = 1000 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(1000, pressure, get_model("O2"), 1.28897, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        1000,
+        pressure,
+        check_values.get_eos_model("O2", MODEL_SUFFIX),
+        1.28897,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_CO2_low(check_values) -> None:
     """:cite:t:`HWZ58{Table V}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(400, pressure, get_model("CO2"), 0.81853, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        400,
+        pressure,
+        check_values.get_eos_model("CO2", MODEL_SUFFIX),
+        0.81853,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_CO2_high(check_values) -> None:
     """:cite:t:`HWZ58{Table V}`"""
     pressure: float = 1000 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(1000, pressure, get_model("CO2"), 1.07058, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        1000,
+        pressure,
+        check_values.get_eos_model("CO2", MODEL_SUFFIX),
+        1.07058,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_NH3_low(check_values) -> None:
     """:cite:t:`HWZ58{Table VI}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(400, pressure, get_model("NH3"), 0.56165, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        400,
+        pressure,
+        check_values.get_eos_model("NH3", MODEL_SUFFIX),
+        0.56165,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_NH3_high(check_values) -> None:
     """:cite:t:`HWZ58{Table VI}`"""
     pressure: float = 500 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(1000, pressure, get_model("NH3"), 0.93714, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        1000,
+        pressure,
+        check_values.get_eos_model("NH3", MODEL_SUFFIX),
+        0.93714,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_CH4_low(check_values) -> None:
     """:cite:t:`HWZ58{Table VII}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(300, pressure, get_model("CH4"), 0.85583, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        300,
+        pressure,
+        check_values.get_eos_model("CH4", MODEL_SUFFIX),
+        0.85583,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_CH4_high(check_values) -> None:
     """:cite:t:`HWZ58{Table VII}`"""
     pressure: float = 1000 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(1000, pressure, get_model("CH4"), 1.36201, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        1000,
+        pressure,
+        check_values.get_eos_model("CH4", MODEL_SUFFIX),
+        1.36201,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_He_low(check_values) -> None:
     """:cite:t:`HWZ58{Table VIII}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(300, pressure, get_model("He"), 1.05148, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        300,
+        pressure,
+        check_values.get_eos_model("He", MODEL_SUFFIX),
+        1.05148,
+        rtol=RTOL,
+        atol=ATOL,
+    )
 
 
 def test_He_high(check_values) -> None:
     """:cite:t:`HWZ58{Table VIII}`"""
     pressure: float = 1000 * unit_conversion.atmosphere_to_bar
-    check_values.compressibility(1000, pressure, get_model("He"), 1.14766, rtol=RTOL, atol=ATOL)
+    check_values.compressibility(
+        1000,
+        pressure,
+        check_values.get_eos_model("He", MODEL_SUFFIX),
+        1.14766,
+        rtol=RTOL,
+        atol=ATOL,
+    )

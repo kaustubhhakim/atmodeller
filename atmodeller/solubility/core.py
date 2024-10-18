@@ -19,7 +19,6 @@
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
 import sys
-from typing import Protocol
 
 import jax.numpy as jnp
 from jax import Array, jit
@@ -32,16 +31,6 @@ if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
-
-
-class SolubilityProtocol(Protocol):
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
-    ) -> ArrayLike: ...
 
 
 @jit

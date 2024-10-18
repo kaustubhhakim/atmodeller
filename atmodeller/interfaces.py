@@ -1,0 +1,52 @@
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Interfaces"""
+
+from typing import Protocol
+
+from jax.typing import ArrayLike
+
+from atmodeller.utilities import ExperimentalCalibrationNew
+
+
+class ActivityProtocol(Protocol):
+
+    def log_activity(
+        self,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+    ) -> ArrayLike: ...
+
+
+class RealGasProtocol(ActivityProtocol, Protocol):
+
+    _calibration: ExperimentalCalibrationNew
+
+    @property
+    def calibration(self) -> ExperimentalCalibrationNew: ...
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+
+class SolubilityProtocol(Protocol):
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+    ) -> ArrayLike: ...

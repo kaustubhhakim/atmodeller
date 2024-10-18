@@ -28,13 +28,13 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.solubility.core import SolubilityProtocol
+from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class _S2_sulfate_andesite_boulliung(NamedTuple):
+class _S2_sulfate_andesite_boulliung23(NamedTuple):
     """Sulfur as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -59,7 +59,7 @@ class _S2_sulfate_andesite_boulliung(NamedTuple):
         return ppmw
 
 
-S2_sulfate_andesite_boulliung: SolubilityProtocol = _S2_sulfate_andesite_boulliung()
+S2_sulfate_andesite_boulliung23: SolubilityProtocol = _S2_sulfate_andesite_boulliung23()
 """Sulfur as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`
 
 Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -69,7 +69,7 @@ equilibrated with Air/SO2 mixtures.
 """
 
 
-class _S2_sulfide_andesite_boulliung(NamedTuple):
+class _S2_sulfide_andesite_boulliung23(NamedTuple):
     """Sulfur as sulfide (S^2-) in andesite :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -93,7 +93,7 @@ class _S2_sulfide_andesite_boulliung(NamedTuple):
         return ppmw
 
 
-S2_sulfide_andesite_boulliung: SolubilityProtocol = _S2_sulfide_andesite_boulliung()
+S2_sulfide_andesite_boulliung23: SolubilityProtocol = _S2_sulfide_andesite_boulliung23()
 """Sulfur as sulfide (S^2-) in andesite :cite:p:`BW23`
 
 Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -102,11 +102,11 @@ controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit bel
 """
 
 
-class _S2_andesite_boulliung(NamedTuple):
+class _S2_andesite_boulliung23(NamedTuple):
     """S2 in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
-    sulfide: SolubilityProtocol = S2_sulfide_andesite_boulliung
-    sulfate: SolubilityProtocol = S2_sulfate_andesite_boulliung
+    sulfide: SolubilityProtocol = S2_sulfide_andesite_boulliung23
+    sulfate: SolubilityProtocol = S2_sulfate_andesite_boulliung23
 
     def concentration(self, *args, **kwargs) -> ArrayLike:
         concentration: ArrayLike = self.sulfide.concentration(*args, **kwargs)
@@ -115,11 +115,11 @@ class _S2_andesite_boulliung(NamedTuple):
         return concentration
 
 
-S2_andesite_boulliung: SolubilityProtocol = _S2_andesite_boulliung()
+S2_andesite_boulliung23: SolubilityProtocol = _S2_andesite_boulliung23()
 """S2 in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
 
-class _S2_sulfate_basalt_boulliung(NamedTuple):
+class _S2_sulfate_basalt_boulliung23(NamedTuple):
     """Sulfur in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract and the corrected expression for sulfate capacity
@@ -145,7 +145,7 @@ class _S2_sulfate_basalt_boulliung(NamedTuple):
         return ppmw
 
 
-S2_sulfate_basalt_boulliung: SolubilityProtocol = _S2_sulfate_basalt_boulliung()
+S2_sulfate_basalt_boulliung23: SolubilityProtocol = _S2_sulfate_basalt_boulliung23()
 """Sulfur in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`
 
 Using the first equation in the abstract and the corrected expression for sulfate capacity
@@ -155,7 +155,7 @@ Air/SO2 mixtures.
 """
 
 
-class _S2_sulfide_basalt_boulliung(NamedTuple):
+class _S2_sulfide_basalt_boulliung23(NamedTuple):
     """Sulfur in basalt as sulfide (S^2-) :cite:p:`BW23`
 
     Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for
@@ -180,7 +180,7 @@ class _S2_sulfide_basalt_boulliung(NamedTuple):
         return ppmw
 
 
-S2_sulfide_basalt_boulliung: SolubilityProtocol = _S2_sulfide_basalt_boulliung()
+S2_sulfide_basalt_boulliung23: SolubilityProtocol = _S2_sulfide_basalt_boulliung23()
 """Sulfur in basalt as sulfide (S^2-) :cite:p:`BW23`
 
 Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for
@@ -190,11 +190,11 @@ unit below FMQ.
 """
 
 
-class _S2_basalt_boulliung(NamedTuple):
+class _S2_basalt_boulliung23(NamedTuple):
     """Sulfur in basalt due to sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
-    sulfide: SolubilityProtocol = S2_sulfide_basalt_boulliung
-    sulfate: SolubilityProtocol = S2_sulfate_basalt_boulliung
+    sulfide: SolubilityProtocol = S2_sulfide_basalt_boulliung23
+    sulfate: SolubilityProtocol = S2_sulfate_basalt_boulliung23
 
     def concentration(self, *args, **kwargs) -> ArrayLike:
         concentration: ArrayLike = self.sulfide.concentration(*args, **kwargs)
@@ -203,11 +203,11 @@ class _S2_basalt_boulliung(NamedTuple):
         return concentration
 
 
-S2_basalt_boulliung: SolubilityProtocol = _S2_basalt_boulliung()
+S2_basalt_boulliung23: SolubilityProtocol = _S2_basalt_boulliung23()
 """Sulfur in basalt due to sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
 
-class _S2_sulfate_trachybasalt_boulliung(NamedTuple):
+class _S2_sulfate_trachybasalt_boulliung23(NamedTuple):
     """Sulfur as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -232,7 +232,7 @@ class _S2_sulfate_trachybasalt_boulliung(NamedTuple):
         return ppmw
 
 
-S2_sulfate_trachybasalt_boulliung: SolubilityProtocol = _S2_sulfate_trachybasalt_boulliung()
+S2_sulfate_trachybasalt_boulliung23: SolubilityProtocol = _S2_sulfate_trachybasalt_boulliung23()
 """Sulfur as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`
 
 Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -242,7 +242,7 @@ equilibrated with Air/SO2 mixtures.
 """
 
 
-class _S2_sulfide_trachybasalt_boulliung(NamedTuple):
+class _S2_sulfide_trachybasalt_boulliung23(NamedTuple):
     """Sulfur as sulfide (S^2-) in trachybasalt :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -266,7 +266,7 @@ class _S2_sulfide_trachybasalt_boulliung(NamedTuple):
         return ppmw
 
 
-S2_sulfide_trachybasalt_boulliung: SolubilityProtocol = _S2_sulfide_trachybasalt_boulliung()
+S2_sulfide_trachybasalt_boulliung23: SolubilityProtocol = _S2_sulfide_trachybasalt_boulliung23()
 """Sulfur as sulfide (S^2-) in trachybasalt :cite:p:`BW23`
 
 Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -275,11 +275,11 @@ controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit bel
 """
 
 
-class _S2_trachybasalt_boulliung(NamedTuple):
+class _S2_trachybasalt_boulliung23(NamedTuple):
     """Sulfur in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
-    sulfide: SolubilityProtocol = S2_sulfide_trachybasalt_boulliung
-    sulfate: SolubilityProtocol = S2_sulfate_trachybasalt_boulliung
+    sulfide: SolubilityProtocol = S2_sulfide_trachybasalt_boulliung23
+    sulfate: SolubilityProtocol = S2_sulfate_trachybasalt_boulliung23
 
     def concentration(self, *args, **kwargs) -> ArrayLike:
         concentration: ArrayLike = self.sulfide.concentration(*args, **kwargs)
@@ -288,14 +288,14 @@ class _S2_trachybasalt_boulliung(NamedTuple):
         return concentration
 
 
-S2_trachybasalt_boulliung: SolubilityProtocol = _S2_trachybasalt_boulliung()
+S2_trachybasalt_boulliung23: SolubilityProtocol = _S2_trachybasalt_boulliung23()
 """Sulfur in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
 
 # FIXME: input fugacity there should actually be the total pressure. unfortunately when they did
 # their fitting to include the melt composition, they got rid of the fS2 dependency and have
 # instead the dependency of T, P and fO2. This class needs correcting somehow.
-class _S2_mercury_magma_namur(NamedTuple):
+class _S2_mercury_magma_namur16(NamedTuple):
     """S in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`
 
     Dissolved S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like
@@ -327,7 +327,7 @@ class _S2_mercury_magma_namur(NamedTuple):
         return ppmw
 
 
-S2_mercury_magma_namur: SolubilityProtocol = _S2_mercury_magma_namur()
+S2_mercury_magma_namur16: SolubilityProtocol = _S2_mercury_magma_namur16()
 """S in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`
 
 Dissolved S concentration at sulfide (S^2-) saturation conditions, relevant for Mercury-like

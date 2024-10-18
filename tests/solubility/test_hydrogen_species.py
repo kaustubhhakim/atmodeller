@@ -25,17 +25,17 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.solubility.core import SolubilityProtocol
+from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.hydrogen_species import (
-    H2_andesite_hirschmann,
-    H2_basalt_hirschmann,
-    H2_silicic_melts_gaillard,
-    H2O_ano_dio_newcombe,
-    H2O_basalt_dixon,
-    H2O_basalt_mitchell,
-    H2O_basalt_wilson,
-    H2O_lunar_glass_newcombe,
-    H2O_peridotite_sossi,
+    H2_andesite_hirschmann12,
+    H2_basalt_hirschmann12,
+    H2_silicic_melts_gaillard03,
+    H2O_ano_dio_newcombe17,
+    H2O_basalt_dixon95,
+    H2O_basalt_mitchell17,
+    H2O_basalt_wilson81,
+    H2O_lunar_glass_newcombe17,
+    H2O_peridotite_sossi23,
 )
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 
@@ -66,7 +66,7 @@ def test_H2_andesite_hirschmann(check_values) -> None:
     """Tests H2 in synthetic andesite :cite:p:`HWA12`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2_andesite_hirschmann
+    solubility_model: SolubilityProtocol = H2_andesite_hirschmann12
     target_concentration: ArrayLike = 15.545054132817002
 
     check_values.concentration(
@@ -84,7 +84,7 @@ def test_H2_basalt_hirschmann(check_values) -> None:
     """Tests H2 in synthetic basalt :cite:p:`HWA12`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2_basalt_hirschmann
+    solubility_model: SolubilityProtocol = H2_basalt_hirschmann12
     target_concentration: ArrayLike = 18.13918061563441
 
     check_values.concentration(
@@ -102,7 +102,7 @@ def test_H2_silicic_melts_gaillard(check_values) -> None:
     """Tests Fe-H redox exchange in silicate glasses :cite:p:`GSM03`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2_silicic_melts_gaillard
+    solubility_model: SolubilityProtocol = H2_silicic_melts_gaillard03
     target_concentration: ArrayLike = 0.38821933289297966
 
     check_values.concentration(
@@ -120,7 +120,7 @@ def test_H2O_ano_dio_newcombe(check_values) -> None:
     """Tests H2O in anorthite-diopside-eutectic compositions :cite:p:`NBB17`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2O_ano_dio_newcombe
+    solubility_model: SolubilityProtocol = H2O_ano_dio_newcombe17
     target_concentration: ArrayLike = 1028.1332598452402
 
     check_values.concentration(
@@ -138,7 +138,7 @@ def test_H2O_basalt_dixon(check_values) -> None:
     """Tests H2O in MORB liquids :cite:p:`DSH95`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2O_basalt_dixon
+    solubility_model: SolubilityProtocol = H2O_basalt_dixon95
     target_concentration: ArrayLike = 1364.7160876900368
 
     check_values.concentration(
@@ -156,7 +156,7 @@ def test_H2O_basalt_mitchell(check_values) -> None:
     """Tests H2O in basaltic melt :cite:p:`MGO17`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2O_basalt_mitchell
+    solubility_model: SolubilityProtocol = H2O_basalt_mitchell17
     target_concentration: ArrayLike = 411.7165015844662
 
     check_values.concentration(
@@ -174,7 +174,7 @@ def test_H2O_basalt_wilson(check_values) -> None:
     """Tests H2O in basalt :cite:p:`WH81,HBO64`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2O_basalt_wilson
+    solubility_model: SolubilityProtocol = H2O_basalt_wilson81
     target_concentration: ArrayLike = 349.26853043318124
 
     check_values.concentration(
@@ -192,7 +192,7 @@ def test_H2O_lunar_glass_newcombe(check_values) -> None:
     """Tests H2O in lunar basalt :cite:p:`NBB17`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2O_lunar_glass_newcombe
+    solubility_model: SolubilityProtocol = H2O_lunar_glass_newcombe17
     target_concentration: ArrayLike = 965.907863100824
 
     check_values.concentration(
@@ -210,7 +210,7 @@ def test_H2O_peridotite_sossi(check_values) -> None:
     """Tests H2O in peridotite liquids :cite:p:`STB23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = H2O_peridotite_sossi
+    solubility_model: SolubilityProtocol = H2O_peridotite_sossi23
     target_concentration: ArrayLike = 914.9961748553926
 
     check_values.concentration(

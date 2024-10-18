@@ -29,12 +29,8 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
-from atmodeller.solubility.core import (
-    PyTreeNoData,
-    SolubilityPowerLaw,
-    SolubilityProtocol,
-    power_law,
-)
+from atmodeller.interfaces import SolubilityProtocol
+from atmodeller.solubility.core import PyTreeNoData, SolubilityPowerLaw, power_law
 from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 11):
@@ -42,7 +38,7 @@ if sys.version_info < (3, 11):
 else:
     from typing import Self
 
-Cl2_ano_dio_for_thomas: SolubilityProtocol = SolubilityPowerLaw(
+Cl2_ano_dio_for_thomas21: SolubilityProtocol = SolubilityPowerLaw(
     140.52 * unit_conversion.percent_to_ppm, 0.5
 )
 """Cl in silicate melts :cite:p:`TW21`
@@ -52,7 +48,7 @@ and Cl fugacity for CMAS composition (An50Di28Fo22 (anorthite-diopside-forsterit
 low-degree mantle melt) at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 1200-1500 C.
 """
 
-Cl2_basalt_thomas: SolubilityProtocol = SolubilityPowerLaw(
+Cl2_basalt_thomas21: SolubilityProtocol = SolubilityPowerLaw(
     78.56 * unit_conversion.percent_to_ppm, 0.5
 )
 """Cl in silicate melts :cite:p:`TW21`
@@ -62,13 +58,13 @@ and Cl fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from 0.5
 1200-1500 C.
 """
 
-_He_henry_sol_constant: float = 56e-5  # cm3*STP/g*bar
+_He_henry_sol_constant_jambon86: float = 56e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert He conc from mol/g to g H2/g total and then to ppmw
-_He_henry_sol_constant = (
-    (_He_henry_sol_constant / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
+_He_henry_sol_constant_jambon86 = (
+    (_He_henry_sol_constant_jambon86 / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
 )
-He_basalt: SolubilityProtocol = SolubilityPowerLaw(_He_henry_sol_constant, 1)
+He_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_He_henry_sol_constant_jambon86, 1)
 """Solubility of He in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -78,7 +74,7 @@ units to mol/g*bar.
 
 
 @register_pytree_node_class
-class _N2_basalt_bernadou(PyTreeNoData):
+class _N2_basalt_bernadou21(PyTreeNoData):
     """N2 in basaltic silicate melt :cite:p:`BGF21`
 
     :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -110,11 +106,11 @@ class _N2_basalt_bernadou(PyTreeNoData):
         return ppmw
 
 
-N2_basalt_bernadou: SolubilityProtocol = _N2_basalt_bernadou()
+N2_basalt_bernadou21: SolubilityProtocol = _N2_basalt_bernadou21()
 
 
 @register_pytree_node_class
-class _N2_basalt_dasgupta:
+class _N2_basalt_dasgupta22:
     """N2 in silicate melts :cite:p:`DFP22`
 
     Using :cite:t:`DFP22{Equation 10}`, composition parameters from :cite:t:`DFP22{Figure 8}`, and
@@ -179,7 +175,7 @@ class _N2_basalt_dasgupta:
         return cls(**aux_data)
 
 
-N2_basalt_dasgupta: SolubilityProtocol = _N2_basalt_dasgupta()
+N2_basalt_dasgupta22: SolubilityProtocol = _N2_basalt_dasgupta22()
 """N2 in basaltic silicate melt :cite:p:`BGF21`
 
 :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -191,7 +187,7 @@ concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solub
 
 
 @register_pytree_node_class
-class _N2_basalt_libourel(PyTreeNoData):
+class _N2_basalt_libourel03(PyTreeNoData):
     """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
     :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
@@ -217,7 +213,7 @@ class _N2_basalt_libourel(PyTreeNoData):
         return ppmw
 
 
-N2_basalt_libourel: SolubilityProtocol = _N2_basalt_libourel()
+N2_basalt_libourel03: SolubilityProtocol = _N2_basalt_libourel03()
 """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
 :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1

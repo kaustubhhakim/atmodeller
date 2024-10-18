@@ -14,17 +14,25 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOS library"""
+"""Real gas EOS library built from the concrete classes"""
 
 import logging
+from pathlib import Path
 from typing import Callable
 
 from atmodeller import ATMOSPHERE
+from atmodeller.eos.classes import BeattieBridgeman, Chabrier
 from atmodeller.eos.core import RealGasProtocol
-from atmodeller.eos.real_gas_eos import BeattieBridgeman
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+# region: Chabrier et al. (2021)
+
+H2_chabrier21 = Chabrier(Path("TABLE_H_TP_v1"), "H2")
+"""H2 Chabrier :cite:p:`CD21`"""
+
+# endregion
 
 # region: Holley et al. (1958)
 
@@ -32,8 +40,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 # in bar). Using the original values in the paper also facilitates visual comparison and checking.
 
 volume_conversion: Callable = lambda x: x * unit_conversion.litre_to_m3
-# Converts PV**2 coefficient to be in terms of m^3 and bar
+"""Volume conversion for :cite:t:`HWZ58` units"""
 A0_conversion: Callable = lambda x: x * ATMOSPHERE * unit_conversion.litre_to_m3**2
+"""PV**2 conversion for :cite:t:`HWZ58` units"""
 
 H2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     A0=A0_conversion(0.1975),
@@ -103,15 +112,16 @@ He_beattie_holley58: RealGasProtocol = BeattieBridgeman(
 
 
 def get_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of EOS models for each species.
+    """Gets a dictionary of EOS models
 
     Returns:
-        Dictionary of EOS models for each species
+        Dictionary of EOS models
     """
     models: dict[str, RealGasProtocol] = {}
     models["CH4_beattie_holley58"] = CH4_beattie_holley58
     models["CO2_beattie_holley58"] = CO2_beattie_holley58
     models["H2_beattie_holley58"] = H2_beattie_holley58
+    models["H2_chabrier21"] = H2_chabrier21
     models["He_beattie_holley58"] = He_beattie_holley58
     models["N2_beattie_holley58"] = N2_beattie_holley58
     models["NH3_beattie_holley58"] = NH3_beattie_holley58

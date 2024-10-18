@@ -21,7 +21,7 @@
 import logging
 import sys
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, NamedTuple, Protocol
 
 import jax.numpy as jnp
 import numpy as np
@@ -33,7 +33,8 @@ from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
 
 from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
-from atmodeller.thermodata.core import ActivityProtocol
+from atmodeller.interfaces import ActivityProtocol, RealGasProtocol
+from atmodeller.thermodata.core import Pref
 from atmodeller.utilities import (
     ExperimentalCalibrationNew,
     PyTreeNoData,
@@ -45,26 +46,12 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
+# if sys.version_info < (3, 11):
+#     from typing_extensions import Self
+# else:
+#     from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-# region: Interfaces
-
-
-# TODO: This might be consolidated with RedoxBufferProtocol or ActivityProtocol
-class RealGasProtocol(Protocol):
-    """Real gas protocol"""
-
-    _calibration: ExperimentalCalibrationNew
-
-    @property
-    def calibration(self) -> ExperimentalCalibrationNew: ...
-
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
 
 class RealGas(ABC, RealGasProtocol):
@@ -81,6 +68,9 @@ class RealGas(ABC, RealGasProtocol):
 
     Child classes must additionally set self._calibration.
     """
+
+    # Must be set by child classes
+    _calibration: ExperimentalCalibrationNew
 
     @property
     def calibration(self) -> ExperimentalCalibrationNew:
@@ -110,6 +100,21 @@ class RealGas(ABC, RealGasProtocol):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
+
+    @jit
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Log activity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log activity
+        """
+        # We define the standard state as 1 bar (see Pref in atmodeller.thermodata.core), so we
+        # do not need to perform a division to get the activity.
+        return self.log_fugacity(temperature, pressure)
 
     @jit
     def compressibility_parameter(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
@@ -154,7 +159,7 @@ class RealGas(ABC, RealGasProtocol):
         Returns:
             Log of the fugacity coefficient, which is dimensionless
         """
-        return -jnp.log(pressure) + self.log_fugacity(temperature, pressure)
+        return self.log_fugacity(temperature, pressure) - jnp.log(pressure)
 
     @jit
     def fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
@@ -185,14 +190,6 @@ class RealGas(ABC, RealGasProtocol):
         ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
 
         return ideal_volume
-
-
-# endregion
-
-# region: Real gas equations of state
-
-
-# endregion
 
 
 # @dataclass(kw_only=True)
@@ -967,82 +964,81 @@ class RealGas(ABC, RealGasProtocol):
 #         return lax.switch(index, [case_0, case_1, case_2])
 
 
-# @dataclass(frozen=True)
-# class CriticalData:
-#     """Critical temperature and pressure of a gas species.
+class CriticalData(NamedTuple):
+    """Critical temperature and pressure of a gas species.
 
-#     Args:
-#         temperature: Critical temperature in K
-#         pressure: Critical pressure in bar
-#     """
+    Args:
+        temperature: Critical temperature in K
+        pressure: Critical pressure in bar
+    """
 
-#     temperature: float
-#     """Critical temperature in K"""
-#     pressure: float
-#     """Critical pressure in bar"""
+    temperature: float
+    """Critical temperature in K"""
+    pressure: float
+    """Critical pressure in bar"""
 
 
-# critical_parameters_H2O: CriticalData = CriticalData(647.25, 221.1925)
-# """Critical parameters for H2O :cite:p:`SS92{Table 2}`"""
-# critical_parameters_CO2: CriticalData = CriticalData(304.15, 73.8659)
-# """Critical parameters for CO2 :cite:p:`SS92{Table 2}`
+critical_parameters_H2O: CriticalData = CriticalData(647.25, 221.1925)
+"""Critical parameters for H2O :cite:p:`SS92{Table 2}`"""
+critical_parameters_CO2: CriticalData = CriticalData(304.15, 73.8659)
+"""Critical parameters for CO2 :cite:p:`SS92{Table 2}`
 
-# Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar
-# """
-# critical_parameters_CH4: CriticalData = CriticalData(191.05, 46.4069)
-# """Critical parameters for CH4 :cite:p:`SS92{Table 2}`
+Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar
+"""
+critical_parameters_CH4: CriticalData = CriticalData(191.05, 46.4069)
+"""Critical parameters for CH4 :cite:p:`SS92{Table 2}`
 
-# Alternative values from :cite:t:`HP91` are 190.6 K and 46 bar
-# """
-# critical_parameters_CO: CriticalData = CriticalData(133.15, 34.9571)
-# """Critical parameters for CO :cite:p:`SS92{Table 2}`
+Alternative values from :cite:t:`HP91` are 190.6 K and 46 bar
+"""
+critical_parameters_CO: CriticalData = CriticalData(133.15, 34.9571)
+"""Critical parameters for CO :cite:p:`SS92{Table 2}`
 
-# Alternative values from :cite:t:`HP91` are 132.9 K and 35 bar
-# """
-# critical_parameters_O2: CriticalData = CriticalData(154.75, 50.7638)
-# """Critical parameters for O2 :cite:p:`SS92{Table 2}`"""
-# critical_parameters_H2: CriticalData = CriticalData(33.25, 12.9696)
-# """Critical parameters for H2 :cite:p:`SS92{Table 2}`"""
-# critical_parameters_H2_holland: CriticalData = CriticalData(41.2, 21.1)
-# """Critical parameters for H2 :cite:p:`HP91`"""
-# critical_parameters_S2: CriticalData = CriticalData(208.15, 72.954)
-# """Critical parameters for S2 :cite:p:`SS92{Table 2}`
+Alternative values from :cite:t:`HP91` are 132.9 K and 35 bar
+"""
+critical_parameters_O2: CriticalData = CriticalData(154.75, 50.7638)
+"""Critical parameters for O2 :cite:p:`SS92{Table 2}`"""
+critical_parameters_H2: CriticalData = CriticalData(33.25, 12.9696)
+"""Critical parameters for H2 :cite:p:`SS92{Table 2}`"""
+critical_parameters_H2_holland: CriticalData = CriticalData(41.2, 21.1)
+"""Critical parameters for H2 :cite:p:`HP91`"""
+critical_parameters_S2: CriticalData = CriticalData(208.15, 72.954)
+"""Critical parameters for S2 :cite:p:`SS92{Table 2}`
 
-# http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
+http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
 
-# :cite:p:`HP11` state that the critical parameters are from :cite:t:`RPS77`. However, in the fifth
-# edition of this book (:cite:t:`PPO00`) S2 is not given (only S is).
-# """
-# critical_parameters_SO2: CriticalData = CriticalData(430.95, 78.7295)
-# """Critical parameters for SO2 :cite:p:`SS92{Table 2}`"""
-# critical_parameters_COS: CriticalData = CriticalData(377.55, 65.8612)
-# """Critical parameters for COS :cite:p:`SS92{Table 2}`"""
-# critical_parameters_H2S: CriticalData = CriticalData(373.55, 90.0779)
-# """Critical parameters for H2S :cite:p:`SS92{Table 2}`
+:cite:p:`HP11` state that the critical parameters are from :cite:t:`RPS77`. However, in the fifth
+edition of this book (:cite:t:`PPO00`) S2 is not given (only S is).
+"""
+critical_parameters_SO2: CriticalData = CriticalData(430.95, 78.7295)
+"""Critical parameters for SO2 :cite:p:`SS92{Table 2}`"""
+critical_parameters_COS: CriticalData = CriticalData(377.55, 65.8612)
+"""Critical parameters for COS :cite:p:`SS92{Table 2}`"""
+critical_parameters_H2S: CriticalData = CriticalData(373.55, 90.0779)
+"""Critical parameters for H2S :cite:p:`SS92{Table 2}`
 
-# Alternative values from :cite:t:`HP91` are 373.4 K and 0.08963 bar
-# """
-# critical_parameters_N2: CriticalData = CriticalData(126.2, 33.9)
-# """Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
-# critical_parameters_Ar: CriticalData = CriticalData(151, 48.6)
-# """Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
+Alternative values from :cite:t:`HP91` are 373.4 K and 0.08963 bar
+"""
+critical_parameters_N2: CriticalData = CriticalData(126.2, 33.9)
+"""Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
+critical_parameters_Ar: CriticalData = CriticalData(151, 48.6)
+"""Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
 
-# critical_parameters: dict[str, CriticalData] = {
-#     "Ar": critical_parameters_Ar,
-#     "CH4": critical_parameters_CH4,
-#     "CO": critical_parameters_CO,
-#     "CO2": critical_parameters_CO2,
-#     "COS": critical_parameters_COS,
-#     "H2": critical_parameters_H2,
-#     "H2_Holland": critical_parameters_H2_holland,
-#     "H2O": critical_parameters_H2O,
-#     "H2S": critical_parameters_H2S,
-#     "N2": critical_parameters_N2,
-#     "O2": critical_parameters_O2,
-#     "S2": critical_parameters_S2,
-#     "SO2": critical_parameters_SO2,
-# }
-# """Critical parameters for gases
+critical_parameters: dict[str, CriticalData] = {
+    "Ar": critical_parameters_Ar,
+    "CH4": critical_parameters_CH4,
+    "CO": critical_parameters_CO,
+    "CO2": critical_parameters_CO2,
+    "COS": critical_parameters_COS,
+    "H2": critical_parameters_H2,
+    "H2_Holland": critical_parameters_H2_holland,
+    "H2O": critical_parameters_H2O,
+    "H2S": critical_parameters_H2S,
+    "N2": critical_parameters_N2,
+    "O2": critical_parameters_O2,
+    "S2": critical_parameters_S2,
+    "SO2": critical_parameters_SO2,
+}
+"""Critical parameters for gases
 
-# These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
-# """
+These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
+"""

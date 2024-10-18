@@ -26,12 +26,13 @@ from jax import Array, jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller.solubility.core import PyTreeNoData, SolubilityProtocol
+from atmodeller.interfaces import SolubilityProtocol
+from atmodeller.solubility.core import PyTreeNoData
 from atmodeller.utilities import unit_conversion
 
 
 @register_pytree_node_class
-class _CH4_basalt_ardia(PyTreeNoData):
+class _CH4_basalt_ardia13(PyTreeNoData):
     """CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`
 
     Experiments conducted at 0.7-3 GPa and 1400-1450 C. :cite:t:`AHW13{Equations 7a, 8}`, values
@@ -56,7 +57,7 @@ class _CH4_basalt_ardia(PyTreeNoData):
         return ppmw
 
 
-CH4_basalt_ardia: SolubilityProtocol = _CH4_basalt_ardia()
+CH4_basalt_ardia13: SolubilityProtocol = _CH4_basalt_ardia13()
 """CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`
 
 Experiments conducted at 0.7-3 GPa and 1400-1450 C. :cite:t:`AHW13{Equations 7a, 8}`, values
@@ -65,7 +66,7 @@ for lnK0 and deltaV from the text.
 
 
 @register_pytree_node_class
-class _CO_basalt_armstrong(PyTreeNoData):
+class _CO_basalt_armstrong15(PyTreeNoData):
     """Volatiles in mafic melts under reduced conditions :cite:p:`AHS15`
 
     Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
@@ -90,7 +91,7 @@ class _CO_basalt_armstrong(PyTreeNoData):
         return ppmw
 
 
-CO_basalt_armstrong: SolubilityProtocol = _CO_basalt_armstrong()
+CO_basalt_armstrong15: SolubilityProtocol = _CO_basalt_armstrong15()
 """Volatiles in mafic melts under reduced conditions :cite:p:`AHS15`
 
 Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
@@ -101,7 +102,7 @@ dependence on total pressure. The fitting coefficients also use data from :cite:
 
 
 @register_pytree_node_class
-class _CO_basalt_yoshioka(PyTreeNoData):
+class _CO_basalt_yoshioka19(PyTreeNoData):
     """Carbon in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -126,7 +127,7 @@ class _CO_basalt_yoshioka(PyTreeNoData):
         return ppmw
 
 
-CO_basalt_yoshioka: SolubilityProtocol = _CO_basalt_yoshioka()
+CO_basalt_yoshioka19: SolubilityProtocol = _CO_basalt_yoshioka19()
 """Carbon in silicate melts :cite:p:`YNN19`
 
 Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -136,7 +137,7 @@ MORB in the abstract.
 
 
 @register_pytree_node_class
-class _CO_rhyolite_yoshioka(PyTreeNoData):
+class _CO_rhyolite_yoshioka19(PyTreeNoData):
     """Carbon in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -161,7 +162,7 @@ class _CO_rhyolite_yoshioka(PyTreeNoData):
         return ppmw
 
 
-CO_rhyolite_yoshioka: SolubilityProtocol = _CO_rhyolite_yoshioka()
+CO_rhyolite_yoshioka19: SolubilityProtocol = _CO_rhyolite_yoshioka19()
 """Carbon in silicate melts :cite:p:`YNN19`
 
 Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -171,7 +172,7 @@ rhyolite in the abstract.
 
 
 @register_pytree_node_class
-class _CO2_basalt_dixon(PyTreeNoData):
+class _CO2_basalt_dixon95(PyTreeNoData):
     """CO2 in MORB liquids :cite:p:`DSH95`
 
     :cite:t:`DSH95{Equation 6}` for mole fraction of dissolved carbonate (CO3^2-) and then
@@ -194,7 +195,7 @@ class _CO2_basalt_dixon(PyTreeNoData):
         return ppmw
 
 
-CO2_basalt_dixon: SolubilityProtocol = _CO2_basalt_dixon()
+CO2_basalt_dixon95: SolubilityProtocol = _CO2_basalt_dixon95()
 """CO2 in MORB liquids :cite:p:`DSH95`
 
 :cite:t:`DSH95{Equation 6}` for mole fraction of dissolved carbonate (CO3^2-) and then

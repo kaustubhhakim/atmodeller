@@ -39,8 +39,10 @@ from atmodeller.containers import (
 )
 from atmodeller.thermodata.core import get_gibbs_over_RT
 from atmodeller.utilities import (
+    log_number_density_from_log_pressure,
     log_pressure_from_log_number_density,
     logsumexp,
+    scale_number_density,
     unit_conversion,
     unscale_number_density,
 )
@@ -153,16 +155,12 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     gas_molar_masses: Array = jnp.take(molar_masses, gas_species_indices)
     log_volume: Array = atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
 
-    # Need pressures in bar for subsequent operations so unscale. This includes condensate
-    # pressures, which are non-physical but are effectively ignored in future calculations because
-    # condensates always have zero solubility by construction.
-    log_pressure: Array = unscale_number_density(
+    # Need pressures of all species in bar for subsequent operations. Note we must unscale.
+    log_pressures: Array = unscale_number_density(
         log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
     )
-    pressure: Array = jnp.exp(log_pressure)
-    total_pressure: Array = atmosphere_pressure(
-        traced_parameters, fixed_parameters, log_number_density
-    )
+    pressures: Array = jnp.exp(log_pressures)
+    total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
 
     residual: Array = jnp.array([])
 
@@ -171,9 +169,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
             species, gas_species_indices, reaction_matrix, temperature, log_scaling
         )
-        log_activity: Array = get_log_activity(
-            traced_parameters, fixed_parameters, log_number_density
-        )
+        log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, pressures)
+        jax.debug.print("log_activity = {out}", out=log_activity)
         reaction_residual: Array = (
             reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
         )
@@ -201,7 +198,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         # Number density of elements in the condensed or gas phase
         element_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
         element_melt_density: Array = element_density_in_melt(
-            traced_parameters, fixed_parameters, log_number_density, pressure, log_volume
+            traced_parameters, fixed_parameters, log_number_density, pressures, log_volume
         )
         log_element_density: Array = jnp.log(element_density + element_melt_density)
         mass_residual = log_element_density - mass_constraints.array(log_volume)
@@ -224,14 +221,14 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 def get_log_activity(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    log_number_density: Array,
+    pressures: ArrayLike,
 ) -> Array:
     """Log activity
 
     Args:
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
-        log_number_density: Log number density
+        pressures: Pressures of all species
 
     Returns:
         Log activity
@@ -239,31 +236,46 @@ def get_log_activity(
     planet: Planet = traced_parameters.planet
     species: tuple[Species, ...] = fixed_parameters.species
     temperature: ArrayLike = planet.surface_temperature
-    total_pressure: Array = atmosphere_pressure(
-        traced_parameters, fixed_parameters, log_number_density
-    )
+    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
+    log_scaling: float = fixed_parameters.log_scaling
+    # Currently not used, but may be required in the future.
+    # total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
 
     activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
 
-    def apply_activity_function(
-        index: ArrayLike, log_number_density: Array, temperature: ArrayLike, total_pressure: Array
-    ):
+    def apply_activity_function(index: ArrayLike, temperature: ArrayLike, pressures: ArrayLike):
+        # Activity, so far, is only a function of the species pressure
+        pressure: Array = jnp.take(pressures, index)
+
         return lax.switch(
             index,
             activity_funcs,
-            log_number_density,
-            index,
             temperature,
-            total_pressure,
+            pressure,
         )
 
-    vmap_apply_function: Callable = jax.vmap(
-        apply_activity_function, in_axes=(0, None, None, None)
-    )
+    vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0, None, None))
     indices: ArrayLike = jnp.arange(len(species))
-    log_activity: Array = vmap_apply_function(
-        indices, log_number_density, temperature, total_pressure
+    log_activity: Array = vmap_apply_function(indices, temperature, pressures)
+
+    mask: Array = jnp.zeros_like(log_activity, dtype=bool)
+    mask = mask.at[gas_species_indices].set(True)
+
+    # Log activities must be converted back to scaled units
+    scaled_log_activity: Array = scale_number_density(
+        log_number_density_from_log_pressure(log_activity, temperature), log_scaling
     )
+
+    log_activity = jnp.where(mask, scaled_log_activity, log_activity)
+
+    # def scale_entries(a: jnp.ndarray, b: jnp.ndarray, factor: float) -> jnp.ndarray:
+    #    # Create a mask of the same shape as a, initialized to False
+    #    mask = jnp.zeros_like(a, dtype=bool)
+    #    # Set the positions in mask corresponding to indices in b to True
+    #    mask = mask.at[b].set(True)
+    #    # Scale the entries in a that correspond to the mask
+    #    scaled_a = jnp.where(mask, a * factor, a)
+    #    return scaled_a
 
     return log_activity
 
@@ -322,9 +334,12 @@ def element_density_in_melt(
 
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.surface_temperature
-    total_pressure: Array = atmosphere_pressure(
-        traced_parameters, fixed_parameters, log_number_density
+
+    log_pressures: Array = unscale_number_density(
+        log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
     )
+    pressures: Array = jnp.exp(log_pressures)
+    total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
     diatomic_oxygen_fugacity: Array = jnp.take(pressure, diatomic_oxygen_index)
 
     solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]
@@ -403,32 +418,22 @@ def atmosphere_log_volume(
 
 @jit
 def atmosphere_pressure(
-    traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    log_number_density: Array,
+    pressures: Array,
 ) -> Array:
     """Pressure of the atmosphere in bar
 
     Args:
-        traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
-        log_number_density: Log number density
+        pressure: Pressure of all species
 
     Returns:
         Pressure of the atmosphere in bar
     """
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-    planet: Planet = traced_parameters.planet
-    temperature: ArrayLike = planet.surface_temperature
-    log_scaling: float = fixed_parameters.log_scaling
+    gas_pressures: Array = jnp.take(pressures, gas_species_indices)
 
-    gas_log_number_density: Array = jnp.take(log_number_density, gas_species_indices)
-    gas_log_pressure: Array = unscale_number_density(
-        log_pressure_from_log_number_density(gas_log_number_density, temperature), log_scaling
-    )
-    gas_pressure: Array = jnp.exp(gas_log_pressure)
-
-    return jnp.sum(gas_pressure)
+    return jnp.sum(gas_pressures)
 
 
 # pylint: disable=invalid-name

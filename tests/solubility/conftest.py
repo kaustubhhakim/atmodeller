@@ -24,7 +24,7 @@ import pytest
 from jax.typing import ArrayLike
 from pytest import approx
 
-from atmodeller.solubility.core import SolubilityProtocol
+from atmodeller.interfaces import SolubilityProtocol
 
 logger: logging.Logger = logging.getLogger("atmodeller.tests.solubility")
 

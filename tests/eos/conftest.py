@@ -21,6 +21,8 @@ from jax.typing import ArrayLike
 from pytest import approx
 
 from atmodeller.eos.interfaces import RealGas
+from atmodeller.eos.library import get_eos_models
+from atmodeller.interfaces import RealGasProtocol
 
 # Tolerances to compare the test results with target output.
 RTOL: float = 1.0e-8
@@ -28,9 +30,24 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
+eos_models: dict[str, RealGasProtocol] = get_eos_models()
+
 
 class CheckValues:
     """Helper class with methods to check and confirm values"""
+
+    @staticmethod
+    def get_eos_model(species_name: str, suffix: str) -> RealGasProtocol:
+        """Gets a model for a species
+
+        Args:
+            species_name: Species name
+            suffix: Model suffix
+
+        Returns:
+            EOS model
+        """
+        return eos_models[f"{species_name}_{suffix}"]
 
     @staticmethod
     def compressibility(

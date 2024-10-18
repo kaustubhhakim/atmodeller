@@ -27,8 +27,8 @@ from jax.typing import ArrayLike
 from atmodeller import AVOGADRO, __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
-from atmodeller.solubility.carbon_species import CO2_basalt_dixon
-from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi
+from atmodeller.solubility.carbon_species import CO2_basalt_dixon95
+from atmodeller.solubility.hydrogen_species import H2O_peridotite_sossi23
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -85,7 +85,7 @@ def test_version():
 def test_H2O(helper) -> None:
     """Tests a single species (H2O)."""
 
-    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi)
+    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi23)
 
     species: tuple[Species, ...] = (H2O_g,)
     planet: Planet = Planet()
@@ -116,7 +116,7 @@ def test_H2O(helper) -> None:
 def test_H_fO2(helper) -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility."""
 
-    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi)
+    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi23)
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
@@ -157,7 +157,7 @@ def test_H_fO2(helper) -> None:
 def test_H_fO2_batch_temperature(helper) -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of surface temperatures."""
 
-    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi)
+    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi23)
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
@@ -201,7 +201,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
 def test_H_fO2_batch_fO2_shift(helper) -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of fO2 shifts."""
 
-    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi)
+    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi23)
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
@@ -261,7 +261,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
 def test_H_fO2_batch_H_mass(helper) -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of H budgets."""
 
-    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi)
+    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi23)
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
@@ -301,11 +301,11 @@ def test_H_fO2_batch_H_mass(helper) -> None:
 def test_H_and_C(helper) -> None:
     """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
 
-    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi)
+    H2O_g: Species = Species.create_gas("H2O_g", solubility=H2O_peridotite_sossi23)
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
     CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g", solubility=CO2_basalt_dixon)
+    CO2_g: Species = Species.create_gas("CO2_g", solubility=CO2_basalt_dixon95)
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
     planet: Planet = Planet()

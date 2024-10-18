@@ -19,7 +19,7 @@
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
 import sys
-from typing import NamedTuple, Protocol
+from typing import NamedTuple
 
 import jax.numpy as jnp
 from jax import Array, jit
@@ -42,18 +42,6 @@ phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2, "alpha": 3, "beta": 4}
 """Mapping from the JANAF phase string to an integer code"""
 inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
 """Inverse mapping from the integer code to a JANAF phase string"""
-
-
-# For all activity models recall that the log_number_density argument is scaled
-class ActivityProtocol(Protocol):
-
-    def log_activity(
-        self,
-        log_number_density: ArrayLike,
-        species_index: Array,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-    ) -> ArrayLike: ...
 
 
 # TODO: First get buffer working, then can reimplement this if required.
@@ -80,33 +68,13 @@ class CondensateActivity(NamedTuple):
 
     def log_activity(
         self,
-        log_number_density: ArrayLike,
-        species_index: Array,
         temperature: ArrayLike,
         pressure: ArrayLike,
     ) -> ArrayLike:
-        del log_number_density
-        del species_index
         del temperature
         del pressure
 
         return jnp.log(self.activity)
-
-
-class IdealGasActivity(NamedTuple):
-    """Activity of an ideal gas"""
-
-    def log_activity(
-        self,
-        log_number_density: ArrayLike,
-        species_index: Array,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-    ) -> ArrayLike:
-        del temperature
-        del pressure
-
-        return jnp.take(log_number_density, species_index)
 
 
 class ThermoData(NamedTuple):
