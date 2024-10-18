@@ -43,6 +43,8 @@ from atmodeller.thermodata.gases import (
     NH3_g_thermodata,
     O2_g_thermodata,
     S2_g_thermodata,
+    SiH4_g_thermodata,
+    SiO_g_thermodata,
     SO2_g_thermodata,
     SO_g_thermodata,
 )
@@ -157,6 +159,12 @@ Si_l_data: SpeciesData = SpeciesData.create(
 )
 "Species data for Si_l"
 
+SiH4_g_data: SpeciesData = SpeciesData.create("SiH4", "g", SiH4_g_thermodata)
+"Species data for SiH4_g"
+
+SiO_g_data: SpeciesData = SpeciesData.create("SiO", "g", SiO_g_thermodata)
+"Species data for SiO_g"
+
 SiO2_l_data: SpeciesData = SpeciesData.create(
     "SiO2",
     "l",
@@ -191,6 +199,8 @@ species_data: dict[str, SpeciesData] = {
     "S2_g": S2_g_data,
     "Si_cr": Si_cr_data,
     "Si_l": Si_l_data,
+    "SiO_g": SiO_g_data,
+    "SiH4_g": SiH4_g_data,
     "SiO2_l": SiO2_l_data,
     "SO_g": SO_g_data,
     "SO2_g": SO2_g_data,

@@ -170,7 +170,6 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
             species, gas_species_indices, reaction_matrix, temperature, log_scaling
         )
         log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, pressures)
-        jax.debug.print("log_activity = {out}", out=log_activity)
         reaction_residual: Array = (
             reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
         )
@@ -267,6 +266,7 @@ def get_log_activity(
     )
 
     log_activity = jnp.where(mask, scaled_log_activity, log_activity)
+    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # def scale_entries(a: jnp.ndarray, b: jnp.ndarray, factor: float) -> jnp.ndarray:
     #    # Create a mask of the same shape as a, initialized to False

@@ -30,7 +30,8 @@ Usage:
     from atmodeller.solubility.library import get_solubility_models
     sol_models = get_solubility_models()
     H2O_peridotite = sol_models["H2O_peridotite_sossi23"]
-    concentration = H2O_peridotite.concentration(2000, 2)
+    # Evaluate solubility (concentration) at 2 bar fH2O and a temperatuer of 2000 K
+    concentration = H2O_peridotite.concentration(2, temperature=2000)
     print(concentration)
 """
 
