@@ -434,3 +434,18 @@ class PyTreeNoData:
         del aux_data
         del children
         return cls()
+
+
+@jit
+def power_law(values: ArrayLike, constant: float, exponent: float) -> Array:
+    """Power law
+
+    Args:
+        values: Values
+        constant: Constant for the power law
+        exponent: Exponent for the power law
+
+    Returns:
+        Evaluated power law
+    """
+    return constant * jnp.power(values, exponent)

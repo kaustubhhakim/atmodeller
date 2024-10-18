@@ -342,7 +342,9 @@ def element_density_in_melt(
     total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
     diatomic_oxygen_fugacity: Array = jnp.take(pressure, diatomic_oxygen_index)
 
-    solubility_funcs: list[Callable] = [species_.solubility.concentration for species_ in species]
+    solubility_funcs: list[Callable] = [
+        species_.solubility.jax_concentration for species_ in species
+    ]
 
     def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike):
         return lax.switch(

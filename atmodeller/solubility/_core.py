@@ -19,13 +19,15 @@
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
 import sys
+from abc import ABC, abstractmethod
 
 import jax.numpy as jnp
-from jax import Array, jit
+from jax import jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller.utilities import PyTreeNoData
+from atmodeller.interfaces import SolubilityProtocol
+from atmodeller.utilities import power_law
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -33,23 +35,39 @@ else:
     from typing import Self
 
 
-@jit
-def power_law(fugacity: ArrayLike, constant: float, exponent: float) -> Array:
-    """Power law
+class Solubility(ABC, SolubilityProtocol):
+    """Solubility interface
 
-    Args:
-        fugacity: Fugacity
-        constant: Constant for the power law
-        exponent: Exponent for the power law
-
-    Returns:
-        Evaluated power law
+    :meth:`~Solubility.jax_concentration` is defined in order to allow arguments to be passed by
+    position to lax.switch.
     """
-    return constant * jnp.power(fugacity, exponent)
+
+    @abstractmethod
+    def concentration(
+        self, fugacity: ArrayLike, *, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
+    ):
+        """Concentration in ppmw
+
+        Args:
+            fugacity: Fugacity in bar
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            fO2: fO2 in bar
+
+        Returns:
+            Concentration in ppmw
+        """
+
+    @jit
+    def jax_concentration(
+        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
+    ):
+        """Wrapper to pass concentration arguments by position to use with JAX lax.switch"""
+        return self.concentration(fugacity, temperature=temperature, pressure=pressure, fO2=fO2)
 
 
 @register_pytree_node_class
-class SolubilityPowerLaw:
+class SolubilityPowerLaw(Solubility):
     """A solubility power law
 
     Args:
@@ -66,18 +84,19 @@ class SolubilityPowerLaw:
         self.exponent: float = exponent
 
     @jit
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
+        del kwargs
+
+        return power_law(fugacity, self.constant, self.exponent)
+
+    @jit
+    def jax_concentration(
+        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> ArrayLike:
         del temperature
         del pressure
         del fO2
-
-        return power_law(fugacity, self.constant, self.exponent)
+        return self.concentration(fugacity)
 
     def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
         children: tuple = ()
@@ -91,7 +110,7 @@ class SolubilityPowerLaw:
 
 
 @register_pytree_node_class
-class SolubilityPowerLawLog10:
+class SolubilityPowerLawLog10(Solubility):
     """A solubility power law with log10 coefficients
 
     Args:
@@ -108,16 +127,8 @@ class SolubilityPowerLawLog10:
         self.log10_exponent: float = log10_exponent
 
     @jit
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
-    ) -> ArrayLike:
-        del temperature
-        del pressure
-        del fO2
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
+        del kwargs
 
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
 
@@ -130,24 +141,3 @@ class SolubilityPowerLawLog10:
     def tree_unflatten(cls, aux_data, children) -> Self:
         del children
         return cls(**aux_data)
-
-
-@register_pytree_node_class
-class NoSolubility(PyTreeNoData):
-    """No solubility"""
-
-    @jit
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
-    ) -> ArrayLike:
-        del fugacity
-        del temperature
-        del pressure
-        del fO2
-
-        # Must be 0.0 (float) for JAX array type compliance
-        return 0.0

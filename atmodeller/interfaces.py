@@ -43,10 +43,23 @@ class RealGasProtocol(ActivityProtocol, Protocol):
 
 
 class SolubilityProtocol(Protocol):
+    """Solubility protocol
+
+    :meth:`~SolubilityProtocol.jax_concentration` is defined in order to allow arguments to be
+    passed by position to lax.switch.
+
+    """
+
     def concentration(
         self,
         fugacity: ArrayLike,
+        *,
         temperature: ArrayLike,
         pressure: ArrayLike,
         fO2: ArrayLike,
     ) -> ArrayLike: ...
+
+    # Want to used fO2 so pylint: disable=invalid-name
+    def jax_concentration(
+        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
+    ): ...

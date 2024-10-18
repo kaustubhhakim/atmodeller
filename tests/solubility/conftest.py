@@ -50,7 +50,7 @@ class CheckValues:
         fO2: ArrayLike,
     ) -> None:
         concentration: ArrayLike = solubility_model.concentration(
-            fugacity, temperature, pressure, fO2
+            fugacity, temperature=temperature, pressure=pressure, fO2=fO2
         )
         logger.debug("%s, concentration = %s ppmw", function_name, concentration)
 

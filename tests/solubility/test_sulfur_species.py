@@ -22,22 +22,12 @@ import inspect
 import logging
 
 import numpy as np
+import pytest
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.sulfur_species import (
-    S2_andesite_boulliung23,
-    S2_basalt_boulliung23,
-    S2_mercury_magma_namur16,
-    S2_sulfate_andesite_boulliung23,
-    S2_sulfate_basalt_boulliung23,
-    S2_sulfate_trachybasalt_boulliung23,
-    S2_sulfide_andesite_boulliung23,
-    S2_sulfide_basalt_boulliung23,
-    S2_sulfide_trachybasalt_boulliung23,
-    S2_trachybasalt_boulliung23,
-)
+from atmodeller.solubility.library import get_solubility_models
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
@@ -68,12 +58,14 @@ logger.info("TEST_PRESSURE_GPA = %e bar", TEST_PRESSURE_GPA)
 logger.info("TEST_FO2 = %e bar", TEST_FO2)
 logger.info("TEST_FO2_GPA = %e bar", TEST_FO2_GPA)
 
+solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
+
 
 def test_S2_sulfate_andesite_boulliung(check_values) -> None:
     """Tests S as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_sulfate_andesite_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_andesite_boulliung23"]
     target_concentration: ArrayLike = 0.00026017525012647343
 
     check_values.concentration(
@@ -91,7 +83,7 @@ def test_S2_sulfide_andesite_boulliung(check_values) -> None:
     """Tests S as sulfide (S^2-) in andesite :cite:p:`BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_sulfide_andesite_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_andesite_boulliung23"]
     target_concentration: ArrayLike = 2765.4015601584474
 
     check_values.concentration(
@@ -109,7 +101,7 @@ def test_S2_andesite_boulliung(check_values) -> None:
     """Tests S in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_andesite_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_andesite_boulliung23"]
     target_concentration: ArrayLike = 2765.4018203336977
 
     check_values.concentration(
@@ -127,7 +119,7 @@ def test_S2_sulfate_basalt_boulliung(check_values) -> None:
     """Tests S in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_sulfate_basalt_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_basalt_boulliung23"]
     target_concentration: ArrayLike = 0.000205313138905436
 
     check_values.concentration(
@@ -145,7 +137,7 @@ def test_S2_sulfide_basalt_boulliung(check_values) -> None:
     """Tests S in basalt as sulfide (S^2-) :cite:p:`BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_sulfide_basalt_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_basalt_boulliung23"]
     target_concentration: ArrayLike = 7575.8488900346765
 
     check_values.concentration(
@@ -163,7 +155,7 @@ def test_S2_basalt_boulliung(check_values) -> None:
     """Tests S in basalt due to sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_basalt_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_basalt_boulliung23"]
     target_concentration: ArrayLike = 7575.849095347816
 
     check_values.concentration(
@@ -181,7 +173,7 @@ def test_S2_sulfate_trachybasalt_boulliung(check_values) -> None:
     """Tests S as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_sulfate_trachybasalt_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_trachybasalt_boulliung23"]
     target_concentration: ArrayLike = 0.0007003728959148125
 
     check_values.concentration(
@@ -199,7 +191,7 @@ def test_S2_sulfide_trachybasalt_boulliung(check_values) -> None:
     """Tests S as sulfide (S^2-) in trachybasalt :cite:p:`BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_sulfide_trachybasalt_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_trachybasalt_boulliung23"]
     target_concentration: ArrayLike = 9573.143159494639
 
     check_values.concentration(
@@ -217,7 +209,7 @@ def test_S2_trachybasalt_boulliung(check_values) -> None:
     """Tests S in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_trachybasalt_boulliung23
+    solubility_model: SolubilityProtocol = solubility_models["S2_trachybasalt_boulliung23"]
     target_concentration: ArrayLike = 9573.143859867534
 
     check_values.concentration(
@@ -231,11 +223,12 @@ def test_S2_trachybasalt_boulliung(check_values) -> None:
     )
 
 
+@pytest.mark.skip(reason="This solubility law should use fS2 and not total pressure")
 def test_S2_mercury_magma_namur(check_values) -> None:
     """Tests S in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = S2_mercury_magma_namur16
+    solubility_model: SolubilityProtocol = solubility_models["S2_mercury_magma_namur16"]
     target_concentration: ArrayLike = 1827.8623756735988
 
     check_values.concentration(

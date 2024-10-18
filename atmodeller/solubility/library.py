@@ -14,17 +14,40 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Solubility library built from the concrete classes"""
+"""Solubility library public API
+
+This module provides the public API for the solubility library. It includes concrete classes and 
+functions that users can utilize to perform solubility calculations. For internal details and 
+implementation specifics, refer to the internal modules.
+
+Classes:
+    NoSolubility: Class for no solubility
+
+Functions:
+    get_solubility_models: Function to get solubility models
+    
+Usage:
+    from atmodeller.solubility.library import get_solubility_models
+    sol_models = get_solubility_models()
+    H2O_peridotite = sol_models["H2O_peridotite_sossi23"]
+    concentration = H2O_peridotite.concentration(2000, 2)
+    print(concentration)
+"""
+
+from jax import jit
+from jax.tree_util import register_pytree_node_class
+from jax.typing import ArrayLike
 
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.carbon_species import (
+from atmodeller.solubility._carbon_species import (
     CH4_basalt_ardia13,
     CO2_basalt_dixon95,
     CO_basalt_armstrong15,
     CO_basalt_yoshioka19,
     CO_rhyolite_yoshioka19,
 )
-from atmodeller.solubility.hydrogen_species import (
+from atmodeller.solubility._core import Solubility
+from atmodeller.solubility._hydrogen_species import (
     H2_andesite_hirschmann12,
     H2_basalt_hirschmann12,
     H2_silicic_melts_gaillard03,
@@ -35,7 +58,7 @@ from atmodeller.solubility.hydrogen_species import (
     H2O_lunar_glass_newcombe17,
     H2O_peridotite_sossi23,
 )
-from atmodeller.solubility.other_species import (
+from atmodeller.solubility._other_species import (
     Cl2_ano_dio_for_thomas21,
     Cl2_basalt_thomas21,
     He_basalt_jambon86,
@@ -43,7 +66,7 @@ from atmodeller.solubility.other_species import (
     N2_basalt_dasgupta22,
     N2_basalt_libourel03,
 )
-from atmodeller.solubility.sulfur_species import (
+from atmodeller.solubility._sulfur_species import (
     S2_andesite_boulliung23,
     S2_basalt_boulliung23,
     S2_sulfate_andesite_boulliung23,
@@ -54,6 +77,28 @@ from atmodeller.solubility.sulfur_species import (
     S2_sulfide_trachybasalt_boulliung23,
     S2_trachybasalt_boulliung23,
 )
+from atmodeller.utilities import PyTreeNoData
+
+
+@register_pytree_node_class
+class NoSolubility(PyTreeNoData, Solubility):
+    """No solubility"""
+
+    @jit
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,  # Convenient to use fO2 so pylint: disable=invalid-name
+    ) -> ArrayLike:
+        del fugacity
+        del temperature
+        del pressure
+        del fO2
+
+        # Must be 0.0 (float) for JAX array type compliance
+        return 0.0
 
 
 def get_solubility_models() -> dict[str, SolubilityProtocol]:
@@ -66,7 +111,7 @@ def get_solubility_models() -> dict[str, SolubilityProtocol]:
 
     # Carbon species
     models["CH4_basalt_ardia13"] = CH4_basalt_ardia13
-    models["CO2_basalt_dixon"] = CO2_basalt_dixon95
+    models["CO2_basalt_dixon95"] = CO2_basalt_dixon95
     models["CO_basalt_armstrong15"] = CO_basalt_armstrong15
     models["CO_basalt_yoshioka19"] = CO_basalt_yoshioka19
     models["CO_rhyolite_yoshioka19"] = CO_rhyolite_yoshioka19
@@ -103,4 +148,10 @@ def get_solubility_models() -> dict[str, SolubilityProtocol]:
     models["N2_basalt_dasgupta22"] = N2_basalt_dasgupta22
     models["N2_basalt_libourel03"] = N2_basalt_libourel03
 
-    return models
+    # Sort the dictionary by keys
+    sorted_models = {k: models[k] for k in sorted(models)}
+
+    # For completeness add the no solubility model at the end of the dictionary
+    sorted_models["NO_SOLUBILITY"] = NoSolubility()
+
+    return sorted_models

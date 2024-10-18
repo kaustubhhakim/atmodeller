@@ -47,7 +47,7 @@ from atmodeller import (
 )
 from atmodeller.eos.classes import IdealGas
 from atmodeller.interfaces import ActivityProtocol, SolubilityProtocol
-from atmodeller.solubility.core import NoSolubility
+from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata.core import CondensateActivity, SpeciesData
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.thermodata.species_data import get_species_data

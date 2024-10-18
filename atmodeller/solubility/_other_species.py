@@ -30,8 +30,13 @@ from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.core import PyTreeNoData, SolubilityPowerLaw, power_law
-from atmodeller.utilities import unit_conversion
+from atmodeller.solubility._core import Solubility, SolubilityPowerLaw, power_law
+from atmodeller.utilities import PyTreeNoData, unit_conversion
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -74,7 +79,7 @@ units to mol/g*bar.
 
 
 @register_pytree_node_class
-class _N2_basalt_bernadou21(PyTreeNoData):
+class _N2_basalt_bernadou21(PyTreeNoData, Solubility):
     """N2 in basaltic silicate melt :cite:p:`BGF21`
 
     :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -84,10 +89,12 @@ class _N2_basalt_bernadou21(PyTreeNoData):
     concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solubility law.
     """
 
+    @override
     @jit
     def concentration(
         self,
         fugacity: ArrayLike,
+        *,
         temperature: ArrayLike,
         pressure: ArrayLike,
         fO2: ArrayLike,
@@ -110,7 +117,7 @@ N2_basalt_bernadou21: SolubilityProtocol = _N2_basalt_bernadou21()
 
 
 @register_pytree_node_class
-class _N2_basalt_dasgupta22:
+class _N2_basalt_dasgupta22(Solubility):
     """N2 in silicate melts :cite:p:`DFP22`
 
     Using :cite:t:`DFP22{Equation 10}`, composition parameters from :cite:t:`DFP22{Figure 8}`, and
@@ -136,10 +143,12 @@ class _N2_basalt_dasgupta22:
         self.xal2o3: float = xal2o3
         self.xtio2: float = xtio2
 
+    @override
     @jit
     def concentration(
         self,
         fugacity: ArrayLike,
+        *,
         temperature: ArrayLike,
         pressure: ArrayLike,
         fO2: ArrayLike,
@@ -187,7 +196,7 @@ concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solub
 
 
 @register_pytree_node_class
-class _N2_basalt_libourel03(PyTreeNoData):
+class _N2_basalt_libourel03(PyTreeNoData, Solubility):
     """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
     :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
@@ -195,16 +204,10 @@ class _N2_basalt_libourel03(PyTreeNoData):
     and N2 gases.
     """
 
+    @override
     @jit
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
-    ) -> Array:
-        del temperature
-        del pressure
+    def concentration(self, fugacity: ArrayLike, *, fO2: ArrayLike, **kwargs) -> Array:
+        del kwargs
         ppmw: Array = power_law(fugacity, 0.0611, 1)
         constant: Array = power_law(fO2, 5.97e-10, -0.75)
         ppmw2: Array = power_law(fugacity, constant, 0.5)
