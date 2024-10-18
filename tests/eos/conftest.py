@@ -68,6 +68,25 @@ class CheckValues:
         assert compressibility == approx(expected, rtol, atol)
 
     @staticmethod
+    def fugacity(
+        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
+    ) -> None:
+        """Checks the fugacity.
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure
+            fugacity_model: Fugacity model
+            expected: The expected value
+            rtol: Relative tolerance
+            atol: Absolute tolerance
+        """
+
+        fugacity: ArrayLike = eos.fugacity(temperature, pressure)
+
+        assert fugacity == approx(expected, rtol, atol)
+
+    @staticmethod
     def fugacity_coefficient(
         temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
     ) -> None:
