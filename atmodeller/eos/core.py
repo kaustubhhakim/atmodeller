@@ -241,45 +241,6 @@ class RealGas(ABC, RealGasProtocol):
 
 
 # @dataclass(kw_only=True)
-# class IdealGas(RealGas):
-#     r"""An ideal gas equation of state:
-
-#     .. math::
-
-#         R T = P V
-
-#     where :math:`R` is the gas constant, :math:`T` is temperature, :math:`P` is pressure, and
-#     :math:`V` is volume.
-
-#     Args:
-#         calibration: Calibration temperature and pressure range. Defaults to empty.
-#     """
-
-#     @override
-#     def fugacity_coefficient(self, *args, **kwargs) -> Array:
-#         """Fugacity coefficient
-
-#         Since we know that the fugacity coefficient of an ideal gas is unity by definition we
-#         simply impose it here to pass a constant to the solver. This seems to avoid some NaN
-#         crashes with the Optimistix solver.
-#         """
-#         del args
-#         del kwargs
-#         return jnp.array(1)
-
-#     @override
-#     def volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
-#         return self.ideal_volume(temperature, pressure)
-
-#     @override
-#     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-#         volume_integral: Array = GAS_CONSTANT_BAR * temperature * jnp.log(pressure)
-#         volume_integral = volume_integral * unit_conversion.m3_bar_to_J
-
-#         return volume_integral
-
-
-# @dataclass(kw_only=True)
 # class ModifiedRedlichKwongABC(RealGas):
 #     r"""A Modified Redlich Kwong (MRK) equation of state :cite:p:`{e.g.}HP91{Equation 3}`:
 
