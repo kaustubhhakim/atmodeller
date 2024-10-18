@@ -1,0 +1,120 @@
+#
+# Copyright 2024 Dan J. Bower
+#
+# This file is part of Atmodeller.
+#
+# Atmodeller is free software: you can redistribute it and/or modify it under the terms of the GNU
+# General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# Atmodeller is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with Atmodeller. If not,
+# see <https://www.gnu.org/licenses/>.
+#
+"""Real gas EOS library"""
+
+import logging
+from typing import Callable
+
+from atmodeller import ATMOSPHERE
+from atmodeller.eos.core import RealGasProtocol
+from atmodeller.eos.real_gas_eos import BeattieBridgeman
+from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
+
+logger: logging.Logger = logging.getLogger(__name__)
+
+# region: Holley et al. (1958)
+
+# Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure
+# in bar). Using the original values in the paper also facilitates visual comparison and checking.
+
+volume_conversion: Callable = lambda x: x * unit_conversion.litre_to_m3
+# Converts PV**2 coefficient to be in terms of m^3 and bar
+A0_conversion: Callable = lambda x: x * ATMOSPHERE * unit_conversion.litre_to_m3**2
+
+H2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
+    A0=A0_conversion(0.1975),
+    a=volume_conversion(-0.00506),
+    B0=volume_conversion(0.02096),
+    b=volume_conversion(-0.04359),
+    c=volume_conversion(0.0504e4),
+    calibration=ExperimentalCalibrationNew(100, 1000, 0.1, 1000),
+)
+"""H2 Beattie-Bridgeman :cite:p:`HWZ58`"""
+N2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
+    A0=A0_conversion(1.3445),
+    a=volume_conversion(0.02617),
+    B0=volume_conversion(0.05046),
+    b=volume_conversion(-0.00691),
+    c=volume_conversion(4.2e4),
+    calibration=ExperimentalCalibrationNew(200, 1000, 0.1, 1000),
+)
+"""N2 Beattie-Bridgeman :cite:p:`HWZ58`"""
+O2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
+    A0=A0_conversion(1.4911),
+    a=volume_conversion(0.02562),
+    B0=volume_conversion(0.04624),
+    b=volume_conversion(0.004208),
+    c=volume_conversion(4.8e4),
+    calibration=ExperimentalCalibrationNew(200, 1000, 0.1, 1000),
+)
+"""O2 Beattie-Bridgeman :cite:p:`HWZ58`"""
+CO2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
+    A0=A0_conversion(5.0065),
+    a=volume_conversion(0.07132),
+    B0=volume_conversion(0.10476),
+    b=volume_conversion(0.07235),
+    c=volume_conversion(66e4),
+    calibration=ExperimentalCalibrationNew(400, 1000, 0.1, 1000),
+)
+"""CO2 Beattie-Bridgeman :cite:p:`HWZ58`"""
+NH3_beattie_holley58: RealGasProtocol = BeattieBridgeman(
+    A0=A0_conversion(2.3930),
+    a=volume_conversion(0.17031),
+    B0=volume_conversion(0.03415),
+    b=volume_conversion(0.19112),
+    c=volume_conversion(476.87e4),
+    calibration=ExperimentalCalibrationNew(500, 1000, 0.1, 500),
+)
+"""NH3 Beattie-Bridgeman :cite:p:`HWZ58`"""
+CH4_beattie_holley58: RealGasProtocol = BeattieBridgeman(
+    A0=A0_conversion(2.2769),
+    a=volume_conversion(0.01855),
+    B0=volume_conversion(0.05587),
+    b=volume_conversion(-0.01587),
+    c=volume_conversion(12.83e4),
+    calibration=ExperimentalCalibrationNew(200, 1000, 0.1, 1000),
+)
+"""CH4 Beattie-Bridgeman :cite:p:`HWZ58`"""
+He_beattie_holley58: RealGasProtocol = BeattieBridgeman(
+    A0=A0_conversion(0.0216),
+    a=volume_conversion(0.05984),
+    B0=volume_conversion(0.01400),
+    b=0,
+    c=volume_conversion(0.004e4),
+    calibration=ExperimentalCalibrationNew(100, 1000, 0.1, 1000),
+)
+"""He Beattie-Bridgeman :cite:p:`HWZ58`"""
+
+# endregion
+
+
+def get_eos_models() -> dict[str, RealGasProtocol]:
+    """Gets a dictionary of EOS models for each species.
+
+    Returns:
+        Dictionary of EOS models for each species
+    """
+    models: dict[str, RealGasProtocol] = {}
+    models["CH4_beattie_holley58"] = CH4_beattie_holley58
+    models["CO2_beattie_holley58"] = CO2_beattie_holley58
+    models["H2_beattie_holley58"] = H2_beattie_holley58
+    models["He_beattie_holley58"] = He_beattie_holley58
+    models["N2_beattie_holley58"] = N2_beattie_holley58
+    models["NH3_beattie_holley58"] = NH3_beattie_holley58
+    models["O2_beattie_holley58"] = O2_beattie_holley58
+
+    return models

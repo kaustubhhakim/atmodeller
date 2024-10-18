@@ -14,27 +14,10 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOSs from :cite:t:`HWZ58`
+"""Real gas equations of state"""
 
-Examples:
-    Get the preferred EOS models for various species from the Holley models::
-    
-        from atmodeller.eos.holley import get_holley_eos_models
-        models = get_holley_eos_models()
-        # List the available species
-        models.keys()
-        # Get the EOS model for He
-        he_model = models['He']
-        # Determine the fugacity coefficient at 1000 K and 100 bar
-        fugacity_coefficient = he_model.fugacity_coefficient(temperature=1000, pressure=100)
-        print(fugacity_coefficient)
-"""
-
-# Use symbols from the paper for consistency so pylint: disable=invalid-name
-
-import logging
 import sys
-from typing import Any, Callable
+from typing import Any
 
 import jax.numpy as jnp
 import optimistix as optx
@@ -42,9 +25,9 @@ from jax import Array, jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller import ATMOSPHERE, GAS_CONSTANT_BAR
-from atmodeller.eos.core import RealGas, RealGasProtocol
-from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
+from atmodeller import GAS_CONSTANT_BAR
+from atmodeller.eos.core import RealGas
+from atmodeller.utilities import ExperimentalCalibrationNew
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -55,8 +38,6 @@ if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 @register_pytree_node_class
@@ -85,6 +66,7 @@ class BeattieBridgeman(RealGas):
         calibration: Experimental calibration. Defaults to empty.
     """
 
+    # Convenient to use symbols from the paper so pylint: disable=invalid-name
     def __init__(
         self,
         A0: float,
@@ -100,6 +82,8 @@ class BeattieBridgeman(RealGas):
         self.b: float = b
         self.c: float = c
         self._calibration: ExperimentalCalibrationNew = calibration
+
+    # pylint: enable=invalid-name
 
     @jit
     def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
@@ -235,94 +219,3 @@ class BeattieBridgeman(RealGas):
     def tree_unflatten(cls, aux_data, children) -> Self:
         del children
         return cls(**aux_data)
-
-
-# Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure
-# in bar). Using the original table values below allows easy visual comparison and ensures that
-# the class does not have to deal with unit conversions.
-
-volume_conversion: Callable = lambda x: x * unit_conversion.litre_to_m3
-# Converts PV**2 coefficient to be in terms of m^3 and bar
-A0_conversion: Callable = lambda x: x * ATMOSPHERE * unit_conversion.litre_to_m3**2
-
-H2_Beattie_holley: RealGasProtocol = BeattieBridgeman(
-    A0=A0_conversion(0.1975),
-    a=volume_conversion(-0.00506),
-    B0=volume_conversion(0.02096),
-    b=volume_conversion(-0.04359),
-    c=volume_conversion(0.0504e4),
-    calibration=ExperimentalCalibrationNew(100, 1000, 0.1, 1000),
-)
-"""H2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-N2_Beattie_holley: RealGasProtocol = BeattieBridgeman(
-    A0=A0_conversion(1.3445),
-    a=volume_conversion(0.02617),
-    B0=volume_conversion(0.05046),
-    b=volume_conversion(-0.00691),
-    c=volume_conversion(4.2e4),
-    calibration=ExperimentalCalibrationNew(200, 1000, 0.1, 1000),
-)
-"""N2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-O2_Beattie_holley: RealGasProtocol = BeattieBridgeman(
-    A0=A0_conversion(1.4911),
-    a=volume_conversion(0.02562),
-    B0=volume_conversion(0.04624),
-    b=volume_conversion(0.004208),
-    c=volume_conversion(4.8e4),
-    calibration=ExperimentalCalibrationNew(200, 1000, 0.1, 1000),
-)
-"""O2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-CO2_Beattie_holley: RealGasProtocol = BeattieBridgeman(
-    A0=A0_conversion(5.0065),
-    a=volume_conversion(0.07132),
-    B0=volume_conversion(0.10476),
-    b=volume_conversion(0.07235),
-    c=volume_conversion(66e4),
-    calibration=ExperimentalCalibrationNew(400, 1000, 0.1, 1000),
-)
-"""CO2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-NH3_Beattie_holley: RealGasProtocol = BeattieBridgeman(
-    A0=A0_conversion(2.3930),
-    a=volume_conversion(0.17031),
-    B0=volume_conversion(0.03415),
-    b=volume_conversion(0.19112),
-    c=volume_conversion(476.87e4),
-    calibration=ExperimentalCalibrationNew(500, 1000, 0.1, 500),
-)
-"""NH3 Beattie-Bridgeman :cite:p:`HWZ58`"""
-CH4_Beattie_holley: RealGasProtocol = BeattieBridgeman(
-    A0=A0_conversion(2.2769),
-    a=volume_conversion(0.01855),
-    B0=volume_conversion(0.05587),
-    b=volume_conversion(-0.01587),
-    c=volume_conversion(12.83e4),
-    calibration=ExperimentalCalibrationNew(200, 1000, 0.1, 1000),
-)
-"""CH4 Beattie-Bridgeman :cite:p:`HWZ58`"""
-He_Beattie_holley: RealGasProtocol = BeattieBridgeman(
-    A0=A0_conversion(0.0216),
-    a=volume_conversion(0.05984),
-    B0=volume_conversion(0.01400),
-    b=0,
-    c=volume_conversion(0.004e4),
-    calibration=ExperimentalCalibrationNew(100, 1000, 0.1, 1000),
-)
-"""He Beattie-Bridgeman :cite:p:`HWZ58`"""
-
-
-def get_holley_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of the preferred Holley EOS models for each species.
-
-    Returns:
-        Dictionary of EOS models for each species
-    """
-    models: dict[str, RealGasProtocol] = {}
-    models["CH4"] = CH4_Beattie_holley
-    models["CO2"] = CO2_Beattie_holley
-    models["H2"] = H2_Beattie_holley
-    models["He"] = He_Beattie_holley
-    models["N2"] = N2_Beattie_holley
-    models["NH3"] = NH3_Beattie_holley
-    models["O2"] = O2_Beattie_holley
-
-    return models

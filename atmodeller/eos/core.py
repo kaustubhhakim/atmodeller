@@ -18,17 +18,17 @@
 
 # Use symbols from the relevant papers for consistency so pylint: disable=C0103
 
-from __future__ import annotations
-
 import logging
 import sys
 from abc import ABC, abstractmethod
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+import optimistix as optx
 from jax import Array, jit, lax
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
 
@@ -45,7 +45,14 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
+
 logger: logging.Logger = logging.getLogger(__name__)
+
+# region: Interfaces
 
 
 # TODO: This might be consolidated with RedoxBufferProtocol or ActivityProtocol
@@ -58,8 +65,6 @@ class RealGasProtocol(Protocol):
     def calibration(self) -> ExperimentalCalibrationNew: ...
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
-
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
 class RealGas(ABC, RealGasProtocol):
@@ -87,36 +92,20 @@ class RealGas(ABC, RealGasProtocol):
         """Log fugacity
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Log fugacity
+            Log fugacity in bar
         """
-
-    #     def ln_fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
-    #         """Natural log of the fugacity
-
-    #         Args:
-    #             temperature: Temperature in K
-    #             pressure: Pressure in bar
-
-    #         Returns:
-    #             Natural log of the fugacity
-    #         """
-    #         ln_fugacity: ArrayLike = self.volume_integral(temperature, pressure) / (
-    #             GAS_CONSTANT * temperature
-    #         )
-
-    #         return ln_fugacity
 
     @abstractmethod
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
@@ -127,8 +116,8 @@ class RealGas(ABC, RealGasProtocol):
         """Compressibility parameter
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             The compressibility parameter, which is dimensionless
@@ -144,11 +133,11 @@ class RealGas(ABC, RealGasProtocol):
         """Fugacity
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Fugacity
+            Fugacity in bar
         """
         fugacity: Array = jnp.exp(self.log_fugacity(temperature, pressure))
 
@@ -163,7 +152,7 @@ class RealGas(ABC, RealGasProtocol):
             pressure: Pressure
 
         Returns:
-            Log of the fugacity coefficient
+            Log of the fugacity coefficient, which is dimensionless
         """
         return -jnp.log(pressure) + self.log_fugacity(temperature, pressure)
 
@@ -184,6 +173,8 @@ class RealGas(ABC, RealGasProtocol):
     def ideal_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Ideal volume
 
+        This is required to compute the compressibility parameter.
+
         Args:
             temperature: Temperature
             pressure: Pressure
@@ -196,33 +187,12 @@ class RealGas(ABC, RealGasProtocol):
         return ideal_volume
 
 
-#     @abstractmethod
-#     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-#         r"""Volume integral
+# endregion
 
-#         .. math::
+# region: Real gas equations of state
 
-#             \int V dP
 
-#         This method requires that the units returned are :math:`\mathrm{J}\mathrm{mol}^{-1}`. Hence
-#         the following conversion is often necessary:
-
-#         .. math::
-
-#             1\ \mathrm{J} = 10^{-5}\ \mathrm{m}^3\mathrm{bar}
-
-#         There are functions to do this conversion in :class:`atmodeller.utilities.UnitConversion`.
-
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-#         """
-
-#     def __repr__(self) -> str:
-#         return f"{self.__class__.__name__}"
+# endregion
 
 
 # @dataclass(kw_only=True)

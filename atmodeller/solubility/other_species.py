@@ -96,9 +96,11 @@ class _N2_basalt_bernadou(PyTreeNoData):
         pressure: ArrayLike,
         fO2: ArrayLike,
     ) -> Array:
+        # TODO: Should this be GAS_CONSTANT or GAS_CONSTANT_BAR?
         k13: Array = jnp.exp(
             -(29344 + 121 * temperature + 4 * pressure) / (GAS_CONSTANT * temperature)
         )
+        # TODO: Should this be GAS_CONSTANT or GAS_CONSTANT_BAR?
         k14: Array = jnp.exp(
             -(183733 + 172 * temperature - 5 * pressure) / (GAS_CONSTANT * temperature)
         )
