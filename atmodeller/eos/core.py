@@ -117,8 +117,8 @@ class RealGas(ABC, RealGasProtocol):
         return self.log_fugacity(temperature, pressure)
 
     @jit
-    def compressibility_parameter(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        """Compressibility parameter
+    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Compressibility factor
 
         Args:
             temperature: Temperature in K
@@ -129,9 +129,9 @@ class RealGas(ABC, RealGasProtocol):
         """
         volume: ArrayLike = self.volume(temperature, pressure)
         volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
-        compressibility_parameter: ArrayLike = volume / volume_ideal
+        compressibility_factor: ArrayLike = volume / volume_ideal
 
-        return compressibility_parameter
+        return compressibility_factor
 
     @jit
     def fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:

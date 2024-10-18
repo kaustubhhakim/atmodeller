@@ -20,7 +20,7 @@ import pytest
 from jax.typing import ArrayLike
 from pytest import approx
 
-from atmodeller.eos.interfaces import RealGas
+from atmodeller.eos.core import RealGas
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import RealGasProtocol
 
@@ -63,7 +63,7 @@ class CheckValues:
             rtol: Relative tolerance
             atol: Absolute tolerance
         """
-        compressibility: ArrayLike = eos.compressibility_parameter(temperature, pressure)
+        compressibility: ArrayLike = eos.compressibility_factor(temperature, pressure)
 
         assert compressibility == approx(expected, rtol, atol)
 

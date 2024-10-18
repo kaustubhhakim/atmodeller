@@ -213,7 +213,7 @@ class RealGas(ABC):
     )
     """Calibration range of the temperature and pressure"""
 
-    def compressibility_parameter(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
+    def compressibility_factor(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Compressibility parameter
 
         Args:
