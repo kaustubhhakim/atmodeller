@@ -22,6 +22,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 import optimistix as optx
 import pandas as pd
@@ -124,8 +125,10 @@ class BeattieBridgeman(RealGas):
     # pylint: enable=invalid-name
 
     @jit
-    def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
-        r"""Objective function to solve for the volume :cite:p:`HWZ58{Equation 2}`
+    def _objective_function(
+        self, compressibility_factor: ArrayLike, kwargs: dict[str, ArrayLike]
+    ) -> Array:
+        r"""Objective function to solve for the compressibility factor :cite:p:`HWZ58{Equation 2}`
 
         .. math::
 
@@ -133,7 +136,7 @@ class BeattieBridgeman(RealGas):
             +\left(RTbB_0+\frac{RcB_0}{T^2}-aA_0\right)V - \frac{RcbB_0}{T^2}=0
 
         Args:
-            volume: Volume
+            compressibility_factor: Compressibility factor
             kwargs: Dictionary with other required parameters
 
         Returns:
@@ -141,6 +144,7 @@ class BeattieBridgeman(RealGas):
         """
         temperature: ArrayLike = kwargs["temperature"]
         pressure: ArrayLike = kwargs["pressure"]
+        volume: Array = compressibility_factor * self.ideal_volume(temperature, pressure)
 
         coeff0: Array = 1 / jnp.square(temperature) * -GAS_CONSTANT_BAR * self.c * self.b * self.B0
         coeff1: Array = (
@@ -181,6 +185,15 @@ class BeattieBridgeman(RealGas):
         Returns:
             Log fugacity
         """
+        # Constrain calculation of fugacity within the calibrated range since outside this range
+        # the function could behave non-physically and/or cause problems for the solver.
+        pressure = jnp.clip(pressure, self.calibration.pressure_min, self.calibration.pressure_max)
+        temperature = jnp.clip(
+            temperature, self.calibration.temperature_min, self.calibration.temperature_max
+        )
+        # jax.debug.print("temperature (possibly clipped) = {out}", out=temperature)
+        # jax.debug.print("pressure (possibly clipped) = {out}", out=pressure)
+
         volume: ArrayLike = self.volume(temperature, pressure)
         log_fugacity: Array = (
             jnp.log(GAS_CONSTANT_BAR * temperature / volume)
@@ -193,7 +206,7 @@ class BeattieBridgeman(RealGas):
             / volume
             - (
                 self.b * self.B0
-                + self.c * self.B0 / temperature**3
+                + self.c * self.B0 / jnp.power(temperature, 3)
                 - self.a * self.A0 / (GAS_CONSTANT_BAR * temperature)
             )
             * 3
@@ -221,23 +234,19 @@ class BeattieBridgeman(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        # Start with a large initial guess, say some factor of the ideal gas volume, to guide the
-        # Newton solver to the largest root, which agrees with the tabulated data in the paper.
-        # The choice of 10 below is somewhat arbitrary, but based on the calibration data for the
-        # Holley model should be comfortably larger than the actual volume.
-        scaling_factor: float = 10
-        initial_volume = scaling_factor * self.ideal_volume(temperature, pressure)
-
+        # Based on the tabulated data, most compressibility factors are around unity
+        initial_compressibility_factor: float = 1.0
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         solver = optx.Newton(rtol=1.0e-8, atol=1.0e-8)
         sol = optx.root_find(
             self._objective_function,
             solver,
-            initial_volume,
+            initial_compressibility_factor,
             args=kwargs,
         )
-        volume: ArrayLike = sol.value
+        volume: ArrayLike = sol.value * self.ideal_volume(temperature, pressure)
+        # jax.debug.print("volume = {out}", out=volume)
 
         return volume
 
@@ -279,7 +288,7 @@ class Chabrier(RealGas):
         self.filename: Path = filename
         self.species_name: str = species_name
         # For self-consistency this should be the same as Pref in atmodeller.thermodata.core
-        self._standard_state_pressure: float = 1
+        self._standard_state_pressure: float = 1.0
         self._log10_density_func: RegularGridInterpolator = self._get_spline()
         self._molar_mass_g_mol: float = Formula(species_name).mass
 
@@ -334,13 +343,19 @@ class Chabrier(RealGas):
     @override
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        jax.debug.print("temperature_in = {out}", out=temperature)
+        jax.debug.print("pressure_in = {out}", out=pressure)
         # Pressure range to integrate over
         pressures: Array = jnp.logspace(
             jnp.log10(self._standard_state_pressure), jnp.log10(pressure), num=1000
         )
+        jax.debug.print("pressures = {out}", out=pressures)
         temperatures: Array = jnp.full_like(pressures, temperature)
+        jax.debug.print("temperatures = {out}", out=temperatures)
         volumes: Array = self.volume(temperatures, pressures)
+        jax.debug.print("volumes = {out}", out=volumes)
         volume_integral: Array = trapezoid(volumes, pressures)
+        jax.debug.print("volume_integral = {out}", out=volume_integral)
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
         return log_fugacity
