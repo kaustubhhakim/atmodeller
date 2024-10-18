@@ -56,6 +56,19 @@ def test_H2_high(check_values) -> None:
     )
 
 
+def test_H2_high_fugacity(check_values) -> None:
+    """Tests that a fugacity can be calculated"""
+    pressure: float = 1000 * unit_conversion.atmosphere_to_bar
+    check_values.fugacity(
+        1000,
+        pressure,
+        check_values.get_eos_model("H2", MODEL_SUFFIX),
+        1301.672235770893,
+        rtol=RTOL,
+        atol=ATOL,
+    )
+
+
 def test_N2_low(check_values) -> None:
     """:cite:t:`HWZ58{Table III}`"""
     pressure: float = 100 * unit_conversion.atmosphere_to_bar
