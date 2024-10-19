@@ -164,7 +164,7 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
         return d
 
     @override
-    def compressibility_parameter(self, temperature: float, pressure: ArrayLike) -> Array:
+    def compressibility_factor(self, temperature: float, pressure: ArrayLike) -> Array:
         """Compressibility parameter :cite:p:`SS92{Equation 2}`
 
         This overrides the base class because the compressibility factor is used to determine the
@@ -195,7 +195,7 @@ class SaxenaABC(CorrespondingStatesMixin, RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
-        Z: Array = self.compressibility_parameter(temperature, pressure)
+        Z: Array = self.compressibility_factor(temperature, pressure)
         volume: Array = Z * self.ideal_volume(temperature, pressure)
 
         return volume

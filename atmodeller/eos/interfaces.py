@@ -225,9 +225,9 @@ class RealGas(ABC):
         """
         volume: ArrayLike = self.volume(temperature, pressure)
         volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
-        compressibility_parameter: ArrayLike = volume / volume_ideal
+        compressibility_factor: ArrayLike = volume / volume_ideal
 
-        return compressibility_parameter
+        return compressibility_factor
 
     def ln_fugacity(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
         """Natural log of the fugacity
@@ -659,7 +659,7 @@ class MRKImplicitABC(ModifiedRedlichKwongABC):
         Returns:
             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
         """
-        z: ArrayLike = self.compressibility_parameter(temperature, pressure)
+        z: ArrayLike = self.compressibility_factor(temperature, pressure)
         A: Array = self.A_factor(temperature, pressure)
         B: ArrayLike = self.B_factor(temperature, pressure)
         # The base class requires a specification of the volume_integral, but the equations are in

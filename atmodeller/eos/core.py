@@ -26,11 +26,12 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Any, Callable, NamedTuple, Protocol
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax
+from jax import Array, grad, jit, lax
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
@@ -94,18 +95,33 @@ class RealGas(ABC, RealGasProtocol):
         """
 
     @jit
+    def dvolume_dpressure(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Derivative of volume with respect to pressure
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Derivative of volume with respect to pressure
+        """
+        dvolume_dpressure_fn: Callable = grad(self.volume, argnums=1)
+
+        return dvolume_dpressure_fn(temperature, pressure)
+
+    @jit
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Log activity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature
+            pressure: Pressure
 
         Returns:
             Log activity
         """
-        # We define the standard state as 1 bar (see PRESSURE_REFERENCE), so we do not need to
-        # perform a division to get activity, which is non-dimensional.
+        # The standard state is defined at 1 bar (see PRESSURE_REFERENCE), so we do not need to
+        # perform a division (by unity) to get activity, which is non-dimensional.
 
         return self.log_fugacity(temperature, pressure)
 
@@ -203,6 +219,8 @@ class RealGas(ABC, RealGasProtocol):
         return ideal_volume
 
 
+# TODO: Eventually this will probably utilise a class that assembles different equations of state
+# for given pressure ranges.
 @register_pytree_node_class
 class RealGasBounded(RealGas):
     """A real gas equation of state that is bounded
@@ -234,12 +252,11 @@ class RealGasBounded(RealGas):
         """Log fugacity that is bounded
 
         Outside of the experimental calibration there is no guarantee that the real gas fugacity
-        is sensible, and it is difficult a priori to predict how reasonable the extrapolation will
+        is sensible and it is difficult a priori to predict how reasonable the extrapolation will
         be. Therefore, below the minimum calibration pressure we assume an ideal gas, and above the
         calibration pressure we assume a fixed fugacity coefficient determined at the maximum
-        pressure. This maintains relatively smooth behaviour of the function across a large
-        pressure range, which is arguably physically most sensible given lack of other
-        knowledge.
+        pressure. This maintains relatively smooth behaviour of the function beyond the calibrated
+        values, which is often required to guide the solver.
 
         This method could also implement a bound on temperature, if eventually required or desired.
 
@@ -250,26 +267,27 @@ class RealGasBounded(RealGas):
         Returns:
             Log fugacity
         """
-        pressure_clipped = jnp.clip(
-            pressure, self.calibration.pressure_min, self.calibration.pressure_max
-        )
+        pressure_clipped = jnp.clip(pressure, self._pressure_min, self._pressure_max)
 
         # Calculate log fugacity in different regions
-        log_fugacity_below: ArrayLike = self.ideal_log_fugacity(temperature, pressure_clipped)
+        # At least for the Holley models, the integration bounds ensure that ideal gas behaviour
+        # is recovered as the pressure decreases to zero. But this may be required for other EOS.
+        # log_fugacity_below: ArrayLike = self.ideal_log_fugacity(temperature, pressure_clipped)
         log_fugacity_in_range: ArrayLike = self._real_gas.log_fugacity(
             temperature, pressure_clipped
         )
-        log_fugacity_coefficient: ArrayLike = self._real_gas.log_fugacity_coefficient(
-            temperature, pressure_clipped
+        log_fugacity_coefficient_at_Pmax: ArrayLike = self._real_gas.log_fugacity_coefficient(
+            temperature, self._pressure_max
         )
-        log_fugacity_above: ArrayLike = log_fugacity_coefficient + self.ideal_log_fugacity(
-            temperature, pressure
+        log_fugacity_at_Pmax: ArrayLike = self._real_gas.log_fugacity(
+            temperature, self._pressure_max
         )
+        fugacity_above: ArrayLike = jnp.exp(log_fugacity_at_Pmax) + jnp.exp(
+            log_fugacity_coefficient_at_Pmax
+        ) * (pressure - self._pressure_max)
+        log_fugacity_above: ArrayLike = jnp.log(fugacity_above)
 
-        # Determine the appropriate log fugacity based on pressure ranges
-        log_fugacity = lax.select(
-            pressure > self._pressure_min, log_fugacity_in_range, log_fugacity_below
-        )
+        log_fugacity = log_fugacity_in_range
         log_fugacity = lax.select(pressure > self._pressure_max, log_fugacity_above, log_fugacity)
 
         return log_fugacity
@@ -277,11 +295,19 @@ class RealGasBounded(RealGas):
     @override
     @jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        pressure = jnp.clip(pressure, self.calibration.pressure_min, self.calibration.pressure_max)
-        ideal_volume: ArrayLike = self.ideal_volume(temperature, pressure)
-        volume: ArrayLike = self._real_gas.volume(temperature, pressure)
+        pressure_clipped = jnp.clip(
+            pressure, self.calibration.pressure_min, self.calibration.pressure_max
+        )
 
-        volume = lax.select(pressure > self._pressure_min, volume, ideal_volume)
+        # FIXME: Use volume derivative to construct extrapolation
+
+        # Calculate volume in different regions
+        # Beattie-Bridgeman already recovers ideal behaviour at P->0
+        # volume_below: ArrayLike = self.ideal_volume(temperature, pressure_clipped)
+        volume: ArrayLike = self._real_gas.volume(temperature, pressure_clipped)
+
+        # Determine the appropriate volume based on pressure ranges
+        # volume = lax.select(pressure > self._pressure_min, volume_in_range, volume_below)
 
         return volume
 
@@ -577,7 +603,7 @@ class RealGasBounded(RealGas):
 #         Returns:
 #             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
 #         """
-#         z: ArrayLike = self.compressibility_parameter(temperature, pressure)
+#         z: ArrayLike = self.compressibility_factor(temperature, pressure)
 #         A: Array = self.A_factor(temperature, pressure)
 #         B: ArrayLike = self.B_factor(temperature, pressure)
 #         # The base class requires a specification of the volume_integral, but the equations are in
