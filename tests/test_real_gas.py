@@ -26,8 +26,9 @@ from jax.typing import ArrayLike
 from atmodeller import AVOGADRO, __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
+from atmodeller.eos.core import RealGas
 from atmodeller.eos.library import get_eos_models
-from atmodeller.interfaces import RealGasProtocol, SolubilityProtocol
+from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.library import get_solubility_models
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -50,7 +51,7 @@ INITIAL_STABILITY: float = -100.0
 """Initial stability"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
-eos_models: dict[str, RealGasProtocol] = get_eos_models()
+eos_models: dict[str, RealGas] = get_eos_models()
 
 
 def test_holley(helper) -> None:
