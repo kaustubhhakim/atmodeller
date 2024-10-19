@@ -55,7 +55,7 @@ eos_models: dict[str, RealGasProtocol] = get_eos_models()
 
 def test_holley(helper) -> None:
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_beattie_holley58"])
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_beattie_holley58_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
 

@@ -33,14 +33,10 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from molmass import Formula
 
-from atmodeller import GAS_CONSTANT_BAR
+from atmodeller import GAS_CONSTANT_BAR, PRESSURE_REFERENCE
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos.core import RealGas
-from atmodeller.utilities import (
-    ExperimentalCalibrationNew,
-    PyTreeNoData,
-    unit_conversion,
-)
+from atmodeller.utilities import PyTreeNoData, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -65,16 +61,13 @@ class IdealGas(PyTreeNoData, RealGas):
     :math:`V` is volume.
     """
 
-    # Validity of ideal gas model depends on species and conditions
-    _calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew()
-
     @override
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        del temperature
-        return jnp.log(pressure)
+        return self.ideal_log_fugacity(temperature, pressure)
 
     @override
+    @jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         return self.ideal_volume(temperature, pressure)
 
@@ -113,14 +106,12 @@ class BeattieBridgeman(RealGas):
         B0: float,
         b: float,
         c: float,
-        calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(),
     ):
-        self.A0: float = A0
-        self.a: float = a
-        self.B0: float = B0
-        self.b: float = b
-        self.c: float = c
-        self._calibration: ExperimentalCalibrationNew = calibration
+        self._A0: float = A0
+        self._a: float = a
+        self._B0: float = B0
+        self._b: float = b
+        self._c: float = c
 
     # pylint: enable=invalid-name
 
@@ -146,16 +137,18 @@ class BeattieBridgeman(RealGas):
         pressure: ArrayLike = kwargs["pressure"]
         volume: Array = compressibility_factor * self.ideal_volume(temperature, pressure)
 
-        coeff0: Array = 1 / jnp.square(temperature) * -GAS_CONSTANT_BAR * self.c * self.b * self.B0
+        coeff0: Array = (
+            1 / jnp.square(temperature) * -GAS_CONSTANT_BAR * self._c * self._b * self._B0
+        )
         coeff1: Array = (
-            1 / jnp.square(temperature) * GAS_CONSTANT_BAR * self.c * self.B0
-            + GAS_CONSTANT_BAR * temperature * self.b * self.B0
-            - self.a * self.A0
+            1 / jnp.square(temperature) * GAS_CONSTANT_BAR * self._c * self._B0
+            + GAS_CONSTANT_BAR * temperature * self._b * self._B0
+            - self._a * self._A0
         )
         coeff2: Array = (
-            1 / jnp.square(temperature) * GAS_CONSTANT_BAR * self.c
-            - GAS_CONSTANT_BAR * temperature * self.B0
-            + self.A0
+            1 / jnp.square(temperature) * GAS_CONSTANT_BAR * self._c
+            - GAS_CONSTANT_BAR * temperature * self._B0
+            + self._A0
         )
         coeff3: ArrayLike = -GAS_CONSTANT_BAR * temperature
 
@@ -185,33 +178,24 @@ class BeattieBridgeman(RealGas):
         Returns:
             Log fugacity
         """
-        # Constrain calculation of fugacity within the calibrated range since outside this range
-        # the function could behave non-physically and/or cause problems for the solver.
-        pressure = jnp.clip(pressure, self.calibration.pressure_min, self.calibration.pressure_max)
-        temperature = jnp.clip(
-            temperature, self.calibration.temperature_min, self.calibration.temperature_max
-        )
-        # jax.debug.print("temperature (possibly clipped) = {out}", out=temperature)
-        # jax.debug.print("pressure (possibly clipped) = {out}", out=pressure)
-
         volume: ArrayLike = self.volume(temperature, pressure)
         log_fugacity: Array = (
             jnp.log(GAS_CONSTANT_BAR * temperature / volume)
             + (
-                self.B0
-                - self.c / jnp.power(temperature, 3)
-                - self.A0 / (GAS_CONSTANT_BAR * temperature)
+                self._B0
+                - self._c / jnp.power(temperature, 3)
+                - self._A0 / (GAS_CONSTANT_BAR * temperature)
             )
             * 2
             / volume
             - (
-                self.b * self.B0
-                + self.c * self.B0 / jnp.power(temperature, 3)
-                - self.a * self.A0 / (GAS_CONSTANT_BAR * temperature)
+                self._b * self._B0
+                + self._c * self._B0 / jnp.power(temperature, 3)
+                - self._a * self._A0 / (GAS_CONSTANT_BAR * temperature)
             )
             * 3
             / (2 * jnp.square(volume))
-            + (self.c * self.b * self.B0 / jnp.power(temperature, 3))
+            + (self._c * self._b * self._B0 / jnp.power(temperature, 3))
             * 4
             / (3 * jnp.power(volume, 3))
         )
@@ -253,12 +237,11 @@ class BeattieBridgeman(RealGas):
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()
         aux_data = {
-            "A0": self.A0,
-            "a": self.a,
-            "B0": self.B0,
-            "b": self.b,
-            "c": self.c,
-            "calibration": self.calibration,
+            "A0": self._A0,
+            "a": self._a,
+            "B0": self._B0,
+            "b": self._b,
+            "c": self._c,
         }
         return (children, aux_data)
 
@@ -276,19 +259,23 @@ class Chabrier(RealGas):
 
     Args:
         filename: Filename of the density-T-P data
+        species_name: Name of the species
 
     Attributes:
         filename: Filename of the density-T-P data
+        species_name: Name of the species
     """
 
     CHABRIER_DIRECTORY: Path = Path("chabrier")
     """Directory of the Chabrier data within :obj:`~atmodeller.eos.data`."""
 
-    def __init__(self, filename: Path, species_name: str):
+    def __init__(
+        self,
+        filename: Path,
+        species_name: str,
+    ):
         self.filename: Path = filename
         self.species_name: str = species_name
-        # For self-consistency this should be the same as Pref in atmodeller.thermodata.core
-        self._standard_state_pressure: float = 1.0
         self._log10_density_func: RegularGridInterpolator = self._get_spline()
         self._molar_mass_g_mol: float = Formula(species_name).mass
 
@@ -347,7 +334,7 @@ class Chabrier(RealGas):
         jax.debug.print("pressure_in = {out}", out=pressure)
         # Pressure range to integrate over
         pressures: Array = jnp.logspace(
-            jnp.log10(self._standard_state_pressure), jnp.log10(pressure), num=1000
+            jnp.log10(PRESSURE_REFERENCE), jnp.log10(pressure), num=1000
         )
         jax.debug.print("pressures = {out}", out=pressures)
         temperatures: Array = jnp.full_like(pressures, temperature)

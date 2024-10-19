@@ -28,7 +28,12 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
-from atmodeller import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
+from atmodeller import (
+    ATMOSPHERE,
+    BOLTZMANN_CONSTANT_BAR,
+    OCEAN_MASS_H2,
+    PRESSURE_REFERENCE,
+)
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -403,17 +408,17 @@ class ExperimentalCalibrationNew(NamedTuple):
     """Experimental calibration
 
     Args:
-        temperature_min: Minimum calibrated temperature
-        temperature_max: Maximum calibrated temperature
-        pressure_min: Minimum calibrated pressure
-        pressure_max: Maximum calibrated pressure
-        log10_fO2_min: Minimum calibrated log10 fO2
-        log10_fO2_max: Maximum calibrated log10 fO2
+        temperature_min: Minimum calibrated temperature. Defaults to None.
+        temperature_max: Maximum calibrated temperature. Defaults to None.
+        pressure_min: Minimum calibrated pressure. Defaults to the standard pressure.
+        pressure_max: Maximum calibrated pressure. Defaults to None.
+        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to None.
+        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
     """
 
     temperature_min: float | None = None
     temperature_max: float | None = None
-    pressure_min: float | None = None
+    pressure_min: float = PRESSURE_REFERENCE
     pressure_max: float | None = None
     # convenient to use fO2 so pylint: disable=invalid-name
     log10_fO2_min: float | None = None

@@ -14,7 +14,10 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core classes and functions for real gas equations of state"""
+"""Core classes and functions for real gas equations of state
+
+Units for temperature and pressure are K and bar, respectively.
+"""
 
 # Use symbols from the relevant papers for consistency so pylint: disable=C0103
 
@@ -32,9 +35,8 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR, PRESSURE_REFERENCE
 from atmodeller.interfaces import ActivityProtocol, RealGasProtocol
-from atmodeller.thermodata.core import Pref
 from atmodeller.utilities import (
     ExperimentalCalibrationNew,
     PyTreeNoData,
@@ -46,10 +48,10 @@ if sys.version_info < (3, 12):
 else:
     from typing import override
 
-# if sys.version_info < (3, 11):
-#     from typing_extensions import Self
-# else:
-#     from typing import Self
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -65,25 +67,15 @@ class RealGas(ABC, RealGasProtocol):
 
     where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
     is volume, and :math:`P` is pressure.
-
-    Child classes must additionally set self._calibration.
     """
-
-    # Must be set by child classes
-    _calibration: ExperimentalCalibrationNew
-
-    @property
-    def calibration(self) -> ExperimentalCalibrationNew:
-        """Experimental calibration"""
-        return self._calibration
 
     @abstractmethod
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature
+            pressure: Pressure
 
         Returns:
             Log fugacity in bar
@@ -94,8 +86,8 @@ class RealGas(ABC, RealGasProtocol):
         r"""Volume
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature
+            pressure: Pressure
 
         Returns:
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
@@ -112,8 +104,9 @@ class RealGas(ABC, RealGasProtocol):
         Returns:
             Log activity
         """
-        # We define the standard state as 1 bar (see Pref in atmodeller.thermodata.core), so we
-        # do not need to perform a division to get the activity.
+        # We define the standard state as 1 bar (see PRESSURE_REFERENCE), so we do not need to
+        # perform a division to get activity, which is non-dimensional.
+
         return self.log_fugacity(temperature, pressure)
 
     @jit
@@ -159,7 +152,9 @@ class RealGas(ABC, RealGasProtocol):
         Returns:
             Log of the fugacity coefficient, which is dimensionless
         """
-        return self.log_fugacity(temperature, pressure) - jnp.log(pressure)
+        return self.log_fugacity(temperature, pressure) - self.ideal_log_fugacity(
+            temperature, pressure
+        )
 
     @jit
     def fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
@@ -175,8 +170,24 @@ class RealGas(ABC, RealGasProtocol):
         return jnp.exp(self.log_fugacity_coefficient(temperature, pressure))
 
     @jit
+    def ideal_log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Log fugacity of an ideal gas
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity of an ideal gas
+        """
+        del temperature
+        ideal_log_fugacity: ArrayLike = jnp.log(pressure)
+
+        return ideal_log_fugacity
+
+    @jit
     def ideal_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Ideal volume
+        r"""Volume of an ideal gas
 
         This is required to compute the compressibility parameter.
 
@@ -190,6 +201,99 @@ class RealGas(ABC, RealGasProtocol):
         ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
 
         return ideal_volume
+
+
+@register_pytree_node_class
+class RealGasBounded(RealGas):
+    """A real gas equation of state that is bounded
+
+    Args:
+        real_gas: Real gas equation of state to bound
+        calibration: Calibration that encodes the bounds
+    """
+
+    def __init__(
+        self,
+        real_gas: RealGas,
+        calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(),
+    ):
+        super().__init__()
+        self._real_gas = real_gas
+        self._calibration: ExperimentalCalibrationNew = calibration
+        self._pressure_min: Array = jnp.array(calibration.pressure_min)
+        self._pressure_max: Array = jnp.array(calibration.pressure_max)
+
+    @property
+    def calibration(self) -> ExperimentalCalibrationNew:
+        """Experimental calibration"""
+        return self._calibration
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log fugacity that is bounded
+
+        Outside of the experimental calibration there is no guarantee that the real gas fugacity
+        is sensible, and it is difficult a priori to predict how reasonable the extrapolation will
+        be. Therefore, below the minimum calibration pressure we assume an ideal gas, and above the
+        calibration pressure we assume a fixed fugacity coefficient determined at the maximum
+        pressure. This maintains relatively smooth behaviour of the function across a large
+        pressure range, which is arguably physically most sensible given lack of other
+        knowledge.
+
+        This method could also implement a bound on temperature, if eventually required or desired.
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity
+        """
+        pressure_clipped = jnp.clip(
+            pressure, self.calibration.pressure_min, self.calibration.pressure_max
+        )
+
+        # Calculate log fugacity in different regions
+        log_fugacity_below: ArrayLike = self.ideal_log_fugacity(temperature, pressure_clipped)
+        log_fugacity_in_range: ArrayLike = self._real_gas.log_fugacity(
+            temperature, pressure_clipped
+        )
+        log_fugacity_coefficient: ArrayLike = self._real_gas.log_fugacity_coefficient(
+            temperature, pressure_clipped
+        )
+        log_fugacity_above: ArrayLike = log_fugacity_coefficient + self.ideal_log_fugacity(
+            temperature, pressure
+        )
+
+        # Determine the appropriate log fugacity based on pressure ranges
+        log_fugacity = lax.select(
+            pressure > self._pressure_min, log_fugacity_in_range, log_fugacity_below
+        )
+        log_fugacity = lax.select(pressure > self._pressure_max, log_fugacity_above, log_fugacity)
+
+        return log_fugacity
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        pressure = jnp.clip(pressure, self.calibration.pressure_min, self.calibration.pressure_max)
+        ideal_volume: ArrayLike = self.ideal_volume(temperature, pressure)
+        volume: ArrayLike = self._real_gas.volume(temperature, pressure)
+
+        volume = lax.select(pressure > self._pressure_min, volume, ideal_volume)
+
+        return volume
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
+        children: tuple = ()
+        aux_data = {"real_gas": self._real_gas, "calibration": self._calibration}
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
 
 
 # @dataclass(kw_only=True)

@@ -20,8 +20,6 @@ from typing import Protocol
 
 from jax.typing import ArrayLike
 
-from atmodeller.utilities import ExperimentalCalibrationNew
-
 
 class ActivityProtocol(Protocol):
 
@@ -33,11 +31,6 @@ class ActivityProtocol(Protocol):
 
 
 class RealGasProtocol(ActivityProtocol, Protocol):
-
-    _calibration: ExperimentalCalibrationNew
-
-    @property
-    def calibration(self) -> ExperimentalCalibrationNew: ...
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
