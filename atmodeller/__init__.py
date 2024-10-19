@@ -34,7 +34,7 @@ print("Package initialized with double precision (float64)")
 # For debugging
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_infs", False)
-# jax.config.update("jax_disable_jit", True)
+jax.config.update("jax_disable_jit", True)
 
 AVOGADRO: float = constants.Avogadro
 """Avogadro constant in 1/mol"""
@@ -58,10 +58,10 @@ OCEAN_MOLES: float = 7.68894973907177e22
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 """Mass of H2 in one present-day Earth ocean in grams"""
 
-DEFAULT_SOLVER: str = "optimistix"  # or "scipy"
-"""Default solver"""
-MACHEPS: float = float(jnp.finfo(jnp.float_).eps)
-"""Machine epsilon"""
+ENTHALPY_REFERENCE: float = 298.15
+"""Enthalpy reference temperature in K"""
+PRESSURE_REFERENCE: float = 1.0
+"""Standard state pressure in bar"""
 
 # Lower and upper bounds on the hypercube which contains the root
 NUMBER_DENSITY_LOWER: float = -100
