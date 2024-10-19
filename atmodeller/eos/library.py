@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # Copyright 2024 Dan J. Bower
 #
@@ -19,6 +20,9 @@
 import logging
 from pathlib import Path
 from typing import Callable
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 from atmodeller import ATMOSPHERE
 from atmodeller.eos.classes import BeattieBridgeman, Chabrier
@@ -169,3 +173,56 @@ def get_eos_models() -> dict[str, RealGasProtocol]:
     models["O2_beattie_holley58_bounded"] = O2_beattie_holley58_bounded
 
     return models
+
+
+if __name__ == "__main__":
+
+    model = get_eos_models()["H2_beattie_holley58_bounded"]
+
+    pressures = np.arange(1, 3000, 100)
+    temperatures = 1000.0 * np.ones_like(pressures)
+
+    temperature_out = []
+    ideal_volume_out = []
+    volume_out = []
+    fugacity_out = []
+    compressibility_factor_out = []
+    fugacity_coefficient_out = []
+
+    for nn, pressure in enumerate(pressures):
+        temperature = temperatures[nn]
+        ideal_volume = model.ideal_volume(temperature, pressure)
+        volume = model.volume(temperature, pressure)
+        fugacity = model.fugacity(temperature, pressure)
+        compressibility_factor = model.compressibility_factor(temperature, pressure)
+        fugacity_coefficient = model.fugacity_coefficient(temperature, pressure)
+        temperature_out.append(temperature)
+        ideal_volume_out.append(ideal_volume)
+        volume_out.append(volume)
+        fugacity_out.append(fugacity)
+        compressibility_factor_out.append(compressibility_factor)
+        fugacity_coefficient_out.append(fugacity_coefficient)
+
+    fig, ax = plt.subplots(1, 4)
+
+    ax[0].plot(pressures, ideal_volume_out, "k--")
+    ax[0].set_xlabel("Pressure")
+    ax[0].set_ylabel("Ideal volume")
+
+    ax[0].plot(pressures, volume_out)
+    ax[0].set_xlabel("Pressure")
+    ax[0].set_ylabel("Volume")
+
+    ax[1].plot(pressures, fugacity_out)
+    ax[1].set_xlabel("Pressure")
+    ax[1].set_ylabel("Fugacity")
+
+    ax[2].plot(pressures, compressibility_factor_out)
+    ax[2].set_xlabel("Pressure")
+    ax[2].set_ylabel("Compressibility factor")
+
+    ax[3].plot(pressures, fugacity_coefficient_out)
+    ax[3].set_xlabel("Pressure")
+    ax[3].set_ylabel("Fugacity coefficient")
+
+    plt.show()

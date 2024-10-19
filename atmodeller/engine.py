@@ -266,7 +266,7 @@ def get_log_activity(
     )
 
     log_activity = jnp.where(mask, scaled_log_activity, log_activity)
-    jax.debug.print("log_activity = {out}", out=log_activity)
+    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     return log_activity
 

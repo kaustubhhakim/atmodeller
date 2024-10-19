@@ -267,47 +267,59 @@ class RealGasBounded(RealGas):
         Returns:
             Log fugacity
         """
-        pressure_clipped = jnp.clip(pressure, self._pressure_min, self._pressure_max)
+        pressure_clipped: Array = jnp.clip(pressure, self._pressure_min, self._pressure_max)
 
         # Calculate log fugacity in different regions
-        # At least for the Holley models, the integration bounds ensure that ideal gas behaviour
-        # is recovered as the pressure decreases to zero. But this may be required for other EOS.
-        # log_fugacity_below: ArrayLike = self.ideal_log_fugacity(temperature, pressure_clipped)
+        log_fugacity_below: ArrayLike = self.ideal_log_fugacity(temperature, pressure_clipped)
+        # jax.debug.print("log_fugacity_below = {out}", out=log_fugacity_below)
+        # Evaluating the function within bounds helps to ensure a more stable numerical solution
         log_fugacity_in_range: ArrayLike = self._real_gas.log_fugacity(
             temperature, pressure_clipped
         )
-        log_fugacity_coefficient_at_Pmax: ArrayLike = self._real_gas.log_fugacity_coefficient(
-            temperature, self._pressure_max
-        )
+        # jax.debug.print("log_fugacity_in_range = {out}", out=log_fugacity_in_range)
         log_fugacity_at_Pmax: ArrayLike = self._real_gas.log_fugacity(
             temperature, self._pressure_max
         )
-        fugacity_above: ArrayLike = jnp.exp(log_fugacity_at_Pmax) + jnp.exp(
-            log_fugacity_coefficient_at_Pmax
-        ) * (pressure - self._pressure_max)
-        log_fugacity_above: ArrayLike = jnp.log(fugacity_above)
+        # jax.debug.print("log_fugacity_at_Pmax = {out}", out=log_fugacity_at_Pmax)
 
-        log_fugacity = log_fugacity_in_range
-        log_fugacity = lax.select(pressure > self._pressure_max, log_fugacity_above, log_fugacity)
+        # Compute the difference in volume relative to ideal at the maximum calibration pressure
+        dvolume: ArrayLike = self._real_gas.volume(
+            temperature, self._pressure_max
+        ) - self.ideal_volume(temperature, self._pressure_max)
+
+        # VdP taking account of the extrapolated volume change above the calibration pressure.
+        log_fugacity_above: ArrayLike = (
+            log_fugacity_at_Pmax
+            + jnp.log(pressure / self._pressure_max)
+            + dvolume * (pressure - self._pressure_max) / (GAS_CONSTANT_BAR * temperature)
+        )
+
+        log_fugacity = lax.select(
+            pressure > self._pressure_min, log_fugacity_in_range, log_fugacity_below
+        )
+        log_fugacity = lax.select(pressure < self._pressure_max, log_fugacity, log_fugacity_above)
 
         return log_fugacity
 
     @override
     @jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        pressure_clipped = jnp.clip(
-            pressure, self.calibration.pressure_min, self.calibration.pressure_max
-        )
-
-        # FIXME: Use volume derivative to construct extrapolation
+        pressure_clipped: Array = jnp.clip(pressure, self._pressure_min, self._pressure_max)
 
         # Calculate volume in different regions
-        # Beattie-Bridgeman already recovers ideal behaviour at P->0
-        # volume_below: ArrayLike = self.ideal_volume(temperature, pressure_clipped)
-        volume: ArrayLike = self._real_gas.volume(temperature, pressure_clipped)
+        ideal_volume: ArrayLike = self.ideal_volume(temperature, pressure)
+        # jax.debug.print("volume_below = {out}", out=volume_below)
+        # Evaluate the function within bounds to help to ensure a more stable numerical solution
+        volume_in_range: ArrayLike = self._real_gas.volume(temperature, pressure_clipped)
+
+        # Compute the difference in volume relative to ideal at the maximum calibration pressure
+        dvolume: ArrayLike = self._real_gas.volume(
+            temperature, self._pressure_max
+        ) - self.ideal_volume(temperature, self._pressure_max)
 
         # Determine the appropriate volume based on pressure ranges
-        # volume = lax.select(pressure > self._pressure_min, volume_in_range, volume_below)
+        volume = lax.select(pressure > self._pressure_min, volume_in_range, ideal_volume)
+        volume = lax.select(pressure < self._pressure_max, volume, ideal_volume + dvolume)
 
         return volume
 
