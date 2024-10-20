@@ -23,6 +23,7 @@ from typing import NamedTuple
 
 import jax.numpy as jnp
 from jax import Array, jit
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
@@ -74,19 +75,197 @@ class CondensateActivity(NamedTuple):
         return jnp.log(self.activity)
 
 
-class ThermoData(NamedTuple):
-    """Thermochemical data"""
+@register_pytree_node_class
+class ThermoData:
+    """Thermochemical data
 
-    b1: tuple[float, ...]
-    """Enthalpy constant(s) of integration"""
-    b2: tuple[float, ...]
-    """Entropy constant(s) of integration"""
-    cp_coeffs: tuple[tuple[float, float, float, float, float, float, float], ...]
-    """Heat capacity coefficients"""
-    T_min: tuple[float, ...]
-    """Minimum temperature(s) in the range"""
-    T_max: tuple[float, ...]
-    """Maximum temperature(s) in the range"""
+    Args:
+        b1: Enthalpy constant(s) of integration
+        b2: Entropy constant(s) of integration
+        cp_coeffs: Heat capacity coefficients
+        T_min: Minimum temperature(s) in the range
+        T_max: Maximum temperature(s) in the range
+
+    Attributes:
+        b1: Enthalpy constant(s) of integration
+        b2: Entropy constant(s) of integration
+        cp_coeffs: Heat capacity coefficients
+        T_min: Minimum temperature(s) in the range
+        T_max: Maximum temperature(s) in the range
+    """
+
+    def __init__(
+        self,
+        b1: tuple[float, ...],
+        b2: tuple[float, ...],
+        cp_coeffs: tuple[tuple[float, float, float, float, float, float, float], ...],
+        T_min: tuple[float, ...],
+        T_max: tuple[float, ...],
+    ):
+        self._b1 = b1
+        self._b2 = b2
+        self._cp_coeffs = cp_coeffs
+        self._T_min = T_min
+        self._T_max = T_max
+
+    @jit
+    def _cp_over_R(self, cp_coefficients: ArrayLike, temperature: ArrayLike) -> Array:
+        """Heat capacity relative to the gas constant (R)
+
+        Args:
+            cp_coefficients: Heat capacity coefficients as an array
+            temperature: Temperature
+
+        Returns:
+            Heat capacity (J/K/mol) relative to R
+        """
+        temperature_terms: Array = jnp.stack(
+            [
+                jnp.power(temperature, -2),
+                jnp.power(temperature, -1),
+                jnp.ones_like(temperature),
+                temperature,
+                jnp.power(temperature, 2),
+                jnp.power(temperature, 3),
+                jnp.power(temperature, 4),
+            ]
+        )
+
+        heat_capacity: Array = jnp.dot(cp_coefficients, temperature_terms)
+        # jax.debug.print("heat_capacity = {out}", out=heat_capacity)
+
+        return heat_capacity
+
+    @jit
+    def _S_over_R(
+        self, cp_coefficients: ArrayLike, b2: ArrayLike, temperature: ArrayLike
+    ) -> Array:
+        """Entropy relative to the gas constant (R)
+
+        Args:
+            cp_coefficients: Heat capacity coefficients as an array
+            b2: Entropy integration constant
+            temperature: Temperature
+
+        Returns:
+            Entropy (J/K/mol) relative to R
+        """
+        temperature_terms: Array = jnp.stack(
+            [
+                -jnp.power(temperature, -2) / 2,
+                -jnp.power(temperature, -1),
+                jnp.log(temperature),
+                temperature,
+                jnp.power(temperature, 2) / 2,
+                jnp.power(temperature, 3) / 3,
+                jnp.power(temperature, 4) / 4,
+            ]
+        )
+
+        entropy: Array = jnp.dot(cp_coefficients, temperature_terms) + b2
+        # jax.debug.print("entropy = {out}", out=entropy)
+
+        return entropy
+
+    @jit
+    def _H_over_RT(
+        self, cp_coefficients: ArrayLike, b1: ArrayLike, temperature: ArrayLike
+    ) -> Array:
+        """Enthalpy relative to RT
+
+        Args:
+            cp_coefficients: Heat capacity coefficients as an array
+            b1: Enthalpy integration constant
+            temperature: Temperature
+
+        Returns:
+            Enthalpy (J/mol) relative to RT
+        """
+        temperature_terms: Array = jnp.stack(
+            [
+                -jnp.power(temperature, -2),
+                jnp.log(temperature) / temperature,
+                jnp.ones_like(temperature),
+                temperature / 2,
+                jnp.power(temperature, 2) / 3,
+                jnp.power(temperature, 3) / 4,
+                jnp.power(temperature, 4) / 5,
+            ]
+        )
+
+        enthalpy: Array = jnp.dot(cp_coefficients, temperature_terms) + b1 / temperature
+        # jax.debug.print("enthalpy = {out}", out=enthalpy)
+
+        return enthalpy
+
+    @jit
+    def _G_over_RT(
+        self, cp_coefficients: ArrayLike, b1: ArrayLike, b2: ArrayLike, temperature: ArrayLike
+    ) -> Array:
+        """Gibbs energy relative to RT
+
+        Args:
+            cp_coefficients: Heat capacity coefficients as an array
+            b1: Enthalpy integration constant
+            b2: Entropy integration constant
+            temperature: Temperature
+
+        Returns:
+            Gibbs energy relative to RT
+        """
+        enthalpy: Array = self._H_over_RT(cp_coefficients, b1, temperature)
+        entropy: Array = self._S_over_R(cp_coefficients, b2, temperature)
+        # No temperature multiplication is correct since the return is Gibbs energy relative to RT
+        gibbs: Array = enthalpy - entropy
+
+        return gibbs
+
+    @jit
+    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
+        """Gets Gibbs energy over RT
+
+        This is calculated using data from the appropriate temperature range.
+
+        Args:
+            temperature: Temperature
+
+        Returns:
+            Gibbs energy over RT
+        """
+        # This assumes the temperature is within one of the ranges and will produce unexpected
+        # output if the temperature is outside the ranges
+        T_min_array: Array = jnp.asarray(self._T_min)
+        T_max_array: Array = jnp.asarray(self._T_max)
+        bool_mask: Array = (T_min_array <= temperature) & (temperature <= T_max_array)
+        index: Array = jnp.argmax(bool_mask)
+        # jax.debug.print("index = {out}", out=index)
+        cp_coeffs_for_index: Array = jnp.take(jnp.array(self._cp_coeffs), index, axis=0)
+        # jax.debug.print("cp_coeffs_for_index = {out}", out=cp_coeffs_for_index)
+        b1_for_index: Array = jnp.take(jnp.array(self._b1), index)
+        # jax.debug.print("b1_for_index = {out}", out=b1_for_index)
+        b2_for_index: Array = jnp.take(jnp.array(self._b2), index)
+        # jax.debug.print("b2_for_index = {out}", out=b2_for_index)
+        gibbs_for_index: Array = self._G_over_RT(
+            cp_coeffs_for_index, b1_for_index, b2_for_index, temperature
+        )
+
+        return gibbs_for_index
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, tuple]]:
+        children: tuple = ()
+        aux_data = {
+            "b1": self._b1,
+            "b2": self._b2,
+            "cp_coeffs": self._cp_coeffs,
+            "T_min": self._T_min,
+            "T_max": self._T_max,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
 
 
 class SpeciesData(NamedTuple):
@@ -164,167 +343,6 @@ class SpeciesData(NamedTuple):
     def phase(self) -> str:
         """JANAF phase"""
         return inverse_phase_mapping[self.phase_code]
-
-
-@jit
-def cp_over_R(cp_coefficients: Array, temperature: ArrayLike) -> Array:
-    """Heat capacity relative to the gas constant (R)
-
-    Args:
-        cp_coefficients: Coefficients for the heat capacity
-        temperature: Temperature in K
-
-    Returns:
-        Heat capacity (J/K/mol) relative to R
-    """
-    temperature_terms: Array = jnp.stack(
-        [
-            jnp.power(temperature, -2),
-            jnp.power(temperature, -1),
-            jnp.ones_like(temperature),
-            temperature,
-            jnp.power(temperature, 2),
-            jnp.power(temperature, 3),
-            jnp.power(temperature, 4),
-        ]
-    )
-
-    heat_capacity: Array = jnp.dot(cp_coefficients, temperature_terms)
-    # jax.debug.print("heat_capacity = {out}", out=heat_capacity)
-
-    return heat_capacity
-
-
-@jit
-def S_over_R(cp_coefficients: Array, b2: ArrayLike, temperature: ArrayLike) -> Array:
-    """Entropy relative to the gas constant (R)
-
-    Args:
-        cp_coefficients: Coefficients for the heat capacity
-        b2: Entropy integration constant
-        temperature: Temperature in K
-
-    Returns:
-        Entropy (J/K/mol) relative to R
-    """
-    temperature_terms: Array = jnp.stack(
-        [
-            -jnp.power(temperature, -2) / 2,
-            -jnp.power(temperature, -1),
-            jnp.log(temperature),
-            temperature,
-            jnp.power(temperature, 2) / 2,
-            jnp.power(temperature, 3) / 3,
-            jnp.power(temperature, 4) / 4,
-        ]
-    )
-
-    entropy: Array = jnp.dot(cp_coefficients, temperature_terms) + b2
-    # jax.debug.print("entropy = {out}", out=entropy)
-
-    return entropy
-
-
-@jit
-def H_over_RT(cp_coefficients: Array, b1: ArrayLike, temperature: ArrayLike) -> Array:
-    """Enthalpy relative to RT
-
-    Args:
-        cp_coefficients: Coefficients for the heat capacity
-        b1: Enthalpy integration constant
-        temperature: Temperature in K
-
-    Returns:
-        Enthalpy (J/mol) relative to RT
-    """
-    temperature_terms: Array = jnp.stack(
-        [
-            -jnp.power(temperature, -2),
-            jnp.log(temperature) / temperature,
-            jnp.ones_like(temperature),
-            temperature / 2,
-            jnp.power(temperature, 2) / 3,
-            jnp.power(temperature, 3) / 4,
-            jnp.power(temperature, 4) / 5,
-        ]
-    )
-
-    enthalpy: Array = jnp.dot(cp_coefficients, temperature_terms) + b1 / temperature
-    # jax.debug.print("enthalpy = {out}", out=enthalpy)
-
-    return enthalpy
-
-
-@jit
-def G_over_RT(
-    cp_coefficients: Array, b1: ArrayLike, b2: ArrayLike, temperature: ArrayLike
-) -> Array:
-    """Gibbs energy relative to RT
-
-    Args:
-        cp_coefficients: Coefficients for the heat capacity
-        b1: Enthalpy integration constant
-        b2: Entropy integration constant
-        temperature: Temperature in K
-
-    Returns:
-        Gibbs energy relative to RT
-    """
-    enthalpy: Array = H_over_RT(cp_coefficients, b1, temperature)
-    entropy: Array = S_over_R(cp_coefficients, b2, temperature)
-    # No temperature multiplication is correct since the return is Gibbs energy relative to RT
-    gibbs: Array = enthalpy - entropy
-
-    return gibbs
-
-
-@jit
-def get_index_for_temperature(
-    temperature_min: ArrayLike, temperature_max: ArrayLike, temperature: ArrayLike
-) -> Array:
-    """Gets the index of the thermodynamic data for a given temperature
-
-    Args:
-        temperature_min: Minimum temperature of range
-        temperature_max: Maximum temperature of range
-        temperature: Target temperature
-
-    Returns:
-        Index of the temperature range
-    """
-    # TODO: This assumes the temperature is within one of the ranges and will produce unexpected
-    # output if the temperature is outside the ranges
-    T_min_array: Array = jnp.asarray(temperature_min)
-    T_max_array: Array = jnp.asarray(temperature_max)
-    bool_mask: Array = (T_min_array <= temperature) & (temperature <= T_max_array)
-    index: Array = jnp.argmax(bool_mask)
-    # jax.debug.print("index = {out}", out=index)
-
-    return index
-
-
-@jit
-def get_gibbs_over_RT(thermodata: ThermoData, temperature: ArrayLike) -> Array:
-    """Gets Gibbs energy over RT
-
-    Args:
-        thermodata: Thermodynamic data
-        temperature: Temperature
-
-    Returns:
-        Gibbs energy over RT
-    """
-    index: Array = get_index_for_temperature(thermodata.T_min, thermodata.T_max, temperature)
-    # jax.debug.print("index = {out}", out=index)
-    cp_coeffs: Array = jnp.take(jnp.array(thermodata.cp_coeffs), index, axis=0)
-    # jax.debug.print("cp_coeffs = {out}", out=cp_coeffs)
-    b1: Array = jnp.take(jnp.array(thermodata.b1), index)
-    # jax.debug.print("b1 = {out}", out=b1)
-    b2: Array = jnp.take(jnp.array(thermodata.b2), index)
-    # jax.debug.print("b2 = {out}", out=b2)
-    gibbs: Array = G_over_RT(cp_coeffs, b1, b2, temperature)
-
-    return gibbs
 
 
 # TODO: Clean up this function which back-computes the log10 fO2 shift for a given fugacity. Will

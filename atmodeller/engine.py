@@ -37,7 +37,6 @@ from atmodeller.containers import (
     Species,
     TracedParameters,
 )
-from atmodeller.thermodata.core import get_gibbs_over_RT
 from atmodeller.utilities import (
     log_number_density_from_log_pressure,
     log_pressure_from_log_number_density,
@@ -446,7 +445,7 @@ def get_log_Kp(
     """
     gibbs_list: list[ArrayLike] = []
     for species_ in species:
-        gibbs: ArrayLike = get_gibbs_over_RT(species_.data.thermodata, temperature)
+        gibbs: ArrayLike = species_.data.thermodata.get_gibbs_over_RT(temperature)
         gibbs_list.append(gibbs)
 
     gibbs_jnp: Array = jnp.array(gibbs_list)
