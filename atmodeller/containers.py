@@ -210,15 +210,10 @@ class FugacityConstraints(NamedTuple):
         constraints_vmap: dict[str, RedoxBufferProtocol] = {}
 
         for key, constraint in self.constraints.items():
-            vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
-            values: ArrayLike = constraint.log10_shift
-            try:
-                num_entries: int = len(values)  # type: ignore - exception dealt with subsequently
-                if num_entries > 1:
-                    vmap_axis = 0
-            except TypeError:  # Just a single value, which means no vmapping required.
-                # vmap_axis = None
-                pass
+            if jnp.isscalar(constraint.log10_shift):
+                vmap_axis: int | None = None
+            else:
+                vmap_axis = 0
             constraints_vmap[key] = type(constraint)(vmap_axis)  # type: ignore - container
 
         return FugacityConstraints(None, constraints_vmap)  # type: ignore - container
@@ -311,14 +306,10 @@ class MassConstraints(NamedTuple):
         log_molecules_vmap: dict[str, int | None] = {}
 
         for key, log_molecules in self.log_molecules.items():
-            vmap_axis: int | None = None  # Set default, which assumes no vmapping required.
-            try:
-                num_entries: int = len(log_molecules)  # type: ignore - exception dealt with later.
-                if num_entries > 1:
-                    vmap_axis = 0
-            except TypeError:  # Just a single value, which means no vmapping required.
-                # vmap_axis = None
-                pass
+            if jnp.isscalar(log_molecules):
+                vmap_axis: int | None = None
+            else:
+                vmap_axis = 0
             log_molecules_vmap[key] = vmap_axis
 
         return MassConstraints(None, log_molecules_vmap)  # type: ignore - container types for data
