@@ -30,7 +30,7 @@ from jax import Array
 from jax.tree_util import tree_flatten
 from jaxtyping import ArrayLike
 
-from atmodeller import BOLTZMANN_CONSTANT_BAR, TAU
+from atmodeller import TAU
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -42,7 +42,7 @@ from atmodeller.containers import (
     TracedParameters,
 )
 from atmodeller.engine import solve
-from atmodeller.jax_output import JaxOutput
+from atmodeller.output import Output
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref, unscale_number_density
 
@@ -465,7 +465,7 @@ class InteriorAtmosphere:
             initial_solution, traced_parameters
         )
 
-        output: JaxOutput = JaxOutput(solution, self, initial_solution_, traced_parameters_)
+        output: Output = Output(solution, self, initial_solution_, traced_parameters_)
         quick_look: dict[str, ArrayLike] = output.quick_look()
 
         logger.info("output_dict = %s", pprint.pformat(quick_look))
