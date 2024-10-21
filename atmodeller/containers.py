@@ -140,13 +140,10 @@ class Planet(NamedTuple):
         # Loop over the attributes
         for field in self._fields:
             value: ArrayLike = getattr(self, field)
-            try:
-                if value.size > 1:  # type: ignore since AttributeError is dealt with by except
-                    vmap_axis: int | None = 0
-                else:
-                    vmap_axis = None
-            except AttributeError:
-                vmap_axis = None
+            if jnp.isscalar(value):
+                vmap_axis: int | None = None
+            else:
+                vmap_axis = 0
             vmap_axes.append(vmap_axis)
 
         return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
