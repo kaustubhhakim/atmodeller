@@ -32,7 +32,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jax import Array, lax
+from jax import Array, lax, tree_map
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -148,8 +148,12 @@ class Planet(NamedTuple):
 
         return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
 
-    def asdict(self) -> dict:
-        """Gets a dictionary of the values"""
+    def asdict(self) -> dict[str, ArrayLike]:
+        """Gets a dictionary of the values
+
+        Returns:
+            A dictionary of the values
+        """
         base_dict: dict = self._asdict()
         base_dict["mantle_mass"] = self.mantle_mass
         base_dict["mantle_melt_mass"] = self.mantle_melt_mass
@@ -158,6 +162,49 @@ class Planet(NamedTuple):
         base_dict["surface_gravity"] = self.surface_gravity
 
         return base_dict
+
+    def expanded_asdict(self) -> dict[str, ArrayLike]:
+        """Gets a dictionary of the values, with scalars expanded to match array sizes
+
+        This method is probably not JAX-compliant, so should only be called outside of JAX
+        operations. This is OK, because it is only used to generate output once the model has run.
+        Furthermore, it assumes that only 1-D arrays are contained within self because it uses
+        size to determine the broadcast shape.
+
+        Returns:
+            A dictionary of the values expanded to the maximum array size
+        """
+
+        def expand_to_match_size(x: ArrayLike, size: int) -> ArrayLike:
+            """Expands an array
+
+            Args:
+                x: Value to possibly expand
+                size: Size to expand to
+
+            Returns:
+                Expanded value
+            """
+            if jnp.isscalar(x):
+                return jnp.broadcast_to(x, size)
+            return x
+
+        def max_array_size() -> int:
+            """Determines the maximum array size"""
+            max_size: int = 1
+            for field in self._fields:
+                value: ArrayLike = getattr(self, field)
+                if not jnp.isscalar(value):
+                    max_size = max(max_size, value.size)  # type: ignore
+
+            return max_size
+
+        max_size: int = max_array_size()
+        expanded_dict: dict[str, ArrayLike] = tree_map(
+            lambda x: expand_to_match_size(x, max_size), self.asdict()
+        )
+
+        return expanded_dict
 
 
 class FugacityConstraints(NamedTuple):

@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Callable
 
 import jax
 import jax.numpy as jnp
+import pandas as pd
 from jax import Array
 from jax.typing import ArrayLike
 
@@ -66,12 +67,12 @@ class JaxOutput:
         # Scale the solution quantities
         log_number_density, log_stability = jnp.split(solution, 2, axis=self._axis)
         self._log_number_density: Array = unscale_number_density(
-            log_number_density, self.model.log_scaling
+            jnp.atleast_2d(log_number_density), self.model.log_scaling
         )
         # Stability is non-dimensional and therefore does not need scaling
-        self._log_stability: Array = log_stability
+        self._log_stability: Array = jnp.atleast_2d(log_stability)
 
-        # self.test_print_output()
+        self.test_print_output()
 
     @property
     def log_number_density(self) -> Array:
@@ -168,6 +169,14 @@ class JaxOutput:
         """
         return jnp.exp(self.log_number_density)
 
+    def planet(self) -> dict[str, ArrayLike]:
+        """Gets the planet properties
+
+        Returns:
+            Planet
+        """
+        return self._traced_parameters.planet.expanded_asdict()
+
     def pressure(self) -> Array:
         """Gets pressure of all species in bar
 
@@ -224,14 +233,29 @@ class JaxOutput:
         print("pressure = ", self.pressure())
         print("log_activity = ", self.log_activity())
         print("activity = ", self.activity())
+        print("planet = ", self.planet())
+        print("planet_expanded = ", self._traced_parameters.planet.expanded_asdict())
 
-    # @property
-    # def size(self) -> int:
-    #     """Number of rows"""
-    #     try:
-    #         return len(self.data["solution"])
-    #     except KeyError:
-    #         return 0
+        self.to_dataframes()
+
+    def to_dataframes(self) -> dict[str, pd.DataFrame]:
+        out: dict[str, pd.DataFrame] = {}
+
+        planet: dict[str, ArrayLike] = self.planet()
+
+        out["planet"] = pd.DataFrame(planet)
+
+        # TODO: Split loop over gas species and condensed to only output relevant quantities
+        for nn, species_ in enumerate(self.model.species):
+            species_out: dict[str, ArrayLike] = {}
+            species_out["atmosphere_number_density"] = self.number_density()[:, nn]
+            species_out["pressure"] = self.pressure()[:, nn]
+            species_out["activity"] = self.activity()[:, nn]
+            out[species_.name] = pd.DataFrame(species_out)
+
+        print(out)
+
+        return out
 
     # @classmethod
     # def read_pickle(cls, pickle_file: Path | str) -> Output:

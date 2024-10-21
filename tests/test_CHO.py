@@ -175,7 +175,13 @@ def test_H_fO2_batch_temperature(helper) -> None:
     surface_temperatures: npt.NDArray[np.float_] = np.array(
         [1500, 2000, 2500, 3000], dtype=np.float_
     )
-    planet: Planet = Planet(surface_temperature=surface_temperatures)
+    # Additionally test batching planet radius
+    # earth_radius: float = 6371000.0
+    # surface_radius: npt.NDArray[np.float_] = earth_radius * np.array([0.5, 1, 1.5, 2])
+    planet: Planet = Planet(
+        surface_temperature=surface_temperatures
+    )  # , surface_radius=surface_radius
+    # )
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
