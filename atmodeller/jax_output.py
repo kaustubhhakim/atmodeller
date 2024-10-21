@@ -53,7 +53,7 @@ class JaxOutput:
         initial_solution: Solution,
         traced_parameters: TracedParameters,
     ):
-        logger.info("Converting output")
+        logger.info("Creating Output")
         self._interior_atmosphere: InteriorAtmosphere = interior_atmosphere
         self._initial_solution: Solution = initial_solution
         self._traced_parameters: TracedParameters = traced_parameters
@@ -75,7 +75,7 @@ class JaxOutput:
 
     @property
     def log_number_density(self) -> Array:
-        r"""Log number density of all species in molecules m :math:`^{-3}`"""
+        r"""Log number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`"""
         return self._log_number_density
 
     @property
@@ -164,7 +164,7 @@ class JaxOutput:
         r"""Gets number density of all species
 
         Returns:
-            Number density in :math:`\mathrm{molecules}\,mathrm{m}^{-3}
+            Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
         return jnp.exp(self.log_number_density)
 
@@ -181,21 +181,22 @@ class JaxOutput:
     def quick_look(self) -> dict[str, ArrayLike]:
         """Quick look at the solution
 
-        This is intended for a quick first glance at the output with convenient units and to ease
-        comparison with test or benchmark data.
+        Provides a quick first glance at the output with convenient units and to ease comparison
+        with test or benchmark data.
 
         Returns:
             Dictionary of the solution
         """
 
-        def collapse_single_entry_values(
-            input_dictionary: dict[str, ArrayLike]
-        ) -> dict[str, ArrayLike]:
-            for key, value in input_dictionary.items():
+        def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, ArrayLike]:
+            output_dict: dict[str, ArrayLike] = {}
+            for key, value in input_dict.items():
                 if value.size == 1:  # type: ignore
-                    input_dictionary[key] = float(value[0])  # type: ignore
+                    output_dict[key] = float(value[0])  # type: ignore
+                else:
+                    output_dict[key] = value
 
-            return input_dictionary
+            return output_dict
 
         output_dict: dict[str, ArrayLike] = {}
 
