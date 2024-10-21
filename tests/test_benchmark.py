@@ -584,7 +584,7 @@ def test_graphite_water_condensed(helper) -> None:
     H2O_l: Species = Species.create_condensed("H2O_l")
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr)
-    planet: Planet = Planet(surface_temperature=430.0)
+    planet: Planet = Planet(surface_temperature=np.array([430.0]))  # , 400.0]))
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
     h_kg: float = 3.10e20

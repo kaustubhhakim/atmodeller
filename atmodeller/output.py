@@ -23,6 +23,8 @@ some of these functions must be vmapped to account for batch calculations.
 from __future__ import annotations
 
 import logging
+import sys
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
 
 import jax
@@ -32,11 +34,20 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.containers import Solution, TracedParameters
-from atmodeller.engine import get_log_activity
+from atmodeller.engine import (
+    get_atmosphere_log_molar_mass,
+    get_atmosphere_log_volume,
+    get_log_activity,
+)
 from atmodeller.utilities import (
     log_pressure_from_log_number_density,
     unscale_number_density,
 )
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
 
 if TYPE_CHECKING:
     from atmodeller.classes import InteriorAtmosphere
@@ -44,8 +55,15 @@ if TYPE_CHECKING:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class Output:
-    """Converts the array output to user-friendly scaled output"""
+class OutputABC(ABC):
+    """Output base class
+
+    Args:
+        Solution: Array output from solve
+        interior_atmosphere: Interior atmosphere
+        initial_solution: Initial solution
+        traced_parameters: Traced parameters
+    """
 
     def __init__(
         self,
@@ -55,24 +73,36 @@ class Output:
         traced_parameters: TracedParameters,
     ):
         logger.info("Creating Output")
+        self._solution: Array = jnp.atleast_2d(solution)
         self._interior_atmosphere: InteriorAtmosphere = interior_atmosphere
         self._initial_solution: Solution = initial_solution
         self._traced_parameters: TracedParameters = traced_parameters
 
-        if self.model.is_batch:
-            self._axis: int = 1
-        else:
-            self._axis = 0
-
         # Scale the solution quantities
-        log_number_density, log_stability = jnp.split(solution, 2, axis=self._axis)
+        log_number_density, log_stability = jnp.split(self._solution, 2, axis=1)
         self._log_number_density: Array = unscale_number_density(
-            jnp.atleast_2d(log_number_density), self.model.log_scaling
+            jnp.atleast_2d(log_number_density), self._interior_atmosphere.log_scaling
         )
         # Stability is non-dimensional and therefore does not need scaling
         self._log_stability: Array = jnp.atleast_2d(log_stability)
 
-        self.test_print_output()
+    @abstractmethod
+    def log_pressure(self) -> Array:
+        """Gets log pressure of all species in bar
+
+        This will compute log pressure of all species, including condensates, for simplicity.
+
+        Returns:
+            Log pressure of all species in bar
+        """
+
+    @abstractmethod
+    def _log_activity_without_stability(self) -> Array:
+        """Gets log activity without stability of all species
+
+        Args:
+            Log activity without stability of all species
+        """
 
     @property
     def log_number_density(self) -> Array:
@@ -85,36 +115,30 @@ class Output:
         return self._log_stability
 
     @property
-    def model(self) -> InteriorAtmosphere:
-        """Interior atmosphere model"""
-        return self._interior_atmosphere
+    def number_solutions(self) -> int:
+        """Number of solutions"""
+        return self.log_number_density.shape[0]
 
-    def _activity_without_stability(self) -> Array:
-        """Gets activity without stability of all species
+    @property
+    def gas_species_indices(self) -> Array:
+        """Gas species indices
+
+        This is a 1-D array.
+        """
+        return jnp.array(self._interior_atmosphere.fixed_parameters.gas_species_indices)
+
+    @property
+    def log_number_density_gas_species(self) -> Array:
+        r"""Log number density of gas species in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`"""
+        return jnp.take(self.log_number_density, self.gas_species_indices, axis=1)
+
+    def activity(self) -> Array:
+        """Gets the activity of all species
 
         Returns:
-            Activity without stability of all species
+            Activity of all species
         """
-        return jnp.exp(self._log_activity_without_stability())
-
-    def _log_activity_without_stability(self) -> Array:
-        """Gets log activity without stability of all species
-
-        Args:
-            Log activity without stability of all species
-        """
-        if self.model.is_batch:
-            log_activity_func: Callable = jax.vmap(
-                get_log_activity, in_axes=(self.model.traced_parameters_vmap, None, 0)
-            )
-        else:
-            log_activity_func = get_log_activity
-
-        log_activity: Array = log_activity_func(
-            self._traced_parameters, self.model.fixed_parameters, self.pressure()
-        )
-
-        return log_activity
+        return jnp.exp(self.log_activity())
 
     def log_activity(self) -> Array:
         """Gets log activity of all species.
@@ -130,37 +154,6 @@ class Output:
 
         return log_activity
 
-    def log_pressure(self) -> Array:
-        """Gets log pressure of all species in bar
-
-        This will compute log pressure of all species, including condensates, for simplicity.
-
-        Returns:
-            Log pressure of all species in bar
-        """
-
-        # For single calculations or calculations where temperature is not batched
-        log_pressure_func: Callable = log_pressure_from_log_number_density
-
-        # Must vectorise for batch calculations with temperature
-        if self.model.is_batch:
-            if self.model.traced_parameters_vmap.planet.surface_temperature == 0:
-                log_pressure_func = jax.vmap(log_pressure_from_log_number_density, in_axes=(0, 0))
-
-        log_pressure: Array = log_pressure_func(
-            self.log_number_density, self._traced_parameters.planet.surface_temperature
-        )
-
-        return log_pressure
-
-    def activity(self) -> Array:
-        """Gets the activity of all species
-
-        Returns:
-            Activity of all species
-        """
-        return jnp.exp(self.log_activity())
-
     def number_density(self) -> Array:
         r"""Gets number density of all species
 
@@ -168,14 +161,6 @@ class Output:
             Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
         return jnp.exp(self.log_number_density)
-
-    def planet(self) -> dict[str, ArrayLike]:
-        """Gets the planet properties
-
-        Returns:
-            Planet
-        """
-        return self._traced_parameters.planet.expanded_asdict()
 
     def pressure(self) -> Array:
         """Gets pressure of all species in bar
@@ -197,21 +182,21 @@ class Output:
             Dictionary of the solution
         """
 
-        def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, ArrayLike]:
+        def collapse_single_entry_values(input_dict: dict[str, Array]) -> dict[str, ArrayLike]:
             output_dict: dict[str, ArrayLike] = {}
             for key, value in input_dict.items():
-                if value.size == 1:  # type: ignore
-                    output_dict[key] = float(value[0])  # type: ignore
+                if value.size > 1:
+                    output_dict[key] = jnp.squeeze(value)
                 else:
-                    output_dict[key] = value
+                    output_dict[key] = value.item()
 
             return output_dict
 
-        output_dict: dict[str, ArrayLike] = {}
+        output_dict: dict[str, Array] = {}
 
-        for nn, species_ in enumerate(self.model.species):
-            pressure: Array = jnp.atleast_2d(self.pressure())[:, nn]
-            activity: Array = jnp.atleast_2d(self.activity())[:, nn]
+        for nn, species_ in enumerate(self._interior_atmosphere.species):
+            pressure: Array = self.pressure()[:, nn]
+            activity: Array = self.activity()[:, nn]
             output_dict[species_.name] = pressure
             output_dict[f"{species_.name}_activity"] = activity
 
@@ -225,18 +210,169 @@ class Output:
         """
         return jnp.exp(self.log_stability)
 
-    def test_print_output(self) -> None:
+    def temperature(self) -> ArrayLike:
+        """Gets temperature
 
-        print("log_number_density = ", self.log_number_density)
-        print("log_stability = ", self.log_stability)
-        print("log_pressure = ", self.log_pressure())
-        print("pressure = ", self.pressure())
-        print("log_activity = ", self.log_activity())
-        print("activity = ", self.activity())
-        print("planet = ", self.planet())
-        print("planet_expanded = ", self._traced_parameters.planet.expanded_asdict())
+        This could be a single value or an array depending if the value is configured for a batch
+        calculation.
 
-        self.to_dataframes()
+        Returns:
+            Temperature
+        """
+        return self._traced_parameters.planet.surface_temperature
+
+    def output_to_logger(self) -> None:
+        """Writes output to the logger.
+
+        Useful for debugging.
+        """
+        logger.info("log_number_density = %s", self.log_number_density)
+        logger.info("number_density = %s", self.number_density())
+        # logger.info("log_stability = %s", self.log_stability)
+        # logger.info("stability = %s", self.stability())
+        logger.info("pressure = %s", self.pressure())
+        # logger.info("log_activity = %s", self.log_activity())
+        logger.info("activity = %s", self.activity())
+
+    def _activity_without_stability(self) -> Array:
+        """Gets activity without stability of all species
+
+        Returns:
+            Activity without stability of all species
+        """
+        return jnp.exp(self._log_activity_without_stability())
+
+
+class OutputSingle(OutputABC):
+    """Converts single calculation output to user-friendly dimensional output"""
+
+    @override
+    def log_pressure(self) -> Array:
+        return log_pressure_from_log_number_density(self.log_number_density, self.temperature())
+
+    @override
+    def _log_activity_without_stability(self) -> Array:
+        return get_log_activity(
+            self._traced_parameters, self._interior_atmosphere.fixed_parameters, self.pressure()
+        )
+
+
+class OutputBatch(OutputABC):
+    """Converts batch calculation output to user-friendly dimensional output"""
+
+    @property
+    def vmap_temperature(self) -> int | None:
+        """Axis for temperature vmap"""
+        return self._interior_atmosphere.traced_parameters_vmap.planet.surface_temperature  # type: ignore
+
+    @override
+    def log_pressure(self) -> Array:
+        if self.vmap_temperature == 0:
+            log_pressure_func: Callable = jax.vmap(
+                log_pressure_from_log_number_density, in_axes=(0, 0)
+            )
+        else:
+            log_pressure_func = log_pressure_from_log_number_density
+
+        log_pressure: Array = log_pressure_func(self.log_number_density, self.temperature())
+
+        return log_pressure
+
+    @override
+    def _log_activity_without_stability(self) -> Array:
+        """Gets log activity without stability of all species
+
+        Args:
+            Log activity without stability of all species
+        """
+        log_activity_func: Callable = jax.vmap(
+            get_log_activity, in_axes=(self._interior_atmosphere.traced_parameters_vmap, None, 0)
+        )
+        log_activity: Array = log_activity_func(
+            self._traced_parameters, self._interior_atmosphere.fixed_parameters, self.pressure()
+        )
+
+        return log_activity
+
+
+# TODO: Removing this old class into single and batch subclasses
+class Output(OutputBatch):
+    """Converts the array output to user-friendly scaled output"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.output_to_logger()
+
+    @property
+    def model(self) -> InteriorAtmosphere:
+        """Interior atmosphere model"""
+        return self._interior_atmosphere
+
+    def atmosphere_log_molar_mass(self) -> Array:
+        """Gets the log molar mass of the atmosphere
+
+        Returns:
+            Log molar mass of the atmosphere
+        """
+        gas_molar_masses: Array = jnp.take(self.molar_mass(), self.gas_species_indices, axis=1)
+
+        if self.model.is_batch:
+            atmosphere_log_molar_mass_func: Callable = jax.vmap(
+                get_atmosphere_log_molar_mass, in_axes=(0, None)
+            )
+        else:
+            atmosphere_log_molar_mass_func = get_atmosphere_log_molar_mass
+
+        atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
+            self.log_number_density_gas_species, gas_molar_masses
+        )
+
+        return atmosphere_log_molar_mass
+
+    def atmosphere_molar_mass(self) -> Array:
+        """Gets the molar mass of the atmosphere
+
+        Returns:
+            Molar mass of the atmosphere
+        """
+        return jnp.exp(self.atmosphere_log_molar_mass())
+
+    # def atmosphere_log_volume(self) -> Array:
+    #     """Gets the atmosphere log volume
+
+    #     Returns:
+    #         Log volume of the atmosphere
+    #     """
+    #     gas_species_indices: Array = jnp.array(self.model.fixed_parameters.gas_species_indices)
+    #     molar_masses: Array = jnp.array(self.model.fixed_parameters.molar_masses)
+    #     gas_log_number_density: Array = jnp.take(
+    #         self.log_number_density, gas_species_indices, axis=1
+    #     )
+    #     gas_molar_masses: Array = jnp.take(molar_masses, gas_species_indices)
+
+    #     print(self.log_number_density)
+    #     print(gas_log_number_density)
+
+    #     return gas_log_number_density
+
+    def molar_mass(self) -> Array:
+        r"""Gets molar mass of all species
+
+        Returns:
+            Molar mass of all species
+        """
+        return jnp.tile(
+            jnp.array(self.model.fixed_parameters.molar_masses), (self.number_solutions, 1)
+        )
+
+    def planet(self) -> dict[str, ArrayLike]:
+        """Gets the planet properties
+
+        Returns:
+            Planet
+        """
+        return self._traced_parameters.planet.expanded_asdict()
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
         out: dict[str, pd.DataFrame] = {}
@@ -257,6 +393,8 @@ class Output:
         print(out)
 
         return out
+
+    # TODO: Old output class continues below. To keep until development of the new class complete.
 
     # @classmethod
     # def read_pickle(cls, pickle_file: Path | str) -> Output:

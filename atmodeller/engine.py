@@ -152,7 +152,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     log_number_density, log_stability = jnp.split(solution, 2)
     gas_log_number_density: Array = jnp.take(log_number_density, gas_species_indices)
     gas_molar_masses: Array = jnp.take(molar_masses, gas_species_indices)
-    log_volume: Array = atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
+    log_volume: Array = get_atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
 
     # Need pressures of all species in bar for subsequent operations. Note we must unscale.
     log_pressures: Array = unscale_number_density(
@@ -369,8 +369,8 @@ def element_density_in_melt(
 
 
 @jit
-def atmosphere_log_molar_mass(gas_log_number_density: Array, gas_molar_masses: Array) -> Array:
-    """Log molar mass of the atmosphere
+def get_atmosphere_log_molar_mass(gas_log_number_density: Array, gas_molar_masses: Array) -> Array:
+    """Gets log molar mass of the atmosphere
 
     Args:
         gas_log_number_density: Log number density of gas species
@@ -387,10 +387,10 @@ def atmosphere_log_molar_mass(gas_log_number_density: Array, gas_molar_masses: A
 
 
 @jit
-def atmosphere_log_volume(
+def get_atmosphere_log_volume(
     gas_log_number_density: Array, gas_molar_masses: Array, planet: Planet
 ) -> Array:
-    """Log volume of the atmosphere"
+    """Gets log volume of the atmosphere"
 
     Args:
         gas_log_number_density: Log number density of gas species
@@ -403,7 +403,7 @@ def atmosphere_log_volume(
     return (
         jnp.log(GAS_CONSTANT)
         + jnp.log(planet.surface_temperature)
-        - atmosphere_log_molar_mass(gas_log_number_density, gas_molar_masses)
+        - get_atmosphere_log_molar_mass(gas_log_number_density, gas_molar_masses)
         + jnp.log(planet.surface_area)
         - jnp.log(planet.surface_gravity)
     )
