@@ -38,6 +38,22 @@ atmodeller.engine module
    :undoc-members:
    :show-inheritance:
 
+atmodeller.interfaces module
+----------------------------
+
+.. automodule:: atmodeller.interfaces
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+atmodeller.jax\_output module
+-----------------------------
+
+.. automodule:: atmodeller.jax_output
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.output module
 ------------------------
 

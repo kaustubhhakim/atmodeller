@@ -28,6 +28,14 @@ atmodeller.thermodata.gases module
    :undoc-members:
    :show-inheritance:
 
+atmodeller.thermodata.redox\_buffers module
+-------------------------------------------
+
+.. automodule:: atmodeller.thermodata.redox_buffers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.thermodata.species\_data module
 ------------------------------------------
 

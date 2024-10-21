@@ -12,10 +12,10 @@ Subpackages
 Submodules
 ----------
 
-atmodeller.eos.chabrier module
-------------------------------
+atmodeller.eos.classes module
+-----------------------------
 
-.. automodule:: atmodeller.eos.chabrier
+.. automodule:: atmodeller.eos.classes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -36,14 +36,6 @@ atmodeller.eos.holland module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.eos.holley module
-----------------------------
-
-.. automodule:: atmodeller.eos.holley
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 atmodeller.eos.interfaces module
 --------------------------------
 
@@ -52,10 +44,10 @@ atmodeller.eos.interfaces module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.eos.jax\_holley module
----------------------------------
+atmodeller.eos.library module
+-----------------------------
 
-.. automodule:: atmodeller.eos.jax_holley
+.. automodule:: atmodeller.eos.library
    :members:
    :undoc-members:
    :show-inheritance:
@@ -64,14 +56,6 @@ atmodeller.eos.saxena module
 ----------------------------
 
 .. automodule:: atmodeller.eos.saxena
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-atmodeller.eos.template module
-------------------------------
-
-.. automodule:: atmodeller.eos.template
    :members:
    :undoc-members:
    :show-inheritance:

@@ -41,7 +41,8 @@ from atmodeller.containers import (
     Species,
     TracedParameters,
 )
-from atmodeller.engine import get_log_extended_activity, solve
+from atmodeller.engine import solve
+from atmodeller.jax_output import JaxOutput
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref, unscale_number_density
 
@@ -78,7 +79,7 @@ class InteriorAtmosphere:
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
-    def _is_batch(self) -> bool:
+    def is_batch(self) -> bool:
         """Returns if any parameters are batched, thereby necessitating a vmap solve"""
         vmap_axes: list = [
             self.planet.vmap_axes(),
@@ -137,7 +138,7 @@ class InteriorAtmosphere:
         )
         logger.debug("traced_parameters = %s", self.traced_parameters)
 
-        if self._is_batch:
+        if self.is_batch:
             self._solver = self._get_solver_vmap()
         else:
             self._solver = self._get_solver_single()
@@ -396,15 +397,15 @@ class InteriorAtmosphere:
     def _get_solver_vmap(self) -> Callable:
         """Gets the solver for a batch solve."""
         # Define the structures to vectorize.
-        self.parameters_vmap = TracedParameters(
+        self.traced_parameters_vmap = TracedParameters(
             planet=self.planet.vmap_axes(),  # type: ignore
             fugacity_constraints=self.fugacity_constraints.vmap_axes(),  # type: ignore
             mass_constraints=self.mass_constraints.vmap_axes(),  # type: ignore
         )
-        logger.debug("parameters_vmap = %s", self.parameters_vmap)
+        logger.debug("traced_parameters_vmap = %s", self.traced_parameters_vmap)
 
         solver: Callable = jax.jit(
-            jax.vmap(self.get_wrapped_jit_solver(), in_axes=(None, self.parameters_vmap))
+            jax.vmap(self.get_wrapped_jit_solver(), in_axes=(None, self.traced_parameters_vmap))
         )
 
         return solver
@@ -413,7 +414,7 @@ class InteriorAtmosphere:
         self,
         initial_solution: Solution | None = None,
         traced_parameters: TracedParameters | None = None,
-    ) -> Array:
+    ) -> tuple[Array, Solution, TracedParameters]:
         """Solves the system and returns the raw (unprocessed) solution
 
         Args:
@@ -423,7 +424,7 @@ class InteriorAtmosphere:
                 parameters used to initialise the solver are used.
 
         Returns:
-            Solution
+            Solution, initial solution, traced parameters
         """
         if initial_solution is None:
             initial_solution_: Solution = self.initial_solution
@@ -442,7 +443,7 @@ class InteriorAtmosphere:
         logger.info("Execution time: %.6f seconds", execution_time)
         logger.debug("out = %s", out)
 
-        return out
+        return out, initial_solution_, traced_parameters_
 
     def solve(
         self,
@@ -460,30 +461,16 @@ class InteriorAtmosphere:
         Returns:
             Number density, extended activity
         """
-        out: Array = self.solve_raw_output(initial_solution, traced_parameters)
-
-        # FIXME: get_log_extended_activity is broken. Now needs pressure as arg.
-        if self._is_batch:
-            logger.debug("Batch calculation")
-            # Must vmap the function to enable it to be used in batch mode.
-            vmap_get_log_extended_activity: Callable = jax.vmap(
-                get_log_extended_activity, in_axes=(self.parameters_vmap, None, 0, 0)
-            )
-            number_density_np, extended_activity_np = self.get_processed_output(
-                out, axis=1, extended_activity_func=vmap_get_log_extended_activity
-            )
-        else:
-            logger.debug("Single calculation")
-            number_density_np, extended_activity_np = self.get_processed_output(
-                out, axis=0, extended_activity_func=get_log_extended_activity
-            )
-
-        output_dict: dict[str, ArrayLike] = self.output_dict(
-            number_density_np, extended_activity_np
+        solution, initial_solution_, traced_parameters_ = self.solve_raw_output(
+            initial_solution, traced_parameters
         )
-        logger.info("output_dict = %s", pprint.pformat(output_dict))
 
-        return output_dict
+        output: JaxOutput = JaxOutput(solution, self, initial_solution_, traced_parameters_)
+        quick_look: dict[str, ArrayLike] = output.quick_look()
+
+        logger.info("output_dict = %s", pprint.pformat(quick_look))
+
+        return quick_look
 
     def output_dict(
         self,

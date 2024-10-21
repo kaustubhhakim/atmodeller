@@ -171,8 +171,10 @@ def test_H_fO2_batch_temperature(helper) -> None:
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
 
-    # Set up a range of surface temperatures to solve from 2000 K to 3000 K
-    surface_temperatures: npt.NDArray[np.float_] = np.array([2000, 2500, 3000], dtype=np.float_)
+    # Number of surface temperatures is different to number of species to test array shapes work.
+    surface_temperatures: npt.NDArray[np.float_] = np.array(
+        [1500, 2000, 2500, 3000], dtype=np.float_
+    )
     planet: Planet = Planet(surface_temperature=surface_temperatures)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
@@ -197,9 +199,20 @@ def test_H_fO2_batch_temperature(helper) -> None:
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
     target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([0.257080033422599, 0.25721776694131, 0.257274566532843]),
-        "H2_g": np.array([0.249157724831255, 0.226576661188286, 0.219958433575132]),
-        "O2_g": np.array([8.838042581380630e-08, 4.544719798221670e-05, 2.739265090516618e-03]),
+        "H2O_g": np.array(
+            [0.25666525060921, 0.257080033422599, 0.25721776694131, 0.257274566532845]
+        ),
+        "H2_g": np.array(
+            [0.313371131998901, 0.249157724831257, 0.226576661188286, 0.219958433575134]
+        ),
+        "O2_g": np.array(
+            [
+                2.394072903442518e-12,
+                8.838042581380567e-08,
+                4.544719798221670e-05,
+                2.739265090516618e-03,
+            ]
+        ),
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)

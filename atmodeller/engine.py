@@ -168,7 +168,9 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
             species, gas_species_indices, reaction_matrix, temperature, log_scaling
         )
-        log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, pressures)
+        log_activity: Array = get_log_activity_scaled(
+            traced_parameters, fixed_parameters, pressures
+        )
         reaction_residual: Array = (
             reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
         )
@@ -221,12 +223,12 @@ def get_log_activity(
     fixed_parameters: FixedParameters,
     pressures: ArrayLike,
 ) -> Array:
-    """Log activity
+    """Gets the log activity of all species
 
     Args:
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
-        pressures: Pressures of all species
+        pressures: Pressures of all species in bar
 
     Returns:
         Log activity
@@ -234,15 +236,13 @@ def get_log_activity(
     planet: Planet = traced_parameters.planet
     species: tuple[Species, ...] = fixed_parameters.species
     temperature: ArrayLike = planet.surface_temperature
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-    log_scaling: float = fixed_parameters.log_scaling
     # Currently not used, but may be required in the future.
     # total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
 
     activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
 
     def apply_activity_function(index: ArrayLike, temperature: ArrayLike, pressures: ArrayLike):
-        # Activity, so far, is only a function of the species pressure
+        # Activity, so far, is only a function of the species pressure, not the total pressure
         pressure: Array = jnp.take(pressures, index)
 
         return lax.switch(
@@ -253,47 +253,48 @@ def get_log_activity(
         )
 
     vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0, None, None))
-    indices: ArrayLike = jnp.arange(len(species))
+    indices: Array = jnp.arange(len(species))
     log_activity: Array = vmap_apply_function(indices, temperature, pressures)
-
-    mask: Array = jnp.zeros_like(log_activity, dtype=bool)
-    mask = mask.at[gas_species_indices].set(True)
-
-    # Log activities must be converted back to scaled units
-    scaled_log_activity: Array = scale_number_density(
-        log_number_density_from_log_pressure(log_activity, temperature), log_scaling
-    )
-
-    log_activity = jnp.where(mask, scaled_log_activity, log_activity)
-    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     return log_activity
 
 
 @jit
-def get_log_extended_activity(
+def get_log_activity_scaled(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    log_number_density: Array,
-    log_stability: Array,
+    pressures: ArrayLike,
 ) -> Array:
-    """Log extended activity
+    """Gets the log activity of all species in scaled units
 
     Args:
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
-        log_number_density: Log number density
-        log_stability: Log stability
+        pressures: Pressures of all species
 
     Returns:
-        Log extended activity
+        Log activity in scaled units
     """
-    log_extended_activity: Array = get_log_activity(
-        traced_parameters, fixed_parameters, log_number_density
-    ) - jnp.exp(log_stability)
-    # jax.debug.print("log_extended_activity = {out}", out=log_extended_activity)
+    planet: Planet = traced_parameters.planet
+    temperature: ArrayLike = planet.surface_temperature
+    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
+    log_scaling: float = fixed_parameters.log_scaling
+    # Currently not used, but may be required in the future.
+    # total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
 
-    return log_extended_activity
+    log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, pressures)
+
+    # Need to convert gas species back to scaled units
+    mask: Array = jnp.zeros_like(log_activity, dtype=bool)
+    mask = mask.at[gas_species_indices].set(True)
+    log_activity_scaled: Array = scale_number_density(
+        log_number_density_from_log_pressure(log_activity, temperature), log_scaling
+    )
+
+    log_activity_scaled = jnp.where(mask, log_activity_scaled, log_activity)
+    # jax.debug.print("log_activity_scaled = {out}", out=log_activity_scaled)
+
+    return log_activity_scaled
 
 
 @jit
