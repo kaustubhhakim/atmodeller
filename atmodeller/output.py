@@ -87,6 +87,14 @@ class OutputABC(ABC):
         self._log_stability: Array = jnp.atleast_2d(log_stability)
 
     @abstractmethod
+    def atmosphere_log_molar_mass(self) -> Array:
+        """Gets log molar mass of the atmosphere
+
+        Returns:
+            Log molar mass of the atmosphere
+        """
+
+    @abstractmethod
     def log_pressure(self) -> Array:
         """Gets log pressure of all species in bar
 
@@ -105,6 +113,11 @@ class OutputABC(ABC):
         """
 
     @property
+    def gas_molar_mass(self) -> Array:
+        """Molar mass of the gas species as a 1-D array"""
+        return jnp.take(self.molar_mass, self.gas_species_indices)
+
+    @property
     def log_number_density(self) -> Array:
         r"""Log number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`"""
         return self._log_number_density
@@ -113,6 +126,11 @@ class OutputABC(ABC):
     def log_stability(self) -> Array:
         """Log stability of all species"""
         return self._log_stability
+
+    @property
+    def molar_mass(self) -> Array:
+        """Gets molar mass of all species as 1-D array"""
+        return jnp.array(self._interior_atmosphere.fixed_parameters.molar_masses)
 
     @property
     def number_solutions(self) -> int:
@@ -140,6 +158,14 @@ class OutputABC(ABC):
         """
         return jnp.exp(self.log_activity())
 
+    def atmosphere_molar_mass(self) -> Array:
+        """Gets the molar mass of the atmosphere
+
+        Returns:
+            Molar mass of the atmosphere
+        """
+        return jnp.exp(self.atmosphere_log_molar_mass())
+
     def log_activity(self) -> Array:
         """Gets log activity of all species.
 
@@ -153,6 +179,14 @@ class OutputABC(ABC):
         log_activity: Array = log_activity_without_stability - jnp.exp(self.log_stability)
 
         return log_activity
+
+    def molar_mass_expanded(self) -> Array:
+        r"""Gets molar mass of all species in an expanded array.
+
+        Returns:
+            Molar mass of all species in an expanded array.
+        """
+        return jnp.tile(self.molar_mass, (self.number_solutions, 1))
 
     def number_density(self) -> Array:
         r"""Gets number density of all species
@@ -233,6 +267,9 @@ class OutputABC(ABC):
         logger.info("pressure = %s", self.pressure())
         # logger.info("log_activity = %s", self.log_activity())
         logger.info("activity = %s", self.activity())
+        logger.info("molar_mass = %s", self.molar_mass)
+        logger.info("molar_mass_expanded = %s", self.molar_mass_expanded())
+        logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
 
     def _activity_without_stability(self) -> Array:
         """Gets activity without stability of all species
@@ -245,6 +282,12 @@ class OutputABC(ABC):
 
 class OutputSingle(OutputABC):
     """Converts single calculation output to user-friendly dimensional output"""
+
+    @override
+    def atmosphere_log_molar_mass(self) -> Array:
+        return get_atmosphere_log_molar_mass(
+            self.log_number_density_gas_species, self.gas_molar_mass
+        )
 
     @override
     def log_pressure(self) -> Array:
@@ -266,6 +309,17 @@ class OutputBatch(OutputABC):
         return self._interior_atmosphere.traced_parameters_vmap.planet.surface_temperature  # type: ignore
 
     @override
+    def atmosphere_log_molar_mass(self) -> Array:
+        atmosphere_log_molar_mass_func: Callable = jax.vmap(
+            get_atmosphere_log_molar_mass, in_axes=(0, None)
+        )
+        atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
+            self.log_number_density_gas_species, self.gas_molar_mass
+        )
+
+        return atmosphere_log_molar_mass
+
+    @override
     def log_pressure(self) -> Array:
         if self.vmap_temperature == 0:
             log_pressure_func: Callable = jax.vmap(
@@ -280,11 +334,6 @@ class OutputBatch(OutputABC):
 
     @override
     def _log_activity_without_stability(self) -> Array:
-        """Gets log activity without stability of all species
-
-        Args:
-            Log activity without stability of all species
-        """
         log_activity_func: Callable = jax.vmap(
             get_log_activity, in_axes=(self._interior_atmosphere.traced_parameters_vmap, None, 0)
         )
@@ -299,44 +348,10 @@ class OutputBatch(OutputABC):
 class Output(OutputBatch):
     """Converts the array output to user-friendly scaled output"""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.output_to_logger()
-
     @property
     def model(self) -> InteriorAtmosphere:
         """Interior atmosphere model"""
         return self._interior_atmosphere
-
-    def atmosphere_log_molar_mass(self) -> Array:
-        """Gets the log molar mass of the atmosphere
-
-        Returns:
-            Log molar mass of the atmosphere
-        """
-        gas_molar_masses: Array = jnp.take(self.molar_mass(), self.gas_species_indices, axis=1)
-
-        if self.model.is_batch:
-            atmosphere_log_molar_mass_func: Callable = jax.vmap(
-                get_atmosphere_log_molar_mass, in_axes=(0, None)
-            )
-        else:
-            atmosphere_log_molar_mass_func = get_atmosphere_log_molar_mass
-
-        atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
-            self.log_number_density_gas_species, gas_molar_masses
-        )
-
-        return atmosphere_log_molar_mass
-
-    def atmosphere_molar_mass(self) -> Array:
-        """Gets the molar mass of the atmosphere
-
-        Returns:
-            Molar mass of the atmosphere
-        """
-        return jnp.exp(self.atmosphere_log_molar_mass())
 
     # def atmosphere_log_volume(self) -> Array:
     #     """Gets the atmosphere log volume
@@ -356,15 +371,15 @@ class Output(OutputBatch):
 
     #     return gas_log_number_density
 
-    def molar_mass(self) -> Array:
-        r"""Gets molar mass of all species
+    # def molar_mass(self) -> Array:
+    #     r"""Gets molar mass of all species
 
-        Returns:
-            Molar mass of all species
-        """
-        return jnp.tile(
-            jnp.array(self.model.fixed_parameters.molar_masses), (self.number_solutions, 1)
-        )
+    #     Returns:
+    #         Molar mass of all species
+    #     """
+    #     return jnp.tile(
+    #         jnp.array(self.model.fixed_parameters.molar_masses), (self.number_solutions, 1)
+    #     )
 
     def planet(self) -> dict[str, ArrayLike]:
         """Gets the planet properties
