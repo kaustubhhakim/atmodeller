@@ -37,6 +37,7 @@ from atmodeller.containers import Solution, TracedParameters
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
+    get_atmosphere_pressure,
     get_log_activity,
 )
 from atmodeller.utilities import (
@@ -92,6 +93,14 @@ class OutputABC(ABC):
 
         Returns:
             Log molar mass of the atmosphere
+        """
+
+    @abstractmethod
+    def atmosphere_pressure(self) -> Array:
+        """Gets pressure of the atmosphere
+
+        Returns:
+            Pressure of the atmosphere
         """
 
     @abstractmethod
@@ -270,6 +279,7 @@ class OutputABC(ABC):
         logger.info("molar_mass = %s", self.molar_mass)
         logger.info("molar_mass_expanded = %s", self.molar_mass_expanded())
         logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
+        logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
 
     def _activity_without_stability(self) -> Array:
         """Gets activity without stability of all species
@@ -288,6 +298,10 @@ class OutputSingle(OutputABC):
         return get_atmosphere_log_molar_mass(
             self.log_number_density_gas_species, self.gas_molar_mass
         )
+
+    @override
+    def atmosphere_pressure(self) -> Array:
+        return get_atmosphere_pressure(self._interior_atmosphere.fixed_parameters, self.pressure())
 
     @override
     def log_pressure(self) -> Array:
@@ -318,6 +332,15 @@ class OutputBatch(OutputABC):
         )
 
         return atmosphere_log_molar_mass
+
+    @override
+    def atmosphere_pressure(self) -> Array:
+        atmosphere_pressure_func: Callable = jax.vmap(get_atmosphere_pressure, in_axes=(None, 0))
+        atmosphere_pressure: Array = atmosphere_pressure_func(
+            self._interior_atmosphere.fixed_parameters, self.pressure()
+        )
+
+        return atmosphere_pressure
 
     @override
     def log_pressure(self) -> Array:

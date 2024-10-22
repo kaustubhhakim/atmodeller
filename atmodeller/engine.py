@@ -159,7 +159,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
     )
     pressures: Array = jnp.exp(log_pressures)
-    total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
+    total_pressure: Array = get_atmosphere_pressure(fixed_parameters, pressures)
 
     residual: Array = jnp.array([])
 
@@ -237,7 +237,7 @@ def get_log_activity(
     species: tuple[Species, ...] = fixed_parameters.species
     temperature: ArrayLike = planet.surface_temperature
     # Currently not used, but may be required in the future.
-    # total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
+    # total_pressure: Array = get_atmosphere_pressure(fixed_parameters, pressures)
 
     activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
 
@@ -280,7 +280,7 @@ def get_log_activity_scaled(
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
     log_scaling: float = fixed_parameters.log_scaling
     # Currently not used, but may be required in the future.
-    # total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
+    # total_pressure: Array = get_atmosphere_pressure(fixed_parameters, pressures)
 
     log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, pressures)
 
@@ -330,7 +330,7 @@ def element_density_in_melt(
         log_pressure_from_log_number_density(log_number_density, temperature), log_scaling
     )
     pressures: Array = jnp.exp(log_pressures)
-    total_pressure: Array = atmosphere_pressure(fixed_parameters, pressures)
+    total_pressure: Array = get_atmosphere_pressure(fixed_parameters, pressures)
     diatomic_oxygen_fugacity: Array = jnp.take(pressure, diatomic_oxygen_index)
 
     solubility_funcs: list[Callable] = [
@@ -410,11 +410,11 @@ def get_atmosphere_log_volume(
 
 
 @jit
-def atmosphere_pressure(
+def get_atmosphere_pressure(
     fixed_parameters: FixedParameters,
     pressures: Array,
 ) -> Array:
-    """Pressure of the atmosphere in bar
+    """Gets pressure of the atmosphere in bar
 
     Args:
         fixed_parameters: Fixed parameters
