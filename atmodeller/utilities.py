@@ -63,38 +63,6 @@ def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
 
 
 @jit
-def scale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
-    """Scales the log number density
-
-    This is in log space.
-
-    Args:
-        number_density: Number density in molecules per m^3
-        scaling: Scaling
-
-    Return:
-        Scaled number density
-    """
-    return number_density - scaling  # type: ignore since types are not bool
-
-
-@jit
-def unscale_number_density(number_density: ArrayLike, scaling: ArrayLike) -> ArrayLike:
-    """Unscales the scaled log number density
-
-    This is in log space.
-
-    Args:
-        number_density: Scaled number density
-        scaling: Scaling
-
-    Returns:
-        Unscaled number density
-    """
-    return number_density + scaling
-
-
-@jit
 def log_pressure_from_log_number_density(
     log_number_density: ArrayLike, temperature: ArrayLike
 ) -> Array:
