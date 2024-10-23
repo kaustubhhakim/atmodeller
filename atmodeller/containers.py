@@ -256,7 +256,7 @@ class FugacityConstraints(NamedTuple):
 
         return FugacityConstraints(constraints_vmap)  # type: ignore - container
 
-    def array(self, temperature: ArrayLike, pressure: Array) -> Array:
+    def array(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log number density as an array
 
         Args:
@@ -270,7 +270,9 @@ class FugacityConstraints(NamedTuple):
             constraint.log_fugacity for constraint in self.constraints.values()
         ]
 
-        def apply_fugacity_function(index: ArrayLike, temperature: ArrayLike, pressure: Array):
+        def apply_fugacity_function(
+            index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
+        ) -> Array:
             return lax.switch(
                 index,
                 fugacity_funcs,
@@ -279,7 +281,7 @@ class FugacityConstraints(NamedTuple):
             )
 
         vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
-        indices: ArrayLike = jnp.arange(len(self.constraints))
+        indices: Array = jnp.arange(len(self.constraints))
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
         log_number_density: Array = get_log_number_density_from_log_pressure(
             log_fugacity, temperature
@@ -342,7 +344,7 @@ class MassConstraints(NamedTuple):
 
         return MassConstraints(log_molecules_vmap)  # type: ignore - container types for data
 
-    def array(self, log_atmosphere_volume: Array) -> Array:
+    def array(self, log_atmosphere_volume: ArrayLike) -> Array:
         """Log number density as an array
 
         Args:
