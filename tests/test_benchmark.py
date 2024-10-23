@@ -24,7 +24,7 @@ import numpy as np
 import pytest
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, debug_logger
+from atmodeller import debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
@@ -39,8 +39,6 @@ ATOL: float = 1.0e-8
 """Absolute tolerance"""
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage and FastChem"""
-SCALING: float = AVOGADRO
-"""Scale the numerical problem from molecules/m^3 to moles/m^3 if SCALING is AVODAGRO"""
 TAU: float = 1.0e60
 """Tau scaling factor for species stability"""
 
@@ -59,7 +57,7 @@ def test_H_O(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g)
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -105,7 +103,7 @@ def test_CHO_reduced(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-2)}
 
@@ -159,7 +157,7 @@ def test_CHO_IW(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(0.5)}
 
@@ -224,7 +222,7 @@ def test_CHO_oxidised(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(2)}
 
@@ -279,7 +277,7 @@ def test_CHO_highly_oxidised(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=1400.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(4)}
 
@@ -329,7 +327,7 @@ def test_CHO_middle_temperature(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=873.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
@@ -380,7 +378,7 @@ def test_CHO_low_temperature(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g)
     planet: Planet = Planet(surface_temperature=450.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -430,7 +428,7 @@ def test_graphite_condensed(helper) -> None:
 
     species: tuple[Species, ...] = (O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr)
     planet: Planet = Planet(surface_temperature=873.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -483,7 +481,7 @@ def test_graphite_unstable(helper) -> None:
 
     species: tuple[Species, ...] = (O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr)
     planet: Planet = Planet(surface_temperature=1400.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(0.5)}
 
@@ -534,7 +532,7 @@ def test_water_condensed(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, H2O_l)
     planet: Planet = Planet(surface_temperature=411.75)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -585,7 +583,7 @@ def test_graphite_water_condensed(helper) -> None:
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr)
     planet: Planet = Planet(surface_temperature=np.array([430.0]))  # , 400.0]))
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
