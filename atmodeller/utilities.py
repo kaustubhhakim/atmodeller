@@ -28,12 +28,7 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
-from atmodeller import (
-    ATMOSPHERE,
-    BOLTZMANN_CONSTANT_BAR,
-    OCEAN_MASS_H2,
-    PRESSURE_REFERENCE,
-)
+from atmodeller import ATMOSPHERE, OCEAN_MASS_H2, PRESSURE_REFERENCE
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self

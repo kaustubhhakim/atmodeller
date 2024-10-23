@@ -43,9 +43,10 @@ from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
     get_atmosphere_pressure,
+    get_element_density,
     get_element_density_in_melt,
     get_log_activity,
-    get_log_pressure_from_log_number_density,
+    get_pressure_from_log_number_density,
     get_species_density_in_melt,
 )
 
@@ -113,6 +114,14 @@ class Output(ABC):
         """
 
     @abstractmethod
+    def element_density(self) -> Array:
+        """Gets the number density of elements in the gas or condensed phase
+
+        Returns:
+            Number density of elements in the gas or condensed phase
+        """
+
+    @abstractmethod
     def element_density_in_melt(self) -> Array:
         """Gets the number density of elements dissolved in melt due to species solubility
 
@@ -121,13 +130,13 @@ class Output(ABC):
         """
 
     @abstractmethod
-    def log_pressure(self) -> Array:
-        """Gets log pressure of all species in bar
+    def pressure(self) -> Array:
+        """Gets pressure of species in bar
 
-        This will compute log pressure of all species, including condensates, for simplicity.
+        This will compute pressure of all species, including condensates, for simplicity.
 
         Returns:
-            Log pressure of all species in bar
+            Pressure of species in bar
         """
 
     @abstractmethod
@@ -197,6 +206,11 @@ class Output(ABC):
         return self._interior_atmosphere.species
 
     @property
+    def temperature(self) -> ArrayLike:
+        """Temperature"""
+        return self.planet.surface_temperature
+
+    @property
     def traced_parameters(self) -> TracedParameters:
         """Traced parameters"""
         return self._traced_parameters
@@ -217,7 +231,7 @@ class Output(ABC):
         """
         out: dict[str, ArrayLike] = {}
         out["pressure"] = self.atmosphere_pressure()
-        out["temperature"] = self.temperature()
+        out["temperature"] = self.temperature
         out["volume"] = self.atmosphere_volume()
 
         return collapse_single_entry_values(out)
@@ -248,7 +262,8 @@ class Output(ABC):
         unique_elements: tuple[str, ...] = (
             self._interior_atmosphere.get_unique_elements_in_species()
         )
-        element_density_in_melt = self.element_density_in_melt()
+        element_density: Array = self.element_density()
+        element_density_in_melt: Array = self.element_density_in_melt()
         for nn, element in enumerate(unique_elements):
             # TODO: Add output quantities
             # total_mass
@@ -264,6 +279,8 @@ class Output(ABC):
             # volume_mixing_ratio
             # molar_mass
             element_dict: dict[str, ArrayLike] = {}
+            # TODO: Split between gas and condensed
+            element_dict["number_density"] = element_density[nn]
             element_dict["dissolved_number_density"] = element_density_in_melt[nn]
             out[element] = collapse_single_entry_values(element_dict)
 
@@ -317,16 +334,6 @@ class Output(ABC):
     #     """
     #     return pd.DataFrame(self.planet_asdict())
 
-    def pressure(self) -> Array:
-        """Gets pressure of all species in bar
-
-        Returns:
-            Pressure in bar
-        """
-        pressure: Array = jnp.exp(self.log_pressure())
-
-        return pressure
-
     def quick_look(self) -> dict[str, ArrayLike]:
         """Quick look at the solution
 
@@ -353,17 +360,6 @@ class Output(ABC):
             Stability of all the species
         """
         return jnp.exp(self.log_stability)
-
-    def temperature(self) -> ArrayLike:
-        """Gets temperature
-
-        This could be a single value or an array depending if the value is configured for a batch
-        calculation.
-
-        Returns:
-            Temperature
-        """
-        return self.planet.surface_temperature
 
     def output_to_logger(self) -> None:
         """Writes output to the logger.
@@ -407,9 +403,7 @@ class OutputSingle(Output):
 
     @override
     def atmosphere_log_molar_mass(self) -> Array:
-        return get_atmosphere_log_molar_mass(
-            self.log_number_density_gas_species, self.gas_molar_mass
-        )
+        return get_atmosphere_log_molar_mass(self.fixed_parameters, self.log_number_density)
 
     @override
     def atmosphere_log_volume(self) -> Array:
@@ -422,8 +416,12 @@ class OutputSingle(Output):
     @override
     def atmosphere_pressure(self) -> Array:
         return get_atmosphere_pressure(
-            self.fixed_parameters, self.log_number_density, self.temperature()
+            self.fixed_parameters, self.log_number_density, self.temperature
         )
+
+    @override
+    def element_density(self) -> Array:
+        return get_element_density(self.fixed_parameters, jnp.ravel(self.log_number_density))
 
     @override
     def element_density_in_melt(self) -> Array:
@@ -432,15 +430,13 @@ class OutputSingle(Output):
             self.fixed_parameters,
             # The function expects 1-D arrays
             jnp.ravel(self.log_number_density),
-            jnp.ravel(self.pressure()),
+            jnp.ravel(self.log_activity()),
             jnp.ravel(self.atmosphere_log_volume()),
         )
 
     @override
-    def log_pressure(self) -> Array:
-        return get_log_pressure_from_log_number_density(
-            self.log_number_density, self.temperature()
-        )
+    def pressure(self) -> Array:
+        return get_pressure_from_log_number_density(self.log_number_density, self.temperature)
 
     @override
     def species_density_in_melt(self) -> Array:
@@ -449,14 +445,16 @@ class OutputSingle(Output):
             self.fixed_parameters,
             # The function expects 1-D arrays
             jnp.ravel(self.log_number_density),
-            jnp.ravel(self.pressure()),
+            jnp.ravel(self.log_activity()),
             jnp.ravel(self.atmosphere_log_volume()),
         )
 
     @override
     def _log_activity_without_stability(self) -> Array:
         return get_log_activity(
-            self._traced_parameters, self._interior_atmosphere.fixed_parameters, self.pressure()
+            self.traced_parameters,
+            self.fixed_parameters,
+            self.log_number_density,
         )
 
 
@@ -464,17 +462,22 @@ class OutputBatch(Output):
     """Converts batch calculation output to user-friendly dimensional output"""
 
     @property
-    def vmap_temperature(self) -> int | None:
+    def temperature_vmap(self) -> int | None:
         """Axis for temperature vmap"""
         return self._interior_atmosphere.traced_parameters_vmap.planet.surface_temperature  # type: ignore
+
+    @property
+    def traced_parameters_vmap(self) -> int | None:
+        """Axis for traced parameters vmap"""
+        return self._interior_atmosphere.traced_parameters_vmap  # type: ignore
 
     @override
     def atmosphere_log_molar_mass(self) -> Array:
         atmosphere_log_molar_mass_func: Callable = jax.vmap(
-            get_atmosphere_log_molar_mass, in_axes=(0, None)
+            get_atmosphere_log_molar_mass, in_axes=(None, 0)
         )
         atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
-            self.log_number_density_gas_species, self.gas_molar_mass
+            self.fixed_parameters, self.log_number_density
         )
 
         return atmosphere_log_molar_mass
@@ -495,47 +498,30 @@ class OutputBatch(Output):
 
     @override
     def atmosphere_pressure(self) -> Array:
-        atmosphere_pressure_func: Callable = jax.vmap(get_atmosphere_pressure, in_axes=(None, 0))
+        atmosphere_pressure_func: Callable = jax.vmap(
+            get_atmosphere_pressure, in_axes=(None, 0, self.temperature_vmap)
+        )
         atmosphere_pressure: Array = atmosphere_pressure_func(
-            self._interior_atmosphere.fixed_parameters, self.pressure()
+            self.fixed_parameters, self.log_number_density, self.temperature
         )
 
         return atmosphere_pressure
 
     @override
-    def element_density_in_melt(self) -> Array:
-        ...
-        # element_density_in_melt_func: Callable = jax.vmap(get_element_density_in_melt)
-        # return get_element_density_in_melt(
-        #     self.traced_parameters,
-        #     self.fixed_parameters,
-        #     # The function expects 1-D arrays
-        #     jnp.ravel(self.log_number_density),
-        #     jnp.ravel(self.pressure()),
-        #     jnp.ravel(self.atmosphere_log_volume()),
-        # )
-
-    @override
-    def log_pressure(self) -> Array:
-        if self.vmap_temperature == 0:
-            log_pressure_func: Callable = jax.vmap(
-                get_log_pressure_from_log_number_density, in_axes=(0, 0)
-            )
-        else:
-            log_pressure_func = get_log_pressure_from_log_number_density
-
-        log_pressure: Array = log_pressure_func(self.log_number_density, self.temperature())
-
-        return log_pressure
-
-    @override
-    def species_density_in_melt(self) -> Array:
-        species_density_in_melt_func: Callable = jax.vmap(
-            get_species_density_in_melt,
-            in_axes=(self._interior_atmosphere.traced_parameters_vmap, None, 0, 0, 0),
+    def element_density(self) -> Array:
+        element_density_func: Callable = jax.vmap(get_element_density, in_axes=(None, 0))
+        element_density: Array = element_density_func(
+            self.fixed_parameters, self.log_number_density
         )
 
-        return species_density_in_melt_func(
+        return element_density
+
+    @override
+    def element_density_in_melt(self) -> Array:
+        element_density_in_melt_func: Callable = jax.vmap(
+            get_element_density_in_melt, in_axes=(self.traced_parameters_vmap, None, 0, 0, 0)
+        )
+        element_density_in_melt: Array = element_density_in_melt_func(
             self.traced_parameters,
             self.fixed_parameters,
             self.log_number_density,
@@ -543,13 +529,40 @@ class OutputBatch(Output):
             self.atmosphere_log_volume(),
         )
 
+        return element_density_in_melt
+
+    @override
+    def pressure(self) -> Array:
+        pressure_func: Callable = jax.vmap(
+            get_pressure_from_log_number_density, in_axes=(0, self.temperature_vmap)
+        )
+        pressure: Array = pressure_func(self.log_number_density, self.temperature)
+
+        return pressure
+
+    @override
+    def species_density_in_melt(self) -> Array:
+        species_density_in_melt_func: Callable = jax.vmap(
+            get_species_density_in_melt,
+            in_axes=(self.traced_parameters_vmap, None, 0, 0, 0),
+        )
+        species_density_in_melt: Array = species_density_in_melt_func(
+            self.traced_parameters,
+            self.fixed_parameters,
+            self.log_number_density,
+            self.pressure(),
+            self.atmosphere_log_volume(),
+        )
+
+        return species_density_in_melt
+
     @override
     def _log_activity_without_stability(self) -> Array:
         log_activity_func: Callable = jax.vmap(
             get_log_activity, in_axes=(self._interior_atmosphere.traced_parameters_vmap, None, 0)
         )
         log_activity: Array = log_activity_func(
-            self._traced_parameters, self._interior_atmosphere.fixed_parameters, self.pressure()
+            self.traced_parameters, self.fixed_parameters, self.log_number_density
         )
 
         return log_activity

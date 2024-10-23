@@ -431,7 +431,7 @@ class InteriorAtmosphere:
         else:
             output = OutputSingle(solution, self, initial_solution_, traced_parameters_)
 
-        # output.output_to_logger()
+        output.output_to_logger()
 
         quick_look: dict[str, ArrayLike] = output.quick_look()
 

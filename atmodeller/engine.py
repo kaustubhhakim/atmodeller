@@ -158,13 +158,11 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # Elemental mass balance residual
     if formula_matrix.size > 0:
         # Number density of elements in the gas or condensed phase
-        element_gas_condensed_density: Array = get_element_density_in_gas_or_condensed(
-            fixed_parameters, log_number_density
-        )
+        element_density: Array = get_element_density(fixed_parameters, log_number_density)
         element_melt_density: Array = get_element_density_in_melt(
             traced_parameters, fixed_parameters, log_number_density, log_activity, log_volume
         )
-        log_element_density: Array = jnp.log(element_gas_condensed_density + element_melt_density)
+        log_element_density: Array = jnp.log(element_density + element_melt_density)
         mass_residual = log_element_density - mass_constraints.array(log_volume)
         # jax.debug.print("mass_residual = {out}", out=mass_residual)
         # Stability residual
@@ -255,9 +253,7 @@ def get_atmosphere_pressure(
 
 
 @jit
-def get_element_density_in_gas_or_condensed(
-    fixed_parameters: FixedParameters, log_number_density: Array
-) -> Array:
+def get_element_density(fixed_parameters: FixedParameters, log_number_density: Array) -> Array:
     """Number density of elements in the gas or condensed phase
 
     Args:
