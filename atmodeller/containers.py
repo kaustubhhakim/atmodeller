@@ -51,7 +51,7 @@ from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata.core import CondensateActivity, SpeciesData
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.thermodata.species_data import get_species_data
-from atmodeller.utilities import OptxSolver, scale_number_density, unit_conversion
+from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -212,25 +212,20 @@ class FugacityConstraints(NamedTuple):
     These are applied as constraints on the gas activity.
 
     Args:
-        log_scaling: Log scaling for the number density
         constraints: Fugacity constraints
     """
 
-    log_scaling: float
-    """Log scaling"""
     constraints: dict[str, RedoxBufferProtocol]
     """Fugacity constraints"""
 
     @classmethod
     def create(
         cls,
-        log_scaling: float,
         fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
     ) -> Self:
         """Creates an instance
 
         Args:
-            log_scaling: Log scaling for the number density
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 None.
 
@@ -242,7 +237,7 @@ class FugacityConstraints(NamedTuple):
         else:
             init_dict = dict(fugacity_constraints)
 
-        return cls(log_scaling, init_dict)
+        return cls(init_dict)
 
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
@@ -259,17 +254,17 @@ class FugacityConstraints(NamedTuple):
                 vmap_axis = 0
             constraints_vmap[key] = type(constraint)(vmap_axis)  # type: ignore - container
 
-        return FugacityConstraints(None, constraints_vmap)  # type: ignore - container
+        return FugacityConstraints(constraints_vmap)  # type: ignore - container
 
     def array(self, temperature: ArrayLike, pressure: Array) -> Array:
-        """Scaled log number density as an array
+        """Log number density as an array
 
         Args:
             temperature: Temperature
             pressure: Pressure
 
         Returns:
-            Scaled log number density as an array
+            Log number density as an array
         """
         fugacity_funcs: list[Callable] = [
             constraint.log_fugacity for constraint in self.constraints.values()
@@ -287,37 +282,29 @@ class FugacityConstraints(NamedTuple):
         indices: ArrayLike = jnp.arange(len(self.constraints))
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
 
+        # TODO: Update to function log_number_density_from_log_pressure
         log_number_density: Array = (
             log_fugacity - jnp.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
         )
-        scaled_log_number_density: Array = scale_number_density(
-            log_number_density, self.log_scaling
-        )
 
-        return scaled_log_number_density
+        return log_number_density
 
 
 class MassConstraints(NamedTuple):
     """Mass constraints
 
     Args:
-        log_scaling: Log scaling for the number density
         log_molecules: Log number of molecules of the species
     """
 
-    log_scaling: ArrayLike
-    """Log scaling"""
     log_molecules: dict[str, ArrayLike]
     """Log number of molecules"""
 
     @classmethod
-    def create(
-        cls, log_scaling: ArrayLike, mass_constraints: Mapping[str, ArrayLike] | None = None
-    ) -> Self:
+    def create(cls, mass_constraints: Mapping[str, ArrayLike] | None = None) -> Self:
         """Creates an instance
 
         Args:
-            log_scaling: Log scaling for the number density
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
 
         Returns:
@@ -338,7 +325,7 @@ class MassConstraints(NamedTuple):
             )
             log_number_of_molecules[element] = log_number_of_molecules_
 
-        return cls(log_scaling, log_number_of_molecules)
+        return cls(log_number_of_molecules)
 
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
@@ -355,20 +342,19 @@ class MassConstraints(NamedTuple):
                 vmap_axis = 0
             log_molecules_vmap[key] = vmap_axis
 
-        return MassConstraints(None, log_molecules_vmap)  # type: ignore - container types for data
+        return MassConstraints(log_molecules_vmap)  # type: ignore - container types for data
 
     def array(self, log_atmosphere_volume: Array) -> Array:
-        """Scaled log number density as an array
+        """Log number density as an array
 
         Args:
             log_atmosphere_volume: Log volume of the atmosphere
 
         Returns:
-            Scaled log number density as an array
+            Log number density as an array
         """
         log_molecules: Array = jnp.array(list(self.log_molecules.values()))
-        log_scaled_molecules: Array = scale_number_density(log_molecules, self.log_scaling)
-        log_number_density: Array = log_scaled_molecules - log_atmosphere_volume
+        log_number_density: Array = log_molecules - log_atmosphere_volume
 
         return log_number_density
 
@@ -392,8 +378,6 @@ class FixedParameters(NamedTuple):
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
         tau: Tau factor for species stability
-        log_scaling: Log scaling for the number density. Defaults to the Avogadro constant, which
-            converts molecules/m^3 to moles/m^3
     """
 
     species: tuple[Species, ...]
@@ -414,8 +398,6 @@ class FixedParameters(NamedTuple):
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""
-    log_scaling: float
-    """Log scaling"""
 
 
 class Species(NamedTuple):
@@ -483,7 +465,6 @@ class Solution(NamedTuple):
     Args:
         number: Number density of species
         stability: Stability of species
-        log_scaling: Log scaling
     """
 
     number_density: ArrayLike
@@ -493,21 +474,20 @@ class Solution(NamedTuple):
 
     @classmethod
     def create(
-        cls, number_density: ArrayLike, stability: ArrayLike, log_scaling: ArrayLike
+        cls,
+        number_density: ArrayLike,
+        stability: ArrayLike,
     ) -> Self:
         """Creates an instance.
 
         Args:
             number_density: Number density
             stability: Stability
-            log_scaling: Log scaling for the number density
 
         Returns:
             An instance
         """
-        number_density_scaled: ArrayLike = scale_number_density(number_density, log_scaling)
-
-        return cls(number_density_scaled, stability)
+        return cls(number_density, stability)
 
     @property
     def data(self) -> Array:
@@ -541,7 +521,6 @@ class SolverParameters(NamedTuple):
     def create(
         cls,
         species: tuple[Species, ...],
-        log_scaling: ArrayLike,
         solver_class: Type[OptxSolver] = optx.Newton,
         rtol: float = 1.0e-8,
         atol: float = 1.0e-8,
@@ -553,7 +532,6 @@ class SolverParameters(NamedTuple):
 
         Args:
             species: A tuple of species
-            log_scaling: Log scaling for the number density
             solver_class: Solver class. Defaults to optimistix Newton.
             rtol: Relative tolerance. Defaults to 1.0e-8.
             atol: Absolute tolerance. Defaults to 1.0e-8.
@@ -563,10 +541,10 @@ class SolverParameters(NamedTuple):
         """
         solver: OptxSolver = solver_class(rtol=rtol, atol=atol, norm=norm)
         lower: tuple[float, ...] = cls._get_hypercube_bound(
-            species, log_scaling, NUMBER_DENSITY_LOWER, STABILITY_LOWER
+            species, NUMBER_DENSITY_LOWER, STABILITY_LOWER
         )
         upper: tuple[float, ...] = cls._get_hypercube_bound(
-            species, log_scaling, NUMBER_DENSITY_UPPER, STABILITY_UPPER
+            species, NUMBER_DENSITY_UPPER, STABILITY_UPPER
         )
 
         return cls(
@@ -581,7 +559,6 @@ class SolverParameters(NamedTuple):
     def _get_hypercube_bound(
         cls,
         species: tuple[Species, ...],
-        log_scaling: ArrayLike,
         number_density_bound: float,
         stability_bound: float,
     ) -> tuple[float, ...]:
@@ -589,7 +566,6 @@ class SolverParameters(NamedTuple):
 
         Args:
             species: Tuple of species
-            log_scaling: Log scaling for the number density
             number_density_bound: Bound on the number density
             stability_bound: Bound on the stability
 
@@ -598,12 +574,11 @@ class SolverParameters(NamedTuple):
         """
         num_species: int = len(species)
         number_density: ArrayLike = number_density_bound * np.ones(num_species)
-        scaled_number_density: ArrayLike = scale_number_density(number_density, log_scaling)
 
         bound: tuple[float, ...] = tuple(
             np.concatenate(
                 (
-                    scaled_number_density,
+                    number_density,
                     stability_bound * np.ones(num_species),
                 )
             ).tolist()
