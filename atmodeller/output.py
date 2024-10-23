@@ -47,10 +47,7 @@ from atmodeller.engine import (
     get_log_activity,
     get_species_density_in_melt,
 )
-from atmodeller.utilities import (
-    log_pressure_from_log_number_density,
-    unscale_number_density,
-)
+from atmodeller.utilities import log_pressure_from_log_number_density
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -165,9 +162,14 @@ class Output(ABC):
         return jnp.array(self.fixed_parameters.gas_species_indices)
 
     @property
-    def log_scaling(self) -> float:
-        """Log scaling"""
-        return self._interior_atmosphere.log_scaling
+    def log_number_density(self) -> Array:
+        """Log number density"""
+        return self._log_number_density
+
+    @property
+    def log_number_density_gas_species(self) -> Array:
+        """Log number density of gas species"""
+        return jnp.take(self.log_number_density, self.gas_species_indices, axis=1)
 
     @property
     def log_stability(self) -> ArrayLike:
@@ -182,7 +184,7 @@ class Output(ABC):
     @property
     def number_solutions(self) -> int:
         """Number of solutions"""
-        return self.log_number_density(False).shape[0]
+        return self.log_number_density.shape[0]
 
     @property
     def planet(self) -> Planet:
@@ -281,35 +283,6 @@ class Output(ABC):
 
         return log_activity
 
-    def log_number_density(self, unscale: bool) -> Array:
-        r"""Log number density
-
-        Args:
-            unscale: Unscale the log number density
-
-        Returns:
-            Log number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
-        """
-        if unscale:
-            log_number_density: Array = unscale_number_density(
-                self._log_number_density, self.log_scaling
-            )
-        else:
-            log_number_density = self._log_number_density
-
-        return log_number_density
-
-    def log_number_density_gas_species(self, unscale: bool) -> Array:
-        r"""Log number density of gas species
-
-        Args:
-            unscale: Unscale the log number density
-
-        Returns:
-            Log number density of gas species in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
-        """
-        return jnp.take(self.log_number_density(unscale), self.gas_species_indices, axis=1)
-
     def molar_mass_expanded(self) -> Array:
         r"""Gets molar mass of all species in an expanded array.
 
@@ -318,16 +291,13 @@ class Output(ABC):
         """
         return jnp.tile(self.molar_mass, (self.number_solutions, 1))
 
-    def number_density(self, unscale: bool) -> Array:
+    def number_density(self) -> Array:
         r"""Gets number density of all species
-
-        Args:
-            unscale: Unscale the number density
 
         Returns:
             Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
-        return jnp.exp(self.log_number_density(unscale))
+        return jnp.exp(self.log_number_density)
 
     def planet_asdict(self) -> dict[str, ArrayLike]:
         """Gets the planet properties as a dictionary
@@ -400,8 +370,8 @@ class Output(ABC):
 
         Useful for debugging.
         """
-        logger.info("log_number_density = %s", self.log_number_density(True))
-        logger.info("number_density = %s", self.number_density(True))
+        logger.info("log_number_density = %s", self.log_number_density)
+        logger.info("number_density = %s", self.number_density())
         # logger.info("log_stability = %s", self.log_stability)
         # logger.info("stability = %s", self.stability())
         logger.info("pressure = %s", self.pressure())
@@ -409,14 +379,14 @@ class Output(ABC):
         logger.info("activity = %s", self.activity())
         logger.info("molar_mass = %s", self.molar_mass)
         logger.info("molar_mass_expanded = %s", self.molar_mass_expanded())
-        logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
-        logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
-        logger.info("atmosphere_volume = %s", self.atmosphere_volume())
-        logger.info("atmosphere_asdict = %s", self.atmosphere_asdict())
-        logger.info("planet_asdict = %s", self.planet_asdict())
+        # logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
+        # logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
+        # logger.info("atmosphere_volume = %s", self.atmosphere_volume())
+        # logger.info("atmosphere_asdict = %s", self.atmosphere_asdict())
+        # logger.info("planet_asdict = %s", self.planet_asdict())
         # logger.info("planet_asdataframe = %s", self.planet_asdataframe())
-        logger.info("species_density_in_melt = %s", self.species_density_in_melt())
-        logger.info("element_density_in_melt = %s", self.element_density_in_melt())
+        # logger.info("species_density_in_melt = %s", self.species_density_in_melt())
+        # logger.info("element_density_in_melt = %s", self.element_density_in_melt())
         # logger.info("element_asdict = %s", self.element_asdict())
         # logger.info("jnp.ravel(self.log_number_density) = %s", jnp.ravel(self.log_number_density))
         # logger.info(
@@ -438,13 +408,13 @@ class OutputSingle(Output):
     @override
     def atmosphere_log_molar_mass(self) -> Array:
         return get_atmosphere_log_molar_mass(
-            self.log_number_density_gas_species(True), self.gas_molar_mass
+            self.log_number_density_gas_species, self.gas_molar_mass
         )
 
     @override
     def atmosphere_log_volume(self) -> Array:
         return get_atmosphere_log_volume(
-            self.log_number_density_gas_species(True),
+            self.log_number_density_gas_species,
             self.gas_molar_mass,
             self.planet,
         )
@@ -459,16 +429,14 @@ class OutputSingle(Output):
             self.traced_parameters,
             self.fixed_parameters,
             # The function expects 1-D arrays
-            jnp.ravel(self.log_number_density(False)),
+            jnp.ravel(self.log_number_density),
             jnp.ravel(self.pressure()),
             jnp.ravel(self.atmosphere_log_volume()),
         )
 
     @override
     def log_pressure(self) -> Array:
-        return log_pressure_from_log_number_density(
-            self.log_number_density(True), self.temperature()
-        )
+        return log_pressure_from_log_number_density(self.log_number_density, self.temperature())
 
     @override
     def species_density_in_melt(self) -> Array:

@@ -44,7 +44,7 @@ from atmodeller.containers import (
 from atmodeller.engine import solve
 from atmodeller.output import Output, OutputBatch, OutputSingle
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
-from atmodeller.utilities import partial_rref, unscale_number_density
+from atmodeller.utilities import partial_rref
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -54,7 +54,6 @@ class InteriorAtmosphere:
 
     Args:
         species: Tuple of species
-        scaling: Scaling for the number density
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
@@ -69,13 +68,10 @@ class InteriorAtmosphere:
     # Used for vmapping (if relevant)
     traced_parameters_vmap: TracedParameters
 
-    def __init__(self, species: tuple[Species, ...], scaling: float, tau: float = TAU):
+    def __init__(self, species: tuple[Species, ...], tau: float = TAU):
         self.species: tuple[Species, ...] = species
-        self.log_scaling: float = np.log(scaling)
         self.tau: float = tau
-        self.solver_parameters: SolverParameters = SolverParameters.create(
-            self.species, self.log_scaling
-        )
+        self.solver_parameters: SolverParameters = SolverParameters.create(self.species)
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
@@ -114,12 +110,10 @@ class InteriorAtmosphere:
             Solver callable
         """
         self.planet = planet
-        self.fugacity_constraints = FugacityConstraints.create(
-            self.log_scaling, fugacity_constraints
-        )
+        self.fugacity_constraints = FugacityConstraints.create(fugacity_constraints)
         logger.debug("fugacity_constraints = %s", self.fugacity_constraints)
 
-        self.mass_constraints = MassConstraints.create(self.log_scaling, mass_constraints)
+        self.mass_constraints = MassConstraints.create(mass_constraints)
         logger.debug("mass_constraints = %s", self.mass_constraints)
 
         self.fixed_parameters = self.get_fixed_parameters(
@@ -127,9 +121,7 @@ class InteriorAtmosphere:
         )
         logger.debug("fixed_parameters = %s", self.fixed_parameters)
 
-        self.initial_solution = Solution.create(
-            initial_number_density, initial_stability, self.log_scaling
-        )
+        self.initial_solution = Solution.create(initial_number_density, initial_stability)
         logger.debug("initial_solution = %s", self.initial_solution)
         self.traced_parameters = TracedParameters(
             planet=self.planet,
@@ -214,7 +206,6 @@ class InteriorAtmosphere:
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
             tau=self.tau,
-            log_scaling=self.log_scaling,
         )
 
         return fixed_parameters
@@ -307,36 +298,6 @@ class InteriorAtmosphere:
         logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
-
-    def get_processed_output(
-        self, raw_out: Array, axis: int, extended_activity_func: Callable
-    ) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
-        """Gets processed output
-
-        Args:
-            raw_out: Raw output from the solver
-            axis: Axis along which to separate the number density from stability
-            extended_activity_func: Function to evaluate the extended activity
-
-        Returns:
-            Number density, extended activity
-        """
-        scaled_number_density, stability = jnp.split(raw_out, 2, axis=axis)
-        unscaled_number_density: Array = unscale_number_density(
-            scaled_number_density, self.log_scaling
-        )
-        number_density_np: npt.NDArray[np.float_] = np.array(unscaled_number_density)
-        logger.info("log_number_density = %s", number_density_np)
-        extended_activity: Array = extended_activity_func(
-            self.traced_parameters,
-            self.fixed_parameters,
-            unscaled_number_density,
-            stability,
-        )
-        extended_activity_np: npt.NDArray[np.float_] = np.array(extended_activity)
-        logger.info("log_extended_activity = %s", extended_activity_np)
-
-        return number_density_np, extended_activity_np
 
     def get_reaction_matrix(self) -> npt.NDArray[np.float_]:
         """Gets the reaction matrix.
@@ -470,7 +431,7 @@ class InteriorAtmosphere:
         else:
             output = OutputSingle(solution, self, initial_solution_, traced_parameters_)
 
-        output.output_to_logger()
+        # output.output_to_logger()
 
         quick_look: dict[str, ArrayLike] = output.quick_look()
 

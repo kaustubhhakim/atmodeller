@@ -23,7 +23,7 @@ import logging
 import numpy as np
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, __version__, debug_logger
+from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.eos.core import RealGas
@@ -40,8 +40,6 @@ RTOL: float = 1.0e-6
 """Relative tolerance"""
 ATOL: float = 1.0e-6
 """Absolute tolerance"""
-SCALING: float = AVOGADRO
-"""Scale the numerical problem from molecules/m^3 to moles/m^3 if SCALING is AVODAGRO"""
 TAU: float = 1.0e60
 """Tau scaling factor for species stability"""
 
@@ -63,7 +61,7 @@ def test_holley(helper) -> None:
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g)
     # Temperature is within the range of the Holley model
     planet: Planet = Planet(surface_temperature=900.0)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
@@ -116,7 +114,7 @@ def test_chabrier(helper) -> None:
         planet_mass=planet_mass,
         surface_radius=surface_radius,
     )
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-4)}
 
@@ -172,7 +170,7 @@ def test_chabrier_simple(helper) -> None:
         planet_mass=planet_mass,
         surface_radius=surface_radius,
     )
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-4)}
     # fugacity_constraints = None

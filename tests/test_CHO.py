@@ -24,7 +24,7 @@ import numpy as np
 import numpy.typing as npt
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, __version__, debug_logger
+from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.interfaces import SolubilityProtocol
@@ -63,8 +63,6 @@ RTOL: float = 1.0e-6
 """Relative tolerance"""
 ATOL: float = 1.0e-6
 """Absolute tolerance"""
-SCALING: float = AVOGADRO
-"""Scale the numerical problem from molecules/m^3 to moles/m^3 if SCALING is AVODAGRO"""
 TAU: float = 1.0e60
 """Tau scaling factor for species stability"""
 
@@ -92,7 +90,7 @@ def test_H2O(helper) -> None:
 
     species: tuple[Species, ...] = (H2O_g,)
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: ArrayLike = 2
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -127,7 +125,7 @@ def test_H_fO2(helper) -> None:
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
@@ -169,7 +167,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Number of surface temperatures is different to number of species to test array shapes work.
     surface_temperatures: npt.NDArray[np.float_] = np.array(
@@ -235,7 +233,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Set up a range of fO2 shifts
     num: int = 4
@@ -297,7 +295,7 @@ def test_H_fO2_batch_H_mass(helper) -> None:
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
@@ -343,7 +341,7 @@ def test_H_and_C(helper) -> None:
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
     planet: Planet = Planet()
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species, SCALING)
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
 
