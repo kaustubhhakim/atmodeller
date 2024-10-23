@@ -34,7 +34,7 @@ print("Package initialized with double precision (float64)")
 # For debugging
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_infs", False)
-jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_disable_jit", True)
 
 AVOGADRO: float = constants.Avogadro
 """Avogadro constant in 1/mol"""

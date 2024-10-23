@@ -38,6 +38,7 @@ from atmodeller.containers import (
     TracedParameters,
 )
 from atmodeller.utilities import (
+    log_number_density_from_log_pressure,
     log_pressure_from_log_number_density,
     logsumexp,
     unit_conversion,
