@@ -473,11 +473,7 @@ class Solution(NamedTuple):
     """Stability of species"""
 
     @classmethod
-    def create(
-        cls,
-        number_density: ArrayLike,
-        stability: ArrayLike,
-    ) -> Self:
+    def create(cls, number_density: ArrayLike, stability: ArrayLike) -> Self:
         """Creates an instance.
 
         Args:

@@ -223,6 +223,7 @@ def get_log_activity(
     planet: Planet = traced_parameters.planet
     species: tuple[Species, ...] = fixed_parameters.species
     temperature: ArrayLike = planet.surface_temperature
+    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
     # Currently not used, but may be required in the future.
     # total_pressure: Array = get_atmosphere_pressure(fixed_parameters, pressures)
 
@@ -242,6 +243,14 @@ def get_log_activity(
     vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0, None, None))
     indices: Array = jnp.arange(len(species))
     log_activity: Array = vmap_apply_function(indices, temperature, pressures)
+
+    # Gas activities are returned in bar, but these must be converted to number density
+    mask: Array = jnp.zeros_like(log_activity, dtype=bool)
+    mask = mask.at[gas_species_indices].set(True)
+    log_activity_number_density: Array = log_number_density_from_log_pressure(
+        log_activity, temperature
+    )
+    log_activity = jnp.where(mask, log_activity_number_density, log_activity)
 
     return log_activity
 
@@ -336,38 +345,6 @@ def get_element_density_in_melt(
     element_melt_density: Array = formula_matrix.dot(species_melt_density)
 
     return element_melt_density
-
-
-# TODO: Remove now using scaled units for simplicity
-# @jit
-# def get_scaled_element_density_in_melt(
-#     traced_parameters: TracedParameters,
-#     fixed_parameters: FixedParameters,
-#     log_number_density: Array,
-#     pressure: Array,
-#     log_volume: Array,
-# ) -> Array:
-#     """Scaled number density of elements dissolved in melt due to species solubility
-
-#     Args:
-#         traced_parameters: Traced parameters
-#         fixed_parameters: Fixed parameters
-#         log_number_density: Log number density
-#         pressure: Pressure
-#         log_volume: Log volume of the atmosphere
-
-#     Returns:
-#         Scaled number density of elements dissolved in melt
-#     """
-#     log_scaling: float = fixed_parameters.log_scaling
-#     element_melt_density: Array = get_element_density_in_melt(
-#         traced_parameters, fixed_parameters, log_number_density, pressure, log_volume
-#     )
-#     # Scale back to the scaling of the numerical problem. Perform in regular space to enable
-#     # addition before logging, hence avoiding any problems with NaNs.
-#     element_melt_density = element_melt_density / jnp.exp(log_scaling)
-
-#     return element_melt_density
 
 
 @jit

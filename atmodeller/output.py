@@ -163,8 +163,13 @@ class Output(ABC):
 
     @property
     def log_number_density(self) -> Array:
-        """Log number density of all species"""
+        """Log number density"""
         return self._log_number_density
+
+    @property
+    def log_number_density_gas_species(self) -> Array:
+        """Log number density of gas species"""
+        return jnp.take(self.log_number_density, self.gas_species_indices, axis=1)
 
     @property
     def log_number_density_gas_species(self) -> Array:
@@ -379,14 +384,14 @@ class Output(ABC):
         logger.info("activity = %s", self.activity())
         logger.info("molar_mass = %s", self.molar_mass)
         logger.info("molar_mass_expanded = %s", self.molar_mass_expanded())
-        logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
-        logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
-        logger.info("atmosphere_volume = %s", self.atmosphere_volume())
-        logger.info("atmosphere_asdict = %s", self.atmosphere_asdict())
-        logger.info("planet_asdict = %s", self.planet_asdict())
+        # logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
+        # logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
+        # logger.info("atmosphere_volume = %s", self.atmosphere_volume())
+        # logger.info("atmosphere_asdict = %s", self.atmosphere_asdict())
+        # logger.info("planet_asdict = %s", self.planet_asdict())
         # logger.info("planet_asdataframe = %s", self.planet_asdataframe())
-        logger.info("species_density_in_melt = %s", self.species_density_in_melt())
-        logger.info("element_density_in_melt = %s", self.element_density_in_melt())
+        # logger.info("species_density_in_melt = %s", self.species_density_in_melt())
+        # logger.info("element_density_in_melt = %s", self.element_density_in_melt())
         # logger.info("element_asdict = %s", self.element_asdict())
         # logger.info("jnp.ravel(self.log_number_density) = %s", jnp.ravel(self.log_number_density))
         # logger.info(

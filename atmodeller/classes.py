@@ -121,10 +121,7 @@ class InteriorAtmosphere:
         )
         logger.debug("fixed_parameters = %s", self.fixed_parameters)
 
-        self.initial_solution = Solution.create(
-            initial_number_density,
-            initial_stability,
-        )
+        self.initial_solution = Solution.create(initial_number_density, initial_stability)
         logger.debug("initial_solution = %s", self.initial_solution)
         self.traced_parameters = TracedParameters(
             planet=self.planet,
@@ -434,7 +431,7 @@ class InteriorAtmosphere:
         else:
             output = OutputSingle(solution, self, initial_solution_, traced_parameters_)
 
-        output.output_to_logger()
+        # output.output_to_logger()
 
         quick_look: dict[str, ArrayLike] = output.quick_look()
 
