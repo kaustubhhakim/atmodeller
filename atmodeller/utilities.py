@@ -63,44 +63,6 @@ def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
 
 
 @jit
-def log_pressure_from_log_number_density(
-    log_number_density: ArrayLike, temperature: ArrayLike
-) -> Array:
-    """Calculates log pressure from log number density
-
-    Args:
-        log_number_density: Log number density
-        temperature: Temperature
-
-    Returns:
-        Log pressure
-    """
-    log_pressure: Array = (
-        jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature) + log_number_density
-    )
-
-    return log_pressure
-
-
-@jit
-def log_number_density_from_log_pressure(log_pressure: ArrayLike, temperature: ArrayLike) -> Array:
-    """Calculates log number density from log pressure
-
-    Args:
-        log_pressure: Log pressure
-        temperature: Temperature
-
-    Returns:
-        Log number density
-    """
-    log_number_density: Array = (
-        -jnp.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature) + log_pressure
-    )
-
-    return log_number_density
-
-
-@jit
 def partial_rref_jax(matrix: Array) -> Array:
     """Computes the partial reduced row echelon form to determine linear components.
 

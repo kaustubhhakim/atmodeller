@@ -16,8 +16,10 @@
 #
 """JAX-related functionality for solving the system of equations"""
 
+from __future__ import annotations
+
 from functools import partial
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import jax
 import jax.numpy as jnp
@@ -27,22 +29,19 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
-from atmodeller.containers import (
-    FixedParameters,
-    FugacityConstraints,
-    MassConstraints,
-    Planet,
-    Solution,
-    SolverParameters,
-    Species,
-    TracedParameters,
-)
-from atmodeller.utilities import (
-    log_number_density_from_log_pressure,
-    log_pressure_from_log_number_density,
-    logsumexp,
-    unit_conversion,
-)
+from atmodeller.utilities import logsumexp, unit_conversion
+
+if TYPE_CHECKING:
+    from atmodeller.containers import (
+        FixedParameters,
+        FugacityConstraints,
+        MassConstraints,
+        Planet,
+        Solution,
+        SolverParameters,
+        Species,
+        TracedParameters,
+    )
 
 
 @partial(jit, static_argnames=["fixed_parameters", "solver_parameters"])
@@ -85,39 +84,6 @@ def solve(
 
 
 @jit
-def get_log_reaction_equilibrium_constant(
-    species: list[Species],
-    gas_species_indices: Array,
-    reaction_matrix: Array,
-    temperature: ArrayLike,
-) -> Array:
-    """Gets the log equilibrium constant of the reactions
-
-    Args:
-        species: List of species
-        gas_species_indices: Indices of gas species
-        reaction_matrix: Reaction matrix
-        temperature: Temperature
-
-    Returns:
-        Log equilibrium constant of the reactions
-    """
-    # pylint: disable=invalid-name
-    log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
-    # jax.debug.print("lnKp = {out}", out=lnKp)
-
-    delta_n: Array = jnp.sum(jnp.take(reaction_matrix, gas_species_indices, axis=1), axis=1)
-    # jax.debug.print("delta_n = {out}", out=delta_n)
-
-    log_Kc: Array = log_Kp - delta_n * (jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature))
-    # jax.debug.print("log10Kc = {out}", out=log_Kc)
-
-    # pylint: enable=invalid-name
-
-    return log_Kc
-
-
-@jit
 def objective_function(solution: Array, kwargs: dict) -> Array:
     """Residual of the reaction network and mass balance
 
@@ -129,27 +95,26 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     """
     traced_parameters: TracedParameters = kwargs["traced_parameters"]
     fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
-
+    planet: Planet = traced_parameters.planet
+    temperature: ArrayLike = planet.surface_temperature
+    fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
+    mass_constraints: MassConstraints = traced_parameters.mass_constraints
     species: tuple[Species, ...] = fixed_parameters.species
     formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
+
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-    molar_masses: Array = jnp.array(fixed_parameters.molar_masses)
 
-    planet: Planet = traced_parameters.planet
-    fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
-    mass_constraints: MassConstraints = traced_parameters.mass_constraints
-    temperature: ArrayLike = planet.surface_temperature
-
+    # Species
     log_number_density, log_stability = jnp.split(solution, 2)
-    gas_log_number_density: Array = jnp.take(log_number_density, gas_species_indices)
-    gas_molar_masses: Array = jnp.take(molar_masses, gas_species_indices)
-    log_volume: Array = get_atmosphere_log_volume(gas_log_number_density, gas_molar_masses, planet)
+    pressure: Array = get_pressure_from_log_number_density(log_number_density, temperature)
 
-    log_pressures: Array = log_pressure_from_log_number_density(log_number_density, temperature)
-    pressures: Array = jnp.exp(log_pressures)
-    total_pressure: Array = get_atmosphere_pressure(fixed_parameters, pressures)
+    # Bulk atmosphere
+    log_volume: Array = get_atmosphere_log_volume(fixed_parameters, log_number_density, planet)
+    total_pressure: Array = get_atmosphere_pressure(
+        fixed_parameters, log_number_density, temperature
+    )
 
     residual: Array = jnp.array([])
 
@@ -158,7 +123,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
             species, gas_species_indices, reaction_matrix, temperature
         )
-        log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, pressures)
+        log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, pressure)
         reaction_residual: Array = (
             reaction_matrix.dot(log_activity) - log_reaction_equilibrium_constant
         )
@@ -183,12 +148,14 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
     # Elemental mass balance residual
     if formula_matrix.size > 0:
-        # Number density of elements in the condensed or gas phase
-        element_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
-        element_melt_density: Array = get_element_density_in_melt(
-            traced_parameters, fixed_parameters, log_number_density, pressures, log_volume
+        # Number density of elements in the gas or condensed phase
+        element_gas_condensed_density: Array = get_element_density_in_gas_or_condensed(
+            fixed_parameters, log_number_density
         )
-        log_element_density: Array = jnp.log(element_density + element_melt_density)
+        element_melt_density: Array = get_element_density_in_melt(
+            traced_parameters, fixed_parameters, log_number_density, log_volume
+        )
+        log_element_density: Array = jnp.log(element_gas_condensed_density + element_melt_density)
         mass_residual = log_element_density - mass_constraints.array(log_volume)
         # jax.debug.print("mass_residual = {out}", out=mass_residual)
         # Stability residual
@@ -209,14 +176,14 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 def get_log_activity(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    pressures: ArrayLike,
+    pressure: ArrayLike,
 ) -> Array:
     """Gets the log activity of all species
 
     Args:
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
-        pressures: Pressures of all species in bar
+        pressure: Pressure
 
     Returns:
         Log activity
@@ -243,12 +210,12 @@ def get_log_activity(
 
     vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0, None, None))
     indices: Array = jnp.arange(len(species))
-    log_activity: Array = vmap_apply_function(indices, temperature, pressures)
+    log_activity: Array = vmap_apply_function(indices, temperature, pressure)
 
     # Gas activities are returned in bar, but these must be converted to number density
     mask: Array = jnp.zeros_like(log_activity, dtype=bool)
     mask = mask.at[gas_species_indices].set(True)
-    log_activity_number_density: Array = log_number_density_from_log_pressure(
+    log_activity_number_density: Array = get_log_number_density_from_log_pressure(
         log_activity, temperature
     )
     log_activity = jnp.where(mask, log_activity_number_density, log_activity)
@@ -257,20 +224,269 @@ def get_log_activity(
 
 
 @jit
-def get_species_density_in_melt(
+def get_atmosphere_log_molar_mass(
+    fixed_parameters: FixedParameters, log_number_density: Array
+) -> Array:
+    """Gets log molar mass of the atmosphere
+
+    Args:
+        fixed_parameters: Fixed parameters
+        log_number_density: Log number density
+
+    Returns:
+        Log molar mass of the atmosphere
+    """
+    gas_log_number_density: Array = get_gas_species_data(fixed_parameters, log_number_density)
+    gas_molar_mass: Array = get_gas_species_data(
+        fixed_parameters, jnp.array(fixed_parameters.molar_masses)
+    )
+    molar_mass: Array = logsumexp(gas_log_number_density, gas_molar_mass) - logsumexp(
+        gas_log_number_density
+    )
+
+    return molar_mass
+
+
+@jit
+def get_atmosphere_log_volume(
+    fixed_parameters: FixedParameters,
+    log_number_density: Array,
+    planet: Planet,
+) -> Array:
+    """Gets log volume of the atmosphere
+
+    Args:
+        fixed_parameters: Fixed parameters
+        log_number_density: Log number density
+        planet: Planet
+
+    Returns:
+        Log volume of the atmosphere
+    """
+
+    log_volume: Array = (
+        jnp.log(GAS_CONSTANT)
+        + jnp.log(planet.surface_temperature)
+        - get_atmosphere_log_molar_mass(fixed_parameters, log_number_density)
+        + jnp.log(planet.surface_area)
+        - jnp.log(planet.surface_gravity)
+    )
+
+    return log_volume
+
+
+@jit
+def get_atmosphere_pressure(
+    fixed_parameters: FixedParameters, log_number_density: Array, temperature: ArrayLike
+) -> Array:
+    """Gets pressure of the atmosphere
+
+    Args:
+        fixed_parameters: Fixed parameters
+        log_number_density: Log number density
+        temperature: Temperature
+
+    Returns:
+        Pressure of the atmosphere
+    """
+    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
+    pressure: Array = get_pressure_from_log_number_density(log_number_density, temperature)
+    gas_pressure: Array = jnp.take(pressure, gas_species_indices)
+
+    return jnp.sum(gas_pressure)
+
+
+@jit
+def get_element_density_in_gas_or_condensed(
+    fixed_parameters: FixedParameters, log_number_density: Array
+) -> Array:
+    """Number density of elements in the gas or condensed phase
+
+    Args:
+        fixed_parameters: Fixed parameters
+        log_number_density: Log number density
+
+    Returns:
+        Number density of elements in the gas or condensed phase
+    """
+    formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
+    element_gas_density: Array = formula_matrix.dot(jnp.exp(log_number_density))
+
+    return element_gas_density
+
+
+@jit
+def get_element_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     log_number_density: Array,
-    pressure: Array,
     log_volume: Array,
 ) -> Array:
-    """Number density of species dissolved in melt due to species solubility
+    """Gets the number density of elements dissolved in melt due to species solubility
 
     Args:
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
         log_number_density: Log number density
-        pressure: Pressure
+        log_volume: Log volume of the atmosphere
+
+    Returns:
+        Number density of elements dissolved in melt
+    """
+    formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
+    species_melt_density: Array = get_species_density_in_melt(
+        traced_parameters, fixed_parameters, log_number_density, log_volume
+    )
+    element_melt_density: Array = formula_matrix.dot(species_melt_density)
+
+    return element_melt_density
+
+
+@jit
+def get_gas_species_data(fixed_parameters: FixedParameters, some_array: ArrayLike) -> Array:
+    """Gets the gas species data from an array
+
+    Args:
+        fixed_parameters: Fixed parameters
+        some_array: Some array to extract gas species data from
+
+    Returns:
+        An array with just the gas species data from `some_array`
+    """
+    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
+    gas_data: Array = jnp.take(some_array, gas_species_indices)
+
+    return gas_data
+
+
+@jit
+def get_log_number_density_from_log_pressure(
+    log_pressure: ArrayLike, temperature: ArrayLike
+) -> Array:
+    """Gets log number density from log pressure
+
+    Args:
+        log_pressure: Log pressure
+        temperature: Temperature
+
+    Returns:
+        Log number density
+    """
+    log_number_density: Array = (
+        -jnp.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature) + log_pressure
+    )
+
+    return log_number_density
+
+
+@jit
+def get_log_pressure_from_log_number_density(
+    log_number_density: ArrayLike, temperature: ArrayLike
+) -> Array:
+    """Gets log pressure from log number density
+
+    Args:
+        log_number_density: Log number density
+        temperature: Temperature
+
+    Returns:
+        Log pressure
+    """
+    log_pressure: Array = (
+        jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature) + log_number_density
+    )
+
+    return log_pressure
+
+
+# pylint: disable=invalid-name
+@jit
+def get_log_Kp(
+    species: tuple[Species, ...], reaction_matrix: Array, temperature: ArrayLike
+) -> Array:
+    """Gets log of the equilibrium constant in terms of partial pressures
+
+    Args:
+        species: Species
+        reaction_matrix: Reaction matrix
+        temperature: Temperature
+
+    Returns:
+        Log of the equilibrium constant in terms of partial pressures
+    """
+    gibbs_list: list[ArrayLike] = []
+    for species_ in species:
+        gibbs: ArrayLike = species_.data.thermodata.get_gibbs_over_RT(temperature)
+        gibbs_list.append(gibbs)
+
+    gibbs_jnp: Array = jnp.array(gibbs_list)
+    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_jnp)
+
+    return log_Kp
+
+
+# pylint: enable=invalid-name
+
+
+@jit
+def get_log_reaction_equilibrium_constant(
+    species: list[Species],
+    gas_species_indices: Array,
+    reaction_matrix: Array,
+    temperature: ArrayLike,
+) -> Array:
+    """Gets the log equilibrium constant of the reactions
+
+    Args:
+        species: List of species
+        gas_species_indices: Indices of gas species
+        reaction_matrix: Reaction matrix
+        temperature: Temperature
+
+    Returns:
+        Log equilibrium constant of the reactions
+    """
+    # pylint: disable=invalid-name
+    log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
+    # jax.debug.print("lnKp = {out}", out=lnKp)
+    delta_n: Array = jnp.sum(jnp.take(reaction_matrix, gas_species_indices, axis=1), axis=1)
+    # jax.debug.print("delta_n = {out}", out=delta_n)
+    log_Kc: Array = log_Kp - delta_n * (jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature))
+    # jax.debug.print("log10Kc = {out}", out=log_Kc)
+    # pylint: enable=invalid-name
+
+    return log_Kc
+
+
+@jit
+def get_pressure_from_log_number_density(
+    log_number_density: ArrayLike, temperature: ArrayLike
+) -> Array:
+    """Gets pressure from log number density
+
+    Args:
+        log_number_density: Log number density
+        temperature: Temperature
+
+    Returns:
+        Pressure
+    """
+    return jnp.exp(get_log_pressure_from_log_number_density(log_number_density, temperature))
+
+
+@jit
+def get_species_density_in_melt(
+    traced_parameters: TracedParameters,
+    fixed_parameters: FixedParameters,
+    log_number_density: Array,
+    log_volume: Array,
+) -> Array:
+    """Gets the number density of species dissolved in melt due to species solubility
+
+    Args:
+        traced_parameters: Traced parameters
+        fixed_parameters: Fixed parameters
+        log_number_density: Log number density
         log_volume: Log volume of the atmosphere
 
     Returns:
@@ -279,13 +495,14 @@ def get_species_density_in_melt(
     species: tuple[Species, ...] = fixed_parameters.species
     diatomic_oxygen_index: Array = jnp.array(fixed_parameters.diatomic_oxygen_index)
     molar_masses: Array = jnp.array(fixed_parameters.molar_masses)
-
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.surface_temperature
 
-    log_pressures: Array = log_pressure_from_log_number_density(log_number_density, temperature)
-    pressures: Array = jnp.exp(log_pressures)
-    total_pressure: Array = get_atmosphere_pressure(fixed_parameters, pressures)
+    # FIXME: Probably not compatible with using fugacities for real gases?
+    pressure: Array = get_pressure_from_log_number_density(log_number_density, temperature)
+    total_pressure: Array = get_atmosphere_pressure(
+        fixed_parameters, log_number_density, temperature
+    )
     diatomic_oxygen_fugacity: Array = jnp.take(pressure, diatomic_oxygen_index)
 
     solubility_funcs: list[Callable] = [
@@ -317,122 +534,3 @@ def get_species_density_in_melt(
     # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
 
     return species_melt_density
-
-
-@jit
-def get_element_density_in_melt(
-    traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
-    log_number_density: Array,
-    pressure: Array,
-    log_volume: Array,
-) -> Array:
-    """Number density of elements dissolved in melt due to species solubility
-
-    Args:
-        traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
-        log_number_density: Log number density
-        pressure: Pressure
-        log_volume: Log volume of the atmosphere
-
-    Returns:
-        Number density of elements dissolved in melt
-    """
-    formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
-    species_melt_density: Array = get_species_density_in_melt(
-        traced_parameters, fixed_parameters, log_number_density, pressure, log_volume
-    )
-    element_melt_density: Array = formula_matrix.dot(species_melt_density)
-
-    return element_melt_density
-
-
-@jit
-def get_atmosphere_log_molar_mass(gas_log_number_density: Array, gas_molar_masses: Array) -> Array:
-    """Gets log molar mass of the atmosphere
-
-    Args:
-        gas_log_number_density: Log number density of gas species
-        gas_molar_masses: Molar masses of gas species
-
-    Returns:
-        Log molar mass of the atmosphere
-    """
-    molar_mass: Array = logsumexp(gas_log_number_density, gas_molar_masses) - logsumexp(
-        gas_log_number_density
-    )
-
-    return molar_mass
-
-
-@jit
-def get_atmosphere_log_volume(
-    gas_log_number_density: Array, gas_molar_masses: Array, planet: Planet
-) -> Array:
-    """Gets log volume of the atmosphere"
-
-    Args:
-        gas_log_number_density: Log number density of gas species
-        gas_molar_masses: Molar masses of gas species
-        planet: Planet
-
-    Returns:
-        Log volume of the atmosphere
-    """
-    return (
-        jnp.log(GAS_CONSTANT)
-        + jnp.log(planet.surface_temperature)
-        - get_atmosphere_log_molar_mass(gas_log_number_density, gas_molar_masses)
-        + jnp.log(planet.surface_area)
-        - jnp.log(planet.surface_gravity)
-    )
-
-
-@jit
-def get_atmosphere_pressure(
-    fixed_parameters: FixedParameters,
-    pressures: Array,
-) -> Array:
-    """Gets pressure of the atmosphere in bar
-
-    Args:
-        fixed_parameters: Fixed parameters
-        pressure: Pressure of all species
-
-    Returns:
-        Pressure of the atmosphere in bar
-    """
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-    gas_pressures: Array = jnp.take(pressures, gas_species_indices)
-
-    return jnp.sum(gas_pressures)
-
-
-# pylint: disable=invalid-name
-@jit
-def get_log_Kp(
-    species: tuple[Species, ...], reaction_matrix: Array, temperature: ArrayLike
-) -> Array:
-    """Gets the natural log of the equilibrium constant in terms of partial pressures.
-
-    Args:
-        species: List of species
-        reaction_matrix: Reaction matrix
-        temperature: Temperature in K
-
-    Returns:
-        Natural log of the equilibrium constant in terms of partial pressures
-    """
-    gibbs_list: list[ArrayLike] = []
-    for species_ in species:
-        gibbs: ArrayLike = species_.data.thermodata.get_gibbs_over_RT(temperature)
-        gibbs_list.append(gibbs)
-
-    gibbs_jnp: Array = jnp.array(gibbs_list)
-    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_jnp)
-
-    return log_Kp
-
-
-# pylint: enable=invalid-name

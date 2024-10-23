@@ -45,9 +45,9 @@ from atmodeller.engine import (
     get_atmosphere_pressure,
     get_element_density_in_melt,
     get_log_activity,
+    get_log_pressure_from_log_number_density,
     get_species_density_in_melt,
 )
-from atmodeller.utilities import log_pressure_from_log_number_density
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -414,14 +414,16 @@ class OutputSingle(Output):
     @override
     def atmosphere_log_volume(self) -> Array:
         return get_atmosphere_log_volume(
-            self.log_number_density_gas_species,
-            self.gas_molar_mass,
+            self.fixed_parameters,
+            self.log_number_density,
             self.planet,
         )
 
     @override
     def atmosphere_pressure(self) -> Array:
-        return get_atmosphere_pressure(self.fixed_parameters, self.pressure())
+        return get_atmosphere_pressure(
+            self.fixed_parameters, self.log_number_density, self.temperature()
+        )
 
     @override
     def element_density_in_melt(self) -> Array:
@@ -436,7 +438,9 @@ class OutputSingle(Output):
 
     @override
     def log_pressure(self) -> Array:
-        return log_pressure_from_log_number_density(self.log_number_density, self.temperature())
+        return get_log_pressure_from_log_number_density(
+            self.log_number_density, self.temperature()
+        )
 
     @override
     def species_density_in_melt(self) -> Array:
@@ -479,11 +483,11 @@ class OutputBatch(Output):
     def atmosphere_log_volume(self) -> Array:
         atmosphere_log_volume_func: Callable = jax.vmap(
             get_atmosphere_log_volume,
-            in_axes=(0, None, self._interior_atmosphere.planet.vmap_axes()),
+            in_axes=(None, 0, self._interior_atmosphere.planet.vmap_axes()),
         )
         atmosphere_log_volume: Array = atmosphere_log_volume_func(
-            self.log_number_density_gas_species,
-            self.gas_molar_mass,
+            self.fixed_parameters,
+            self.log_number_density,
             self._interior_atmosphere.planet,
         )
 
@@ -515,10 +519,10 @@ class OutputBatch(Output):
     def log_pressure(self) -> Array:
         if self.vmap_temperature == 0:
             log_pressure_func: Callable = jax.vmap(
-                log_pressure_from_log_number_density, in_axes=(0, 0)
+                get_log_pressure_from_log_number_density, in_axes=(0, 0)
             )
         else:
-            log_pressure_func = log_pressure_from_log_number_density
+            log_pressure_func = get_log_pressure_from_log_number_density
 
         log_pressure: Array = log_pressure_func(self.log_number_density, self.temperature())
 

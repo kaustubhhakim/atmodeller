@@ -38,13 +38,13 @@ from molmass import Formula
 
 from atmodeller import (
     AVOGADRO,
-    BOLTZMANN_CONSTANT_BAR,
     GRAVITATIONAL_CONSTANT,
     NUMBER_DENSITY_LOWER,
     NUMBER_DENSITY_UPPER,
     STABILITY_LOWER,
     STABILITY_UPPER,
 )
+from atmodeller.engine import get_log_number_density_from_log_pressure
 from atmodeller.eos.classes import IdealGas
 from atmodeller.interfaces import ActivityProtocol, SolubilityProtocol
 from atmodeller.solubility.library import NoSolubility
@@ -281,10 +281,8 @@ class FugacityConstraints(NamedTuple):
         vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
         indices: ArrayLike = jnp.arange(len(self.constraints))
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
-
-        # TODO: Update to function log_number_density_from_log_pressure
-        log_number_density: Array = (
-            log_fugacity - jnp.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature)
+        log_number_density: Array = get_log_number_density_from_log_pressure(
+            log_fugacity, temperature
         )
 
         return log_number_density
