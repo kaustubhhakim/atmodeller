@@ -42,7 +42,7 @@ from atmodeller.containers import (
     TracedParameters,
 )
 from atmodeller.engine import solve
-from atmodeller.output import OutputABC, OutputBatch, OutputSingle
+from atmodeller.output import Output, OutputBatch, OutputSingle
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref, unscale_number_density
 
@@ -466,7 +466,7 @@ class InteriorAtmosphere:
         )
 
         if self.is_batch:
-            output: OutputABC = OutputBatch(solution, self, initial_solution_, traced_parameters_)
+            output: Output = OutputBatch(solution, self, initial_solution_, traced_parameters_)
         else:
             output = OutputSingle(solution, self, initial_solution_, traced_parameters_)
 

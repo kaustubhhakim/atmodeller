@@ -137,7 +137,6 @@ class Planet(NamedTuple):
             vmap axes
         """
         vmap_axes: list[int | None] = []
-        # Loop over the attributes
         for field in self._fields:
             value: ArrayLike = getattr(self, field)
             if jnp.isscalar(value):
