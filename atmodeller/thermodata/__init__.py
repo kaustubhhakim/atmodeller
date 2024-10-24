@@ -22,3 +22,6 @@
 
 # DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}")
 # """Data directory, which is the same as the package directory"""
+
+# Expose public API
+from atmodeller.thermodata.library import get_species_data

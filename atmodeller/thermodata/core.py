@@ -76,8 +76,10 @@ class CondensateActivity(NamedTuple):
 
 
 @register_pytree_node_class
-class ThermoData:
-    """Thermochemical data
+class ThermoCoefficients:
+    """Coefficients for thermochemical data
+
+    Coefficients are available at https://ntrs.nasa.gov/citations/20020085330
 
     Args:
         b1: Enthalpy constant(s) of integration
@@ -284,7 +286,7 @@ class SpeciesData(NamedTuple):
     """Phase code"""
     molar_mass: float
     """Molar mass"""
-    thermodata: ThermoData
+    thermodata: ThermoCoefficients
     """Thermodynamic data"""
 
     @classmethod
@@ -292,7 +294,7 @@ class SpeciesData(NamedTuple):
         cls,
         formula: str,
         phase: str,
-        thermodata: ThermoData,
+        thermodata: ThermoCoefficients,
     ) -> Self:
         """Creates an instance
 

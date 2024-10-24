@@ -19,9 +19,9 @@
 https://ntrs.nasa.gov/citations/20020085330
 """
 
-from atmodeller.thermodata.core import ThermoData
+from atmodeller.thermodata.core import SpeciesData, ThermoCoefficients
 
-C_cr_thermodata: ThermoData = ThermoData(
+_C_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (8.943859760e3, 1.398412456e4, 5.848134850e3),
     (-7.295824740e1, -4.477183040e1, -2.350925275e1),
     (
@@ -56,9 +56,10 @@ C_cr_thermodata: ThermoData = ThermoData(
     (200, 600, 2000),
     (600, 2000, 6000),
 )
-"""Thermodata for C_cr"""
+C_cr: SpeciesData = SpeciesData.create("C", "cr", _C_cr_coeffs)
+"Species data for C_cr"
 
-H2O_cr_thermodata: ThermoData = ThermoData(
+_H2O_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-5.530314990e4,),
     (-1.902572063e2,),
     (
@@ -75,9 +76,10 @@ H2O_cr_thermodata: ThermoData = ThermoData(
     (200,),
     (273.1507,),
 )
-"""Thermodata for H2O_cr"""
+H2O_cr: SpeciesData = SpeciesData.create("H2O", "cr", _H2O_cr_coeffs)
+"Species data for H2O_cr"
 
-H2O_l_thermodata: ThermoData = ThermoData(
+_H2O_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (1.101760476e8, 8.113176880e7),
     (-9.779700970e5, -5.134418080e5),
     (
@@ -103,27 +105,35 @@ H2O_l_thermodata: ThermoData = ThermoData(
     (273.150, 373.150),
     (373.150, 600),
 )
-"""Thermodata for H2O_l"""
+H2O_l: SpeciesData = SpeciesData.create(
+    "H2O",
+    "l",
+    _H2O_l_coeffs,
+)
+"Species data for H2O_l"
 
-S_alpha_thermodata: ThermoData = ThermoData(
+_S_alpha_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.516389580e2,),
     (-7.961066980,),
     ((-1.035710779e4, 0, 1.866766938, 4.256140250e-3, -3.265252270e-06, 0, 0),),
     (200,),
     (368.3,),
 )
-"""Thermodata for S_alpha"""
 
-S_beta_thermodata: ThermoData = ThermoData(
+S_alpha: SpeciesData = SpeciesData.create("S", "alpha", _S_alpha_coeffs)
+"Species data for S_alpha"
+
+_S_beta_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-6.852714730e2,),
     (-8.607846750,),
     ((0, 0, 2.080514131, 2.440879557e-3, 0, 0, 0),),
     (368.3,),
     (388.36,),
 )
-"""Thermodata for S_beta"""
+S_beta: SpeciesData = SpeciesData.create("S", "beta", _S_beta_coeffs)
+"Species data for S_beta"
 
-S_l_thermodata: ThermoData = ThermoData(
+_S_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-6.356594920e5, -9.832222680e5, -2.638846929e4, 1.113013440e4, -8.284589830e2),
     (-1.186929589e4, -3.154806751e4, -7.681730097e2, 1.363174183e2, -1.736128237e1),
     (
@@ -136,9 +146,14 @@ S_l_thermodata: ThermoData = ThermoData(
     (388.36, 428.15, 432.25, 453.15, 717),
     (428.15, 432.25, 453.15, 717, 6000),
 )
-"""Thermodata for S_l"""
+S_l: SpeciesData = SpeciesData.create(
+    "S",
+    "l",
+    _S_l_coeffs,
+)
+"Species data for S_l"
 
-Si_cr_thermodata: ThermoData = ThermoData(
+_Si_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.850635210e2, -1.042947234e3),
     (-1.038427318e1, -1.438964187e1),
     (
@@ -148,22 +163,37 @@ Si_cr_thermodata: ThermoData = ThermoData(
     (200, 298.15),
     (298.15, 1690),
 )
-"""Thermodata for Si_cr"""
+Si_cr: SpeciesData = SpeciesData.create(
+    "Si",
+    "cr",
+    _Si_cr_coeffs,
+)
+"Species data for Si_cr"
 
-Si_l_thermodata: ThermoData = ThermoData(
+_Si_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (4.882667110e3,),
     (-1.326611073e1,),
     ((0, 0, 3.271389414, 0, 0, 0, 0),),
     (1690,),
     (6000,),
 )
-"""Thermodata for Si_l"""
+Si_l: SpeciesData = SpeciesData.create(
+    "Si",
+    "l",
+    _Si_l_coeffs,
+)
+"Species data for Si_l"
 
-SiO2_l_thermodata: ThermoData = ThermoData(
+_SiO2_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-1.140002976e5,),
     (-5.554279592e1,),
     ((0, 0, 1.004268442e1, 0, 0, 0, 0),),
     (1996,),
     (6000,),
 )
-"""Thermodata for SiO2_l"""
+SiO2_l: SpeciesData = SpeciesData.create(
+    "SiO2",
+    "l",
+    _SiO2_l_coeffs,
+)
+"Species data for SiO2_l"

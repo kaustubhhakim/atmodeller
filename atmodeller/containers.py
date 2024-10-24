@@ -48,9 +48,9 @@ from atmodeller.engine import get_log_number_density_from_log_pressure
 from atmodeller.eos.classes import IdealGas
 from atmodeller.interfaces import ActivityProtocol, SolubilityProtocol
 from atmodeller.solubility.library import NoSolubility
+from atmodeller.thermodata import get_species_data
 from atmodeller.thermodata.core import CondensateActivity, SpeciesData
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
-from atmodeller.thermodata.species_data import get_species_data
 from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):

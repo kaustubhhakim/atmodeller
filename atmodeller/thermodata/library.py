@@ -18,18 +18,18 @@
 
 import logging
 
-from atmodeller.thermodata.condensates import (
-    C_cr_thermodata,
-    H2O_l_thermodata,
-    S_alpha_thermodata,
-    S_beta_thermodata,
-    S_l_thermodata,
-    Si_cr_thermodata,
-    Si_l_thermodata,
-    SiO2_l_thermodata,
+from atmodeller.thermodata._condensates import (
+    C_cr,
+    H2O_cr,
+    H2O_l,
+    S_alpha,
+    S_beta,
+    S_l,
+    Si_cr,
+    Si_l,
+    SiO2_l,
 )
-from atmodeller.thermodata.core import SpeciesData
-from atmodeller.thermodata.gases import (
+from atmodeller.thermodata._gases import (
     C_g_thermodata,
     CH4_g_thermodata,
     Cl2_g_thermodata,
@@ -48,6 +48,7 @@ from atmodeller.thermodata.gases import (
     SO2_g_thermodata,
     SO_g_thermodata,
 )
+from atmodeller.thermodata.core import SpeciesData
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -82,8 +83,6 @@ CO2_g_data: SpeciesData = SpeciesData.create(
 )
 "Species data for CO2_g"
 
-C_cr_data: SpeciesData = SpeciesData.create("C", "cr", C_cr_thermodata)
-"Species data for C_cr"
 
 H2_g_data: SpeciesData = SpeciesData.create("H2", "g", H2_g_thermodata)
 "Species data for H2_g"
@@ -94,13 +93,6 @@ H2O_g_data: SpeciesData = SpeciesData.create(
     H2O_g_thermodata,
 )
 "Species data for H2O_g"
-
-H2O_l_data: SpeciesData = SpeciesData.create(
-    "H2O",
-    "l",
-    H2O_l_thermodata,
-)
-"Species data for H2O_l"
 
 H2S_g_data: SpeciesData = SpeciesData.create(
     "H2S",
@@ -129,35 +121,10 @@ NH3_g_data: SpeciesData = SpeciesData.create(
 O2_g_data: SpeciesData = SpeciesData.create("O2", "g", O2_g_thermodata)
 "Species data for O2_g"
 
-S_alpha_data: SpeciesData = SpeciesData.create("S", "alpha", S_alpha_thermodata)
-"Species data for S_alpha"
-
-S_beta_data: SpeciesData = SpeciesData.create("S", "beta", S_beta_thermodata)
-"Species data for S_beta"
-
-S_l_data: SpeciesData = SpeciesData.create(
-    "S",
-    "l",
-    S_l_thermodata,
-)
-"Species data for S_l"
 
 S2_g_data: SpeciesData = SpeciesData.create("S2", "g", S2_g_thermodata)
 "Species data for S2_g"
 
-Si_cr_data: SpeciesData = SpeciesData.create(
-    "Si",
-    "cr",
-    Si_cr_thermodata,
-)
-"Species data for Si_cr"
-
-Si_l_data: SpeciesData = SpeciesData.create(
-    "Si",
-    "l",
-    Si_l_thermodata,
-)
-"Species data for Si_l"
 
 SiH4_g_data: SpeciesData = SpeciesData.create("SiH4", "g", SiH4_g_thermodata)
 "Species data for SiH4_g"
@@ -165,12 +132,6 @@ SiH4_g_data: SpeciesData = SpeciesData.create("SiH4", "g", SiH4_g_thermodata)
 SiO_g_data: SpeciesData = SpeciesData.create("SiO", "g", SiO_g_thermodata)
 "Species data for SiO_g"
 
-SiO2_l_data: SpeciesData = SpeciesData.create(
-    "SiO2",
-    "l",
-    SiO2_l_thermodata,
-)
-"Species data for SiO2_l"
 
 SO_g_data: SpeciesData = SpeciesData.create("SO", "g", SO_g_thermodata)
 "Species data for SO_g"
@@ -184,24 +145,25 @@ species_data: dict[str, SpeciesData] = {
     "Cl2_g": Cl2_g_data,
     "CO_g": CO_g_data,
     "CO2_g": CO2_g_data,
-    "C_cr": C_cr_data,
+    "C_cr": C_cr,
     "H2_g": H2_g_data,
+    "H2O_cr": H2O_cr,
     "H2O_g": H2O_g_data,
-    "H2O_l": H2O_l_data,
+    "H2O_l": H2O_l,
     "H2S_g": H2S_g_data,
     "He_g": He_g_data,
     "N2_g": N2_g_data,
     "NH3_g": NH3_g_data,
     "O2_g": O2_g_data,
-    "S_alpha": S_alpha_data,
-    "S_beta": S_beta_data,
-    "S_l": S_l_data,
+    "S_alpha": S_alpha,
+    "S_beta": S_beta,
+    "S_l": S_l,
     "S2_g": S2_g_data,
-    "Si_cr": Si_cr_data,
-    "Si_l": Si_l_data,
+    "Si_cr": Si_cr,
+    "Si_l": Si_l,
     "SiO_g": SiO_g_data,
     "SiH4_g": SiH4_g_data,
-    "SiO2_l": SiO2_l_data,
+    "SiO2_l": SiO2_l,
     "SO_g": SO_g_data,
     "SO2_g": SO2_g_data,
 }
