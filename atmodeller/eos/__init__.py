@@ -21,3 +21,9 @@ from importlib.abc import Traversable
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory, which is the same as the package directory"""
+
+# Expose the public API
+# pylint: disable=wrong-import-position
+from atmodeller.eos.classes import BeattieBridgeman, Chabrier, IdealGas
+from atmodeller.eos.core import RealGas, RealGasBounded
+from atmodeller.eos.library import get_eos_models

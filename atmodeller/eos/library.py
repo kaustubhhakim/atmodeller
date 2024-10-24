@@ -15,7 +15,16 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOS library built from the concrete classes"""
+"""Real gas EOS library
+
+Usage:
+    from atmodeller.eos.library import get_eos_models
+    eos_models = get_eos_models()
+    CH4_beattie = eos_models["CH4_beattie_holley58"]
+    # Evaluate fugacity at 10 bar and 800 K
+    fugacity = CH4_beattie.fugacity(800, 10)
+    print(fugacity)
+"""
 
 import logging
 from pathlib import Path
