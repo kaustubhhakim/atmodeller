@@ -30,7 +30,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility._core import Solubility, SolubilityPowerLaw, power_law
+from atmodeller.solubility.classes import Solubility, SolubilityPowerLaw, power_law
 from atmodeller.utilities import PyTreeNoData, unit_conversion
 
 if sys.version_info < (3, 12):

@@ -22,7 +22,7 @@ For every law there should be a test in the test suite.
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility._core import SolubilityPowerLaw, SolubilityPowerLawLog10
+from atmodeller.solubility.classes import SolubilityPowerLaw, SolubilityPowerLawLog10
 
 H2_andesite_hirschmann12: SolubilityProtocol = SolubilityPowerLawLog10(1.01058631, 0.60128868)
 """H2 in synthetic andesite :cite:p:`HWA12`

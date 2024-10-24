@@ -28,7 +28,7 @@ from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.library import get_solubility_models
+from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 

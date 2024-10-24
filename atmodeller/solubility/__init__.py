@@ -15,3 +15,12 @@
 # see <https://www.gnu.org/licenses/>.
 #
 """Solubility package"""
+
+# Expose the public API
+from atmodeller.solubility.classes import (
+    NoSolubility,
+    Solubility,
+    SolubilityPowerLaw,
+    SolubilityPowerLawLog10,
+)
+from atmodeller.solubility.library import get_solubility_models

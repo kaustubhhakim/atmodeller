@@ -14,30 +14,16 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Solubility library public API
-
-This module provides the public API for the solubility library. It includes concrete classes and 
-functions that users can utilize to perform solubility calculations. For internal details and 
-implementation specifics, refer to the internal modules.
-
-Classes:
-    NoSolubility: Class for no solubility
-
-Functions:
-    get_solubility_models: Function to get solubility models
+"""Solubility library
     
 Usage:
     from atmodeller.solubility.library import get_solubility_models
     sol_models = get_solubility_models()
     H2O_peridotite = sol_models["H2O_peridotite_sossi23"]
-    # Evaluate solubility (concentration) at 2 bar fH2O and a temperatuer of 2000 K
+    # Evaluate solubility (concentration) at 2 bar fH2O and a temperature of 2000 K
     concentration = H2O_peridotite.concentration(2, temperature=2000)
     print(concentration)
 """
-
-from jax import jit
-from jax.tree_util import register_pytree_node_class
-from jax.typing import ArrayLike
 
 from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility._carbon_species import (
@@ -47,7 +33,6 @@ from atmodeller.solubility._carbon_species import (
     CO_basalt_yoshioka19,
     CO_rhyolite_yoshioka19,
 )
-from atmodeller.solubility._core import Solubility
 from atmodeller.solubility._hydrogen_species import (
     H2_andesite_hirschmann12,
     H2_basalt_hirschmann12,
@@ -78,28 +63,7 @@ from atmodeller.solubility._sulfur_species import (
     S2_sulfide_trachybasalt_boulliung23,
     S2_trachybasalt_boulliung23,
 )
-from atmodeller.utilities import PyTreeNoData
-
-
-@register_pytree_node_class
-class NoSolubility(PyTreeNoData, Solubility):
-    """No solubility"""
-
-    @jit
-    def concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,  # Convenient to use fO2 so pylint: disable=invalid-name
-    ) -> ArrayLike:
-        del fugacity
-        del temperature
-        del pressure
-        del fO2
-
-        # Must be 0.0 (float) for JAX array type compliance
-        return 0.0
+from atmodeller.solubility.classes import NoSolubility
 
 
 def get_solubility_models() -> dict[str, SolubilityProtocol]:

@@ -27,7 +27,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.library import get_solubility_models
+from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 

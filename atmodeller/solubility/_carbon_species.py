@@ -29,7 +29,7 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility._core import Solubility
+from atmodeller.solubility.classes import Solubility
 from atmodeller.utilities import PyTreeNoData, unit_conversion
 
 if sys.version_info < (3, 12):

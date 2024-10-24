@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core classes and functionality"""
+"""Abstract and concrete classes for solubility laws"""
 
 # Convenient to use chemical formulas so pylint: disable=invalid-name
 
@@ -27,7 +27,7 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.utilities import power_law
+from atmodeller.utilities import PyTreeNoData, power_law
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -64,6 +64,27 @@ class Solubility(ABC, SolubilityProtocol):
     ):
         """Wrapper to pass concentration arguments by position to use with JAX lax.switch"""
         return self.concentration(fugacity, temperature=temperature, pressure=pressure, fO2=fO2)
+
+
+@register_pytree_node_class
+class NoSolubility(PyTreeNoData, Solubility):
+    """No solubility"""
+
+    @jit
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,  # Convenient to use fO2 so pylint: disable=invalid-name
+    ) -> ArrayLike:
+        del fugacity
+        del temperature
+        del pressure
+        del fO2
+
+        # Must be 0.0 (float) for JAX array type compliance
+        return 0.0
 
 
 @register_pytree_node_class
