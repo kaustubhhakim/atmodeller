@@ -48,7 +48,7 @@ from atmodeller.engine import get_log_number_density_from_log_pressure
 from atmodeller.eos.classes import IdealGas
 from atmodeller.interfaces import ActivityProtocol, SolubilityProtocol
 from atmodeller.solubility.library import NoSolubility
-from atmodeller.thermodata import get_species_data
+from atmodeller.thermodata import select_species_data
 from atmodeller.thermodata.core import CondensateActivity, SpeciesData
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import OptxSolver, unit_conversion
@@ -433,7 +433,7 @@ class Species(NamedTuple):
         Returns:
             A condensed species
         """
-        species_data: SpeciesData = get_species_data(species_name)
+        species_data: SpeciesData = select_species_data(species_name)
 
         return cls(species_data, activity, NoSolubility())
 
@@ -454,7 +454,7 @@ class Species(NamedTuple):
         Returns:
             A gas species
         """
-        species_data: SpeciesData = get_species_data(species_name)
+        species_data: SpeciesData = select_species_data(species_name)
 
         return cls(species_data, activity, solubility)
 

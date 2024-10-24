@@ -19,9 +19,9 @@
 https://ntrs.nasa.gov/citations/20020085330
 """
 
-from atmodeller.thermodata.core import ThermoCoefficients
+from atmodeller.thermodata.core import SpeciesData, ThermoCoefficients
 
-C_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_C_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (8.545763110e4, 8.410597850e4, 2.355273444e6),
     (4.747924288, 4.130047418, -6.405123160e2),
     (
@@ -56,9 +56,14 @@ C_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-"""Thermodata for C_g"""
+C_g: SpeciesData = SpeciesData.create(
+    "C",
+    "g",
+    _C_g_coeffs,
+)
+"Species data for C_g"
 
-CH4_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_CH4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-2.331314360e4, 7.532066910e4),
     (8.904322750e1, -1.219124889e2),
     (
@@ -84,9 +89,14 @@ CH4_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-"""Thermodata for CH4_g"""
+CH4_g: SpeciesData = SpeciesData.create(
+    "CH4",
+    "g",
+    _CH4_g_coeffs,
+)
+"Species data for CH4_g"
 
-Cl2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_Cl2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (1.534069331e3, 1.212117724e5),
     (-9.438331107, -1.690778824e2),
     (
@@ -112,9 +122,10 @@ Cl2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-"""Thermodata for Cl2_g"""
+Cl2_g: SpeciesData = SpeciesData.create("Cl2", "g", _Cl2_g_coeffs)
+"Species data for Cl2_g"
 
-CO_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_CO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-1.303131878e4, -2.466261084e3, 5.701421130e6),
     (
         -7.859241350,
@@ -153,9 +164,14 @@ CO_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-"""Thermodata for CO_g"""
+CO_g: SpeciesData = SpeciesData.create(
+    "CO",
+    "g",
+    _CO_g_coeffs,
+)
+"Species data for CO_g"
 
-CO2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_CO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-4.528198460e4, -3.908350590e4, -8.043214510e6),
     (-7.048279440, -2.652669281e1, 2.254177493e3),
     (
@@ -190,9 +206,14 @@ CO2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-"""Thermodata for CO2_g"""
+CO2_g: SpeciesData = SpeciesData.create(
+    "CO2",
+    "g",
+    _CO2_g_coeffs,
+)
+"Species data for CO2_g"
 
-H2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_H2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (2.682484665e3, 5.339824410e3, 2.488433516e6),
     (-3.043788844e1, -2.202774769, -6.695728110e2),
     (
@@ -227,9 +248,10 @@ H2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-"""Thermodata for H2_g"""
+H2_g: SpeciesData = SpeciesData.create("H2", "g", _H2_g_coeffs)
+"Species data for H2_g"
 
-H2O_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_H2O_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-3.303974310e4, -1.384286509e4),
     (1.724205775e1, -7.978148510),
     (
@@ -255,9 +277,14 @@ H2O_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-"""Thermodata for H2O_g"""
+H2O_g: SpeciesData = SpeciesData.create(
+    "H2O",
+    "g",
+    _H2O_g_coeffs,
+)
+"Species data for H2O_g"
 
-H2S_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_H2S_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-3.278457280e3, 2.908696214e4),
     (1.415194691, -4.349160391e1),
     (
@@ -283,9 +310,14 @@ H2S_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-"""Thermodata for H2S_g"""
+H2S_g: SpeciesData = SpeciesData.create(
+    "H2S",
+    "g",
+    _H2S_g_coeffs,
+)
+"Species data for H2S_g"
 
-He_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.453750000e2, -7.453750000e2, 1.650518960e4),
     (9.287239740e-1, 9.287239740e-1, -4.048814390),
     (
@@ -304,9 +336,14 @@ He_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-"""Thermodata for He_g"""
+He_g: SpeciesData = SpeciesData.create(
+    "He",
+    "g",
+    _He_g_coeffs,
+)
+"Species data for He_g"
 
-N2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_N2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (7.108460860e2, 1.283210415e4, 4.938707040e6),
     (-1.076003744e1, -1.586640027e1, -1.672099740e3),
     (
@@ -341,9 +378,10 @@ N2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-"""Thermodata for N2_g"""
+N2_g: SpeciesData = SpeciesData.create("N2", "g", _N2_g_coeffs)
+"Species data for N2_g"
 
-NH3_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_NH3_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-1.264886413e4, 4.386191960e4),
     (4.366014588e1, -6.462330602e1),
     (
@@ -369,9 +407,14 @@ NH3_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-"""Thermodata for NH3_g"""
+NH3_g: SpeciesData = SpeciesData.create(
+    "NH3",
+    "g",
+    _NH3_g_coeffs,
+)
+"Species data for NH3_g"
 
-O2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_O2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-3.391454870e3, -1.689010929e4, 2.293554027e6),
     (1.849699470e1, 1.738716506e1, -5.530621610e2),
     (
@@ -406,121 +449,10 @@ O2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-"""Thermodata for O2_g"""
+O2_g: SpeciesData = SpeciesData.create("O2", "g", _O2_g_coeffs)
+"Species data for O2_g"
 
-SiO_g_thermodata: ThermoCoefficients = ThermoCoefficients(
-    (-1.666585903e4, -1.350842360e4),
-    (3.355795700e1, -8.386957330e-1),
-    (
-        (
-            -4.722771050e4,
-            8.063137640e2,
-            -1.636976133,
-            1.454275546e-2,
-            -1.723202046e-5,
-            1.042397340e-8,
-            -2.559365273e-12,
-        ),
-        (
-            -1.7651341625,
-            -3.199177090e1,
-            4.477441930,
-            4.591764710e-6,
-            3.558143150e-8,
-            -1.327012559e-11,
-            1.613253297e-15,
-        ),
-    ),
-    (200, 1000),
-    (1000, 6000),
-)
-"""Thermodata for SiO_g"""
-
-SiH4_g_thermodata: ThermoCoefficients = ThermoCoefficients(
-    (6.269669060e3, 4.766887950e4),
-    (4.965461830, -9.801697460e1),
-    (
-        (
-            7.872993290e4,
-            -5.526087050e2,
-            2.498944303,
-            1.442118274e-2,
-            -8.467107310e-6,
-            2.726164641e-9,
-            -5.436754370e-13,
-        ),
-        (
-            1.290378740e6,
-            -7.813399780e3,
-            1.828851664e1,
-            -1.975620946e-3,
-            4.156502150e-7,
-            -4.596745610e-11,
-            2.072777131e-15,
-        ),
-    ),
-    (200, 1000),
-    (1000, 6000),
-)
-"""Thermodata for SiH4_g"""
-
-SO_g_thermodata: ThermoCoefficients = ThermoCoefficients(
-    (-3.371292190e3, -2.708838059e4),
-    (3.093861963e1, 3.615358329e1),
-    (
-        (
-            -3.342757000e4,
-            6.403862500e2,
-            -1.006641228,
-            1.381512705e-2,
-            -1.704486364e-5,
-            1.061294930e-8,
-            -2.645796205e-12,
-        ),
-        (
-            -1.443410557e6,
-            4.113874360e3,
-            -5.383695780e-1,
-            2.794153269e-3,
-            -6.633352260e-7,
-            7.838221190e-11,
-            -3.560509070e-15,
-        ),
-    ),
-    (200, 1000),
-    (1000, 6000),
-)
-"""Thermodata for SO_g"""
-
-SO2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
-    (-4.113752080e4, -3.351308690e4),
-    (4.045512519e1, -1.655776085e1),
-    (
-        (
-            -5.310842140e4,
-            9.090311670e2,
-            -2.356891244,
-            2.204449885e-2,
-            -2.510781471e-5,
-            1.446300484e-8,
-            -3.369070940e-12,
-        ),
-        (
-            -1.127640116e5,
-            -8.252261380e2,
-            7.616178630,
-            -1.999327610e-4,
-            5.655631430e-8,
-            -5.454316610e-12,
-            2.918294102e-16,
-        ),
-    ),
-    (200, 1000),
-    (1000, 6000),
-)
-"""Thermodata for SO2_g"""
-
-S2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
+_S2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (1.654767715e4, 1.085508427e4),
     (-7.957279032e-1, 1.458544515e1),
     (
@@ -546,4 +478,121 @@ S2_g_thermodata: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-"""Thermodata for S2_g"""
+S2_g: SpeciesData = SpeciesData.create("S2", "g", _S2_g_coeffs)
+"Species data for S2_g"
+
+_SO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (-3.371292190e3, -2.708838059e4),
+    (3.093861963e1, 3.615358329e1),
+    (
+        (
+            -3.342757000e4,
+            6.403862500e2,
+            -1.006641228,
+            1.381512705e-2,
+            -1.704486364e-5,
+            1.061294930e-8,
+            -2.645796205e-12,
+        ),
+        (
+            -1.443410557e6,
+            4.113874360e3,
+            -5.383695780e-1,
+            2.794153269e-3,
+            -6.633352260e-7,
+            7.838221190e-11,
+            -3.560509070e-15,
+        ),
+    ),
+    (200, 1000),
+    (1000, 6000),
+)
+SO_g: SpeciesData = SpeciesData.create("SO", "g", _SO_g_coeffs)
+"Species data for SO_g"
+
+_SO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (-4.113752080e4, -3.351308690e4),
+    (4.045512519e1, -1.655776085e1),
+    (
+        (
+            -5.310842140e4,
+            9.090311670e2,
+            -2.356891244,
+            2.204449885e-2,
+            -2.510781471e-5,
+            1.446300484e-8,
+            -3.369070940e-12,
+        ),
+        (
+            -1.127640116e5,
+            -8.252261380e2,
+            7.616178630,
+            -1.999327610e-4,
+            5.655631430e-8,
+            -5.454316610e-12,
+            2.918294102e-16,
+        ),
+    ),
+    (200, 1000),
+    (1000, 6000),
+)
+SO2_g: SpeciesData = SpeciesData.create("SO2", "g", _SO2_g_coeffs)
+"Species data for SO2_g"
+
+_SiH4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (6.269669060e3, 4.766887950e4),
+    (4.965461830, -9.801697460e1),
+    (
+        (
+            7.872993290e4,
+            -5.526087050e2,
+            2.498944303,
+            1.442118274e-2,
+            -8.467107310e-6,
+            2.726164641e-9,
+            -5.436754370e-13,
+        ),
+        (
+            1.290378740e6,
+            -7.813399780e3,
+            1.828851664e1,
+            -1.975620946e-3,
+            4.156502150e-7,
+            -4.596745610e-11,
+            2.072777131e-15,
+        ),
+    ),
+    (200, 1000),
+    (1000, 6000),
+)
+SiH4_g: SpeciesData = SpeciesData.create("SiH4", "g", _SiH4_g_coeffs)
+"Species data for SiH4_g"
+
+_SiO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (-1.666585903e4, -1.350842360e4),
+    (3.355795700e1, -8.386957330e-1),
+    (
+        (
+            -4.722771050e4,
+            8.063137640e2,
+            -1.636976133,
+            1.454275546e-2,
+            -1.723202046e-5,
+            1.042397340e-8,
+            -2.559365273e-12,
+        ),
+        (
+            -1.7651341625,
+            -3.199177090e1,
+            4.477441930,
+            4.591764710e-6,
+            3.558143150e-8,
+            -1.327012559e-11,
+            1.613253297e-15,
+        ),
+    ),
+    (200, 1000),
+    (1000, 6000),
+)
+SiO_g: SpeciesData = SpeciesData.create("SiO", "g", _SiO_g_coeffs)
+"Species data for SiO_g"
