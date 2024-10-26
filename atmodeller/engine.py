@@ -412,7 +412,7 @@ def get_log_Kp(
     """
     gibbs_list: list[ArrayLike] = []
     for species_ in species:
-        gibbs: ArrayLike = species_.data.thermodata.get_gibbs_over_RT(temperature)
+        gibbs: ArrayLike = species_.data.get_gibbs_over_RT(temperature)
         gibbs_list.append(gibbs)
 
     gibbs_jnp: Array = jnp.array(gibbs_list)

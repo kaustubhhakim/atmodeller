@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Species data"""
+"""Thermodynamic data for species"""
 
 import logging
 
@@ -53,11 +53,11 @@ from atmodeller.thermodata.core import SpeciesData
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def get_species_data() -> dict[str, SpeciesData]:
-    """Gets a dictionary of species data
+def get_thermodata() -> dict[str, SpeciesData]:
+    """Gets a dictionary of thermodynamic data for species
 
     Returns:
-        Dictionary of species data
+        Dictionary of thermodynamic data for species
     """
     species_data: dict[str, SpeciesData] = {
         "C_g": C_g,
@@ -91,21 +91,21 @@ def get_species_data() -> dict[str, SpeciesData]:
     return species_data
 
 
-def select_species_data(species_name: str) -> SpeciesData:
-    """Selects species data
+def select_thermodata(species_name: str) -> SpeciesData:
+    """Selects thermodynamic data for species
 
     Args:
         species_name: Name of the species
 
     Returns:
-        Species data
+        Thermodynamic data for data
     """
-    species_data: dict[str, SpeciesData] = get_species_data()
+    species_data: dict[str, SpeciesData] = get_thermodata()
 
     try:
         data: SpeciesData = species_data[species_name]
     except KeyError as exc:
-        msg: str = f"Species data for '{species_name}' is not available"
+        msg: str = f"Thermodynamic data for '{species_name}' is not available"
         logger.warning(msg)
         logger.warning("Available options are: %s", list(species_data.keys()))
         raise ValueError(msg) from exc

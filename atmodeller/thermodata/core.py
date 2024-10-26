@@ -331,6 +331,19 @@ class SpeciesData(NamedTuple):
 
         return Formula(formula)
 
+    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
+        """Gets Gibbs energy over RT
+
+        This is calculated using data from the appropriate temperature range.
+
+        Args:
+            temperature: Temperature
+
+        Returns:
+            Gibbs energy over RT
+        """
+        return self.thermodata.get_gibbs_over_RT(temperature)
+
     @property
     def name(self) -> str:
         """Unique name by combining Hill notation and phase"""

@@ -164,24 +164,24 @@ def get_eos_models() -> dict[str, RealGas]:
     Returns:
         Dictionary of EOS models
     """
-    models: dict[str, RealGas] = {}
-    models["CH4_beattie_holley58"] = CH4_beattie_holley58
-    models["CH4_beattie_holley58_bounded"] = CH4_beattie_holley58_bounded
-    models["CO2_beattie_holley58"] = CO2_beattie_holley58
-    models["CO2_beattie_holley58_bounded"] = CO2_beattie_holley58_bounded
-    models["H2_beattie_holley58"] = H2_beattie_holley58
-    models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
-    models["H2_chabrier21"] = H2_chabrier21
-    models["He_beattie_holley58"] = He_beattie_holley58
-    models["He_beattie_holley58_bounded"] = He_beattie_holley58_bounded
-    models["N2_beattie_holley58"] = N2_beattie_holley58
-    models["N2_beattie_holley58_bounded"] = N2_beattie_holley58_bounded
-    models["NH3_beattie_holley58"] = NH3_beattie_holley58
-    models["NH3_beattie_holley58_bounded"] = NH3_beattie_holley58_bounded
-    models["O2_beattie_holley58"] = O2_beattie_holley58
-    models["O2_beattie_holley58_bounded"] = O2_beattie_holley58_bounded
+    eos_models: dict[str, RealGas] = {}
+    eos_models["CH4_beattie_holley58"] = CH4_beattie_holley58
+    eos_models["CH4_beattie_holley58_bounded"] = CH4_beattie_holley58_bounded
+    eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58
+    eos_models["CO2_beattie_holley58_bounded"] = CO2_beattie_holley58_bounded
+    eos_models["H2_beattie_holley58"] = H2_beattie_holley58
+    eos_models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
+    eos_models["H2_chabrier21"] = H2_chabrier21
+    eos_models["He_beattie_holley58"] = He_beattie_holley58
+    eos_models["He_beattie_holley58_bounded"] = He_beattie_holley58_bounded
+    eos_models["N2_beattie_holley58"] = N2_beattie_holley58
+    eos_models["N2_beattie_holley58_bounded"] = N2_beattie_holley58_bounded
+    eos_models["NH3_beattie_holley58"] = NH3_beattie_holley58
+    eos_models["NH3_beattie_holley58_bounded"] = NH3_beattie_holley58_bounded
+    eos_models["O2_beattie_holley58"] = O2_beattie_holley58
+    eos_models["O2_beattie_holley58_bounded"] = O2_beattie_holley58_bounded
 
-    return models
+    return eos_models
 
 
 if __name__ == "__main__":

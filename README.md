@@ -7,9 +7,18 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-
 ## About
-Atmodeller is a Python package that leverages [Google JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under The GNU General Public License v3.0 or later. Community development of the code is encouraged so please contact the lead developer if you or your team would like to contribute.
+Atmodeller is a Python package that leverages [Google JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under The GNU General Public License v3.0 or later.
+
+## Citation
+
+If you use Atmodeller please cite (prior to manuscript submission, check back to see if this reference has been updated):
+
+- Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, The Astrophysical Journal, to be submitted.
+
+## Development
+
+Community development of the code is strongly encouraged so please contact the lead developer if you or your team would like to contribute. Atmodeller uses JAX so familiarise yourself with [How to think in JAX](https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html) and  [JAX - The Sharp Bits](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html), as well as other resources offered on the JAX site and the web in general. You are welcome to enquire about the reasoning behind the structure and design of the code with the development team. Please add a corresponding unit test for new features that you develop.
 
 Current development team:
 
@@ -18,11 +27,57 @@ Current development team:
 - Meng Tian (LMU Munich)
 - Paolo Sossi (ETH Zurich)
 
-## Citation
+## Basic usage
 
-If you use Atmodeller please cite (prior to manuscript submission, check back to see if this reference has been updated):
+Atmodeller contains three sub-packages that provide real gas equations of state (EOS), solubility laws, and thermodynamic data
 
-- Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, The Astrophysical Journal, to be submitted.
+Accessing real gas EOS:
+
+```
+from atmodeller.eos import get_eos_models
+
+eos_models = get_eos_models()
+# Find the available models
+eos_models.keys()
+# Get a CH4 model
+CH4_eos_model = eos_models['CH4_beattie_holley58']
+# Compute the fugacity at 800 K and 100 bar
+CH4_eos_model.fugacity(800, 100)
+# Compute the compressibility factor at the same conditions
+CH4_eos_model.compressibility_factor(800, 100)
+# Etc., other methods are available to compute other quantities
+```
+
+Accessing solubility laws:
+
+```
+from atmodeller.solubility import get_solubility_models
+
+sol_models = get_solubility_models()
+# Find the available models
+sol_models.keys()
+CO2_basalt = sol_models["CO2_basalt_dixon95"]
+# Compute the concentration at fCO2=0.5 bar, 1300 K, and 1 bar
+# Note that fugacity is the first argument and others are keyword only
+CO2_basalt.concentration(0.5, temperature=1300, pressure=1)
+```
+
+Accessing thermodynamic data for species:
+
+```
+from atmodeller.thermodata import get_thermodata
+
+species_data = get_thermodata()
+# Find the available species
+species_data.keys()
+# Get CO2 gas
+CO2_g = species_data["CO2_g"]
+# Compute the Gibbs energy relative to RT at 2000 K
+CO2_g.get_gibbs_over_RT(2000.0)
+# Compute the composition
+CO2_g.composition
+# Etc., other methods are available to compute other quantities
+```
 
 ## Installation
 
