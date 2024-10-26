@@ -334,7 +334,7 @@ class Chabrier(RealGas):
         with data as datapath:
             df: pd.DataFrame = pd.read_csv(
                 datapath,
-                delim_whitespace=True,
+                sep="\s+",
                 comment="#",
                 usecols=[0, 1, 2],
                 names=column_names,

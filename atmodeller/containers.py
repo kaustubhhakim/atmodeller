@@ -32,7 +32,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jax import Array, lax, tree_map
+from jax import Array, lax
+from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from molmass import Formula
 
