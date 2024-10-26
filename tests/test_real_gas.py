@@ -52,7 +52,8 @@ solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 eos_models: dict[str, RealGas] = get_eos_models()
 
 
-def test_holley(helper) -> None:
+# Test is comparable to main branch
+def test_fO2_holley(helper) -> None:
 
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_beattie_holley58_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
@@ -60,7 +61,7 @@ def test_holley(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g)
     # Temperature is within the range of the Holley model
-    planet: Planet = Planet(surface_temperature=900.0)
+    planet: Planet = Planet(surface_temperature=1000.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
@@ -87,9 +88,9 @@ def test_holley(helper) -> None:
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
     target: dict[str, float] = {
-        "H2O_g": 23.113789256592163,
-        "H2_g": 67.28471475999238,
-        "O2_g": 1.1643429977602485e-24,
+        "H2O_g": 32.75151735610369,
+        "H2_g": 71.49724178583168,
+        "O2_g": 1.5470258614815338e-21,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -97,7 +98,7 @@ def test_holley(helper) -> None:
 
 def test_chabrier(helper) -> None:
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")

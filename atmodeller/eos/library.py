@@ -44,6 +44,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 H2_chabrier21: RealGas = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
+# TODO: Update calibration bounds. Kaustubh to do.
+H2_chabrier21_bounded: RealGas = RealGasBounded(
+    H2_chabrier21, ExperimentalCalibrationNew(100, 4000, 0.1, 50e3)
+)
 He_chabrier21: RealGas = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
 H2HeY0275_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0275_v1"))
@@ -180,6 +184,7 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["H2_beattie_holley58"] = H2_beattie_holley58
     eos_models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
     eos_models["H2_chabrier21"] = H2_chabrier21
+    eos_models["H2_chabrier21_bounded"] = H2_chabrier21_bounded
     eos_models["H2HeY0275_chabrier21"] = H2HeY0275_chabrier21
     eos_models["H2HeY0292_chabrier21"] = H2HeY0292_chabrier21
     eos_models["H2HeY0297_chabrier21"] = H2HeY0297_chabrier21
