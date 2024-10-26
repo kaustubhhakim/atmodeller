@@ -42,8 +42,16 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 # region: Chabrier et al. (2021)
 
-H2_chabrier21: RealGas = Chabrier(Path("TABLE_H_TP_v1"), "H2")
+H2_chabrier21: RealGas = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
+He_chabrier21: RealGas = Chabrier(Path("TABLE_HE_TP_v1"))
+"""He :cite:p:`CD21`"""
+H2HeY0275_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0275_v1"))
+"""H2HeY0275 :cite:p:`CD21`"""
+H2HeY0292_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0292_v1"))
+"""H2HeY0292 :cite:p:`CD21`"""
+H2HeY0297_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
+"""H2HeY0297 :cite:p:`CD21`"""
 
 # endregion
 
@@ -172,8 +180,12 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["H2_beattie_holley58"] = H2_beattie_holley58
     eos_models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
     eos_models["H2_chabrier21"] = H2_chabrier21
+    eos_models["H2HeY0275_chabrier21"] = H2HeY0275_chabrier21
+    eos_models["H2HeY0292_chabrier21"] = H2HeY0292_chabrier21
+    eos_models["H2HeY0297_chabrier21"] = H2HeY0297_chabrier21
     eos_models["He_beattie_holley58"] = He_beattie_holley58
     eos_models["He_beattie_holley58_bounded"] = He_beattie_holley58_bounded
+    eos_models["He_chabrier21"] = He_chabrier21
     eos_models["N2_beattie_holley58"] = N2_beattie_holley58
     eos_models["N2_beattie_holley58_bounded"] = N2_beattie_holley58_bounded
     eos_models["NH3_beattie_holley58"] = NH3_beattie_holley58

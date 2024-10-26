@@ -32,6 +32,7 @@ from jax.scipy.interpolate import RegularGridInterpolator
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from molmass import Formula
+from xmmutablemap import ImmutableMap
 
 from atmodeller import GAS_CONSTANT_BAR, PRESSURE_REFERENCE
 from atmodeller.eos import DATA_DIRECTORY
@@ -251,6 +252,7 @@ class BeattieBridgeman(RealGas):
         return cls(**aux_data)
 
 
+# Convenient to use P, T, H2, and He as names so pylint: disable=invalid-name
 @register_pytree_node_class
 class Chabrier(RealGas):
     r"""Chabrier EOS from :cite:t:`CD21`
@@ -259,52 +261,88 @@ class Chabrier(RealGas):
 
     Args:
         filename: Filename of the density-T-P data
-        species_name: Name of the species
-
-    Attributes:
-        filename: Filename of the density-T-P data
-        species_name: Name of the species
     """
 
     CHABRIER_DIRECTORY: Path = Path("chabrier")
-    """Directory of the Chabrier data within :obj:`~atmodeller.eos.data`."""
+    """Directory of the Chabrier data within :obj:`~atmodeller.eos.data`"""
+    He_fraction_map: ImmutableMap = ImmutableMap(
+        {
+            "TABLE_H_TP_v1": 0,
+            "TABLE_HE_TP_v1": 1,
+            "TABLEEOS_2021_TP_Y0275_v1": 0.275,
+            "TABLEEOS_2021_TP_Y0292_v1": 0.292,
+            "TABLEEOS_2021_TP_Y0297_v1": 0.297,
+        }
+    )
+    """Mole fraction of He in the gas mixture, the other component being H2.
+    
+    Dictionary keys should correspond to the name of the Chabrier file.
+    """
 
     def __init__(
         self,
         filename: Path,
-        species_name: str,
     ):
-        self.filename: Path = filename
-        self.species_name: str = species_name
+        self._filename: Path = filename
         self._log10_density_func: RegularGridInterpolator = self._get_spline()
-        self._molar_mass_g_mol: float = Formula(species_name).mass
+        self._He_fraction = self.He_fraction_map[self._filename.name]
+        self._H2_molar_mass_g_mol: float = Formula("H2").mass
+        self._He_molar_mass_g_mol: float = Formula("He").mass
+        # Changing the number of integration steps will require updating the unit test output for
+        # Chabrier.
+        self._integration_steps: int = 100
+
+    def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
+        r"""Converts density to molar density
+
+        Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
+
+        Args:
+            log10_density_gcc: Log10 density in g/cc
+
+        Returns:
+            Molar density in :math:`\mathrm{mol}\mathrm{m}^{-3}`
+        """
+        molar_density: Array = jnp.power(10, log10_density_gcc) / unit_conversion.cm3_to_m3
+        composition_factor: float = (
+            self._He_molar_mass_g_mol * self._He_fraction
+            + self._H2_molar_mass_g_mol * (1 - self._He_fraction)
+        )
+        molar_density = molar_density / composition_factor
+
+        return molar_density
 
     def _get_spline(self) -> RegularGridInterpolator:
-        """Gets spline lookup for density from :cite:t:`CD21` T-P-rhp tables.
+        """Gets spline lookup for density from :cite:t:`CD21` T-P-rho tables.
 
-        The first 3 columns contain log10 T [K], log10 P [GPa], log10 rho [g/cc].
+        The data tables have a slightly different organisation of the header line. But in all cases
+        the first three columns contain the required data: log10 T [K], log10 P [GPa], and
+        log10 rho [g/cc].
+
+        Returns:
+            Interpolator
         """
+        # Define column names for the first three columns
+        T_name: str = "log T [K]"
+        P_name: str = "log P [GPa]"
+        rho_name: str = "log rho [g/cc]"
+        column_names: list[str] = [T_name, P_name, rho_name]
+
         data: AbstractContextManager[Path] = importlib.resources.as_file(
-            DATA_DIRECTORY.joinpath(str(self.CHABRIER_DIRECTORY.joinpath(self.filename)))
+            DATA_DIRECTORY.joinpath(str(self.CHABRIER_DIRECTORY.joinpath(self._filename)))
         )
         with data as datapath:
-            columns: pd.Index = pd.read_fwf(
-                datapath, widths=(16, 15, 15, 15, 16, 15, 15, 15, 15, 15)
-            ).columns
-            df: pd.DataFrame = pd.read_fwf(
+            df: pd.DataFrame = pd.read_csv(
                 datapath,
-                widths=(16, 15, 15, 15, 16, 15, 15, 15, 15, 15),
-                header=None,
+                delim_whitespace=True,
                 comment="#",
+                usecols=[0, 1, 2],
+                names=column_names,
+                skiprows=2,
             )
-        df.columns = columns
-        pivot_table: pd.DataFrame = df.pivot(
-            index="#log T [K]", columns="log P [GPa]", values="log rho [g/cc]"
-        )
-        # Convenient to use T and P so pylint: disable=invalid-name
+        pivot_table: pd.DataFrame = df.pivot(index=T_name, columns=P_name, values=rho_name)
         log_T: Array = jnp.array(pivot_table.index.to_numpy())
         log_P: Array = jnp.array(pivot_table.columns.to_numpy())
-        # pylint: enable=invalid-name
         log_rho: Array = jnp.array(pivot_table.to_numpy())
 
         interpolator: RegularGridInterpolator = RegularGridInterpolator(
@@ -319,11 +357,8 @@ class Chabrier(RealGas):
         log10_density_gcc: Array = self._log10_density_func(
             (jnp.log10(temperature), jnp.log10(unit_conversion.bar_to_GPa * pressure))
         )
-        # Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
-        molar_density: Array = jnp.power(10, log10_density_gcc) / (
-            unit_conversion.cm3_to_m3 * self._molar_mass_g_mol
-        )
-        volume: Array = 1 / molar_density
+        molar_density: Array = self._convert_to_molar_density(log10_density_gcc)
+        volume: Array = jnp.reciprocal(molar_density)
 
         return volume
 
@@ -334,7 +369,7 @@ class Chabrier(RealGas):
         jax.debug.print("pressure_in = {out}", out=pressure)
         # Pressure range to integrate over
         pressures: Array = jnp.logspace(
-            jnp.log10(PRESSURE_REFERENCE), jnp.log10(pressure), num=1000
+            jnp.log10(PRESSURE_REFERENCE), jnp.log10(pressure), num=self._integration_steps
         )
         jax.debug.print("pressures = {out}", out=pressures)
         temperatures: Array = jnp.full_like(pressures, temperature)
@@ -349,10 +384,13 @@ class Chabrier(RealGas):
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()
-        aux_data = {"filename": self.filename, "species_name": self.species_name}
+        aux_data = {"filename": self._filename}
         return (children, aux_data)
 
     @classmethod
     def tree_unflatten(cls, aux_data, children) -> Self:
         del children
         return cls(**aux_data)
+
+
+# pylint: enable=invalid-name
