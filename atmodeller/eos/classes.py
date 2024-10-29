@@ -73,6 +73,31 @@ class IdealGas(PyTreeNoData, RealGas):
         return self.ideal_volume(temperature, pressure)
 
 
+# Hack for impose the simplest possible EOS with real gas like behaviour
+@register_pytree_node_class
+class IdealGas2(PyTreeNoData, RealGas):
+    r"""Ideal gas equation of state:
+
+    .. math::
+
+        R T = P V
+
+    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`P` is pressure, and
+    :math:`V` is volume.
+    """
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        # Update coefficient in log below to change fugacity coefficient
+        return self.ideal_log_fugacity(temperature, pressure) + jnp.log(22.8429535135057)
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        return self.ideal_volume(temperature, pressure)
+
+
 @register_pytree_node_class
 class BeattieBridgeman(RealGas):
     r"""Beattie-Bridgeman equation :cite:p:`HWZ58{Equation 1}`.
@@ -290,7 +315,8 @@ class Chabrier(RealGas):
         self._He_molar_mass_g_mol: float = Formula("He").mass
         # Changing the number of integration steps will require updating the unit test output for
         # Chabrier.
-        self._integration_steps: int = 100
+        # FIXME: Increase during debugging to aid comparison with main branch
+        self._integration_steps: int = 1000
 
     def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
         r"""Converts density to molar density
@@ -334,7 +360,7 @@ class Chabrier(RealGas):
         with data as datapath:
             df: pd.DataFrame = pd.read_csv(
                 datapath,
-                sep="\s+",
+                sep=r"\s+",
                 comment="#",
                 usecols=[0, 1, 2],
                 names=column_names,
@@ -365,19 +391,19 @@ class Chabrier(RealGas):
     @override
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        jax.debug.print("temperature_in = {out}", out=temperature)
-        jax.debug.print("pressure_in = {out}", out=pressure)
+        # jax.debug.print("temperature_in = {out}", out=temperature)
+        # jax.debug.print("pressure_in = {out}", out=pressure)
         # Pressure range to integrate over
         pressures: Array = jnp.logspace(
             jnp.log10(PRESSURE_REFERENCE), jnp.log10(pressure), num=self._integration_steps
         )
-        jax.debug.print("pressures = {out}", out=pressures)
+        # jax.debug.print("pressures = {out}", out=pressures)
         temperatures: Array = jnp.full_like(pressures, temperature)
-        jax.debug.print("temperatures = {out}", out=temperatures)
+        # jax.debug.print("temperatures = {out}", out=temperatures)
         volumes: Array = self.volume(temperatures, pressures)
-        jax.debug.print("volumes = {out}", out=volumes)
+        # jax.debug.print("volumes = {out}", out=volumes)
         volume_integral: Array = trapezoid(volumes, pressures)
-        jax.debug.print("volume_integral = {out}", out=volume_integral)
+        # jax.debug.print("volume_integral = {out}", out=volume_integral)
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
         return log_fugacity

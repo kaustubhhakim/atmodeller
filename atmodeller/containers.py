@@ -40,8 +40,8 @@ from molmass import Formula
 from atmodeller import (
     AVOGADRO,
     GRAVITATIONAL_CONSTANT,
-    NUMBER_DENSITY_LOWER,
-    NUMBER_DENSITY_UPPER,
+    LOG_NUMBER_DENSITY_LOWER,
+    LOG_NUMBER_DENSITY_UPPER,
     STABILITY_LOWER,
     STABILITY_UPPER,
 )
@@ -464,32 +464,32 @@ class Solution(NamedTuple):
     """Solution
 
     Args:
-        number: Number density of species
+        log_number_density: Log number density of species
         stability: Stability of species
     """
 
-    number_density: ArrayLike
-    """Number density of species"""
+    log_number_density: ArrayLike
+    """Log number density of species"""
     stability: ArrayLike
     """Stability of species"""
 
     @classmethod
-    def create(cls, number_density: ArrayLike, stability: ArrayLike) -> Self:
+    def create(cls, log_number_density: ArrayLike, stability: ArrayLike) -> Self:
         """Creates an instance.
 
         Args:
-            number_density: Number density
+            log_number_density: Log number density
             stability: Stability
 
         Returns:
             An instance
         """
-        return cls(number_density, stability)
+        return cls(log_number_density, stability)
 
     @property
     def data(self) -> Array:
         """Combined data in a single array"""
-        return jnp.concatenate((self.number_density, self.stability))
+        return jnp.concatenate((self.log_number_density, self.stability))
 
 
 class SolverParameters(NamedTuple):
@@ -505,13 +505,13 @@ class SolverParameters(NamedTuple):
 
     solver: OptxSolver
     """Solver"""
-    throw: bool
+    throw: bool = True
     """How to report any failures"""
-    max_steps: int
+    max_steps: int = 256
     """Maximum number of steps the solver can take"""
-    lower: tuple[float, ...]
+    lower: tuple[float, ...] = ()
     """Lower bound on the hypercube which contains the root"""
-    upper: tuple[float, ...]
+    upper: tuple[float, ...] = ()
     """Upper bound on the hypercube which contains the root"""
 
     @classmethod
@@ -538,44 +538,38 @@ class SolverParameters(NamedTuple):
         """
         solver: OptxSolver = solver_class(rtol=rtol, atol=atol, norm=norm)
         lower: tuple[float, ...] = cls._get_hypercube_bound(
-            species, NUMBER_DENSITY_LOWER, STABILITY_LOWER
+            species, LOG_NUMBER_DENSITY_LOWER, STABILITY_LOWER
         )
         upper: tuple[float, ...] = cls._get_hypercube_bound(
-            species, NUMBER_DENSITY_UPPER, STABILITY_UPPER
+            species, LOG_NUMBER_DENSITY_UPPER, STABILITY_UPPER
         )
 
-        return cls(
-            solver,
-            throw=throw,
-            max_steps=max_steps,
-            lower=lower,
-            upper=upper,
-        )
+        return cls(solver, throw=throw, max_steps=max_steps, lower=lower, upper=upper)
 
     @classmethod
     def _get_hypercube_bound(
         cls,
         species: tuple[Species, ...],
-        number_density_bound: float,
+        log_number_density_bound: float,
         stability_bound: float,
     ) -> tuple[float, ...]:
         """Gets the bound on the hypercube
 
         Args:
             species: Tuple of species
-            number_density_bound: Bound on the number density
+            log_number_density_bound: Bound on the log number density
             stability_bound: Bound on the stability
 
         Returns:
             Bound on the hypercube which contains the root
         """
         num_species: int = len(species)
-        number_density: ArrayLike = number_density_bound * np.ones(num_species)
+        log_number_density: ArrayLike = log_number_density_bound * np.ones(num_species)
 
         bound: tuple[float, ...] = tuple(
             np.concatenate(
                 (
-                    number_density,
+                    log_number_density,
                     stability_bound * np.ones(num_species),
                 )
             ).tolist()

@@ -55,6 +55,7 @@ class InteriorAtmosphere:
     Args:
         species: Tuple of species
         tau: Tau factor for species stability. Defaults to TAU.
+        solver_parameters: Solver parameters. Defaults to None to use defaults.
     """
 
     # Attributes that are set during initialise_solve are included for typing
@@ -68,10 +69,19 @@ class InteriorAtmosphere:
     # Used for vmapping (if relevant)
     traced_parameters_vmap: TracedParameters
 
-    def __init__(self, species: tuple[Species, ...], tau: float = TAU):
+    def __init__(
+        self,
+        species: tuple[Species, ...],
+        tau: float = TAU,
+        solver_parameters: SolverParameters | None = None,
+    ):
         self.species: tuple[Species, ...] = species
         self.tau: float = tau
-        self.solver_parameters: SolverParameters = SolverParameters.create(self.species)
+        if solver_parameters is None:
+            solver_parameters_: SolverParameters = SolverParameters.create(self.species)
+        else:
+            solver_parameters_ = solver_parameters
+        self.solver_parameters: SolverParameters = solver_parameters_
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
@@ -92,7 +102,7 @@ class InteriorAtmosphere:
     def initialise_solve(
         self,
         planet: Planet,
-        initial_number_density: npt.NDArray[np.float_],
+        initial_log_number_density: npt.NDArray[np.float_],
         initial_stability: npt.NDArray[np.float_],
         fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
@@ -101,7 +111,7 @@ class InteriorAtmosphere:
 
         Args:
             planet: Planet
-            initial_number_density: Initial number density
+            initial_log_number_density: Initial log number density
             initial_stability: Initial stability
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
@@ -121,7 +131,7 @@ class InteriorAtmosphere:
         )
         logger.debug("fixed_parameters = %s", self.fixed_parameters)
 
-        self.initial_solution = Solution.create(initial_number_density, initial_stability)
+        self.initial_solution = Solution.create(initial_log_number_density, initial_stability)
         logger.debug("initial_solution = %s", self.initial_solution)
         self.traced_parameters = TracedParameters(
             planet=self.planet,

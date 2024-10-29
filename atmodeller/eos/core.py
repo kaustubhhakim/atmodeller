@@ -268,6 +268,7 @@ class RealGasBounded(RealGas):
             Log fugacity
         """
         pressure_clipped: Array = jnp.clip(pressure, self._pressure_min, self._pressure_max)
+        # jax.debug.print("pressure_clipped = {out}", out=pressure_clipped)
 
         # Calculate log fugacity in different regions
         log_fugacity_below: ArrayLike = self.ideal_log_fugacity(temperature, pressure_clipped)
@@ -297,7 +298,8 @@ class RealGasBounded(RealGas):
         log_fugacity = lax.select(
             pressure > self._pressure_min, log_fugacity_in_range, log_fugacity_below
         )
-        log_fugacity = lax.select(pressure < self._pressure_max, log_fugacity, log_fugacity_above)
+        # FIXME: Commented out for testing
+        # log_fugacity = lax.select(pressure < self._pressure_max, log_fugacity, log_fugacity_above)
 
         return log_fugacity
 

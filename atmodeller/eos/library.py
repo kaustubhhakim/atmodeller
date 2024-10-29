@@ -46,7 +46,7 @@ H2_chabrier21: RealGas = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
 # TODO: Update calibration bounds. Kaustubh to do.
 H2_chabrier21_bounded: RealGas = RealGasBounded(
-    H2_chabrier21, ExperimentalCalibrationNew(100, 4000, 0.1, 50e3)
+    H2_chabrier21, ExperimentalCalibrationNew(100, 4000, 0.1, 50e9)
 )
 He_chabrier21: RealGas = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""

@@ -64,17 +64,24 @@ PRESSURE_REFERENCE: float = 1.0
 """Standard state pressure in bar"""
 
 # Lower and upper bounds on the hypercube which contains the root
-NUMBER_DENSITY_LOWER: float = -100
-"""Lower number density"""
-NUMBER_DENSITY_UPPER: float = 70
-"""Upper number density"""
+LOG_NUMBER_DENSITY_LOWER: float = -100
+"""Lower log number density for a species
+
+At 3000 K this corresponds to 1.5E-68 bar and at 298 K this corresponds to 1.5E-69 bar.
+"""
+LOG_NUMBER_DENSITY_UPPER: float = 70
+"""Upper log number density for a species
+
+At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this corresponds to 103494 bar
+(10.34 GPa).
+"""
 STABILITY_LOWER: float = -200
-"""Lower stability"""
+"""Lower stability for a species"""
 STABILITY_UPPER: float = 10
-"""Upper stability"""
+"""Upper stability for a species"""
 
 TAU: float = 1.0e60
-"""Tau scaling factor for condensate stability"""
+"""Tau scaling factor for species stability"""
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config

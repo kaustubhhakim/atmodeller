@@ -20,7 +20,6 @@
 
 import logging
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 from jax.typing import ArrayLike
@@ -43,7 +42,7 @@ TOLERANCE: float = 5.0e-2
 TAU: float = 1.0e60
 """Tau scaling factor for species stability"""
 
-INITIAL_NUMBER_DENSITY: float = 30.0
+INITIAL_LOG_NUMBER_DENSITY: float = 50.0
 """Initial number density"""
 INITIAL_STABILITY: float = -100.0
 """Initial stability"""
@@ -69,13 +68,13 @@ def test_H_O(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
-        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
+        planet, initial_log_number_density, initial_stability, mass_constraints=mass_constraints
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
@@ -117,14 +116,14 @@ def test_CHO_reduced(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
@@ -171,14 +170,14 @@ def test_CHO_IW(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
@@ -236,14 +235,14 @@ def test_CHO_oxidised(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
@@ -290,14 +289,14 @@ def test_CHO_highly_oxidised(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
@@ -341,14 +340,14 @@ def test_CHO_middle_temperature(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
@@ -372,12 +371,12 @@ def test_CHO_low_temperature(helper) -> None:
 
     H2_g: Species = Species.create_gas("H2_g")
     H2O_g: Species = Species.create_gas("H2O_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    O2_g: Species = Species.create_gas("O2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
     CO_g: Species = Species.create_gas("CO_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
-    species: tuple[Species, ...] = (H2_g, H2O_g, CO2_g, O2_g, CH4_g, CO_g)
+    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=450.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -392,15 +391,15 @@ def test_CHO_low_temperature(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
     # For this case, reducing the fO2 is required for the solver to latch onto the solution
-    initial_number_density[3] *= -1
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_log_number_density[5] = -50
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
-        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
+        planet, initial_log_number_density, initial_stability, mass_constraints=mass_constraints
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
@@ -442,13 +441,13 @@ def test_graphite_condensed(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
-        planet, initial_number_density, initial_stability, mass_constraints=mass_constraints
+        planet, initial_log_number_density, initial_stability, mass_constraints=mass_constraints
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
@@ -495,14 +494,14 @@ def test_graphite_unstable(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
@@ -544,16 +543,16 @@ def test_water_condensed(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
     # For this case, reducing the fO2 is required for the solver to latch onto the solution
-    initial_number_density[2] *= -1
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_log_number_density[2] *= -60
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         mass_constraints=mass_constraints,
     )
@@ -583,7 +582,7 @@ def test_graphite_water_condensed(helper) -> None:
     H2O_l: Species = Species.create_condensed("H2O_l")
 
     species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr)
-    planet: Planet = Planet(surface_temperature=jnp.array(430.0))  # , 400.0]))
+    planet: Planet = Planet(surface_temperature=430.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     h_kg: float = 3.10e20
@@ -596,16 +595,14 @@ def test_graphite_water_condensed(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    # For this case, reducing the fO2 is required for the solver to latch onto the solution
-    initial_number_density[2] *= -1
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_stability,
         mass_constraints=mass_constraints,
     )
