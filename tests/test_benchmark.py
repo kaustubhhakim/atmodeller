@@ -572,7 +572,7 @@ def test_water_condensed(helper) -> None:
         len(species), dtype=np.float_
     )
     # For this case, reducing the fO2 is required for the solver to latch onto the solution
-    initial_log_number_density[2] *= -INITIAL_LOG_NUMBER_DENSITY
+    initial_log_number_density[2] = -INITIAL_LOG_NUMBER_DENSITY
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
         initial_log_number_density
     )

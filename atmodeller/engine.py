@@ -388,13 +388,12 @@ def get_log_activity_ideal_mixing(
     gas_species_mask: Array = jnp.zeros_like(log_activity_pure_species, dtype=bool)
     gas_species_mask = gas_species_mask.at[gas_species_indices].set(True)
 
-    gas_species_number_density: Array = jnp.where(
-        gas_species_mask, safe_exp(log_number_density), 0
-    )
-    atmosphere_number_density: Array = jnp.log(jnp.sum(gas_species_number_density))
+    number_density: Array = safe_exp(log_number_density)
+    gas_species_number_density: Array = jnp.where(gas_species_mask, number_density, 0)
+    atmosphere_log_number_density: Array = jnp.log(jnp.sum(gas_species_number_density))
 
     log_activity_gas_species: Array = (
-        log_activity_pure_species + log_number_density - atmosphere_number_density
+        log_activity_pure_species + log_number_density - atmosphere_log_number_density
     )
     log_activity: Array = jnp.where(
         gas_species_mask, log_activity_gas_species, log_activity_pure_species

@@ -90,7 +90,7 @@ class IdealGas2(PyTreeNoData, RealGas):
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         # Update coefficient in log below to change fugacity coefficient
-        return self.ideal_log_fugacity(temperature, pressure) + jnp.log(22.8429535135057)
+        return self.ideal_log_fugacity(temperature, pressure) + jnp.log(6166.825466)
 
     @override
     @jit

@@ -22,6 +22,7 @@ import logging
 
 import numpy as np
 import optimistix as optx
+import pytest
 from jax.typing import ArrayLike
 
 from atmodeller import __version__, debug_logger
@@ -96,6 +97,7 @@ def test_fO2_holley(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
+@pytest.mark.skip(reason="Superseded by the test for a sub-Neptune")
 def test_chabrier_earth(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
@@ -148,18 +150,6 @@ def test_chabrier_earth(helper) -> None:
         "OSi_g": 635.9088815105993,
         "OSi_g_activity": 635.9088815105947,
     }
-
-    # Result from the main branch is basically the same with the difference likely attributable
-    # to the thermodynamic data
-    # target_main_branch: dict[str, float] = {
-    #     "H2O_g": 6906.686657050143,
-    #     "H2_g": 12177.449403945378,
-    #     "H4Si_g": 67048.93476214791,
-    #     "O2Si_l": 1.0,
-    #     "O2_g": 1.771347227850254e-05,
-    #     "OSi_g": 634.3598055223664,
-    #     "mass_O2Si_l": 1.077551466072747e24,
-    # }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
@@ -219,23 +209,21 @@ def test_chabrier_earth_dogleg(helper) -> None:
         "OSi_g_activity": 635.9088815105947,
     }
 
-    # Result from the main branch is basically the same with the difference likely attributable
-    # to the thermodynamic data
-    # target_main_branch: dict[str, float] = {
-    #     "H2O_g": 6906.686657050143,
-    #     "H2_g": 12177.449403945378,
-    #     "H4Si_g": 67048.93476214791,
-    #     "O2Si_l": 1.0,
-    #     "O2_g": 1.771347227850254e-05,
-    #     "OSi_g": 634.3598055223664,
-    #     "mass_O2Si_l": 1.077551466072747e24,
-    # }
-
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 def test_chabrier_subNeptune(helper) -> None:
-    """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune"""
+    """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune
+
+    It is recommended to impose mass constraints for all species and not to impose a buffered
+    oxygen fugacity. This is because a redox buffer depends on total pressure, which is dictated by
+    the atmospheric speciation and size. Hence for a given buffer choice, particularly for large
+    pressure ranges, there can be multiple atmospheric structures that satisfy the fO2 constraint
+    imposed by the redox buffer, with each structure possessing a different total reservoir of
+    oxygen. If instead the oxygen mass is constrained then there is only one physical solution and
+    root, which is preferred for robust numerical solution. Remember that the oxygen fugacity shift
+    relative to the iron-wustite buffer is back-calculated for the output.
+    """
 
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
@@ -246,9 +234,9 @@ def test_chabrier_subNeptune(helper) -> None:
 
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l)
 
-    surface_temperature = 3400.0  # kelvin
-    planet_mass = 4.6 * 5.972e24  # kg
-    surface_radius = 1.5 * 6371000  # metre
+    surface_temperature = 3400.0  # K
+    planet_mass = 4.6 * 5.97224e24  # kg
+    surface_radius = 1.5 * 6371000  # m
     planet: Planet = Planet(
         surface_temperature=surface_temperature,
         planet_mass=planet_mass,
@@ -256,47 +244,107 @@ def test_chabrier_subNeptune(helper) -> None:
     )
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-4)}
-
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
-    # o_kg: ArrayLike = h_kg * 10
+    o_kg: ArrayLike = 6.74717e24
 
     logger.info("h_kg = %s", h_kg)
     logger.info("si_kg = %s", si_kg)
-    # logger.info("o_kg = %s", o_kg)
+    logger.info("o_kg = %s", o_kg)
 
-    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg}  # , "O": o_kg}
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_log_stability,
-        fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
-    # TODO: This target output has not yet been reconciled with the main branch
     target: dict[str, float] = {
-        "H2O_g": 532855.3061344444,
-        "H2O_g_activity": 532855.3061344444,
-        "H2_g": 0.0004968173246434008,
-        "H2_g_activity": 159.90611584650233,
-        "H4Si_g": 2.040739980025119e-12,
-        "H4Si_g_activity": 2.0407399800251263e-12,
-        "O2Si_l": 558017.1285126358,
+        "H2O_g": 429506.99705368624,
+        "H2O_g_activity": 429506.99705368624,
+        "H2_g": 3.0474730096539067,
+        "H2_g_activity": 19509.066519228905,
+        "H4Si_g": 0.0006959073713891908,
+        "H4Si_g_activity": 0.0006959073713891908,
+        "O2Si_l": 449791.006799111,
         "O2Si_l_activity": 1.0,
-        "O2_g": 239554.19489954918,
-        "O2_g_activity": 239554.19489954918,
-        "OSi_g": 0.005450682951662908,
-        "OSi_g_activity": 0.005450682951662908,
+        "O2_g": 10.456415851163248,
+        "O2_g_activity": 10.456415851163175,
+        "OSi_g": 0.8250141324194714,
+        "OSi_g_activity": 0.8250141324194655,
+    }
+
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+
+
+def test_chabrier_subNeptune_batch(helper) -> None:
+    """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune for several O masses"""
+
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
+    H2O_g: Species = Species.create_gas("H2O_g")
+    O2_g: Species = Species.create_gas("O2_g")
+    SiO_g: Species = Species.create_gas("SiO_g")
+    SiH4_g: Species = Species.create_gas("SiH4_g")
+    SiO2_l: Species = Species.create_condensed("SiO2_l")
+
+    species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l)
+
+    surface_temperature = 3400.0  # K
+    planet_mass = 4.6 * 5.97224e24  # kg
+    surface_radius = 1.5 * 6371000  # m
+    planet: Planet = Planet(
+        surface_temperature=surface_temperature,
+        planet_mass=planet_mass,
+        surface_radius=surface_radius,
+    )
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
+
+    h_kg: ArrayLike = 0.01 * planet.planet_mass
+    si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
+    # Batch solve for three oxygen masses
+    o_kg: ArrayLike = 1e24 * np.array([6.5, 7.0, 7.5])
+
+    logger.info("h_kg = %s", h_kg)
+    logger.info("si_kg = %s", si_kg)
+    logger.info("o_kg = %s", o_kg)
+
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
+
+    # Initial solution guess number density (molecules/m^3)
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
+
+    interior_atmosphere.initialise_solve(
+        planet,
+        initial_log_number_density,
+        initial_log_stability,
+        mass_constraints=mass_constraints,
+    )
+    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+
+    # Some pertinent output here for testing, no need to specify all species
+    target: dict[str, ArrayLike] = {
+        "H2O_g": np.array([414196.4384174478, 447778.96881315584, 478589.0587503356]),
+        "H2_g": np.array([2.013044674841153e02, 3.623165974290676e-02, 7.557512794647293e-03]),
+        "H2_g_activity": np.array(
+            [1.244151704590899e06, 4.081150459112090e02, 2.445386580128216e02]
+        ),
+        "O2_g": np.array([2.391009941230580e-03, 2.597033254819690e04, 8.263153524645795e04]),
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)

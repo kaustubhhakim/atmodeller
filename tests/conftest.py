@@ -43,6 +43,8 @@ class Helper:
     ) -> np.bool_:
         """Determines if the solution is close to a target within tolerance.
 
+        Only the values in `solution` and `target` that have matching keys will be compared.
+
         Args:
             solution: Dictionary of the solution values
             target: Dictionary of the target values

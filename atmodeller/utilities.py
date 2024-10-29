@@ -58,8 +58,8 @@ def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
 
 
 @jit
-def safe_exp(x: ArrayLike):
-    max_val: float = 300  # 709.78  # Maximum value to prevent overflow in 64-bit
+def safe_exp(x: ArrayLike) -> Array:
+    max_val: float = 709.78  # Maximum value to prevent overflow in 64-bit
     return jnp.exp(jnp.clip(x, a_max=max_val))
 
 
