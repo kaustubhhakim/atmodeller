@@ -45,7 +45,7 @@ ATOL: float = 1.0e-6
 
 INITIAL_NUMBER_DENSITY: float = 60.0
 """Initial log number density"""
-INITIAL_LOG_STABILITY: float = -100.0
+INITIAL_LOG_STABILITY: float = -140.0
 """Initial log stability"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
@@ -116,12 +116,18 @@ def test_chabrier_earth(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = 100 * np.ones(len(species), dtype=np.float_)
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
+    initial_log_number_density: ArrayLike = 65 * np.ones(len(species), dtype=np.float_)
+    # For this case, tweaking the initial condition is necessary to latch onto the solution
+    initial_log_number_density[2] = 45
+    initial_log_number_density[4] = 60
+
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
         planet,
-        initial_number_density,
+        initial_log_number_density,
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
@@ -183,7 +189,9 @@ def test_chabrier_earth_dogleg(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = 80 * np.ones(len(species), dtype=np.float_)
+    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
 
     interior_atmosphere.initialise_solve(

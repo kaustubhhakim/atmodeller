@@ -105,11 +105,14 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
 
+    jax.debug.print("Starting new objective function evaluation")
+
     # Species
     log_number_density, log_stability = jnp.split(solution, 2)
     jax.debug.print("log_number_density = {out}", out=log_number_density)
     jax.debug.print("log_stability = {out}", out=log_stability)
     log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, log_number_density)
+    jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Based on the definition of the reaction constant we need to convert gas activities
     # (fugacities) from bar to effective number density.
@@ -119,6 +122,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_activity, temperature
     )
     log_activity_number_density = jnp.where(mask, log_activity_number_density, log_activity)
+    jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
     # Bulk atmosphere
     log_volume: Array = get_atmosphere_log_volume(fixed_parameters, log_number_density, planet)
@@ -135,7 +139,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         )
         jax.debug.print("reaction_residual = {out}", out=reaction_residual)
         # Account for species stability.
-        reaction_residual = reaction_residual - reaction_matrix.dot(jnp.exp(log_stability))
+        reaction_residual = reaction_residual - reaction_matrix.dot(safe_exp(log_stability))
         jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
         residual = jnp.concatenate([residual, reaction_residual])
 
@@ -251,6 +255,7 @@ def get_atmosphere_pressure(
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
     pressure: Array = get_pressure_from_log_number_density(log_number_density, temperature)
     gas_pressure: Array = jnp.take(pressure, gas_species_indices)
+    jax.debug.print("gas_pressure = {out}", out=gas_pressure)
 
     return jnp.sum(gas_pressure)
 
@@ -341,6 +346,8 @@ def get_log_activity(
         fixed_parameters, log_number_density, temperature
     )
 
+    jax.debug.print("atmosphere_pressure = {out}", out=atmosphere_pressure)
+
     activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
 
     def apply_activity_function(index: ArrayLike):
@@ -354,9 +361,11 @@ def get_log_activity(
     vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0,))
     indices: Array = jnp.arange(len(species))
     log_activity_pure_species: Array = vmap_apply_function(indices)
+    jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
     log_activity = get_log_activity_ideal_mixing(
         fixed_parameters, log_number_density, log_activity_pure_species
     )
+    jax.debug.print("log_activity = {out}", out=log_activity)
 
     return log_activity
 
@@ -379,7 +388,9 @@ def get_log_activity_ideal_mixing(
     gas_species_mask: Array = jnp.zeros_like(log_activity_pure_species, dtype=bool)
     gas_species_mask = gas_species_mask.at[gas_species_indices].set(True)
 
-    gas_species_number_density: Array = jnp.where(gas_species_mask, jnp.exp(log_number_density), 0)
+    gas_species_number_density: Array = jnp.where(
+        gas_species_mask, safe_exp(log_number_density), 0
+    )
     atmosphere_number_density: Array = jnp.log(jnp.sum(gas_species_number_density))
 
     log_activity_gas_species: Array = (
@@ -504,7 +515,7 @@ def get_pressure_from_log_number_density(
     Returns:
         Pressure
     """
-    return jnp.exp(get_log_pressure_from_log_number_density(log_number_density, temperature))
+    return safe_exp(get_log_pressure_from_log_number_density(log_number_density, temperature))
 
 
 @jit
@@ -533,7 +544,7 @@ def get_species_density_in_melt(
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.surface_temperature
 
-    fugacity: Array = jnp.exp(log_activity)
+    fugacity: Array = safe_exp(log_activity)
     atmosphere_pressure: Array = get_atmosphere_pressure(
         fixed_parameters, log_number_density, temperature
     )
@@ -563,7 +574,7 @@ def get_species_density_in_melt(
         * unit_conversion.ppm_to_fraction
         * AVOGADRO
         * planet.mantle_melt_mass
-        / (molar_masses * jnp.exp(log_volume))
+        / (molar_masses * safe_exp(log_volume))
     )
     # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
 

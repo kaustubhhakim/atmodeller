@@ -372,7 +372,7 @@ class Chabrier(RealGas):
         log_rho: Array = jnp.array(pivot_table.to_numpy())
 
         interpolator: RegularGridInterpolator = RegularGridInterpolator(
-            (log_T, log_P), log_rho, method="linear"
+            (log_T, log_P), log_rho, method="linear", fill_value=0
         )
 
         return interpolator
@@ -383,8 +383,10 @@ class Chabrier(RealGas):
         log10_density_gcc: Array = self._log10_density_func(
             (jnp.log10(temperature), jnp.log10(unit_conversion.bar_to_GPa * pressure))
         )
+        # jax.debug.print("log10_density_gcc = {out}", out=log10_density_gcc)
         molar_density: Array = self._convert_to_molar_density(log10_density_gcc)
         volume: Array = jnp.reciprocal(molar_density)
+        # jax.debug.print("volume = {out}", out=volume)
 
         return volume
 
@@ -403,7 +405,7 @@ class Chabrier(RealGas):
         volumes: Array = self.volume(temperatures, pressures)
         # jax.debug.print("volumes = {out}", out=volumes)
         volume_integral: Array = trapezoid(volumes, pressures)
-        # jax.debug.print("volume_integral = {out}", out=volume_integral)
+        jax.debug.print("volume_integral = {out}", out=volume_integral)
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
         return log_fugacity

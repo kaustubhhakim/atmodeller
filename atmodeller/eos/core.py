@@ -41,6 +41,7 @@ from atmodeller.interfaces import ActivityProtocol, RealGasProtocol
 from atmodeller.utilities import (
     ExperimentalCalibrationNew,
     PyTreeNoData,
+    safe_exp,
     unit_conversion,
 )
 
@@ -153,7 +154,7 @@ class RealGas(ABC, RealGasProtocol):
         Returns:
             Fugacity in bar
         """
-        fugacity: Array = jnp.exp(self.log_fugacity(temperature, pressure))
+        fugacity: Array = safe_exp(self.log_fugacity(temperature, pressure))
 
         return fugacity
 
@@ -183,7 +184,7 @@ class RealGas(ABC, RealGasProtocol):
         Returns:
             fugacity coefficient, which is non-dimensional
         """
-        return jnp.exp(self.log_fugacity_coefficient(temperature, pressure))
+        return safe_exp(self.log_fugacity_coefficient(temperature, pressure))
 
     @jit
     def ideal_log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
