@@ -371,8 +371,9 @@ class Chabrier(RealGas):
         log_P: Array = jnp.array(pivot_table.columns.to_numpy())
         log_rho: Array = jnp.array(pivot_table.to_numpy())
 
+        # The default fill_value is NaN
         interpolator: RegularGridInterpolator = RegularGridInterpolator(
-            (log_T, log_P), log_rho, method="linear", fill_value=0
+            (log_T, log_P), log_rho, method="linear"
         )
 
         return interpolator

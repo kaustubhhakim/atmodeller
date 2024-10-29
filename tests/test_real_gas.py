@@ -43,7 +43,7 @@ RTOL: float = 1.0e-6
 ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
-INITIAL_NUMBER_DENSITY: float = 60.0
+INITIAL_LOG_NUMBER_DENSITY: float = 60.0
 """Initial log number density"""
 INITIAL_LOG_STABILITY: float = -140.0
 """Initial log stability"""
@@ -52,8 +52,8 @@ solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 eos_models: dict[str, RealGas] = get_eos_models()
 
 
-# Test is comparable to main branch
 def test_fO2_holley(helper) -> None:
+    """Tests a system with the H2 EOS from :cite:t:`HWZ58`"""
 
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_beattie_holley58_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
@@ -73,7 +73,7 @@ def test_fO2_holley(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
@@ -97,6 +97,7 @@ def test_fO2_holley(helper) -> None:
 
 
 def test_chabrier_earth(helper) -> None:
+    """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
@@ -164,6 +165,7 @@ def test_chabrier_earth(helper) -> None:
 
 
 def test_chabrier_earth_dogleg(helper) -> None:
+    """Tests a system with the H2 EOS from :cite:t:`CD21` using the dogleg solver"""
 
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
@@ -189,7 +191,7 @@ def test_chabrier_earth_dogleg(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
+    initial_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
@@ -233,6 +235,7 @@ def test_chabrier_earth_dogleg(helper) -> None:
 
 
 def test_chabrier_subNeptune(helper) -> None:
+    """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune"""
 
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
     H2O_g: Species = Species.create_gas("H2O_g")
@@ -244,48 +247,56 @@ def test_chabrier_subNeptune(helper) -> None:
     species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l)
 
     surface_temperature = 3400.0  # kelvin
-    # planet_mass = 4.6 * 5.972e24  # kg
-    # surface_radius = 1.5 * 6371000  # metre
+    planet_mass = 4.6 * 5.972e24  # kg
+    surface_radius = 1.5 * 6371000  # metre
     planet: Planet = Planet(
         surface_temperature=surface_temperature,
-        # planet_mass=planet_mass,
-        # surface_radius=surface_radius,
+        planet_mass=planet_mass,
+        surface_radius=surface_radius,
     )
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    # fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-4)}
+    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-4)}
 
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
-    o_kg: ArrayLike = h_kg * 10
+    # o_kg: ArrayLike = h_kg * 10
 
     logger.info("h_kg = %s", h_kg)
     logger.info("si_kg = %s", si_kg)
-    logger.info("o_kg = %s", o_kg)
+    # logger.info("o_kg = %s", o_kg)
 
-    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg}  # , "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = 70 * np.ones(len(species), dtype=np.float_)
-    # For this case, reducing the fO2 is required for the solver to latch onto the solution
-    initial_number_density[2] = 40
+    initial_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_number_density,
         initial_log_stability,
-        # fugacity_constraints=fugacity_constraints,
+        fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
-    print(solution)
+    # TODO: This target output has not yet been reconciled with the main branch
+    target: dict[str, float] = {
+        "H2O_g": 532855.3061344444,
+        "H2O_g_activity": 532855.3061344444,
+        "H2_g": 0.0004968173246434008,
+        "H2_g_activity": 159.90611584650233,
+        "H4Si_g": 2.040739980025119e-12,
+        "H4Si_g_activity": 2.0407399800251263e-12,
+        "O2Si_l": 558017.1285126358,
+        "O2Si_l_activity": 1.0,
+        "O2_g": 239554.19489954918,
+        "O2_g_activity": 239554.19489954918,
+        "OSi_g": 0.005450682951662908,
+        "OSi_g_activity": 0.005450682951662908,
+    }
 
-    # target: dict[str, float] = {
-    #     "H2O_g": 0.25708003342259883,
-    #     "H2_g": 0.2491577248312551,
-    #     "O2_g": 8.83804258138063e-08,
-    # }
-
-    # assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
