@@ -50,9 +50,6 @@ BOLTZMANN_CONSTANT: float = constants.Boltzmann
 """Boltzmann constant in J/K"""
 BOLTZMANN_CONSTANT_BAR: float = BOLTZMANN_CONSTANT * 1e-5
 """Boltzmann constant in bar m^3/K"""
-# Used to determine the JANAF reference state
-NOBLE_GASES: list[str] = ["He", "Ne", "Ar", "Kr", "Xe", "Rn"]
-"""Noble gases"""
 OCEAN_MOLES: float = 7.68894973907177e22
 """Moles of H2 (or H2O) in one present-day Earth ocean"""
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
@@ -67,17 +64,17 @@ PRESSURE_REFERENCE: float = 1.0
 LOG_NUMBER_DENSITY_LOWER: float = -100
 """Lower log number density for a species
 
-At 3000 K this corresponds to 1.5E-68 bar and at 298 K this corresponds to 1.5E-69 bar.
+At 3000 K this corresponds to 1.54E-68 bar and at 298 K this corresponds to 1.5E-69 bar.
 """
 LOG_NUMBER_DENSITY_UPPER: float = 70
 """Upper log number density for a species
 
 At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this corresponds to 103494 bar
-(10.34 GPa).
+(10.3 GPa).
 """
-STABILITY_LOWER: float = -200
+LOG_STABILITY_LOWER: float = -200
 """Lower stability for a species"""
-STABILITY_UPPER: float = 10
+LOG_STABILITY_UPPER: float = 10
 """Upper stability for a species"""
 
 TAU: float = 1.0e60

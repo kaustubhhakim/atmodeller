@@ -103,7 +103,7 @@ class InteriorAtmosphere:
         self,
         planet: Planet,
         initial_log_number_density: npt.NDArray[np.float_],
-        initial_stability: npt.NDArray[np.float_],
+        initial_log_stability: npt.NDArray[np.float_],
         fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
     ) -> Callable:
@@ -112,7 +112,7 @@ class InteriorAtmosphere:
         Args:
             planet: Planet
             initial_log_number_density: Initial log number density
-            initial_stability: Initial stability
+            initial_log_stability: Initial log stability
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
 
@@ -131,7 +131,7 @@ class InteriorAtmosphere:
         )
         logger.debug("fixed_parameters = %s", self.fixed_parameters)
 
-        self.initial_solution = Solution.create(initial_log_number_density, initial_stability)
+        self.initial_solution = Solution.create(initial_log_number_density, initial_log_stability)
         logger.debug("initial_solution = %s", self.initial_solution)
         self.traced_parameters = TracedParameters(
             planet=self.planet,

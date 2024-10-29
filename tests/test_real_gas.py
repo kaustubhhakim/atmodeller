@@ -44,9 +44,9 @@ ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 INITIAL_NUMBER_DENSITY: float = 60.0
-"""Initial number density"""
-INITIAL_STABILITY: float = -100.0
-"""Initial stability"""
+"""Initial log number density"""
+INITIAL_LOG_STABILITY: float = -100.0
+"""Initial log stability"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 eos_models: dict[str, RealGas] = get_eos_models()
@@ -76,12 +76,12 @@ def test_fO2_holley(helper) -> None:
     initial_number_density: ArrayLike = INITIAL_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_number_density,
-        initial_stability,
+        initial_log_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -117,12 +117,12 @@ def test_chabrier_earth(helper) -> None:
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = 100 * np.ones(len(species), dtype=np.float_)
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_number_density,
-        initial_stability,
+        initial_log_stability,
         mass_constraints=mass_constraints,
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
@@ -184,12 +184,12 @@ def test_chabrier_earth_dogleg(helper) -> None:
 
     # Initial solution guess number density (molecules/m^3)
     initial_number_density: ArrayLike = 80 * np.ones(len(species), dtype=np.float_)
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_number_density,
-        initial_stability,
+        initial_log_stability,
         mass_constraints=mass_constraints,
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
@@ -261,12 +261,12 @@ def test_chabrier_subNeptune(helper) -> None:
     initial_number_density: ArrayLike = 70 * np.ones(len(species), dtype=np.float_)
     # For this case, reducing the fO2 is required for the solver to latch onto the solution
     initial_number_density[2] = 40
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_number_density,
-        initial_stability,
+        initial_log_stability,
         # fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )

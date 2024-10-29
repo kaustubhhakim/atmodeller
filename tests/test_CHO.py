@@ -63,13 +63,11 @@ RTOL: float = 1.0e-6
 """Relative tolerance"""
 ATOL: float = 1.0e-6
 """Absolute tolerance"""
-TAU: float = 1.0e60
-"""Tau scaling factor for species stability"""
 
 INITIAL_LOG_NUMBER_DENSITY: float = 50.0
-"""Initial number density"""
-INITIAL_STABILITY: float = -100.0
-"""Initial stability"""
+"""Initial log number density"""
+INITIAL_LOG_STABILITY: float = -100.0
+"""Initial log stability"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 
@@ -98,10 +96,15 @@ def test_H2O(helper) -> None:
     initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
-        planet, initial_log_number_density, initial_stability, mass_constraints=mass_constraints
+        planet,
+        initial_log_number_density,
+        initial_log_stability,
+        mass_constraints=mass_constraints,
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
@@ -135,12 +138,14 @@ def test_H_fO2(helper) -> None:
     initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_log_number_density,
-        initial_stability,
+        initial_log_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -189,12 +194,14 @@ def test_H_fO2_batch_temperature(helper) -> None:
     initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_log_number_density,
-        initial_stability,
+        initial_log_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -248,12 +255,14 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_log_number_density,
-        initial_stability,
+        initial_log_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -308,12 +317,14 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_log_number_density,
-        initial_stability,
+        initial_log_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -357,12 +368,14 @@ def test_H_and_C(helper) -> None:
     initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    initial_stability: ArrayLike = INITIAL_STABILITY * np.ones_like(initial_log_number_density)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
+        initial_log_number_density
+    )
 
     interior_atmosphere.initialise_solve(
         planet,
         initial_log_number_density,
-        initial_stability,
+        initial_log_stability,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )

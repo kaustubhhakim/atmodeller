@@ -42,8 +42,8 @@ from atmodeller import (
     GRAVITATIONAL_CONSTANT,
     LOG_NUMBER_DENSITY_LOWER,
     LOG_NUMBER_DENSITY_UPPER,
-    STABILITY_LOWER,
-    STABILITY_UPPER,
+    LOG_STABILITY_LOWER,
+    LOG_STABILITY_UPPER,
 )
 from atmodeller.engine import get_log_number_density_from_log_pressure
 from atmodeller.eos.classes import IdealGas
@@ -538,10 +538,10 @@ class SolverParameters(NamedTuple):
         """
         solver: OptxSolver = solver_class(rtol=rtol, atol=atol, norm=norm)
         lower: tuple[float, ...] = cls._get_hypercube_bound(
-            species, LOG_NUMBER_DENSITY_LOWER, STABILITY_LOWER
+            species, LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER
         )
         upper: tuple[float, ...] = cls._get_hypercube_bound(
-            species, LOG_NUMBER_DENSITY_UPPER, STABILITY_UPPER
+            species, LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER
         )
 
         return cls(solver, throw=throw, max_steps=max_steps, lower=lower, upper=upper)
