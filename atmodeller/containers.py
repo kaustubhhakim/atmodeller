@@ -372,6 +372,7 @@ class FixedParameters(NamedTuple):
     Args:
         species: Tuple of species
         formula_matrix; Formula matrix
+        formula_matrix_constraints: Formula matrix for applying mass constraints
         reaction_matrix: Reaction matrix
         fugacity_matrix: Fugacity constraint matrix
         gas_species_indices: Indices of gas species
@@ -385,6 +386,8 @@ class FixedParameters(NamedTuple):
     """Tuple of species """
     formula_matrix: tuple[tuple[float, ...], ...]
     """Formula matrix"""
+    formula_matrix_constraints: tuple[tuple[float, ...], ...]
+    """Formula matrix for applying mass constraints"""
     reaction_matrix: tuple[tuple[float, ...], ...]
     """Reaction matrix"""
     fugacity_matrix: tuple[tuple[float, ...], ...]

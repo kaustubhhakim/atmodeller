@@ -337,7 +337,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     )
     solution: dict[str, ArrayLike] = interior_atmosphere.solve()
 
-    # Some pertinent output here for testing, no need to specify all species
+    # Some pertinent output here for testing, no need to specify all the species
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array([414196.4384174478, 447778.96881315584, 478589.0587503356]),
         "H2_g": np.array([2.013044674841153e02, 3.623165974290676e-02, 7.557512794647293e-03]),

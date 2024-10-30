@@ -47,8 +47,9 @@ from atmodeller.thermodata._gases import (
     SiO_g,
     SO2_g,
     SO_g,
+    critical_data,
 )
-from atmodeller.thermodata.core import SpeciesData
+from atmodeller.thermodata.core import CriticalData, SpeciesData
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ def select_thermodata(species_name: str) -> SpeciesData:
         species_name: Name of the species
 
     Returns:
-        Thermodynamic data for data
+        Thermodynamic data for species
     """
     species_data: dict[str, SpeciesData] = get_thermodata()
 
@@ -108,6 +109,26 @@ def select_thermodata(species_name: str) -> SpeciesData:
         msg: str = f"Thermodynamic data for '{species_name}' is not available"
         logger.warning(msg)
         logger.warning("Available options are: %s", list(species_data.keys()))
+        raise ValueError(msg) from exc
+
+    return data
+
+
+def select_critical_data(species_name: str) -> CriticalData:
+    """Selects critical data for species
+
+    Args:
+        species_name: Name of the species
+
+    Returns:
+        Critical data for species
+    """
+    try:
+        data: CriticalData = critical_data[species_name]
+    except KeyError as exc:
+        msg: str = f"Critical for '{species_name}' is not available"
+        logger.warning(msg)
+        logger.warning("Available options are: %s", list(critical_data.keys()))
         raise ValueError(msg) from exc
 
     return data

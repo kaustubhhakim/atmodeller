@@ -30,4 +30,8 @@ from atmodeller.thermodata.core import (
 )
 
 # Expose public API
-from atmodeller.thermodata.library import get_thermodata, select_thermodata
+from atmodeller.thermodata.library import (
+    get_thermodata,
+    select_critical_data,
+    select_thermodata,
+)

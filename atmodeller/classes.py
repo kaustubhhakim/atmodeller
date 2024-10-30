@@ -187,14 +187,19 @@ class InteriorAtmosphere:
         molar_masses: tuple[float, ...] = self.get_molar_masses()
         diatomic_oxygen_index: int = self.get_diatomic_oxygen_index()
 
-        # Formula matrix rows for elements that are constrained by mass constraints
+        # The complete formula matrix is not required for the calculation but it is used for
+        # computing output quantities. So calculate and store it.
         formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
+
+        # Formula matrix for elements that are constrained by mass constraints
         unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
         indices: list[int] = []
         for element in mass_constraints.log_molecules.keys():
             index: int = unique_elements.index(element)
             indices.append(index)
-        formula_matrix = formula_matrix[indices, :]
+        formula_matrix_constraints: npt.NDArray[np.int_] = formula_matrix.copy()
+        formula_matrix_constraints = formula_matrix_constraints[indices, :]
+        logger.info("formula_matrix_constraints = %s", formula_matrix_constraints)
 
         # Fugacity constraint matrix and indices
         number_fugacity_constraints: int = len(fugacity_constraints.constraints)
@@ -209,6 +214,7 @@ class InteriorAtmosphere:
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=tuple(map(tuple, formula_matrix)),
+            formula_matrix_constraints=tuple(map(tuple, formula_matrix_constraints)),
             reaction_matrix=tuple(map(tuple, reaction_matrix)),
             fugacity_matrix=tuple(map(tuple, fugacity_matrix)),
             gas_species_indices=gas_species_indices,

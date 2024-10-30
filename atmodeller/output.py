@@ -31,6 +31,7 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
+from molmass import Formula
 
 from atmodeller.containers import (
     FixedParameters,
@@ -84,7 +85,6 @@ class Output(ABC):
         self._initial_solution: Solution = initial_solution
         self._traced_parameters: TracedParameters = traced_parameters
 
-        # Scale the solution quantities
         log_number_density, log_stability = jnp.split(self._solution, 2, axis=1)
         self._log_number_density: Array = log_number_density
         self._log_stability: Array = log_stability
@@ -117,6 +117,9 @@ class Output(ABC):
     def element_density(self) -> Array:
         """Gets the number density of elements in the gas or condensed phase
 
+        Unlike for the objective function, we want the number density of all elements, regardless
+        of whether they were used to impose a mass constraint on the system.
+
         Returns:
             Number density of elements in the gas or condensed phase
         """
@@ -124,6 +127,9 @@ class Output(ABC):
     @abstractmethod
     def element_density_in_melt(self) -> Array:
         """Gets the number density of elements dissolved in melt due to species solubility
+
+        Unlike for the objective function, we want the number density of all elements, regardless
+        of whether they were used to impose a mass constraint on the system.
 
         Returns:
             Number density of elements dissolved in melt due to species solubility
@@ -259,11 +265,15 @@ class Output(ABC):
             Element outputs as a dictionary
         """
         out: dict[str, dict[str, ArrayLike]] = {}
+        atmosphere_volume: Array = self.atmosphere_volume()
         unique_elements: tuple[str, ...] = (
             self._interior_atmosphere.get_unique_elements_in_species()
         )
         element_density: Array = self.element_density()
         element_density_in_melt: Array = self.element_density_in_melt()
+
+        # TODO: generally seems like a bad idea.  Elements are in columns for element_density and
+        # not rows;
         for nn, element in enumerate(unique_elements):
             # TODO: Add output quantities
             # total_mass
@@ -281,7 +291,14 @@ class Output(ABC):
             element_dict: dict[str, ArrayLike] = {}
             # TODO: Split between gas and condensed
             element_dict["number_density"] = element_density[nn]
+            # element_dict["number"] = (
+            #    element_dict["number_density"] * atmosphere_volume[:, jnp.newaxis]
+            # )
             element_dict["dissolved_number_density"] = element_density_in_melt[nn]
+            # element_dict["dissolved_number"] = (
+            #    element_dict["dissolved_number_density"] * atmosphere_volume[:, jnp.newaxis]
+            # )
+            element_dict["molar_mass"] = Formula(element).mass
             out[element] = collapse_single_entry_values(element_dict)
 
         return out
@@ -421,13 +438,16 @@ class OutputSingle(Output):
 
     @override
     def element_density(self) -> Array:
-        return get_element_density(self.fixed_parameters, jnp.ravel(self.log_number_density))
+        return get_element_density(
+            jnp.array(self.fixed_parameters.formula_matrix), jnp.ravel(self.log_number_density)
+        )
 
     @override
     def element_density_in_melt(self) -> Array:
         return get_element_density_in_melt(
             self.traced_parameters,
             self.fixed_parameters,
+            jnp.array(self.fixed_parameters.formula_matrix),
             # The function expects 1-D arrays
             jnp.ravel(self.log_number_density),
             jnp.ravel(self.log_activity()),
@@ -510,20 +530,23 @@ class OutputBatch(Output):
     @override
     def element_density(self) -> Array:
         element_density_func: Callable = jax.vmap(get_element_density, in_axes=(None, 0))
+        logger.info("log_number_density = %s", self.log_number_density)
         element_density: Array = element_density_func(
-            self.fixed_parameters, self.log_number_density
+            jnp.array(self.fixed_parameters.formula_matrix), self.log_number_density
         )
+        logger.info("element_density = %s", element_density)
 
         return element_density
 
     @override
     def element_density_in_melt(self) -> Array:
         element_density_in_melt_func: Callable = jax.vmap(
-            get_element_density_in_melt, in_axes=(self.traced_parameters_vmap, None, 0, 0, 0)
+            get_element_density_in_melt, in_axes=(self.traced_parameters_vmap, None, None, 0, 0, 0)
         )
         element_density_in_melt: Array = element_density_in_melt_func(
             self.traced_parameters,
             self.fixed_parameters,
+            jnp.array(self.fixed_parameters.formula_matrix),
             self.log_number_density,
             self.pressure(),
             self.atmosphere_log_volume(),

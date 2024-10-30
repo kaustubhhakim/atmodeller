@@ -29,7 +29,7 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 
 from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
-from atmodeller.utilities import logsumexp, safe_exp, unit_conversion
+from atmodeller.utilities import safe_exp, unit_conversion
 
 if TYPE_CHECKING:
     from atmodeller.containers import (
@@ -101,18 +101,19 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     mass_constraints: MassConstraints = traced_parameters.mass_constraints
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
 
-    formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
+    # For the objective function we only need the formula matrix for elements with mass constraints
+    formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
 
-    jax.debug.print("Starting new objective function evaluation")
+    # jax.debug.print("Starting new objective function evaluation")
 
     # Species
     log_number_density, log_stability = jnp.split(solution, 2)
-    jax.debug.print("log_number_density = {out}", out=log_number_density)
-    jax.debug.print("log_stability = {out}", out=log_stability)
+    # jax.debug.print("log_number_density = {out}", out=log_number_density)
+    # jax.debug.print("log_stability = {out}", out=log_stability)
     log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, log_number_density)
-    jax.debug.print("log_activity = {out}", out=log_activity)
+    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Based on the definition of the reaction constant we need to convert gas activities
     # (fugacities) from bar to effective number density.
@@ -122,7 +123,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_activity, temperature
     )
     log_activity_number_density = jnp.where(mask, log_activity_number_density, log_activity)
-    jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
+    # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
     # Bulk atmosphere
     log_volume: Array = get_atmosphere_log_volume(fixed_parameters, log_number_density, planet)
@@ -137,10 +138,10 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         reaction_residual: Array = (
             reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
         )
-        jax.debug.print("reaction_residual = {out}", out=reaction_residual)
+        # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
         # Account for species stability.
         reaction_residual = reaction_residual - reaction_matrix.dot(safe_exp(log_stability))
-        jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
+        # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
         residual = jnp.concatenate([residual, reaction_residual])
 
     # Fugacity constraints residual
@@ -149,39 +150,46 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         fugacity_log_activity_number_density: Array = jnp.take(
             log_activity_number_density, fugacity_species_indices
         )
-        jax.debug.print("fugacity_log_activity = {out}", out=fugacity_log_activity_number_density)
+        # jax.debug.print("fugacity_log_activity = {out}", out=fugacity_log_activity_number_density)
         fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity_number_density)
-        jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+        # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
         total_pressure: Array = get_atmosphere_pressure(
             fixed_parameters, log_number_density, temperature
         )
         fugacity_residual = fugacity_residual - fugacity_constraints.array(
             temperature, total_pressure
         )
-        jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+        # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
         residual = jnp.concatenate([residual, fugacity_residual])
 
     # Elemental mass balance residual
-    if formula_matrix.size > 0:
+    if formula_matrix_constraints.size > 0:
         # Number density of elements in the gas or condensed phase
-        element_density: Array = get_element_density(fixed_parameters, log_number_density)
-        jax.debug.print("element_density = {out}", out=element_density)
+        element_density: Array = get_element_density(
+            formula_matrix_constraints, log_number_density
+        )
+        # jax.debug.print("element_density = {out}", out=element_density)
         element_melt_density: Array = get_element_density_in_melt(
-            traced_parameters, fixed_parameters, log_number_density, log_activity, log_volume
+            traced_parameters,
+            fixed_parameters,
+            formula_matrix_constraints,
+            log_number_density,
+            log_activity,
+            log_volume,
         )
         log_element_density: Array = jnp.log(element_density + element_melt_density)
         mass_residual = log_element_density - mass_constraints.array(log_volume)
-        jax.debug.print("mass_residual = {out}", out=mass_residual)
+        # jax.debug.print("mass_residual = {out}", out=mass_residual)
         # Stability residual
         # Get minimum scaled log number of molecules
         log_min_number_density: Array = jnp.min(mass_constraints.array(log_volume)) - jnp.log(
             fixed_parameters.tau
         )
         stability_residual: Array = log_number_density + log_stability - log_min_number_density
-        jax.debug.print("stability_residual = {out}", out=stability_residual)
+        # jax.debug.print("stability_residual = {out}", out=stability_residual)
         residual = jnp.concatenate([residual, mass_residual, stability_residual])
 
-    jax.debug.print("residual = {out}", out=residual)
+    # jax.debug.print("residual = {out}", out=residual)
 
     return residual
 
@@ -255,32 +263,32 @@ def get_atmosphere_pressure(
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
     pressure: Array = get_pressure_from_log_number_density(log_number_density, temperature)
     gas_pressure: Array = jnp.take(pressure, gas_species_indices)
-    jax.debug.print("gas_pressure = {out}", out=gas_pressure)
+    # jax.debug.print("gas_pressure = {out}", out=gas_pressure)
 
     return jnp.sum(gas_pressure)
 
 
 @jit
-def get_element_density(fixed_parameters: FixedParameters, log_number_density: Array) -> Array:
+def get_element_density(formula_matrix: Array, log_number_density: Array) -> Array:
     """Number density of elements in the gas or condensed phase
 
     Args:
-        fixed_parameters: Fixed parameters
+        formula_matrix: Formula matrix
         log_number_density: Log number density
 
     Returns:
         Number density of elements in the gas or condensed phase
     """
-    formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
-    element_gas_density: Array = formula_matrix.dot(safe_exp(log_number_density))
+    element_density: Array = formula_matrix.dot(safe_exp(log_number_density))
 
-    return element_gas_density
+    return element_density
 
 
 @jit
 def get_element_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
+    formula_matrix: Array,
     log_number_density: Array,
     log_activity: Array,
     log_volume: Array,
@@ -290,6 +298,7 @@ def get_element_density_in_melt(
     Args:
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
+        formula_matrix: Formula matrix
         log_number_density: Log number density
         log_activity: Log activity
         log_volume: Log volume of the atmosphere
@@ -297,7 +306,6 @@ def get_element_density_in_melt(
     Returns:
         Number density of elements dissolved in melt
     """
-    formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
     species_melt_density: Array = get_species_density_in_melt(
         traced_parameters, fixed_parameters, log_number_density, log_activity, log_volume
     )
@@ -345,8 +353,7 @@ def get_log_activity(
     atmosphere_pressure: Array = get_atmosphere_pressure(
         fixed_parameters, log_number_density, temperature
     )
-
-    jax.debug.print("atmosphere_pressure = {out}", out=atmosphere_pressure)
+    # jax.debug.print("atmosphere_pressure = {out}", out=atmosphere_pressure)
 
     activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
 
@@ -361,11 +368,11 @@ def get_log_activity(
     vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0,))
     indices: Array = jnp.arange(len(species))
     log_activity_pure_species: Array = vmap_apply_function(indices)
-    jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
+    # jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
     log_activity = get_log_activity_ideal_mixing(
         fixed_parameters, log_number_density, log_activity_pure_species
     )
-    jax.debug.print("log_activity = {out}", out=log_activity)
+    # jax.debug.print("log_activity = {out}", out=log_activity)
 
     return log_activity
 
@@ -578,3 +585,20 @@ def get_species_density_in_melt(
     # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
 
     return species_melt_density
+
+
+@jit
+def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
+    """Computes the log-sum-exp in a numerically stable way.
+
+    Args:
+        log_values: Array of log values to sum
+        prefactors: Array of prefactors corresponding to each log value
+
+    Returns:
+        The log of the sum of prefactors multiplied by exponentials of the input values
+    """
+    max_log: Array = jnp.max(log_values)
+    value_sum: Array = jnp.sum(prefactors * safe_exp(log_values - max_log))
+
+    return max_log + jnp.log(value_sum)

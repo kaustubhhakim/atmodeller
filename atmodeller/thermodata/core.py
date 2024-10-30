@@ -360,6 +360,20 @@ class SpeciesData(NamedTuple):
         return inverse_phase_mapping[self.phase_code]
 
 
+class CriticalData(NamedTuple):
+    """Critical temperature and pressure of a gas species.
+
+    Args:
+        temperature: Critical temperature in K
+        pressure: Critical pressure in bar
+    """
+
+    temperature: float
+    """Critical temperature in K"""
+    pressure: float
+    """Critical pressure in bar"""
+
+
 # TODO: Clean up this function which back-computes the log10 fO2 shift for a given fugacity. Will
 # be required for output.
 # def solve_for_log10_dIW(

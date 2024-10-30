@@ -41,23 +41,6 @@ OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.Ab
 
 
 @jit
-def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
-    """Computes the log-sum-exp in a numerically stable way.
-
-    Args:
-        log_values: Array of log values to sum
-        prefactors: Array of prefactors corresponding to each log value
-
-    Returns:
-        The log of the sum of prefactors multiplied by exponentials of the input values
-    """
-    max_log: Array = jnp.max(log_values)
-    value_sum: Array = jnp.sum(prefactors * safe_exp(log_values - max_log))
-
-    return max_log + jnp.log(value_sum)
-
-
-@jit
 def safe_exp(x: ArrayLike) -> Array:
     max_val: float = 709.78  # Maximum value to prevent overflow in 64-bit
     return jnp.exp(jnp.clip(x, a_max=max_val))
