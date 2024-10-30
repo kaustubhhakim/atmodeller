@@ -33,6 +33,7 @@ from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
 
+from atmodeller import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
     Planet,
@@ -50,6 +51,7 @@ from atmodeller.engine import (
     get_pressure_from_log_number_density,
     get_species_density_in_melt,
 )
+from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -266,42 +268,76 @@ class Output(ABC):
         """
         out: dict[str, dict[str, ArrayLike]] = {}
         atmosphere_volume: Array = self.atmosphere_volume()
-        unique_elements: tuple[str, ...] = (
-            self._interior_atmosphere.get_unique_elements_in_species()
-        )
+        logger.debug("atmosphere_volume = %s", atmosphere_volume)
+        element_molar_mass_expanded: Array = self.element_molar_mass_expanded()
+        logger.debug("element_molar_mass_expanded = %s", element_molar_mass_expanded)
+        # unique_elements: tuple[str, ...] = (
+        #     self._interior_atmosphere.get_unique_elements_in_species()
+        # )
         element_density: Array = self.element_density()
+        logger.debug("element_density = %s", element_density)
+        molecules: Array = element_density * atmosphere_volume
+        logger.debug("molecules = %s", molecules)
+        moles: Array = molecules / AVOGADRO
+        logger.debug("moles = %s", moles)
+        mass: Array = moles * element_molar_mass_expanded
+        logger.debug("mass = %s", mass)
         element_density_in_melt: Array = self.element_density_in_melt()
+        logger.debug("element_density_in_melt = %s", element_density_in_melt)
+        molecules_in_melt: Array = element_density_in_melt * atmosphere_volume
+        logger.debug("molecules_in_melt = %s", molecules_in_melt)
+        moles_in_melt: Array = molecules_in_melt / AVOGADRO
+        logger.debug("moles_in_melt = %s", moles_in_melt)
+        mass_in_melt: Array = moles_in_melt * element_molar_mass_expanded
+        logger.debug("mass_in_melt = %s", mass_in_melt)
+        total_element_density: Array = element_density + element_density_in_melt
+        logger.debug("total_element_density = %s", total_element_density)
+        total_molecules: Array = total_element_density * atmosphere_volume
+        logger.debug("total_molecules = %s", total_molecules)
+        total_moles: Array = total_molecules / AVOGADRO
+        logger.debug("total_moles = %s", total_moles)
+        total_mass: Array = total_moles * element_molar_mass_expanded
+        logger.debug("total_mass = %s", total_mass)
 
         # TODO: generally seems like a bad idea.  Elements are in columns for element_density and
         # not rows;
-        for nn, element in enumerate(unique_elements):
-            # TODO: Add output quantities
-            # total_mass
-            # total_moles
-            # logarithmic abundance
-            # atmosphere_number_density
-            # atmosphere_mass
-            # atmosphere_molecules
-            # atmosphere_moles
-            # dissolved_mass
-            # dissolved_molecules
-            # dissolved_moles
-            # volume_mixing_ratio
-            # molar_mass
-            element_dict: dict[str, ArrayLike] = {}
-            # TODO: Split between gas and condensed
-            element_dict["number_density"] = element_density[nn]
-            # element_dict["number"] = (
-            #    element_dict["number_density"] * atmosphere_volume[:, jnp.newaxis]
-            # )
-            element_dict["dissolved_number_density"] = element_density_in_melt[nn]
-            # element_dict["dissolved_number"] = (
-            #    element_dict["dissolved_number_density"] * atmosphere_volume[:, jnp.newaxis]
-            # )
-            element_dict["molar_mass"] = Formula(element).mass
-            out[element] = collapse_single_entry_values(element_dict)
+        # for nn, element in enumerate(unique_elements):
+        #     # TODO: Add output quantities
+        #     # total_mass
+        #     # total_moles
+        #     # logarithmic abundance
+        #     # atmosphere_number_density
+        #     # atmosphere_mass
+        #     # atmosphere_molecules
+        #     # atmosphere_moles
+        #     # dissolved_mass
+        #     # dissolved_molecules
+        #     # dissolved_moles
+        #     # volume_mixing_ratio
+        #     # molar_mass
+        #     element_dict: dict[str, ArrayLike] = {}
+        #     # TODO: Split between gas and condensed
+        #     element_dict["number_density"] = element_density[nn]
+        #     # element_dict["number"] = (
+        #     #    element_dict["number_density"] * atmosphere_volume[:, jnp.newaxis]
+        #     # )
+        #     element_dict["dissolved_number_density"] = element_density_in_melt[nn]
+        #     # element_dict["dissolved_number"] = (
+        #     #    element_dict["dissolved_number_density"] * atmosphere_volume[:, jnp.newaxis]
+        #     # )
+        #     element_dict["molar_mass"] = Formula(element).mass
+        #     out[element] = collapse_single_entry_values(element_dict)
 
         return out
+
+    def element_molar_mass_expanded(self) -> Array:
+        unique_elements: tuple[str, ...] = (
+            self._interior_atmosphere.get_unique_elements_in_species()
+        )
+        molar_mass: Array = jnp.array([Formula(element).mass for element in unique_elements])
+        molar_mass = unit_conversion.g_to_kg * molar_mass
+
+        return jnp.tile(molar_mass, (self.number_solutions, 1))
 
     def log_activity(self) -> Array:
         """Gets log activity of all species.
@@ -514,7 +550,7 @@ class OutputBatch(Output):
             self._interior_atmosphere.planet,
         )
 
-        return atmosphere_log_volume
+        return atmosphere_log_volume[:, jnp.newaxis]  # Column vector for subsequent calculations
 
     @override
     def atmosphere_pressure(self) -> Array:
@@ -530,11 +566,9 @@ class OutputBatch(Output):
     @override
     def element_density(self) -> Array:
         element_density_func: Callable = jax.vmap(get_element_density, in_axes=(None, 0))
-        logger.info("log_number_density = %s", self.log_number_density)
         element_density: Array = element_density_func(
             jnp.array(self.fixed_parameters.formula_matrix), self.log_number_density
         )
-        logger.info("element_density = %s", element_density)
 
         return element_density
 
@@ -548,7 +582,7 @@ class OutputBatch(Output):
             self.fixed_parameters,
             jnp.array(self.fixed_parameters.formula_matrix),
             self.log_number_density,
-            self.pressure(),
+            self.log_activity(),
             self.atmosphere_log_volume(),
         )
 
