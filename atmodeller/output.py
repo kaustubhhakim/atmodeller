@@ -364,6 +364,12 @@ class Output(ABC):
         out |= self.get_element_density_output(dissolved, "dissolved")
         out |= self.get_element_density_output(total, "total")
 
+        out["molar_mass"] = self.element_molar_mass_expanded()
+        out["degree_of_condensation"] = out["condensed_molecules"] / out["total_molecules"]
+        out["volume_mixing_ratio"] = out["atmosphere_molecules"] / jnp.sum(
+            out["atmosphere_molecules"]
+        )
+
         # TODO: Add logarithmic abundance, volume mixing ratio, degree of condensation
 
         logger.debug("out = %s", out)
