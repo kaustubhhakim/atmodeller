@@ -154,6 +154,19 @@ class InteriorAtmosphere:
 
         return self._solver
 
+    def get_condensed_species_indices(self) -> tuple[int, ...]:
+        """Gets the indices of condensed species
+
+        Returns:
+            Indices of the condensed species
+        """
+        indices: list[int] = []
+        for nn, species_ in enumerate(self.species):
+            if species_.data.phase != "g":
+                indices.append(nn)
+
+        return tuple(indices)
+
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 

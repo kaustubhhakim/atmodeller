@@ -31,7 +31,7 @@ from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferPr
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+# logger.setLevel(logging.INFO)
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""

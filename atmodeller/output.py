@@ -116,18 +116,18 @@ class Output(ABC):
         """
 
     @abstractmethod
-    def element_density(self) -> Array:
-        """Gets the number density of elements in the gas or condensed phase
+    def element_density_condensed(self) -> Array:
+        """Gets the number density of elements in the condensed phase
 
         Unlike for the objective function, we want the number density of all elements, regardless
         of whether they were used to impose a mass constraint on the system.
 
         Returns:
-            Number density of elements in the gas or condensed phase
+            Number density of elements in the condensed phase
         """
 
     @abstractmethod
-    def element_density_in_melt(self) -> Array:
+    def element_density_dissolved(self) -> Array:
         """Gets the number density of elements dissolved in melt due to species solubility
 
         Unlike for the objective function, we want the number density of all elements, regardless
@@ -135,6 +135,17 @@ class Output(ABC):
 
         Returns:
             Number density of elements dissolved in melt due to species solubility
+        """
+
+    @abstractmethod
+    def element_density_gas(self) -> Array:
+        """Gets the number density of elements in the gas phase
+
+        Unlike for the objective function, we want the number density of all elements, regardless
+        of whether they were used to impose a mass constraint on the system.
+
+        Returns:
+            Number density of elements in the gas phase
         """
 
     @abstractmethod
@@ -163,30 +174,49 @@ class Output(ABC):
             Log activity without stability of all species
         """
 
+    # TODO: Remove. I think not required because we zero the formula matrix instead
+    # @property
+    # def condensed_molar_mass(self) -> Array:
+    #     """Molar mass of the condensed species as a 1-D array"""
+    #     return jnp.take(self.molar_mass, self.condensed_species_indices)
+
+    @property
+    def condensed_species_indices(self) -> Array:
+        """Condensed species indices as a 1-D array"""
+        return jnp.array(self._interior_atmosphere.get_condensed_species_indices(), dtype=int)
+
     @property
     def fixed_parameters(self) -> FixedParameters:
         """Fixed parameters"""
         return self._interior_atmosphere.fixed_parameters
 
-    @property
-    def gas_molar_mass(self) -> Array:
-        """Molar mass of the gas species as a 1-D array"""
-        return jnp.take(self.molar_mass, self.gas_species_indices)
+    # TODO: Remove. I think not required because we zero the formula matrix instead
+    # @property
+    # def gas_molar_mass(self) -> Array:
+    #     """Molar mass of the gas species as a 1-D array"""
+    #     return jnp.take(self.molar_mass, self.gas_species_indices)
 
     @property
     def gas_species_indices(self) -> Array:
         """Gas species indices as a 1-D array"""
-        return jnp.array(self.fixed_parameters.gas_species_indices)
+        return jnp.array(self.fixed_parameters.gas_species_indices, dtype=int)
 
     @property
     def log_number_density(self) -> Array:
         """Log number density"""
         return self._log_number_density
 
-    @property
-    def log_number_density_gas_species(self) -> Array:
-        """Log number density of gas species"""
-        return jnp.take(self.log_number_density, self.gas_species_indices, axis=1)
+    # TODO: Remove. I think not required because we zero the formula matrix instead
+    # @property
+    # def log_number_density_condensed_species(self) -> Array:
+    #     """Log number density of condensed species"""
+    #     return jnp.take(self.log_number_density, self.condensed_species_indices, axis=1)
+
+    # TODO: Remove. I think not required because we zero the formula matrix instead
+    # @property
+    # def log_number_density_gas_species(self) -> Array:
+    #     """Log number density of gas species"""
+    #     return jnp.take(self.log_number_density, self.gas_species_indices, axis=1)
 
     @property
     def log_stability(self) -> Array:
@@ -260,59 +290,88 @@ class Output(ABC):
         """
         return jnp.exp(self.atmosphere_log_volume())
 
-    def element_asdict(self) -> dict[str, dict[str, ArrayLike]]:
+    def formula_matrix_condensed(self) -> Array:
+        """Formula matrix for condensed species
+
+        Only columns in the formula matrix referring to condensed species have non-zero values.
+
+        Returns:
+            Formula matrix for condensed species
+        """
+        formula_matrix: Array = jnp.array(self.fixed_parameters.formula_matrix)
+        mask: Array = jnp.zeros_like(formula_matrix, dtype=bool)
+        mask = mask.at[:, self.condensed_species_indices].set(True)
+        logger.debug("formula_matrix_condensed mask = %s", mask)
+        formula_matrix_condensed: Array = formula_matrix * mask
+
+        return formula_matrix_condensed
+
+    def formula_matrix_gas(self) -> Array:
+        """Formula matrix for gas species
+
+        Only columns in the formula matrix referring to gas species have non-zero values.
+
+        Returns:
+            Formula matrix for gas species
+        """
+        formula_matrix: Array = jnp.array(self.fixed_parameters.formula_matrix)
+        mask: Array = jnp.zeros_like(formula_matrix, dtype=bool)
+        mask = mask.at[:, self.gas_species_indices].set(True)
+        logger.debug("formula_matrix_gas mask = %s", mask)
+        formula_matrix_gas: Array = formula_matrix * mask
+
+        return formula_matrix_gas
+
+    def get_element_density_output(
+        self, element_density: ArrayLike, prefix: str = ""
+    ) -> dict[str, ArrayLike]:
+        """Gets the outputs associated with an element density
+
+        Args:
+            element_density: Element density
+            prefix: Key prefix for the output. Defaults to an empty string.
+
+        Returns
+            Dictionary of output quantities
+        """
+        atmosphere_volume: Array = self.atmosphere_volume()
+        element_molar_mass_expanded: Array = self.element_molar_mass_expanded()
+        molecules: ArrayLike = element_density * atmosphere_volume
+        moles: ArrayLike = molecules / AVOGADRO
+        mass: ArrayLike = moles * element_molar_mass_expanded
+
+        out: dict[str, ArrayLike] = {}
+        out[f"{prefix}_number_density"] = element_density
+        out[f"{prefix}_molecules"] = molecules
+        out[f"{prefix}_moles"] = moles
+        out[f"{prefix}_mass"] = mass
+
+        return out
+
+    def elements_asdict(self) -> dict[str, dict[str, ArrayLike]]:
         """Gets the element properties as a dictionary
 
         Returns:
             Element outputs as a dictionary
         """
-        out: dict[str, dict[str, ArrayLike]] = {}
-        atmosphere_volume: Array = self.atmosphere_volume()
-        logger.debug("atmosphere_volume = %s", atmosphere_volume)
-        element_molar_mass_expanded: Array = self.element_molar_mass_expanded()
-        logger.debug("element_molar_mass_expanded = %s", element_molar_mass_expanded)
-        # unique_elements: tuple[str, ...] = (
-        #     self._interior_atmosphere.get_unique_elements_in_species()
-        # )
-        element_density: Array = self.element_density()
-        logger.debug("element_density = %s", element_density)
-        molecules: Array = element_density * atmosphere_volume
-        logger.debug("molecules = %s", molecules)
-        moles: Array = molecules / AVOGADRO
-        logger.debug("moles = %s", moles)
-        mass: Array = moles * element_molar_mass_expanded
-        logger.debug("mass = %s", mass)
-        element_density_in_melt: Array = self.element_density_in_melt()
-        logger.debug("element_density_in_melt = %s", element_density_in_melt)
-        molecules_in_melt: Array = element_density_in_melt * atmosphere_volume
-        logger.debug("molecules_in_melt = %s", molecules_in_melt)
-        moles_in_melt: Array = molecules_in_melt / AVOGADRO
-        logger.debug("moles_in_melt = %s", moles_in_melt)
-        mass_in_melt: Array = moles_in_melt * element_molar_mass_expanded
-        logger.debug("mass_in_melt = %s", mass_in_melt)
-        total_element_density: Array = element_density + element_density_in_melt
-        logger.debug("total_element_density = %s", total_element_density)
-        total_molecules: Array = total_element_density * atmosphere_volume
-        logger.debug("total_molecules = %s", total_molecules)
-        total_moles: Array = total_molecules / AVOGADRO
-        logger.debug("total_moles = %s", total_moles)
-        total_mass: Array = total_moles * element_molar_mass_expanded
-        logger.debug("total_mass = %s", total_mass)
+        atmosphere: Array = self.element_density_gas()
+        condensed: Array = self.element_density_condensed()
+        dissolved: Array = self.element_density_dissolved()
+        total: Array = atmosphere + condensed + dissolved
+
+        out: dict[str, ArrayLike] = self.get_element_density_output(atmosphere, "atmosphere")
+        out |= self.get_element_density_output(condensed, "condensed")
+        out |= self.get_element_density_output(dissolved, "dissolved")
+        out |= self.get_element_density_output(total, "total")
+
+        # TODO: Add logarithmic abundance, volume mixing ratio, degree of condensation
+
+        logger.debug("out = %s", out)
 
         # TODO: generally seems like a bad idea.  Elements are in columns for element_density and
         # not rows;
         # for nn, element in enumerate(unique_elements):
-        #     # TODO: Add output quantities
-        #     # total_mass
-        #     # total_moles
         #     # logarithmic abundance
-        #     # atmosphere_number_density
-        #     # atmosphere_mass
-        #     # atmosphere_molecules
-        #     # atmosphere_moles
-        #     # dissolved_mass
-        #     # dissolved_molecules
-        #     # dissolved_moles
         #     # volume_mixing_ratio
         #     # molar_mass
         #     element_dict: dict[str, ArrayLike] = {}
@@ -321,7 +380,7 @@ class Output(ABC):
         #     # element_dict["number"] = (
         #     #    element_dict["number_density"] * atmosphere_volume[:, jnp.newaxis]
         #     # )
-        #     element_dict["dissolved_number_density"] = element_density_in_melt[nn]
+        #     element_dict["dissolved_number_density"] = element_density_dissolved[nn]
         #     # element_dict["dissolved_number"] = (
         #     #    element_dict["dissolved_number_density"] * atmosphere_volume[:, jnp.newaxis]
         #     # )
@@ -435,8 +494,8 @@ class Output(ABC):
         logger.info("planet_asdict = %s", self.planet_asdict())
         # logger.info("planet_asdataframe = %s", self.planet_asdataframe())
         logger.info("species_density_in_melt = %s", self.species_density_in_melt())
-        logger.info("element_density_in_melt = %s", self.element_density_in_melt())
-        logger.info("element_asdict = %s", self.element_asdict())
+        logger.info("element_density_dissolved = %s", self.element_density_dissolved())
+        logger.info("element_asdict = %s", self.elements_asdict())
         # logger.info("jnp.ravel(self.log_number_density) = %s", jnp.ravel(self.log_number_density))
         # logger.info(
         #    "jnp.squeeze(self.log_number_density) = %s", jnp.squeeze(self.log_number_density)
@@ -473,13 +532,13 @@ class OutputSingle(Output):
         )
 
     @override
-    def element_density(self) -> Array:
+    def element_density_condensed(self) -> Array:
         return get_element_density(
-            jnp.array(self.fixed_parameters.formula_matrix), jnp.ravel(self.log_number_density)
+            self.formula_matrix_condensed(), jnp.ravel(self.log_number_density)
         )
 
     @override
-    def element_density_in_melt(self) -> Array:
+    def element_density_dissolved(self) -> Array:
         return get_element_density_in_melt(
             self.traced_parameters,
             self.fixed_parameters,
@@ -489,6 +548,10 @@ class OutputSingle(Output):
             jnp.ravel(self.log_activity()),
             jnp.ravel(self.atmosphere_log_volume()),
         )
+
+    @override
+    def element_density_gas(self) -> Array:
+        return get_element_density(self.formula_matrix_gas(), jnp.ravel(self.log_number_density))
 
     @override
     def pressure(self) -> Array:
@@ -564,20 +627,21 @@ class OutputBatch(Output):
         return atmosphere_pressure
 
     @override
-    def element_density(self) -> Array:
+    def element_density_condensed(self) -> Array:
         element_density_func: Callable = jax.vmap(get_element_density, in_axes=(None, 0))
         element_density: Array = element_density_func(
-            jnp.array(self.fixed_parameters.formula_matrix), self.log_number_density
+            self.formula_matrix_condensed(), self.log_number_density
         )
 
         return element_density
 
     @override
-    def element_density_in_melt(self) -> Array:
-        element_density_in_melt_func: Callable = jax.vmap(
-            get_element_density_in_melt, in_axes=(self.traced_parameters_vmap, None, None, 0, 0, 0)
+    def element_density_dissolved(self) -> Array:
+        element_density_dissolved_func: Callable = jax.vmap(
+            get_element_density_in_melt,
+            in_axes=(self.traced_parameters_vmap, None, None, 0, 0, 0),
         )
-        element_density_in_melt: Array = element_density_in_melt_func(
+        element_density_dissolved: Array = element_density_dissolved_func(
             self.traced_parameters,
             self.fixed_parameters,
             jnp.array(self.fixed_parameters.formula_matrix),
@@ -586,7 +650,16 @@ class OutputBatch(Output):
             self.atmosphere_log_volume(),
         )
 
-        return element_density_in_melt
+        return element_density_dissolved
+
+    @override
+    def element_density_gas(self) -> Array:
+        element_density_func: Callable = jax.vmap(get_element_density, in_axes=(None, 0))
+        element_density: Array = element_density_func(
+            self.formula_matrix_gas(), self.log_number_density
+        )
+
+        return element_density
 
     @override
     def pressure(self) -> Array:
