@@ -286,6 +286,7 @@ class Chabrier(RealGas):
 
     Args:
         filename: Filename of the density-T-P data
+        integration_steps: Number of integration steps. Defaults to 1000.
     """
 
     CHABRIER_DIRECTORY: Path = Path("chabrier")
@@ -304,19 +305,13 @@ class Chabrier(RealGas):
     Dictionary keys should correspond to the name of the Chabrier file.
     """
 
-    def __init__(
-        self,
-        filename: Path,
-    ):
+    def __init__(self, filename: Path, integration_steps: int = 1000):
         self._filename: Path = filename
         self._log10_density_func: RegularGridInterpolator = self._get_spline()
-        self._He_fraction = self.He_fraction_map[self._filename.name]
+        self._He_fraction: float = self.He_fraction_map[self._filename.name]
         self._H2_molar_mass_g_mol: float = Formula("H2").mass
         self._He_molar_mass_g_mol: float = Formula("He").mass
-        # Changing the number of integration steps will require updating the unit test output for
-        # Chabrier.
-        # FIXME: Increase during debugging to aid comparison with main branch
-        self._integration_steps: int = 1000
+        self._integration_steps: int = integration_steps
 
     def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
         r"""Converts density to molar density
@@ -371,7 +366,6 @@ class Chabrier(RealGas):
         log_P: Array = jnp.array(pivot_table.columns.to_numpy())
         log_rho: Array = jnp.array(pivot_table.to_numpy())
 
-        # The default fill_value is NaN
         interpolator: RegularGridInterpolator = RegularGridInterpolator(
             (log_T, log_P), log_rho, method="linear"
         )
@@ -406,7 +400,7 @@ class Chabrier(RealGas):
         volumes: Array = self.volume(temperatures, pressures)
         # jax.debug.print("volumes = {out}", out=volumes)
         volume_integral: Array = trapezoid(volumes, pressures)
-        jax.debug.print("volume_integral = {out}", out=volume_integral)
+        # jax.debug.print("volume_integral = {out}", out=volume_integral)
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
         return log_fugacity
