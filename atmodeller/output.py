@@ -437,8 +437,8 @@ class Output:
 
         logger.debug("out = %s", out)
 
-        # split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        # logger.debug("split_dict = %s", split_dict)
+        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
+        logger.debug("split_dict = %s", split_dict)
         # elements_out: dict[str, dict[str, Array]] = {
         #    f"element_{element}": split_dict[nn] for nn, element in enumerate(unique_elements)
         # }
@@ -649,19 +649,11 @@ def split_dict_by_columns(element_asdict: dict[str, Array]) -> list[dict[str, Ar
     first_key = next(iter(element_asdict))
     logger.debug("first_key = %s", first_key)
 
-    first_array: Array = element_asdict[first_key]
-    ndim: int = element_asdict[first_key].ndim
-    if ndim == 1:
-        num_columns: int = first_array.size
-    else:
-        num_columns = first_array.shape[1]
+    num_columns: int = element_asdict[first_key].shape[1]
 
     # Function to split an array into a list of its columns
     def split_columns(array: Array):
-        if ndim == 1:
-            return [array[i] for i in range(num_columns)]
-        else:
-            return [array[:, i] for i in range(num_columns)]
+        return [array[:, i] for i in range(num_columns)]
 
     # Apply the splitting function to each array in the dictionary
     split_values = jax.tree_util.tree_map(split_columns, element_asdict)
