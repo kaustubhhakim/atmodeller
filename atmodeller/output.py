@@ -198,7 +198,7 @@ class Output:
         out["planet"] = self.planet.expanded_asdict()
 
         # FIXME: Output for elements for single and batch calculations
-        # out["elements"] = self.elements_asdict()
+        out["elements"] = self.elements_asdict()
 
         logger.debug("asdict = %s", out)
 
@@ -388,7 +388,8 @@ class Output:
         """
         atmosphere_volume: Array = self.atmosphere_volume()
         element_molar_mass_expanded: Array = self.element_molar_mass_expanded()
-        molecules: Array = element_density * atmosphere_volume
+        # Volume must be a column vector because it multiples all elements in the row
+        molecules: Array = element_density * atmosphere_volume[:, jnp.newaxis]
         moles: Array = molecules / AVOGADRO
         mass: Array = moles * element_molar_mass_expanded
 
@@ -428,7 +429,7 @@ class Output:
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
             # pylint: disable=invalid-name
-            H_total_moles: Array = jnp.atleast_2d(out["total_moles"])[:, index]
+            H_total_moles: Array = out["total_moles"][:, index]
             # pylint: enable=invalid-name
             out["logarithmic_abundance"] = (
                 jnp.log10(out["total_moles"] / H_total_moles[:, jnp.newaxis]) + 12
@@ -436,12 +437,12 @@ class Output:
 
         logger.debug("out = %s", out)
 
-        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        logger.debug("split_dict = %s", split_dict)
-        elements_out: dict[str, dict[str, Array]] = {
-            f"element_{element}": split_dict[nn] for nn, element in enumerate(unique_elements)
-        }
-        logger.debug("elements_out = %s", elements_out)
+        # split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
+        # logger.debug("split_dict = %s", split_dict)
+        # elements_out: dict[str, dict[str, Array]] = {
+        #    f"element_{element}": split_dict[nn] for nn, element in enumerate(unique_elements)
+        # }
+        # logger.debug("elements_out = %s", elements_out)
 
         # split_dict: dict[str, dict[str, Array]] = {
         #     element: split_dict_by_columns(out)[nn] for element, nn in enumerate(unique_elements)
@@ -449,7 +450,7 @@ class Output:
 
         #     out[element] = collapse_single_entry_values(element_dict)
 
-        return elements_out
+        return out  #  elements_out
 
     def element_molar_mass_expanded(self) -> Array:
         unique_elements: tuple[str, ...] = (
@@ -458,8 +459,7 @@ class Output:
         molar_mass: Array = jnp.array([Formula(element).mass for element in unique_elements])
         molar_mass = unit_conversion.g_to_kg * molar_mass
 
-        # If only one solution then collapse to a 1-D array, otherwise keep as 2-D array.
-        return jnp.tile(molar_mass, (self.number_solutions, 1)).squeeze()
+        return jnp.tile(molar_mass, (self.number_solutions, 1))
 
     def log_activity_without_stability(self) -> Array:
         """Gets log activity without stability of all species
