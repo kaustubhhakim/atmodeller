@@ -42,7 +42,7 @@ from atmodeller.containers import (
     TracedParameters,
 )
 from atmodeller.engine import solve
-from atmodeller.output import Output, OutputBatch, OutputSingle
+from atmodeller.output import Output
 from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref
 
@@ -66,8 +66,6 @@ class InteriorAtmosphere:
     fixed_parameters: FixedParameters
     initial_solution: Solution
     _solver: Callable
-    # Used for vmapping (if relevant)
-    traced_parameters_vmap: TracedParameters
 
     def __init__(
         self,
@@ -87,13 +85,7 @@ class InteriorAtmosphere:
     @property
     def is_batch(self) -> bool:
         """Returns if any parameters are batched, thereby necessitating a vmap solve"""
-        vmap_axes: list = [
-            self.planet.vmap_axes(),
-            self.fugacity_constraints.vmap_axes(),
-            self.mass_constraints.vmap_axes(),
-        ]
-        leaves, _ = tree_flatten(vmap_axes)
-
+        leaves, _ = tree_flatten(self.get_traced_parameters_vmap())
         # Check if any of the axes should be vmapped, which is defined by an entry of zero
         contains_zero: bool = any(np.array(leaves) == 0)
 
@@ -386,19 +378,27 @@ class InteriorAtmosphere:
 
     def _get_solver_vmap(self) -> Callable:
         """Gets the solver for a batch solve."""
-        # Define the structures to vectorize.
-        self.traced_parameters_vmap = TracedParameters(
+        solver: Callable = jax.jit(
+            jax.vmap(
+                self.get_wrapped_jit_solver(), in_axes=(None, self.get_traced_parameters_vmap())
+            )
+        )
+
+        return solver
+
+    def get_traced_parameters_vmap(self) -> TracedParameters:
+        """Gets the vmapping axes for tracer parameters
+
+        Returns:
+            Vmapping for tracer parameters
+        """
+        traced_parameters_vmap: TracedParameters = TracedParameters(
             planet=self.planet.vmap_axes(),  # type: ignore
             fugacity_constraints=self.fugacity_constraints.vmap_axes(),  # type: ignore
             mass_constraints=self.mass_constraints.vmap_axes(),  # type: ignore
         )
-        logger.debug("traced_parameters_vmap = %s", self.traced_parameters_vmap)
 
-        solver: Callable = jax.jit(
-            jax.vmap(self.get_wrapped_jit_solver(), in_axes=(None, self.traced_parameters_vmap))
-        )
-
-        return solver
+        return traced_parameters_vmap
 
     def solve_raw_output(
         self,
@@ -455,12 +455,20 @@ class InteriorAtmosphere:
             initial_solution, traced_parameters
         )
 
-        if self.is_batch:
-            output: Output = OutputBatch(solution, self, initial_solution_, traced_parameters_)
-        else:
-            output = OutputSingle(solution, self, initial_solution_, traced_parameters_)
+        output: Output = Output(solution, self, initial_solution_, traced_parameters_)
 
-        output.output_to_logger()
+        # TODO: Remove. Now unified class.
+        # if self.is_batch:
+        #    output: Output = OutputBatch(solution, self, initial_solution_, traced_parameters_)
+        # else:
+        #    output = OutputSingle(solution, self, initial_solution_, traced_parameters_)
+
+        # output.output_to_logger()
+
+        # TODO: Implement output options
+        output.asdict()
+        # output.to_dataframes()
+        # output.to_excel()
 
         quick_look: dict[str, ArrayLike] = output.quick_look()
 

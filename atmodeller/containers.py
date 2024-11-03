@@ -148,22 +148,29 @@ class Planet(NamedTuple):
 
         return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
 
-    def asdict(self) -> dict[str, ArrayLike]:
+    def asdict(self) -> dict[str, Array]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
-        base_dict: dict = self._asdict()
+        base_dict: dict[str, ArrayLike] = self._asdict()
         base_dict["mantle_mass"] = self.mantle_mass
         base_dict["mantle_melt_mass"] = self.mantle_melt_mass
         base_dict["mantle_solid_mass"] = self.mantle_solid_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.surface_gravity
 
-        return base_dict
+        # Always return JAX arrays
+        converted_dict: dict[str, Array] = {
+            key: jnp.asarray(value) for key, value in base_dict.items()
+        }
 
-    def expanded_asdict(self) -> dict[str, ArrayLike]:
+        return converted_dict
+
+    # TODO: Will probably be a separate function to use elsewhere with other containers, like
+    # mass and fugacity constraints
+    def expanded_asdict(self) -> dict[str, Array]:
         """Gets a dictionary of the values, with scalars expanded to match array sizes
 
         This method is probably not JAX-compliant, so should only be called outside of JAX
@@ -200,7 +207,7 @@ class Planet(NamedTuple):
             return max_size
 
         max_size: int = max_array_size()
-        expanded_dict: dict[str, ArrayLike] = tree_map(
+        expanded_dict: dict[str, Array] = tree_map(
             lambda x: expand_to_match_size(x, max_size), self.asdict()
         )
 
