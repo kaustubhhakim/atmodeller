@@ -23,6 +23,7 @@ must be vmapped to compute the output.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 import jax
@@ -193,12 +194,16 @@ class Output:
         return jnp.exp(self.log_activity_without_stability())
 
     def asdict(self) -> dict[str, dict[str, Array]]:
+        """All output in a dictionary
+
+        Returns:
+            Dictionary of all output
+        """
         out: dict[str, dict[str, Array]] = {}
         out["atmosphere"] = self.atmosphere_asdict()
         out["planet"] = self.planet.expanded_asdict()
-
-        # FIXME: Output for elements for single and batch calculations
-        out["elements"] = self.elements_asdict()
+        out["raw_solution"] = self.raw_solution_asdict()
+        out |= self.elements_asdict()
 
         logger.debug("asdict = %s", out)
 
@@ -439,10 +444,11 @@ class Output:
 
         split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
         logger.debug("split_dict = %s", split_dict)
-        # elements_out: dict[str, dict[str, Array]] = {
-        #    f"element_{element}": split_dict[nn] for nn, element in enumerate(unique_elements)
-        # }
-        # logger.debug("elements_out = %s", elements_out)
+
+        elements_out: dict[str, dict[str, Array]] = {
+            f"element_{element}": split_dict[nn] for nn, element in enumerate(unique_elements)
+        }
+        logger.debug("elements_out = %s", elements_out)
 
         # split_dict: dict[str, dict[str, Array]] = {
         #     element: split_dict_by_columns(out)[nn] for element, nn in enumerate(unique_elements)
@@ -450,7 +456,7 @@ class Output:
 
         #     out[element] = collapse_single_entry_values(element_dict)
 
-        return out  #  elements_out
+        return elements_out
 
     def element_molar_mass_expanded(self) -> Array:
         unique_elements: tuple[str, ...] = (
@@ -551,6 +557,17 @@ class Output:
 
         return collapse_single_entry_values(out)
 
+    def raw_solution_asdict(self) -> dict[str, Array]:
+        """Gets the raw solution"""
+        raw_solution: dict[str, Array] = {}
+
+        for ii, species_ in enumerate(self.species):
+            species_name: str = species_.name
+            raw_solution[species_name] = self._log_number_density[:, ii]
+            raw_solution[f"{species_name}_stability"] = self._log_stability[:, ii]
+
+        return raw_solution
+
     def species_density_in_melt(self) -> Array:
         """Gets species number density in the melt
 
@@ -580,10 +597,30 @@ class Output:
         return jnp.exp(self.log_stability)
 
     def to_dataframes(self) -> dict[str, pd.DataFrame]:
+        """Gets the output in a dictionary of dataframes.
+
+        Returns:
+            Output in a dictionary of dataframes
+        """
         out: dict[str, pd.DataFrame] = nested_dict_to_dataframes(self.asdict())
         logger.debug("to_dataframes = %s", out)
 
         return out
+
+    def to_excel(self, file_prefix: Path | str = "new_atmodeller_out") -> None:
+        """Writes the output to an Excel file.
+
+        Args:
+            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+        """
+        out: dict[str, pd.DataFrame] = self.to_dataframes()
+        output_file: Path = Path(f"{file_prefix}.xlsx")
+
+        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:  # pylint: disable=E0110
+            for df_name, df in out.items():
+                df.to_excel(writer, sheet_name=df_name, index=True)
+
+        logger.info("Output written to %s", output_file)
 
     def output_to_logger(self) -> None:
         """Writes output to the logger.
@@ -636,30 +673,29 @@ def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, 
     return out
 
 
-def split_dict_by_columns(element_asdict: dict[str, Array]) -> list[dict[str, Array]]:
-    """Splits a dictionary based on the entries
+def split_dict_by_columns(dict_to_split: dict[str, Array]) -> list[dict[str, Array]]:
+    """Splits a dictionary based on columns in the values.
 
     Args:
-        element_asdict: A dictionary of element data
+        dict_to_split: A dictionary to split
 
     Returns:
-        A list of data split by elements
+        A list of dictionaries split by column
     """
     # Get the number of columns from the first array in the dictionary
-    first_key = next(iter(element_asdict))
+    first_key: str = next(iter(dict_to_split))
     logger.debug("first_key = %s", first_key)
-
-    num_columns: int = element_asdict[first_key].shape[1]
+    num_columns: int = dict_to_split[first_key].shape[1]
 
     # Function to split an array into a list of its columns
-    def split_columns(array: Array):
+    def split_columns(array: Array) -> list[Array]:
         return [array[:, i] for i in range(num_columns)]
 
     # Apply the splitting function to each array in the dictionary
-    split_values = jax.tree_util.tree_map(split_columns, element_asdict)
+    split_values: dict[str, list[Array]] = jax.tree_util.tree_map(split_columns, dict_to_split)
 
     # Initialize a list of dictionaries, one for each column
-    split_dicts = [{} for _ in range(num_columns)]
+    split_dicts: list[dict] = [{} for _ in range(num_columns)]
 
     # Fill the dictionaries with the corresponding columns
     for key, columns in split_values.items():
@@ -690,18 +726,8 @@ def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[st
 
 # TODO: Removing this old class into single and batch subclasses
 # class Output(OutputBatch):
+
 #     """Converts the array output to user-friendly scaled output"""
-
-# def molar_mass(self) -> Array:
-#     r"""Gets molar mass of all species
-
-#     Returns:
-#         Molar mass of all species
-#     """
-#     return jnp.tile(
-#         jnp.array(self.model.fixed_parameters.molar_masses), (self.number_solutions, 1)
-#     )
-
 # def to_dataframes(self) -> dict[str, pd.DataFrame]:
 #     out: dict[str, pd.DataFrame] = {}
 
@@ -796,32 +822,6 @@ def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[st
 #     if extra_output is not None:
 #         data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
 #         data_list.append(extra_output)
-
-# def to_dataframes(self) -> dict[str, pd.DataFrame]:
-#     """Output as a dictionary of dataframes
-
-#     Returns:
-#         The output as a dictionary of dataframes
-#     """
-#     out: dict[str, pd.DataFrame] = {
-#         key: pd.DataFrame(value) for key, value in self.data.items()
-#     }
-#     return out
-
-# def to_excel(self, file_prefix: Path | str = "atmodeller_out") -> None:
-#     """Writes the output to an Excel file.
-
-#     Args:
-#         file_prefix: Prefix of the output file. Defaults to atmodeller_out.
-#     """
-#     out: dict[str, pd.DataFrame] = self.to_dataframes()
-#     output_file: Path = Path(f"{file_prefix}.xlsx")
-
-#     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:  # pylint: disable=E0110
-#         for df_name, df in out.items():
-#             df.to_excel(writer, sheet_name=df_name, index=True)
-
-#     logger.info("Output written to %s", output_file)
 
 # def to_pickle(self, file_prefix: Path | str = "atmodeller_out") -> None:
 #     """Writes the output to a pickle file.
