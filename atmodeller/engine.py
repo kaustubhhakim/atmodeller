@@ -150,7 +150,6 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         fugacity_log_activity_number_density: Array = jnp.take(
             log_activity_number_density, fugacity_species_indices
         )
-        # jax.debug.print("fugacity_log_activity = {out}", out=fugacity_log_activity_number_density)
         fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity_number_density)
         # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
         total_pressure: Array = get_atmosphere_pressure(

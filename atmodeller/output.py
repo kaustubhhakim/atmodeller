@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import logging
 import pickle
-from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -50,6 +49,7 @@ from atmodeller.engine import (
     get_element_density,
     get_element_density_in_melt,
     get_log_activity,
+    get_log_number_density_from_log_pressure,
     get_pressure_from_log_number_density,
     get_species_density_in_melt,
     get_species_ppmw_in_melt,
@@ -183,8 +183,11 @@ class Output:
         out |= self.condensed_species_asdict()
         out |= self.gas_species_asdict()
         out |= self.elements_asdict()
-        out["atmosphere"] = self.atmosphere_asdict()
+
         out["planet"] = self.planet.expanded_asdict()
+        out["atmosphere"] = self.atmosphere_asdict()
+        # Temperature has already been expanded for the planet output, so re-use here
+        out["atmosphere"]["temperature"] = out["planet"]["surface_temperature"]
         out["raw_solution"] = self.raw_solution_asdict()
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
 
@@ -199,9 +202,29 @@ class Output:
             Atmosphere properties
         """
         out: dict[str, Array] = {}
+
+        log_number_density_from_log_pressure_func: Callable = jax.vmap(
+            get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap)
+        )
+        log_number_density = log_number_density_from_log_pressure_func(
+            jnp.log(self.atmosphere_pressure()), self.temperature
+        )
+        # Must be 2-D to align arrays for computing number-density-related quantities
+        number_density: Array = jnp.exp(log_number_density)[:, jnp.newaxis]
+        molar_mass: Array = self.atmosphere_molar_mass()[:, jnp.newaxis]
+        out: dict[str, Array] = self._get_number_density_output(
+            number_density, molar_mass, "species_"
+        )
+
+        out["molar_mass"] = molar_mass
+        # Ensure all arrays are 1-D, which is required for creating dataframes
+        out = {key: value.ravel() for key, value in out.items()}
+
         out["pressure"] = self.atmosphere_pressure()
-        out["temperature"] = self.temperature
         out["volume"] = self.atmosphere_volume()
+        out["element_number_density"] = jnp.sum(self.element_density_gas(), axis=1)
+        out["element_count"] = out["element_number_density"] * out["volume"]
+        out["element_moles"] = out["element_count"] / AVOGADRO
 
         return out
 
@@ -314,7 +337,14 @@ class Output:
         out: dict[str, Array] = self._get_number_density_output(
             atmosphere, molar_mass, "atmosphere_"
         )
+
+        logger.warning("condensed_number_density = %s", condensed)
+        logger.warning("condensed_molar_mass = %s", molar_mass)
+
         out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
+
+        logger.warning("condensed_out = %s", out)
+
         out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
         out |= self._get_number_density_output(total, molar_mass, "total_")
 
@@ -846,23 +876,6 @@ def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[st
 
 # TODO: Removing this old class into single and batch subclasses
 # class Output(OutputBatch):
-
-#     """Converts the array output to user-friendly scaled output"""
-# def to_dataframes(self) -> dict[str, pd.DataFrame]:
-#     out: dict[str, pd.DataFrame] = {}
-
-#     # TODO: Split loop over gas species and condensed to only output relevant quantities
-#     for nn, species_ in enumerate(self.model.species):
-#         species_out: dict[str, ArrayLike] = {}
-#         species_out["atmosphere_number_density"] = self.number_density()[:, nn]
-#         species_out["pressure"] = self.pressure()[:, nn]
-#         species_out["activity"] = self.activity()[:, nn]
-#         species_out["fugacity_coefficient"] = species_out["activity"] / species_out["pressure"]
-#         out[species_.name] = pd.DataFrame(species_out)
-
-#     print(out)
-
-#     return out
 
 # def add(
 #     self,
