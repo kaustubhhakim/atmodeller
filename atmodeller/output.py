@@ -51,6 +51,7 @@ from atmodeller.engine import (
     get_log_activity,
     get_pressure_from_log_number_density,
     get_species_density_in_melt,
+    get_species_ppmw_in_melt,
 )
 from atmodeller.utilities import unit_conversion
 
@@ -401,6 +402,11 @@ class Output:
         return element_density
 
     def element_molar_mass_expanded(self) -> Array:
+        """Gets molar mass of elements
+
+        Returns:
+            Molar mass of elements
+        """
         unique_elements: tuple[str, ...] = (
             self._interior_atmosphere.get_unique_elements_in_species()
         )
@@ -505,6 +511,7 @@ class Output:
         out["pressure"] = pressure_gas
         out["fugacity"] = activity_gas
         out["fugacity_coefficient"] = activity_gas / pressure_gas
+        out["ppmw"] = self.species_ppmw_in_melt()
 
         split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
         species_out: dict[str, dict[str, Array]] = {
@@ -657,11 +664,29 @@ class Output:
             self.traced_parameters,
             self.fixed_parameters,
             self.log_number_density,
-            self.pressure(),
+            self.log_activity(),
             self.atmosphere_log_volume(),
         )
 
         return species_density_in_melt
+
+    def species_ppmw_in_melt(self) -> Array:
+        """Gets species ppmw in the melt
+
+        Return:
+            Species ppmw in the melt
+        """
+        species_ppmw_in_melt_func: Callable = jax.vmap(
+            get_species_ppmw_in_melt, in_axes=(self.traced_parameters_vmap, None, 0, 0)
+        )
+        species_ppmw_in_melt: Array = species_ppmw_in_melt_func(
+            self.traced_parameters,
+            self.fixed_parameters,
+            self.log_number_density,
+            self.log_activity(),
+        )
+
+        return species_ppmw_in_melt
 
     def stability(self) -> Array:
         """Gets stability of all species

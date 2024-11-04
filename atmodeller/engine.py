@@ -544,9 +544,45 @@ def get_species_density_in_melt(
     Returns:
         Number density of species dissolved in melt
     """
+    molar_masses: Array = jnp.array(fixed_parameters.molar_masses)
+    planet: Planet = traced_parameters.planet
+
+    ppmw: Array = get_species_ppmw_in_melt(
+        traced_parameters, fixed_parameters, log_number_density, log_activity
+    )
+
+    species_melt_density: Array = (
+        ppmw
+        * unit_conversion.ppm_to_fraction
+        * AVOGADRO
+        * planet.mantle_melt_mass
+        / (molar_masses * safe_exp(log_volume))
+    )
+    # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
+
+    return species_melt_density
+
+
+@jit
+def get_species_ppmw_in_melt(
+    traced_parameters: TracedParameters,
+    fixed_parameters: FixedParameters,
+    log_number_density: Array,
+    log_activity: Array,
+) -> Array:
+    """Gets the ppmw of species dissolved in melt due to species solubility
+
+    Args:
+        traced_parameters: Traced parameters
+        fixed_parameters: Fixed parameters
+        log_number_density: Log number density
+        log_activity: Log activity
+
+    Returns:
+        ppmw of species dissolved in melt
+    """
     species: tuple[Species, ...] = fixed_parameters.species
     diatomic_oxygen_index: Array = jnp.array(fixed_parameters.diatomic_oxygen_index)
-    molar_masses: Array = jnp.array(fixed_parameters.molar_masses)
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.surface_temperature
 
@@ -572,19 +608,10 @@ def get_species_density_in_melt(
 
     vmap_apply_function: Callable = jax.vmap(apply_solubility_function, in_axes=(0, 0))
     indices: ArrayLike = jnp.arange(len(species))
-    ppmw: Array = vmap_apply_function(indices, fugacity)
+    species_ppmw: Array = vmap_apply_function(indices, fugacity)
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
-    species_melt_density: Array = (
-        ppmw
-        * unit_conversion.ppm_to_fraction
-        * AVOGADRO
-        * planet.mantle_melt_mass
-        / (molar_masses * safe_exp(log_volume))
-    )
-    # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
-
-    return species_melt_density
+    return species_ppmw
 
 
 @jit
@@ -593,7 +620,7 @@ def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
 
     Args:
         log_values: Array of log values to sum
-        prefactors: Array of prefactors corresponding to each log value
+        prefactors: Array of prefactors corresponding to each log value. Defaults to 1.
 
     Returns:
         The log of the sum of prefactors multiplied by exponentials of the input values
