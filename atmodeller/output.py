@@ -295,6 +295,55 @@ class Output:
 
         return species_out
 
+    def elements_asdict(self) -> dict[str, dict[str, Array]]:
+        """Gets the element properties as a dictionary
+
+        Returns:
+            Element outputs as a dictionary
+        """
+        molar_mass: Array = self.element_molar_mass_expanded()
+        atmosphere: Array = self.element_density_gas()
+        condensed: Array = self.element_density_condensed()
+        dissolved: Array = self.element_density_dissolved()
+        total: Array = atmosphere + condensed + dissolved
+
+        out: dict[str, Array] = self._get_number_density_output(
+            atmosphere, molar_mass, "atmosphere_"
+        )
+        out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
+        out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
+        out |= self._get_number_density_output(total, molar_mass, "total_")
+
+        out["molar_mass"] = molar_mass
+        out["degree_of_condensation"] = out["condensed_molecules"] / out["total_molecules"]
+        out["volume_mixing_ratio"] = out["atmosphere_molecules"] / jnp.sum(
+            out["atmosphere_molecules"]
+        )
+
+        unique_elements: tuple[str, ...] = (
+            self._interior_atmosphere.get_unique_elements_in_species()
+        )
+        if "H" in unique_elements:
+            index: int = unique_elements.index("H")
+            # pylint: disable=invalid-name
+            H_total_moles: Array = out["total_moles"][:, index]
+            # pylint: enable=invalid-name
+            out["logarithmic_abundance"] = (
+                jnp.log10(out["total_moles"] / H_total_moles[:, jnp.newaxis]) + 12
+            )
+
+        logger.debug("out = %s", out)
+
+        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
+        logger.debug("split_dict = %s", split_dict)
+
+        elements_out: dict[str, dict[str, Array]] = {
+            f"element_{element}": split_dict[ii] for ii, element in enumerate(unique_elements)
+        }
+        logger.debug("elements_out = %s", elements_out)
+
+        return elements_out
+
     def element_density_condensed(self) -> Array:
         """Gets the number density of elements in the condensed phase
 
@@ -350,6 +399,15 @@ class Output:
         )
 
         return element_density
+
+    def element_molar_mass_expanded(self) -> Array:
+        unique_elements: tuple[str, ...] = (
+            self._interior_atmosphere.get_unique_elements_in_species()
+        )
+        molar_mass: Array = jnp.array([Formula(element).mass for element in unique_elements])
+        molar_mass = unit_conversion.g_to_kg * molar_mass
+
+        return jnp.tile(molar_mass, (self.number_solutions, 1))
 
     def _get_modified_formula_matrix(self, indices: Array) -> Array:
         """Gets a modified formula matrix with columns not in indices set to zero.
@@ -415,64 +473,6 @@ class Output:
 
         return out
 
-    def elements_asdict(self) -> dict[str, dict[str, Array]]:
-        """Gets the element properties as a dictionary
-
-        Returns:
-            Element outputs as a dictionary
-        """
-        molar_mass: Array = self.element_molar_mass_expanded()
-        atmosphere: Array = self.element_density_gas()
-        condensed: Array = self.element_density_condensed()
-        dissolved: Array = self.element_density_dissolved()
-        total: Array = atmosphere + condensed + dissolved
-
-        out: dict[str, Array] = self._get_number_density_output(
-            atmosphere, molar_mass, "atmosphere_"
-        )
-        out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
-        out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
-        out |= self._get_number_density_output(total, molar_mass, "total_")
-
-        out["molar_mass"] = molar_mass
-        out["degree_of_condensation"] = out["condensed_molecules"] / out["total_molecules"]
-        out["volume_mixing_ratio"] = out["atmosphere_molecules"] / jnp.sum(
-            out["atmosphere_molecules"]
-        )
-
-        unique_elements: tuple[str, ...] = (
-            self._interior_atmosphere.get_unique_elements_in_species()
-        )
-        if "H" in unique_elements:
-            index: int = unique_elements.index("H")
-            # pylint: disable=invalid-name
-            H_total_moles: Array = out["total_moles"][:, index]
-            # pylint: enable=invalid-name
-            out["logarithmic_abundance"] = (
-                jnp.log10(out["total_moles"] / H_total_moles[:, jnp.newaxis]) + 12
-            )
-
-        logger.debug("out = %s", out)
-
-        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        logger.debug("split_dict = %s", split_dict)
-
-        elements_out: dict[str, dict[str, Array]] = {
-            f"element_{element}": split_dict[ii] for ii, element in enumerate(unique_elements)
-        }
-        logger.debug("elements_out = %s", elements_out)
-
-        return elements_out
-
-    def element_molar_mass_expanded(self) -> Array:
-        unique_elements: tuple[str, ...] = (
-            self._interior_atmosphere.get_unique_elements_in_species()
-        )
-        molar_mass: Array = jnp.array([Formula(element).mass for element in unique_elements])
-        molar_mass = unit_conversion.g_to_kg * molar_mass
-
-        return jnp.tile(molar_mass, (self.number_solutions, 1))
-
     def gas_species_asdict(self) -> dict[str, dict[str, Array]]:
         """Gets the gas species output as a dictionary
 
@@ -513,6 +513,20 @@ class Output:
 
         return species_out
 
+    def log_activity(self) -> Array:
+        """Gets log activity of all species.
+
+        This is usually what the user wants when referring to activity because it includes a
+        consideration of species stability
+
+        Returns:
+            Log activity of all species
+        """
+        log_activity_without_stability: Array = self.log_activity_without_stability()
+        log_activity: Array = log_activity_without_stability - jnp.exp(self.log_stability)
+
+        return log_activity
+
     def log_activity_without_stability(self) -> Array:
         """Gets log activity without stability of all species
 
@@ -529,19 +543,13 @@ class Output:
 
         return log_activity
 
-    def log_activity(self) -> Array:
-        """Gets log activity of all species.
-
-        This is usually what the user wants when referring to activity because it includes a
-        consideration of species stability
+    def number_density(self) -> Array:
+        r"""Gets number density of all species
 
         Returns:
-            Log activity of all species
+            Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
-        log_activity_without_stability: Array = self.log_activity_without_stability()
-        log_activity: Array = log_activity_without_stability - jnp.exp(self.log_stability)
-
-        return log_activity
+        return jnp.exp(self.log_number_density)
 
     def species_molar_mass_expanded(self) -> Array:
         r"""Gets molar mass of all species in an expanded array.
@@ -550,14 +558,6 @@ class Output:
             Molar mass of all species in an expanded array.
         """
         return jnp.tile(self.molar_mass, (self.number_solutions, 1))
-
-    def number_density(self) -> Array:
-        r"""Gets number density of all species
-
-        Returns:
-            Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
-        """
-        return jnp.exp(self.log_number_density)
 
     # TODO: Probably not really needed once output options available
     # def output_to_logger(self) -> None:
