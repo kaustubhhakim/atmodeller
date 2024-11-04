@@ -89,12 +89,6 @@ class Output:
         self._log_number_density: Array = log_number_density
         self._log_stability: Array = log_stability
 
-    # TODO: Remove. I think not required because we zero the formula matrix instead
-    # @property
-    # def condensed_molar_mass(self) -> Array:
-    #     """Molar mass of the condensed species as a 1-D array"""
-    #     return jnp.take(self.molar_mass, self.condensed_species_indices)
-
     @property
     def condensed_species_indices(self) -> Array:
         """Condensed species indices"""
@@ -105,12 +99,6 @@ class Output:
         """Fixed parameters"""
         return self._interior_atmosphere.fixed_parameters
 
-    # TODO: Remove. I think not required because we zero the formula matrix instead
-    # @property
-    # def gas_molar_mass(self) -> Array:
-    #     """Molar mass of the gas species as a 1-D array"""
-    #     return jnp.take(self.molar_mass, self.gas_species_indices)
-
     @property
     def gas_species_indices(self) -> Array:
         """Gas species indices"""
@@ -120,18 +108,6 @@ class Output:
     def log_number_density(self) -> Array:
         """Log number density"""
         return self._log_number_density
-
-    # TODO: Remove. I think not required because we zero the formula matrix instead
-    # @property
-    # def log_number_density_condensed_species(self) -> Array:
-    #     """Log number density of condensed species"""
-    #     return jnp.take(self.log_number_density, self.condensed_species_indices, axis=1)
-
-    # TODO: Remove. I think not required because we zero the formula matrix instead
-    # @property
-    # def log_number_density_gas_species(self) -> Array:
-    #     """Log number density of gas species"""
-    #     return jnp.take(self.log_number_density, self.gas_species_indices, axis=1)
 
     @property
     def log_stability(self) -> Array:
@@ -299,6 +275,9 @@ class Output:
         number_density_condensed: Array = jnp.take(
             self.number_density(), self.condensed_species_indices, axis=1
         )
+        activity_condensed: Array = jnp.take(
+            self.activity(), self.condensed_species_indices, axis=1
+        )
         molar_mass_condensed: Array = jnp.take(molar_mass, self.condensed_species_indices, axis=1)
         condensed_species: tuple[Species, ...] = tuple(
             self.species[ii] for ii in self.condensed_species_indices
@@ -307,6 +286,7 @@ class Output:
             number_density_condensed, molar_mass_condensed, "total_"
         )
         out["molar_mass"] = molar_mass
+        out["activity"] = activity_condensed
 
         split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
         species_out: dict[str, dict[str, Array]] = {
@@ -493,6 +473,46 @@ class Output:
 
         return jnp.tile(molar_mass, (self.number_solutions, 1))
 
+    def gas_species_asdict(self) -> dict[str, dict[str, Array]]:
+        """Gets the gas species output as a dictionary
+
+        Returns:
+            Gas species output as a dictionary
+        """
+        molar_mass: Array = self.species_molar_mass_expanded()
+        number_density_gas: Array = jnp.take(
+            self.number_density(), self.gas_species_indices, axis=1
+        )
+        dissolved_gas: Array = jnp.take(
+            self.species_density_in_melt(), self.gas_species_indices, axis=1
+        )
+        total_gas: Array = number_density_gas + dissolved_gas
+        activity_gas: Array = jnp.take(self.activity(), self.gas_species_indices, axis=1)
+        pressure_gas: Array = jnp.take(self.pressure(), self.gas_species_indices, axis=1)
+        molar_mass_gas: Array = jnp.take(molar_mass, self.gas_species_indices, axis=1)
+        gas_species: tuple[Species, ...] = tuple(
+            self.species[ii] for ii in self.gas_species_indices
+        )
+
+        out: dict[str, Array] = {}
+        out |= self._get_number_density_output(number_density_gas, molar_mass_gas, "atmosphere_")
+        out |= self._get_number_density_output(dissolved_gas, molar_mass_gas, "dissolved_")
+        out |= self._get_number_density_output(total_gas, molar_mass_gas, "total_")
+        out["molar_mass"] = molar_mass
+        out["volume_mixing_ratio"] = out["atmosphere_molecules"] / jnp.sum(
+            out["atmosphere_molecules"]
+        )
+        out["pressure"] = pressure_gas
+        out["fugacity"] = activity_gas
+        out["fugacity_coefficient"] = activity_gas / pressure_gas
+
+        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
+        species_out: dict[str, dict[str, Array]] = {
+            species.name: split_dict[ii] for ii, species in enumerate(gas_species)
+        }
+
+        return species_out
+
     def log_activity_without_stability(self) -> Array:
         """Gets log activity without stability of all species
 
@@ -622,38 +642,6 @@ class Output:
             raw_solution[f"{species_name}_stability"] = self._log_stability[:, ii]
 
         return raw_solution
-
-    def gas_species_asdict(self) -> dict[str, dict[str, Array]]:
-        """Gets the gas species output as a dictionary
-
-        Returns:
-            Gas species output as a dictionary
-        """
-        molar_mass: Array = self.species_molar_mass_expanded()
-        number_density_gas: Array = jnp.take(
-            self.number_density(), self.gas_species_indices, axis=1
-        )
-        dissolved_gas: Array = jnp.take(
-            self.species_density_in_melt(), self.gas_species_indices, axis=1
-        )
-        total_gas: Array = number_density_gas + dissolved_gas
-        molar_mass_gas: Array = jnp.take(molar_mass, self.gas_species_indices, axis=1)
-        gas_species: tuple[Species, ...] = tuple(
-            self.species[ii] for ii in self.gas_species_indices
-        )
-
-        out: dict[str, Array] = {}
-        out |= self._get_number_density_output(number_density_gas, molar_mass_gas, "atmosphere_")
-        out |= self._get_number_density_output(dissolved_gas, molar_mass_gas, "dissolved_")
-        out |= self._get_number_density_output(total_gas, molar_mass_gas, "total_")
-        out["molar_mass"] = molar_mass
-
-        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        species_out: dict[str, dict[str, Array]] = {
-            species.name: split_dict[ii] for ii, species in enumerate(gas_species)
-        }
-
-        return species_out
 
     def species_density_in_melt(self) -> Array:
         """Gets species number density in the melt
