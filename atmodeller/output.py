@@ -201,10 +201,11 @@ class Output:
             Dictionary of all output
         """
         out: dict[str, dict[str, Array]] = {}
+        out |= self.species_asdict()
+        out |= self.elements_asdict()
         out["atmosphere"] = self.atmosphere_asdict()
         out["planet"] = self.planet.expanded_asdict()
         out["raw_solution"] = self.raw_solution_asdict()
-        out |= self.elements_asdict()
 
         logger.debug("asdict = %s", out)
 
@@ -380,30 +381,30 @@ class Output:
         """
         return self._get_modified_formula_matrix(self.gas_species_indices)
 
-    def get_element_density_output(
-        self, element_density: Array, prefix: str = ""
+    def _get_number_density_output(
+        self, number_density: Array, molar_mass_expanded: Array, prefix: str = ""
     ) -> dict[str, Array]:
-        """Gets the outputs associated with an element density
+        """Gets the outputs associated with a number density
 
         Args:
-            element_density: Element density
+            number_density: Number density
+            molar_mass_expanded: Molar mass associated with the number density
             prefix: Key prefix for the output. Defaults to an empty string.
 
         Returns
             Dictionary of output quantities
         """
         atmosphere_volume: Array = self.atmosphere_volume()
-        element_molar_mass_expanded: Array = self.element_molar_mass_expanded()
         # Volume must be a column vector because it multiples all elements in the row
-        molecules: Array = element_density * atmosphere_volume[:, jnp.newaxis]
+        molecules: Array = number_density * atmosphere_volume[:, jnp.newaxis]
         moles: Array = molecules / AVOGADRO
-        mass: Array = moles * element_molar_mass_expanded
+        mass: Array = moles * molar_mass_expanded
 
         out: dict[str, Array] = {}
-        out[f"{prefix}_number_density"] = element_density
-        out[f"{prefix}_molecules"] = molecules
-        out[f"{prefix}_moles"] = moles
-        out[f"{prefix}_mass"] = mass
+        out[f"{prefix}number_density"] = number_density
+        out[f"{prefix}molecules"] = molecules
+        out[f"{prefix}moles"] = moles
+        out[f"{prefix}mass"] = mass
 
         return out
 
@@ -413,17 +414,20 @@ class Output:
         Returns:
             Element outputs as a dictionary
         """
+        molar_mass: Array = self.element_molar_mass_expanded()
         atmosphere: Array = self.element_density_gas()
         condensed: Array = self.element_density_condensed()
         dissolved: Array = self.element_density_dissolved()
         total: Array = atmosphere + condensed + dissolved
 
-        out: dict[str, Array] = self.get_element_density_output(atmosphere, "atmosphere")
-        out |= self.get_element_density_output(condensed, "condensed")
-        out |= self.get_element_density_output(dissolved, "dissolved")
-        out |= self.get_element_density_output(total, "total")
+        out: dict[str, Array] = self._get_number_density_output(
+            atmosphere, molar_mass, "atmosphere_"
+        )
+        out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
+        out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
+        out |= self._get_number_density_output(total, molar_mass, "total_")
 
-        out["molar_mass"] = self.element_molar_mass_expanded()
+        out["molar_mass"] = molar_mass
         out["degree_of_condensation"] = out["condensed_molecules"] / out["total_molecules"]
         out["volume_mixing_ratio"] = out["atmosphere_molecules"] / jnp.sum(
             out["atmosphere_molecules"]
@@ -447,15 +451,9 @@ class Output:
         logger.debug("split_dict = %s", split_dict)
 
         elements_out: dict[str, dict[str, Array]] = {
-            f"element_{element}": split_dict[nn] for nn, element in enumerate(unique_elements)
+            f"element_{element}": split_dict[ii] for ii, element in enumerate(unique_elements)
         }
         logger.debug("elements_out = %s", elements_out)
-
-        # split_dict: dict[str, dict[str, Array]] = {
-        #     element: split_dict_by_columns(out)[nn] for element, nn in enumerate(unique_elements)
-        # }
-
-        #     out[element] = collapse_single_entry_values(element_dict)
 
         return elements_out
 
@@ -498,7 +496,7 @@ class Output:
 
         return log_activity
 
-    def molar_mass_expanded(self) -> Array:
+    def species_molar_mass_expanded(self) -> Array:
         r"""Gets molar mass of all species in an expanded array.
 
         Returns:
@@ -597,6 +595,36 @@ class Output:
             raw_solution[f"{species_name}_stability"] = self._log_stability[:, ii]
 
         return raw_solution
+
+    def species_asdict(self) -> dict[str, dict[str, Array]]:
+        """Gets the species properties as a dictionary
+
+        Returns:
+            Species outputs as a dictionary
+        """
+        molar_mass: Array = self.species_molar_mass_expanded()
+
+        number_density: Array = self.number_density()
+        dissolved: Array = self.species_density_in_melt()
+        total: Array = number_density + dissolved
+
+        out: dict[str, Array] = self._get_number_density_output(number_density, molar_mass)
+        out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
+        out |= self._get_number_density_output(total, molar_mass, "total_")
+
+        out["molar_mass"] = molar_mass
+
+        logger.debug("out = %s", out)
+
+        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
+        logger.debug("split_dict = %s", split_dict)
+
+        species_out: dict[str, dict[str, Array]] = {
+            species.name: split_dict[ii] for ii, species in enumerate(self.species)
+        }
+        logger.debug("species_out = %s", species_out)
+
+        return species_out
 
     def species_density_in_melt(self) -> Array:
         """Gets species number density in the melt
