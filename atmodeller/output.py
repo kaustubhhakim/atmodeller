@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import pickle
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -52,6 +53,7 @@ from atmodeller.engine import (
     get_pressure_from_log_number_density,
     get_species_density_in_melt,
     get_species_ppmw_in_melt,
+    objective_function,
 )
 from atmodeller.utilities import unit_conversion
 
@@ -184,6 +186,7 @@ class Output:
         out["atmosphere"] = self.atmosphere_asdict()
         out["planet"] = self.planet.expanded_asdict()
         out["raw_solution"] = self.raw_solution_asdict()
+        out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
 
         logger.debug("asdict = %s", out)
 
@@ -640,7 +643,11 @@ class Output:
         return collapse_single_entry_values(out)
 
     def raw_solution_asdict(self) -> dict[str, Array]:
-        """Gets the raw solution"""
+        """Gets the raw solution
+
+        Returns:
+            Dictionary of the raw solution
+        """
         raw_solution: dict[str, Array] = {}
 
         for ii, species_ in enumerate(self.species):
@@ -649,6 +656,33 @@ class Output:
             raw_solution[f"{species_name}_stability"] = self._log_stability[:, ii]
 
         return raw_solution
+
+    def residual_asdict(self) -> dict[int, Array]:
+        """Gets the residual
+
+        Returns:
+            Dictionary of the residual
+        """
+        residual_func: Callable = jax.vmap(
+            objective_function,
+            in_axes=(
+                0,
+                {"traced_parameters": self.traced_parameters_vmap, "fixed_parameters": None},
+            ),
+        )
+        residual: Array = residual_func(
+            self._solution,
+            {
+                "traced_parameters": self._traced_parameters,
+                "fixed_parameters": self.fixed_parameters,
+            },
+        )
+
+        out: dict[int, Array] = {}
+        for ii in range(residual.shape[1]):
+            out[ii] = residual[:, ii]
+
+        return out
 
     def species_density_in_melt(self) -> Array:
         """Gets species number density in the melt
