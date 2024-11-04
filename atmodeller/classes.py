@@ -457,14 +457,6 @@ class InteriorAtmosphere:
 
         output: Output = Output(solution, self, initial_solution_, traced_parameters_)
 
-        # TODO: Remove. Now unified class.
-        # if self.is_batch:
-        #    output: Output = OutputBatch(solution, self, initial_solution_, traced_parameters_)
-        # else:
-        #    output = OutputSingle(solution, self, initial_solution_, traced_parameters_)
-
-        # output.output_to_logger()
-
         # TODO: Implement output options
         output.asdict()
         output.to_dataframes()

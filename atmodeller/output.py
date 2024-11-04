@@ -201,7 +201,8 @@ class Output:
             Dictionary of all output
         """
         out: dict[str, dict[str, Array]] = {}
-        out |= self.species_asdict()
+        out |= self.condensed_species_asdict()
+        out |= self.gas_species_asdict()
         out |= self.elements_asdict()
         out["atmosphere"] = self.atmosphere_asdict()
         out["planet"] = self.planet.expanded_asdict()
@@ -287,6 +288,32 @@ class Output:
         )
 
         return atmosphere_pressure
+
+    def condensed_species_asdict(self) -> dict[str, dict[str, Array]]:
+        """Gets the condensed species output as a dictionary
+
+        Returns:
+            Condensed species output as a dictionary
+        """
+        molar_mass: Array = self.species_molar_mass_expanded()
+        number_density_condensed: Array = jnp.take(
+            self.number_density(), self.condensed_species_indices, axis=1
+        )
+        molar_mass_condensed: Array = jnp.take(molar_mass, self.condensed_species_indices, axis=1)
+        condensed_species: tuple[Species, ...] = tuple(
+            self.species[ii] for ii in self.condensed_species_indices
+        )
+        out: dict[str, Array] = self._get_number_density_output(
+            number_density_condensed, molar_mass_condensed, "total_"
+        )
+        out["molar_mass"] = molar_mass
+
+        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
+        species_out: dict[str, dict[str, Array]] = {
+            species.name: split_dict[ii] for ii, species in enumerate(condensed_species)
+        }
+
+        return species_out
 
     def element_density_condensed(self) -> Array:
         """Gets the number density of elements in the condensed phase
@@ -596,33 +623,35 @@ class Output:
 
         return raw_solution
 
-    def species_asdict(self) -> dict[str, dict[str, Array]]:
-        """Gets the species properties as a dictionary
+    def gas_species_asdict(self) -> dict[str, dict[str, Array]]:
+        """Gets the gas species output as a dictionary
 
         Returns:
-            Species outputs as a dictionary
+            Gas species output as a dictionary
         """
         molar_mass: Array = self.species_molar_mass_expanded()
+        number_density_gas: Array = jnp.take(
+            self.number_density(), self.gas_species_indices, axis=1
+        )
+        dissolved_gas: Array = jnp.take(
+            self.species_density_in_melt(), self.gas_species_indices, axis=1
+        )
+        total_gas: Array = number_density_gas + dissolved_gas
+        molar_mass_gas: Array = jnp.take(molar_mass, self.gas_species_indices, axis=1)
+        gas_species: tuple[Species, ...] = tuple(
+            self.species[ii] for ii in self.gas_species_indices
+        )
 
-        number_density: Array = self.number_density()
-        dissolved: Array = self.species_density_in_melt()
-        total: Array = number_density + dissolved
-
-        out: dict[str, Array] = self._get_number_density_output(number_density, molar_mass)
-        out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
-        out |= self._get_number_density_output(total, molar_mass, "total_")
-
+        out: dict[str, Array] = {}
+        out |= self._get_number_density_output(number_density_gas, molar_mass_gas, "atmosphere_")
+        out |= self._get_number_density_output(dissolved_gas, molar_mass_gas, "dissolved_")
+        out |= self._get_number_density_output(total_gas, molar_mass_gas, "total_")
         out["molar_mass"] = molar_mass
 
-        logger.debug("out = %s", out)
-
         split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        logger.debug("split_dict = %s", split_dict)
-
         species_out: dict[str, dict[str, Array]] = {
-            species.name: split_dict[ii] for ii, species in enumerate(self.species)
+            species.name: split_dict[ii] for ii, species in enumerate(gas_species)
         }
-        logger.debug("species_out = %s", species_out)
 
         return species_out
 
