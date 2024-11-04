@@ -469,6 +469,7 @@ class InteriorAtmosphere:
         output.asdict()
         output.to_dataframes()
         output.to_excel()
+        output.to_pickle()
 
         quick_look: dict[str, ArrayLike] = output.quick_look()
 

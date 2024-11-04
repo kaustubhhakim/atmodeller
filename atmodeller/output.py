@@ -23,6 +23,7 @@ must be vmapped to compute the output.
 from __future__ import annotations
 
 import logging
+import pickle
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -513,6 +514,35 @@ class Output:
         """
         return jnp.exp(self.log_number_density)
 
+    # TODO: Probably not really needed once output options available
+    # def output_to_logger(self) -> None:
+    #     """Writes output to the logger.
+
+    #     Useful for debugging.
+    #     """
+    #     logger.info("log_number_density = %s", self.log_number_density)
+    #     logger.info("number_density = %s", self.number_density())
+    #     # logger.info("log_stability = %s", self.log_stability)
+    #     # logger.info("stability = %s", self.stability())
+    #     logger.info("pressure = %s", self.pressure())
+    #     # logger.info("log_activity = %s", self.log_activity())
+    #     logger.info("activity = %s", self.activity())
+    #     logger.info("molar_mass = %s", self.molar_mass)
+    #     logger.info("molar_mass_expanded = %s", self.molar_mass_expanded())
+    #     logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
+    #     logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
+    #     logger.info("atmosphere_volume = %s", self.atmosphere_volume())
+    #     logger.info("atmosphere_asdict = %s", self.atmosphere_asdict())
+    #     logger.info("planet_asdict = %s", self.planet_asdict())
+    #     # logger.info("planet_asdataframe = %s", self.planet_asdataframe())
+    #     logger.info("species_density_in_melt = %s", self.species_density_in_melt())
+    #     logger.info("element_density_dissolved = %s", self.element_density_dissolved())
+    #     logger.info("element_asdict = %s", self.elements_asdict())
+    #     # logger.info("jnp.ravel(self.log_number_density) = %s", jnp.ravel(self.log_number_density))
+    #     # logger.info(
+    #     #    "jnp.squeeze(self.log_number_density) = %s", jnp.squeeze(self.log_number_density)
+    #     # )
+
     # TODO: Might need a general function to deal with difference in indexing between single and
     # batch cases
     # def planet_asdataframe(self) -> pd.DataFrame:
@@ -611,7 +641,7 @@ class Output:
         """Writes the output to an Excel file.
 
         Args:
-            file_prefix: Prefix of the output file. Defaults to atmodeller_out.
+            file_prefix: Prefix of the output file. Defaults to new_atmodeller_out.
         """
         out: dict[str, pd.DataFrame] = self.to_dataframes()
         output_file: Path = Path(f"{file_prefix}.xlsx")
@@ -622,33 +652,19 @@ class Output:
 
         logger.info("Output written to %s", output_file)
 
-    def output_to_logger(self) -> None:
-        """Writes output to the logger.
+    def to_pickle(self, file_prefix: Path | str = "new_atmodeller_out") -> None:
+        """Writes the output to a pickle file.
 
-        Useful for debugging.
+        Args:
+            file_prefix: Prefix of the output file. Defaults to new_atmodeller_out.
         """
-        logger.info("log_number_density = %s", self.log_number_density)
-        logger.info("number_density = %s", self.number_density())
-        # logger.info("log_stability = %s", self.log_stability)
-        # logger.info("stability = %s", self.stability())
-        logger.info("pressure = %s", self.pressure())
-        # logger.info("log_activity = %s", self.log_activity())
-        logger.info("activity = %s", self.activity())
-        logger.info("molar_mass = %s", self.molar_mass)
-        logger.info("molar_mass_expanded = %s", self.molar_mass_expanded())
-        logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
-        logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
-        logger.info("atmosphere_volume = %s", self.atmosphere_volume())
-        logger.info("atmosphere_asdict = %s", self.atmosphere_asdict())
-        logger.info("planet_asdict = %s", self.planet_asdict())
-        # logger.info("planet_asdataframe = %s", self.planet_asdataframe())
-        logger.info("species_density_in_melt = %s", self.species_density_in_melt())
-        logger.info("element_density_dissolved = %s", self.element_density_dissolved())
-        logger.info("element_asdict = %s", self.elements_asdict())
-        # logger.info("jnp.ravel(self.log_number_density) = %s", jnp.ravel(self.log_number_density))
-        # logger.info(
-        #    "jnp.squeeze(self.log_number_density) = %s", jnp.squeeze(self.log_number_density)
-        # )
+        output_file: Path = Path(f"{file_prefix}.pkl")
+        dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
+
+        with open(output_file, "wb") as handle:
+            pickle.dump(dataframes, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        logger.info("Output written to %s", output_file)
 
 
 def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, ArrayLike]:
@@ -744,43 +760,6 @@ def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[st
 
 #     return out
 
-# TODO: Old output class continues below. To keep until development of the new class complete.
-
-# @classmethod
-# def read_pickle(cls, pickle_file: Path | str) -> Output:
-#     """Reads output data from a pickle file and creates an Output instance.
-
-#     Args:
-#         pickle_file: Pickle file of the output from a previous (or similar) model run.
-#             Importantly, the reaction network must be the same (same number of species in the
-#             same order) and the constraints must be the same (also in the same order).
-
-#     Returns:
-#         Output
-#     """
-#     with open(pickle_file, "rb") as handle:
-#         output_data: dict[str, list[dict[str, float]]] = pickle.load(handle)
-
-#     logger.info("%s: Reading data from %s", cls.__name__, pickle_file)
-
-#     return cls(output_data)
-
-# @classmethod
-# def from_dataframes(cls, dataframes: dict[str, pd.DataFrame]) -> Output:
-#     """Reads a dictionary of dataframes and creates an Output instance.
-
-#     Args:
-#         dataframes: A dictionary of dataframes.
-
-#     Returns:
-#         Output
-#     """
-#     output_data: dict[str, list[dict[Hashable, float]]] = {}
-#     for key, dataframe in dataframes.items():
-#         output_data[key] = dataframe.to_dict(orient="records")
-
-#     return cls(output_data)
-
 # def add(
 #     self,
 #     solution: Solution,
@@ -822,133 +801,3 @@ def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[st
 #     if extra_output is not None:
 #         data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
 #         data_list.append(extra_output)
-
-# def to_pickle(self, file_prefix: Path | str = "atmodeller_out") -> None:
-#     """Writes the output to a pickle file.
-
-#     Args:
-#         file_prefix: Prefix of the output file. Defaults to atmodeller_out.
-#     """
-#     output_file: Path = Path(f"{file_prefix}.pkl")
-
-#     with open(output_file, "wb") as handle:
-#         pickle.dump(self.data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-#     logger.info("Output written to %s", output_file)
-
-# def _check_keys_the_same(self, other: Output) -> None:
-#     """Checks if the keys are the same in 'other' before combining output.
-
-#     Args:
-#         other: Other output to potentially combine (if keys are the same)
-#     """
-#     if not self.keys() == other.keys():
-#         msg: str = "Keys for 'other' are not the same as 'self' so cannot combine them"
-#         logger.error(msg)
-#         raise KeyError(msg)
-
-# def __add__(self, other: Output) -> Output:
-#     """Addition
-
-#     Args:
-#         other: Other output to combine with self
-
-#     Returns:
-#         Combined output
-#     """
-#     self._check_keys_the_same(other)
-#     output: Output = copy.deepcopy(self)
-#     for key in self.keys():
-#         output[key].extend(other[key])
-
-#     return output
-
-# def __iadd__(self, other: Output) -> Output:
-#     """In-place addition
-
-#     Args:
-#         other: Other output to combine with self in-place
-
-#     Returns:
-#         self
-#     """
-#     self._check_keys_the_same(other)
-#     for key in self:
-#         self[key].extend(other[key])
-
-#     return self
-
-# def filter_by_index_notin(self, other: Output, index_key: str, index_name: str) -> Output:
-#     """Filters out the entries in `self` that are not present in the index of `other`
-
-#     Args:
-#         other: Other output with the filtering index
-#         index_key: Key of the index
-#         index_name: Name of the index
-
-#     Returns:
-#         The filtered output
-#     """
-#     self_dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
-#     other_dataframes: dict[str, pd.DataFrame] = other.to_dataframes()
-#     index: pd.Index = pd.Index(other_dataframes[index_key][index_name])
-
-#     for key, dataframe in self_dataframes.items():
-#         self_dataframes[key] = dataframe[~dataframe.index.isin(index)]
-
-#     return self.from_dataframes(self_dataframes)
-
-# def reorder(self, other: Output, index_key: str, index_name: str) -> Output:
-#     """Reorders all the entries according to an index in `other`
-
-#     Args:
-#         other: Other output with the reordering index
-#         index_key: Key of the index
-#         index_name: Name of the index
-
-#     Returns:
-#         The reordered output
-#     """
-#     self_dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
-#     other_dataframes: dict[str, pd.DataFrame] = other.to_dataframes()
-#     index: pd.Index = pd.Index(other_dataframes[index_key][index_name])
-
-#     for key, dataframe in self_dataframes.items():
-#         self_dataframes[key] = dataframe.reindex(index)
-
-#     return self.from_dataframes(self_dataframes)
-
-# def __call__(
-#     self,
-#     file_prefix: Path | str = "atmodeller_out",
-#     to_dataframes: bool = True,
-#     to_pickle: bool = False,
-#     to_excel: bool = False,
-# ) -> dict | None:
-#     """Gets the output as a dict and/or optionally write it to a pickle or Excel file.
-
-#     Args:
-#         file_prefix: Prefix of the output file if writing to a pickle or Excel. Defaults to
-#             atmodeller_out
-#         to_dataframes: Returns the output data in a dictionary of dataframes. Defaults to
-#             True.
-#         to_pickle: Writes a pickle file. Defaults to False.
-#         to_excel: Writes an Excel file. Defaults to False.
-
-#     Returns:
-#         A dictionary of the output or None if no data
-#     """
-#     if self.size == 0:
-#         logger.warning("There is no data to export")
-#         return None
-
-#     if to_pickle:
-#         self.to_pickle(file_prefix)
-
-#     if to_excel:
-#         self.to_excel(file_prefix)
-
-#     if to_dataframes:
-#         return self.to_dataframes()
-#     else:
-#         return self.data
