@@ -611,35 +611,6 @@ class Output:
         """
         return jnp.tile(self.molar_mass, (self.number_solutions, 1))
 
-    # TODO: Probably not really needed once output options available
-    # def output_to_logger(self) -> None:
-    #     """Writes output to the logger.
-
-    #     Useful for debugging.
-    #     """
-    #     logger.info("log_number_density = %s", self.log_number_density)
-    #     logger.info("number_density = %s", self.number_density())
-    #     # logger.info("log_stability = %s", self.log_stability)
-    #     # logger.info("stability = %s", self.stability())
-    #     logger.info("pressure = %s", self.pressure())
-    #     # logger.info("log_activity = %s", self.log_activity())
-    #     logger.info("activity = %s", self.activity())
-    #     logger.info("molar_mass = %s", self.molar_mass)
-    #     logger.info("molar_mass_expanded = %s", self.molar_mass_expanded())
-    #     logger.info("atmosphere_molar_mass = %s", self.atmosphere_molar_mass())
-    #     logger.info("atmosphere_pressure = %s", self.atmosphere_pressure())
-    #     logger.info("atmosphere_volume = %s", self.atmosphere_volume())
-    #     logger.info("atmosphere_asdict = %s", self.atmosphere_asdict())
-    #     logger.info("planet_asdict = %s", self.planet_asdict())
-    #     # logger.info("planet_asdataframe = %s", self.planet_asdataframe())
-    #     logger.info("species_density_in_melt = %s", self.species_density_in_melt())
-    #     logger.info("element_density_dissolved = %s", self.element_density_dissolved())
-    #     logger.info("element_asdict = %s", self.elements_asdict())
-    #     # logger.info("jnp.ravel(self.log_number_density) = %s", jnp.ravel(self.log_number_density))
-    #     # logger.info(
-    #     #    "jnp.squeeze(self.log_number_density) = %s", jnp.squeeze(self.log_number_density)
-    #     # )
-
     def pressure(self) -> Array:
         """Gets pressure of species in bar
 
