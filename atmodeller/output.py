@@ -185,13 +185,15 @@ class Output:
         out |= self.gas_species_asdict()
         out |= self.elements_asdict()
 
-        out["planet"] = expand_dict(self.planet.asdict())
+        out["planet"] = expand_dict(self.planet.asdict(), self.number_solutions)
         out["atmosphere"] = self.atmosphere_asdict()
-        # Temperature has already been expanded for the planet output, so re-use here
+        # Temperature has already been expanded for the planet output so easiest to re-use here
         out["atmosphere"]["temperature"] = out["planet"]["surface_temperature"]
         out["raw_solution"] = self.raw_solution_asdict()
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
-        out["constraints"] = expand_dict(self.traced_parameters.mass_constraints.asdict())
+        out["constraints"] = expand_dict(
+            self.traced_parameters.mass_constraints.asdict(), self.number_solutions
+        )
         logger.debug("asdict = %s", out)
 
         return out
@@ -810,11 +812,15 @@ def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, 
     return out
 
 
-def expand_dict(some_dict: dict[str, Array]) -> dict[str, Array]:
-    """Gets a dictionary of the values, with scalars expanded to match array sizes
+def expand_dict(some_dict: dict[str, Array], expand_to_size: int) -> dict[str, Array]:
+    """Gets a dictionary of the values with scalars expanded
+
+    Args:
+        some_dict: Some dictionary
+        expand_to_size: Size to expand the arrays to
 
     Returns:
-        A dictionary of the values expanded to the maximum array size
+        A dictionary with values expanded to `expand_to_size`
     """
 
     def expand_to_match_size(x: ArrayLike, size: int) -> ArrayLike:
@@ -829,20 +835,11 @@ def expand_dict(some_dict: dict[str, Array]) -> dict[str, Array]:
         """
         if jnp.isscalar(x):
             return jnp.broadcast_to(x, size)
+
         return x
 
-    def max_array_size() -> int:
-        """Determines the maximum array size"""
-        max_size: int = 1
-        for value in some_dict.values():
-            if not jnp.isscalar(value):
-                max_size = max(max_size, value.size)  # type: ignore
-
-        return max_size
-
-    max_size: int = max_array_size()
     expanded_dict: dict[str, Array] = tree_map(
-        lambda x: expand_to_match_size(x, max_size), some_dict
+        lambda x: jnp.asarray(expand_to_match_size(x, expand_to_size)), some_dict
     )
 
     return expanded_dict
