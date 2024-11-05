@@ -201,24 +201,25 @@ class FugacityConstraints(NamedTuple):
 
         return cls(init_dict)
 
-    # def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
-    #     """Gets a dictionary of the values
+    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
+        """Gets a dictionary of the evaluated fugacity
 
-    #     Returns:
-    #         A dictionary of the values
-    #     """
-    #     log_fugacity_func: Callable = jax.vmap(self.log_fugacity, in_axes=(0, 0))
+        Args:
+            temperature: Temperature
+            pressure: Pressure
 
-    #     log_fugacity: Array = log_fugacity_func(temperature, pressure)
+        Returns:
+            A dictionary of the evaluated fugacity
+        """
+        log_fugacity_func: Callable = jax.vmap(self.log_fugacity, in_axes=(0, 0))
+        log_fugacity: Array = log_fugacity_func(temperature, pressure)
 
-    #     # (temperature, pressure)
+        out: dict[str, Array] = {
+            f"{key}_fugacity": jnp.exp(log_fugacity[:, ii])
+            for ii, key in enumerate(self.constraints)
+        }
 
-    #     out: dict[str, Array] = {
-    #         f"{key}_fugacity": jnp.exp(jnp.asarray(value))
-    #         for key, value in zip(self.constraints, log_fugacity)
-    #     }
-
-    #     return out
+        return out
 
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:

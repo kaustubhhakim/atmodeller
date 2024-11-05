@@ -102,9 +102,9 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
 
     # For the objective function we only need the formula matrix for elements with mass constraints
-    formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
+    formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
 
     # jax.debug.print("Starting new objective function evaluation")
 

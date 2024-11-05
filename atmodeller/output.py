@@ -180,6 +180,11 @@ class Output:
         Returns:
             Dictionary of all output
         """
+        fugacity_matrix: Array = jnp.array(self.fixed_parameters.fugacity_matrix)
+        formula_matrix_constraints: Array = jnp.array(
+            self.fixed_parameters.formula_matrix_constraints
+        )
+
         out: dict[str, dict[str, Array]] = {}
         out |= self.condensed_species_asdict()
         out |= self.gas_species_asdict()
@@ -190,10 +195,18 @@ class Output:
         # Temperature has already been expanded for the planet output so easiest to re-use here
         out["atmosphere"]["temperature"] = out["planet"]["surface_temperature"]
         out["raw_solution"] = self.raw_solution_asdict()
+
+        out["constraints"] = {}
+        if formula_matrix_constraints.size > 0:
+            out["constraints"] |= expand_dict(
+                self.traced_parameters.mass_constraints.asdict(), self.number_solutions
+            )
+        if fugacity_matrix.size > 0:
+            out["constraints"] |= self.traced_parameters.fugacity_constraints.asdict(
+                out["atmosphere"]["temperature"], out["atmosphere"]["pressure"]
+            )
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
-        out["constraints"] = expand_dict(
-            self.traced_parameters.mass_constraints.asdict(), self.number_solutions
-        )
+
         logger.debug("asdict = %s", out)
 
         return out
@@ -543,7 +556,7 @@ class Output:
         out["pressure"] = pressure_gas
         out["fugacity"] = activity_gas
         out["fugacity_coefficient"] = activity_gas / pressure_gas
-        out["ppmw"] = self.species_ppmw_in_melt()
+        out["dissolved_ppmw"] = self.species_ppmw_in_melt()
 
         split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
         species_out: dict[str, dict[str, Array]] = {
