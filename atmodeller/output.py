@@ -31,6 +31,7 @@ import jax
 import jax.numpy as jnp
 import pandas as pd
 from jax import Array
+from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -184,13 +185,13 @@ class Output:
         out |= self.gas_species_asdict()
         out |= self.elements_asdict()
 
-        out["planet"] = self.planet.expanded_asdict()
+        out["planet"] = expand_dict(self.planet.asdict())
         out["atmosphere"] = self.atmosphere_asdict()
         # Temperature has already been expanded for the planet output, so re-use here
         out["atmosphere"]["temperature"] = out["planet"]["surface_temperature"]
         out["raw_solution"] = self.raw_solution_asdict()
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
-
+        out["constraints"] = expand_dict(self.traced_parameters.mass_constraints.asdict())
         logger.debug("asdict = %s", out)
 
         return out
@@ -223,8 +224,8 @@ class Output:
         out["pressure"] = self.atmosphere_pressure()
         out["volume"] = self.atmosphere_volume()
         out["element_number_density"] = jnp.sum(self.element_density_gas(), axis=1)
-        out["element_count"] = out["element_number_density"] * out["volume"]
-        out["element_moles"] = out["element_count"] / AVOGADRO
+        out["element_number"] = out["element_number_density"] * out["volume"]
+        out["element_moles"] = out["element_number"] / AVOGADRO
 
         return out
 
@@ -349,10 +350,8 @@ class Output:
         out |= self._get_number_density_output(total, molar_mass, "total_")
 
         out["molar_mass"] = molar_mass
-        out["degree_of_condensation"] = out["condensed_molecules"] / out["total_molecules"]
-        out["volume_mixing_ratio"] = out["atmosphere_molecules"] / jnp.sum(
-            out["atmosphere_molecules"]
-        )
+        out["degree_of_condensation"] = out["condensed_number"] / out["total_number"]
+        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(out["atmosphere_number"])
 
         unique_elements: tuple[str, ...] = (
             self._interior_atmosphere.get_unique_elements_in_species()
@@ -500,13 +499,13 @@ class Output:
         """
         atmosphere_volume: Array = self.atmosphere_volume()
         # Volume must be a column vector because it multiples all elements in the row
-        molecules: Array = number_density * atmosphere_volume[:, jnp.newaxis]
-        moles: Array = molecules / AVOGADRO
+        number: Array = number_density * atmosphere_volume[:, jnp.newaxis]
+        moles: Array = number / AVOGADRO
         mass: Array = moles * molar_mass_expanded
 
         out: dict[str, Array] = {}
         out[f"{prefix}number_density"] = number_density
-        out[f"{prefix}molecules"] = molecules
+        out[f"{prefix}number"] = number
         out[f"{prefix}moles"] = moles
         out[f"{prefix}mass"] = mass
 
@@ -538,9 +537,7 @@ class Output:
         out |= self._get_number_density_output(dissolved_gas, molar_mass_gas, "dissolved_")
         out |= self._get_number_density_output(total_gas, molar_mass_gas, "total_")
         out["molar_mass"] = molar_mass
-        out["volume_mixing_ratio"] = out["atmosphere_molecules"] / jnp.sum(
-            out["atmosphere_molecules"]
-        )
+        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(out["atmosphere_number"])
         out["pressure"] = pressure_gas
         out["fugacity"] = activity_gas
         out["fugacity_coefficient"] = activity_gas / pressure_gas
@@ -627,16 +624,6 @@ class Output:
     #     # logger.info(
     #     #    "jnp.squeeze(self.log_number_density) = %s", jnp.squeeze(self.log_number_density)
     #     # )
-
-    # TODO: Might need a general function to deal with difference in indexing between single and
-    # batch cases
-    # def planet_asdataframe(self) -> pd.DataFrame:
-    #     """Gets the planet properties as a dataframe
-
-    #     Returns:
-    #         Planet properties as a dataframe
-    #     """
-    #     return pd.DataFrame(self.planet_asdict())
 
     def pressure(self) -> Array:
         """Gets pressure of species in bar
@@ -821,6 +808,44 @@ def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, 
             out[key] = value
 
     return out
+
+
+def expand_dict(some_dict: dict[str, Array]) -> dict[str, Array]:
+    """Gets a dictionary of the values, with scalars expanded to match array sizes
+
+    Returns:
+        A dictionary of the values expanded to the maximum array size
+    """
+
+    def expand_to_match_size(x: ArrayLike, size: int) -> ArrayLike:
+        """Expands an array
+
+        Args:
+            x: Value to possibly expand
+            size: Size to expand to
+
+        Returns:
+            Expanded value
+        """
+        if jnp.isscalar(x):
+            return jnp.broadcast_to(x, size)
+        return x
+
+    def max_array_size() -> int:
+        """Determines the maximum array size"""
+        max_size: int = 1
+        for value in some_dict.values():
+            if not jnp.isscalar(value):
+                max_size = max(max_size, value.size)  # type: ignore
+
+        return max_size
+
+    max_size: int = max_array_size()
+    expanded_dict: dict[str, Array] = tree_map(
+        lambda x: expand_to_match_size(x, max_size), some_dict
+    )
+
+    return expanded_dict
 
 
 def split_dict_by_columns(dict_to_split: dict[str, Array]) -> list[dict[str, Array]]:

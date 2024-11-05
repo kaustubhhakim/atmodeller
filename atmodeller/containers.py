@@ -33,7 +33,6 @@ import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
 from jax import Array, lax
-from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -161,57 +160,12 @@ class Planet(NamedTuple):
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.surface_gravity
 
-        # Always return JAX arrays
+        # Always return JAX arrays which are required for subsequent output operations
         converted_dict: dict[str, Array] = {
             key: jnp.asarray(value) for key, value in base_dict.items()
         }
 
         return converted_dict
-
-    # TODO: Will probably be a separate function to use elsewhere with other containers, like
-    # mass and fugacity constraints
-    def expanded_asdict(self) -> dict[str, Array]:
-        """Gets a dictionary of the values, with scalars expanded to match array sizes
-
-        This method is probably not JAX-compliant, so should only be called outside of JAX
-        operations. This is OK, because it is only used to generate output once the model has run.
-        Furthermore, it assumes that only 1-D arrays are contained within self because it uses
-        size to determine the broadcast shape.
-
-        Returns:
-            A dictionary of the values expanded to the maximum array size
-        """
-
-        def expand_to_match_size(x: ArrayLike, size: int) -> ArrayLike:
-            """Expands an array
-
-            Args:
-                x: Value to possibly expand
-                size: Size to expand to
-
-            Returns:
-                Expanded value
-            """
-            if jnp.isscalar(x):
-                return jnp.broadcast_to(x, size)
-            return x
-
-        def max_array_size() -> int:
-            """Determines the maximum array size"""
-            max_size: int = 1
-            for field in self._fields:
-                value: ArrayLike = getattr(self, field)
-                if not jnp.isscalar(value):
-                    max_size = max(max_size, value.size)  # type: ignore
-
-            return max_size
-
-        max_size: int = max_array_size()
-        expanded_dict: dict[str, Array] = tree_map(
-            lambda x: expand_to_match_size(x, max_size), self.asdict()
-        )
-
-        return expanded_dict
 
 
 class FugacityConstraints(NamedTuple):
@@ -335,6 +289,33 @@ class MassConstraints(NamedTuple):
 
         return cls(log_number_of_molecules)
 
+    def array(self, log_atmosphere_volume: ArrayLike) -> Array:
+        """Log number density as an array
+
+        Args:
+            log_atmosphere_volume: Log volume of the atmosphere
+
+        Returns:
+            Log number density as an array
+        """
+        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
+        log_number_density: Array = log_molecules - log_atmosphere_volume
+
+        return log_number_density
+
+    def asdict(self) -> dict[str, Array]:
+        """Gets a dictionary of the values
+
+        Returns:
+            A dictionary of the values
+        """
+        out: dict[str, Array] = {
+            f"{key}_molecules": jnp.exp(jnp.asarray(value))
+            for key, value in self.log_molecules.items()
+        }
+
+        return out
+
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
 
@@ -351,20 +332,6 @@ class MassConstraints(NamedTuple):
             log_molecules_vmap[key] = vmap_axis
 
         return MassConstraints(log_molecules_vmap)  # type: ignore - container types for data
-
-    def array(self, log_atmosphere_volume: ArrayLike) -> Array:
-        """Log number density as an array
-
-        Args:
-            log_atmosphere_volume: Log volume of the atmosphere
-
-        Returns:
-            Log number density as an array
-        """
-        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
-        log_number_density: Array = log_molecules - log_atmosphere_volume
-
-        return log_number_density
 
 
 # endregion
