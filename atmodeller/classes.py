@@ -42,8 +42,8 @@ from atmodeller.containers import (
     TracedParameters,
 )
 from atmodeller.engine import solve
+from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
-from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import partial_rref
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ class InteriorAtmosphere:
         planet: Planet,
         initial_log_number_density: npt.NDArray[np.float_],
         initial_log_stability: npt.NDArray[np.float_],
-        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
+        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
     ) -> Callable:
         """Initialises the solve.
@@ -437,7 +437,7 @@ class InteriorAtmosphere:
         self,
         initial_solution: Solution | None = None,
         traced_parameters: TracedParameters | None = None,
-    ) -> dict[str, ArrayLike]:
+    ) -> Output:
         """Solves the system and returns the processed solution
 
         Args:
@@ -447,22 +447,14 @@ class InteriorAtmosphere:
                 parameters used to initialise the solver are used.
 
         Returns:
-            Number density, extended activity
+            Output
         """
         solution, initial_solution_, traced_parameters_ = self.solve_raw_output(
             initial_solution, traced_parameters
         )
-
         output: Output = Output(solution, self, initial_solution_, traced_parameters_)
 
-        # TODO: Implement output options
-        output.asdict()
-        output.to_dataframes()
-        output.to_excel()
-        output.to_pickle()
-
         quick_look: dict[str, ArrayLike] = output.quick_look()
+        logger.info("quick_look = %s", pprint.pformat(quick_look))
 
-        logger.info("output_dict = %s", pprint.pformat(quick_look))
-
-        return quick_look
+        return output

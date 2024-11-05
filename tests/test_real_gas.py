@@ -28,10 +28,10 @@ from jax.typing import ArrayLike
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, SolverParameters, Species
-from atmodeller.eos.classes import IdealGas, IdealGas2
 from atmodeller.eos.core import RealGas
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import SolubilityProtocol
+from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import OptxSolver, earth_oceans_to_hydrogen_mass
@@ -86,7 +86,8 @@ def test_fO2_holley(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
         "H2O_g": 33.04668613839122,
@@ -134,7 +135,8 @@ def test_chabrier_earth(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
         "H2O_g": 7113.08023480496,
@@ -192,7 +194,8 @@ def test_chabrier_earth_dogleg(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
         "H2O_g": 7113.08023480496,
@@ -268,7 +271,8 @@ def test_chabrier_subNeptune(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
         "H2O_g": 429506.99705368624,
@@ -335,7 +339,8 @@ def test_chabrier_subNeptune_batch(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     # Some pertinent output here for testing, no need to specify all the species
     target: dict[str, ArrayLike] = {

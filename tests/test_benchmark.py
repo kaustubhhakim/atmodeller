@@ -27,6 +27,7 @@ from jax.typing import ArrayLike
 from atmodeller import debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
+from atmodeller.output import Output
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
@@ -79,7 +80,8 @@ def test_H_O(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     fastchem_result: dict[str, float] = {
         "H2O_g": 76.45861543,
@@ -133,7 +135,8 @@ def test_CHO_reduced(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "H2_g": 175.5,
@@ -189,7 +192,8 @@ def test_CHO_IW(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "CH4_g": 28.66,
@@ -256,7 +260,8 @@ def test_CHO_oxidised(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.00129,
@@ -312,7 +317,8 @@ def test_CHO_highly_oxidised(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "CH4_g": 7.13e-05,
@@ -365,7 +371,8 @@ def test_CHO_middle_temperature(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "H2_g": 59.066,
@@ -419,7 +426,8 @@ def test_CHO_low_temperature(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "H2_g": 55.475,
@@ -472,7 +480,8 @@ def test_graphite_condensed(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "O2_g": 1.27e-25,
@@ -531,7 +540,8 @@ def test_graphite_unstable(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "O2_g": 4.11e-13,
@@ -583,7 +593,8 @@ def test_water_condensed(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "H2O_g": 3.3596,
@@ -635,7 +646,8 @@ def test_graphite_water_condensed(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
         "CH4_g": 0.3241,

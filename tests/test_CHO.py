@@ -20,6 +20,7 @@
 
 import logging
 
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from jax.typing import ArrayLike
@@ -28,6 +29,7 @@ from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, Species
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
+from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
@@ -57,7 +59,7 @@ from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 # from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -106,7 +108,8 @@ def test_H2O(helper) -> None:
         initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
         "H2O_g": 1.0312913336898137,
@@ -149,7 +152,8 @@ def test_H_fO2(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
         "H2O_g": 0.25708003342259883,
@@ -161,7 +165,7 @@ def test_H_fO2(helper) -> None:
 
 
 def test_H_fO2_fH2(helper) -> None:
-    """Tests H2-H2O at the IW buffer with H2O solubility and a constant fH2."""
+    """Tests H2-H2O at the IW buffer with H2O solubility and mixed fugacity constraints."""
 
     H2O_g: Species = Species.create_gas(
         "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
@@ -174,8 +178,8 @@ def test_H_fO2_fH2(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        O2_g.name: IronWustiteBuffer(0),
-        H2_g.name: ConstantFugacityConstraint(1.0e-8),
+        O2_g.name: IronWustiteBuffer(jnp.array([-1, 0, 1])),
+        H2_g.name: ConstantFugacityConstraint(jnp.array([1.0e-8, 1.0e-7, 1.0e-6])),
     }
 
     # oceans: float = 1
@@ -197,17 +201,16 @@ def test_H_fO2_fH2(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         # mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
-    print(solution)
+    target: dict[str, ArrayLike] = {
+        "H2O_g": np.array([3.262689650880299e-09, 1.031753073747030e-07, 3.262689895293855e-06]),
+        "H2_g": np.array([1.000000000000005e-08, 9.999999999999959e-08, 1.000000000000000e-06]),
+        "O2_g": np.array([8.837300808668651e-09, 8.837301052658971e-08, 8.837302132702910e-07]),
+    }
 
-    # target: dict[str, float] = {
-    #     "H2O_g": 0.25708003342259883,
-    #     "H2_g": 0.2491577248312551,
-    #     "O2_g": 8.83804258138063e-08,
-    # }
-
-    # assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
 def test_H_fO2_batch_temperature(helper) -> None:
@@ -255,7 +258,8 @@ def test_H_fO2_batch_temperature(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array(
@@ -316,7 +320,8 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array(
@@ -378,7 +383,8 @@ def test_H_fO2_batch_H_mass(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array([2.570800334225988e-01, 2.426344578243460e01, 1.661069629540155e03]),
@@ -429,7 +435,8 @@ def test_H_and_C(helper) -> None:
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    solution: dict[str, ArrayLike] = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
         "CO2_g": 13.468919648305025,

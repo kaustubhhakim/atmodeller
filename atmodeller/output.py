@@ -193,8 +193,11 @@ class Output:
 
         out["planet"] = expand_dict(self.planet.asdict(), self.number_solutions)
         out["atmosphere"] = self.atmosphere_asdict()
-        # Temperature has already been expanded for the planet output so easiest to re-use here
-        out["atmosphere"]["temperature"] = out["planet"]["surface_temperature"]
+        # temperature and pressure have already been expanded to the number of solutions
+        temperature: Array = out["planet"]["surface_temperature"]
+        pressure: Array = out["atmosphere"]["pressure"]
+        # Convenient to also attach temperature to the atmosphere output
+        out["atmosphere"]["temperature"] = temperature
         out["raw_solution"] = self.raw_solution_asdict()
 
         out["constraints"] = {}
@@ -204,7 +207,7 @@ class Output:
             )
         if fugacity_matrix.size > 0:
             out["constraints"] |= self.traced_parameters.fugacity_constraints.asdict(
-                out["atmosphere"]["temperature"], out["atmosphere"]["pressure"]
+                temperature, pressure
             )
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
 

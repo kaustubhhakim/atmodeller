@@ -229,31 +229,27 @@ class FugacityConstraints(NamedTuple):
         return cls(init_map)
 
     def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
-        """Gets a dictionary of the evaluated fugacity
+        """Gets a dictionary of the evaluated fugacity constraints.
+
+        `temperature` and `pressure` should have a size equal to the number of solutions, which
+        will ensure that the returned dictionary also has the same size. For this reason there is
+        no need to vmap.
 
         Args:
             temperature: Temperature
             pressure: Pressure
 
         Returns:
-            A dictionary of the evaluated fugacity
+            A dictionary of the evaluated fugacity constraints
         """
-        log_fugacity_func: Callable = jax.vmap(self.log_fugacity, in_axes=(0, 0))
-        log_fugacity: Array = log_fugacity_func(temperature, pressure)
+        # This contains evaluated fugacity constraints in columns
+        log_fugacity: Array = jnp.atleast_2d(self.log_fugacity(temperature, pressure)).T
 
-        # out: dict[str, Array] = {
-        #     f"{key}_fugacity": jnp.exp(log_fugacity[:, ii])
-        #     for ii, key in enumerate(self.constraints)
-        # }
-
-        jax.debug.print("log_fugacity JAX = {out}", out=log_fugacity)
-
+        # Split the evaluated fugacity constraints by column
         out: dict[str, Array] = {
             f"{key}_fugacity": jnp.exp(log_fugacity[:, ii])
             for ii, key in enumerate(self.constraints)
         }
-
-        logger.warning("fugacity_constraints_out = %s", out)
 
         return out
 
