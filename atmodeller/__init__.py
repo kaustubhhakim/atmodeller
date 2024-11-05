@@ -74,10 +74,10 @@ At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this correspond
 """
 LOG_STABILITY_LOWER: float = -200
 """Lower stability for a species"""
-LOG_STABILITY_UPPER: float = 10
+LOG_STABILITY_UPPER: float = 5
 """Upper stability for a species"""
 
-TAU: float = 1.0e60
+TAU: float = 1.0e-60
 """Tau scaling factor for species stability"""
 
 # Create the package logger.
@@ -149,3 +149,9 @@ def debug_file_logger() -> logging.Logger:
     package_logger.addHandler(file_handler)
 
     return package_logger
+
+
+# pylint: disable=wrong-import-position
+from atmodeller.classes import InteriorAtmosphere
+from atmodeller.containers import Planet, Species
+from atmodeller.utilities import earth_oceans_to_hydrogen_mass

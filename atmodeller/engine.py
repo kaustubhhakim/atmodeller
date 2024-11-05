@@ -189,7 +189,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         # Get minimum scaled log number of molecules
         log_min_number_density: Array = jnp.min(
             mass_constraints.log_number_density(log_volume)
-        ) - jnp.log(fixed_parameters.tau)
+        ) + jnp.log(fixed_parameters.tau)
         stability_residual: Array = log_number_density + log_stability - log_min_number_density
         # jax.debug.print("stability_residual = {out}", out=stability_residual)
         residual = jnp.concatenate([residual, mass_residual, stability_residual])
