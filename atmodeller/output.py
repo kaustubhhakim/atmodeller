@@ -56,7 +56,10 @@ from atmodeller.engine import (
     get_species_ppmw_in_melt,
     objective_function,
 )
-from atmodeller.thermodata.redox_buffers import solve_for_log10_dIW
+
+# TODO: Remove not required anymore
+# from atmodeller.thermodata.redox_buffers import solve_for_log10_dIW
+from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 
 if TYPE_CHECKING:
@@ -211,22 +214,24 @@ class Output:
             )
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
 
-        # if "O2_g" in out:
-        #     logger.info("Found O2_g. Adding extra output")
-        #     O2_g_fugacity: Array = out["O2_g"]["fugacity"]
-        #     logger.warning("O2_g_fugacity = %s", O2_g_fugacity)
-        #     temperature: Array = out["planet"]["surface_temperature"]
-        #     logger.warning("temperature = %s", temperature)
-        #     pressure: Array = out["atmosphere"]["pressure"]
-        #     logger.warning("pressure = %s", pressure)
-        #     O2_g_shift_at_1bar: Array = solve_for_log10_dIW(O2_g_fugacity, temperature)
-        #     logger.warning("O2_g_shift_at_1bar = %s", O2_g_shift_at_1bar)
-        #     out["O2_g"]["log10dIW_1_bar"] = O2_g_shift_at_1bar
-        #     O2_g_shift_at_P: Array = solve_for_log10_dIW(O2_g_fugacity, temperature, pressure)
-        #     logger.warning("O2_g_shift_at_P: = %s", O2_g_shift_at_P)
-        #     out["O2_g"]["log10dIW_P"] = O2_g_shift_at_P
-
-        logger.debug("asdict = %s", out)
+        if "O2_g" in out:
+            logger.info("Found O2_g so back-computing log10 shift for fO2")
+            log10_fugacity: Array = jnp.log10(out["O2_g"]["fugacity"])
+            temperature: Array = out["planet"]["surface_temperature"]
+            pressure: Array = out["atmosphere"]["pressure"]
+            buffer: RedoxBufferProtocol = IronWustiteBuffer()
+            # Shift at 1 bar
+            buffer_at_one_bar: Array = buffer.log10_fugacity(temperature, 1.0)
+            log10_shift_at_one_bar: Array = log10_fugacity - buffer_at_one_bar
+            logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
+            out["O2_g"]["log10dIW_1_bar"] = log10_shift_at_one_bar
+            # Shift at actual pressure
+            # pylint: disable=invalid-name
+            buffer_at_P: Array = buffer.log10_fugacity(temperature, pressure)
+            log10_shift_at_P: Array = log10_fugacity - buffer_at_P
+            # pylint: enable=invalid-name
+            logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
+            out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
         return out
 
@@ -649,9 +654,6 @@ class Output:
         """
         out: dict[str, ArrayLike] = {}
 
-        print(self.pressure())
-        print(self.stability())
-
         for nn, species_ in enumerate(self.species):
             pressure: Array = self.pressure()[:, nn]
             activity: Array = self.activity()[:, nn]
@@ -893,49 +895,3 @@ def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[st
         dataframes[outer_key] = df
 
     return dataframes
-
-
-# TODO: Removing this old class into single and batch subclasses
-# class Output(OutputBatch):
-
-# def add(
-#     self,
-#     solution: Solution,
-#     residual_dict: dict[str, float],
-#     constraints_dict: dict[str, float],
-#     extra_output: dict[str, float] | None = None,
-# ) -> None:
-#     """Adds all outputs.
-
-#     Args:
-#         solution: Solution
-#         residual_dict: Dictionary of residuals
-#         constraints_dict: Dictionary of constraints
-#         extra_output: Extra data to write to the output. Defaults to None.
-#     """
-#     output_full: dict[str, dict[str, float]] = solution.output_full()
-
-#     # Back-compute and add the log10 shift relative to the default iron-wustite buffer
-#     if "O2_g" in output_full:
-#         temperature: float = output_full["atmosphere"]["temperature"]
-#         pressure: float = output_full["atmosphere"]["pressure"]
-#         # pylint: disable=invalid-name
-#         O2_g_output: dict[str, float] = output_full["O2_g"]
-#         O2_g_fugacity: float = O2_g_output["fugacity"]
-#         O2_g_shift_at_1bar: float = solve_for_log10_dIW(O2_g_fugacity, temperature)
-#         O2_g_output["log10dIW_1_bar"] = O2_g_shift_at_1bar
-#         O2_g_shift_at_P: float = solve_for_log10_dIW(O2_g_fugacity, temperature, pressure)
-#         O2_g_output["log10dIW_P"] = O2_g_shift_at_P
-
-#     for key, value in output_full.items():
-#         data_list: list[dict[str, float]] = self.data.setdefault(key, [])
-#         data_list.append(value)
-
-#     constraints_list: list[dict[str, float]] = self.data.setdefault("constraints", [])
-#     constraints_list.append(constraints_dict)
-#     residual_list: list[dict[str, float]] = self.data.setdefault("residual", [])
-#     residual_list.append(residual_dict)
-
-#     if extra_output is not None:
-#         data_list: list[dict[str, float]] = self.data.setdefault("extra", [])
-#         data_list.append(extra_output)

@@ -166,7 +166,7 @@ class InteriorAtmosphere:
         """
         for nn, species_ in enumerate(self.species):
             if species_.data.hill_formula == "O2":
-                logger.info("Found O2 at index = %d", nn)
+                logger.debug("Found O2 at index = %d", nn)
                 return nn
 
         # TODO: Bad practice to return the first index because it could be wrong and therefore give

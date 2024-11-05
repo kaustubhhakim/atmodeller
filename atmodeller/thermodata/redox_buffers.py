@@ -22,9 +22,7 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Protocol
 
-import jax
 import jax.numpy as jnp
-import optimistix as optx
 from jax import Array, jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
@@ -401,62 +399,3 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
 
 
 IronWustiteBuffer = IronWustiteBufferHirschmann
-
-
-def solve_for_log10_dIW(
-    target_fugacity: ArrayLike,
-    temperature: ArrayLike,
-    pressure: ArrayLike = 1.0,
-) -> Array:
-    """Solves for the log10 shift relative to the iron-wustite buffer
-
-    The shift is report relative to the standard state defined at temperature and 1 bar pressure.
-    If desired, the shift can be reported relative to a standard state defined at an alternative
-    pressure.
-
-    Args:
-        target_fugacity: Target fugacity in bar
-        temperature: Temperature in K
-        pressure: Pressure defining the standard state in bar. Defaults to 1 bar.
-
-    Returns:
-        Log10 shift relative to the iron-wustite buffer to match the target fugacity at `pressure`
-    """
-    buffer: RedoxBufferProtocol = IronWustiteBuffer()
-
-    def objective_function(log10_shift: ArrayLike, args) -> Array:
-        """Objective function
-
-        Args:
-            log10_shift: Log10 shift
-            args: Optional arguments (not used)
-
-        Returns:
-            Residual of the objective function
-        """
-        del args
-        buffer.log10_shift = log10_shift
-        jax.debug.print("log10_shift = {out}", out=log10_shift)
-        buffer_log10_fugacity: ArrayLike = buffer.log10_fugacity(temperature, pressure)
-        jax.debug.print("buffer_log10_fugacity = {out}", out=buffer_log10_fugacity)
-
-        residual: Array = jnp.asarray(buffer_log10_fugacity) - jnp.log10(target_fugacity)
-        jax.debug.print("residual = {out}", out=residual)
-
-        return residual
-
-    solver = optx.Newton(rtol=1.0e-4, atol=1.0e-4)
-    # TODO: Check these solver parameters are robust
-    sol = optx.root_find(
-        objective_function, solver, jnp.array([-10, -4, 4, 10]), options=dict(lower=-80, upper=40)
-    )
-
-    jax.debug.print("sol.value = {out}", out=sol.value)
-
-    # Success is indicated by no message
-    # if optx.RESULTS[sol.result] == "":
-    #    value: float = sol.value.item()
-    # else:
-    #    raise ValueError("Root finding did not converge")
-
-    return sol.value
