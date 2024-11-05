@@ -32,7 +32,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jax import Array, lax
+from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from molmass import Formula
 
@@ -130,23 +130,6 @@ class Planet(NamedTuple):
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        vmap_axes: list[int | None] = []
-        for field in self._fields:
-            value: ArrayLike = getattr(self, field)
-            if jnp.isscalar(value):
-                vmap_axis: int | None = None
-            else:
-                vmap_axis = 0
-            vmap_axes.append(vmap_axis)
-
-        return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
-
     def asdict(self) -> dict[str, Array]:
         """Gets a dictionary of the values
 
@@ -166,6 +149,23 @@ class Planet(NamedTuple):
         }
 
         return converted_dict
+
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
+        vmap_axes: list[int | None] = []
+        for field in self._fields:
+            value: ArrayLike = getattr(self, field)
+            if jnp.isscalar(value):
+                vmap_axis: int | None = None
+            else:
+                vmap_axis = 0
+            vmap_axes.append(vmap_axis)
+
+        return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
 
 
 class FugacityConstraints(NamedTuple):
@@ -201,32 +201,35 @@ class FugacityConstraints(NamedTuple):
 
         return cls(init_dict)
 
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
+    # def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
+    #     """Gets a dictionary of the values
 
-        Returns:
-            vmap axes
-        """
-        constraints_vmap: dict[str, RedoxBufferProtocol] = {}
+    #     Returns:
+    #         A dictionary of the values
+    #     """
+    #     log_fugacity_func: Callable = jax.vmap(self.log_fugacity, in_axes=(0, 0))
 
-        for key, constraint in self.constraints.items():
-            if jnp.isscalar(constraint.log10_shift):
-                vmap_axis: int | None = None
-            else:
-                vmap_axis = 0
-            constraints_vmap[key] = type(constraint)(vmap_axis)  # type: ignore - container
+    #     log_fugacity: Array = log_fugacity_func(temperature, pressure)
 
-        return FugacityConstraints(constraints_vmap)  # type: ignore - container
+    #     # (temperature, pressure)
 
-    def array(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log number density as an array
+    #     out: dict[str, Array] = {
+    #         f"{key}_fugacity": jnp.exp(jnp.asarray(value))
+    #         for key, value in zip(self.constraints, log_fugacity)
+    #     }
+
+    #     return out
+
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log fugacity
 
         Args:
             temperature: Temperature
             pressure: Pressure
 
         Returns:
-            Log number density as an array
+            Log fugacity
         """
         fugacity_funcs: list[Callable] = [
             constraint.log_fugacity for constraint in self.constraints.values()
@@ -245,11 +248,43 @@ class FugacityConstraints(NamedTuple):
         vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
         indices: Array = jnp.arange(len(self.constraints))
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
+
+        return log_fugacity
+
+    @jit
+    def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log number density
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log number density
+        """
+        log_fugacity: Array = self.log_fugacity(temperature, pressure)
         log_number_density: Array = get_log_number_density_from_log_pressure(
             log_fugacity, temperature
         )
 
         return log_number_density
+
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
+        constraints_vmap: dict[str, RedoxBufferProtocol] = {}
+
+        for key, constraint in self.constraints.items():
+            if jnp.isscalar(constraint.log10_shift):
+                vmap_axis: int | None = None
+            else:
+                vmap_axis = 0
+            constraints_vmap[key] = type(constraint)(vmap_axis)  # type: ignore - container
+
+        return FugacityConstraints(constraints_vmap)  # type: ignore - container
 
 
 class MassConstraints(NamedTuple):
@@ -289,20 +324,6 @@ class MassConstraints(NamedTuple):
 
         return cls(log_number_of_molecules)
 
-    def array(self, log_atmosphere_volume: ArrayLike) -> Array:
-        """Log number density as an array
-
-        Args:
-            log_atmosphere_volume: Log volume of the atmosphere
-
-        Returns:
-            Log number density as an array
-        """
-        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
-        log_number_density: Array = log_molecules - log_atmosphere_volume
-
-        return log_number_density
-
     def asdict(self) -> dict[str, Array]:
         """Gets a dictionary of the values
 
@@ -315,6 +336,21 @@ class MassConstraints(NamedTuple):
         }
 
         return out
+
+    @jit
+    def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Array:
+        """Log number density
+
+        Args:
+            log_atmosphere_volume: Log volume of the atmosphere
+
+        Returns:
+            Log number density
+        """
+        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
+        log_number_density: Array = log_molecules - log_atmosphere_volume
+
+        return log_number_density
 
     def vmap_axes(self) -> Self:
         """Gets vmap axes.

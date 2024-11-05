@@ -155,7 +155,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         total_pressure: Array = get_atmosphere_pressure(
             fixed_parameters, log_number_density, temperature
         )
-        fugacity_residual = fugacity_residual - fugacity_constraints.array(
+        fugacity_residual = fugacity_residual - fugacity_constraints.log_number_density(
             temperature, total_pressure
         )
         # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
@@ -177,13 +177,13 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
             log_volume,
         )
         log_element_density: Array = jnp.log(element_density + element_melt_density)
-        mass_residual = log_element_density - mass_constraints.array(log_volume)
+        mass_residual = log_element_density - mass_constraints.log_number_density(log_volume)
         # jax.debug.print("mass_residual = {out}", out=mass_residual)
         # Stability residual
         # Get minimum scaled log number of molecules
-        log_min_number_density: Array = jnp.min(mass_constraints.array(log_volume)) - jnp.log(
-            fixed_parameters.tau
-        )
+        log_min_number_density: Array = jnp.min(
+            mass_constraints.log_number_density(log_volume)
+        ) - jnp.log(fixed_parameters.tau)
         stability_residual: Array = log_number_density + log_stability - log_min_number_density
         # jax.debug.print("stability_residual = {out}", out=stability_residual)
         residual = jnp.concatenate([residual, mass_residual, stability_residual])
