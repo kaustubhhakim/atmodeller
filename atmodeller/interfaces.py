@@ -30,6 +30,14 @@ class ActivityProtocol(Protocol):
     ) -> ArrayLike: ...
 
 
+class FugacityConstraintProtocol(Protocol):
+
+    @property
+    def value(self) -> ArrayLike: ...
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+
 class RealGasProtocol(ActivityProtocol, Protocol):
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...

@@ -113,7 +113,6 @@ class InteriorAtmosphere:
         """
         self.planet = planet
         self.fugacity_constraints = FugacityConstraints.create(fugacity_constraints)
-        logger.debug("fugacity_constraints = %s", self.fugacity_constraints)
 
         self.mass_constraints = MassConstraints.create(mass_constraints)
         logger.debug("mass_constraints = %s", self.mass_constraints)
@@ -204,7 +203,6 @@ class InteriorAtmosphere:
             indices.append(index)
         formula_matrix_constraints: npt.NDArray[np.int_] = formula_matrix.copy()
         formula_matrix_constraints = formula_matrix_constraints[indices, :]
-        logger.info("formula_matrix_constraints = %s", formula_matrix_constraints)
 
         # Fugacity constraint matrix and indices
         number_fugacity_constraints: int = len(fugacity_constraints.constraints)

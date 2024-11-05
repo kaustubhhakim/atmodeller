@@ -147,9 +147,15 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # Fugacity constraints residual
     if fugacity_matrix.size > 0:
         fugacity_species_indices: Array = jnp.array(fixed_parameters.fugacity_species_indices)
+        # jax.debug.print("fugacity_species_indices = {out}", out=fugacity_species_indices)
         fugacity_log_activity_number_density: Array = jnp.take(
             log_activity_number_density, fugacity_species_indices
         )
+        # jax.debug.print(
+        #     "fugacity_log_activity_number_density = {out}",
+        #     out=fugacity_log_activity_number_density,
+        # )
+        # jax.debug.print("fugacity_matrix = {out}", out=fugacity_matrix)
         fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity_number_density)
         # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
         total_pressure: Array = get_atmosphere_pressure(

@@ -35,6 +35,7 @@ import optimistix as optx
 from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from molmass import Formula
+from xmmutablemap import ImmutableMap
 
 from atmodeller import (
     AVOGADRO,
@@ -46,11 +47,14 @@ from atmodeller import (
 )
 from atmodeller.engine import get_log_number_density_from_log_pressure
 from atmodeller.eos.classes import IdealGas
-from atmodeller.interfaces import ActivityProtocol, SolubilityProtocol
+from atmodeller.interfaces import (
+    ActivityProtocol,
+    FugacityConstraintProtocol,
+    SolubilityProtocol,
+)
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import select_thermodata
 from atmodeller.thermodata.core import CondensateActivity, SpeciesData
-from atmodeller.thermodata.redox_buffers import RedoxBufferProtocol
 from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 11):
@@ -168,6 +172,27 @@ class Planet(NamedTuple):
         return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
 
 
+class ConstantFugacityConstraint(NamedTuple):
+    """A constant fugacity constraint
+
+    This must adhere to FugacityConstraintProtocol
+
+    Args:
+        fugacity: Fugacity
+    """
+
+    fugacity: ArrayLike
+
+    @property
+    def value(self) -> ArrayLike:
+        return self.fugacity
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        del temperature
+        del pressure
+        return jnp.log(self.fugacity)
+
+
 class FugacityConstraints(NamedTuple):
     """Fugacity constraints
 
@@ -177,13 +202,13 @@ class FugacityConstraints(NamedTuple):
         constraints: Fugacity constraints
     """
 
-    constraints: dict[str, RedoxBufferProtocol]
+    constraints: ImmutableMap[str, FugacityConstraintProtocol]
     """Fugacity constraints"""
 
     @classmethod
     def create(
         cls,
-        fugacity_constraints: Mapping[str, RedoxBufferProtocol] | None = None,
+        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
     ) -> Self:
         """Creates an instance
 
@@ -195,11 +220,13 @@ class FugacityConstraints(NamedTuple):
             An instance
         """
         if fugacity_constraints is None:
-            init_dict: dict[str, RedoxBufferProtocol] = {}
+            init_dict: dict[str, FugacityConstraintProtocol] = {}
         else:
             init_dict = dict(fugacity_constraints)
 
-        return cls(init_dict)
+        init_map: ImmutableMap[str, FugacityConstraintProtocol] = ImmutableMap(init_dict)
+
+        return cls(init_map)
 
     def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
         """Gets a dictionary of the evaluated fugacity
@@ -214,10 +241,19 @@ class FugacityConstraints(NamedTuple):
         log_fugacity_func: Callable = jax.vmap(self.log_fugacity, in_axes=(0, 0))
         log_fugacity: Array = log_fugacity_func(temperature, pressure)
 
+        # out: dict[str, Array] = {
+        #     f"{key}_fugacity": jnp.exp(log_fugacity[:, ii])
+        #     for ii, key in enumerate(self.constraints)
+        # }
+
+        jax.debug.print("log_fugacity JAX = {out}", out=log_fugacity)
+
         out: dict[str, Array] = {
             f"{key}_fugacity": jnp.exp(log_fugacity[:, ii])
             for ii, key in enumerate(self.constraints)
         }
+
+        logger.warning("fugacity_constraints_out = %s", out)
 
         return out
 
@@ -276,16 +312,16 @@ class FugacityConstraints(NamedTuple):
         Returns:
             vmap axes
         """
-        constraints_vmap: dict[str, RedoxBufferProtocol] = {}
+        constraints_vmap: dict[str, FugacityConstraintProtocol] = {}
 
         for key, constraint in self.constraints.items():
-            if jnp.isscalar(constraint.log10_shift):
+            if jnp.isscalar(constraint.value):
                 vmap_axis: int | None = None
             else:
                 vmap_axis = 0
             constraints_vmap[key] = type(constraint)(vmap_axis)  # type: ignore - container
 
-        return FugacityConstraints(constraints_vmap)  # type: ignore - container
+        return FugacityConstraints(ImmutableMap(constraints_vmap))  # type: ignore - container
 
 
 class MassConstraints(NamedTuple):
@@ -295,7 +331,7 @@ class MassConstraints(NamedTuple):
         log_molecules: Log number of molecules of the species
     """
 
-    log_molecules: dict[str, ArrayLike]
+    log_molecules: ImmutableMap[str, ArrayLike]
     """Log number of molecules"""
 
     @classmethod
@@ -323,7 +359,9 @@ class MassConstraints(NamedTuple):
             )
             log_number_of_molecules[element] = log_number_of_molecules_
 
-        return cls(log_number_of_molecules)
+        init_map: ImmutableMap[str, ArrayLike] = ImmutableMap(log_number_of_molecules)
+
+        return cls(init_map)
 
     def asdict(self) -> dict[str, Array]:
         """Gets a dictionary of the values
@@ -368,7 +406,7 @@ class MassConstraints(NamedTuple):
                 vmap_axis = 0
             log_molecules_vmap[key] = vmap_axis
 
-        return MassConstraints(log_molecules_vmap)  # type: ignore - container types for data
+        return MassConstraints(ImmutableMap(log_molecules_vmap))  # type: ignore - container
 
 
 # endregion

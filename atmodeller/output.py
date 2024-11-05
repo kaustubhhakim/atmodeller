@@ -56,6 +56,7 @@ from atmodeller.engine import (
     get_species_ppmw_in_melt,
     objective_function,
 )
+from atmodeller.thermodata.redox_buffers import solve_for_log10_dIW
 from atmodeller.utilities import unit_conversion
 
 if TYPE_CHECKING:
@@ -207,6 +208,21 @@ class Output:
             )
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
 
+        # if "O2_g" in out:
+        #     logger.info("Found O2_g. Adding extra output")
+        #     O2_g_fugacity: Array = out["O2_g"]["fugacity"]
+        #     logger.warning("O2_g_fugacity = %s", O2_g_fugacity)
+        #     temperature: Array = out["planet"]["surface_temperature"]
+        #     logger.warning("temperature = %s", temperature)
+        #     pressure: Array = out["atmosphere"]["pressure"]
+        #     logger.warning("pressure = %s", pressure)
+        #     O2_g_shift_at_1bar: Array = solve_for_log10_dIW(O2_g_fugacity, temperature)
+        #     logger.warning("O2_g_shift_at_1bar = %s", O2_g_shift_at_1bar)
+        #     out["O2_g"]["log10dIW_1_bar"] = O2_g_shift_at_1bar
+        #     O2_g_shift_at_P: Array = solve_for_log10_dIW(O2_g_fugacity, temperature, pressure)
+        #     logger.warning("O2_g_shift_at_P: = %s", O2_g_shift_at_P)
+        #     out["O2_g"]["log10dIW_P"] = O2_g_shift_at_P
+
         logger.debug("asdict = %s", out)
 
         return out
@@ -353,14 +369,7 @@ class Output:
         out: dict[str, Array] = self._get_number_density_output(
             atmosphere, molar_mass, "atmosphere_"
         )
-
-        logger.warning("condensed_number_density = %s", condensed)
-        logger.warning("condensed_molar_mass = %s", molar_mass)
-
         out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
-
-        logger.warning("condensed_out = %s", out)
-
         out |= self._get_number_density_output(dissolved, molar_mass, "dissolved_")
         out |= self._get_number_density_output(total, molar_mass, "total_")
 
@@ -636,6 +645,9 @@ class Output:
             Dictionary of the solution
         """
         out: dict[str, ArrayLike] = {}
+
+        print(self.pressure())
+        print(self.stability())
 
         for nn, species_ in enumerate(self.species):
             pressure: Array = self.pressure()[:, nn]

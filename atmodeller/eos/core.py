@@ -877,6 +877,7 @@ class RealGasBounded(RealGas):
 #         Returns:
 #             Pressure difference relative to :attr:`P0`
 #         """
+# TODO: Careful. Maybe jnp.where is better for array-based operations
 #         delta_pressure: Array = lax.cond(
 #             jnp.asarray(pressure) > jnp.asarray(self.P0),
 #             lambda pressure: jnp.asarray(pressure - self.P0, dtype=jnp.float_),
@@ -1024,6 +1025,7 @@ class RealGasBounded(RealGas):
 #         def body_fun(i: int, carry: int) -> int:
 #             pressure_high: Array = self.upper_pressure_bounds[i]
 #             condition = pressure >= pressure_high
+# TODO: Careful. Maybe jnp.where is better for array-based operations
 #             new_index: int = lax.cond(condition, lambda _: i + 1, lambda _: carry, None)
 
 #             return new_index
