@@ -28,7 +28,7 @@ import numpy as np
 import numpy.typing as npt
 from jax import Array
 from jax.tree_util import tree_flatten
-from jaxtyping import ArrayLike
+from jax.typing import ArrayLike
 
 from atmodeller import TAU
 from atmodeller.containers import (
