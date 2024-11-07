@@ -29,7 +29,7 @@ from scipy import constants
 
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
-print("Package initialized with double precision (float64)")
+print("Atmodeller initialized with double precision (float64)")
 
 # For debugging
 # jax.config.update("jax_debug_nans", True)
@@ -73,12 +73,26 @@ At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this correspond
 (10.3 GPa).
 """
 LOG_STABILITY_LOWER: float = -200
-"""Lower stability for a species"""
-LOG_STABILITY_UPPER: float = 5
-"""Upper stability for a species"""
+"""Lower stability for a species
 
+Empiricially determined.
+"""
+LOG_STABILITY_UPPER: float = 5
+"""Upper stability for a species
+
+Empirically determined.
+"""
 TAU: float = 1.0e-60
-"""Tau scaling factor for species stability"""
+"""Tau scaling factor for species stability
+
+Tau effectively controls the minimum non-zero number density of unstable species. Formally, it
+defines the number density of an unstable pure condensate with an activity of 1/e, which
+corresponds to a log stability of zero.
+
+In practice, this default value of Tau is determined empirically for low-temperature cases where 
+Tau must be sufficiently small to permit the stability of O2. This prevents the number density of 
+O2 from being truncated resulting in inaccurate calculations.
+"""
 
 # Create the package logger.
 # https://docs.python.org/3/howto/logging.html#library-config

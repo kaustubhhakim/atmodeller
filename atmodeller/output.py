@@ -56,9 +56,6 @@ from atmodeller.engine import (
     get_species_ppmw_in_melt,
     objective_function,
 )
-
-# TODO: Remove not required anymore
-# from atmodeller.thermodata.redox_buffers import solve_for_log10_dIW
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
 from atmodeller.utilities import unit_conversion
 

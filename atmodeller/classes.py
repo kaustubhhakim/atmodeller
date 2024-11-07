@@ -111,25 +111,23 @@ class InteriorAtmosphere:
         Returns:
             Solver callable
         """
+        # Store initialised quantities as the defaults for any subsequent solve specified without
+        # overrides
         self.planet = planet
         self.fugacity_constraints = FugacityConstraints.create(fugacity_constraints)
-
         self.mass_constraints = MassConstraints.create(mass_constraints)
-        logger.debug("mass_constraints = %s", self.mass_constraints)
+        self.initial_log_number_density = initial_log_number_density
+        self.initial_log_stability = initial_log_stability
 
+        self.initial_solution = Solution.create(initial_log_number_density, initial_log_stability)
         self.fixed_parameters = self.get_fixed_parameters(
             self.fugacity_constraints, self.mass_constraints
         )
-        logger.debug("fixed_parameters = %s", self.fixed_parameters)
-
-        self.initial_solution = Solution.create(initial_log_number_density, initial_log_stability)
-        logger.debug("initial_solution = %s", self.initial_solution)
         self.traced_parameters = TracedParameters(
             planet=self.planet,
             fugacity_constraints=self.fugacity_constraints,
             mass_constraints=self.mass_constraints,
         )
-        logger.debug("traced_parameters = %s", self.traced_parameters)
 
         if self.is_batch:
             self._solver = self._get_solver_vmap()
@@ -435,25 +433,69 @@ class InteriorAtmosphere:
 
     def solve(
         self,
-        initial_solution: Solution | None = None,
-        traced_parameters: TracedParameters | None = None,
+        planet: Planet | None = None,
+        initial_log_number_density: ArrayLike | None = None,
+        initial_log_stability: ArrayLike | None = None,
+        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
     ) -> Output:
         """Solves the system and returns the processed solution
 
         Args:
-            initial_solution: Initial solution. Defaults to None, meaning that the initial solution
-                used to initialise the solver is used.
-            traced_parameters: Traced parameters. Defaults to None, meaning that the traced
-                parameters used to initialise the solver are used.
+            planet: Planet. Defaults to None to use initialised planet
+            initial_log_number_density: Initial log number density. Defaults to None to use
+                initialised log_number_density.
+            initial_log_stability: Initial log stability. Defaults to None to use initialised
+                initial_log_stability.
+            fugacity_constraints: Fugacity constraints. Defaults to None to use initialised
+                fugacity_constraints
+            mass_constraints: Mass constraints. Defaults to None to use initialised
+                mass_constraints.
 
         Returns:
             Output
         """
-        solution, initial_solution_, traced_parameters_ = self.solve_raw_output(
-            initial_solution, traced_parameters
-        )
-        output: Output = Output(solution, self, initial_solution_, traced_parameters_)
+        if planet is None:
+            planet_: Planet = self.planet
+        else:
+            planet_ = planet
 
+        if initial_log_number_density is None:
+            initial_log_number_density_: ArrayLike = self.initial_log_number_density
+        else:
+            initial_log_number_density_ = initial_log_number_density
+
+        if initial_log_stability is None:
+            initial_log_stability_: ArrayLike = self.initial_log_stability
+        else:
+            initial_log_stability_ = initial_log_stability
+
+        if fugacity_constraints is None:
+            fugacity_constraints_: FugacityConstraints = self.fugacity_constraints
+        else:
+            fugacity_constraints_ = FugacityConstraints.create(fugacity_constraints)
+
+        if mass_constraints is None:
+            mass_constraints_: MassConstraints = self.mass_constraints
+        else:
+            mass_constraints_ = MassConstraints.create(mass_constraints)
+        logger.debug("mass_constraints = %s", mass_constraints_)
+
+        initial_solution = Solution.create(initial_log_number_density_, initial_log_stability_)
+        traced_parameters = TracedParameters(
+            planet=planet_,
+            fugacity_constraints=fugacity_constraints_,
+            mass_constraints=mass_constraints_,
+        )
+
+        # Compile
+        start_time = time.time()
+        solution: Array = self._solver(initial_solution, traced_parameters).block_until_ready()
+        end_time = time.time()
+        execution_time = end_time - start_time
+        logger.info("Execution time: %.6f seconds", execution_time)
+
+        output: Output = Output(solution, self, initial_solution, traced_parameters)
         quick_look: dict[str, ArrayLike] = output.quick_look()
         logger.info("quick_look = %s", pprint.pformat(quick_look))
 
