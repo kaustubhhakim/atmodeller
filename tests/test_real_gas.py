@@ -265,7 +265,9 @@ def test_chabrier_subNeptune(helper) -> None:
     # Initial solution guess number density (molecules/m^3)
     # Since we are dealing with a larger planet and atmosphere size, increase the initial number
     # density estimate
-    initial_log_number_density: ArrayLike = 60 * np.ones(len(species), dtype=np.float_)
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
         initial_log_number_density
     )
@@ -338,7 +340,9 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = 60 * np.ones(len(species), dtype=np.float_)
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float_
+    )
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
         initial_log_number_density
     )
