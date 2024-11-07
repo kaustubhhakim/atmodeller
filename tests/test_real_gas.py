@@ -25,12 +25,7 @@ import optimistix as optx
 import pytest
 from jax.typing import ArrayLike
 
-from atmodeller import (
-    INITIAL_LOG_NUMBER_DENSITY,
-    INITIAL_LOG_STABILITY,
-    __version__,
-    debug_logger,
-)
+from atmodeller import INITIAL_LOG_STABILITY, __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, SolverParameters, Species
 from atmodeller.eos.core import RealGas
@@ -73,16 +68,8 @@ def test_fO2_holley(helper) -> None:
         "H": h_kg,
     }
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_number_density,
-        initial_log_stability,
+        planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -130,9 +117,9 @@ def test_chabrier_earth(helper) -> None:
     )
 
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
+        initial_log_number_density=initial_log_number_density,
+        initial_log_stability=initial_log_stability,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.solve()
@@ -173,26 +160,15 @@ def test_chabrier_earth_dogleg(helper) -> None:
     solver: OptxSolver = optx.Dogleg(rtol=1.0e-8, atol=1.0e-8)
     solver_parameters: SolverParameters = SolverParameters(solver)
 
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(
-        species, solver_parameters=solver_parameters
-    )
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(initial_number_density)
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_number_density,
-        initial_log_stability,
-        mass_constraints=mass_constraints,
+        planet=planet, mass_constraints=mass_constraints, solver_parameters=solver_parameters
     )
     output: Output = interior_atmosphere.solve()
     solution: dict[str, ArrayLike] = output.quick_look()
@@ -262,20 +238,8 @@ def test_chabrier_subNeptune(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    # Since we are dealing with a larger planet and atmosphere size, increase the initial number
-    # density estimate
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.solve()
@@ -339,18 +303,8 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.solve()

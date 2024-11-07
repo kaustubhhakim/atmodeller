@@ -25,12 +25,7 @@ import numpy as np
 import numpy.typing as npt
 from jax.typing import ArrayLike
 
-from atmodeller import (
-    INITIAL_LOG_NUMBER_DENSITY,
-    INITIAL_LOG_STABILITY,
-    __version__,
-    debug_logger,
-)
+from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, Species
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
@@ -94,18 +89,8 @@ def test_H2O(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.solve()
@@ -137,18 +122,8 @@ def test_H_fO2(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -186,18 +161,8 @@ def test_H_fO2_fH2(helper) -> None:
     # h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     # mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         fugacity_constraints=fugacity_constraints,
         # mass_constraints=mass_constraints,
     )
@@ -243,18 +208,8 @@ def test_H_fO2_batch_temperature(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -305,18 +260,8 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -368,18 +313,8 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     # Set up a range of H masses
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
@@ -420,18 +355,8 @@ def test_H_and_C(helper) -> None:
     c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
-
     interior_atmosphere.initialise_solve(
-        planet,
-        initial_log_number_density,
-        initial_log_stability,
+        planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )

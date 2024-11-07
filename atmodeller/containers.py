@@ -319,6 +319,9 @@ class FugacityConstraints(NamedTuple):
 
         return FugacityConstraints(ImmutableMap(constraints_vmap))  # type: ignore - container
 
+    def __bool__(self) -> bool:
+        return bool(self.constraints)
+
 
 class MassConstraints(NamedTuple):
     """Mass constraints
@@ -403,6 +406,9 @@ class MassConstraints(NamedTuple):
             log_molecules_vmap[key] = vmap_axis
 
         return MassConstraints(ImmutableMap(log_molecules_vmap))  # type: ignore - container
+
+    def __bool__(self) -> bool:
+        return bool(self.log_molecules)
 
 
 # endregion
@@ -583,6 +589,9 @@ class SolverParameters(NamedTuple):
             throw. How to report any failures. Defaults to True.
             max_steps: The maximum number of steps the solver can take. Defaults to 256.
             norm: The norm. Defaults to optimistix RMS norm.
+
+        Returns:
+            An instance
         """
         solver: OptxSolver = solver_class(rtol=rtol, atol=atol, norm=norm)
         lower: tuple[float, ...] = cls._get_hypercube_bound(

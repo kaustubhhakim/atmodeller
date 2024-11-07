@@ -102,7 +102,10 @@ class Output:
     @property
     def fixed_parameters(self) -> FixedParameters:
         """Fixed parameters"""
-        return self._interior_atmosphere.fixed_parameters
+        int_atmos: InteriorAtmosphere = self._interior_atmosphere
+        return int_atmos.get_fixed_parameters(
+            int_atmos.solution_args.fugacity_constraints, int_atmos.solution_args.mass_constraints
+        )
 
     @property
     def gas_species_indices(self) -> Array:
@@ -296,7 +299,7 @@ class Output:
         """
         atmosphere_log_volume_func: Callable = jax.vmap(
             get_atmosphere_log_volume,
-            in_axes=(None, 0, self._interior_atmosphere.planet.vmap_axes()),
+            in_axes=(None, 0, self._interior_atmosphere.solution_args.planet.vmap_axes()),
         )
         atmosphere_log_volume: Array = atmosphere_log_volume_func(
             self.fixed_parameters,
