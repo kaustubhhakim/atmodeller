@@ -36,6 +36,7 @@ print("Atmodeller initialized with double precision (float64)")
 # jax.config.update("jax_debug_infs", False)
 # jax.config.update("jax_disable_jit", True)
 
+# Physical constants
 AVOGADRO: float = constants.Avogadro
 """Avogadro constant in 1/mol"""
 GAS_CONSTANT: float = constants.gas_constant
@@ -55,10 +56,24 @@ OCEAN_MOLES: float = 7.68894973907177e22
 OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
 """Mass of H2 in one present-day Earth ocean in grams"""
 
+# Thermodynamic standard state
 ENTHALPY_REFERENCE: float = 298.15
 """Enthalpy reference temperature in K"""
 PRESSURE_REFERENCE: float = 1.0
 """Standard state pressure in bar"""
+
+# Initial solution guess
+INITIAL_LOG_NUMBER_DENSITY: float = 50.0
+"""Initial log number density
+
+Empiricially determined. This value is mid-range for Earth-like planets.
+"""
+INITIAL_LOG_STABILITY: float = -70.0
+"""Initial log stability
+
+Empirically determined. This value is mid-range between stable (more negative) and unstable (less
+negative).
+"""
 
 # Lower and upper bounds on the hypercube which contains the root
 LOG_NUMBER_DENSITY_LOWER: float = -100
@@ -91,7 +106,7 @@ corresponds to a log stability of zero.
 
 In practice, this default value of Tau is determined empirically for low-temperature cases where 
 Tau must be sufficiently small to permit the stability of O2. This prevents the number density of 
-O2 from being truncated resulting in inaccurate calculations.
+O2 from being truncated which would result in inaccurate calculations.
 """
 
 # Create the package logger.

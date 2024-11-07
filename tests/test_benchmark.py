@@ -24,7 +24,7 @@ import numpy as np
 import pytest
 from jax.typing import ArrayLike
 
-from atmodeller import debug_logger
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
 from atmodeller.output import Output
@@ -40,11 +40,6 @@ ATOL: float = 1.0e-8
 """Absolute tolerance"""
 TOLERANCE: float = 5.0e-2
 """Tolerance of log output to satisfy comparison with FactSage and FastChem"""
-
-INITIAL_LOG_NUMBER_DENSITY: float = 50.0
-"""Initial log number density"""
-INITIAL_LOG_STABILITY: float = -100.0
-"""Initial log stability"""
 
 
 def test_H_O(helper) -> None:

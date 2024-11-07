@@ -25,7 +25,12 @@ import numpy as np
 import numpy.typing as npt
 from jax.typing import ArrayLike
 
-from atmodeller import __version__, debug_logger
+from atmodeller import (
+    INITIAL_LOG_NUMBER_DENSITY,
+    INITIAL_LOG_STABILITY,
+    __version__,
+    debug_logger,
+)
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, Species
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
@@ -65,11 +70,6 @@ RTOL: float = 1.0e-6
 """Relative tolerance"""
 ATOL: float = 1.0e-6
 """Absolute tolerance"""
-
-INITIAL_LOG_NUMBER_DENSITY: float = 50.0
-"""Initial log number density"""
-INITIAL_LOG_STABILITY: float = -100.0
-"""Initial log stability"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 

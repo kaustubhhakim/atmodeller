@@ -25,7 +25,12 @@ import optimistix as optx
 import pytest
 from jax.typing import ArrayLike
 
-from atmodeller import __version__, debug_logger
+from atmodeller import (
+    INITIAL_LOG_NUMBER_DENSITY,
+    INITIAL_LOG_STABILITY,
+    __version__,
+    debug_logger,
+)
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, SolverParameters, Species
 from atmodeller.eos.core import RealGas
@@ -43,11 +48,6 @@ RTOL: float = 1.0e-6
 """Relative tolerance"""
 ATOL: float = 1.0e-6
 """Absolute tolerance"""
-
-INITIAL_LOG_NUMBER_DENSITY: float = 60.0
-"""Initial log number density"""
-INITIAL_LOG_STABILITY: float = -140.0
-"""Initial log stability"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 eos_models: dict[str, RealGas] = get_eos_models()
@@ -226,6 +226,11 @@ def test_chabrier_subNeptune(helper) -> None:
     oxygen. If instead the oxygen mass is constrained then there is only one physical solution and
     root, which is preferred for robust numerical solution. Remember that the oxygen fugacity shift
     relative to the iron-wustite buffer is back-calculated for the output.
+
+    This case effectively saturates the maximum allowable log number density at a value of 70
+    based on the default hypercube that brackets the solution (see LOG_NUMBER_DENSITY_UPPER).
+    This is fine for a test, but this test is not physically realistic because solubilities are
+    ignored, which would greatly lower the pressure and hence the number density.
     """
 
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
@@ -258,9 +263,9 @@ def test_chabrier_subNeptune(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
+    # Since we are dealing with a larger planet and atmosphere size, increase the initial number
+    # density estimate
+    initial_log_number_density: ArrayLike = 60 * np.ones(len(species), dtype=np.float_)
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
         initial_log_number_density
     )
@@ -293,10 +298,17 @@ def test_chabrier_subNeptune(helper) -> None:
 
 
 def test_chabrier_subNeptune_batch(helper) -> None:
-    """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune for several O masses"""
+    """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune for several O masses
 
+    H2O solubility is also included.
+
+    As above, this test has questionable physical relevance without the inclusion of more species'
+    solubility, but it serves its purpose as a test.
+    """
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
-    H2O_g: Species = Species.create_gas("H2O_g")
+    H2O_g: Species = Species.create_gas(
+        "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
+    )
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")
     SiH4_g: Species = Species.create_gas("SiH4_g")
@@ -317,7 +329,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
     # Batch solve for three oxygen masses
-    o_kg: ArrayLike = 1e24 * np.array([6.5, 7.0, 7.5])
+    o_kg: ArrayLike = 1e24 * np.array([7.0, 7.5, 8.0])
 
     logger.info("h_kg = %s", h_kg)
     logger.info("si_kg = %s", si_kg)
@@ -326,9 +338,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
-    )
+    initial_log_number_density: ArrayLike = 60 * np.ones(len(species), dtype=np.float_)
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
         initial_log_number_density
     )
@@ -344,12 +354,10 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     # Some pertinent output here for testing, no need to specify all the species
     target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([414196.4384174478, 447778.96881315584, 478589.0587503356]),
-        "H2_g": np.array([2.013044674841153e02, 3.623165974290676e-02, 7.557512794647293e-03]),
-        "H2_g_activity": np.array(
-            [1.244151704590899e06, 4.081150459112090e02, 2.445386580128216e02]
-        ),
-        "O2_g": np.array([2.391009941230580e-03, 2.597033254819690e04, 8.263153524645795e04]),
+        "H2O_g": np.array([34153.77081497173, 34647.13320000063, 34773.46401215592]),
+        "H2_g": np.array([2.003779275377057, 0.170286601371338, 0.027748065184473]),
+        "H2_g_activity": np.array([26.950066680710645, 14.769839969937074, 11.271846166572525]),
+        "O2_g": np.array([34647.5851511399, 118713.0248545309, 205315.21994142563]),
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
