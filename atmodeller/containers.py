@@ -405,6 +405,8 @@ class MassConstraints(NamedTuple):
                 vmap_axis = 0
             log_molecules_vmap[key] = vmap_axis
 
+        logger.debug("log_molecules_vmap = %s", log_molecules_vmap)
+
         return MassConstraints(ImmutableMap(log_molecules_vmap))  # type: ignore - container
 
     def __bool__(self) -> bool:

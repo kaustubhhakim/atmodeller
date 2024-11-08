@@ -406,7 +406,7 @@ class InteriorAtmosphere:
         return tuple(indices)
 
     def get_unique_elements_in_species(self) -> tuple[str, ...]:
-        """Gets unique elements
+        """Gets unique elements.
 
         Args:
             species: A list of species
@@ -502,7 +502,7 @@ class InteriorAtmosphere:
         return reactions
 
     def get_species_names(self) -> tuple[str, ...]:
-        """Gets the names of all species
+        """Gets the names of all species.
 
         Returns:
             Species names
@@ -525,7 +525,7 @@ class InteriorAtmosphere:
         return solver
 
     def get_traced_parameters_vmap(self) -> TracedParameters:
-        """Gets the vmapping axes for tracer parameters
+        """Gets the vmapping axes for tracer parameters.
 
         Returns:
             Vmapping for tracer parameters
@@ -546,8 +546,9 @@ class InteriorAtmosphere:
         initial_log_stability: ArrayLike | None = None,
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
+        quick_look: bool = False,
     ) -> Output:
-        """Solves the system and returns the processed solution
+        """Solves the system and returns the processed solution.
 
         Args:
             planet: Planet. Defaults to None.
@@ -555,6 +556,7 @@ class InteriorAtmosphere:
             initial_log_stability: Initial log stability. Defaults to None.
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
+            quick_look: Show the solution via the logger. Defaults to False.
 
         Returns:
             Output
@@ -578,7 +580,9 @@ class InteriorAtmosphere:
         logger.info("Execution time: %.6f seconds", execution_time)
 
         output: Output = Output(solution, self, initial_solution, traced_parameters)
-        quick_look: dict[str, ArrayLike] = output.quick_look()
-        logger.info("quick_look = %s", pprint.pformat(quick_look))
+
+        if quick_look:
+            quick_look_dict: dict[str, ArrayLike] = output.quick_look()
+            logger.info("quick_look = %s", pprint.pformat(quick_look_dict))
 
         return output

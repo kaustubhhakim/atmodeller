@@ -8,9 +8,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-scipy = "^1.14.0"
+scipy = "^1.14.1"
 numpy = "^1.26.4"
-pandas = "^2.2.2"
+pandas = "^2.2.3"
 openpyxl = "^3.1.2"
 molmass = "^2024.10.25"
 ipykernel = "^6.29.0"
@@ -20,8 +20,8 @@ seaborn = "^0.13.2"
 typing-extensions = "^4.12.2"
 optax = "^0.2.3"
 xmmutablemap = "^0.1"
-optimistix = "^0.0.8"
-jax = "0.4.33"
+optimistix = "0.0.9"
+jax = "0.4.35"
 equinox = "0.11.8"
 
 [tool.poetry.group.test.dependencies]
@@ -34,7 +34,7 @@ optional = true
 sphinx-rtd-theme = "^2.0.0"
 sphinx = "^7.2.6"
 sphinxcontrib-bibtex = "^2.6.2"
-setuptools = "^69.0.3"
+setuptools = "^69.5.1"
 
 [build-system]
 requires = ["poetry-core"]
