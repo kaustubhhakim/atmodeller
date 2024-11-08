@@ -182,6 +182,9 @@ class ConstantFugacityConstraint(NamedTuple):
     """
 
     fugacity: ArrayLike
+    # TODO: This is a temporary hack so this class has the same number of arguments as for the
+    # redox protocol and hence the vmapping works
+    dummy_does_nothing: ArrayLike | None = None
 
     @property
     def value(self) -> ArrayLike:
@@ -369,7 +372,7 @@ class MassConstraints(NamedTuple):
             A dictionary of the values
         """
         out: dict[str, Array] = {
-            f"{key}_molecules": jnp.exp(jnp.asarray(value))
+            f"{key}_number": jnp.exp(jnp.asarray(value))
             for key, value in self.log_molecules.items()
         }
 
