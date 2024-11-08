@@ -78,7 +78,7 @@ def solve(
         options=options,
     )
 
-    jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+    # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
 
     return sol.value
 

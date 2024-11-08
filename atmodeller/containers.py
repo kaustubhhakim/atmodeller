@@ -315,7 +315,7 @@ class FugacityConstraints(NamedTuple):
                 vmap_axis: int | None = None
             else:
                 vmap_axis = 0
-            constraints_vmap[key] = type(constraint)(vmap_axis)  # type: ignore - container
+            constraints_vmap[key] = type(constraint)(vmap_axis, None)  # type: ignore - container
 
         return FugacityConstraints(ImmutableMap(constraints_vmap))  # type: ignore - container
 

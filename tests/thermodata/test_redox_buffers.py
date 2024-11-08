@@ -148,3 +148,27 @@ def test_IW_Hirschmann() -> None:
     )
 
     assert log10_fugacity_composite == approx(log10_fugacity_high_temperature, RTOL, ATOL)
+
+
+def test_IW_Hirschmann08_fixed_P() -> None:
+    """Tests the low temperature iron-wustite buffer with constant pressure
+
+    When the user sets an evaluation pressure the total pressure should not enter the calculation
+    of the fugacity.
+    """
+    # Define an evaluation pressure at 1 bar
+    buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann08(LOG10_SHIFT, 1)
+
+    log10_fugacity_low_pressure: ArrayLike = buffer.log10_fugacity(
+        TEST_BELOW_SWITCH_TEMPERATURE, TEST_LOW_PRESSURE
+    )
+    logger.info("log10_fugacity_low_pressure = %s", log10_fugacity_low_pressure)
+
+    log10_fugacity_high_pressure: ArrayLike = buffer.log10_fugacity(
+        TEST_BELOW_SWITCH_TEMPERATURE, TEST_HIGH_PRESSURE
+    )
+    logger.info("log10_fugacity_high_pressure = %s", log10_fugacity_high_pressure)
+
+    # The evaluation should be at 1 bar pressure and the input pressure ignored
+    assert log10_fugacity_low_pressure == approx(-23.93938230619323, RTOL, ATOL)
+    assert log10_fugacity_high_pressure == approx(-23.93938230619323, RTOL, ATOL)
