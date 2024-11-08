@@ -312,6 +312,14 @@ def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
 
 
 def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> ArrayLike:
+    """Converts Earth oceans to hydrogen mass
+
+    Args:
+        number_of_earth_oceans: Number of Earth oceans. Defaults to 1.
+
+    Returns:
+        Hydrogen mass
+    """
     h_grams: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: ArrayLike = h_grams * unit_conversion.g_to_kg
     return h_kg
