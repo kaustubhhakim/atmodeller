@@ -207,13 +207,10 @@ class InteriorAtmosphere:
     _solution_args: SolutionArguments
     _solver: Callable
 
-    def __init__(
-        self,
-        species: tuple[Species, ...],
-        tau: float = TAU,
-    ):
+    def __init__(self, species: tuple[Species, ...], tau: float = TAU):
         self.species: tuple[Species, ...] = species
         self.tau: float = tau
+        logger.info("species = %s", [species.name for species in self.species])
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
@@ -323,7 +320,9 @@ class InteriorAtmosphere:
             Fixed parameters
         """
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
+        stability_matrix: npt.NDArray[np.float_] = self.get_stability_matrix()
         gas_species_indices: tuple[int, ...] = self.get_gas_species_indices()
+        condensed_species_indices: tuple[int, ...] = self.get_condensed_species_indices()
         molar_masses: tuple[float, ...] = self.get_molar_masses()
         diatomic_oxygen_index: int = self.get_diatomic_oxygen_index()
 
@@ -355,8 +354,10 @@ class InteriorAtmosphere:
             formula_matrix=tuple(map(tuple, formula_matrix)),
             formula_matrix_constraints=tuple(map(tuple, formula_matrix_constraints)),
             reaction_matrix=tuple(map(tuple, reaction_matrix)),
+            stability_matrix=tuple(map(tuple, stability_matrix)),
             fugacity_matrix=tuple(map(tuple, fugacity_matrix)),
             gas_species_indices=gas_species_indices,
+            condensed_species_indices=condensed_species_indices,
             fugacity_species_indices=tuple(fugacity_species_indices),
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
@@ -473,6 +474,26 @@ class InteriorAtmosphere:
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
+
+    def get_stability_matrix(self) -> npt.NDArray[np.float_]:
+        """Gets the stability matrix.
+
+        Returns:
+            A matrix for the stability of species
+        """
+        reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
+        mask: npt.NDArray[np.bool_] = np.zeros_like(reaction_matrix, dtype=bool)
+
+        # Find the species to solve for stability
+        stability_bool: npt.NDArray[np.bool_] = np.array(
+            [species.solve_for_stability for species in self.species], dtype=bool
+        )
+        mask[:, stability_bool] = True
+
+        stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
+        logger.debug("stability_matrix = %s", stability_matrix)
+
+        return stability_matrix
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.

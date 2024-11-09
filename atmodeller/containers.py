@@ -430,6 +430,7 @@ class FixedParameters(NamedTuple):
         formula_matrix; Formula matrix
         formula_matrix_constraints: Formula matrix for applying mass constraints
         reaction_matrix: Reaction matrix
+        stability_matrix: Stability matrix
         fugacity_matrix: Fugacity constraint matrix
         gas_species_indices: Indices of gas species
         fugacity_species_indices: Indices of species to constrain the fugacity
@@ -446,10 +447,14 @@ class FixedParameters(NamedTuple):
     """Formula matrix for applying mass constraints"""
     reaction_matrix: tuple[tuple[float, ...], ...]
     """Reaction matrix"""
+    stability_matrix: tuple[tuple[float, ...], ...]
+    """Stability matrix"""
     fugacity_matrix: tuple[tuple[float, ...], ...]
     """Fugacity constraint matrix"""
     gas_species_indices: tuple[int, ...]
     """Indices of gas species"""
+    condensed_species_indices: tuple[int, ...]
+    """Indices of condensed species"""
     fugacity_species_indices: tuple[int, ...]
     """Indices of species to constrain the fugacity"""
     diatomic_oxygen_index: int
@@ -467,11 +472,13 @@ class Species(NamedTuple):
         data: Species data
         activity: Activity
         solubility: Solubility
+        solve_for_stability: Solve for stability
     """
 
     data: SpeciesData
     activity: ActivityProtocol
     solubility: SolubilityProtocol
+    solve_for_stability: bool
 
     @property
     def name(self) -> str:
@@ -483,19 +490,21 @@ class Species(NamedTuple):
         cls,
         species_name: str,
         activity: ActivityProtocol = CondensateActivity(),
+        solve_for_stability: bool = True,
     ) -> Self:
         """Creates a condensate
 
         Args:
             species_name: Species name, as it appears in the species dictionary
             activity: Activity. Defaults to unity activity.
+            solve_for_stability. Solve for stability. Defaults to True.
 
         Returns:
             A condensed species
         """
         species_data: SpeciesData = select_thermodata(species_name)
 
-        return cls(species_data, activity, NoSolubility())
+        return cls(species_data, activity, NoSolubility(), solve_for_stability)
 
     @classmethod
     def create_gas(
@@ -503,6 +512,7 @@ class Species(NamedTuple):
         species_name: str,
         activity: ActivityProtocol = IdealGas(),
         solubility: SolubilityProtocol = NoSolubility(),
+        solve_for_stability: bool = False,
     ) -> Self:
         """Creates a gas species
 
@@ -510,13 +520,14 @@ class Species(NamedTuple):
             species_name: Species name, as it appears in the species dictionary
             activity: Activity. Defaults to an ideal gas.
             solubility: Solubility. Defaults to no solubility.
+            solve_for_stability. Solve for stability. Defaults to False.
 
         Returns:
             A gas species
         """
         species_data: SpeciesData = select_thermodata(species_name)
 
-        return cls(species_data, activity, solubility)
+        return cls(species_data, activity, solubility, solve_for_stability)
 
 
 class Solution(NamedTuple):
