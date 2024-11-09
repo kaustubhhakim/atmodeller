@@ -143,6 +143,11 @@ class Output:
         return self._interior_atmosphere.species
 
     @property
+    def stability_species_mask(self) -> Array:
+        """Stability species mask"""
+        return jnp.array(self._interior_atmosphere.get_stability_species_mask())
+
+    @property
     def temperature(self) -> Array:
         """Temperature"""
         return jnp.asarray(self.planet.surface_temperature)
@@ -592,7 +597,19 @@ class Output:
             Log activity of all species
         """
         log_activity_without_stability: Array = self.log_activity_without_stability()
-        log_activity: Array = log_activity_without_stability - jnp.exp(self.log_stability)
+        log_activity_with_stability: Array = log_activity_without_stability - jnp.exp(
+            self.log_stability
+        )
+        condition_broadcasted = jnp.broadcast_to(
+            self.stability_species_mask, log_activity_without_stability.shape
+        )
+        logger.debug("condition_broadcasted = %s", condition_broadcasted)
+
+        log_activity: Array = jnp.where(
+            condition_broadcasted,
+            log_activity_with_stability,
+            log_activity_without_stability,
+        )
 
         return log_activity
 

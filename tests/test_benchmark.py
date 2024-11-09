@@ -32,7 +32,7 @@ from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferPr
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -322,17 +322,14 @@ def test_CHO_middle_temperature(helper) -> None:
 
 
 def test_CHO_low_temperature(helper) -> None:
-    """Tests C-H-O system at 450 K
+    """Tests C-H-O system at 450 K"""
 
-    Currently this test only passes if we solve for the stability of the gas species.
-    """
-
-    H2_g: Species = Species.create_gas("H2_g", solve_for_stability=True)
-    H2O_g: Species = Species.create_gas("H2O_g", solve_for_stability=True)
-    CO_g: Species = Species.create_gas("CO_g", solve_for_stability=True)
-    CO2_g: Species = Species.create_gas("CO2_g", solve_for_stability=True)
-    CH4_g: Species = Species.create_gas("CH4_g", solve_for_stability=True)
-    O2_g: Species = Species.create_gas("O2_g", solve_for_stability=True)
+    H2_g: Species = Species.create_gas("H2_g")
+    H2O_g: Species = Species.create_gas("H2O_g")
+    CO_g: Species = Species.create_gas("CO_g")
+    CO2_g: Species = Species.create_gas("CO2_g")
+    CH4_g: Species = Species.create_gas("CH4_g")
+    O2_g: Species = Species.create_gas("O2_g")
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=450.0)
@@ -352,7 +349,8 @@ def test_CHO_low_temperature(helper) -> None:
     initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
-    # For this case, reducing the fO2 is required for the solver to latch onto the solution
+    # Correcting for the low CO and O2 helps the solver to latch onto the solution
+    initial_log_number_density[2] = 30
     initial_log_number_density[5] = -INITIAL_LOG_NUMBER_DENSITY
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
         initial_log_number_density

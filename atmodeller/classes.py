@@ -320,9 +320,10 @@ class InteriorAtmosphere:
             Fixed parameters
         """
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
-        stability_matrix: npt.NDArray[np.float_] = self.get_stability_matrix()
+        reaction_stability_matrix: npt.NDArray[np.float_] = self.get_reaction_stability_matrix()
         gas_species_indices: tuple[int, ...] = self.get_gas_species_indices()
         condensed_species_indices: tuple[int, ...] = self.get_condensed_species_indices()
+        stability_species_indices: tuple[int, ...] = self.get_stability_species_indices()
         molar_masses: tuple[float, ...] = self.get_molar_masses()
         diatomic_oxygen_index: int = self.get_diatomic_oxygen_index()
 
@@ -354,7 +355,8 @@ class InteriorAtmosphere:
             formula_matrix=tuple(map(tuple, formula_matrix)),
             formula_matrix_constraints=tuple(map(tuple, formula_matrix_constraints)),
             reaction_matrix=tuple(map(tuple, reaction_matrix)),
-            stability_matrix=tuple(map(tuple, stability_matrix)),
+            reaction_stability_matrix=tuple(map(tuple, reaction_stability_matrix)),
+            stability_species_indices=stability_species_indices,
             fugacity_matrix=tuple(map(tuple, fugacity_matrix)),
             gas_species_indices=gas_species_indices,
             condensed_species_indices=condensed_species_indices,
@@ -475,28 +477,26 @@ class InteriorAtmosphere:
 
         return reaction_matrix
 
-    def get_stability_matrix(self) -> npt.NDArray[np.float_]:
-        """Gets the stability matrix.
+    def get_reaction_stability_matrix(self) -> npt.NDArray[np.float_]:
+        """Gets the reaction stability matrix.
 
         Returns:
-            A matrix for the stability of species
+            Reaction stability matrix
         """
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
         mask: npt.NDArray[np.bool_] = np.zeros_like(reaction_matrix, dtype=bool)
 
         if reaction_matrix.size > 0:
             # Find the species to solve for stability
-            stability_bool: npt.NDArray[np.bool_] = np.array(
-                [species.solve_for_stability for species in self.species], dtype=bool
-            )
+            stability_bool: npt.NDArray[np.bool_] = self.get_stability_species_mask()
             mask[:, stability_bool] = True
-            stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
+            reaction_stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
         else:
-            stability_matrix = reaction_matrix
+            reaction_stability_matrix = reaction_matrix
 
-        logger.debug("stability_matrix = %s", stability_matrix)
+        logger.debug("reaction_stability_matrix = %s", reaction_stability_matrix)
 
-        return stability_matrix
+        return reaction_stability_matrix
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.
@@ -532,6 +532,32 @@ class InteriorAtmosphere:
             Species names
         """
         return tuple([species_.name for species_ in self.species])
+
+    def get_stability_species_indices(self) -> tuple[int, ...]:
+        """Gets the indices of species to solve for stability
+
+        Returns:
+            Indices of the species to solve for stability
+        """
+        indices: list[int] = []
+        for nn, species_ in enumerate(self.species):
+            if species_.solve_for_stability:
+                indices.append(nn)
+
+        return tuple(indices)
+
+    def get_stability_species_mask(self) -> npt.NDArray[np.bool_]:
+        """Gets the stability species mask
+
+        Returns:
+            Mask for the species to solve for the stability
+        """
+        # Find the species to solve for stability
+        stability_bool: npt.NDArray[np.bool_] = np.array(
+            [species.solve_for_stability for species in self.species], dtype=np.bool_
+        )
+
+        return stability_bool
 
     def _get_solver_single(self) -> Callable:
         """Gets the solver for a single solve."""
