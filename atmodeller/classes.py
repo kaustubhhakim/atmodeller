@@ -635,4 +635,6 @@ class InteriorAtmosphere:
             quick_look_dict: dict[str, ArrayLike] = output.quick_look()
             logger.info("quick_look = %s", pprint.pformat(quick_look_dict))
 
+        output.to_excel("new_atmodeller_out")
+
         return output

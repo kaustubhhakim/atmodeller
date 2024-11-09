@@ -103,16 +103,17 @@ LOG_STABILITY_UPPER: float = 35
 
 Empirically determined.
 """
-TAU: float = 1.0e-72
-"""Tau scaling factor for species stability
+TAU: float = 1.0e-25
+"""Tau scaling factor for species stability :cite:p:`LKK16`.
 
 Tau effectively controls the minimum non-zero number density of unstable species. Formally, it
 defines the number density of an unstable pure condensate with an activity of 1/e, which
 corresponds to a log stability of zero.
 
-In practice, this default value of Tau is determined empirically for low-temperature cases where 
-Tau must be sufficiently small to permit the stability of O2. This prevents the number density of 
-O2 from being truncated which would result in inaccurate calculations.
+This value is typically appropriate for condensate stability only, but if you additionally apply 
+stability criteria to gas species you should reduce this value, maybe as low as 1e-60 to 1e-72 if
+you want to ensure you do not truncated O2 at low temperatures. Hence you can override this default
+using an argument to :class:`atmodeller.classes.InteriorAtmosphere`.
 """
 
 # Create the package logger.
