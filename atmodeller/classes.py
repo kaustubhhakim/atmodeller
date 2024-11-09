@@ -490,7 +490,6 @@ class InteriorAtmosphere:
                 [species.solve_for_stability for species in self.species], dtype=bool
             )
             mask[:, stability_bool] = True
-
             stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
         else:
             stability_matrix = reaction_matrix
