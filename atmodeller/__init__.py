@@ -23,7 +23,8 @@ __version__: str = "0.2.0"
 import logging
 
 import jax
-import numpy as jnp
+import jax.numpy as jnp
+import numpy as np
 from molmass import Formula
 from scipy import constants
 
@@ -75,11 +76,16 @@ Empirically determined. This value is mid-range between stable (more negative) a
 negative).
 """
 
+# Maximum x for which exp(x) is finite in 64-bit precision
+max_exp_input = np.log(np.finfo(np.float64).max)
+# Minimum x for which exp(x) is non-zero in 64-bit precision
+min_exp_input = np.log(jnp.finfo(np.float64).tiny)
+
 # Lower and upper bounds on the hypercube which contains the root
-LOG_NUMBER_DENSITY_LOWER: float = -100
+LOG_NUMBER_DENSITY_LOWER: float = -120
 """Lower log number density for a species
 
-At 3000 K this corresponds to 1.54E-68 bar and at 298 K this corresponds to 1.5E-69 bar.
+At 3000 K this corresponds to 3.17E-77 bar and at 298 K this corresponds to 3.16E-78 bar.
 """
 LOG_NUMBER_DENSITY_UPPER: float = 70
 """Upper log number density for a species
@@ -87,17 +93,17 @@ LOG_NUMBER_DENSITY_UPPER: float = 70
 At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this corresponds to 103494 bar
 (10.3 GPa).
 """
-LOG_STABILITY_LOWER: float = -200
+LOG_STABILITY_LOWER: float = -700  # basically the same as min_exp_input
 """Lower stability for a species
 
-Empiricially determined.
+Derived to ensure that the exponential function exp(x) does not underflow to zero
 """
-LOG_STABILITY_UPPER: float = 5
+LOG_STABILITY_UPPER: float = 35
 """Upper stability for a species
 
 Empirically determined.
 """
-TAU: float = 1.0e-60
+TAU: float = 1.0e-72
 """Tau scaling factor for species stability
 
 Tau effectively controls the minimum non-zero number density of unstable species. Formally, it
