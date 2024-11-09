@@ -78,7 +78,7 @@ def solve(
         options=options,
     )
 
-    # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+    jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
 
     return sol.value
 
@@ -101,8 +101,12 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     mass_constraints: MassConstraints = traced_parameters.mass_constraints
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
 
+    # TODO: Can possibly remove?
+    # condensed_species_indices: Array = jnp.array(fixed_parameters.condensed_species_indices)
+
     # For the objective function we only need the formula matrix for elements with mass constraints
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
+    stability_matrix: Array = jnp.array(fixed_parameters.stability_matrix)
     fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
     formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
 
@@ -119,6 +123,13 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # (fugacities) from bar to effective number density.
     mask: Array = jnp.zeros_like(log_activity, dtype=bool)
     mask = mask.at[gas_species_indices].set(True)
+    # jax.debug.print("mask = {out}", out=mask)
+
+    # HACK: Create the inverse mask for condensates
+    # Can possibly remove?
+    # condensate_mask: Array = jnp.logical_not(mask)
+    # jax.debug.print("condensate_mask here = {out}", out=condensate_mask)
+
     log_activity_number_density: Array = get_log_number_density_from_log_pressure(
         log_activity, temperature
     )
@@ -139,9 +150,11 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
             reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
         )
         # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
+
         # Account for species stability.
-        reaction_residual = reaction_residual - reaction_matrix.dot(safe_exp(log_stability))
-        # jax.debug.print("reaction_residual with stability = {out}", out=reaction_residual)
+        reaction_residual = reaction_residual - stability_matrix.dot(safe_exp(log_stability))
+        # jax.debug.print("reaction_residual = {out}", out=reaction_residual)
+
         residual = jnp.concatenate([residual, reaction_residual])
 
     # Fugacity constraints residual
@@ -161,6 +174,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         total_pressure: Array = get_atmosphere_pressure(
             fixed_parameters, log_number_density, temperature
         )
+        # TODO: Check if there is a need to consider the stability of the species for which the
+        # fugacity constraints is being applied.
         fugacity_residual = fugacity_residual - fugacity_constraints.log_number_density(
             temperature, total_pressure
         )
@@ -185,13 +200,28 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_element_density: Array = jnp.log(element_density + element_melt_density)
         mass_residual = log_element_density - mass_constraints.log_number_density(log_volume)
         # jax.debug.print("mass_residual = {out}", out=mass_residual)
+
         # Stability residual
         # Get minimum scaled log number of molecules
         log_min_number_density: Array = jnp.min(
             mass_constraints.log_number_density(log_volume)
         ) + jnp.log(fixed_parameters.tau)
+
+        # HACK: Residual if stability is a consideration
+        # TODO: Can this be modified with the stability matrix?
         stability_residual: Array = log_number_density + log_stability - log_min_number_density
+        # Otherwise stability is not a consideration
+        # stability_residual = jnp.take(stability_residual, condensed_species_indices)
+
         # jax.debug.print("stability_residual = {out}", out=stability_residual)
+
+        # TODO: Testing only applying stability residual constraints to condensed species
+        # mask: Array = jnp.zeros_like(log_stability, dtype=bool)
+        # mask = mask.at[gas_species_indices].set(False)
+        # jax.debug.print("mask = {out}", out=mask)
+        # stability_residual = jnp.where(inv_mask, stability_residual, 0.0)
+        # jax.debug.print("stability_residual = {out}", out=stability_residual)
+
         residual = jnp.concatenate([residual, mass_residual, stability_residual])
 
     # jax.debug.print("residual = {out}", out=residual)
