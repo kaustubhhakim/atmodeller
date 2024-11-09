@@ -322,14 +322,17 @@ def test_CHO_middle_temperature(helper) -> None:
 
 
 def test_CHO_low_temperature(helper) -> None:
-    """Tests C-H-O system at 450 K"""
+    """Tests C-H-O system at 450 K
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    O2_g: Species = Species.create_gas("O2_g")
+    Currently this test only passes if we solve for the stability of the gas species.
+    """
+
+    H2_g: Species = Species.create_gas("H2_g", solve_for_stability=True)
+    H2O_g: Species = Species.create_gas("H2O_g", solve_for_stability=True)
+    CO_g: Species = Species.create_gas("CO_g", solve_for_stability=True)
+    CO2_g: Species = Species.create_gas("CO2_g", solve_for_stability=True)
+    CH4_g: Species = Species.create_gas("CH4_g", solve_for_stability=True)
+    O2_g: Species = Species.create_gas("O2_g", solve_for_stability=True)
 
     species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
     planet: Planet = Planet(surface_temperature=450.0)
