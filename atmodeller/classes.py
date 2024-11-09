@@ -484,13 +484,17 @@ class InteriorAtmosphere:
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
         mask: npt.NDArray[np.bool_] = np.zeros_like(reaction_matrix, dtype=bool)
 
-        # Find the species to solve for stability
-        stability_bool: npt.NDArray[np.bool_] = np.array(
-            [species.solve_for_stability for species in self.species], dtype=bool
-        )
-        mask[:, stability_bool] = True
+        if reaction_matrix.size > 0:
+            # Find the species to solve for stability
+            stability_bool: npt.NDArray[np.bool_] = np.array(
+                [species.solve_for_stability for species in self.species], dtype=bool
+            )
+            mask[:, stability_bool] = True
 
-        stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
+            stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
+        else:
+            stability_matrix = reaction_matrix
+
         logger.debug("stability_matrix = %s", stability_matrix)
 
         return stability_matrix
