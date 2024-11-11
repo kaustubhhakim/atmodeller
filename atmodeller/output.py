@@ -226,12 +226,12 @@ class Output:
             pressure: Array = out["atmosphere"]["pressure"]
             buffer: RedoxBufferProtocol = IronWustiteBuffer()
             # Shift at 1 bar
-            buffer_at_one_bar: Array = buffer.log10_fugacity(temperature, 1.0)
+            buffer_at_one_bar: ArrayLike = buffer.log10_fugacity(temperature, 1.0)
             log10_shift_at_one_bar: Array = log10_fugacity - buffer_at_one_bar
             logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
             out["O2_g"]["log10dIW_1_bar"] = log10_shift_at_one_bar
             # Shift at actual pressure
-            buffer_at_P: Array = buffer.log10_fugacity(temperature, pressure)
+            buffer_at_P: ArrayLike = buffer.log10_fugacity(temperature, pressure)
             log10_shift_at_P: Array = log10_fugacity - buffer_at_P
             logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P

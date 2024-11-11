@@ -46,6 +46,10 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
     evaluation_pressure: ArrayLike | None
     _calibration: ExperimentalCalibrationNew
 
+    def __init__(
+        self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0
+    ): ...
+
     @property
     def calibration(self) -> ExperimentalCalibrationNew: ...
 
@@ -54,6 +58,8 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
         return self.log10_shift
 
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
