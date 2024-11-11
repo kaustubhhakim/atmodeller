@@ -72,31 +72,6 @@ class IdealGas(PyTreeNoData, RealGas):
         return self.ideal_volume(temperature, pressure)
 
 
-# Hack for impose the simplest possible EOS with real gas like behaviour
-@register_pytree_node_class
-class IdealGas2(PyTreeNoData, RealGas):
-    r"""Ideal gas equation of state:
-
-    .. math::
-
-        R T = P V
-
-    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`P` is pressure, and
-    :math:`V` is volume.
-    """
-
-    @override
-    @jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        # Update coefficient in log below to change fugacity coefficient
-        return self.ideal_log_fugacity(temperature, pressure) + jnp.log(6166.825466)
-
-    @override
-    @jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        return self.ideal_volume(temperature, pressure)
-
-
 @register_pytree_node_class
 class BeattieBridgeman(RealGas):
     r"""Beattie-Bridgeman equation :cite:p:`HWZ58{Equation 1}`.
