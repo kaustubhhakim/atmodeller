@@ -75,9 +75,9 @@ def test_fO2_holley(helper) -> None:
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
-        "H2O_g": 33.04668613839122,
-        "H2_g": 71.59251832343173,
-        "O2_g": 1.547107185208223e-21,
+        "H2O_g": 32.77125989799751,
+        "H2_g": 71.50366765504069,
+        "O2_g": 1.525466019972283e-21,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)

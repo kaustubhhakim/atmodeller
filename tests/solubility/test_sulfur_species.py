@@ -64,7 +64,7 @@ def test_S2_sulfate_andesite_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_andesite_boulliung23"]
-    target_concentration: ArrayLike = 0.00026017525012647343
+    target_concentration: ArrayLike = 0.0002601378182149385
 
     check_values.concentration(
         function_name,
@@ -82,7 +82,7 @@ def test_S2_sulfide_andesite_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_andesite_boulliung23"]
-    target_concentration: ArrayLike = 2765.4015601584474
+    target_concentration: ArrayLike = 2765.534194086474
 
     check_values.concentration(
         function_name,
@@ -100,7 +100,7 @@ def test_S2_andesite_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_andesite_boulliung23"]
-    target_concentration: ArrayLike = 2765.4018203336977
+    target_concentration: ArrayLike = 2765.5344542242924
 
     check_values.concentration(
         function_name,
@@ -118,7 +118,7 @@ def test_S2_sulfate_basalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_basalt_boulliung23"]
-    target_concentration: ArrayLike = 0.000205313138905436
+    target_concentration: ArrayLike = 0.00020528360011091678
 
     check_values.concentration(
         function_name,
@@ -136,7 +136,7 @@ def test_S2_sulfide_basalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_basalt_boulliung23"]
-    target_concentration: ArrayLike = 7575.8488900346765
+    target_concentration: ArrayLike = 7576.212242182479
 
     check_values.concentration(
         function_name,
@@ -154,7 +154,7 @@ def test_S2_basalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_basalt_boulliung23"]
-    target_concentration: ArrayLike = 7575.849095347816
+    target_concentration: ArrayLike = 7576.212447466079
 
     check_values.concentration(
         function_name,
@@ -172,7 +172,7 @@ def test_S2_sulfate_trachybasalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_trachybasalt_boulliung23"]
-    target_concentration: ArrayLike = 0.0007003728959148125
+    target_concentration: ArrayLike = 0.0007002721319248917
 
     check_values.concentration(
         function_name,
@@ -190,7 +190,7 @@ def test_S2_sulfide_trachybasalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_trachybasalt_boulliung23"]
-    target_concentration: ArrayLike = 9573.143159494639
+    target_concentration: ArrayLike = 9573.602305681254
 
     check_values.concentration(
         function_name,
@@ -208,7 +208,7 @@ def test_S2_trachybasalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_trachybasalt_boulliung23"]
-    target_concentration: ArrayLike = 9573.143859867534
+    target_concentration: ArrayLike = 9573.603005953386
 
     check_values.concentration(
         function_name,

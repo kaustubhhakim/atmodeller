@@ -18,7 +18,7 @@
 
 import sys
 from abc import ABC, abstractmethod
-from typing import Protocol
+from typing import Protocol, Type
 
 import jax.numpy as jnp
 from jax import Array, jit
@@ -61,22 +61,23 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
 class RedoxBuffer(ABC, RedoxBufferProtocol):
     """Redox buffer
 
-    Child classes must set self._calibration and self._evaluation_pressure_scaling
+    Child classes must set self._calibration
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
-        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to None, meaning use
-            the total pressure which is passed in as an argument.
+        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
+            the total pressure will be used, but this can give rise to multiple solutions and
+            should be used with caution.
 
     Attributes:
         log10_shift: Log10 shift relative to the buffer
-        evaluation_pressure: Pressure to evaluate the buffer at or None
+        evaluation_pressure: Pressure to evaluate the buffer at.
     """
 
     def __init__(
         self,
         log10_shift: ArrayLike = 0,
-        evaluation_pressure: ArrayLike | None = None,
+        evaluation_pressure: ArrayLike | None = 1.0,
     ):
         self.log10_shift: ArrayLike = log10_shift
         self.evaluation_pressure: ArrayLike | None = evaluation_pressure
@@ -154,8 +155,9 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
-        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to None, meaning use
-            the total pressure which is passed in as an argument.
+        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
+            the total pressure will be used, but this can give rise to multiple solutions and
+            should be used with caution.
 
     Attributes:
         log10_shift: Log10 shift relative to the buffer.
@@ -163,7 +165,7 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
     """
 
     @override
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = None):
+    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0):
         self._calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
             pressure_max=27.5 * unit_conversion.GPa_to_bar
         )
@@ -207,8 +209,9 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to zero.
-        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to None, meaning use
-            the total pressure which is passed in as an argument.
+        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
+            the total pressure will be used, but this can give rise to multiple solutions and
+            should be used with caution.
 
     Attributes:
         log10_shift: Log10 shift relative to the buffer
@@ -216,7 +219,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
     """
 
     @override
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = None):
+    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0):
         super().__init__(log10_shift, evaluation_pressure)
         self._calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
             temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
@@ -367,7 +370,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
     def __init__(
         self,
         log10_shift: ArrayLike = 0,
-        evaluation_pressure: ArrayLike | None = None,
+        evaluation_pressure: ArrayLike | None = 1.0,
     ):
         super().__init__(log10_shift, evaluation_pressure)
         self._low_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann08(
@@ -427,4 +430,4 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         return buffer_value
 
 
-IronWustiteBuffer = IronWustiteBufferHirschmann
+IronWustiteBuffer: Type[RedoxBufferProtocol] = IronWustiteBufferHirschmann

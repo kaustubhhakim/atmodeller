@@ -57,7 +57,7 @@ from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 # from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -129,9 +129,9 @@ def test_H_fO2(helper) -> None:
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
-        "H2O_g": 0.25708003342259883,
-        "H2_g": 0.2491577248312551,
-        "O2_g": 8.83804258138063e-08,
+        "H2O_g": 0.2570800742364775,
+        "H2_g": 0.2491511264610601,
+        "O2_g": 8.838513516896038e-08,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -168,9 +168,9 @@ def test_H_fO2_fH2(helper) -> None:
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([3.262689650880299e-09, 1.031753073747030e-07, 3.262689895293855e-06]),
+        "H2O_g": np.array([3.262913506271090e-09, 1.031823848794260e-07, 3.262913506271089e-06]),
         "H2_g": np.array([1.000000000000005e-08, 9.999999999999959e-08, 1.000000000000000e-06]),
-        "O2_g": np.array([8.837300808668651e-09, 8.837301052658971e-08, 8.837302132702910e-07]),
+        "O2_g": np.array([8.838513516896060e-09, 8.838513516896038e-08, 8.838513516896018e-07]),
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -216,17 +216,27 @@ def test_H_fO2_batch_temperature(helper) -> None:
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array(
-            [0.25666525060921, 0.257080033422599, 0.25721776694131, 0.257274566532845]
+            [
+                2.566653037020448e-01,
+                2.570800742364757e-01,
+                2.572178041535549e-01,
+                2.572746043480848e-01,
+            ]
         ),
         "H2_g": np.array(
-            [0.313371131998901, 0.249157724831257, 0.226576661188286, 0.219958433575134]
+            [
+                3.133632393608037e-01,
+                2.491511264610584e-01,
+                2.265704456625875e-01,
+                2.199521409043987e-01,
+            ]
         ),
         "O2_g": np.array(
             [
-                2.394072903442518e-12,
-                8.838042581380567e-08,
-                4.544719798221670e-05,
-                2.739265090516618e-03,
+                2.394194493859141e-12,
+                8.838513516896038e-08,
+                4.544970468047975e-05,
+                2.739422634823809e-03,
             ]
         ),
     }
@@ -268,22 +278,27 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
 
     target: dict[str, ArrayLike] = {
         "H2O_g": np.array(
-            [0.00029780832006, 0.160943544377939, 0.258302012780794, 0.258540269218237]
+            [
+                2.974916728388850e-04,
+                1.609262626310640e-01,
+                2.583020136413676e-01,
+                2.585402668639946e-01,
+            ]
         ),
         "H2_g": np.array(
             [
-                2.883109764678719e01,
-                7.237950850551736e00,
-                5.393537121196381e-03,
-                2.425598009366862e-06,
+                2.883163373152490e01,
+                7.239157580397396e00,
+                5.393312233908341e-03,
+                2.505662833497315e-06,
             ]
         ),
         "O2_g": np.array(
             [
-                8.857668173953893e-18,
-                4.104724093203387e-11,
-                1.904041209642506e-04,
-                9.431631962648368e02,
+                8.838513516896005e-18,
+                4.102474564576031e-11,
+                1.904200012911665e-04,
+                8.838513516896137e02,
             ]
         ),
     }
@@ -320,9 +335,9 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([2.570800334225988e-01, 2.426344578243460e01, 1.661069629540155e03]),
-        "H2_g": np.array([2.491577248312551e-01, 2.347358252845090e01, 1.448607479781265e03]),
-        "O2_g": np.array([8.838042581380630e-08, 8.869809838835624e-08, 1.091546738162749e-07]),
+        "H2O_g": np.array([2.570800742364757e-01, 2.426110356931991e01, 1.610286613431932e03]),
+        "H2_g": np.array([2.491511264610584e-01, 2.351283467393216e01, 1.560621626756960e03]),
+        "O2_g": np.array([8.838513516896038e-08, 8.838513516896038e-08, 8.838513516896102e-08]),
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -362,11 +377,11 @@ def test_H_and_C(helper) -> None:
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
-        "CO2_g": 13.468919648305025,
-        "CO_g": 59.63530829377201,
-        "H2O_g": 0.25824676047561873,
-        "H2_g": 0.24960964905685357,
-        "O2_g": 8.886180538941781e-08,
+        "CO2_g": 13.43793686555727,
+        "CO_g": 59.65835224848439,
+        "H2O_g": 0.2582458752325180,
+        "H2_g": 0.2502809714412906,
+        "O2_g": 8.838513516896038e-08,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
