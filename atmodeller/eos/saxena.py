@@ -37,7 +37,6 @@ Examples:
         fugacity_coefficient = co_model.fugacity_coefficient(temperature=2000, pressure=1000)
         print(fugacity_coefficient)
 """
-# Use symbols from the relevant papers for consistency so pylint: disable=C0103
 
 from __future__ import annotations
 

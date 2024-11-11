@@ -16,8 +16,6 @@
 #
 """Core classes and functions for thermochemical data"""
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 import sys
 from typing import NamedTuple
 

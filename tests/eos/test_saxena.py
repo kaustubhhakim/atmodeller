@@ -16,8 +16,6 @@
 #
 """Tests for the EOS models from :cite:t:`SF87,SF87a,SF88,SS92`"""
 
-# Convenient to use species chemical formulae so pylint: disable=invalid-name
-
 from __future__ import annotations
 
 import logging

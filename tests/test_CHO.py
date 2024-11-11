@@ -16,8 +16,6 @@
 #
 """Tests for C-H-O systems to test some of the main functionality of atmodeller"""
 
-# Want to use chemistry symbols so pylint: disable=invalid-name
-
 import logging
 
 import jax.numpy as jnp

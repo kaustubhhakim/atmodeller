@@ -20,7 +20,7 @@ import sphinx.builders.latex.transforms
 # -- Project information -----------------------------------------------------
 
 project = "Atmodeller"
-copyright = "2024, Dan J. Bower"  # Created by Sphinx, so pylint: disable=W0622
+copyright = "2024, Dan J. Bower"
 author = "Dan J. Bower"
 
 # The full version, including alpha/beta/rc tags

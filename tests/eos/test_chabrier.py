@@ -16,8 +16,6 @@
 #
 """Tests for the EOS models from :cite:t:`CD21`"""
 
-# Convenient to use scientific abbreviations so pylint: disable=invalid-name
-
 from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8

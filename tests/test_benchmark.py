@@ -16,8 +16,6 @@
 #
 """Comparisons with FactSage 8.2 and FastChem 3.1.1"""
 
-# Want to use chemistry symbols so pylint: disable=invalid-name
-
 import logging
 
 import numpy as np

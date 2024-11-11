@@ -16,8 +16,6 @@
 #
 """Tests solubility laws for carbon species"""
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 import inspect
 import logging
 

@@ -16,8 +16,6 @@
 #
 """Tests for the EOS models from :cite:t:`HWZ58`"""
 
-# Convenient to use species chemical formulae so pylint: disable=invalid-name
-
 from atmodeller.utilities import unit_conversion
 
 # Probably due to rounding of the model parameters in the paper, some compressibilities in the

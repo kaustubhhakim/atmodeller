@@ -16,8 +16,6 @@
 #
 """Redox buffers"""
 
-# Convenient to use fO2 so pylint: disable=invalid-name
-
 import sys
 from abc import ABC, abstractmethod
 from typing import Protocol

@@ -231,10 +231,8 @@ class Output:
             logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
             out["O2_g"]["log10dIW_1_bar"] = log10_shift_at_one_bar
             # Shift at actual pressure
-            # pylint: disable=invalid-name
             buffer_at_P: Array = buffer.log10_fugacity(temperature, pressure)
             log10_shift_at_P: Array = log10_fugacity - buffer_at_P
-            # pylint: enable=invalid-name
             logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
@@ -395,9 +393,7 @@ class Output:
         )
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
-            # pylint: disable=invalid-name
             H_total_moles: Array = out["total_moles"][:, index]
-            # pylint: enable=invalid-name
             out["logarithmic_abundance"] = (
                 jnp.log10(out["total_moles"] / H_total_moles[:, jnp.newaxis]) + 12
             )
@@ -787,7 +783,7 @@ class Output:
         out: dict[str, pd.DataFrame] = self.to_dataframes()
         output_file: Path = Path(f"{file_prefix}.xlsx")
 
-        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:  # pylint: disable=E0110
+        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             for df_name, df in out.items():
                 df.to_excel(writer, sheet_name=df_name, index=True)
 

@@ -471,7 +471,6 @@ def get_log_pressure_from_log_number_density(
     return log_pressure
 
 
-# pylint: disable=invalid-name
 @jit
 def get_log_Kp(
     species: tuple[Species, ...], reaction_matrix: Array, temperature: ArrayLike
@@ -497,9 +496,6 @@ def get_log_Kp(
     return log_Kp
 
 
-# pylint: enable=invalid-name
-
-
 @jit
 def get_log_reaction_equilibrium_constant(
     fixed_parameters: FixedParameters,
@@ -518,14 +514,12 @@ def get_log_reaction_equilibrium_constant(
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
 
-    # pylint: disable=invalid-name
     log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
     # jax.debug.print("lnKp = {out}", out=lnKp)
     delta_n: Array = jnp.sum(jnp.take(reaction_matrix, gas_species_indices, axis=1), axis=1)
     # jax.debug.print("delta_n = {out}", out=delta_n)
     log_Kc: Array = log_Kp - delta_n * (jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature))
     # jax.debug.print("log10Kc = {out}", out=log_Kc)
-    # pylint: enable=invalid-name
 
     return log_Kc
 

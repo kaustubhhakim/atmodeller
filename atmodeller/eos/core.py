@@ -19,8 +19,6 @@
 Units for temperature and pressure are K and bar, respectively.
 """
 
-# Use symbols from the relevant papers for consistency so pylint: disable=C0103
-
 import logging
 import sys
 from abc import ABC, abstractmethod

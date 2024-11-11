@@ -16,8 +16,6 @@
 #
 """Tests solubility laws for other species"""
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 import inspect
 import logging
 

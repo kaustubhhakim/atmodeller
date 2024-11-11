@@ -60,7 +60,6 @@ class SolubilityProtocol(Protocol):
         fO2: ArrayLike,
     ) -> ArrayLike: ...
 
-    # Want to used fO2 so pylint: disable=invalid-name
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ): ...

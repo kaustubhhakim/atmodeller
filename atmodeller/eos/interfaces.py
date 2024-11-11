@@ -16,8 +16,6 @@
 #
 """Interfaces for real gas equations of state"""
 
-# Use symbols from the relevant papers for consistency so pylint: disable=C0103
-
 from __future__ import annotations
 
 import logging

@@ -19,8 +19,6 @@
 For every law there should be a test in the test suite.
 """
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 import sys
 
 import jax.numpy as jnp

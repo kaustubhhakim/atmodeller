@@ -269,7 +269,6 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
 class UnitConversion(NamedTuple):
     """Unit conversions"""
 
-    # Convenient to use scientific abbreviation so pylint: disable=invalid-name
     atmosphere_to_bar: float = ATMOSPHERE
     bar_to_Pa: float = 1.0e5
     bar_to_GPa: float = 1.0e-4
@@ -284,7 +283,6 @@ class UnitConversion(NamedTuple):
     m3_bar_to_J: float = 1.0e5
     J_to_m3_bar: float = 1.0e-5
     litre_to_m3: float = 1.0e-3
-    # pylint: enable=invalid-name
 
 
 unit_conversion = UnitConversion()
@@ -342,10 +340,8 @@ class ExperimentalCalibrationNew(NamedTuple):
     temperature_max: float | None = None
     pressure_min: float = PRESSURE_REFERENCE
     pressure_max: float | None = None
-    # convenient to use fO2 so pylint: disable=invalid-name
     log10_fO2_min: float | None = None
     log10_fO2_max: float | None = None
-    # pylint: enable=invalid-name
 
 
 class PyTreeNoData:

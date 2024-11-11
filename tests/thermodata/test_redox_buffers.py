@@ -16,8 +16,6 @@
 #
 """Tests redox buffers"""
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 import logging
 
 from jax.typing import ArrayLike

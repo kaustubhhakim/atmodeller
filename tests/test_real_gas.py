@@ -16,8 +16,6 @@
 #
 """Tests for systems with real gases"""
 
-# Want to use chemistry symbols so pylint: disable=invalid-name
-
 import logging
 
 import numpy as np
@@ -25,7 +23,7 @@ import optimistix as optx
 import pytest
 from jax.typing import ArrayLike
 
-from atmodeller import INITIAL_LOG_STABILITY, __version__, debug_logger
+from atmodeller import INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, SolverParameters, Species
 from atmodeller.eos.core import RealGas

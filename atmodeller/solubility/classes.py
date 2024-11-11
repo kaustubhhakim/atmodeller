@@ -16,8 +16,6 @@
 #
 """Abstract and concrete classes for solubility laws"""
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 import sys
 from abc import ABC, abstractmethod
 
@@ -76,7 +74,7 @@ class NoSolubility(PyTreeNoData, Solubility):
         fugacity: ArrayLike,
         temperature: ArrayLike,
         pressure: ArrayLike,
-        fO2: ArrayLike,  # Convenient to use fO2 so pylint: disable=invalid-name
+        fO2: ArrayLike,
     ) -> ArrayLike:
         del fugacity
         del temperature

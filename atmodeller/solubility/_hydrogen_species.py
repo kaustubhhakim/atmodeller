@@ -19,8 +19,6 @@
 For every law there should be a test in the test suite.
 """
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.classes import SolubilityPowerLaw, SolubilityPowerLawLog10
 

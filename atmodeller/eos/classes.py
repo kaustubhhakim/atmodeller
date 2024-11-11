@@ -22,7 +22,6 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
 
-import jax
 import jax.numpy as jnp
 import optimistix as optx
 import pandas as pd
@@ -124,7 +123,6 @@ class BeattieBridgeman(RealGas):
         calibration: Experimental calibration. Defaults to empty.
     """
 
-    # Convenient to use symbols from the paper so pylint: disable=invalid-name
     def __init__(
         self,
         A0: float,
@@ -138,8 +136,6 @@ class BeattieBridgeman(RealGas):
         self._B0: float = B0
         self._b: float = b
         self._c: float = c
-
-    # pylint: enable=invalid-name
 
     @jit
     def _objective_function(
@@ -277,7 +273,6 @@ class BeattieBridgeman(RealGas):
         return cls(**aux_data)
 
 
-# Convenient to use P, T, H2, and He as names so pylint: disable=invalid-name
 @register_pytree_node_class
 class Chabrier(RealGas):
     r"""Chabrier EOS from :cite:t:`CD21`
@@ -414,6 +409,3 @@ class Chabrier(RealGas):
     def tree_unflatten(cls, aux_data, children) -> Self:
         del children
         return cls(**aux_data)
-
-
-# pylint: enable=invalid-name

@@ -16,8 +16,6 @@
 #
 """Tests for the EOS models from :cite:t:`HP91,HP98`"""
 
-# Convenient to use acroynms and symbol names so pylint: disable=invalid-name
-
 from __future__ import annotations
 
 import logging

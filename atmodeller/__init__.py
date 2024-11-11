@@ -187,10 +187,9 @@ def debug_file_logger() -> logging.Logger:
     return package_logger
 
 
-# pylint: disable=wrong-import-position
-from atmodeller.classes import InteriorAtmosphere
-from atmodeller.containers import Planet, SolverParameters, Species
-from atmodeller.utilities import (
+from atmodeller.classes import InteriorAtmosphere  # noqa: E402, F401
+from atmodeller.containers import Planet, SolverParameters, Species  # noqa: E402, F401
+from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,
     earth_oceans_to_hydrogen_mass,
 )

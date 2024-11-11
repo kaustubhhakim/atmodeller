@@ -16,8 +16,6 @@
 #
 """Utilities for tests"""
 
-# Want to use chemistry symbols so pylint: disable=invalid-name
-
 import logging
 
 import numpy as np

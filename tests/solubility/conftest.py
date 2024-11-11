@@ -16,8 +16,6 @@
 #
 """Utilities for tests"""
 
-# Convenient to use chemical formulas so pylint: disable=invalid-name
-
 import logging
 
 import pytest
