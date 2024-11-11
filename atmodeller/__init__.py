@@ -69,11 +69,11 @@ INITIAL_LOG_NUMBER_DENSITY: float = 50.0
 
 Empiricially determined. This value is mid-range for Earth-like planets.
 """
-INITIAL_LOG_STABILITY: float = -70.0
+INITIAL_LOG_STABILITY: float = -140.0
 """Initial log stability
 
-Empirically determined. This value is mid-range between stable (more negative) and unstable (less
-negative).
+Empirically determined. Preliminary testing seems to reveal that starting from a large negative 
+value improves the performance of the solver. This asserts that all species are stable.
 """
 
 # Maximum x for which exp(x) is finite in 64-bit precision
