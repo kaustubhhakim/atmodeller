@@ -221,6 +221,8 @@ class RedlichKwongABC(RealGas, ABC):
     where :math:`P` is pressure, :math:`T` is temperature, :math:`V` is the molar volume, :math:`R`
     the gas constant, :math:`a` corrects for the attractive potential of molecules, and :math:`b`
     corrects for the volume.
+
+    This employs an approximation to analytically determine the volume and the volume integral.
     """
 
     @abstractmethod
@@ -494,100 +496,6 @@ class RealGasBounded(RealGas):
 #         scaled_temperature: float = temperature / self.critical_temperature
 
 #         return scaled_temperature
-
-
-# @dataclass(kw_only=True)
-# class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
-#     """A Modified Redlich Kwong (MRK) EOS in explicit form"""
-
-#     @override
-#     def a(self, temperature: float) -> Array:
-#         r"""MRK `a` parameter from :attr:`a_coefficients` :cite:p:`HP91{Equation 9}`
-
-#         Args:
-#             temperature: Temperature in K
-
-#         Returns:
-#             MRK `a` parameter in
-#             :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
-#         """
-#         a: Array = (
-#             self.a_coefficients[0] * self.critical_temperature ** (5.0 / 2)
-#             + self.a_coefficients[1] * self.critical_temperature ** (3.0 / 2) * temperature
-#             + self.a_coefficients[2] * self.critical_temperature ** (1.0 / 2) * temperature**2
-#         )
-#         a = a / self.critical_pressure
-
-#         return a
-
-#     @property
-#     def b(self) -> float:
-#         r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`.
-
-#         Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
-#         """
-#         b: float = self.b0 * self.critical_temperature / self.critical_pressure
-
-#         return b
-
-#     @override
-#     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-#         r"""Volume-explicit equation :cite:p:`HP91{Equation 7}`
-
-#         Without complications of critical phenomena the MRK equation can be simplified using the
-#         approximation:
-
-#         .. math::
-
-#             V \sim \frac{RT}{P} + b
-
-#         where :math:`V` is volume, :math:`R` is the gas constant, :math:`T` is temperature,
-#         :math:`P` is pressure, and :math:`b` is :attr:`b`.
-
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-
-#         Returns:
-#             MRK volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
-#         """
-#         volume: Array = (
-#             jnp.sqrt(temperature)
-#             * -self.a(temperature)
-#             * GAS_CONSTANT_BAR
-#             / (GAS_CONSTANT_BAR * temperature + self.b * pressure)
-#             / (GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
-#             + GAS_CONSTANT_BAR * temperature / pressure
-#             + self.b
-#         )
-
-#         return volume
-
-#     @override
-#     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-#         r"""Volume-explicit integral :cite:p:`HP91{Equation 8}`
-
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-#         """
-#         volume_integral: Array = (
-#             GAS_CONSTANT_BAR * temperature * jnp.log(pressure)
-#             + self.b * pressure
-#             + self.a(temperature)
-#             / self.b
-#             / jnp.sqrt(temperature)
-#             * (
-#                 jnp.log(GAS_CONSTANT_BAR * temperature + self.b * pressure)
-#                 - jnp.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
-#             )
-#         )
-#         volume_integral = volume_integral * unit_conversion.m3_bar_to_J
-
-#         return volume_integral
 
 
 # # TODO: Update to support JAX
