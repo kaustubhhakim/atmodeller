@@ -27,7 +27,6 @@ Usage:
 
 import logging
 from pathlib import Path
-from typing import Callable
 
 from atmodeller import ATMOSPHERE
 from atmodeller.eos.classes import BeattieBridgeman, Chabrier, MRKCorrespondingStatesHP91
@@ -55,7 +54,7 @@ H2_He_Y0297_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
 
 # endregion
 
-# region Holland
+# region Holland and Powell (1991, 2011)
 
 CO2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2_g")
 """CO2 MRK corresponding states :cite:p:`HP91`"""
@@ -79,12 +78,21 @@ H2S_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S_g")
 # Coefficients from Table I, which must be converted to the correct units scheme (SI and pressure
 # in bar). Using the original values in the paper also facilitates visual comparison and checking.
 
-volume_conversion: Callable = lambda x: x * unit_conversion.litre_to_m3
-"""Volume conversion for :cite:t:`HWZ58` units"""
-A0_conversion: Callable = lambda x: x * ATMOSPHERE * unit_conversion.litre_to_m3**2
-"""PV**2 conversion for :cite:t:`HWZ58` units"""
-atm2bar: Callable = lambda x: unit_conversion.atmosphere_to_bar * x
-"""Atmosphere to bar"""
+
+def volume_conversion(x: float) -> float:
+    """Volume conversion for :cite:t:`HWZ58` units."""
+    return x * unit_conversion.litre_to_m3
+
+
+def A0_conversion(x: float) -> float:
+    """PV**2 conversion for :cite:t:`HWZ58` units."""
+    return x * ATMOSPHERE * unit_conversion.litre_to_m3**2
+
+
+def atm2bar(x: float) -> float:
+    """Atmosphere to bar conversion."""
+    return unit_conversion.atmosphere_to_bar * x
+
 
 H2_beattie_holley58: RealGas = BeattieBridgeman(
     A0=A0_conversion(0.1975),
