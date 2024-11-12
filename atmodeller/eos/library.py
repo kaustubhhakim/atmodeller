@@ -188,6 +188,12 @@ He_beattie_holley58_bounded: RealGas = RealGasBounded(
 def get_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of EOS models
 
+    The naming convention is as follows:
+        [species]_[eos model]_[citation], with an optional suffix of 'bounded'
+
+    'cs' refers to corresponding states and `bounded` means that the EOS is reasonably well-behaved
+    outside its calibrated range to mitigate the solver throwing inf/nans.
+
     Returns:
         Dictionary of EOS models
     """
