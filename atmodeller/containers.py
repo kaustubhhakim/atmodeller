@@ -18,9 +18,10 @@
 
 The leaves of pytrees must be JAX-compliant types, which excludes strings. So the preferred
 approach is to encode the data as JAX-compatible types and provide properties and methods that can
-reconstruct other desired quantities, notably strings and other objects. This ensures that similar 
+reconstruct other desired quantities, notably strings and other objects. This ensures that similar
 functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
 """
+
 from __future__ import annotations
 
 import logging

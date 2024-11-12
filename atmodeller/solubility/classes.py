@@ -42,15 +42,20 @@ class Solubility(ABC, SolubilityProtocol):
 
     @abstractmethod
     def concentration(
-        self, fugacity: ArrayLike, *, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ):
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: ArrayLike | None = None,
+        pressure: ArrayLike | None = None,
+        fO2: ArrayLike | None = None,
+    ) -> ArrayLike:
         """Concentration in ppmw
 
         Args:
             fugacity: Fugacity in bar
-            temperature: Temperature in K
-            pressure: Pressure in bar
-            fO2: fO2 in bar
+            temperature: Temperature in K. Defaults to None for not used.
+            pressure: Pressure in bar. Defaults to None for not used.
+            fO2: fO2 in bar. Defaults to None for not used.
 
         Returns:
             Concentration in ppmw
@@ -59,7 +64,7 @@ class Solubility(ABC, SolubilityProtocol):
     @jit
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ):
+    ) -> ArrayLike:
         """Wrapper to pass concentration arguments by position to use with JAX lax.switch"""
         return self.concentration(fugacity, temperature=temperature, pressure=pressure, fO2=fO2)
 

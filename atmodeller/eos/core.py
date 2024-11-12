@@ -22,25 +22,18 @@ Units for temperature and pressure are K and bar, respectively.
 import logging
 import sys
 from abc import ABC, abstractmethod
-from typing import Any, Callable, NamedTuple, Protocol
+from typing import Any, Callable
 
-import jax
 import jax.numpy as jnp
-import numpy as np
-import numpy.typing as npt
-import optimistix as optx
 from jax import Array, grad, jit, lax
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
-from numpy.polynomial.polynomial import Polynomial
 
-from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR, PRESSURE_REFERENCE
-from atmodeller.interfaces import ActivityProtocol, RealGasProtocol
+from atmodeller import GAS_CONSTANT_BAR
+from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import (
     ExperimentalCalibrationNew,
-    PyTreeNoData,
     safe_exp,
-    unit_conversion,
 )
 
 if sys.version_info < (3, 12):

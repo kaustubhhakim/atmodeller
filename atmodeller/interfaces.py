@@ -22,7 +22,6 @@ from jax.typing import ArrayLike
 
 
 class ActivityProtocol(Protocol):
-
     def log_activity(
         self,
         temperature: ArrayLike,
@@ -31,7 +30,6 @@ class ActivityProtocol(Protocol):
 
 
 class FugacityConstraintProtocol(Protocol):
-
     @property
     def value(self) -> ArrayLike: ...
 
@@ -39,7 +37,6 @@ class FugacityConstraintProtocol(Protocol):
 
 
 class RealGasProtocol(ActivityProtocol, Protocol):
-
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
@@ -55,11 +52,15 @@ class SolubilityProtocol(Protocol):
         self,
         fugacity: ArrayLike,
         *,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
+        temperature: ArrayLike | None = None,
+        pressure: ArrayLike | None = None,
+        fO2: ArrayLike | None = None,
     ) -> ArrayLike: ...
 
     def jax_concentration(
-        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
+        self,
+        fugacity: ArrayLike,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
     ): ...

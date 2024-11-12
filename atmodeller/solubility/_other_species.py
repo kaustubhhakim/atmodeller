@@ -162,9 +162,9 @@ class _N2_basalt_dasgupta22(Solubility):
             - 0.8853 * jnp.log(temperature)
         )
         fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity
-        ppmw: Array = jnp.exp(
-            (5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)
-        ) * (fugacity_gpa**0.5)
+        ppmw: Array = jnp.exp((5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)) * (
+            fugacity_gpa**0.5
+        )
         ppmw = ppmw + fugacity_gpa * jnp.exp(
             4.67 + (7.11 * self.xsio2) - (13.06 * self.xal2o3) - (120.67 * self.xtio2)
         )

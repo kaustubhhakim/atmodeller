@@ -17,7 +17,7 @@
 """Real gas EOS from :cite:t:`HP91,HP98,HP11`
 
 You will usually want to use the CORK models, since these are the most complete. The MRK models are
-nevertheless useful for comparison and understanding the influence of the virial compensation term 
+nevertheless useful for comparison and understanding the influence of the virial compensation term
 that is encapsulated within the CORK model.
 
 Examples:
@@ -30,7 +30,7 @@ Examples:
         print(fugacity_coefficient)
 
     Get the preferred EOS models for various species from the Holland and Powell models::
-    
+
         from atmodeller.eos.holland import get_holland_eos_models
         models = get_holland_eos_models()
         # List the available species

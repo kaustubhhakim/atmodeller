@@ -202,7 +202,6 @@ def get_eos_models() -> dict[str, RealGas]:
 
 
 if __name__ == "__main__":
-
     model = get_eos_models()["H2_beattie_holley58_bounded"]
 
     pressures = np.arange(1, 3000, 100)

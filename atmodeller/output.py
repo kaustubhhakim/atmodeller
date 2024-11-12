@@ -104,7 +104,8 @@ class Output:
         """Fixed parameters"""
         int_atmos: InteriorAtmosphere = self._interior_atmosphere
         return int_atmos.get_fixed_parameters(
-            int_atmos.solution_args.fugacity_constraints, int_atmos.solution_args.mass_constraints
+            int_atmos.solution_args.fugacity_constraints,
+            int_atmos.solution_args.mass_constraints,
         )
 
     @property
@@ -302,7 +303,11 @@ class Output:
         """
         atmosphere_log_volume_func: Callable = jax.vmap(
             get_atmosphere_log_volume,
-            in_axes=(None, 0, self._interior_atmosphere.solution_args.planet.vmap_axes()),
+            in_axes=(
+                None,
+                0,
+                self._interior_atmosphere.solution_args.planet.vmap_axes(),
+            ),
         )
         atmosphere_log_volume: Array = atmosphere_log_volume_func(
             self.fixed_parameters,
@@ -700,7 +705,10 @@ class Output:
             objective_function,
             in_axes=(
                 0,
-                {"traced_parameters": self.traced_parameters_vmap, "fixed_parameters": None},
+                {
+                    "traced_parameters": self.traced_parameters_vmap,
+                    "fixed_parameters": None,
+                },
             ),
         )
         residual: Array = residual_func(
@@ -804,7 +812,9 @@ class Output:
         logger.info("Output written to %s", output_file)
 
 
-def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, ArrayLike]:
+def collapse_single_entry_values(
+    input_dict: dict[str, ArrayLike],
+) -> dict[str, ArrayLike]:
     """Collapses single entry values in a dictionary
 
     Args:
@@ -891,7 +901,9 @@ def split_dict_by_columns(dict_to_split: dict[str, Array]) -> list[dict[str, Arr
     return split_dicts
 
 
-def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[str, pd.DataFrame]:
+def nested_dict_to_dataframes(
+    nested_dict: dict[str, dict[str, Any]],
+) -> dict[str, pd.DataFrame]:
     """Creates a dictionary of dataframes from a nested dictionary
 
     Args:

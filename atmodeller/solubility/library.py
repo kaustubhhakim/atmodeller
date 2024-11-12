@@ -15,7 +15,7 @@
 # see <https://www.gnu.org/licenses/>.
 #
 """Solubility library
-    
+
 Usage:
     from atmodeller.solubility.library import get_solubility_models
     sol_models = get_solubility_models()

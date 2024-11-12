@@ -185,7 +185,6 @@ class ExperimentalCalibration:
 
 
 class RealGasProtocol(Protocol):
-
     def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike: ...
 
 
