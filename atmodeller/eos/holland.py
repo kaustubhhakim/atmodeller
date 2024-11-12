@@ -56,15 +56,15 @@ from jax import Array
 from jax.typing import ArrayLike
 from scipy.constants import kilo
 
+from atmodeller.eos.classes import MRKCorrespondingStatesHP91
 from atmodeller.eos.interfaces import (
     CORK,
     ExperimentalCalibration,
     MRKCriticalBehaviour,
-    MRKExplicitABC,
     MRKImplicitABC,
     RealGas,
-    critical_parameters,
 )
+from atmodeller.thermodata._gases import critical_data
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -75,45 +75,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 # Common calibration parameters from Holland and Powell (1991)
 CALIBRATION_HP91: ExperimentalCalibration = ExperimentalCalibration(400, 1900, 0, 50e3)
-
-
-@dataclass(kw_only=True)
-class MRKCorrespondingStatesHP91(MRKExplicitABC):
-    """An MRK simplified model used for corresponding states :cite:p:`HP91`
-
-    Universal constants from :cite:t:`HP91{Table 2}`
-
-    Note the unit conversion to SI and pressure in bar using the values in Table 2:
-
-        * `a` coefficients have been multiplied by 1e-4
-        * `b0` has been multiplied by 1e-2
-
-    Args:
-        calibration: Calibration temperature and pressure range. Defaults to empty.
-    """
-
-    a_coefficients: Array = field(init=False, default=jnp.array((5.45963e-9, -8.63920e-10, 0)))
-    b0: float = field(init=False, default=9.18301e-6)
-
-    @classmethod
-    def get_species(
-        cls, species: str, calibration: ExperimentalCalibration = ExperimentalCalibration()
-    ) -> RealGas:
-        """Gets an MRK corresponding states model for a given species.
-
-        Args:
-            species: A species, which must be a key in
-                :obj:`.interfaces.critical_parameters`
-            calibration: Calibration temperature and pressure range. Defaults to empty.
-
-        Returns:
-            A corresponding states model for the species
-        """
-        return cls(
-            critical_temperature=critical_parameters[species].temperature,
-            critical_pressure=critical_parameters[species].pressure,
-            calibration=calibration,
-        )
 
 
 @dataclass(kw_only=True)
@@ -156,46 +117,29 @@ class CORKCorrespondingStatesHP91(CORK):
         Returns:
             A corresponding states model for the species
         """
-        mrk: RealGas = MRKCorrespondingStatesHP91.get_species(species)
+        mrk = MRKCorrespondingStatesHP91.get_species(species)
 
         return cls(
             mrk=mrk,
-            critical_temperature=critical_parameters[species].temperature,
-            critical_pressure=critical_parameters[species].pressure,
+            critical_temperature=critical_data[species].temperature,
+            critical_pressure=critical_data[species].pressure,
             calibration=calibration,
         )
 
 
-# Doesn't really make sense to specify a calibration range for the MRK EOS because they are a
-# building block for the CORK EOS.
-CO2_MRK_simple_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2")
-"""CO2 MRK corresponding states :cite:p:`HP91`"""
-CH4_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4")
-"""CH4 MRK corresponding states :cite:p:`HP91`"""
-H2_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("H2_Holland")
-"""H2 MRK corresponding states :cite:p:`HP91`"""
-CO_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("CO")
-"""CO MRK corresponding states :cite:p:`HP91`"""
-N2_MRK_HP91: RealGas = MRKCorrespondingStatesHP91.get_species("N2")
-"""N2 MRK corresponding states :cite:p:`HP91`"""
-S2_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("S2")
-"""S2 MRK corresponding states :cite:p:`HP91`"""
-H2S_MRK_HP11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S")
-"""H2S MRK corresponding states :cite:p:`HP91`"""
-
-CO2_CORK_simple_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO2", CALIBRATION_HP91)
+CO2_CORK_simple_HP91 = CORKCorrespondingStatesHP91.get_species("CO2_g", CALIBRATION_HP91)
 """CO2 CORK corresponding states :cite:p:`HP91`"""
-CH4_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CH4", CALIBRATION_HP91)
+CH4_CORK_HP91 = CORKCorrespondingStatesHP91.get_species("CH4_g", CALIBRATION_HP91)
 """CH4 CORK corresponding states :cite:p:`HP91`"""
-H2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("H2_Holland", CALIBRATION_HP91)
+H2_CORK_HP91 = CORKCorrespondingStatesHP91.get_species("H2_g_Holland", CALIBRATION_HP91)
 """H2 CORK corresponding states :cite:p:`HP91`"""
-CO_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("CO", CALIBRATION_HP91)
+CO_CORK_HP91 = CORKCorrespondingStatesHP91.get_species("CO_g", CALIBRATION_HP91)
 """CO CORK corresponding states :cite:p:`HP91`"""
-N2_CORK_HP91: RealGas = CORKCorrespondingStatesHP91.get_species("N2", CALIBRATION_HP91)
+N2_CORK_HP91 = CORKCorrespondingStatesHP91.get_species("N2_g", CALIBRATION_HP91)
 """N2 CORK corresponding states :cite:p:`HP91`"""
-S2_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("S2", CALIBRATION_HP91)
+S2_CORK_HP11 = CORKCorrespondingStatesHP91.get_species("S2_g", CALIBRATION_HP91)
 """S2 CORK corresponding states :cite:p:`HP11`"""
-H2S_CORK_HP11: RealGas = CORKCorrespondingStatesHP91.get_species("H2S", CALIBRATION_HP91)
+H2S_CORK_HP11 = CORKCorrespondingStatesHP91.get_species("H2S_g", CALIBRATION_HP91)
 """H2S CORK corresponding states :cite:p:`HP11`"""
 
 # For any subclass of MRKImplicitABC, note the unit conversion to SI and pressure in bar compared

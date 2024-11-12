@@ -211,8 +211,129 @@ class RealGas(ABC, RealGasProtocol):
         return ideal_volume
 
 
-# TODO: Eventually this will probably utilise a class that assembles different equations of state
-# for given pressure ranges.
+class RedlichKwongABC(RealGas, ABC):
+    r"""Redlich Kwong (RK) equation of state:
+
+    .. math::
+
+        P = \frac{RT}{V-b} - \frac{a}{\sqrt{T}V(V+b)}
+
+    where :math:`P` is pressure, :math:`T` is temperature, :math:`V` is the molar volume, :math:`R`
+    the gas constant, :math:`a` corrects for the attractive potential of molecules, and :math:`b`
+    corrects for the volume.
+    """
+
+    @abstractmethod
+    def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Computes the `a` parameter
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            `a` parameter in
+            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
+        """
+
+    @abstractmethod
+    def b(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Computes the `b` parameter
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
+        """
+
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume integral
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Volume integral
+        """
+        a: ArrayLike = self.a(temperature, pressure)
+        b: ArrayLike = self.b(temperature, pressure)
+
+        volume_integral: Array = (
+            jnp.log(pressure) * GAS_CONSTANT_BAR * temperature
+            + b * pressure
+            + a
+            / b
+            / jnp.sqrt(temperature)
+            * (
+                jnp.log(GAS_CONSTANT_BAR * temperature + b * pressure)
+                - jnp.log(GAS_CONSTANT_BAR * temperature + 2.0 * b * pressure)
+            )
+        )
+
+        return volume_integral * 1e5  # Multiply by 1E5 to convert to J for CORK model
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Log fugacity :cite:p:`HP91{Equation 8}`
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity
+        """
+        # 1e-5 to convert volume integral back to appropriate units
+        log_fugacity: Array = (
+            1e-5 * self.volume_integral(temperature, pressure) / (GAS_CONSTANT_BAR * temperature)
+        )
+
+        return log_fugacity
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume-explicit equation :cite:p:`HP91{Equation 7}`
+
+        Without complications of critical phenomena the RK equation can be simplified using the
+        approximation:
+
+        .. math::
+
+            V \sim \frac{RT}{P} + b
+
+        where :math:`V` is volume, :math:`R` is the gas constant, :math:`T` is temperature,
+        :math:`P` is pressure, and :math:`b` corrects for the volume.
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+        """
+        a: ArrayLike = self.a(temperature, pressure)
+        b: ArrayLike = self.b(temperature, pressure)
+
+        volume: Array = (
+            jnp.sqrt(temperature)
+            * -1.0
+            * a
+            * GAS_CONSTANT_BAR
+            / (GAS_CONSTANT_BAR * temperature + b * pressure)
+            / (GAS_CONSTANT_BAR * temperature + 2.0 * b * pressure)
+            + GAS_CONSTANT_BAR * temperature / pressure
+            + b
+        )
+
+        return volume
+
+
 @register_pytree_node_class
 class RealGasBounded(RealGas):
     """A real gas equation of state that is bounded
@@ -373,52 +494,6 @@ class RealGasBounded(RealGas):
 #         scaled_temperature: float = temperature / self.critical_temperature
 
 #         return scaled_temperature
-
-
-# @dataclass(kw_only=True)
-# class ModifiedRedlichKwongABC(RealGas):
-#     r"""A Modified Redlich Kwong (MRK) equation of state :cite:p:`{e.g.}HP91{Equation 3}`:
-
-#     .. math::
-
-#         P = \frac{RT}{V-b} - \frac{a(T)}{V(V+b)\sqrt{T}}
-
-#     where :math:`P` is pressure, :math:`T` is temperature, :math:`V` is the molar volume, :math:`R`
-#     the gas constant, :math:`a(T)` is the Redlich-Kwong function of :math:`T`, and :math:`b` is the
-#     Redlich-Kwong constant.
-
-#     Args:
-#         a_coefficients: Coefficients for the Modified Redlich Kwong (MRK) `a` parameter
-#         b0: The Redlich-Kwong constant `b`
-#         calibration: Calibration temperature and pressure range. Defaults to empty.
-#     """
-
-#     a_coefficients: Array
-#     """Coefficients for the Modified Redlich Kwong (MRK) `a` parameter"""
-#     b0: float
-#     """The Redlich-Kwong constant `b`"""
-
-#     @abstractmethod
-#     def a(self, temperature: float) -> Array:
-#         r"""MRK `a` parameter computed from :attr:`a_coefficients`.
-
-#         Args:
-#             temperature: Temperature in K
-
-#         Returns:
-#             MRK `a` parameter in
-#             :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
-#         """
-#         raise NotImplementedError
-
-#     @property
-#     @abstractmethod
-#     def b(self) -> float:
-#         r"""MRK `b` parameter computed from :attr:`b0`
-
-#         Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
-#         """
-#         raise NotImplementedError
 
 
 # @dataclass(kw_only=True)

@@ -23,13 +23,13 @@
 # DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}")
 # """Data directory, which is the same as the package directory"""
 
+# Expose public API
 from atmodeller.thermodata.core import (
     CondensateActivity,  # noqa: F401
+    CriticalData,  # noqa: F401
     SpeciesData,  # noqa: F401
     ThermoCoefficients,  # noqa: F401
 )
-
-# Expose public API
 from atmodeller.thermodata.library import (
     get_thermodata,  # noqa: F401
     select_critical_data,  # noqa: F401

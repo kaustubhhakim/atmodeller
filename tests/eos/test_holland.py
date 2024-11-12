@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 
 from atmodeller import debug_logger
+from atmodeller.eos import get_eos_models
 from atmodeller.eos.holland import (
     CH4_CORK_HP91,
     CO2_CORK_HP91,
@@ -28,7 +29,6 @@ from atmodeller.eos.holland import (
     H2_CORK_HP91,
     H2O_CORK_HP91,
     CO2_CORK_simple_HP91,
-    CO2_MRK_simple_HP91,
     get_holland_eos_models,
 )
 from atmodeller.eos.interfaces import RealGas
@@ -124,8 +124,9 @@ def test_CORK_H2_volume_10kb(check_values) -> None:
 
 def test_MRKCO2(check_values) -> None:
     """MRK CO2"""
+    CO2_mrk_cs_holland91 = get_eos_models()["CO2_mrk_cs_holland91"]
     check_values.fugacity_coefficient(
-        2000, 10e3, CO2_MRK_simple_HP91, 9.80535714428564, rtol=RTOL, atol=ATOL
+        2000, 10e3, CO2_mrk_cs_holland91, 9.80535714428564, rtol=RTOL, atol=ATOL
     )
 
 

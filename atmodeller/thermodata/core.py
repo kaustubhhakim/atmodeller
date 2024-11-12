@@ -359,7 +359,7 @@ class SpeciesData(NamedTuple):
 
 
 class CriticalData(NamedTuple):
-    """Critical temperature and pressure of a gas species.
+    """Critical temperature and pressure of a gas species
 
     Args:
         temperature: Critical temperature in K

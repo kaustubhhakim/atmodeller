@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright 2024 Dan J. Bower
 #
@@ -30,11 +29,8 @@ import logging
 from pathlib import Path
 from typing import Callable
 
-import matplotlib.pyplot as plt
-import numpy as np
-
 from atmodeller import ATMOSPHERE
-from atmodeller.eos.classes import BeattieBridgeman, Chabrier
+from atmodeller.eos.classes import BeattieBridgeman, Chabrier, MRKCorrespondingStatesHP91
 from atmodeller.eos.core import RealGas, RealGasBounded
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
@@ -50,14 +46,33 @@ H2_chabrier21_bounded: RealGas = RealGasBounded(
 )
 He_chabrier21: RealGas = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
-H2HeY0275_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0275_v1"))
+H2_He_Y0275_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0275_v1"))
 """H2HeY0275 :cite:p:`CD21`"""
-H2HeY0292_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0292_v1"))
+H2_He_Y0292_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0292_v1"))
 """H2HeY0292 :cite:p:`CD21`"""
-H2HeY0297_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
+H2_He_Y0297_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
 """H2HeY0297 :cite:p:`CD21`"""
 
 # endregion
+
+# region Holland
+
+CO2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2_g")
+"""CO2 MRK corresponding states :cite:p:`HP91`"""
+CH4_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4_g")
+"""CH4 MRK corresponding states :cite:p:`HP91`"""
+H2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("H2_g_Holland")
+"""H2 MRK corresponding states :cite:p:`HP91`"""
+CO_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO_g")
+"""CO MRK corresponding states :cite:p:`HP91`"""
+N2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("N2_g")
+"""N2 MRK corresponding states :cite:p:`HP91`"""
+S2_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("S2_g")
+"""S2 MRK corresponding states :cite:p:`HP11`"""
+H2S_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S_g")
+"""H2S MRK corresponding states :cite:p:`HP11`"""
+
+# end region
 
 # region: Holley et al. (1958)
 
@@ -179,75 +194,30 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models: dict[str, RealGas] = {}
     eos_models["CH4_beattie_holley58"] = CH4_beattie_holley58
     eos_models["CH4_beattie_holley58_bounded"] = CH4_beattie_holley58_bounded
+    eos_models["CH4_mrk_cs_holland91"] = CH4_mrk_cs_holland91
+    eos_models["CO_mrk_cs_holland91"] = CO_mrk_cs_holland91
     eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58
     eos_models["CO2_beattie_holley58_bounded"] = CO2_beattie_holley58_bounded
+    eos_models["CO2_mrk_cs_holland91"] = CO2_mrk_cs_holland91
     eos_models["H2_beattie_holley58"] = H2_beattie_holley58
     eos_models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
     eos_models["H2_chabrier21"] = H2_chabrier21
     eos_models["H2_chabrier21_bounded"] = H2_chabrier21_bounded
-    eos_models["H2HeY0275_chabrier21"] = H2HeY0275_chabrier21
-    eos_models["H2HeY0292_chabrier21"] = H2HeY0292_chabrier21
-    eos_models["H2HeY0297_chabrier21"] = H2HeY0297_chabrier21
+    eos_models["H2_mrk_cs_holland91"] = H2_mrk_cs_holland91
+    eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21
+    eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21
+    eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21
+    eos_models["H2S_mrk_cs_holland11"] = H2S_mrk_cs_holland11
     eos_models["He_beattie_holley58"] = He_beattie_holley58
     eos_models["He_beattie_holley58_bounded"] = He_beattie_holley58_bounded
     eos_models["He_chabrier21"] = He_chabrier21
     eos_models["N2_beattie_holley58"] = N2_beattie_holley58
     eos_models["N2_beattie_holley58_bounded"] = N2_beattie_holley58_bounded
+    eos_models["N2_mrk_cs_holland91"] = N2_mrk_cs_holland91
     eos_models["NH3_beattie_holley58"] = NH3_beattie_holley58
     eos_models["NH3_beattie_holley58_bounded"] = NH3_beattie_holley58_bounded
     eos_models["O2_beattie_holley58"] = O2_beattie_holley58
     eos_models["O2_beattie_holley58_bounded"] = O2_beattie_holley58_bounded
+    eos_models["S2_mrk_cs_holland11"] = S2_mrk_cs_holland11
 
     return eos_models
-
-
-if __name__ == "__main__":
-    model = get_eos_models()["H2_beattie_holley58_bounded"]
-
-    pressures = np.arange(1, 3000, 100)
-    temperatures = 1000.0 * np.ones_like(pressures)
-
-    temperature_out = []
-    ideal_volume_out = []
-    volume_out = []
-    fugacity_out = []
-    compressibility_factor_out = []
-    fugacity_coefficient_out = []
-
-    for nn, pressure in enumerate(pressures):
-        temperature = temperatures[nn]
-        ideal_volume = model.ideal_volume(temperature, pressure)
-        volume = model.volume(temperature, pressure)
-        fugacity = model.fugacity(temperature, pressure)
-        compressibility_factor = model.compressibility_factor(temperature, pressure)
-        fugacity_coefficient = model.fugacity_coefficient(temperature, pressure)
-        temperature_out.append(temperature)
-        ideal_volume_out.append(ideal_volume)
-        volume_out.append(volume)
-        fugacity_out.append(fugacity)
-        compressibility_factor_out.append(compressibility_factor)
-        fugacity_coefficient_out.append(fugacity_coefficient)
-
-    fig, ax = plt.subplots(1, 4)
-
-    ax[0].plot(pressures, ideal_volume_out, "k--")
-    ax[0].set_xlabel("Pressure")
-    ax[0].set_ylabel("Ideal volume")
-
-    ax[0].plot(pressures, volume_out)
-    ax[0].set_xlabel("Pressure")
-    ax[0].set_ylabel("Volume")
-
-    ax[1].plot(pressures, fugacity_out)
-    ax[1].set_xlabel("Pressure")
-    ax[1].set_ylabel("Fugacity")
-
-    ax[2].plot(pressures, compressibility_factor_out)
-    ax[2].set_xlabel("Pressure")
-    ax[2].set_ylabel("Compressibility factor")
-
-    ax[3].plot(pressures, fugacity_coefficient_out)
-    ax[3].set_xlabel("Pressure")
-    ax[3].set_ylabel("Fugacity coefficient")
-
-    plt.show()

@@ -22,7 +22,7 @@ import logging
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Protocol
+from typing import Callable
 
 import jax.numpy as jnp
 import numpy as np
@@ -182,10 +182,6 @@ class ExperimentalCalibration:
         ) + self.temperature_penalty * jnp.power(temperature_clip - temperature, 2)
 
         return penalty
-
-
-class RealGasProtocol(Protocol):
-    def fugacity_coefficient(self, temperature: float, pressure: ArrayLike) -> ArrayLike: ...
 
 
 @dataclass(kw_only=True)
@@ -353,6 +349,7 @@ class CorrespondingStatesMixin(ABC):
     critical_pressure: float = 1
     """Critical pressure in bar"""
 
+    # Required for Saxena but not for Holland and Powell
     def scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
         """Scaled pressure
 
@@ -368,6 +365,7 @@ class CorrespondingStatesMixin(ABC):
 
         return scaled_pressure
 
+    # Required for Saxena but not for Holland and Powell
     def scaled_temperature(self, temperature: float) -> float:
         """Scaled temperature
 
@@ -382,45 +380,6 @@ class CorrespondingStatesMixin(ABC):
         scaled_temperature: float = temperature / self.critical_temperature
 
         return scaled_temperature
-
-
-@dataclass(kw_only=True)
-class IdealGas(RealGas):
-    r"""An ideal gas equation of state:
-
-    .. math::
-
-        R T = P V
-
-    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`P` is pressure, and
-    :math:`V` is volume.
-
-    Args:
-        calibration: Calibration temperature and pressure range. Defaults to empty.
-    """
-
-    @override
-    def fugacity_coefficient(self, *args, **kwargs) -> Array:
-        """Fugacity coefficient
-
-        Since we know that the fugacity coefficient of an ideal gas is unity by definition we
-        simply impose it here to pass a constant to the solver. This seems to avoid some NaN
-        crashes with the Optimistix solver.
-        """
-        del args
-        del kwargs
-        return jnp.array(1)
-
-    @override
-    def volume(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
-        return self.ideal_volume(temperature, pressure)
-
-    @override
-    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-        volume_integral: Array = GAS_CONSTANT_BAR * temperature * jnp.log(pressure)
-        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
-
-        return volume_integral
 
 
 @dataclass(kw_only=True)
@@ -467,100 +426,6 @@ class ModifiedRedlichKwongABC(RealGas):
         Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
         """
         raise NotImplementedError
-
-
-@dataclass(kw_only=True)
-class MRKExplicitABC(CorrespondingStatesMixin, ModifiedRedlichKwongABC):
-    """A Modified Redlich Kwong (MRK) EOS in explicit form"""
-
-    @override
-    def a(self, temperature: float) -> Array:
-        r"""MRK `a` parameter from :attr:`a_coefficients` :cite:p:`HP91{Equation 9}`
-
-        Args:
-            temperature: Temperature in K
-
-        Returns:
-            MRK `a` parameter in
-            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
-        """
-        a: Array = (
-            self.a_coefficients[0] * self.critical_temperature ** (5.0 / 2)
-            + self.a_coefficients[1] * self.critical_temperature ** (3.0 / 2) * temperature
-            + self.a_coefficients[2] * self.critical_temperature ** (1.0 / 2) * temperature**2
-        )
-        a = a / self.critical_pressure
-
-        return a
-
-    @property
-    def b(self) -> float:
-        r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`.
-
-        Units are :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
-        """
-        b: float = self.b0 * self.critical_temperature / self.critical_pressure
-
-        return b
-
-    @override
-    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-        r"""Volume-explicit equation :cite:p:`HP91{Equation 7}`
-
-        Without complications of critical phenomena the MRK equation can be simplified using the
-        approximation:
-
-        .. math::
-
-            V \sim \frac{RT}{P} + b
-
-        where :math:`V` is volume, :math:`R` is the gas constant, :math:`T` is temperature,
-        :math:`P` is pressure, and :math:`b` is :attr:`b`.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            MRK volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
-        """
-        volume: Array = (
-            jnp.sqrt(temperature)
-            * -self.a(temperature)
-            * GAS_CONSTANT_BAR
-            / (GAS_CONSTANT_BAR * temperature + self.b * pressure)
-            / (GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
-            + GAS_CONSTANT_BAR * temperature / pressure
-            + self.b
-        )
-
-        return volume
-
-    @override
-    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-        r"""Volume-explicit integral :cite:p:`HP91{Equation 8}`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-        """
-        volume_integral: Array = (
-            GAS_CONSTANT_BAR * temperature * jnp.log(pressure)
-            + self.b * pressure
-            + self.a(temperature)
-            / self.b
-            / jnp.sqrt(temperature)
-            * (
-                jnp.log(GAS_CONSTANT_BAR * temperature + self.b * pressure)
-                - jnp.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b * pressure)
-            )
-        )
-        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
-
-        return volume_integral
 
 
 # TODO: Update to support JAX
@@ -1108,84 +973,3 @@ class CombinedEOSModel(RealGas):
             return volume0 + dvolume0 + dvolume1
 
         return lax.switch(index, [case_0, case_1, case_2])
-
-
-@dataclass(frozen=True)
-class CriticalData:
-    """Critical temperature and pressure of a gas species.
-
-    Args:
-        temperature: Critical temperature in K
-        pressure: Critical pressure in bar
-    """
-
-    temperature: float
-    """Critical temperature in K"""
-    pressure: float
-    """Critical pressure in bar"""
-
-
-critical_parameters_H2O: CriticalData = CriticalData(647.25, 221.1925)
-"""Critical parameters for H2O :cite:p:`SS92{Table 2}`"""
-critical_parameters_CO2: CriticalData = CriticalData(304.15, 73.8659)
-"""Critical parameters for CO2 :cite:p:`SS92{Table 2}`
-
-Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar
-"""
-critical_parameters_CH4: CriticalData = CriticalData(191.05, 46.4069)
-"""Critical parameters for CH4 :cite:p:`SS92{Table 2}`
-
-Alternative values from :cite:t:`HP91` are 190.6 K and 46 bar
-"""
-critical_parameters_CO: CriticalData = CriticalData(133.15, 34.9571)
-"""Critical parameters for CO :cite:p:`SS92{Table 2}`
-
-Alternative values from :cite:t:`HP91` are 132.9 K and 35 bar
-"""
-critical_parameters_O2: CriticalData = CriticalData(154.75, 50.7638)
-"""Critical parameters for O2 :cite:p:`SS92{Table 2}`"""
-critical_parameters_H2: CriticalData = CriticalData(33.25, 12.9696)
-"""Critical parameters for H2 :cite:p:`SS92{Table 2}`"""
-critical_parameters_H2_holland: CriticalData = CriticalData(41.2, 21.1)
-"""Critical parameters for H2 :cite:p:`HP91`"""
-critical_parameters_S2: CriticalData = CriticalData(208.15, 72.954)
-"""Critical parameters for S2 :cite:p:`SS92{Table 2}`
-
-http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
-
-:cite:p:`HP11` state that the critical parameters are from :cite:t:`RPS77`. However, in the fifth
-edition of this book (:cite:t:`PPO00`) S2 is not given (only S is).
-"""
-critical_parameters_SO2: CriticalData = CriticalData(430.95, 78.7295)
-"""Critical parameters for SO2 :cite:p:`SS92{Table 2}`"""
-critical_parameters_COS: CriticalData = CriticalData(377.55, 65.8612)
-"""Critical parameters for COS :cite:p:`SS92{Table 2}`"""
-critical_parameters_H2S: CriticalData = CriticalData(373.55, 90.0779)
-"""Critical parameters for H2S :cite:p:`SS92{Table 2}`
-
-Alternative values from :cite:t:`HP91` are 373.4 K and 0.08963 bar
-"""
-critical_parameters_N2: CriticalData = CriticalData(126.2, 33.9)
-"""Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
-critical_parameters_Ar: CriticalData = CriticalData(151, 48.6)
-"""Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
-
-critical_parameters: dict[str, CriticalData] = {
-    "Ar": critical_parameters_Ar,
-    "CH4": critical_parameters_CH4,
-    "CO": critical_parameters_CO,
-    "CO2": critical_parameters_CO2,
-    "COS": critical_parameters_COS,
-    "H2": critical_parameters_H2,
-    "H2_Holland": critical_parameters_H2_holland,
-    "H2O": critical_parameters_H2O,
-    "H2S": critical_parameters_H2S,
-    "N2": critical_parameters_N2,
-    "O2": critical_parameters_O2,
-    "S2": critical_parameters_S2,
-    "SO2": critical_parameters_SO2,
-}
-"""Critical parameters for gases
-
-These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
-"""
