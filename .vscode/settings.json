@@ -2,8 +2,6 @@
     "autoDocstring.docstringFormat": "google-notypes",
     "cSpell.diagnosticLevel": "Hint",
     "python.analysis.diagnosticMode": "workspace",
-    "python.analysis.typeCheckingMode": "basic",
-    "editor.formatOnSave": true,
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
