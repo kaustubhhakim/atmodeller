@@ -29,6 +29,9 @@ Current development team:
 
 ## Basic usage
 
+There are Jupyter notebooks in `notebooks/` that provide code snippets for how to perform single and batch calculations, as well as include Atmodeller into a time integration.
+
+
 Atmodeller contains three sub-packages that provide real gas equations of state (EOS), solubility laws, and thermodynamic data
 
 Accessing real gas EOS:
@@ -39,6 +42,7 @@ from atmodeller.eos import get_eos_models
 eos_models = get_eos_models()
 # Find the available models
 eos_models.keys()
+
 # Get a CH4 model
 CH4_eos_model = eos_models['CH4_beattie_holley58']
 # Compute the fugacity at 800 K and 100 bar
@@ -78,6 +82,56 @@ CO2_g.get_gibbs_over_RT(2000.0)
 CO2_g.composition
 # Etc., other methods are available to compute other quantities
 ```
+
+Running a model:
+
+```
+from atmodeller import Species, InteriorAtmosphere, Planet, earth_oceans_to_hydrogen_mass
+from atmodeller.solubility import get_solubility_models
+import numpy as np
+
+solubility_models = get_solubility_models()
+# Get the available solubility models
+logger.info("solubility models = %s", solubility_models.keys())
+
+H2_g = Species.create_gas("H2_g")
+H2O_g = Species.create_gas("H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"])
+O2_g = Species.create_gas("O2_g")
+
+species = (H2_g, H2O_g, O2_g)
+planet = Planet()
+interior_atmosphere = InteriorAtmosphere(species)
+
+oceans = 1
+h_kg = earth_oceans_to_hydrogen_mass(oceans)
+o_kg = 6.25774e20
+mass_constraints = {
+    "H": h_kg,
+    "O": o_kg,
+}
+
+# If you do not specify an initial solution guess then a default will be used
+# Initial solution guess number density (molecules/m^3)
+initial_log_number_density = 50 * np.ones(len(species), dtype=np.float_)
+
+interior_atmosphere.initialise_solve(
+    planet=planet,
+    initial_log_number_density=initial_log_number_density,
+    mass_constraints=mass_constraints,
+)
+output = interior_atmosphere.solve()
+
+# Quick look at the solution
+solution = output.quick_look()
+
+# Get complete solution as a dictionary
+solution_asdict = output.asdict()
+logger.info(solution_asdict)
+
+# Write the complete solution to Excel
+output.to_excel("example_single")
+```
+
 
 ## Installation
 
