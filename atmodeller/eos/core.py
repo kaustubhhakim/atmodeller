@@ -290,8 +290,7 @@ class RealGasBounded(RealGas):
         log_fugacity = lax.select(
             pressure > self._pressure_min, log_fugacity_in_range, log_fugacity_below
         )
-        # FIXME: Commented out for testing
-        # log_fugacity = lax.select(pressure < self._pressure_max, log_fugacity, log_fugacity_above)
+        log_fugacity = lax.select(pressure < self._pressure_max, log_fugacity, log_fugacity_above)
 
         return log_fugacity
 
