@@ -3,10 +3,10 @@ Installation
 
 *Atmodeller* is a Python package that can be installed on a variety of platforms (e.g. Mac, Windows, Linux).
 
-Quick install
--------------
+Quick install for Mac
+----------------------
 
-The instructions are given in terms of terminal commands for a Mac, but equivalents exist for other systems.
+The instructions are given in terms of terminal commands for a Mac, but equivalents exist for other systems (see Linux instructions below).
 
 Navigate to a location on your computer and obtain the *Atmodeller* source code::
 
@@ -27,6 +27,42 @@ You can load the tutorials by specifying the path to the Jupyter notebook. For e
     jupyter notebook notebooks/1_basics.ipynb
 
 You may need to *trust* the notebook before it will run.
+
+Quick Install for Linux systems
+-------------------------------
+
+Installing *Atmodeller* on a Linux-based system is very similar to the installation for Mac. 
+
+Navigate to a location on your computer and obtain the *Atmodeller* source code via Github::
+
+    git clone git@github.com:ExPlanetology/atmodeller.git
+    cd atmodeller
+
+Create an anaconda environment called atmodeller::
+
+    conda create -n atmodeller python
+    conda activate atmodeller 
+
+Note that *Atmodeller* requires Python >= 3.10, so check that your pip installer is up-to-date::
+
+    pip install --upgrade pip
+
+Install *Atmodeller* into your environment::
+
+    pip install . 
+
+If you would like to set up your system to develop, then you will also want to install Poetry in your anaconda environment::
+
+    pip install poetry 
+
+Also see below for additional instructions for developer Installation
+
+If you would like to work with *Atmodeller* in VS Code, open the atmodeller directory in VS Code and activate your anaconda environment in the terminal within VS Code
+
+If you run into issues running the Jupyter notebooks, check that you have the necessary packages installed in your environment (e.g., numpy), installing Intel's Math Kernel Library (MKL) for Python should do the trick::
+    
+    pip install mkl 
+
 
 Developer install
 -----------------
