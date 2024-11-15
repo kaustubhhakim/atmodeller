@@ -18,6 +18,7 @@
 
 from typing import Protocol
 
+from jax import Array
 from jax.typing import ArrayLike
 
 
@@ -37,7 +38,7 @@ class FugacityConstraintProtocol(Protocol):
 
 
 class RealGasProtocol(ActivityProtocol, Protocol):
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
 
 class SolubilityProtocol(Protocol):

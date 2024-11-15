@@ -35,8 +35,7 @@ from xmmutablemap import ImmutableMap
 
 from atmodeller import GAS_CONSTANT_BAR, PRESSURE_REFERENCE
 from atmodeller.eos import DATA_DIRECTORY
-from atmodeller.eos.core import RealGas, RedlichKwongABC
-from atmodeller.thermodata import CriticalData, select_critical_data
+from atmodeller.eos.core import RealGas
 from atmodeller.utilities import PyTreeNoData, unit_conversion
 
 if sys.version_info < (3, 12):
@@ -385,103 +384,3 @@ class Chabrier(RealGas):
     def tree_unflatten(cls, aux_data, children) -> Self:
         del children
         return cls(**aux_data)
-
-
-@register_pytree_node_class
-class MRKCorrespondingStatesHP91(RedlichKwongABC):
-    """An MRK simplified model used for corresponding states :cite:p:`HP91`
-
-    Universal constants from :cite:t:`HP91{Table 2}`
-
-    Note the unit conversion to SI and pressure in bar using the values in Table 2:
-
-        * `a` coefficients have been multiplied by 1e-4
-        * `b0` has been multiplied by 1e-2
-
-    Args:
-        critical_data: Critical data
-    """
-
-    def __init__(self, critical_data: CriticalData):
-        self._critical_data: CriticalData = critical_data
-        self._a_coefficients: tuple[float, ...] = (5.45963e-9, -8.63920e-10, 0)
-        self._b0: float = 9.18301e-6
-
-    @property
-    def critical_pressure(self) -> float:
-        """Critical pressure"""
-        return self._critical_data.pressure
-
-    @property
-    def critical_temperature(self) -> float:
-        """Critical temperature"""
-        return self._critical_data.temperature
-
-    @classmethod
-    def get_species(cls, species: str) -> Self:
-        """Gets an MRK corresponding states model for a given species.
-
-        Args:
-            species: Species
-
-        Returns:
-            An MRK corresponding states model for the species
-        """
-        critical_data: CriticalData = select_critical_data(species)
-
-        return cls(critical_data)
-
-    @override
-    def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""MRK `a` parameter :cite:p:`HP91{Equation 9}`
-
-        Args:
-            temperature: Temperature
-            pressure: Pressure
-
-        Returns:
-            MRK `a` parameter in
-            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
-        """
-        del pressure
-
-        a: ArrayLike = (
-            self._a_coefficients[0] * jnp.power(self.critical_temperature, (5.0 / 2))
-            + self._a_coefficients[1]
-            * jnp.power(self.critical_temperature, (3.0 / 2))
-            * temperature
-            + self._a_coefficients[2]
-            * jnp.power(self.critical_temperature, (1.0 / 2))
-            * jnp.square(temperature)
-        )
-        a = a / self.critical_pressure
-
-        return a
-
-    @override
-    def b(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`.
-
-        Args:
-            temperature: Temperature
-            pressure: Pressure
-
-        Returns:
-            MRK `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
-        """
-        del temperature
-        del pressure
-
-        b: ArrayLike = self._b0 * self.critical_temperature / self.critical_pressure
-
-        return b
-
-    def tree_flatten(self) -> tuple[tuple, tuple]:
-        children: tuple = ()
-        aux_data = (self._critical_data,)
-        return (children, aux_data)
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(*aux_data)

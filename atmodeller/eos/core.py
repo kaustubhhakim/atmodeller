@@ -25,8 +25,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable
 
 import jax.numpy as jnp
+import optimistix as optx
 from jax import Array, grad, jit, lax
-from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT_BAR
@@ -122,11 +122,11 @@ class RealGas(ABC, RealGasProtocol):
         """Compressibility factor
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature
+            pressure: Pressure
 
         Returns:
-            The compressibility parameter, which is dimensionless
+            Compressibility factor, which is dimensionless
         """
         volume: ArrayLike = self.volume(temperature, pressure)
         volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
@@ -139,11 +139,11 @@ class RealGas(ABC, RealGasProtocol):
         """Fugacity
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            temperature: Temperature
+            pressure: Pressure
 
         Returns:
-            Fugacity in bar
+            Fugacity
         """
         fugacity: Array = safe_exp(self.log_fugacity(temperature, pressure))
 
@@ -211,8 +211,8 @@ class RealGas(ABC, RealGasProtocol):
         return ideal_volume
 
 
-class RedlichKwongABC(RealGas, ABC):
-    r"""Redlich Kwong (RK) equation of state:
+class RedlichKwongABC(RealGas):
+    r"""Redlich-Kwong EOS:
 
     .. math::
 
@@ -227,7 +227,7 @@ class RedlichKwongABC(RealGas, ABC):
 
     @abstractmethod
     def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Computes the `a` parameter
+        r"""Gets the `a` parameter
 
         Args:
             temperature: Temperature
@@ -239,15 +239,11 @@ class RedlichKwongABC(RealGas, ABC):
         """
 
     @abstractmethod
-    def b(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Computes the `b` parameter
-
-        Args:
-            temperature: Temperature
-            pressure: Pressure
+    def b(self) -> ArrayLike:
+        r"""Gets the `b` parameter
 
         Returns:
-            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
+            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
 
     @jit
@@ -262,17 +258,16 @@ class RedlichKwongABC(RealGas, ABC):
             Volume integral
         """
         a: ArrayLike = self.a(temperature, pressure)
-        b: ArrayLike = self.b(temperature, pressure)
 
         volume_integral: Array = (
             jnp.log(pressure) * GAS_CONSTANT_BAR * temperature
-            + b * pressure
+            + self.b() * pressure
             + a
-            / b
+            / self.b()
             / jnp.sqrt(temperature)
             * (
-                jnp.log(GAS_CONSTANT_BAR * temperature + b * pressure)
-                - jnp.log(GAS_CONSTANT_BAR * temperature + 2.0 * b * pressure)
+                jnp.log(GAS_CONSTANT_BAR * temperature + self.b() * pressure)
+                - jnp.log(GAS_CONSTANT_BAR * temperature + 2.0 * self.b() * pressure)
             )
         )
 
@@ -320,23 +315,236 @@ class RedlichKwongABC(RealGas, ABC):
             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
         """
         a: ArrayLike = self.a(temperature, pressure)
-        b: ArrayLike = self.b(temperature, pressure)
 
         volume: Array = (
             jnp.sqrt(temperature)
             * -1.0
             * a
             * GAS_CONSTANT_BAR
-            / (GAS_CONSTANT_BAR * temperature + b * pressure)
-            / (GAS_CONSTANT_BAR * temperature + 2.0 * b * pressure)
+            / (GAS_CONSTANT_BAR * temperature + self.b() * pressure)
+            / (GAS_CONSTANT_BAR * temperature + 2.0 * self.b() * pressure)
             + GAS_CONSTANT_BAR * temperature / pressure
-            + b
+            + self.b()
         )
 
         return volume
 
 
-@register_pytree_node_class
+class RedlichKwongImplicitABC(RedlichKwongABC):
+    r"""Redlich-Kwong EOS in an implicit form
+
+    .. math::
+
+        P = \frac{RT}{V-b} - \frac{a}{\sqrt{T}V(V+b)}
+
+    where :math:`P` is pressure, :math:`T` is temperature, :math:`V` is the molar volume, :math:`R`
+    the gas constant, :math:`a` corrects for the attractive potential of molecules, and :math:`b`
+    corrects for the volume.
+    """
+
+    @abstractmethod
+    def initial_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Initial guess volume for the solution to ensure convergence to the correct root
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Initial volume
+        """
+        ...
+
+    def A_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """`A` factor :cite:p:`HP91{Appendix A}`
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            `A` factor, which is non-dimensional
+        """
+        A_factor: ArrayLike = self.a(temperature, pressure) / (
+            self.b() * GAS_CONSTANT_BAR * jnp.power(temperature, 1.5)
+        )
+
+        return A_factor
+
+    def B_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """`B` factor :cite:p:`HP91{Appendix A}`
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            `B` factor, which is non-dimensional
+        """
+        B_factor: ArrayLike = self.b() * pressure / (GAS_CONSTANT_BAR * temperature)
+
+        return B_factor
+
+    @override
+    @jit
+    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Compressibility factor
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            The compressibility factor, which is dimensionless
+        """
+        volume: ArrayLike = self.volume(temperature, pressure)
+        volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
+        compressibility_factor: ArrayLike = volume / volume_ideal
+
+        return compressibility_factor
+
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume integral :cite:p:`HP91{Equation A.2}`
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+        """
+        log_fugacity: Array = self.log_fugacity(temperature, pressure)
+        volume_integral: Array = log_fugacity * GAS_CONSTANT_BAR * temperature
+        volume_integral = volume_integral * 1e5  # Multiply by 1E5 to convert to J for CORK model
+
+        return volume_integral
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Log fugacity
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity
+        """
+        z: Array = jnp.asarray(self.compressibility_factor(temperature, pressure))
+        A: ArrayLike = self.A_factor(temperature, pressure)
+        B: ArrayLike = self.B_factor(temperature, pressure)
+
+        log_fugacity_coefficient: Array = -jnp.log(z - B) - A * jnp.log(1 + B / z) + z - 1
+        log_fugacity: Array = jnp.log(pressure) + log_fugacity_coefficient
+
+        return log_fugacity
+
+    @jit
+    def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
+        r"""Objective function to solve for the volume
+
+        Args:
+            volume: Volume
+            kwargs: Dictionary with other required parameters
+
+        Returns:
+            Residual of the objective function
+        """
+        temperature: ArrayLike = kwargs["temperature"]
+        pressure: ArrayLike = kwargs["pressure"]
+        a: ArrayLike = self.a(temperature, pressure)
+
+        residual: Array = (
+            jnp.power(volume, 3) * pressure
+            - GAS_CONSTANT_BAR * temperature * jnp.square(volume)
+            - (
+                self.b() * GAS_CONSTANT_BAR * temperature
+                + jnp.square(self.b()) * pressure
+                - a / jnp.sqrt(temperature)
+            )
+            * volume
+            - a * self.b() / jnp.sqrt(temperature)
+        )
+
+        return residual
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Solves the RK equation numerically to compute the volume.
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+        """
+        kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
+        initial_volume: ArrayLike = self.initial_volume(temperature, pressure)
+
+        # atol reduced since typical volumes are around 1e-5 to 1e-6
+        solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
+        sol = optx.root_find(
+            self._objective_function,
+            solver,
+            initial_volume,
+            args=kwargs,
+        )
+        volume: ArrayLike = sol.value
+        # jax.debug.print("volume = {out}", out=volume)
+
+        return volume
+
+
+class RedlichKwongImplicitDenseFluidABC(RedlichKwongImplicitABC):
+    """MRK for the high density fluid phase :cite:p`HP91{Equation 6}`"""
+
+    @override
+    def initial_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Initial guess volume to ensure convergence to the correct root
+
+        For the dense fluid phase a suitably low value must be chosen :cite:p:`HP91{Appendix}`.
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Initial volume
+        """
+        del temperature
+        del pressure
+
+        initial_volume: ArrayLike = self.b() / 2
+
+        return initial_volume
+
+
+class RedlichKwongImplicitGasABC(RedlichKwongImplicitABC):
+    """MRK for the low density gaseous phase :cite:p:`HP91{Equation 6a}`"""
+
+    @override
+    def initial_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Initial guess volume to ensure convergence to the correct root
+
+        For the gaseous phase a suitably high value must be chosen :cite:p:`HP91{Appendix}`.
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Initial volume
+        """
+        initial_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure + 10 * self.b()
+
+        return initial_volume
+
+
 class RealGasBounded(RealGas):
     """A real gas equation of state that is bounded
 

@@ -29,8 +29,15 @@ import logging
 from pathlib import Path
 
 from atmodeller import ATMOSPHERE
-from atmodeller.eos.classes import BeattieBridgeman, Chabrier, MRKCorrespondingStatesHP91
+from atmodeller.eos.classes import BeattieBridgeman, Chabrier
 from atmodeller.eos.core import RealGas, RealGasBounded
+from atmodeller.eos.holland_jax import (
+    CO2MrkHolland91,
+    H2OMrkFluidHolland91,
+    H2OMrkGasHolland91,
+    H2OMrkLiquidHolland91,
+    MRKCorrespondingStatesHP91,
+)
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -70,6 +77,12 @@ S2_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("S2_g")
 """S2 MRK corresponding states :cite:p:`HP11`"""
 H2S_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S_g")
 """H2S MRK corresponding states :cite:p:`HP11`"""
+H2O_mrk_fluid_holland91: RealGas = H2OMrkFluidHolland91
+"""H2O MRK supercritical fluid :cite:p:`HP91`"""
+H2O_mrk_gas_holland91: RealGas = H2OMrkGasHolland91
+"""H2O MRK gas :cite:p:`HP91`"""
+H2O_mrk_liquid_holland91: RealGas = H2OMrkLiquidHolland91
+"""H2O MRK liquid :cite:p:`HP91`"""
 
 # end region
 
@@ -213,6 +226,7 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58
     eos_models["CO2_beattie_holley58_bounded"] = CO2_beattie_holley58_bounded
     eos_models["CO2_mrk_cs_holland91"] = CO2_mrk_cs_holland91
+    eos_models["CO2_mrk_holland91"] = CO2MrkHolland91
     eos_models["H2_beattie_holley58"] = H2_beattie_holley58
     eos_models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
     eos_models["H2_chabrier21"] = H2_chabrier21
@@ -221,6 +235,12 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21
     eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21
     eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21
+    # Supercritical fluid only
+    eos_models["H2O_mrk_fluid_holland91"] = H2O_mrk_fluid_holland91
+    # Gas (subcritical) only
+    eos_models["H2O_mrk_gas_holland91"] = H2O_mrk_gas_holland91
+    # Eventually it might make sense to include the liquid as a condensed activity model
+    eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
     eos_models["H2S_mrk_cs_holland11"] = H2S_mrk_cs_holland11
     eos_models["He_beattie_holley58"] = He_beattie_holley58
     eos_models["He_beattie_holley58_bounded"] = He_beattie_holley58_bounded
