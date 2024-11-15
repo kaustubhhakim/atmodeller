@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   atmodeller.activity
    atmodeller.eos
    atmodeller.solubility
    atmodeller.thermodata
@@ -42,14 +43,6 @@ atmodeller.interfaces module
 ----------------------------
 
 .. automodule:: atmodeller.interfaces
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-atmodeller.jax\_output module
------------------------------
-
-.. automodule:: atmodeller.jax_output
    :members:
    :undoc-members:
    :show-inheritance:

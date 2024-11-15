@@ -4,14 +4,6 @@ atmodeller.thermodata package
 Submodules
 ----------
 
-atmodeller.thermodata.condensates module
-----------------------------------------
-
-.. automodule:: atmodeller.thermodata.condensates
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 atmodeller.thermodata.core module
 ---------------------------------
 
@@ -20,10 +12,10 @@ atmodeller.thermodata.core module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.thermodata.gases module
-----------------------------------
+atmodeller.thermodata.library module
+------------------------------------
 
-.. automodule:: atmodeller.thermodata.gases
+.. automodule:: atmodeller.thermodata.library
    :members:
    :undoc-members:
    :show-inheritance:
@@ -32,14 +24,6 @@ atmodeller.thermodata.redox\_buffers module
 -------------------------------------------
 
 .. automodule:: atmodeller.thermodata.redox_buffers
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-atmodeller.thermodata.species\_data module
-------------------------------------------
-
-.. automodule:: atmodeller.thermodata.species_data
    :members:
    :undoc-members:
    :show-inheritance:
