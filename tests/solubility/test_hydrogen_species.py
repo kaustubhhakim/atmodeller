@@ -169,17 +169,19 @@ def test_H2O_basalt_mitchell(check_values) -> None:
 
 
 def test_H2O_basalt_wilson(check_values) -> None:
-    """Tests H2O in basalt :cite:p:`WH81,HBO64`"""
+    """Tests H2O in basalt :cite:p:`WH81,HBO64`,
+    Reference Parameters (fH2O and H2O Conc) from Hamilton et al. 1964, Table 3, Run No. 196; 
+    And Confirmed with Figure 1 that pressure in the table refers to water pressure (fH2O)"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["H2O_basalt_wilson81"]
-    target_concentration: ArrayLike = 349.26853043318124
-
+    target_concentration: ArrayLike = 45900
+    test_fugacity_H2O_wilson_basalt: ArrayLike = 2000
     check_values.concentration(
         function_name,
         solubility_model,
         target_concentration,
-        TEST_FUGACITY,
+        test_fugacity_H2O_wilson_basalt,
         TEST_TEMPERATURE,
         TEST_PRESSURE,
         TEST_FO2,
