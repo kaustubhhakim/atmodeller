@@ -559,7 +559,7 @@ class RealGasBounded(RealGas):
         calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(),
     ):
         super().__init__()
-        self._real_gas = real_gas
+        self._real_gas: RealGas = real_gas
         self._calibration: ExperimentalCalibrationNew = calibration
         self._pressure_min: Array = jnp.array(calibration.pressure_min)
         self._pressure_max: Array = jnp.array(calibration.pressure_max)

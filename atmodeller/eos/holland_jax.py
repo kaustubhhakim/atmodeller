@@ -21,7 +21,6 @@ import sys
 from abc import abstractmethod
 from typing import Any, Callable
 
-import jax
 import jax.numpy as jnp
 from jax import Array, jit, lax
 from jax.tree_util import register_pytree_node_class
@@ -359,6 +358,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
     Ta: float = Ta_H2O
     Tc: float = Tc_H2O
 
+    @jit
     def Psat(self, temperature: ArrayLike) -> Array:
         """Saturation curve
 
@@ -377,6 +377,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
         return Psat
 
+    @jit
     def _select_condition(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Selects the condition
 
@@ -385,7 +386,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
             pressure: Pressure
 
         Returns:
-            Integer denoting the condition
+            Integer denoting the condition, i.e. the region of phase space
         """
         Psat: Array = self.Psat(temperature)
         temperature_array: Array = jnp.asarray(temperature)
@@ -411,12 +412,12 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         cond4 = jnp.logical_and(cond4, ~cond3)
         # jax.debug.print("cond4 = {cond}", cond=cond4)
 
+        # All conditions are mutually exclusive
         condition: Array = jnp.select([cond0, cond1, cond2, cond3, cond4], [0, 1, 2, 3, 4])
         # jax.debug.print("condition = {condition}", condition=condition)
 
         return condition
 
-    # TODO: Needs updating to support JAX
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Volume integral :cite:p:`HP91{Appendix A}`
 
@@ -428,6 +429,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
             volume integral
         """
         condition: Array = self._select_condition(temperature, pressure)
+        Psat: Array = self.Psat(temperature)
 
         def volume_integral0() -> Array:
             return self.mrk_fluid.volume_integral(temperature, pressure)
@@ -438,46 +440,28 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         def volume_integral2() -> Array:
             return self.mrk_fluid.volume_integral(temperature, pressure)
 
+        def volume_integral3() -> Array:
+            value: Array = self.mrk_gas.volume_integral(temperature, Psat)
+            value = value - self.mrk_liquid.volume_integral(temperature, Psat)
+            value = value + self.mrk_liquid.volume_integral(temperature, pressure)
+
+            return value
+
+        def volume_integral4() -> Array:
+            return self.mrk_fluid.volume_integral(temperature, pressure)
+
         volume_integral_funcs: list[Callable] = [
             volume_integral0,
             volume_integral1,
             volume_integral2,
+            volume_integral3,
+            volume_integral4,
         ]
 
         volume_integral: Array = lax.switch(condition, volume_integral_funcs)
-        jax.debug.print("volume_integral = {out}", out=volume_integral)
+        # jax.debug.print("volume_integral = {out}", out=volume_integral)
 
         return volume_integral
-
-        # Original non-JAX below
-        # else:  # temperature < self.Tc and pressure > Psat:
-        #     if temperature <= self.Ta:
-        #         initial_volume: ArrayLike = (
-        #             GAS_CONSTANT_BAR * temperature / Psat
-        #             + 10 * self.mrk_gas.b(temperature, pressure)
-        #         )
-        #         volume_integral = self.mrk_gas.volume_integral(temperature, Psat, initial_volume)
-        #         logger.debug("volume_integral = %f", volume_integral)
-        #         initial_volume: ArrayLike = self.mrk_liquid.initial_solution_volume(
-        #             temperature, pressure
-        #         )
-        #         volume_integral -= self.mrk_liquid.volume_integral(
-        #             temperature, Psat, initial_volume
-        #         )
-        #         logger.debug("volume_integral = %f", volume_integral)
-        #         volume_integral += self.mrk_liquid.volume_integral(
-        #             temperature, pressure, initial_volume
-        #         )
-        #         logger.debug("volume_integral = %f", volume_integral)
-        #     else:
-        #         initial_volume: ArrayLike = self.mrk_fluid.initial_solution_volume(
-        #             temperature, pressure
-        #         )
-        #         volume_integral = self.mrk_fluid.volume_integral(
-        #             temperature, pressure, initial_volume
-        #         )
-
-        # return volume_integral
 
     @override
     @jit
@@ -499,7 +483,8 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         return log_fugacity
 
     @override
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Volume
 
         Args:
@@ -529,7 +514,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         volume_funcs: list[Callable] = [volume0, volume1, volume2, volume3, volume4]
 
         volume: Array = lax.switch(condition, volume_funcs)
-        jax.debug.print("volume = {out}", out=volume)
+        # jax.debug.print("volume = {out}", out=volume)
 
         return volume
 
