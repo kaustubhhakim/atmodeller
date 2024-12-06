@@ -126,6 +126,21 @@ class Planet(NamedTuple):
         return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
 
     @property
+    def mass(self) -> ArrayLike:
+        """Mass"""
+        return self.mantle_mass
+
+    @property
+    def melt_mass(self) -> ArrayLike:
+        """Mass of the melt"""
+        return self.mantle_melt_mass
+
+    @property
+    def solid_mass(self) -> ArrayLike:
+        """Mass of the solid"""
+        return self.mantle_solid_mass
+
+    @property
     def surface_area(self) -> ArrayLike:
         """Surface area"""
         return 4.0 * jnp.pi * self.surface_radius**2
@@ -135,6 +150,11 @@ class Planet(NamedTuple):
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
+    @property
+    def temperature(self) -> ArrayLike:
+        """Temperature"""
+        return self.surface_temperature
+
     def asdict(self) -> dict[str, Array]:
         """Gets a dictionary of the values
 
@@ -142,9 +162,9 @@ class Planet(NamedTuple):
             A dictionary of the values
         """
         base_dict: dict[str, ArrayLike] = self._asdict()
-        base_dict["mantle_mass"] = self.mantle_mass
-        base_dict["mantle_melt_mass"] = self.mantle_melt_mass
-        base_dict["mantle_solid_mass"] = self.mantle_solid_mass
+        base_dict["mantle_mass"] = self.mass
+        base_dict["mantle_melt_mass"] = self.melt_mass
+        base_dict["mantle_solid_mass"] = self.solid_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.surface_gravity
 
@@ -171,6 +191,35 @@ class Planet(NamedTuple):
             vmap_axes.append(vmap_axis)
 
         return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
+
+
+class NormalisedMass(NamedTuple):
+    """Normalised mass for conventional outgassing
+
+    Default values are for a unit mass (1 kg) system.
+
+    Args:
+        melt_fraction: Melt fraction. Defaults to 0.3 for 30%.
+        temperature: Temperature. Defaults to 1400 K.
+        mass: Total mass. Defaults to 1 kg for a unit mass system.
+    """
+
+    melt_fraction: ArrayLike = 0.3
+    """Mass fraction of melt in kg/kg"""
+    temperature: ArrayLike = 1400
+    """Temperature in K"""
+    mass: ArrayLike = 1.0
+    """Total mass"""
+
+    @property
+    def melt_mass(self) -> ArrayLike:
+        """Mass of the melt"""
+        return self.mass * self.melt_fraction
+
+    @property
+    def solid_mass(self) -> ArrayLike:
+        """Mass of the solid"""
+        return self.mass * (1 - self.melt_fraction)
 
 
 class ConstantFugacityConstraint(NamedTuple):

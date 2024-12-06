@@ -46,7 +46,6 @@ from atmodeller.containers import (
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
-    get_atmosphere_pressure,
     get_element_density,
     get_element_density_in_melt,
     get_log_activity,
@@ -54,6 +53,7 @@ from atmodeller.engine import (
     get_pressure_from_log_number_density,
     get_species_density_in_melt,
     get_species_ppmw_in_melt,
+    get_total_pressure,
     objective_function,
 )
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
@@ -151,12 +151,12 @@ class Output:
     @property
     def temperature(self) -> Array:
         """Temperature"""
-        return jnp.asarray(self.planet.surface_temperature)
+        return jnp.asarray(self.planet.temperature)
 
     @property
     def temperature_vmap(self) -> int | None:
         """Axis for temperature vmap"""
-        return self.traced_parameters_vmap.planet.surface_temperature  # type: ignore
+        return self.traced_parameters_vmap.planet.temperature  # type: ignore
 
     @property
     def traced_parameters(self) -> TracedParameters:
@@ -215,6 +215,8 @@ class Output:
                 self.traced_parameters.mass_constraints.asdict(), self.number_solutions
             )
         if fugacity_matrix.size > 0:
+            # FIXME: This fails when fugacity constraints have a single value but mass constraints
+            # have multiple values
             out["constraints"] |= self.traced_parameters.fugacity_constraints.asdict(
                 temperature, pressure
             )
@@ -251,7 +253,7 @@ class Output:
             get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap)
         )
         log_number_density = log_number_density_from_log_pressure_func(
-            jnp.log(self.atmosphere_pressure()), self.temperature
+            jnp.log(self.total_pressure()), self.temperature
         )
         # Must be 2-D to align arrays for computing number-density-related quantities
         number_density: Array = jnp.exp(log_number_density)[:, jnp.newaxis]
@@ -264,7 +266,7 @@ class Output:
         # Ensure all arrays are 1-D, which is required for creating dataframes
         out = {key: value.ravel() for key, value in out.items()}
 
-        out["pressure"] = self.atmosphere_pressure()
+        out["pressure"] = self.total_pressure()
         out["volume"] = self.atmosphere_volume()
         out["element_number_density"] = jnp.sum(self.element_density_gas(), axis=1)
         out["element_number"] = out["element_number_density"] * out["volume"]
@@ -325,20 +327,20 @@ class Output:
         """
         return jnp.exp(self.atmosphere_log_volume())
 
-    def atmosphere_pressure(self) -> Array:
-        """Gets pressure of the atmosphere
+    def total_pressure(self) -> Array:
+        """Gets total pressure
 
         Returns:
-            Pressure of the atmosphere
+            Total pressure
         """
-        atmosphere_pressure_func: Callable = jax.vmap(
-            get_atmosphere_pressure, in_axes=(None, 0, self.temperature_vmap)
+        total_pressure_func: Callable = jax.vmap(
+            get_total_pressure, in_axes=(None, 0, self.temperature_vmap)
         )
-        atmosphere_pressure: Array = atmosphere_pressure_func(
+        total_pressure: Array = total_pressure_func(
             self.fixed_parameters, self.log_number_density, self.temperature
         )
 
-        return atmosphere_pressure
+        return total_pressure
 
     def condensed_species_asdict(self) -> dict[str, dict[str, Array]]:
         """Gets the condensed species output as a dictionary

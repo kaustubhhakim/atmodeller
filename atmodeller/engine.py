@@ -96,7 +96,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     traced_parameters: TracedParameters = kwargs["traced_parameters"]
     fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
     planet: Planet = traced_parameters.planet
-    temperature: ArrayLike = planet.surface_temperature
+    temperature: ArrayLike = planet.temperature
     fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
     mass_constraints: MassConstraints = traced_parameters.mass_constraints
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
@@ -170,7 +170,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         # fugacity constraint is being applied.
         fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity_number_density)
         # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-        total_pressure: Array = get_atmosphere_pressure(
+        total_pressure: Array = get_total_pressure(
             fixed_parameters, log_number_density, temperature
         )
         fugacity_residual = fugacity_residual - fugacity_constraints.log_number_density(
@@ -256,10 +256,9 @@ def get_atmosphere_log_volume(
     Returns:
         Log volume of the atmosphere
     """
-
     log_volume: Array = (
         jnp.log(GAS_CONSTANT)
-        + jnp.log(planet.surface_temperature)
+        + jnp.log(planet.temperature)
         - get_atmosphere_log_molar_mass(fixed_parameters, log_number_density)
         + jnp.log(planet.surface_area)
         - jnp.log(planet.surface_gravity)
@@ -269,10 +268,10 @@ def get_atmosphere_log_volume(
 
 
 @jit
-def get_atmosphere_pressure(
+def get_total_pressure(
     fixed_parameters: FixedParameters, log_number_density: Array, temperature: ArrayLike
 ) -> Array:
-    """Gets pressure of the atmosphere
+    """Gets total pressure
 
     Args:
         fixed_parameters: Fixed parameters
@@ -280,7 +279,7 @@ def get_atmosphere_pressure(
         temperature: Temperature
 
     Returns:
-        Pressure of the atmosphere
+        Total pressure
     """
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
     pressure: Array = get_pressure_from_log_number_density(log_number_density, temperature)
@@ -370,12 +369,10 @@ def get_log_activity(
         Log activity
     """
     planet: Planet = traced_parameters.planet
-    temperature: ArrayLike = planet.surface_temperature
+    temperature: ArrayLike = planet.temperature
     species: tuple[Species, ...] = fixed_parameters.species
-    atmosphere_pressure: Array = get_atmosphere_pressure(
-        fixed_parameters, log_number_density, temperature
-    )
-    # jax.debug.print("atmosphere_pressure = {out}", out=atmosphere_pressure)
+    total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
+    # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
 
@@ -384,7 +381,7 @@ def get_log_activity(
             index,
             activity_funcs,
             temperature,
-            atmosphere_pressure,
+            total_pressure,
         )
 
     vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0,))
@@ -571,7 +568,7 @@ def get_species_density_in_melt(
         ppmw
         * unit_conversion.ppm_to_fraction
         * AVOGADRO
-        * planet.mantle_melt_mass
+        * planet.melt_mass
         / (molar_masses * safe_exp(log_volume))
     )
     # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
@@ -600,12 +597,10 @@ def get_species_ppmw_in_melt(
     species: tuple[Species, ...] = fixed_parameters.species
     diatomic_oxygen_index: Array = jnp.array(fixed_parameters.diatomic_oxygen_index)
     planet: Planet = traced_parameters.planet
-    temperature: ArrayLike = planet.surface_temperature
+    temperature: ArrayLike = planet.temperature
 
     fugacity: Array = safe_exp(log_activity)
-    atmosphere_pressure: Array = get_atmosphere_pressure(
-        fixed_parameters, log_number_density, temperature
-    )
+    total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
     diatomic_oxygen_fugacity: Array = jnp.take(fugacity, diatomic_oxygen_index)
 
     solubility_funcs: list[Callable] = [
@@ -618,7 +613,7 @@ def get_species_ppmw_in_melt(
             solubility_funcs,
             fugacity,
             temperature,
-            atmosphere_pressure,
+            total_pressure,
             diatomic_oxygen_fugacity,
         )
 
