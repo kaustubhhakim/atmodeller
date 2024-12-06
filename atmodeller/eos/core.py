@@ -27,10 +27,12 @@ from typing import Any, Callable
 import jax.numpy as jnp
 import optimistix as optx
 from jax import Array, grad, jit, lax
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasProtocol
+from atmodeller.thermodata.core import CriticalData
 from atmodeller.utilities import (
     ExperimentalCalibrationNew,
     safe_exp,
@@ -545,6 +547,282 @@ class RedlichKwongImplicitGasABC(RedlichKwongImplicitABC):
         return initial_volume
 
 
+# TODO: log_fugacity is not implemented so this cannot subclass RealGas
+@register_pytree_node_class
+class VirialCompensation:
+    r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
+
+    General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
+
+    .. math::
+
+        V_\mathrm{virial} = a(P-P0) + b(P-P0)^\frac{1}{2} + c(P-P0)^\frac{1}{4}
+
+    This form also works for the virial compensation term from :cite:t:`HP91`, in which
+    case :math:`c=0`. :attr:`critical_pressure` and :attr:`critical_temperature` are required for
+    gases which are known to obey approximately the principle of corresponding states.
+
+    Although this looks similar to an EOS, it only calculates an additional perturbation to the
+    volume and the volume integral of an MRK EOS, and hence it does not return a meaningful volume
+    or volume integral by itself.
+
+    TODO: Update documentation re. corresponding states and scaled temperature and pressure
+
+    Args:
+        a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where
+            :math:`a_0` and :math:`a_1` may be scaled (internally) by critical parameters for
+            corresponding states.
+        b_coefficients: As above for the b coefficients
+        c_coefficients: As above for the c coefficients
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly and may be determined from experimental data.
+    """
+
+    def __init__(
+        self,
+        a_coefficients: tuple[float, ...],
+        b_coefficients: tuple[float, ...],
+        c_coefficients: tuple[float, ...],
+        P0: float,
+    ):
+        self.a_coefficients: tuple[float, ...] = a_coefficients
+        self.b_coefficients: tuple[float, ...] = b_coefficients
+        self.c_coefficients: tuple[float, ...] = c_coefficients
+        self.P0: float = P0
+
+    @jit
+    def _a(self, temperature: ArrayLike, critical_data: CriticalData) -> Array:
+        r"""`a` parameter :cite:p:`HP98`
+
+        This is also the `d` parameter in :cite:t:`HP91`.
+
+        Args:
+            temperature: Temperature
+            critical_data: Critical data
+
+        Returns:
+            `a` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^{-1}`
+        """
+        a: Array = (
+            self.a_coefficients[1] * jnp.asarray(temperature)
+            + self.a_coefficients[0] * critical_data.temperature
+        )
+        a = a / jnp.square(critical_data.pressure)
+
+        return a
+
+    @jit
+    def _b(self, temperature: ArrayLike, critical_data: CriticalData) -> Array:
+        r"""`b` parameter :cite:p:`HP98`
+
+        This is also the `c` parameter in :cite:t:`HP91`.
+
+        Args:
+            temperature: Temperature
+            critical_data: Critical data
+
+        Returns:
+            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{2}`
+        """
+        b: Array = (
+            self.b_coefficients[1] * jnp.asarray(temperature)
+            + self.b_coefficients[0] * critical_data.temperature
+        )
+        b = b / jnp.power(critical_data.pressure, (3.0 / 2))
+
+        return b
+
+    @jit
+    def _c(self, temperature: ArrayLike, critical_data: CriticalData) -> Array:
+        r"""`c` parameter :cite:p:`HP98`
+
+        Args:
+            temperature: Temperature
+            critical_data: Critical data
+
+        Returns:
+            `c` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{4}`
+        """
+        c: Array = (
+            self.c_coefficients[1] * jnp.asarray(temperature)
+            + self.c_coefficients[0] * critical_data.temperature
+        )
+        c = c / jnp.power(critical_data.pressure, (5.0 / 4))
+
+        return c
+
+    @jit
+    def _delta_pressure(self, pressure: ArrayLike) -> Array:
+        """Pressure difference
+
+        Args:
+            pressure: Pressure
+
+        Returns:
+            Pressure difference relative to :attr:`P0`
+        """
+        pressure_array: Array = jnp.asarray(pressure)
+        condition: Array = pressure_array > self.P0
+
+        def pressure_above_P0() -> Array:
+            return pressure_array - self.P0
+
+        def pressure_not_above_p0() -> Array:
+            return jnp.zeros_like(pressure_array)
+
+        delta_pressure: Array = jnp.where(condition, pressure_above_P0(), pressure_not_above_p0())
+
+        return delta_pressure
+
+    @jit
+    def volume(
+        self, temperature: ArrayLike, pressure: ArrayLike, critical_data: CriticalData
+    ) -> Array:
+        r"""Volume contribution
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+            critical_data: Critical data
+
+        Returns:
+            Volume contribution in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+        """
+        delta_pressure: Array = self._delta_pressure(pressure)
+        volume: Array = (
+            self._a(temperature, critical_data) * delta_pressure
+            + self._b(temperature, critical_data) * jnp.sqrt(delta_pressure)
+            + self._c(temperature, critical_data) * jnp.power(delta_pressure, 0.25)
+        )
+
+        return volume
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
+        children: tuple = ()
+        aux_data = {
+            "a_coefficients": self.a_coefficients,
+            "b_coefficients": self.b_coefficients,
+            "c_coefficients": self.c_coefficients,
+            "P0": self.P0,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
+
+    @jit
+    def volume_integral(
+        self, temperature: ArrayLike, pressure: ArrayLike, critical_data: CriticalData
+    ) -> Array:
+        r"""Volume integral :math:`V dP` contribution
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+            critical_data: Critical data
+
+        Returns:
+            Volume integral contribution in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+        """
+        delta_pressure: Array = self._delta_pressure(pressure)
+        volume_integral: Array = (
+            self._a(temperature, critical_data) / 2.0 * jnp.square(delta_pressure)
+            + 2.0
+            / 3.0
+            * self._b(temperature, critical_data)
+            * jnp.power(delta_pressure, (3.0 / 2.0))
+            + 4.0
+            / 5.0
+            * self._c(temperature, critical_data)
+            * jnp.power(delta_pressure, (5.0 / 4.0))
+        )
+        # TODO: Clean up these 1e5 factors in the volume integral across the MRK/CORK models
+        volume_integral = volume_integral * 1e5
+
+        return volume_integral
+
+
+@register_pytree_node_class
+class CORK(RealGas):
+    """A Compensated-Redlich-Kwong (CORK) EOS :cite:p:`HP91`
+
+    Args:
+        mrk: MRK model
+        virial: Virial compensation term
+        critical_data: Critical data
+    """
+
+    def __init__(
+        self, mrk: RedlichKwongABC, virial: VirialCompensation, critical_data: CriticalData
+    ):
+        self._mrk: RedlichKwongABC = mrk
+        self._virial: VirialCompensation = virial
+        self._critical_data: CriticalData = critical_data
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Log fugacity :cite:p:`HP91{Equation 8}`
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log fugacity
+        """
+        # 1e-5 to convert volume integral back to appropriate units
+        log_fugacity: Array = (
+            1e-5 * self.volume_integral(temperature, pressure) / (GAS_CONSTANT_BAR * temperature)
+        )
+
+        return log_fugacity
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume :cite:p:`HP91{Equation 7a}`
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+        """
+        return self._mrk.volume(temperature, pressure) + self._virial.volume(
+            temperature, pressure, self._critical_data
+        )
+
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume integral :cite:p:`HP91{Equation 8}`
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+        """
+        return self._mrk.volume_integral(temperature, pressure) + self._virial.volume_integral(
+            temperature, pressure, self._critical_data
+        )
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
+        children: tuple = ()
+        aux_data = {"mrk": self._mrk, "virial": self._virial, "critical_data": self._critical_data}
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
+
+
 class RealGasBounded(RealGas):
     """A real gas equation of state that is bounded
 
@@ -704,165 +982,6 @@ class RealGasBounded(RealGas):
 #         scaled_temperature: float = temperature / self.critical_temperature
 
 #         return scaled_temperature
-
-
-# @dataclass(kw_only=True)
-# class VirialCompensation(CorrespondingStatesMixin, RealGas):
-#     r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
-
-#     General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
-
-#     .. math::
-
-#         V_\mathrm{virial} = a(P-P0) + b(P-P0)^\frac{1}{2} + c(P-P0)^\frac{1}{4}
-
-#     This form also works for the virial compensation term from :cite:t:`HP91`, in which
-#     case :math:`c=0`. :attr:`critical_pressure` and :attr:`critical_temperature` are required for
-#     gases which are known to obey approximately the principle of corresponding states.
-
-#     Although this looks similar to an EOS, it only calculates an additional perturbation to the
-#     volume and the volume integral of an MRK EOS, and hence it does not return a meaningful volume
-#     or volume integral by itself.
-
-#     Args:
-#         a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where
-#             :math:`a_0` and :math:`a_1` may be scaled (internally) by critical parameters for
-#             corresponding states.
-#         b_coefficients: As above for the b coefficients
-#         c_coefficients: As above for the c coefficients
-#         P0: Pressure at which the MRK equation begins to overestimate the molar volume
-#             significantly and may be determined from experimental data.
-#         critical_temperature: Critical temperature in K. Defaults to unity meaning not a
-#             corresponding states model.
-#         critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
-#             states model.
-#         calibration: Calibration temperature and pressure range. Defaults to empty.
-#     """
-
-#     a_coefficients: Array
-#     r"""Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where :math:`a_0` and
-#     :math:`a_1` may be additionally (internally) scaled by critical parameters
-#     (:attr:`critical_temperature` and :attr:`critical_pressure`) for corresponding states."""
-#     b_coefficients: Array
-#     """Coefficients for the `b` parameter. See :attr:`a_coefficients` documentation."""
-#     c_coefficients: Array
-#     """Coefficients for the `c` parameter. See :attr:`a_coefficients` documentation."""
-#     P0: ArrayLike
-#     """Pressure at which the MRK equation begins to overestimate the molar volume significantly
-#     and may be determined from experimental data."""
-
-#     def a(self, temperature: float) -> Array:
-#         r"""`a` parameter :cite:p:`HP98`
-
-#         This is also the `d` parameter in :cite:t:`HP91`.
-
-#         Args:
-#             temperature: Temperature in K
-
-#         Returns:
-#             `a` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^{-1}`
-#         """
-#         a: Array = (
-#             self.a_coefficients[0] * self.critical_temperature
-#             + self.a_coefficients[1] * temperature
-#         )
-#         a = a / self.critical_pressure**2
-
-#         return a
-
-#     def b(self, temperature: float) -> Array:
-#         r"""`b` parameter :cite:p:`HP98`
-
-#         This is also the `c` parameter in :cite:t:`HP91`.
-
-#         Args:
-#             temperature: Temperature in K
-
-#         Returns:
-#             `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{2}`
-#         """
-#         b: Array = (
-#             self.b_coefficients[0] * self.critical_temperature
-#             + self.b_coefficients[1] * temperature
-#         )
-#         b = b / self.critical_pressure ** (3 / 2)
-
-#         return b
-
-#     def c(self, temperature: float) -> Array:
-#         r"""`c` parameter :cite:p:`HP98`
-
-#         Args:
-#             temperature: Temperature in K
-
-#         Returns:
-#             `c` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{4}`
-#         """
-#         c: Array = (
-#             self.c_coefficients[0] * self.critical_temperature
-#             + self.c_coefficients[1] * temperature
-#         )
-#         c = c / self.critical_pressure ** (5 / 4)
-
-#         return c
-
-#     def delta_pressure(self, pressure: ArrayLike) -> Array:
-#         """Pressure difference
-
-#         Args:
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Pressure difference relative to :attr:`P0`
-#         """
-# TODO: Careful. Maybe jnp.where is better for array-based operations
-#         delta_pressure: Array = lax.cond(
-#             jnp.asarray(pressure) > jnp.asarray(self.P0),
-#             lambda pressure: jnp.asarray(pressure - self.P0, dtype=jnp.float_),
-#             lambda pressure: jnp.array(0, dtype=jnp.float_),
-#             pressure,
-#         )
-
-#         return delta_pressure
-
-#     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-#         r"""Volume contribution
-
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Volume contribution in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-#         """
-#         delta_pressure: Array = self.delta_pressure(pressure)
-#         volume: Array = (
-#             self.a(temperature) * delta_pressure
-#             + self.b(temperature) * delta_pressure**0.5
-#             + self.c(temperature) * delta_pressure**0.25
-#         )
-
-#         return volume
-
-#     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-#         r"""Volume integral :math:`V dP` contribution
-
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Volume integral contribution in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-#         """
-#         delta_pressure: Array = self.delta_pressure(pressure)
-#         volume_integral: Array = (
-#             self.a(temperature) / 2.0 * delta_pressure**2
-#             + 2.0 / 3.0 * self.b(temperature) * delta_pressure ** (3.0 / 2.0)
-#             + 4.0 / 5.0 * self.c(temperature) * delta_pressure ** (5.0 / 4.0)
-#         )
-#         volume_integral = volume_integral * unit_conversion.m3_bar_to_J
-
-#         return volume_integral
 
 
 # @dataclass(kw_only=True)

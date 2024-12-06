@@ -168,7 +168,7 @@ class MRKImplicitHP91ABCMixin:
         * `b` is multiplied by 1e-5
 
     These scalings are different by 1e3 compared to the corresponding states scaling because in the
-    corresponding states formulation the coeffficients contain a kilo pressure scaling as well.
+    corresponding states formulation the coefficients contain a kilo pressure scaling as well.
 
     Args:
         a_coefficients: `a` coefficients

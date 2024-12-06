@@ -421,7 +421,7 @@ class VirialCompensation(CorrespondingStatesMixin, RealGas):
     c_coefficients: Array
     """Coefficients for the `c` parameter. See :attr:`a_coefficients` documentation."""
     P0: ArrayLike
-    """Pressure at which the MRK equation begins to overestimate the molar volume significantly 
+    """Pressure at which the MRK equation begins to overestimate the molar volume significantly
     and may be determined from experimental data."""
 
     def a(self, temperature: float) -> Array:

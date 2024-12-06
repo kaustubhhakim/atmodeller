@@ -30,7 +30,7 @@ from pathlib import Path
 
 from atmodeller import ATMOSPHERE
 from atmodeller.eos.classes import BeattieBridgeman, Chabrier
-from atmodeller.eos.core import RealGas, RealGasBounded
+from atmodeller.eos.core import CORK, RealGas, RealGasBounded, VirialCompensation
 from atmodeller.eos.holland_jax import (
     CO2MrkHolland91,
     H2OMrkFluidHolland91,
@@ -39,6 +39,7 @@ from atmodeller.eos.holland_jax import (
     H2OMrkLiquidHolland91,
     MRKCorrespondingStatesHP91,
 )
+from atmodeller.thermodata.library import select_critical_data
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -84,6 +85,47 @@ H2O_mrk_gas_holland91: RealGas = H2OMrkGasHolland91
 """H2O MRK gas :cite:p:`HP91`"""
 H2O_mrk_liquid_holland91: RealGas = H2OMrkLiquidHolland91
 """H2O MRK liquid :cite:p:`HP91`"""
+
+virial_compensation: VirialCompensation = VirialCompensation(
+    (6.93054e-9, -8.38293e-10), (-3.30558e-7, 2.30524e-8), (0, 0), 0
+)
+"""Virial compensation for corresponding states :cite:p:`HP91{Table 2}`
+
+In this case it appears `P0` is always zero, even though for the full CORK equations it determines
+whether or not the virial contribution is added. The unit conversions to SI and pressure in bar 
+mean that every virial coefficient has been multiplied by 1e-2 compared to the values in 
+:cite:t:`HP91{Table 2}`.
+"""
+
+# TODO: Add bounded versions with experimental calibrations
+CH4_cork_cs_holland91: RealGas = CORK(
+    CH4_mrk_cs_holland91, virial_compensation, select_critical_data("CH4_g")
+)
+"""CH4 CORK corresponding states :cite:p:`HP91`"""
+CO_cork_cs_holland91: RealGas = CORK(
+    CO_mrk_cs_holland91, virial_compensation, select_critical_data("CO_g")
+)
+"""CO CORK corresponding states :cite:p:`HP91`"""
+CO2_cork_cs_holland91: RealGas = CORK(
+    CO2_mrk_cs_holland91, virial_compensation, select_critical_data("CO2_g")
+)
+"""CO2 CORK corresponding states :cite:p:`HP91`"""
+H2_cork_cs_holland91: RealGas = CORK(
+    H2_mrk_cs_holland91, virial_compensation, select_critical_data("H2_g_Holland")
+)
+"""H2 CORK corresponding states :cite:p:`HP91`"""
+H2S_cork_cs_holland11: RealGas = CORK(
+    H2S_mrk_cs_holland11, virial_compensation, select_critical_data("H2S_g")
+)
+"""H2S CORK corresponding states :cite:p:`HP91`"""
+N2_cork_cs_holland91: RealGas = CORK(
+    N2_mrk_cs_holland91, virial_compensation, select_critical_data("N2_g")
+)
+"""N2 CORK corresponding states :cite:p:`HP91`"""
+S2_cork_cs_holland11: RealGas = CORK(
+    S2_mrk_cs_holland11, virial_compensation, select_critical_data("S2_g")
+)
+"""S2 CORK corresponding states :cite:p:`HP91`"""
 
 # end region
 
@@ -222,16 +264,20 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models: dict[str, RealGas] = {}
     eos_models["CH4_beattie_holley58"] = CH4_beattie_holley58
     eos_models["CH4_beattie_holley58_bounded"] = CH4_beattie_holley58_bounded
+    eos_models["CH4_cork_cs_holland91"] = CH4_cork_cs_holland91
     eos_models["CH4_mrk_cs_holland91"] = CH4_mrk_cs_holland91
+    eos_models["CO_cork_cs_holland91"] = CO_cork_cs_holland91
     eos_models["CO_mrk_cs_holland91"] = CO_mrk_cs_holland91
     eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58
     eos_models["CO2_beattie_holley58_bounded"] = CO2_beattie_holley58_bounded
+    eos_models["CO2_cork_cs_holland91"] = CO2_cork_cs_holland91
     eos_models["CO2_mrk_cs_holland91"] = CO2_mrk_cs_holland91
     eos_models["CO2_mrk_holland91"] = CO2MrkHolland91
     eos_models["H2_beattie_holley58"] = H2_beattie_holley58
     eos_models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
     eos_models["H2_chabrier21"] = H2_chabrier21
     eos_models["H2_chabrier21_bounded"] = H2_chabrier21_bounded
+    eos_models["H2_cork_cs_holland91"] = H2_cork_cs_holland91
     eos_models["H2_mrk_cs_holland91"] = H2_mrk_cs_holland91
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21
     eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21
@@ -243,17 +289,20 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["H2O_mrk_gas_holland91"] = H2O_mrk_gas_holland91
     # Eventually it might make sense to include the liquid as a condensed activity model
     eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
+    eos_models["H2S_cork_cs_holland11"] = H2S_cork_cs_holland11
     eos_models["H2S_mrk_cs_holland11"] = H2S_mrk_cs_holland11
     eos_models["He_beattie_holley58"] = He_beattie_holley58
     eos_models["He_beattie_holley58_bounded"] = He_beattie_holley58_bounded
     eos_models["He_chabrier21"] = He_chabrier21
     eos_models["N2_beattie_holley58"] = N2_beattie_holley58
     eos_models["N2_beattie_holley58_bounded"] = N2_beattie_holley58_bounded
+    eos_models["N2_cork_cs_holland91"] = N2_cork_cs_holland91
     eos_models["N2_mrk_cs_holland91"] = N2_mrk_cs_holland91
     eos_models["NH3_beattie_holley58"] = NH3_beattie_holley58
     eos_models["NH3_beattie_holley58_bounded"] = NH3_beattie_holley58_bounded
     eos_models["O2_beattie_holley58"] = O2_beattie_holley58
     eos_models["O2_beattie_holley58_bounded"] = O2_beattie_holley58_bounded
+    eos_models["S2_cork_cs_holland11"] = S2_cork_cs_holland11
     eos_models["S2_mrk_cs_holland11"] = S2_mrk_cs_holland11
 
     return eos_models
