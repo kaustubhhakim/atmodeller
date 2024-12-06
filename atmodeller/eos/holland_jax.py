@@ -104,6 +104,7 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         return cls(critical_data)
 
     @override
+    @jit
     def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""MRK `a` parameter :cite:p:`HP91{Equation 9}`
 
@@ -131,6 +132,7 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         return a
 
     @override
+    @jit
     def b(self) -> ArrayLike:
         r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`.
 
@@ -195,6 +197,7 @@ class MRKImplicitHP91ABCMixin:
         """
         ...
 
+    @jit
     def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""MRK `a` parameter :cite:p:`HP91{Equation 6}`
 
@@ -275,6 +278,7 @@ class MRKImplicitFluidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFlu
         return temperature - self._Ta
 
     @override
+    @jit
     def initial_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Initial guess volume to ensure convergence to the correct root
 
@@ -418,6 +422,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
         return condition
 
+    @jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Volume integral :cite:p:`HP91{Appendix A}`
 
