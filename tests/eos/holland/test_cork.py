@@ -163,33 +163,10 @@ def test_CO2_above_P0(check_values) -> None:
     )
 
 
-def test_CorkH2O_above_Tc_below_P0(check_values) -> None:
-    """H2O above Tc and below P0"""
-    check_values.fugacity_coefficient(
-        2000, 1e3, eos_models["H2O"], 1.048278616058322, rtol=RTOL, atol=ATOL
-    )
-
-
 def test_H2O_above_Tc_above_P0(check_values) -> None:
     """H2O above Tc and above P0"""
     check_values.fugacity_coefficient(
         2000, 5e3, eos_models["H2O"], 1.3444013638026706, rtol=RTOL, atol=ATOL
-    )
-
-
-def test_H2O_below_Tc_below_Psat(check_values) -> None:
-    """H2O below Tc and below Psat"""
-    # Psat = 0.118224 kbar at T = 600 K
-    check_values.fugacity_coefficient(
-        600, 0.1e3, eos_models["H2O"], 0.7910907770688191, rtol=RTOL, atol=ATOL
-    )
-
-
-def test_H2O_below_Tc_above_Psat(check_values) -> None:
-    """H2O below Tc and above Psat"""
-    # Psat = 0.118224 kbar at T = 600 K
-    check_values.fugacity_coefficient(
-        600, 1e3, eos_models["H2O"], 0.13704706029361396, rtol=RTOL, atol=ATOL
     )
 
 

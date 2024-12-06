@@ -43,8 +43,8 @@ def test_CO2(check_values) -> None:
     check_values.fugacity_coefficient(2000, 2e3, model, 1.575457075165528, rtol=RTOL, atol=ATOL)
 
 
-def test_H2O_above_Tc_below_P0(check_values) -> None:
-    """H2O above Tc and below P0"""
+def test_H2O_above_Tc(check_values) -> None:
+    """H2O above Tc"""
     model: RealGas = eos_models["H2O_mrk_fluid_holland91"]
     check_values.fugacity_coefficient(2000, 1e3, model, 1.048278616058322, rtol=RTOL, atol=ATOL)
 
@@ -54,3 +54,11 @@ def test_H2O_below_Tc_below_Psat(check_values) -> None:
     # Psat = 0.118224 kbar at T = 600 K
     model: RealGas = eos_models["H2O_mrk_gas_holland91"]
     check_values.fugacity_coefficient(600, 0.1e3, model, 0.7910907770688191, rtol=RTOL, atol=ATOL)
+
+
+def test_H2O_below_Tc_above_Psat(check_values) -> None:
+    """H2O below Tc and above Psat"""
+    # Psat = 0.118224 kbar at T = 600 K
+    check_values.fugacity_coefficient(
+        600, 1e3, eos_models["H2O_mrk_holland91"], 0.13704706029361396, rtol=RTOL, atol=ATOL
+    )
