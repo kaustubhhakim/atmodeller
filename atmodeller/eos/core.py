@@ -823,6 +823,7 @@ class CORK(RealGas):
         return cls(**aux_data)
 
 
+@register_pytree_node_class
 class RealGasBounded(RealGas):
     """A real gas equation of state that is bounded
 
