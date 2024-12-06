@@ -54,7 +54,7 @@ from jax import Array
 from jax.typing import ArrayLike
 from scipy.constants import kilo
 
-from atmodeller.eos.holland_jax import CO2MrkHolland91, H2OMrkHP91, MRKCorrespondingStatesHP91
+from atmodeller.eos.holland_jax import CO2MrkHolland91, H2OMrkHolland91, MRKCorrespondingStatesHP91
 from atmodeller.eos.interfaces import (
     CORK,
     ExperimentalCalibration,
@@ -161,9 +161,9 @@ CO2_MRK_HP98 = CO2MrkHolland91
 This is the same as the CO2 MRK model in :cite:t:`HP91`.
 """
 
-H2O_MRK_HP91 = H2OMrkHP91()
+H2O_MRK_HP91 = H2OMrkHolland91
 """H2O MRK :cite:p:`HP91`"""
-H2O_MRK_HP98 = H2OMrkHP91()
+H2O_MRK_HP98 = H2OMrkHolland91
 """H2O MRK :cite:p:`HP98`
 
 This is the same as the H2O MRK model in :cite:t:`HP91`.

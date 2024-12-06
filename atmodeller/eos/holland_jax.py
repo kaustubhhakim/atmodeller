@@ -19,10 +19,11 @@
 import logging
 import sys
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Callable
 
+import jax
 import jax.numpy as jnp
-from jax import Array, jit
+from jax import Array, jit, lax
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
@@ -333,8 +334,9 @@ formulation for H2O, the CO2 critical temperature is set.
 # TODO: Stitch together the H2O gas and H2O fluid for a single EOS
 
 
-class MRKCriticalBehaviour(PyTreeNoData, RealGas):
-    """A MRK model that accommodates critical behaviour
+@register_pytree_node_class
+class H2OMrkHP91(PyTreeNoData, RealGas):
+    """A MRK model for H2O that accommodates critical behaviour
 
     Args:
         mrk_fluid: The MRK for the supercritical fluid
@@ -351,13 +353,12 @@ class MRKCriticalBehaviour(PyTreeNoData, RealGas):
         Tc: Critical temperature
     """
 
-    mrk_fluid: MRKImplicitFluidHP91
-    mrk_gas: MRKImplicitGasHP91
-    mrk_liquid: MRKImplicitLiquidHP91
-    Ta: float
-    Tc: float
+    mrk_fluid: MRKImplicitFluidHP91 = H2OMrkFluidHolland91
+    mrk_gas: MRKImplicitGasHP91 = H2OMrkGasHolland91
+    mrk_liquid: MRKImplicitLiquidHP91 = H2OMrkLiquidHolland91
+    Ta: float = Ta_H2O
+    Tc: float = Tc_H2O
 
-    @abstractmethod
     def Psat(self, temperature: ArrayLike) -> Array:
         """Saturation curve
 
@@ -367,11 +368,57 @@ class MRKCriticalBehaviour(PyTreeNoData, RealGas):
         Returns:
             Saturation curve pressure
         """
-        ...
+        Psat: Array = (
+            -13.627
+            + 7.29395e-4 * jnp.square(temperature)
+            - 2.34622e-6 * jnp.power(temperature, 3)
+            + 4.83607e-12 * jnp.power(temperature, 5)
+        )
+
+        return Psat
+
+    def _select_condition(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Selects the condition
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Integer denoting the condition
+        """
+        Psat: Array = self.Psat(temperature)
+        temperature_array: Array = jnp.asarray(temperature)
+        pressure_array: Array = jnp.asarray(pressure)
+
+        # Supercritical (saturation pressure irrelevant)
+        cond0: Array = temperature_array >= self.Tc
+        # jax.debug.print("cond0 = {cond}", cond=cond0)
+        # Below the saturation pressure and below Ta
+        cond1: Array = jnp.logical_and(temperature_array <= self.Ta, pressure_array <= Psat)
+        # jax.debug.print("cond1 = {cond}", cond=cond1)
+        # Below the saturation pressure and below Tc
+        cond2: Array = jnp.logical_and(temperature_array < self.Tc, pressure_array <= Psat)
+        # Ensure cond2 is exclusive of cond1
+        cond2 = jnp.logical_and(cond2, ~cond1)
+        # jax.debug.print("cond2 = {cond}", cond=cond2)
+        # Above the saturation pressure and below Ta
+        cond3: Array = jnp.logical_and(temperature_array <= self.Ta, pressure_array > Psat)
+        # jax.debug.print("cond3 = {cond}", cond=cond3)
+        # Above the saturation pressure and below Tc
+        cond4: Array = jnp.logical_and(temperature_array < self.Tc, pressure_array > Psat)
+        # Ensure cond4 is exclusive of cond3
+        cond4 = jnp.logical_and(cond4, ~cond3)
+        # jax.debug.print("cond4 = {cond}", cond=cond4)
+
+        condition: Array = jnp.select([cond0, cond1, cond2, cond3, cond4], [0, 1, 2, 3, 4])
+        # jax.debug.print("condition = {condition}", condition=condition)
+
+        return condition
 
     # TODO: Needs updating to support JAX
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Volume integral. Appendix A, Holland and Powell (1991)
+        """Volume integral :cite:p:`HP91{Appendix A}`
 
         Args:
             temperature: Temperature
@@ -380,51 +427,57 @@ class MRKCriticalBehaviour(PyTreeNoData, RealGas):
         Returns:
             volume integral
         """
-        Psat: ArrayLike = self.Psat(temperature)
+        condition: Array = self._select_condition(temperature, pressure)
 
-        if temperature >= self.Tc:
-            logger.debug("temperature >= critical temperature of %f", self.Tc)
-            volume_integral: float = self.mrk_fluid.volume_integral(temperature, pressure)
+        def volume_integral0() -> Array:
+            return self.mrk_fluid.volume_integral(temperature, pressure)
 
-        elif temperature <= self.Ta and pressure <= Psat:
-            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
-            volume_integral = self.mrk_gas.volume_integral(temperature, pressure)
+        def volume_integral1() -> Array:
+            return self.mrk_gas.volume_integral(temperature, pressure)
 
-        elif temperature < self.Tc and pressure <= Psat:
-            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
-            initial_volume: ArrayLike = self.mrk_fluid.initial_solution_volume(
-                temperature, pressure
-            )
-            volume_integral = self.mrk_fluid.volume_integral(temperature, pressure, initial_volume)
+        def volume_integral2() -> Array:
+            return self.mrk_fluid.volume_integral(temperature, pressure)
 
-        else:  # temperature < self.Tc and pressure > Psat:
-            if temperature <= self.Ta:
-                initial_volume: ArrayLike = (
-                    GAS_CONSTANT_BAR * temperature / Psat
-                    + 10 * self.mrk_gas.b(temperature, pressure)
-                )
-                volume_integral = self.mrk_gas.volume_integral(temperature, Psat, initial_volume)
-                logger.debug("volume_integral = %f", volume_integral)
-                initial_volume: ArrayLike = self.mrk_liquid.initial_solution_volume(
-                    temperature, pressure
-                )
-                volume_integral -= self.mrk_liquid.volume_integral(
-                    temperature, Psat, initial_volume
-                )
-                logger.debug("volume_integral = %f", volume_integral)
-                volume_integral += self.mrk_liquid.volume_integral(
-                    temperature, pressure, initial_volume
-                )
-                logger.debug("volume_integral = %f", volume_integral)
-            else:
-                initial_volume: ArrayLike = self.mrk_fluid.initial_solution_volume(
-                    temperature, pressure
-                )
-                volume_integral = self.mrk_fluid.volume_integral(
-                    temperature, pressure, initial_volume
-                )
+        volume_integral_funcs: list[Callable] = [
+            volume_integral0,
+            volume_integral1,
+            volume_integral2,
+        ]
+
+        volume_integral: Array = lax.switch(condition, volume_integral_funcs)
+        jax.debug.print("volume_integral = {out}", out=volume_integral)
 
         return volume_integral
+
+        # Original non-JAX below
+        # else:  # temperature < self.Tc and pressure > Psat:
+        #     if temperature <= self.Ta:
+        #         initial_volume: ArrayLike = (
+        #             GAS_CONSTANT_BAR * temperature / Psat
+        #             + 10 * self.mrk_gas.b(temperature, pressure)
+        #         )
+        #         volume_integral = self.mrk_gas.volume_integral(temperature, Psat, initial_volume)
+        #         logger.debug("volume_integral = %f", volume_integral)
+        #         initial_volume: ArrayLike = self.mrk_liquid.initial_solution_volume(
+        #             temperature, pressure
+        #         )
+        #         volume_integral -= self.mrk_liquid.volume_integral(
+        #             temperature, Psat, initial_volume
+        #         )
+        #         logger.debug("volume_integral = %f", volume_integral)
+        #         volume_integral += self.mrk_liquid.volume_integral(
+        #             temperature, pressure, initial_volume
+        #         )
+        #         logger.debug("volume_integral = %f", volume_integral)
+        #     else:
+        #         initial_volume: ArrayLike = self.mrk_fluid.initial_solution_volume(
+        #             temperature, pressure
+        #         )
+        #         volume_integral = self.mrk_fluid.volume_integral(
+        #             temperature, pressure, initial_volume
+        #         )
+
+        # return volume_integral
 
     @override
     @jit
@@ -445,66 +498,41 @@ class MRKCriticalBehaviour(PyTreeNoData, RealGas):
 
         return log_fugacity
 
-    # TODO: Needs updating to support JAX
     @override
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Volume
 
         Args:
-            temperature: Temperature in kelvin
-            pressure: Pressure in bar
+            temperature: Temperature
+            pressure: Pressure
 
         Returns:
             Volume
         """
-        Psat: ArrayLike = self.Psat(temperature)
+        condition: Array = self._select_condition(temperature, pressure)
 
-        if temperature >= self.Tc:
-            logger.debug("temperature >= critical temperature of %f", self.Tc)
-            volume: ArrayLike = self.mrk_fluid.volume(temperature, pressure)
+        def volume0() -> Array:
+            return self.mrk_fluid.volume(temperature, pressure)
 
-        elif temperature <= self.Ta and pressure <= Psat:
-            logger.debug("temperature <= %f and pressure <= %f", self.Ta, Psat)
-            volume = self.mrk_gas.volume(temperature, pressure)
+        def volume1() -> Array:
+            return self.mrk_gas.volume(temperature, pressure)
 
-        elif temperature < self.Tc and pressure <= Psat:
-            logger.debug("temperature < %f and pressure <= %f", self.Tc, Psat)
-            volume = self.mrk_fluid.volume(temperature, pressure)
+        def volume2() -> Array:
+            return self.mrk_fluid.volume(temperature, pressure)
 
-        else:  # temperature < self.Tc and pressure > Psat:
-            if temperature <= self.Ta:
-                volume = self.mrk_liquid.volume(temperature, pressure)
-            else:
-                volume = self.mrk_fluid.volume(temperature, pressure)
+        def volume3() -> Array:
+            return self.mrk_liquid.volume(temperature, pressure)
+
+        def volume4() -> Array:
+            return self.mrk_fluid.volume(temperature, pressure)
+
+        volume_funcs: list[Callable] = [volume0, volume1, volume2, volume3, volume4]
+
+        volume: Array = lax.switch(condition, volume_funcs)
+        jax.debug.print("volume = {out}", out=volume)
 
         return volume
 
 
-@register_pytree_node_class
-class H2OMrkHP91(MRKCriticalBehaviour):
-    """MRK for H2O that includes critical behaviour"""
-
-    mrk_fluid: MRKImplicitFluidHP91 = H2OMrkFluidHolland91
-    mrk_gas: MRKImplicitGasHP91 = H2OMrkGasHolland91
-    mrk_liquid: MRKImplicitLiquidHP91 = H2OMrkLiquidHolland91
-    Ta: float = Ta_H2O
-    Tc: float = Tc_H2O
-
-    @override
-    def Psat(self, temperature: ArrayLike) -> Array:
-        """Saturation curve :cite:p:`HP91{Equation 5}`
-
-        Args:
-            temperature: Temperature
-
-        Returns:
-            Saturation curve pressure
-        """
-        Psat: Array = (
-            -13.627
-            + 7.29395e-4 * jnp.square(temperature)
-            - 2.34622e-6 * jnp.power(temperature, 3)
-            + 4.83607e-12 * jnp.power(temperature, 5)
-        )
-
-        return Psat
+H2OMrkHolland91: RealGas = H2OMrkHP91()
+"""H2O MRK that includes critical behaviour"""

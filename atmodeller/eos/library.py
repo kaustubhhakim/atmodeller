@@ -35,6 +35,7 @@ from atmodeller.eos.holland_jax import (
     CO2MrkHolland91,
     H2OMrkFluidHolland91,
     H2OMrkGasHolland91,
+    H2OMrkHolland91,
     H2OMrkLiquidHolland91,
     MRKCorrespondingStatesHP91,
 )
@@ -235,6 +236,7 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21
     eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21
     eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21
+    eos_models["H2O_mrk_holland91"] = H2OMrkHolland91
     # Supercritical fluid only
     eos_models["H2O_mrk_fluid_holland91"] = H2O_mrk_fluid_holland91
     # Gas (subcritical) only
