@@ -39,7 +39,7 @@ atmodeller.eos.holland module
 atmodeller.eos.holland\_jax module
 ----------------------------------
 
-.. automodule:: atmodeller.eos.holland_jax
+.. automodule:: atmodeller.eos.holland
    :members:
    :undoc-members:
    :show-inheritance:

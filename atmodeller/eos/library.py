@@ -34,7 +34,7 @@ from scipy.constants import kilo
 from atmodeller import ATMOSPHERE
 from atmodeller.eos.classes import BeattieBridgeman, Chabrier
 from atmodeller.eos.core import CORK, RealGas, RealGasBounded, VirialCompensation
-from atmodeller.eos.holland_jax import (
+from atmodeller.eos.holland import (
     CO2MrkHolland91,
     H2OMrkFluidHolland91,
     H2OMrkGasHolland91,
