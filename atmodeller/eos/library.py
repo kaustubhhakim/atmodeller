@@ -27,6 +27,9 @@ Usage:
 
 import logging
 from pathlib import Path
+from typing import Callable
+
+from scipy.constants import kilo
 
 from atmodeller import ATMOSPHERE
 from atmodeller.eos.classes import BeattieBridgeman, Chabrier
@@ -39,6 +42,7 @@ from atmodeller.eos.holland_jax import (
     H2OMrkLiquidHolland91,
     MRKCorrespondingStatesHP91,
 )
+from atmodeller.thermodata.core import CriticalData
 from atmodeller.thermodata.library import select_critical_data
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
@@ -157,6 +161,86 @@ S2_cork_cs_holland11_bounded: RealGas = RealGasBounded(
     S2_cork_cs_holland11, experimental_calibration_holland91
 )
 """S2 CORK corresponding states bounded :cite:p:`HP91`"""
+
+# For the Full CORK models, the virial coefficients in the Holland and Powell papers need
+# converting to SI units and pressure in bar as follows, where k = kilo = 1000:
+#   a_virial = a_virial (Holland and Powell) * 10**(-5) / k
+#   b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
+#   c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
+
+_a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
+    [y * 1e-5 / kilo for y in x]
+)
+_b_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
+    [y * 1e-5 / kilo**0.5 for y in x]
+)
+_c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
+    [y * 1e-5 / kilo**0.25 for y in x]
+)
+
+dummy_critical_data: CriticalData = CriticalData(1.0, 1.0)
+"""Dummy critical data
+
+The full CO2 and H2O CORK models are not corresponding states, which can be reproduced by ignoring
+the scaling by the critical temperature and pressure, i.e. setting these quantities to unity.
+"""
+_CO2_virial_compensation_holland91: VirialCompensation = VirialCompensation(
+    _a_conversion((1.33790e-2, -1.01740e-5)),
+    _b_conversion((-2.26924e-1, 7.73793e-5)),
+    (0, 0),
+    5000,
+)
+"""CO2 virial compensation :cite:p:`HP91`"""
+CO2_cork_holland91: RealGas = CORK(
+    CO2MrkHolland91, _CO2_virial_compensation_holland91, dummy_critical_data
+)
+"""CO2 cork :cite:p:`HP91`
+
+TODO: ExperimentalCalibrationNew(400, 1900, 0, 50e3)
+"""
+_H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
+    _a_conversion((-3.2297554e-3, 2.2215221e-6)),
+    _b_conversion((-3.025650e-2, -5.343144e-6)),
+    (0, 0),
+    2000,
+)
+"""H2O virial compensation :cite:p:`HP91`"""
+H2O_cork_holland91: RealGas = CORK(
+    H2OMrkHolland91, _H2O_virial_compensation_holland91, dummy_critical_data
+)
+"""H2O cork :cite:p:`HP91`
+
+TODO: calibration=ExperimentalCalibration(400, 1700, 0, 50e3),
+"""
+
+_CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
+    _a_conversion((5.40776e-3, -1.59046e-6)),
+    _b_conversion((-1.78198e-1, 2.45317e-5)),
+    (0, 0),
+    5000,
+)
+"""CO2 virial compensation :cite:p:`HP98`"""
+CO2_cork_holland98: RealGas = CORK(
+    CO2MrkHolland91, _CO2_virial_compensation_holland98, dummy_critical_data
+)
+"""CO2 cork :cite:p:`HP98`
+
+TODO: calibration=ExperimentalCalibration(400, 1900, 0, 120e3),
+"""
+_H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
+    _a_conversion((1.9853e-3, 0)),
+    _b_conversion((-8.9090e-2, 0)),
+    _c_conversion((8.0331e-2, 0)),
+    2000,
+)
+H2O_cork_holland98: RealGas = CORK(
+    H2OMrkHolland91, _H2O_virial_compensation_holland98, dummy_critical_data
+)
+"""H2O cork :cite:p:`HP98`
+
+TODO: calibration=ExperimentalCalibration(400, 1700, 0, 120e3),
+"""
+
 
 # end region
 
@@ -302,6 +386,8 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["CO_mrk_cs_holland91"] = CO_mrk_cs_holland91
     eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58
     eos_models["CO2_beattie_holley58_bounded"] = CO2_beattie_holley58_bounded
+    eos_models["CO2_cork_holland91"] = CO2_cork_holland91
+    eos_models["CO2_cork_holland98"] = CO2_cork_holland98
     eos_models["CO2_cork_cs_holland91"] = CO2_cork_cs_holland91
     eos_models["CO2_cork_cs_holland91_bounded"] = CO2_cork_cs_holland91_bounded
     eos_models["CO2_mrk_cs_holland91"] = CO2_mrk_cs_holland91
@@ -316,6 +402,8 @@ def get_eos_models() -> dict[str, RealGas]:
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21
     eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21
     eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21
+    eos_models["H2O_cork_holland91"] = H2O_cork_holland91
+    eos_models["H2O_cork_holland98"] = H2O_cork_holland98
     eos_models["H2O_mrk_holland91"] = H2OMrkHolland91
     # Supercritical fluid only
     eos_models["H2O_mrk_fluid_holland91"] = H2O_mrk_fluid_holland91
