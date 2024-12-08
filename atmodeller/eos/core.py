@@ -939,54 +939,6 @@ class RealGasBounded(RealGas):
 
 
 # @dataclass(kw_only=True)
-# class CorrespondingStatesMixin(ABC):
-#     """A corresponding states model
-
-#     Args:
-#         critical_temperature: Critical temperature in K. Defaults to 1, effectively meaning that
-#             the scaled temperature is numerically the same as the actual temperature, albeit
-#             without units.
-#         critical_pressure: Critical pressure in bar. Defaults to 1, effectively meaning that the
-#             scale pressure is numerically the same as the actual pressure, albeit without units.
-#     """
-
-#     critical_temperature: float = 1
-#     """Critical temperature in K"""
-#     critical_pressure: float = 1
-#     """Critical pressure in bar"""
-
-#     def scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
-#         """Scaled pressure
-
-#         This is a reduced pressure when :attr:`critical_pressure` is not unity.
-
-#         Args:
-#             pressure: Pressure in bar
-
-#         Returns:
-#             The scaled (reduced) pressure, which is dimensionless
-#         """
-#         scaled_pressure: ArrayLike = pressure / self.critical_pressure
-
-#         return scaled_pressure
-
-#     def scaled_temperature(self, temperature: float) -> float:
-#         """Scaled temperature
-
-#         This is a reduced temperature when :attr:`critical_temperature` is not unity.
-
-#         Args:
-#             temperature: Temperature in K
-
-#         Returns:
-#             The scaled (reduced) temperature, which is dimensionless
-#         """
-#         scaled_temperature: float = temperature / self.critical_temperature
-
-#         return scaled_temperature
-
-
-# @dataclass(kw_only=True)
 # class CombinedEOSModel(RealGas):
 #     """Combines multiple EOS models for different pressure ranges into a single EOS model.
 

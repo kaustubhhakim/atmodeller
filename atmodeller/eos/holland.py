@@ -55,7 +55,7 @@ r"""Temperature at which :math:`a_{\mathrm gas} = a` for H2O by fitting :cite:p:
 b0_H2O: float = 1.465e-5
 """b parameter value which is the same across all H2O phases :cite:p:`HP91`
 
-Compared to :cite:t:`HP91` the value accounts for unit conversion.
+Compared to :cite:t:`HP91` this value accounts for unit conversion.
 """
 
 
