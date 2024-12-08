@@ -30,7 +30,7 @@ from jax import Array, grad, jit, lax
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller import GAS_CONSTANT_BAR
+from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata.core import CriticalData
 from atmodeller.utilities import (
@@ -357,6 +357,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         """
         ...
 
+    @jit
     def A_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """`A` factor :cite:p:`HP91{Appendix A}`
 
@@ -373,6 +374,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
 
         return A_factor
 
+    @jit
     def B_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """`B` factor :cite:p:`HP91{Appendix A}`
 
@@ -547,7 +549,6 @@ class RedlichKwongImplicitGasABC(RedlichKwongImplicitABC):
         return initial_volume
 
 
-# TODO: log_fugacity is not implemented so this cannot subclass RealGas
 @register_pytree_node_class
 class VirialCompensation:
     r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
@@ -697,21 +698,6 @@ class VirialCompensation:
 
         return volume
 
-    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
-        children: tuple = ()
-        aux_data = {
-            "a_coefficients": self.a_coefficients,
-            "b_coefficients": self.b_coefficients,
-            "c_coefficients": self.c_coefficients,
-            "P0": self.P0,
-        }
-        return (children, aux_data)
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
-
     @jit
     def volume_integral(
         self, temperature: ArrayLike, pressure: ArrayLike, critical_data: CriticalData
@@ -742,6 +728,21 @@ class VirialCompensation:
         volume_integral = volume_integral * 1e5
 
         return volume_integral
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
+        children: tuple = ()
+        aux_data = {
+            "a_coefficients": self.a_coefficients,
+            "b_coefficients": self.b_coefficients,
+            "c_coefficients": self.c_coefficients,
+            "P0": self.P0,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
 
 
 @register_pytree_node_class
@@ -983,77 +984,6 @@ class RealGasBounded(RealGas):
 #         scaled_temperature: float = temperature / self.critical_temperature
 
 #         return scaled_temperature
-
-
-# @dataclass(kw_only=True)
-# class CORK(CorrespondingStatesMixin, RealGas):
-#     """A Compensated-Redlich-Kwong (CORK) EOS :cite:p:`HP91`
-
-#     Args:
-#         P0: Pressure at which the MRK equation begins to overestimate the molar volume
-#             significantly and may be determined from experimental data.
-#         mrk: MRK model for computing the MRK contribution
-#         a_virial: `a` coefficients for the virial compensation. Defaults to zero.
-#         b_virial: `b` coefficients for the virial compensation. Defaults to zero.
-#         c_virial: `c` coefficients for the virial compensation. Defaults to zero.
-#         critical_temperature: Critical temperature in K. Defaults to unity meaning not a
-#             corresponding states model.
-#         critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
-#             states model.
-#         calibration: Calibration temperature and pressure range. Defaults to empty.
-#     """
-
-#     P0: ArrayLike
-#     """Pressure at which the MRK equation begins to overestimate the molar volume significantly
-#     and may be determined from experimental data."""
-#     mrk: RealGas
-#     """MRK model for computing the MRK contribution"""
-#     a_virial: Array = jnp.array((0, 0))
-#     """`a` coefficients for the virial compensation"""
-#     b_virial: Array = jnp.array((0, 0))
-#     """`b` coefficients for the virial compensation"""
-#     c_virial: Array = jnp.array((0, 0))
-#     """`c` coefficients for the virial compensation"""
-#     virial: VirialCompensation = field(init=False)
-#     """The virial compensation model"""
-
-#     def __post_init__(self):
-#         self.virial = VirialCompensation(
-#             a_coefficients=self.a_virial,
-#             b_coefficients=self.b_virial,
-#             c_coefficients=self.c_virial,
-#             P0=self.P0,
-#             critical_temperature=self.critical_temperature,
-#             critical_pressure=self.critical_pressure,
-#         )
-
-#     @override
-#     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-#         r"""Volume :cite:p:`HP91{Equation 7a}`
-
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-#         """
-#         return self.virial.volume(temperature, pressure) + self.mrk.volume(temperature, pressure)
-
-#     @override
-#     def volume_integral(self, temperature: float, pressure: float) -> Array:
-#         r"""Volume integral :cite:p:`HP91{Equation 8}`
-
-#         Args:
-#             temperature: Temperature in K
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-#         """
-#         return self.virial.volume_integral(temperature, pressure) + self.mrk.volume_integral(
-#             temperature, pressure
-#         )
 
 
 # @dataclass(kw_only=True)

@@ -39,13 +39,12 @@ from molmass import Formula
 from xmmutablemap import ImmutableMap
 
 from atmodeller import (
-    AVOGADRO,
-    GRAVITATIONAL_CONSTANT,
     LOG_NUMBER_DENSITY_LOWER,
     LOG_NUMBER_DENSITY_UPPER,
     LOG_STABILITY_LOWER,
     LOG_STABILITY_UPPER,
 )
+from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
 from atmodeller.engine import get_log_number_density_from_log_pressure
 from atmodeller.eos.classes import IdealGas
 from atmodeller.interfaces import (

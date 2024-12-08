@@ -28,7 +28,7 @@ import jax.numpy as jnp
 from jax import Array, lax
 from jax.typing import ArrayLike
 
-from atmodeller import GAS_CONSTANT, GAS_CONSTANT_BAR
+from atmodeller.constants import GAS_CONSTANT, GAS_CONSTANT_BAR
 from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):

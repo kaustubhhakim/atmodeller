@@ -26,7 +26,7 @@ from jax import Array, jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller import GAS_CONSTANT
+from atmodeller.constants import GAS_CONSTANT
 from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.classes import Solubility, SolubilityPowerLaw, power_law
 from atmodeller.utilities import PyTreeNoData, unit_conversion

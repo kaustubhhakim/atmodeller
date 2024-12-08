@@ -26,7 +26,7 @@ from jax import Array, jit, lax
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller import GAS_CONSTANT_BAR
+from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import (
     RealGas,
     RedlichKwongABC,

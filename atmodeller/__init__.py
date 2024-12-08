@@ -25,8 +25,6 @@ import logging
 import jax
 import jax.numpy as jnp
 import numpy as np
-from molmass import Formula
-from scipy import constants
 
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
@@ -36,26 +34,6 @@ print("Atmodeller initialized with double precision (float64)")
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_infs", False)
 # jax.config.update("jax_disable_jit", True)
-
-# Physical constants
-AVOGADRO: float = constants.Avogadro
-"""Avogadro constant in 1/mol"""
-GAS_CONSTANT: float = constants.gas_constant
-"""Gas constant in J/K/mol"""
-GAS_CONSTANT_BAR: float = GAS_CONSTANT * 1.0e-5
-"""Gas constant in m^3 bar/K/mol"""
-GRAVITATIONAL_CONSTANT: float = constants.gravitational_constant
-"""Gravitational constant in m^3/kg/s^2"""
-ATMOSPHERE: float = constants.atmosphere / constants.bar
-"""Atmospheres in 1 bar"""
-BOLTZMANN_CONSTANT: float = constants.Boltzmann
-"""Boltzmann constant in J/K"""
-BOLTZMANN_CONSTANT_BAR: float = BOLTZMANN_CONSTANT * 1e-5
-"""Boltzmann constant in bar m^3/K"""
-OCEAN_MOLES: float = 7.68894973907177e22
-"""Moles of H2 (or H2O) in one present-day Earth ocean"""
-OCEAN_MASS_H2: float = OCEAN_MOLES * Formula("H2").mass
-"""Mass of H2 in one present-day Earth ocean in grams"""
 
 # Thermodynamic standard state
 ENTHALPY_REFERENCE: float = 298.15

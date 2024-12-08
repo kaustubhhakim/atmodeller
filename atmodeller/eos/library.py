@@ -31,7 +31,7 @@ from typing import Callable
 
 from scipy.constants import kilo
 
-from atmodeller import ATMOSPHERE
+from atmodeller.constants import ATMOSPHERE
 from atmodeller.eos.classes import BeattieBridgeman, Chabrier
 from atmodeller.eos.core import CORK, RealGas, RealGasBounded, VirialCompensation
 from atmodeller.eos.holland import (

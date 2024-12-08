@@ -33,7 +33,8 @@ from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
-from atmodeller import GAS_CONSTANT_BAR, PRESSURE_REFERENCE
+from atmodeller import PRESSURE_REFERENCE
+from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import PyTreeNoData, unit_conversion

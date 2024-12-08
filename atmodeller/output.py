@@ -35,7 +35,7 @@ from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from molmass import Formula
 
-from atmodeller import AVOGADRO
+from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
     Planet,

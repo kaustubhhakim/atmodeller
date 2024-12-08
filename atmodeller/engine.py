@@ -28,7 +28,7 @@ import optimistix as optx
 from jax import Array, jit, lax
 from jax.typing import ArrayLike
 
-from atmodeller import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
+from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.utilities import safe_exp, unit_conversion
 
 if TYPE_CHECKING:

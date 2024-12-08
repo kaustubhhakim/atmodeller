@@ -49,7 +49,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller import GAS_CONSTANT_BAR
+from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.interfaces import (
     CombinedEOSModel,
     CorrespondingStatesMixin,
