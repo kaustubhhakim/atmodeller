@@ -29,7 +29,7 @@ from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
 from atmodeller import PRESSURE_REFERENCE
-from atmodeller.constants import ATMOSPHERE, OCEAN_MASS_H2
+from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -39,6 +39,26 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
+
+
+@jit
+def get_log_number_density_from_log_pressure(
+    log_pressure: ArrayLike, temperature: ArrayLike
+) -> Array:
+    """Gets log number density from log pressure
+
+    Args:
+        log_pressure: Log pressure
+        temperature: Temperature
+
+    Returns:
+        Log number density
+    """
+    log_number_density: Array = (
+        -jnp.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature) + log_pressure
+    )
+
+    return log_number_density
 
 
 @jit

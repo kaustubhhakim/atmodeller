@@ -45,7 +45,6 @@ from atmodeller import (
     LOG_STABILITY_UPPER,
 )
 from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
-from atmodeller.engine import get_log_number_density_from_log_pressure
 from atmodeller.eos.classes import IdealGas
 from atmodeller.interfaces import (
     ActivityProtocol,
@@ -55,7 +54,11 @@ from atmodeller.interfaces import (
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import select_thermodata
 from atmodeller.thermodata.core import CondensateActivity, SpeciesData
-from atmodeller.utilities import OptxSolver, unit_conversion
+from atmodeller.utilities import (
+    OptxSolver,
+    get_log_number_density_from_log_pressure,
+    unit_conversion,
+)
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self

@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
@@ -29,19 +29,21 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
-from atmodeller.utilities import safe_exp, unit_conversion
-
-if TYPE_CHECKING:
-    from atmodeller.containers import (
-        FixedParameters,
-        FugacityConstraints,
-        MassConstraints,
-        Planet,
-        Solution,
-        SolverParameters,
-        Species,
-        TracedParameters,
-    )
+from atmodeller.containers import (
+    FixedParameters,
+    FugacityConstraints,
+    MassConstraints,
+    Planet,
+    Solution,
+    SolverParameters,
+    Species,
+    TracedParameters,
+)
+from atmodeller.utilities import (
+    get_log_number_density_from_log_pressure,
+    safe_exp,
+    unit_conversion,
+)
 
 
 @partial(jit, static_argnames=["fixed_parameters", "solver_parameters"])
@@ -426,26 +428,6 @@ def get_log_activity_ideal_mixing(
     )
 
     return log_activity
-
-
-@jit
-def get_log_number_density_from_log_pressure(
-    log_pressure: ArrayLike, temperature: ArrayLike
-) -> Array:
-    """Gets log number density from log pressure
-
-    Args:
-        log_pressure: Log pressure
-        temperature: Temperature
-
-    Returns:
-        Log number density
-    """
-    log_number_density: Array = (
-        -jnp.log(BOLTZMANN_CONSTANT_BAR) - jnp.log(temperature) + log_pressure
-    )
-
-    return log_number_density
 
 
 @jit
