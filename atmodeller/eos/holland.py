@@ -64,34 +64,35 @@ Compared to :cite:t:`HP91` this value accounts for unit conversion.
 
 
 class CorrespondingStateUnitConverter:
-    r"""Unit converter for Holland and Powell corresponding states model
+    r"""Unit converter for Holland and Powell CORK corresponding states model
 
     This converts the coefficient units from Holland and Powell to the required units for
-    Atmodeller. This is mostly accounting for kilo factors and converting the energy from J to SI
-    volume and pressure in bar using:
+    Atmodeller. This accounts for kilo factors and converting the energy from J to SI volume and
+    pressure in bar using:
 
     .. math::
-
         1\ \mathrm{J} = 10^{-5}\ \mathrm{m}^3\ \mathrm{bar}
     """
 
     @staticmethod
     def convert_a_coefficients(a_coefficients: tuple[float, ...]) -> tuple[float, ...]:
-        r"""Converts the a coefficients for corresponding states
+        r"""Converts the a coefficients for corresponding states.
 
         The a coefficients (a0 and a1) have units :cite:p:`HP91{Equation 9}`:
 
         .. math::
+            \left(\frac{\mathrm{kJ}}{\mathrm{mol}\ \mathrm{K}}\right)^2
 
-            \frac{\mathrm{kJ}^2\ \mathrm{K}^{1/2}}{\mathrm{mol}^2}
-
-        Converting the energy scale gives rise to a unit conversion factor of $10^{-4}$.
+        Converting kJ gives rise to a unit conversion factor of :math:`10^{-4}`.
 
         Args:
             a_coefficients: a coefficients from Holland and Powell
 
         Returns:
-            a coefficients in Atmodeller units
+            a coefficients with units of
+
+            .. math::
+                \left(\frac{\mathrm{m}^3\ \mathrm{bar}}{\mathrm{mol}\ \mathrm{K}}\right)^2
         """
         factor: float = 1e-4
 
@@ -99,25 +100,56 @@ class CorrespondingStateUnitConverter:
 
     @staticmethod
     def convert_b_coefficient(b_coefficient: float) -> float:
-        r"""Converts the b coefficient for corresponding states
+        r"""Converts the b coefficient for corresponding states.
 
-        The b coefficient has units :cite:p:`HP91{Equation 9}`:
+        The b coefficient (b0) has units :cite:p:`HP91{Equation 9}`:
 
         .. math::
 
-            \frac{\mathrm{kJ}{\mathrm{kbar}\ \mathrm{mol}^2}
+            \frac{\mathrm{kJ}}{\mathrm{mol}\ \mathrm{K}}
 
-        Converting the energy scale gives rise to a unit conversion factor of $10^{-2}$.
+        Converting kJ gives rise to a unit conversion factor of :math:`10^{-2}`.
 
         Args:
             b_coefficient: b coefficient from Holland and Powell
 
         Returns:
-            b coefficient in Atmodeller units
+            b coefficient with units of
+
+            .. math::
+                \frac{\mathrm{m}^3\ \mathrm{bar}}{\mathrm{mol}\ \mathrm{K}}
         """
         factor: float = 1e-2
 
         return b_coefficient * factor
+
+    @staticmethod
+    def convert_virial_coefficients(virial_coefficients: tuple[float, ...]) -> tuple[float, ...]:
+        r"""Converts the virial coefficients for corresponding states
+
+        The virial coefficients, for example associated with coefficients c and d in
+        :cite:`HP91{Table 2}`, have units:
+
+        .. math::
+
+            \frac{\mathrm{kJ}}{\mathrm{mol}\ \mathrm{K}}
+
+        Converting kJ gives rise to a unit conversion factor of :math:`10^{-2}`.
+
+        Args:
+            virial_coefficient: virial coefficients from Holland and Powell
+
+        Returns:
+            virial coefficients with units of
+
+            .. math::
+                \frac{\mathrm{m}^3\ \mathrm{bar}}{\mathrm{mol}\ \mathrm{K}}
+        """
+        factor: float = 1e-2
+
+        return tuple(
+            map(lambda virial_coefficient: factor * virial_coefficient, virial_coefficients)
+        )
 
 
 @register_pytree_node_class
@@ -588,8 +620,6 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
 H2OMrkHolland91: RealGas = H2OMrkHP91()
 """H2O MRK that includes critical behaviour"""
-
-
 CO2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2_g")
 """CO2 MRK corresponding states :cite:p:`HP91`"""
 CH4_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4_g")
@@ -611,8 +641,14 @@ H2O_mrk_gas_holland91: RealGas = H2OMrkGasHolland91
 H2O_mrk_liquid_holland91: RealGas = H2OMrkLiquidHolland91
 """H2O MRK liquid :cite:p:`HP91`"""
 
+coefficients_P: tuple[float, ...] = CorrespondingStateUnitConverter.convert_virial_coefficients(
+    (6.93054e-7, -8.38293e-8)
+)
+coefficients_sqrtP: tuple[float, ...] = (
+    CorrespondingStateUnitConverter.convert_virial_coefficients((-3.30558e-5, 2.30524e-6))
+)
 virial_compensation: VirialCompensation = VirialCompensation(
-    (6.93054e-9, -8.38293e-10), (-3.30558e-7, 2.30524e-8), (0, 0), 0
+    coefficients_P, coefficients_sqrtP, (0, 0), 0
 )
 """Virial compensation for corresponding states :cite:p:`HP91{Table 2}`
 
