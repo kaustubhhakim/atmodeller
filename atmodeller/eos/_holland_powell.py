@@ -416,7 +416,7 @@ r"""Temperature at which :math:`a_{\mathrm gas} = a` for H2O by fitting :cite:p:
 b0_H2O: float = FullUnitConverter.convert_b_coefficient(1.465)
 """b parameter value which is the same across all H2O phases :cite:p:`HP91`"""
 
-H2OMrkGasHolland91: RealGas = MRKImplicitGasHP91(
+H2OMrkGasHolland91: MRKImplicitGasHP91 = MRKImplicitGasHP91(
     FullUnitConverter.convert_a_coefficients((1113.4, 5.8487, -2.1370e-2, 6.8133e-5)),
     b0_H2O,
     Ta_H2O,
@@ -434,7 +434,7 @@ class MRKImplicitLiquidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFl
         return self._Ta - temperature
 
 
-H2OMrkLiquidHolland91: RealGas = MRKImplicitLiquidHP91(
+H2OMrkLiquidHolland91: MRKImplicitLiquidHP91 = MRKImplicitLiquidHP91(
     FullUnitConverter.convert_a_coefficients((1113.4, -0.88517, 4.53e-3, -1.3183e-5)),
     b0_H2O,
     Ta_H2O,
@@ -484,7 +484,7 @@ class MRKImplicitFluidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFlu
         return initial_volume
 
 
-H2OMrkFluidHolland91: RealGas = MRKImplicitFluidHP91(
+H2OMrkFluidHolland91: MRKImplicitFluidHP91 = MRKImplicitFluidHP91(
     FullUnitConverter.convert_a_coefficients(
         (
             1113.4,
@@ -501,7 +501,7 @@ H2OMrkFluidHolland91: RealGas = MRKImplicitFluidHP91(
 
 CO2_critical_data: CriticalData = select_critical_data("CO2_g")
 """Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar"""
-CO2MrkHolland91: RealGas = MRKImplicitFluidHP91(
+CO2MrkHolland91: MRKImplicitFluidHP91 = MRKImplicitFluidHP91(
     FullUnitConverter.convert_a_coefficients((741.2, -0.10891, -3.4203e-4, 0)),
     FullUnitConverter.convert_b_coefficient(3.057),
     0,

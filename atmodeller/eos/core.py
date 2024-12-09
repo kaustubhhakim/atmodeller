@@ -750,10 +750,8 @@ class CORK(RealGas):
         critical_data: Critical data
     """
 
-    def __init__(
-        self, mrk: RedlichKwongABC, virial: VirialCompensation, critical_data: CriticalData
-    ):
-        self._mrk: RedlichKwongABC = mrk
+    def __init__(self, mrk: RealGas, virial: VirialCompensation, critical_data: CriticalData):
+        self._mrk: RealGas = mrk
         self._virial: VirialCompensation = virial
         self._critical_data: CriticalData = critical_data
 
