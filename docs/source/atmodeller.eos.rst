@@ -28,10 +28,10 @@ atmodeller.eos.core module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.eos.holland module
------------------------------
+atmodeller.eos._holland_powell module
+-------------------------------------
 
-.. automodule:: atmodeller.eos.holland
+.. automodule:: atmodeller.eos._holland_powell
    :members:
    :undoc-members:
    :show-inheritance:
