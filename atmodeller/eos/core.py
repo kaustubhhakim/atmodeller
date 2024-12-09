@@ -560,19 +560,14 @@ class VirialCompensation:
         V_\mathrm{virial} = a(P-P0) + b(P-P0)^\frac{1}{2} + c(P-P0)^\frac{1}{4}
 
     This form also works for the virial compensation term from :cite:t:`HP91`, in which
-    case :math:`c=0`. :attr:`critical_pressure` and :attr:`critical_temperature` are required for
-    gases which are known to obey approximately the principle of corresponding states.
+    case :math:`c=0`.
 
     Although this looks similar to an EOS, it only calculates an additional perturbation to the
     volume and the volume integral of an MRK EOS, and hence it does not return a meaningful volume
     or volume integral by itself.
 
-    TODO: Update documentation re. corresponding states and scaled temperature and pressure
-
     Args:
-        a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where
-            :math:`a_0` and :math:`a_1` may be scaled (internally) by critical parameters for
-            corresponding states.
+        a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`.
         b_coefficients: As above for the b coefficients
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
