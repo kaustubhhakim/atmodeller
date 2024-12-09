@@ -31,17 +31,17 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 def volume_conversion(x: float) -> float:
-    """Volume conversion for :cite:t:`HWZ58` units."""
+    """Volume conversion for :cite:t:`HWZ58` units"""
     return x * unit_conversion.litre_to_m3
 
 
 def A0_conversion(x: float) -> float:
-    """PV**2 conversion for :cite:t:`HWZ58` units."""
+    """PV**2 conversion for :cite:t:`HWZ58` units"""
     return x * ATMOSPHERE * unit_conversion.litre_to_m3**2
 
 
 def atm2bar(x: float) -> float:
-    """Atmosphere to bar conversion."""
+    """Atmosphere to bar conversion"""
     return unit_conversion.atmosphere_to_bar * x
 
 
