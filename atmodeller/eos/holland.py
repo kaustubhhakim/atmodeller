@@ -63,7 +63,7 @@ Compared to :cite:t:`HP91` this value accounts for unit conversion.
 """
 
 
-class CorrespondingStateUnitConverter:
+class CorrespondingStatesUnitConverter:
     r"""Unit converter for Holland and Powell CORK corresponding states model
 
     This converts the coefficient units from Holland and Powell to the required units for
@@ -166,10 +166,10 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         self._critical_data: CriticalData = critical_data
         a_coefficients_holland: tuple[float, ...] = (5.45963e-5, -8.63920e-6, 0)
         self._a_coefficients: tuple[float, ...] = (
-            CorrespondingStateUnitConverter.convert_a_coefficients(a_coefficients_holland)
+            CorrespondingStatesUnitConverter.convert_a_coefficients(a_coefficients_holland)
         )
         b_coefficient_holland: float = 9.18301e-4
-        self._b: float = CorrespondingStateUnitConverter.convert_b_coefficient(
+        self._b: float = CorrespondingStatesUnitConverter.convert_b_coefficient(
             b_coefficient_holland
         )
 
@@ -641,11 +641,11 @@ H2O_mrk_gas_holland91: RealGas = H2OMrkGasHolland91
 H2O_mrk_liquid_holland91: RealGas = H2OMrkLiquidHolland91
 """H2O MRK liquid :cite:p:`HP91`"""
 
-coefficients_P: tuple[float, ...] = CorrespondingStateUnitConverter.convert_virial_coefficients(
+coefficients_P: tuple[float, ...] = CorrespondingStatesUnitConverter.convert_virial_coefficients(
     (6.93054e-7, -8.38293e-8)
 )
 coefficients_sqrtP: tuple[float, ...] = (
-    CorrespondingStateUnitConverter.convert_virial_coefficients((-3.30558e-5, 2.30524e-6))
+    CorrespondingStatesUnitConverter.convert_virial_coefficients((-3.30558e-5, 2.30524e-6))
 )
 virial_compensation: VirialCompensation = VirialCompensation(
     coefficients_P, coefficients_sqrtP, (0, 0), 0
