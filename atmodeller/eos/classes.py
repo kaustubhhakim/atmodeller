@@ -170,8 +170,8 @@ class BeattieBridgeman(RealGas):
         """Log fugacity :cite:p:`HWZ58{Equation 11}`.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity
@@ -210,11 +210,11 @@ class BeattieBridgeman(RealGas):
         for all species.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         # Based on the tabulated data, most compressibility factors are around unity
         initial_compressibility_factor: float = 1.0

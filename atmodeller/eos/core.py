@@ -57,7 +57,6 @@ class RealGas(ABC):
     Fugacity is computed using the standard relation:
 
     .. math::
-
         R T \ln f = \int V dP
 
     where :math:`R` is the gas constant, :math:`T` is temperature, :math:`f` is fugacity, :math:`V`
@@ -69,8 +68,8 @@ class RealGas(ABC):
         """Log fugacity
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity in bar
@@ -81,20 +80,47 @@ class RealGas(ABC):
         r"""Volume
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
+
+    # TODO: To include
+    # @abstractmethod
+    # def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    #     r"""Volume integral in units required for internal Atmodeller operations.
+
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
+
+    #     Returns:
+    #         Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+    #     """
+
+    # TODO: To include
+    # @jit
+    # def volume_integral_J(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    #     r"""Volume integral in J
+
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
+
+    #     Returns:
+    #         Volume integral in :math:`\mathrm{J}\ \mathrm{mol}^{-1}
+    #     """
+    #     return 1e5 * self.volume_integral(temperature, pressure)
 
     @jit
     def dvolume_dpressure(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Derivative of volume with respect to pressure
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Derivative of volume with respect to pressure
@@ -108,11 +134,11 @@ class RealGas(ABC):
         """Log activity
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Log activity
+            Log activity, which is dimensionless
         """
         # The standard state is defined at 1 bar (see PRESSURE_REFERENCE), so we do not need to
         # perform a division (by unity) to get activity, which is non-dimensional.
@@ -124,8 +150,8 @@ class RealGas(ABC):
         """Compressibility factor
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Compressibility factor, which is dimensionless
@@ -141,11 +167,11 @@ class RealGas(ABC):
         """Fugacity
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Fugacity
+            Fugacity in bar
         """
         fugacity: Array = safe_exp(self.log_fugacity(temperature, pressure))
 
@@ -156,8 +182,8 @@ class RealGas(ABC):
         """Log of the fugacity coefficient
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log of the fugacity coefficient, which is dimensionless
@@ -171,11 +197,11 @@ class RealGas(ABC):
         """Fugacity coefficient
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            fugacity coefficient, which is non-dimensional
+            fugacity coefficient, which is dimensionless
         """
         return safe_exp(self.log_fugacity_coefficient(temperature, pressure))
 
@@ -184,8 +210,8 @@ class RealGas(ABC):
         r"""Log fugacity of an ideal gas
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity of an ideal gas
@@ -202,11 +228,11 @@ class RealGas(ABC):
         This is required to compute the compressibility parameter.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Ideal volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            Ideal volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
 
@@ -232,8 +258,8 @@ class RedlichKwongABC(RealGas):
         r"""Gets the `a` parameter
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             `a` parameter in
@@ -253,11 +279,11 @@ class RedlichKwongABC(RealGas):
         r"""Volume integral
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume integral
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
         """
         a: ArrayLike = self.a(temperature, pressure)
 
@@ -273,7 +299,7 @@ class RedlichKwongABC(RealGas):
             )
         )
 
-        return volume_integral * 1e5  # Multiply by 1E5 to convert to J for CORK model
+        return volume_integral  # TODO: REMOVE ME * 1e5  # Multiply by 1E5 to convert to J for CORK model
 
     @override
     @jit
@@ -281,16 +307,16 @@ class RedlichKwongABC(RealGas):
         r"""Log fugacity :cite:p:`HP91{Equation 8}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity
         """
-        # 1e-5 to convert volume integral back to appropriate units
-        log_fugacity: Array = (
-            1e-5 * self.volume_integral(temperature, pressure) / (GAS_CONSTANT_BAR * temperature)
-        )
+        # TODO: REMOVE ME 1e-5 to convert volume integral back to appropriate units
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
+        )  # TODO: REMOVED *1e-5 volume_integral
 
         return log_fugacity
 
@@ -310,11 +336,11 @@ class RedlichKwongABC(RealGas):
         :math:`P` is pressure, and :math:`b` corrects for the volume.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         a: ArrayLike = self.a(temperature, pressure)
 
@@ -346,14 +372,14 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
 
     @abstractmethod
     def initial_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        """Initial guess volume for the solution to ensure convergence to the correct root
+        r"""Initial guess volume for the solution to ensure convergence to the correct root
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Initial volume
+            Initial volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         ...
 
@@ -362,11 +388,11 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         """`A` factor :cite:p:`HP91{Appendix A}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            `A` factor, which is non-dimensional
+            `A` factor, which is dimensionless
         """
         A_factor: ArrayLike = self.a(temperature, pressure) / (
             self.b() * GAS_CONSTANT_BAR * jnp.power(temperature, 1.5)
@@ -379,11 +405,11 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         """`B` factor :cite:p:`HP91{Appendix A}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            `B` factor, which is non-dimensional
+            `B` factor, which is dimensionless
         """
         B_factor: ArrayLike = self.b() * pressure / (GAS_CONSTANT_BAR * temperature)
 
@@ -395,8 +421,8 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         """Compressibility factor
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             The compressibility factor, which is dimensionless
@@ -413,15 +439,15 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         r"""Volume integral :cite:p:`HP91{Equation A.2}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
         """
         log_fugacity: Array = self.log_fugacity(temperature, pressure)
         volume_integral: Array = log_fugacity * GAS_CONSTANT_BAR * temperature
-        volume_integral = volume_integral * 1e5  # Multiply by 1E5 to convert to J for CORK model
+        # TODO: REMOVE ME volume_integral = volume_integral * 1e5  # Multiply by 1E5 to convert to J for CORK model
 
         return volume_integral
 
@@ -431,8 +457,8 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         r"""Log fugacity
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity
@@ -451,7 +477,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         r"""Objective function to solve for the volume
 
         Args:
-            volume: Volume
+            volume: Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
             kwargs: Dictionary with other required parameters
 
         Returns:
@@ -481,11 +507,11 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         r"""Solves the RK equation numerically to compute the volume.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
         initial_volume: ArrayLike = self.initial_volume(temperature, pressure)
@@ -514,11 +540,11 @@ class RedlichKwongImplicitDenseFluidABC(RedlichKwongImplicitABC):
         For the dense fluid phase a suitably low value must be chosen :cite:p:`HP91{Appendix}`.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Initial volume
+            Initial volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         del temperature
         del pressure
@@ -538,11 +564,11 @@ class RedlichKwongImplicitGasABC(RedlichKwongImplicitABC):
         For the gaseous phase a suitably high value must be chosen :cite:p:`HP91{Appendix}`.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Initial volume
+            Initial volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         initial_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure + 10 * self.b()
 
@@ -593,7 +619,7 @@ class VirialCompensation:
         This is also the `d` parameter in :cite:t:`HP91`.
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             critical_data: Critical data
 
         Returns:
@@ -614,7 +640,7 @@ class VirialCompensation:
         This is also the `c` parameter in :cite:t:`HP91`.
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             critical_data: Critical data
 
         Returns:
@@ -633,7 +659,7 @@ class VirialCompensation:
         r"""`c` parameter :cite:p:`HP98`
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
             critical_data: Critical data
 
         Returns:
@@ -652,10 +678,10 @@ class VirialCompensation:
         """Pressure difference
 
         Args:
-            pressure: Pressure
+            pressure: Pressure in bar
 
         Returns:
-            Pressure difference relative to :attr:`P0`
+            Pressure difference relative to :attr:`P0` in bar
         """
         pressure_array: Array = jnp.asarray(pressure)
         condition: Array = pressure_array > self.P0
@@ -677,12 +703,12 @@ class VirialCompensation:
         r"""Volume contribution
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
             critical_data: Critical data
 
         Returns:
-            Volume contribution in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            Volume contribution in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         delta_pressure: Array = self._delta_pressure(pressure)
         volume: Array = (
@@ -700,12 +726,12 @@ class VirialCompensation:
         r"""Volume integral :math:`V dP` contribution
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
             critical_data: Critical data
 
         Returns:
-            Volume integral contribution in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+            Volume integral contribution in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
         """
         delta_pressure: Array = self._delta_pressure(pressure)
         volume_integral: Array = (
@@ -719,8 +745,10 @@ class VirialCompensation:
             * self._c(temperature, critical_data)
             * jnp.power(delta_pressure, (5.0 / 4.0))
         )
+
+        # TODO: REMOVE
         # TODO: Clean up these 1e5 factors in the volume integral across the MRK/CORK models
-        volume_integral = volume_integral * 1e5
+        # volume_integral = volume_integral * 1e5
 
         return volume_integral
 
@@ -763,16 +791,16 @@ class CORK(RealGas):
         r"""Log fugacity :cite:p:`HP91{Equation 8}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity
         """
-        # 1e-5 to convert volume integral back to appropriate units
-        log_fugacity: Array = (
-            1e-5 * self.volume_integral(temperature, pressure) / (GAS_CONSTANT_BAR * temperature)
-        )
+        # TODO: REMOVE  1e-5 to convert volume integral back to appropriate units
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
+        )  # TODO: REMOVED 1.0E-5 from multiplying the volume_integral
 
         return log_fugacity
 
@@ -782,11 +810,11 @@ class CORK(RealGas):
         r"""Volume :cite:p:`HP91{Equation 7a}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         return self._mrk.volume(temperature, pressure) + self._virial.volume(
             temperature, pressure, self._critical_data
@@ -798,11 +826,11 @@ class CORK(RealGas):
         r"""Volume integral :cite:p:`HP91{Equation 8}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
         """
         return self._mrk.volume_integral(temperature, pressure) + self._virial.volume_integral(
             temperature, pressure, self._critical_data
@@ -859,8 +887,8 @@ class RealGasBounded(RealGas):
         This method could also implement a bound on temperature, if eventually required or desired.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity
@@ -922,10 +950,10 @@ class RealGasBounded(RealGas):
 
         return volume
 
-    # FIXME: TODO
-    @override
-    @jit
-    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+    # # FIXME: TODO
+    # @override
+    # @jit
+    # def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()

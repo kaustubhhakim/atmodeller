@@ -252,12 +252,12 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
 
     @property
     def critical_pressure(self) -> float:
-        """Critical pressure"""
+        """Critical pressure in bar"""
         return self._critical_data.pressure
 
     @property
     def critical_temperature(self) -> float:
-        """Critical temperature"""
+        """Critical temperature in K"""
         return self._critical_data.temperature
 
     @classmethod
@@ -280,12 +280,12 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         r"""MRK `a` parameter :cite:p:`HP91{Equation 9}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             MRK `a` parameter in
-            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
+            :math:`(\mathrm{m}^3\ \mathrm{mol}^{-1})^2\ \mathrm{K}^{1/2}\ \mathrm{bar}`
         """
         del pressure
 
@@ -308,11 +308,11 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            MRK `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`.
+            MRK `b` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`.
         """
         b: ArrayLike = self._b * self.critical_temperature / self.critical_pressure
 
@@ -352,10 +352,10 @@ class MRKImplicitHP91ABCMixin:
         """Temperature difference for the calculation of the `a` parameter
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
 
         Returns:
-            Temperature difference
+            Temperature difference in K
         """
         ...
 
@@ -364,8 +364,8 @@ class MRKImplicitHP91ABCMixin:
         r"""MRK `a` parameter :cite:p:`HP91{Equation 6}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             MRK `a` parameter
@@ -463,11 +463,11 @@ class MRKImplicitFluidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFlu
         initial guess is changed accordingly.
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Initial volume
+            Initial volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
 
         def low_temperature_case() -> ArrayLike:
@@ -549,7 +549,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         Compared to :cite:t:`HP91` the pressure is returned in bar, as required by Atmodeller.
 
         Args:
-            temperature: Temperature
+            temperature: Temperature in K
 
         Returns:
             Saturation curve pressure in bar
@@ -568,8 +568,8 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         """Selects the condition
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Integer denoting the condition, i.e. the region of phase space
@@ -606,14 +606,14 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
     @jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Volume integral :cite:p:`HP91{Appendix A}`
+        r"""Volume integral :cite:p:`HP91{Appendix A}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            volume integral
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
         """
         condition: Array = self._select_condition(temperature, pressure)
         Psat: Array = self.Psat(temperature)
@@ -656,15 +656,15 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         r"""Log fugacity :cite:p:`HP91{Equation 8}`
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
             Log fugacity
         """
-        # 1e-5 to convert volume integral back to appropriate units
-        log_fugacity: Array = (
-            1e-5 * self.volume_integral(temperature, pressure) / (GAS_CONSTANT_BAR * temperature)
+        # TODO: REMOVE 1e-5 to convert volume integral back to appropriate units  1e-5 *
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
         )
 
         return log_fugacity
@@ -675,11 +675,11 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         """Volume
 
         Args:
-            temperature: Temperature
-            pressure: Pressure
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
         Returns:
-            Volume
+            Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         condition: Array = self._select_condition(temperature, pressure)
 
