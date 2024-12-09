@@ -647,7 +647,7 @@ coefficients_P: tuple[float, ...] = CorrespondingStatesUnitConverter.convert_vir
 coefficients_sqrtP: tuple[float, ...] = (
     CorrespondingStatesUnitConverter.convert_virial_coefficients((-3.30558e-5, 2.30524e-6))
 )
-virial_compensation: VirialCompensation = VirialCompensation(
+_virial_compensation_corresponding_states: VirialCompensation = VirialCompensation(
     coefficients_P, coefficients_sqrtP, (0, 0), 0
 )
 """Virial compensation for corresponding states :cite:p:`HP91{Table 2}`
@@ -663,7 +663,7 @@ experimental_calibration_holland91: ExperimentalCalibrationNew = ExperimentalCal
 """Experimental calibration for :cite:`HP91,HP11` models"""
 
 CH4_cork_cs_holland91: RealGas = CORK(
-    CH4_mrk_cs_holland91, virial_compensation, select_critical_data("CH4_g")
+    CH4_mrk_cs_holland91, _virial_compensation_corresponding_states, select_critical_data("CH4_g")
 )
 """CH4 CORK corresponding states :cite:p:`HP91`"""
 CH4_cork_cs_holland91_bounded: RealGas = RealGasBounded(
@@ -671,7 +671,7 @@ CH4_cork_cs_holland91_bounded: RealGas = RealGasBounded(
 )
 """CH4 CORK corresponding states bounded :cite:p:`HP91`"""
 CO_cork_cs_holland91: RealGas = CORK(
-    CO_mrk_cs_holland91, virial_compensation, select_critical_data("CO_g")
+    CO_mrk_cs_holland91, _virial_compensation_corresponding_states, select_critical_data("CO_g")
 )
 """CO CORK corresponding states :cite:p:`HP91`"""
 CO_cork_cs_holland91_bounded: RealGas = RealGasBounded(
@@ -679,7 +679,7 @@ CO_cork_cs_holland91_bounded: RealGas = RealGasBounded(
 )
 """CO CORK corresponding states bounded :cite:p:`HP91`"""
 CO2_cork_cs_holland91: RealGas = CORK(
-    CO2_mrk_cs_holland91, virial_compensation, select_critical_data("CO2_g")
+    CO2_mrk_cs_holland91, _virial_compensation_corresponding_states, select_critical_data("CO2_g")
 )
 """CO2 CORK corresponding states :cite:p:`HP91`"""
 CO2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
@@ -687,7 +687,9 @@ CO2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
 )
 """CO2 CORK corresponding states bounded :cite:p:`HP91`"""
 H2_cork_cs_holland91: RealGas = CORK(
-    H2_mrk_cs_holland91, virial_compensation, select_critical_data("H2_g_Holland")
+    H2_mrk_cs_holland91,
+    _virial_compensation_corresponding_states,
+    select_critical_data("H2_g_Holland"),
 )
 """H2 CORK corresponding states :cite:p:`HP91`"""
 H2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
@@ -695,7 +697,7 @@ H2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
 )
 """H2 CORK corresponding states bounded :cite:p:`HP91`"""
 H2S_cork_cs_holland11: RealGas = CORK(
-    H2S_mrk_cs_holland11, virial_compensation, select_critical_data("H2S_g")
+    H2S_mrk_cs_holland11, _virial_compensation_corresponding_states, select_critical_data("H2S_g")
 )
 """H2S CORK corresponding states :cite:p:`HP91`"""
 H2S_cork_cs_holland11_bounded: RealGas = RealGasBounded(
@@ -703,7 +705,7 @@ H2S_cork_cs_holland11_bounded: RealGas = RealGasBounded(
 )
 """H2S CORK corresponding states bounded :cite:p:`HP91`"""
 N2_cork_cs_holland91: RealGas = CORK(
-    N2_mrk_cs_holland91, virial_compensation, select_critical_data("N2_g")
+    N2_mrk_cs_holland91, _virial_compensation_corresponding_states, select_critical_data("N2_g")
 )
 """N2 CORK corresponding states :cite:p:`HP91`"""
 N2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
@@ -711,7 +713,7 @@ N2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
 )
 """N2 CORK corresponding states bounded :cite:p:`HP91`"""
 S2_cork_cs_holland11: RealGas = CORK(
-    S2_mrk_cs_holland11, virial_compensation, select_critical_data("S2_g")
+    S2_mrk_cs_holland11, _virial_compensation_corresponding_states, select_critical_data("S2_g")
 )
 """S2 CORK corresponding states :cite:p:`HP91`"""
 S2_cork_cs_holland11_bounded: RealGas = RealGasBounded(

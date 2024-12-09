@@ -29,9 +29,9 @@ import logging
 from pathlib import Path
 
 from atmodeller.constants import ATMOSPHERE
+from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos.classes import BeattieBridgeman, Chabrier
 from atmodeller.eos.core import RealGas, RealGasBounded
-from atmodeller.eos.holland import get_holland_eos_models
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
