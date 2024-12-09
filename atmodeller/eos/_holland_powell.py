@@ -662,7 +662,6 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         Returns:
             Log fugacity
         """
-        # TODO: REMOVE 1e-5 to convert volume integral back to appropriate units  1e-5 *
         log_fugacity: Array = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT_BAR * temperature
         )

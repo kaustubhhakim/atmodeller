@@ -299,7 +299,7 @@ class RedlichKwongABC(RealGas):
             )
         )
 
-        return volume_integral  # TODO: REMOVE ME * 1e5  # Multiply by 1E5 to convert to J for CORK model
+        return volume_integral
 
     @override
     @jit
@@ -313,10 +313,9 @@ class RedlichKwongABC(RealGas):
         Returns:
             Log fugacity
         """
-        # TODO: REMOVE ME 1e-5 to convert volume integral back to appropriate units
         log_fugacity: Array = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT_BAR * temperature
-        )  # TODO: REMOVED *1e-5 volume_integral
+        )
 
         return log_fugacity
 
@@ -447,7 +446,6 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         """
         log_fugacity: Array = self.log_fugacity(temperature, pressure)
         volume_integral: Array = log_fugacity * GAS_CONSTANT_BAR * temperature
-        # TODO: REMOVE ME volume_integral = volume_integral * 1e5  # Multiply by 1E5 to convert to J for CORK model
 
         return volume_integral
 
@@ -746,10 +744,6 @@ class VirialCompensation:
             * jnp.power(delta_pressure, (5.0 / 4.0))
         )
 
-        # TODO: REMOVE
-        # TODO: Clean up these 1e5 factors in the volume integral across the MRK/CORK models
-        # volume_integral = volume_integral * 1e5
-
         return volume_integral
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
@@ -797,10 +791,9 @@ class CORK(RealGas):
         Returns:
             Log fugacity
         """
-        # TODO: REMOVE  1e-5 to convert volume integral back to appropriate units
         log_fugacity: Array = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT_BAR * temperature
-        )  # TODO: REMOVED 1.0E-5 from multiplying the volume_integral
+        )
 
         return log_fugacity
 
