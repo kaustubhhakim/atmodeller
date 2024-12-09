@@ -127,7 +127,7 @@ class CorrespondingStatesUnitConverter:
         Converting kJ gives rise to a unit conversion factor of :math:`10^{-2}`.
 
         Args:
-            virial_coefficient: virial coefficients from Holland and Powell
+            virial_coefficient: Virial coefficients from Holland and Powell
 
         Returns:
             virial coefficients with units of
@@ -202,6 +202,34 @@ class FullUnitConverter:
         factor: float = 1e-5
 
         return b_coefficient * factor
+
+    @staticmethod
+    def convert_virial_coefficients(
+        virial_coefficients: tuple[float, ...], pressure_exponent
+    ) -> tuple[float, ...]:
+        r"""Converts the virial coefficients for the full CORK models
+
+        The volume correction to the MRK volume, :math:`\Delta V`, based on the parameter that the
+        coefficients determine is given by:
+
+        .. math::
+            \Delta V = \mathrm{parameter(coefficients)} (P-P_0)^\gamma
+
+        where :math:`\gamma` is `pressure_exponent` and :math:`P_0` is the pressure at which the
+        MRK equation begins to overestimate the molar volume significantly.
+
+        Args:
+            virial_coefficients: Virial coefficients from Holland and Powell
+            pressure_exponent: Pressure exponent :math:`\gamma`, also given by Holland and Powell
+
+        Returns:
+            Virial coefficients with the appropriate units for Atmodeller
+        """
+        factor: float = 1e-5 / kilo**pressure_exponent
+
+        return tuple(
+            map(lambda virial_coefficient: factor * virial_coefficient, virial_coefficients)
+        )
 
 
 @register_pytree_node_class
@@ -780,22 +808,6 @@ S2_cork_cs_holland11_bounded: RealGas = RealGasBounded(
 )
 """S2 CORK corresponding states bounded :cite:p:`HP91`"""
 
-# For the Full CORK models, the virial coefficients in the Holland and Powell papers need
-# converting to SI units and pressure in bar as follows, where k = kilo = 1000:
-#   a_virial = a_virial (Holland and Powell) * 10**(-5) / k
-#   b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
-#   c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
-
-_a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
-    [y * 1e-5 / kilo for y in x]
-)
-_b_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
-    [y * 1e-5 / kilo**0.5 for y in x]
-)
-_c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
-    [y * 1e-5 / kilo**0.25 for y in x]
-)
-
 dummy_critical_data: CriticalData = CriticalData(1.0, 1.0)
 """Dummy critical data
 
@@ -804,8 +816,8 @@ ignoring the scaling by the critical temperature and pressure, i.e. setting thes
 unity.
 """
 CO2_virial_compensation_holland91: VirialCompensation = VirialCompensation(
-    _a_conversion((1.33790e-2, -1.01740e-5)),
-    _b_conversion((-2.26924e-1, 7.73793e-5)),
+    FullUnitConverter.convert_virial_coefficients((1.33790e-2, -1.01740e-5), 1.0),
+    FullUnitConverter.convert_virial_coefficients((-2.26924e-1, 7.73793e-5), 0.5),
     (0, 0),
     5000,
 )
@@ -818,8 +830,8 @@ CO2_cork_holland91: RealGas = CORK(
 TODO: ExperimentalCalibrationNew(400, 1900, 0, 50e3)
 """
 H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
-    _a_conversion((-3.2297554e-3, 2.2215221e-6)),
-    _b_conversion((-3.025650e-2, -5.343144e-6)),
+    FullUnitConverter.convert_virial_coefficients((-3.2297554e-3, 2.2215221e-6), 1.0),
+    FullUnitConverter.convert_virial_coefficients((-3.025650e-2, -5.343144e-6), 0.5),
     (0, 0),
     2000,
 )
@@ -833,8 +845,8 @@ TODO: calibration=ExperimentalCalibration(400, 1700, 0, 50e3),
 """
 
 CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
-    _a_conversion((5.40776e-3, -1.59046e-6)),
-    _b_conversion((-1.78198e-1, 2.45317e-5)),
+    FullUnitConverter.convert_virial_coefficients((5.40776e-3, -1.59046e-6), 1.0),
+    FullUnitConverter.convert_virial_coefficients((-1.78198e-1, 2.45317e-5), 0.5),
     (0, 0),
     5000,
 )
@@ -847,9 +859,9 @@ CO2_cork_holland98: RealGas = CORK(
 TODO: calibration=ExperimentalCalibration(400, 1900, 0, 120e3),
 """
 H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
-    _a_conversion((1.9853e-3, 0)),
-    _b_conversion((-8.9090e-2, 0)),
-    _c_conversion((8.0331e-2, 0)),
+    FullUnitConverter.convert_virial_coefficients((1.9853e-3, 0), 1.0),
+    FullUnitConverter.convert_virial_coefficients((-8.9090e-2, 0), 0.5),
+    FullUnitConverter.convert_virial_coefficients((8.0331e-2, 0), 0.25),
     2000,
 )
 H2O_cork_holland98: RealGas = CORK(
