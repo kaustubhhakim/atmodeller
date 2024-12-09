@@ -31,7 +31,7 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.interfaces import RealGasProtocol
+from atmodeller.interfaces import RealGasExtendedProtocol
 from atmodeller.thermodata.core import CriticalData
 from atmodeller.utilities import (
     ExperimentalCalibrationNew,
@@ -51,7 +51,7 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class RealGas(ABC, RealGasProtocol):
+class RealGas(ABC):
     r"""A real gas equation of state (EOS)
 
     Fugacity is computed using the standard relation:
@@ -750,8 +750,10 @@ class CORK(RealGas):
         critical_data: Critical data
     """
 
-    def __init__(self, mrk: RealGas, virial: VirialCompensation, critical_data: CriticalData):
-        self._mrk: RealGas = mrk
+    def __init__(
+        self, mrk: RealGasExtendedProtocol, virial: VirialCompensation, critical_data: CriticalData
+    ):
+        self._mrk: RealGasExtendedProtocol = mrk
         self._virial: VirialCompensation = virial
         self._critical_data: CriticalData = critical_data
 
@@ -828,11 +830,11 @@ class RealGasBounded(RealGas):
 
     def __init__(
         self,
-        real_gas: RealGas,
+        real_gas: RealGasExtendedProtocol,
         calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(),
     ):
         super().__init__()
-        self._real_gas: RealGas = real_gas
+        self._real_gas: RealGasExtendedProtocol = real_gas
         self._calibration: ExperimentalCalibrationNew = calibration
         self._pressure_min: Array = jnp.array(calibration.pressure_min)
         self._pressure_max: Array = jnp.array(calibration.pressure_max)
@@ -919,6 +921,11 @@ class RealGasBounded(RealGas):
         volume = lax.select(pressure < self._pressure_max, volume, ideal_volume + dvolume)
 
         return volume
+
+    # FIXME: TODO
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()

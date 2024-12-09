@@ -32,6 +32,7 @@ from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
 from atmodeller.eos.classes import Chabrier
 from atmodeller.eos.core import RealGas, RealGasBounded
+from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibrationNew
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ H2_He_Y0297_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
 """H2HeY0297 :cite:p:`CD21`"""
 
 
-def get_eos_models() -> dict[str, RealGas]:
+def get_eos_models() -> dict[str, RealGasProtocol]:
     """Gets a dictionary of EOS models
 
     The naming convention is as follows:
@@ -64,7 +65,7 @@ def get_eos_models() -> dict[str, RealGas]:
     Returns:
         Dictionary of EOS models
     """
-    eos_models: dict[str, RealGas] = {}
+    eos_models: dict[str, RealGasProtocol] = {}
     eos_models["H2_chabrier21"] = H2_chabrier21
     eos_models["H2_chabrier21_bounded"] = H2_chabrier21_bounded
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21

@@ -21,15 +21,13 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Callable
+from dataclasses import dataclass
 
 import jax.numpy as jnp
 from jax import Array, lax
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT, GAS_CONSTANT_BAR
-from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -39,146 +37,146 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ExperimentalCalibration:
-    """Experimental calibration range
+# @dataclass(frozen=True)
+# class ExperimentalCalibration:
+#     """Experimental calibration range
 
-    Args:
-        temperature_min: Minimum temperature in K. Defaults to None (i.e. not specified).
-        temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
-        pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
-        pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
-        temperature_penalty: Penalty coefficients for temperature. Defaults to 1000.
-        pressure_penalty: Penalty coefficient for pressure. Defaults to 1000.
-    """
+#     Args:
+#         temperature_min: Minimum temperature in K. Defaults to None (i.e. not specified).
+#         temperature_max: Maximum temperature in K. Defaults to None (i.e. not specified).
+#         pressure_min: Minimum pressure in bar. Defaults to None (i.e. not specified).
+#         pressure_max: Maximum pressure in bar. Defaults to None (i.e. not specified).
+#         temperature_penalty: Penalty coefficients for temperature. Defaults to 1000.
+#         pressure_penalty: Penalty coefficient for pressure. Defaults to 1000.
+#     """
 
-    temperature_min: float | None = None
-    """Minimum temperature in K"""
-    temperature_max: float | None = None
-    """Maximum temperature in K"""
-    pressure_min: float | None = None
-    """Minimum pressure in bar"""
-    pressure_max: float | None = None
-    """Maximum pressure in bar"""
-    temperature_penalty: float = 1e3
-    """Temperature penalty"""
-    pressure_penalty: float = 1e3
-    """Pressure penalty"""
-    _clips_to_apply: list[Callable] = field(init=False, default_factory=list, repr=False)
-    """Clips to apply"""
+#     temperature_min: float | None = None
+#     """Minimum temperature in K"""
+#     temperature_max: float | None = None
+#     """Maximum temperature in K"""
+#     pressure_min: float | None = None
+#     """Minimum pressure in bar"""
+#     pressure_max: float | None = None
+#     """Maximum pressure in bar"""
+#     temperature_penalty: float = 1e3
+#     """Temperature penalty"""
+#     pressure_penalty: float = 1e3
+#     """Pressure penalty"""
+#     _clips_to_apply: list[Callable] = field(init=False, default_factory=list, repr=False)
+#     """Clips to apply"""
 
-    def __post_init__(self):
-        if self.temperature_min is not None:
-            logger.info(
-                "Set minimum evaluation temperature (temperature > %f)", self.temperature_min
-            )
-            self._clips_to_apply.append(self._clip_temperature_min)
-        if self.temperature_max is not None:
-            logger.info(
-                "Set maximum evaluation temperature (temperature < %f)", self.temperature_max
-            )
-            self._clips_to_apply.append(self._clip_temperature_max)
-        if self.pressure_min is not None:
-            logger.info("Set minimum evaluation pressure (pressure > %f)", self.pressure_min)
-            self._clips_to_apply.append(self._clip_pressure_min)
-        if self.pressure_max is not None:
-            logger.info("Set maximum evaluation pressure (pressure < %f)", self.pressure_max)
-            self._clips_to_apply.append(self._clip_pressure_max)
+#     def __post_init__(self):
+#         if self.temperature_min is not None:
+#             logger.info(
+#                 "Set minimum evaluation temperature (temperature > %f)", self.temperature_min
+#             )
+#             self._clips_to_apply.append(self._clip_temperature_min)
+#         if self.temperature_max is not None:
+#             logger.info(
+#                 "Set maximum evaluation temperature (temperature < %f)", self.temperature_max
+#             )
+#             self._clips_to_apply.append(self._clip_temperature_max)
+#         if self.pressure_min is not None:
+#             logger.info("Set minimum evaluation pressure (pressure > %f)", self.pressure_min)
+#             self._clips_to_apply.append(self._clip_pressure_min)
+#         if self.pressure_max is not None:
+#             logger.info("Set maximum evaluation pressure (pressure < %f)", self.pressure_max)
+#             self._clips_to_apply.append(self._clip_pressure_max)
 
-    def _clip_pressure_max(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
-        """Clips maximum pressure
+#     def _clip_pressure_max(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
+#         """Clips maximum pressure
 
-        Args:
-            temperature: Temperature in K
-            pressure: pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: pressure in bar
 
-        Returns:
-            Temperature, and clipped pressure
-        """
-        assert self.pressure_max is not None
+#         Returns:
+#             Temperature, and clipped pressure
+#         """
+#         assert self.pressure_max is not None
 
-        return temperature, jnp.minimum(pressure, jnp.array(self.pressure_max))
+#         return temperature, jnp.minimum(pressure, jnp.array(self.pressure_max))
 
-    def _clip_pressure_min(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
-        """Clips minimum pressure
+#     def _clip_pressure_min(self, temperature: float, pressure: ArrayLike) -> tuple[float, Array]:
+#         """Clips minimum pressure
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            Temperature, and clipped pressure
-        """
-        assert self.pressure_min is not None
+#         Returns:
+#             Temperature, and clipped pressure
+#         """
+#         assert self.pressure_min is not None
 
-        return temperature, jnp.maximum(pressure, jnp.array(self.pressure_min))
+#         return temperature, jnp.maximum(pressure, jnp.array(self.pressure_min))
 
-    def _clip_temperature_max(
-        self, temperature: float, pressure: ArrayLike
-    ) -> tuple[float, Array]:
-        """Clips maximum temperature
+#     def _clip_temperature_max(
+#         self, temperature: float, pressure: ArrayLike
+#     ) -> tuple[float, Array]:
+#         """Clips maximum temperature
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            Clipped temperature, and pressure
-        """
-        assert self.temperature_max is not None
+#         Returns:
+#             Clipped temperature, and pressure
+#         """
+#         assert self.temperature_max is not None
 
-        return min(temperature, self.temperature_max), jnp.array(pressure)
+#         return min(temperature, self.temperature_max), jnp.array(pressure)
 
-    def _clip_temperature_min(
-        self, temperature: float, pressure: ArrayLike
-    ) -> tuple[float, Array]:
-        """Clips minimum temperature
+#     def _clip_temperature_min(
+#         self, temperature: float, pressure: ArrayLike
+#     ) -> tuple[float, Array]:
+#         """Clips minimum temperature
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            Clipped temperature, and pressure
-        """
-        assert self.temperature_min is not None
+#         Returns:
+#             Clipped temperature, and pressure
+#         """
+#         assert self.temperature_min is not None
 
-        return max(temperature, self.temperature_min), jnp.array(pressure)
+#         return max(temperature, self.temperature_min), jnp.array(pressure)
 
-    def get_within_range(self, temperature: float, pressure: ArrayLike) -> tuple[float, ArrayLike]:
-        """Gets temperature and pressure conditions within the calibration range.
+#     def get_within_range(self, temperature: float, pressure: ArrayLike) -> tuple[float, ArrayLike]:
+#         """Gets temperature and pressure conditions within the calibration range.
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            temperature in K, pressure in bar, according to prescribed clips
-        """
-        for clip_func in self._clips_to_apply:
-            temperature, pressure = clip_func(temperature, pressure)
+#         Returns:
+#             temperature in K, pressure in bar, according to prescribed clips
+#         """
+#         for clip_func in self._clips_to_apply:
+#             temperature, pressure = clip_func(temperature, pressure)
 
-        return temperature, pressure
+#         return temperature, pressure
 
-    def get_penalty(self, temperature: float, pressure: ArrayLike) -> Array:
-        """Gets a penalty value if temperature and pressure are outside the calibration range
+#     def get_penalty(self, temperature: float, pressure: ArrayLike) -> Array:
+#         """Gets a penalty value if temperature and pressure are outside the calibration range
 
-        This is based on the quadratic penalty method.
+#         This is based on the quadratic penalty method.
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            A penalty value
-        """
-        pressure_: Array = jnp.asarray(pressure)
-        temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
-        penalty = self.pressure_penalty * jnp.power(
-            pressure_clip - pressure_, 2
-        ) + self.temperature_penalty * jnp.power(temperature_clip - temperature, 2)
+#         Returns:
+#             A penalty value
+#         """
+#         pressure_: Array = jnp.asarray(pressure)
+#         temperature_clip, pressure_clip = self.get_within_range(temperature, pressure)
+#         penalty = self.pressure_penalty * jnp.power(
+#             pressure_clip - pressure_, 2
+#         ) + self.temperature_penalty * jnp.power(temperature_clip - temperature, 2)
 
-        return penalty
+#         return penalty
 
 
 @dataclass(kw_only=True)
@@ -198,9 +196,9 @@ class RealGas(ABC):
         calibration: Calibration temperature and pressure range. Defaults to empty.
     """
 
-    calibration: ExperimentalCalibration = field(
-        default_factory=ExperimentalCalibration, repr=False
-    )
+    # calibration: ExperimentalCalibration = field(
+    #    default_factory=ExperimentalCalibration, repr=False
+    # )
     """Calibration range of the temperature and pressure"""
 
     def compressibility_factor(self, temperature: float, pressure: ArrayLike) -> ArrayLike:
@@ -379,234 +377,234 @@ class CorrespondingStatesMixin(ABC):
         return scaled_temperature
 
 
-@dataclass(kw_only=True)
-class VirialCompensation(CorrespondingStatesMixin, RealGas):
-    r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
+# @dataclass(kw_only=True)
+# class VirialCompensation(CorrespondingStatesMixin, RealGas):
+#     r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
 
-    General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
+#     General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
 
-    .. math::
+#     .. math::
 
-        V_\mathrm{virial} = a(P-P0) + b(P-P0)^\frac{1}{2} + c(P-P0)^\frac{1}{4}
+#         V_\mathrm{virial} = a(P-P0) + b(P-P0)^\frac{1}{2} + c(P-P0)^\frac{1}{4}
 
-    This form also works for the virial compensation term from :cite:t:`HP91`, in which
-    case :math:`c=0`. :attr:`critical_pressure` and :attr:`critical_temperature` are required for
-    gases which are known to obey approximately the principle of corresponding states.
+#     This form also works for the virial compensation term from :cite:t:`HP91`, in which
+#     case :math:`c=0`. :attr:`critical_pressure` and :attr:`critical_temperature` are required for
+#     gases which are known to obey approximately the principle of corresponding states.
 
-    Although this looks similar to an EOS, it only calculates an additional perturbation to the
-    volume and the volume integral of an MRK EOS, and hence it does not return a meaningful volume
-    or volume integral by itself.
+#     Although this looks similar to an EOS, it only calculates an additional perturbation to the
+#     volume and the volume integral of an MRK EOS, and hence it does not return a meaningful volume
+#     or volume integral by itself.
 
-    Args:
-        a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where
-            :math:`a_0` and :math:`a_1` may be scaled (internally) by critical parameters for
-            corresponding states.
-        b_coefficients: As above for the b coefficients
-        c_coefficients: As above for the c coefficients
-        P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly and may be determined from experimental data.
-        critical_temperature: Critical temperature in K. Defaults to unity meaning not a
-            corresponding states model.
-        critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
-            states model.
-        calibration: Calibration temperature and pressure range. Defaults to empty.
-    """
+#     Args:
+#         a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where
+#             :math:`a_0` and :math:`a_1` may be scaled (internally) by critical parameters for
+#             corresponding states.
+#         b_coefficients: As above for the b coefficients
+#         c_coefficients: As above for the c coefficients
+#         P0: Pressure at which the MRK equation begins to overestimate the molar volume
+#             significantly and may be determined from experimental data.
+#         critical_temperature: Critical temperature in K. Defaults to unity meaning not a
+#             corresponding states model.
+#         critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
+#             states model.
+#         calibration: Calibration temperature and pressure range. Defaults to empty.
+#     """
 
-    a_coefficients: Array
-    r"""Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where :math:`a_0` and
-    :math:`a_1` may be additionally (internally) scaled by critical parameters
-    (:attr:`critical_temperature` and :attr:`critical_pressure`) for corresponding states."""
-    b_coefficients: Array
-    """Coefficients for the `b` parameter. See :attr:`a_coefficients` documentation."""
-    c_coefficients: Array
-    """Coefficients for the `c` parameter. See :attr:`a_coefficients` documentation."""
-    P0: ArrayLike
-    """Pressure at which the MRK equation begins to overestimate the molar volume significantly
-    and may be determined from experimental data."""
+#     a_coefficients: Array
+#     r"""Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`, where :math:`a_0` and
+#     :math:`a_1` may be additionally (internally) scaled by critical parameters
+#     (:attr:`critical_temperature` and :attr:`critical_pressure`) for corresponding states."""
+#     b_coefficients: Array
+#     """Coefficients for the `b` parameter. See :attr:`a_coefficients` documentation."""
+#     c_coefficients: Array
+#     """Coefficients for the `c` parameter. See :attr:`a_coefficients` documentation."""
+#     P0: ArrayLike
+#     """Pressure at which the MRK equation begins to overestimate the molar volume significantly
+#     and may be determined from experimental data."""
 
-    def a(self, temperature: float) -> Array:
-        r"""`a` parameter :cite:p:`HP98`
+#     def a(self, temperature: float) -> Array:
+#         r"""`a` parameter :cite:p:`HP98`
 
-        This is also the `d` parameter in :cite:t:`HP91`.
+#         This is also the `d` parameter in :cite:t:`HP91`.
 
-        Args:
-            temperature: Temperature in K
+#         Args:
+#             temperature: Temperature in K
 
-        Returns:
-            `a` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^{-1}`
-        """
-        a: Array = (
-            self.a_coefficients[0] * self.critical_temperature
-            + self.a_coefficients[1] * temperature
-        )
-        a = a / self.critical_pressure**2
+#         Returns:
+#             `a` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^{-1}`
+#         """
+#         a: Array = (
+#             self.a_coefficients[0] * self.critical_temperature
+#             + self.a_coefficients[1] * temperature
+#         )
+#         a = a / self.critical_pressure**2
 
-        return a
+#         return a
 
-    def b(self, temperature: float) -> Array:
-        r"""`b` parameter :cite:p:`HP98`
+#     def b(self, temperature: float) -> Array:
+#         r"""`b` parameter :cite:p:`HP98`
 
-        This is also the `c` parameter in :cite:t:`HP91`.
+#         This is also the `c` parameter in :cite:t:`HP91`.
 
-        Args:
-            temperature: Temperature in K
+#         Args:
+#             temperature: Temperature in K
 
-        Returns:
-            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{2}`
-        """
-        b: Array = (
-            self.b_coefficients[0] * self.critical_temperature
-            + self.b_coefficients[1] * temperature
-        )
-        b = b / self.critical_pressure ** (3 / 2)
+#         Returns:
+#             `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{2}`
+#         """
+#         b: Array = (
+#             self.b_coefficients[0] * self.critical_temperature
+#             + self.b_coefficients[1] * temperature
+#         )
+#         b = b / self.critical_pressure ** (3 / 2)
 
-        return b
+#         return b
 
-    def c(self, temperature: float) -> Array:
-        r"""`c` parameter :cite:p:`HP98`
+#     def c(self, temperature: float) -> Array:
+#         r"""`c` parameter :cite:p:`HP98`
 
-        Args:
-            temperature: Temperature in K
+#         Args:
+#             temperature: Temperature in K
 
-        Returns:
-            `c` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{4}`
-        """
-        c: Array = (
-            self.c_coefficients[0] * self.critical_temperature
-            + self.c_coefficients[1] * temperature
-        )
-        c = c / self.critical_pressure ** (5 / 4)
+#         Returns:
+#             `c` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{4}`
+#         """
+#         c: Array = (
+#             self.c_coefficients[0] * self.critical_temperature
+#             + self.c_coefficients[1] * temperature
+#         )
+#         c = c / self.critical_pressure ** (5 / 4)
 
-        return c
+#         return c
 
-    def delta_pressure(self, pressure: ArrayLike) -> Array:
-        """Pressure difference
+#     def delta_pressure(self, pressure: ArrayLike) -> Array:
+#         """Pressure difference
 
-        Args:
-            pressure: Pressure in bar
+#         Args:
+#             pressure: Pressure in bar
 
-        Returns:
-            Pressure difference relative to :attr:`P0`
-        """
-        # TODO: Careful. Maybe jnp.where is better for array-based operations
-        delta_pressure: Array = lax.cond(
-            jnp.asarray(pressure) > jnp.asarray(self.P0),
-            lambda pressure: jnp.asarray(pressure - self.P0, dtype=jnp.float_),
-            lambda pressure: jnp.array(0, dtype=jnp.float_),
-            pressure,
-        )
+#         Returns:
+#             Pressure difference relative to :attr:`P0`
+#         """
+#         # TODO: Careful. Maybe jnp.where is better for array-based operations
+#         delta_pressure: Array = lax.cond(
+#             jnp.asarray(pressure) > jnp.asarray(self.P0),
+#             lambda pressure: jnp.asarray(pressure - self.P0, dtype=jnp.float_),
+#             lambda pressure: jnp.array(0, dtype=jnp.float_),
+#             pressure,
+#         )
 
-        return delta_pressure
+#         return delta_pressure
 
-    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-        r"""Volume contribution
+#     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
+#         r"""Volume contribution
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            Volume contribution in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-        """
-        delta_pressure: Array = self.delta_pressure(pressure)
-        volume: Array = (
-            self.a(temperature) * delta_pressure
-            + self.b(temperature) * delta_pressure**0.5
-            + self.c(temperature) * delta_pressure**0.25
-        )
+#         Returns:
+#             Volume contribution in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+#         """
+#         delta_pressure: Array = self.delta_pressure(pressure)
+#         volume: Array = (
+#             self.a(temperature) * delta_pressure
+#             + self.b(temperature) * delta_pressure**0.5
+#             + self.c(temperature) * delta_pressure**0.25
+#         )
 
-        return volume
+#         return volume
 
-    def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-        r"""Volume integral :math:`V dP` contribution
+#     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
+#         r"""Volume integral :math:`V dP` contribution
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            Volume integral contribution in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-        """
-        delta_pressure: Array = self.delta_pressure(pressure)
-        volume_integral: Array = (
-            self.a(temperature) / 2.0 * delta_pressure**2
-            + 2.0 / 3.0 * self.b(temperature) * delta_pressure ** (3.0 / 2.0)
-            + 4.0 / 5.0 * self.c(temperature) * delta_pressure ** (5.0 / 4.0)
-        )
-        volume_integral = volume_integral * unit_conversion.m3_bar_to_J
+#         Returns:
+#             Volume integral contribution in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+#         """
+#         delta_pressure: Array = self.delta_pressure(pressure)
+#         volume_integral: Array = (
+#             self.a(temperature) / 2.0 * delta_pressure**2
+#             + 2.0 / 3.0 * self.b(temperature) * delta_pressure ** (3.0 / 2.0)
+#             + 4.0 / 5.0 * self.c(temperature) * delta_pressure ** (5.0 / 4.0)
+#         )
+#         volume_integral = volume_integral * unit_conversion.m3_bar_to_J
 
-        return volume_integral
+# return volume_integral
 
 
-@dataclass(kw_only=True)
-class CORK(CorrespondingStatesMixin, RealGas):
-    """A Compensated-Redlich-Kwong (CORK) EOS :cite:p:`HP91`
+# @dataclass(kw_only=True)
+# class CORK(CorrespondingStatesMixin, RealGas):
+#     """A Compensated-Redlich-Kwong (CORK) EOS :cite:p:`HP91`
 
-    Args:
-        P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly and may be determined from experimental data.
-        mrk: MRK model for computing the MRK contribution
-        a_virial: `a` coefficients for the virial compensation. Defaults to zero.
-        b_virial: `b` coefficients for the virial compensation. Defaults to zero.
-        c_virial: `c` coefficients for the virial compensation. Defaults to zero.
-        critical_temperature: Critical temperature in K. Defaults to unity meaning not a
-            corresponding states model.
-        critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
-            states model.
-        calibration: Calibration temperature and pressure range. Defaults to empty.
-    """
+#     Args:
+#         P0: Pressure at which the MRK equation begins to overestimate the molar volume
+#             significantly and may be determined from experimental data.
+#         mrk: MRK model for computing the MRK contribution
+#         a_virial: `a` coefficients for the virial compensation. Defaults to zero.
+#         b_virial: `b` coefficients for the virial compensation. Defaults to zero.
+#         c_virial: `c` coefficients for the virial compensation. Defaults to zero.
+#         critical_temperature: Critical temperature in K. Defaults to unity meaning not a
+#             corresponding states model.
+#         critical_pressure: Critical pressure in bar. Defaults to unity meaning not a corresponding
+#             states model.
+#         calibration: Calibration temperature and pressure range. Defaults to empty.
+#     """
 
-    P0: ArrayLike
-    """Pressure at which the MRK equation begins to overestimate the molar volume significantly 
-    and may be determined from experimental data."""
-    mrk: RealGas
-    """MRK model for computing the MRK contribution"""
-    a_virial: Array = jnp.array((0, 0))
-    """`a` coefficients for the virial compensation"""
-    b_virial: Array = jnp.array((0, 0))
-    """`b` coefficients for the virial compensation"""
-    c_virial: Array = jnp.array((0, 0))
-    """`c` coefficients for the virial compensation"""
-    virial: VirialCompensation = field(init=False)
-    """The virial compensation model"""
+#     P0: ArrayLike
+#     """Pressure at which the MRK equation begins to overestimate the molar volume significantly
+#     and may be determined from experimental data."""
+#     mrk: RealGas
+#     """MRK model for computing the MRK contribution"""
+#     a_virial: Array = jnp.array((0, 0))
+#     """`a` coefficients for the virial compensation"""
+#     b_virial: Array = jnp.array((0, 0))
+#     """`b` coefficients for the virial compensation"""
+#     c_virial: Array = jnp.array((0, 0))
+#     """`c` coefficients for the virial compensation"""
+#     virial: VirialCompensation = field(init=False)
+#     """The virial compensation model"""
 
-    def __post_init__(self):
-        self.virial = VirialCompensation(
-            a_coefficients=self.a_virial,
-            b_coefficients=self.b_virial,
-            c_coefficients=self.c_virial,
-            P0=self.P0,
-            critical_temperature=self.critical_temperature,
-            critical_pressure=self.critical_pressure,
-        )
+#     def __post_init__(self):
+#         self.virial = VirialCompensation(
+#             a_coefficients=self.a_virial,
+#             b_coefficients=self.b_virial,
+#             c_coefficients=self.c_virial,
+#             P0=self.P0,
+#             critical_temperature=self.critical_temperature,
+#             critical_pressure=self.critical_pressure,
+#         )
 
-    @override
-    def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-        r"""Volume :cite:p:`HP91{Equation 7a}`
+#     @override
+#     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
+#         r"""Volume :cite:p:`HP91{Equation 7a}`
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
-        """
-        return self.virial.volume(temperature, pressure) + self.mrk.volume(temperature, pressure)
+#         Returns:
+#             Volume in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+#         """
+#         return self.virial.volume(temperature, pressure) + self.mrk.volume(temperature, pressure)
 
-    @override
-    def volume_integral(self, temperature: float, pressure: float) -> Array:
-        r"""Volume integral :cite:p:`HP91{Equation 8}`
+#     @override
+#     def volume_integral(self, temperature: float, pressure: float) -> Array:
+#         r"""Volume integral :cite:p:`HP91{Equation 8}`
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+#         Args:
+#             temperature: Temperature in K
+#             pressure: Pressure in bar
 
-        Returns:
-            Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
-        """
-        return self.virial.volume_integral(temperature, pressure) + self.mrk.volume_integral(
-            temperature, pressure
-        )
+#         Returns:
+#             Volume integral in :math:`\mathrm{J}\mathrm{mol}^{-1}`
+#         """
+#         return self.virial.volume_integral(temperature, pressure) + self.mrk.volume_integral(
+#             temperature, pressure
+#         )
 
 
 @dataclass(kw_only=True)

@@ -26,9 +26,8 @@ from jax.typing import ArrayLike
 from atmodeller import INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, SolverParameters, Species
-from atmodeller.eos.core import RealGas
 from atmodeller.eos.library import get_eos_models
-from atmodeller.interfaces import SolubilityProtocol
+from atmodeller.interfaces import RealGasProtocol, SolubilityProtocol
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
@@ -43,7 +42,7 @@ ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
-eos_models: dict[str, RealGas] = get_eos_models()
+eos_models: dict[str, RealGasProtocol] = get_eos_models()
 
 
 def test_fO2_holley(helper) -> None:

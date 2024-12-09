@@ -30,7 +30,7 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
-eos_models: dict[str, RealGas] = get_eos_models()
+eos_models: dict[str, RealGasProtocol] = get_eos_models()
 
 
 class CheckValues:

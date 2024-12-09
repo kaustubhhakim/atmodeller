@@ -21,6 +21,7 @@ import logging
 from atmodeller.constants import ATMOSPHERE
 from atmodeller.eos.classes import BeattieBridgeman
 from atmodeller.eos.core import RealGas, RealGasBounded
+from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -140,7 +141,7 @@ He_beattie_holley58_bounded: RealGas = RealGasBounded(
 """He Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
 
-def get_holley_eos_models() -> dict[str, RealGas]:
+def get_holley_eos_models() -> dict[str, RealGasProtocol]:
     """Gets a dictionary of Holley models
 
     The naming convention is as follows:
@@ -152,7 +153,7 @@ def get_holley_eos_models() -> dict[str, RealGas]:
     Returns:
         Dictionary of EOS models
     """
-    eos_models: dict[str, RealGas] = {}
+    eos_models: dict[str, RealGasProtocol] = {}
     eos_models["CH4_beattie_holley58"] = CH4_beattie_holley58
     eos_models["CH4_beattie_holley58_bounded"] = CH4_beattie_holley58_bounded
     eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58

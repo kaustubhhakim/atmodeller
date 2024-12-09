@@ -41,12 +41,19 @@ class RealGasProtocol(ActivityProtocol, Protocol):
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
 
+class RealGasExtendedProtocol(RealGasProtocol, Protocol):
+    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+
+
 class SolubilityProtocol(Protocol):
     """Solubility protocol
 
     :meth:`~SolubilityProtocol.jax_concentration` is defined in order to allow arguments to be
     passed by position to lax.switch.
-
     """
 
     def concentration(

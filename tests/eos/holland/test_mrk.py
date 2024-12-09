@@ -19,7 +19,8 @@
 import logging
 
 from atmodeller import debug_logger
-from atmodeller.eos import RealGas, get_eos_models
+from atmodeller.eos import get_eos_models
+from atmodeller.interfaces import RealGasProtocol
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -28,26 +29,26 @@ ATOL: float = 1.0e-8
 
 logger: logging.Logger = debug_logger()
 
-eos_models: dict[str, RealGas] = get_eos_models()
+eos_models: dict[str, RealGasProtocol] = get_eos_models()
 
 
 def test_CO2_corresponding_states(check_values) -> None:
     """CO2 corresponding states"""
-    model: RealGas = eos_models["CO2_mrk_cs_holland91"]
+    model: RealGasProtocol = eos_models["CO2_mrk_cs_holland91"]
     expected: float = 1.5831992703027848
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2(check_values) -> None:
     """CO2"""
-    model: RealGas = eos_models["CO2_mrk_holland91"]
+    model: RealGasProtocol = eos_models["CO2_mrk_holland91"]
     expected: float = 1.575457075165528
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_above_Tc(check_values) -> None:
     """H2O above Tc"""
-    model: RealGas = eos_models["H2O_mrk_fluid_holland91"]
+    model: RealGasProtocol = eos_models["H2O_mrk_fluid_holland91"]
     expected: float = 1.048278616058322
     check_values.fugacity_coefficient(2000, 1e3, model, expected, rtol=RTOL, atol=ATOL)
 
@@ -55,7 +56,7 @@ def test_H2O_above_Tc(check_values) -> None:
 def test_H2O_below_Tc_below_Psat(check_values) -> None:
     """H2O below Tc and below Psat"""
     # Psat = 0.118224 kbar at T = 600 K
-    model: RealGas = eos_models["H2O_mrk_gas_holland91"]
+    model: RealGasProtocol = eos_models["H2O_mrk_gas_holland91"]
     expected: float = 0.7910907770688191
     check_values.fugacity_coefficient(600, 0.1e3, model, expected, rtol=RTOL, atol=ATOL)
 
