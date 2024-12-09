@@ -36,8 +36,6 @@ from atmodeller.utilities import ExperimentalCalibrationNew
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-# region: Chabrier et al. (2021)
-
 H2_chabrier21: RealGas = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
 # TODO: Update calibration bounds. Kaustubh to do.
@@ -52,8 +50,6 @@ H2_He_Y0292_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0292_v1"))
 """H2HeY0292 :cite:p:`CD21`"""
 H2_He_Y0297_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
 """H2HeY0297 :cite:p:`CD21`"""
-
-# endregion
 
 
 def get_eos_models() -> dict[str, RealGas]:
