@@ -25,16 +25,20 @@ import jax.numpy as jnp
 from jax import Array, jit, lax
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
+from scipy.constants import kilo
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import (
+    CORK,
     RealGas,
+    RealGasBounded,
     RedlichKwongABC,
     RedlichKwongImplicitDenseFluidABC,
     RedlichKwongImplicitGasABC,
+    VirialCompensation,
 )
 from atmodeller.thermodata import CriticalData, select_critical_data
-from atmodeller.utilities import PyTreeNoData
+from atmodeller.utilities import ExperimentalCalibrationNew, PyTreeNoData
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -59,16 +63,68 @@ Compared to :cite:t:`HP91` this value accounts for unit conversion.
 """
 
 
+class CorrespondingStateUnitConverter:
+    r"""Unit converter for Holland and Powell corresponding states model
+
+    This converts the coefficient units from Holland and Powell to the required units for
+    Atmodeller. This is mostly accounting for kilo factors and converting the energy from J to SI
+    volume and pressure in bar using:
+
+    .. math::
+
+        1\ \mathrm{J} = 10^{-5}\ \mathrm{m}^3\ \mathrm{bar}
+    """
+
+    @staticmethod
+    def convert_a_coefficients(a_coefficients: tuple[float, ...]) -> tuple[float, ...]:
+        r"""Converts the a coefficients for corresponding states
+
+        The a coefficients (a0 and a1) have units :cite:p:`HP91{Equation 9}`:
+
+        .. math::
+
+            \frac{\mathrm{kJ}^2\ \mathrm{K}^{1/2}}{\mathrm{mol}^2}
+
+        Converting the energy scale gives rise to a unit conversion factor of $10^{-4}$.
+
+        Args:
+            a_coefficients: a coefficients from Holland and Powell
+
+        Returns:
+            a coefficients in Atmodeller units
+        """
+        factor: float = 1e-4
+
+        return tuple(map(lambda a_coefficient: factor * a_coefficient, a_coefficients))
+
+    @staticmethod
+    def convert_b_coefficient(b_coefficient: float) -> float:
+        r"""Converts the b coefficient for corresponding states
+
+        The b coefficient has units :cite:p:`HP91{Equation 9}`:
+
+        .. math::
+
+            \frac{\mathrm{kJ}{\mathrm{kbar}\ \mathrm{mol}^2}
+
+        Converting the energy scale gives rise to a unit conversion factor of $10^{-2}$.
+
+        Args:
+            b_coefficient: b coefficient from Holland and Powell
+
+        Returns:
+            b coefficient in Atmodeller units
+        """
+        factor: float = 1e-2
+
+        return b_coefficient * factor
+
+
 @register_pytree_node_class
 class MRKCorrespondingStatesHP91(RedlichKwongABC):
     """MRK corresponding states :cite:p:`HP91`
 
     Universal constants from :cite:t:`HP91{Table 2}`
-
-    Note the unit conversion to SI and pressure in bar using the values in Table 2:
-
-        * `a` coefficients are multiplied by 1e-4
-        * `b` is multiplied by 1e-2
 
     Args:
         critical_data: Critical data
@@ -76,8 +132,14 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
 
     def __init__(self, critical_data: CriticalData):
         self._critical_data: CriticalData = critical_data
-        self._a_coefficients: tuple[float, ...] = (5.45963e-9, -8.63920e-10, 0)
-        self._b: float = 9.18301e-6
+        a_coefficients_holland: tuple[float, ...] = (5.45963e-5, -8.63920e-6, 0)
+        self._a_coefficients: tuple[float, ...] = (
+            CorrespondingStateUnitConverter.convert_a_coefficients(a_coefficients_holland)
+        )
+        b_coefficient_holland: float = 9.18301e-4
+        self._b: float = CorrespondingStateUnitConverter.convert_b_coefficient(
+            b_coefficient_holland
+        )
 
     @property
     def critical_pressure(self) -> float:
@@ -526,3 +588,220 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
 H2OMrkHolland91: RealGas = H2OMrkHP91()
 """H2O MRK that includes critical behaviour"""
+
+
+CO2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2_g")
+"""CO2 MRK corresponding states :cite:p:`HP91`"""
+CH4_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4_g")
+"""CH4 MRK corresponding states :cite:p:`HP91`"""
+H2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("H2_g_Holland")
+"""H2 MRK corresponding states :cite:p:`HP91`"""
+CO_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO_g")
+"""CO MRK corresponding states :cite:p:`HP91`"""
+N2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("N2_g")
+"""N2 MRK corresponding states :cite:p:`HP91`"""
+S2_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("S2_g")
+"""S2 MRK corresponding states :cite:p:`HP11`"""
+H2S_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S_g")
+"""H2S MRK corresponding states :cite:p:`HP11`"""
+H2O_mrk_fluid_holland91: RealGas = H2OMrkFluidHolland91
+"""H2O MRK supercritical fluid :cite:p:`HP91`"""
+H2O_mrk_gas_holland91: RealGas = H2OMrkGasHolland91
+"""H2O MRK gas :cite:p:`HP91`"""
+H2O_mrk_liquid_holland91: RealGas = H2OMrkLiquidHolland91
+"""H2O MRK liquid :cite:p:`HP91`"""
+
+virial_compensation: VirialCompensation = VirialCompensation(
+    (6.93054e-9, -8.38293e-10), (-3.30558e-7, 2.30524e-8), (0, 0), 0
+)
+"""Virial compensation for corresponding states :cite:p:`HP91{Table 2}`
+
+In this case it appears `P0` is always zero, even though for the full CORK equations it determines
+whether or not the virial contribution is added. The unit conversions to SI and pressure in bar 
+mean that every virial coefficient has been multiplied by 1e-2 compared to the values in 
+:cite:t:`HP91{Table 2}`.
+"""
+experimental_calibration_holland91: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+    100, 4000, 0.1, 50e9
+)
+"""Experimental calibration for :cite:`HP91,HP11` models"""
+
+CH4_cork_cs_holland91: RealGas = CORK(
+    CH4_mrk_cs_holland91, virial_compensation, select_critical_data("CH4_g")
+)
+"""CH4 CORK corresponding states :cite:p:`HP91`"""
+CH4_cork_cs_holland91_bounded: RealGas = RealGasBounded(
+    CH4_cork_cs_holland91, experimental_calibration_holland91
+)
+"""CH4 CORK corresponding states bounded :cite:p:`HP91`"""
+CO_cork_cs_holland91: RealGas = CORK(
+    CO_mrk_cs_holland91, virial_compensation, select_critical_data("CO_g")
+)
+"""CO CORK corresponding states :cite:p:`HP91`"""
+CO_cork_cs_holland91_bounded: RealGas = RealGasBounded(
+    CO_cork_cs_holland91, experimental_calibration_holland91
+)
+"""CO CORK corresponding states bounded :cite:p:`HP91`"""
+CO2_cork_cs_holland91: RealGas = CORK(
+    CO2_mrk_cs_holland91, virial_compensation, select_critical_data("CO2_g")
+)
+"""CO2 CORK corresponding states :cite:p:`HP91`"""
+CO2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
+    CO2_cork_cs_holland91, experimental_calibration_holland91
+)
+"""CO2 CORK corresponding states bounded :cite:p:`HP91`"""
+H2_cork_cs_holland91: RealGas = CORK(
+    H2_mrk_cs_holland91, virial_compensation, select_critical_data("H2_g_Holland")
+)
+"""H2 CORK corresponding states :cite:p:`HP91`"""
+H2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
+    H2_cork_cs_holland91, experimental_calibration_holland91
+)
+"""H2 CORK corresponding states bounded :cite:p:`HP91`"""
+H2S_cork_cs_holland11: RealGas = CORK(
+    H2S_mrk_cs_holland11, virial_compensation, select_critical_data("H2S_g")
+)
+"""H2S CORK corresponding states :cite:p:`HP91`"""
+H2S_cork_cs_holland11_bounded: RealGas = RealGasBounded(
+    H2S_cork_cs_holland11, experimental_calibration_holland91
+)
+"""H2S CORK corresponding states bounded :cite:p:`HP91`"""
+N2_cork_cs_holland91: RealGas = CORK(
+    N2_mrk_cs_holland91, virial_compensation, select_critical_data("N2_g")
+)
+"""N2 CORK corresponding states :cite:p:`HP91`"""
+N2_cork_cs_holland91_bounded: RealGas = RealGasBounded(
+    N2_cork_cs_holland91, experimental_calibration_holland91
+)
+"""N2 CORK corresponding states bounded :cite:p:`HP91`"""
+S2_cork_cs_holland11: RealGas = CORK(
+    S2_mrk_cs_holland11, virial_compensation, select_critical_data("S2_g")
+)
+"""S2 CORK corresponding states :cite:p:`HP91`"""
+S2_cork_cs_holland11_bounded: RealGas = RealGasBounded(
+    S2_cork_cs_holland11, experimental_calibration_holland91
+)
+"""S2 CORK corresponding states bounded :cite:p:`HP91`"""
+
+# For the Full CORK models, the virial coefficients in the Holland and Powell papers need
+# converting to SI units and pressure in bar as follows, where k = kilo = 1000:
+#   a_virial = a_virial (Holland and Powell) * 10**(-5) / k
+#   b_virial = b_virial (Holland and Powell) * 10**(-5) / k**(1/2)
+#   c_virial = c_virial (Holland and Powell) * 10**(-5) / k**(1/4)
+
+_a_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
+    [y * 1e-5 / kilo for y in x]
+)
+_b_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
+    [y * 1e-5 / kilo**0.5 for y in x]
+)
+_c_conversion: Callable[[tuple[float, ...]], tuple[float, ...]] = lambda x: tuple(  # noqa: E731
+    [y * 1e-5 / kilo**0.25 for y in x]
+)
+
+dummy_critical_data: CriticalData = CriticalData(1.0, 1.0)
+"""Dummy critical data
+
+The full CO2 and H2O CORK models are not corresponding states, which can be reproduced by ignoring
+the scaling by the critical temperature and pressure, i.e. setting these quantities to unity.
+"""
+_CO2_virial_compensation_holland91: VirialCompensation = VirialCompensation(
+    _a_conversion((1.33790e-2, -1.01740e-5)),
+    _b_conversion((-2.26924e-1, 7.73793e-5)),
+    (0, 0),
+    5000,
+)
+"""CO2 virial compensation :cite:p:`HP91`"""
+CO2_cork_holland91: RealGas = CORK(
+    CO2MrkHolland91, _CO2_virial_compensation_holland91, dummy_critical_data
+)
+"""CO2 cork :cite:p:`HP91`
+
+TODO: ExperimentalCalibrationNew(400, 1900, 0, 50e3)
+"""
+_H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
+    _a_conversion((-3.2297554e-3, 2.2215221e-6)),
+    _b_conversion((-3.025650e-2, -5.343144e-6)),
+    (0, 0),
+    2000,
+)
+"""H2O virial compensation :cite:p:`HP91`"""
+H2O_cork_holland91: RealGas = CORK(
+    H2OMrkHolland91, _H2O_virial_compensation_holland91, dummy_critical_data
+)
+"""H2O cork :cite:p:`HP91`
+
+TODO: calibration=ExperimentalCalibration(400, 1700, 0, 50e3),
+"""
+
+_CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
+    _a_conversion((5.40776e-3, -1.59046e-6)),
+    _b_conversion((-1.78198e-1, 2.45317e-5)),
+    (0, 0),
+    5000,
+)
+"""CO2 virial compensation :cite:p:`HP98`"""
+CO2_cork_holland98: RealGas = CORK(
+    CO2MrkHolland91, _CO2_virial_compensation_holland98, dummy_critical_data
+)
+"""CO2 cork :cite:p:`HP98`
+
+TODO: calibration=ExperimentalCalibration(400, 1900, 0, 120e3),
+"""
+_H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
+    _a_conversion((1.9853e-3, 0)),
+    _b_conversion((-8.9090e-2, 0)),
+    _c_conversion((8.0331e-2, 0)),
+    2000,
+)
+H2O_cork_holland98: RealGas = CORK(
+    H2OMrkHolland91, _H2O_virial_compensation_holland98, dummy_critical_data
+)
+"""H2O cork :cite:p:`HP98`
+
+TODO: calibration=ExperimentalCalibration(400, 1700, 0, 120e3),
+"""
+
+
+def get_holland_eos_models() -> dict[str, RealGas]:
+    """Gets a dictionary of Holland and Powell EOS models
+
+    Returns:
+        Dictionary of EOS models
+    """
+    eos_models: dict[str, RealGas] = {}
+    eos_models["CH4_cork_cs_holland91"] = CH4_cork_cs_holland91
+    eos_models["CH4_cork_cs_holland91_bounded"] = CH4_cork_cs_holland91_bounded
+    eos_models["CH4_mrk_cs_holland91"] = CH4_mrk_cs_holland91
+    eos_models["CO_cork_cs_holland91"] = CO_cork_cs_holland91
+    eos_models["CO_cork_cs_holland91_bounded"] = CO_cork_cs_holland91_bounded
+    eos_models["CO_mrk_cs_holland91"] = CO_mrk_cs_holland91
+    eos_models["CO2_cork_holland91"] = CO2_cork_holland91
+    eos_models["CO2_cork_holland98"] = CO2_cork_holland98
+    eos_models["CO2_cork_cs_holland91"] = CO2_cork_cs_holland91
+    eos_models["CO2_cork_cs_holland91_bounded"] = CO2_cork_cs_holland91_bounded
+    eos_models["CO2_mrk_cs_holland91"] = CO2_mrk_cs_holland91
+    eos_models["CO2_mrk_holland91"] = CO2MrkHolland91
+    eos_models["H2_cork_cs_holland91"] = H2_cork_cs_holland91
+    eos_models["H2_cork_cs_holland91_bounded"] = H2_cork_cs_holland91_bounded
+    eos_models["H2_mrk_cs_holland91"] = H2_mrk_cs_holland91
+    eos_models["H2O_cork_holland91"] = H2O_cork_holland91
+    eos_models["H2O_cork_holland98"] = H2O_cork_holland98
+    eos_models["H2O_mrk_holland91"] = H2OMrkHolland91
+    # Supercritical fluid only
+    eos_models["H2O_mrk_fluid_holland91"] = H2O_mrk_fluid_holland91
+    # Gas (subcritical) only
+    eos_models["H2O_mrk_gas_holland91"] = H2O_mrk_gas_holland91
+    # Eventually it might make sense to include the liquid as a condensed activity model
+    eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
+    eos_models["H2S_cork_cs_holland11"] = H2S_cork_cs_holland11
+    eos_models["H2S_cork_cs_holland11_bounded"] = H2S_cork_cs_holland11_bounded
+    eos_models["H2S_mrk_cs_holland11"] = H2S_mrk_cs_holland11
+    eos_models["N2_cork_cs_holland91"] = N2_cork_cs_holland91
+    eos_models["N2_cork_cs_holland91_bounded"] = N2_cork_cs_holland91_bounded
+    eos_models["N2_mrk_cs_holland91"] = N2_mrk_cs_holland91
+    eos_models["S2_cork_cs_holland11"] = S2_cork_cs_holland11
+    eos_models["S2_cork_cs_holland11_bounded"] = S2_cork_cs_holland11_bounded
+    eos_models["S2_mrk_cs_holland11"] = S2_mrk_cs_holland11
+
+    return eos_models

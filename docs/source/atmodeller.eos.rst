@@ -36,14 +36,6 @@ atmodeller.eos.holland module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.eos.holland\_jax module
-----------------------------------
-
-.. automodule:: atmodeller.eos.holland
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 atmodeller.eos.interfaces module
 --------------------------------
 
