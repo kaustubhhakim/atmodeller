@@ -28,16 +28,16 @@ from jax.typing import ArrayLike
 from scipy.constants import kilo
 
 from atmodeller.constants import GAS_CONSTANT_BAR
+from atmodeller.eos.aggregators import RealGasBounded
 from atmodeller.eos.core import (
     CORK,
     RealGas,
-    RealGasBounded,
     RedlichKwongABC,
     RedlichKwongImplicitDenseFluidABC,
     RedlichKwongImplicitGasABC,
     VirialCompensation,
 )
-from atmodeller.interfaces import RealGasExtendedProtocol, RealGasProtocol
+from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData, select_critical_data
 from atmodeller.utilities import ExperimentalCalibrationNew, PyTreeNoData
 
@@ -705,29 +705,27 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         return volume
 
 
-H2OMrkHolland91: RealGasExtendedProtocol = H2OMrkHP91()
+H2OMrkHolland91: RealGasProtocol = H2OMrkHP91()
 """H2O MRK that includes critical behaviour"""
-CO2_mrk_cs_holland91: RealGasExtendedProtocol = MRKCorrespondingStatesHP91.get_species("CO2_g")
+CO2_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CO2_g")
 """CO2 MRK corresponding states :cite:p:`HP91`"""
-CH4_mrk_cs_holland91: RealGasExtendedProtocol = MRKCorrespondingStatesHP91.get_species("CH4_g")
+CH4_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CH4_g")
 """CH4 MRK corresponding states :cite:p:`HP91`"""
-H2_mrk_cs_holland91: RealGasExtendedProtocol = MRKCorrespondingStatesHP91.get_species(
-    "H2_g_Holland"
-)
+H2_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("H2_g_Holland")
 """H2 MRK corresponding states :cite:p:`HP91`"""
-CO_mrk_cs_holland91: RealGasExtendedProtocol = MRKCorrespondingStatesHP91.get_species("CO_g")
+CO_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CO_g")
 """CO MRK corresponding states :cite:p:`HP91`"""
-N2_mrk_cs_holland91: RealGasExtendedProtocol = MRKCorrespondingStatesHP91.get_species("N2_g")
+N2_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("N2_g")
 """N2 MRK corresponding states :cite:p:`HP91`"""
-S2_mrk_cs_holland11: RealGasExtendedProtocol = MRKCorrespondingStatesHP91.get_species("S2_g")
+S2_mrk_cs_holland11: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("S2_g")
 """S2 MRK corresponding states :cite:p:`HP11`"""
-H2S_mrk_cs_holland11: RealGasExtendedProtocol = MRKCorrespondingStatesHP91.get_species("H2S_g")
+H2S_mrk_cs_holland11: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("H2S_g")
 """H2S MRK corresponding states :cite:p:`HP11`"""
-H2O_mrk_fluid_holland91: RealGasExtendedProtocol = H2OMrkFluidHolland91
+H2O_mrk_fluid_holland91: RealGasProtocol = H2OMrkFluidHolland91
 """H2O MRK supercritical fluid :cite:p:`HP91`"""
-H2O_mrk_gas_holland91: RealGasExtendedProtocol = H2OMrkGasHolland91
+H2O_mrk_gas_holland91: RealGasProtocol = H2OMrkGasHolland91
 """H2O MRK gas :cite:p:`HP91`"""
-H2O_mrk_liquid_holland91: RealGasExtendedProtocol = H2OMrkLiquidHolland91
+H2O_mrk_liquid_holland91: RealGasProtocol = H2OMrkLiquidHolland91
 """H2O MRK liquid :cite:p:`HP91`"""
 
 coefficients_P: tuple[float, ...] = CorrespondingStatesUnitConverter.convert_virial_coefficients(
@@ -747,65 +745,65 @@ mean that every virial coefficient has been multiplied by 1e-2 compared to the v
 :cite:t:`HP91{Table 2}`.
 """
 experimental_calibration_holland91: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
-    100, 4000, 0.1, 50e9
+    100, 4000, 0.1, 50e3
 )
 """Experimental calibration for :cite:`HP91,HP11` models"""
 
-CH4_cork_cs_holland91: RealGasExtendedProtocol = CORK(
+CH4_cork_cs_holland91: RealGasProtocol = CORK(
     CH4_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CH4_g")
 )
 """CH4 CORK corresponding states :cite:p:`HP91`"""
-CH4_cork_cs_holland91_bounded: RealGasExtendedProtocol = RealGasBounded(
+CH4_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
     CH4_cork_cs_holland91, experimental_calibration_holland91
 )
 """CH4 CORK corresponding states bounded :cite:p:`HP91`"""
-CO_cork_cs_holland91: RealGasExtendedProtocol = CORK(
+CO_cork_cs_holland91: RealGasProtocol = CORK(
     CO_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO_g")
 )
 """CO CORK corresponding states :cite:p:`HP91`"""
-CO_cork_cs_holland91_bounded: RealGasExtendedProtocol = RealGasBounded(
+CO_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
     CO_cork_cs_holland91, experimental_calibration_holland91
 )
 """CO CORK corresponding states bounded :cite:p:`HP91`"""
-CO2_cork_cs_holland91: RealGasExtendedProtocol = CORK(
+CO2_cork_cs_holland91: RealGasProtocol = CORK(
     CO2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO2_g")
 )
 """CO2 CORK corresponding states :cite:p:`HP91`"""
-CO2_cork_cs_holland91_bounded: RealGasExtendedProtocol = RealGasBounded(
+CO2_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
     CO2_cork_cs_holland91, experimental_calibration_holland91
 )
 """CO2 CORK corresponding states bounded :cite:p:`HP91`"""
-H2_cork_cs_holland91: RealGasExtendedProtocol = CORK(
+H2_cork_cs_holland91: RealGasProtocol = CORK(
     H2_mrk_cs_holland91,
     virial_compensation_corresponding_states,
     select_critical_data("H2_g_Holland"),
 )
 """H2 CORK corresponding states :cite:p:`HP91`"""
-H2_cork_cs_holland91_bounded: RealGasExtendedProtocol = RealGasBounded(
+H2_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
     H2_cork_cs_holland91, experimental_calibration_holland91
 )
 """H2 CORK corresponding states bounded :cite:p:`HP91`"""
-H2S_cork_cs_holland11: RealGasExtendedProtocol = CORK(
+H2S_cork_cs_holland11: RealGasProtocol = CORK(
     H2S_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("H2S_g")
 )
 """H2S CORK corresponding states :cite:p:`HP91`"""
-H2S_cork_cs_holland11_bounded: RealGasExtendedProtocol = RealGasBounded(
+H2S_cork_cs_holland11_bounded: RealGasProtocol = RealGasBounded(
     H2S_cork_cs_holland11, experimental_calibration_holland91
 )
 """H2S CORK corresponding states bounded :cite:p:`HP91`"""
-N2_cork_cs_holland91: RealGasExtendedProtocol = CORK(
+N2_cork_cs_holland91: RealGasProtocol = CORK(
     N2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("N2_g")
 )
 """N2 CORK corresponding states :cite:p:`HP91`"""
-N2_cork_cs_holland91_bounded: RealGasExtendedProtocol = RealGasBounded(
+N2_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
     N2_cork_cs_holland91, experimental_calibration_holland91
 )
 """N2 CORK corresponding states bounded :cite:p:`HP91`"""
-S2_cork_cs_holland11: RealGasExtendedProtocol = CORK(
+S2_cork_cs_holland11: RealGasProtocol = CORK(
     S2_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("S2_g")
 )
 """S2 CORK corresponding states :cite:p:`HP91`"""
-S2_cork_cs_holland11_bounded: RealGasExtendedProtocol = RealGasBounded(
+S2_cork_cs_holland11_bounded: RealGasProtocol = RealGasBounded(
     S2_cork_cs_holland11, experimental_calibration_holland91
 )
 """S2 CORK corresponding states bounded :cite:p:`HP91`"""
@@ -866,7 +864,7 @@ H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((8.0331e-2, 0), 0.25),
     2000,
 )
-H2O_cork_holland98: RealGasExtendedProtocol = CORK(
+H2O_cork_holland98: RealGasProtocol = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
 """H2O cork :cite:p:`HP98`

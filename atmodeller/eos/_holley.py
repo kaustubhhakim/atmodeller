@@ -19,8 +19,9 @@
 import logging
 
 from atmodeller.constants import ATMOSPHERE
+from atmodeller.eos.aggregators import RealGasBounded
 from atmodeller.eos.classes import BeattieBridgeman
-from atmodeller.eos.core import RealGas, RealGasBounded
+from atmodeller.eos.core import RealGas
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 

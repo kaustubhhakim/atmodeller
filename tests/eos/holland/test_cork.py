@@ -22,7 +22,7 @@ import logging
 
 from atmodeller import debug_logger
 from atmodeller.eos.library import get_eos_models
-from atmodeller.interfaces import RealGasExtendedProtocol
+from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8
@@ -38,132 +38,132 @@ eos_models: dict = get_eos_models()
 
 def test_H2O_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 2a}`"""
-    model: RealGasExtendedProtocol = eos_models["H2O_cork_holland91"]
+    model: RealGasProtocol = eos_models["H2O_cork_holland91"]
     expected: float = 47.502083040419844 * unit_conversion.cm3_to_m3
     check_values.volume(873, 1000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 7}`"""
-    model: RealGasExtendedProtocol = eos_models["CO2_cork_holland91"]
+    model: RealGasProtocol = eos_models["CO2_cork_holland91"]
     expected: float = 96.13326116472262 * unit_conversion.cm3_to_m3
     check_values.volume(873, 1000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8a}`"""
-    model: RealGasExtendedProtocol = eos_models["CO_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CO_cork_cs_holland91"]
     expected: float = 131.475184896045 * unit_conversion.cm3_to_m3
     check_values.volume(1173, 1000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO_volume_2kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8a}`"""
-    model: RealGasExtendedProtocol = eos_models["CO_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CO_cork_cs_holland91"]
     expected: float = 71.32153159834933 * unit_conversion.cm3_to_m3
     check_values.volume(973, 2000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO_volume_4kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8a}`"""
-    model: RealGasExtendedProtocol = eos_models["CO_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CO_cork_cs_holland91"]
     expected: float = 62.22167162862537 * unit_conversion.cm3_to_m3
     check_values.volume(1473, 4000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CH4_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8b}`"""
-    model: RealGasExtendedProtocol = eos_models["CH4_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CH4_cork_cs_holland91"]
     expected: float = 131.6743085645421 * unit_conversion.cm3_to_m3
     check_values.volume(1173, 1000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CH4_volume_2kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8b}`"""
-    model: RealGasExtendedProtocol = eos_models["CH4_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CH4_cork_cs_holland91"]
     expected: float = 72.14376119913776 * unit_conversion.cm3_to_m3
     check_values.volume(973, 2000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CH4_volume_4kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 8b}`"""
-    model: RealGasExtendedProtocol = eos_models["CH4_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CH4_cork_cs_holland91"]
     expected: float = 63.106094264549 * unit_conversion.cm3_to_m3
     check_values.volume(1473, 4000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_volume_500bar(check_values) -> None:
     """:cite:t:`HP91{Figure 8c}`"""
-    model: RealGasExtendedProtocol = eos_models["H2_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["H2_cork_cs_holland91"]
     expected: float = 149.1657987388235 * unit_conversion.cm3_to_m3
     check_values.volume(773, 500, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_volume_1800bar(check_values) -> None:
     """:cite:t:`HP91{Figure 8c}`"""
-    model: RealGasExtendedProtocol = eos_models["H2_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["H2_cork_cs_holland91"]
     expected: float = 55.04174839002075 * unit_conversion.cm3_to_m3
     check_values.volume(773, 1800, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2_volume_10kb(check_values) -> None:
     """:cite:t:`HP91{Figure 8c}`"""
-    model: RealGasExtendedProtocol = eos_models["H2_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["H2_cork_cs_holland91"]
     expected: float = 20.67497630046999 * unit_conversion.cm3_to_m3
     check_values.volume(773, 10000, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2(check_values) -> None:
     """H2"""
-    model: RealGasExtendedProtocol = eos_models["H2_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["H2_cork_cs_holland91"]
     expected: float = 4.672042007568433
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO(check_values) -> None:
     """CO"""
-    model: RealGasExtendedProtocol = eos_models["CO_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CO_cork_cs_holland91"]
     expected: float = 7.737070657107842
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CH4(check_values) -> None:
     """CH4"""
-    model: RealGasExtendedProtocol = eos_models["CH4_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CH4_cork_cs_holland91"]
     expected: float = 8.013532244610671
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_simple_CO2(check_values) -> None:
     """Simple CO2"""
-    model: RealGasExtendedProtocol = eos_models["CO2_cork_cs_holland91"]
+    model: RealGasProtocol = eos_models["CO2_cork_cs_holland91"]
     expected: float = 7.120242298956865
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2_at_P0(check_values) -> None:
     """CO2 below P0 so virial contribution excluded"""
-    model: RealGasExtendedProtocol = eos_models["CO2_cork_holland98"]
+    model: RealGasProtocol = eos_models["CO2_cork_holland98"]
     expected: float = 1.5754570751655304
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2_above_P0(check_values) -> None:
     """CO2 above P0 so virial contribution included"""
-    model: RealGasExtendedProtocol = eos_models["CO2_cork_holland98"]
+    model: RealGasProtocol = eos_models["CO2_cork_holland98"]
     expected: float = 7.144759853226838
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_above_Tc_above_P0(check_values) -> None:
     """H2O above Tc and above P0"""
-    model: RealGasExtendedProtocol = eos_models["H2O_cork_holland98"]
+    model: RealGasProtocol = eos_models["H2O_cork_holland98"]
     expected: float = 1.3444013638026706
     check_values.fugacity_coefficient(2000, 5e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_below_Tc_above_P0(check_values) -> None:
     """H2O below Tc and above P0"""
-    model: RealGasExtendedProtocol = eos_models["H2O_cork_holland98"]
+    model: RealGasProtocol = eos_models["H2O_cork_holland98"]
     expected: float = 0.39074941260585533
     check_values.fugacity_coefficient(600, 10e3, model, expected, rtol=RTOL, atol=ATOL)

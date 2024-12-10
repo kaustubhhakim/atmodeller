@@ -23,10 +23,10 @@ DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory, which is the same as the package directory"""
 
 # Expose the public API
+from atmodeller.eos.aggregators import RealGasBounded  # noqa: E402, F401
 from atmodeller.eos.classes import (  # noqa: E402, F401
     BeattieBridgeman,
     Chabrier,
     IdealGas,
 )
-from atmodeller.eos.core import RealGas, RealGasBounded  # noqa: E402, F401
 from atmodeller.eos.library import get_eos_models  # noqa: E402, F401

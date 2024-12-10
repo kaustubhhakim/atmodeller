@@ -26,15 +26,14 @@ from typing import Any, Callable
 
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array, grad, jit, lax
+from jax import Array, grad, jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.interfaces import RealGasExtendedProtocol
+from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata.core import CriticalData
 from atmodeller.utilities import (
-    ExperimentalCalibrationNew,
     safe_exp,
 )
 
@@ -772,16 +771,16 @@ class CORK(RealGas):
     """
 
     def __init__(
-        self, mrk: RealGasExtendedProtocol, virial: VirialCompensation, critical_data: CriticalData
+        self, mrk: RealGasProtocol, virial: VirialCompensation, critical_data: CriticalData
     ):
-        self._mrk: RealGasExtendedProtocol = mrk
+        self._mrk: RealGasProtocol = mrk
         self._virial: VirialCompensation = virial
         self._critical_data: CriticalData = critical_data
 
     @override
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Log fugacity :cite:p:`HP91{Equation 8}`
+        """Log fugacity :cite:p:`HP91{Equation 8}`
 
         Args:
             temperature: Temperature in K
@@ -841,195 +840,3 @@ class CORK(RealGas):
     def tree_unflatten(cls, aux_data, children) -> Self:
         del children
         return cls(**aux_data)
-
-
-@register_pytree_node_class
-class RealGasBounded(RealGas):
-    """A real gas equation of state that is bounded
-
-    Args:
-        real_gas: Real gas equation of state to bound
-        calibration: Calibration that encodes the bounds
-    """
-
-    def __init__(
-        self,
-        real_gas: RealGasExtendedProtocol,
-        calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(),
-    ):
-        super().__init__()
-        self._real_gas: RealGasExtendedProtocol = real_gas
-        self._calibration: ExperimentalCalibrationNew = calibration
-        self._pressure_min: Array = jnp.array(calibration.pressure_min)
-        self._pressure_max: Array = jnp.array(calibration.pressure_max)
-
-    @property
-    def calibration(self) -> ExperimentalCalibrationNew:
-        """Experimental calibration"""
-        return self._calibration
-
-    @override
-    @jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log fugacity that is bounded
-
-        Outside of the experimental calibration there is no guarantee that the real gas fugacity
-        is sensible and it is difficult a priori to predict how reasonable the extrapolation will
-        be. Therefore, below the minimum calibration pressure we assume an ideal gas, and above the
-        calibration pressure we assume a fixed fugacity coefficient determined at the maximum
-        pressure. This maintains relatively smooth behaviour of the function beyond the calibrated
-        values, which is often required to guide the solver.
-
-        This method could also implement a bound on temperature, if eventually required or desired.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity
-        """
-        pressure_clipped: Array = jnp.clip(pressure, self._pressure_min, self._pressure_max)
-        # jax.debug.print("pressure_clipped = {out}", out=pressure_clipped)
-
-        # Calculate log fugacity in different regions
-        log_fugacity_below: ArrayLike = self.ideal_log_fugacity(temperature, pressure_clipped)
-        # jax.debug.print("log_fugacity_below = {out}", out=log_fugacity_below)
-        # Evaluating the function within bounds helps to ensure a more stable numerical solution
-        log_fugacity_in_range: ArrayLike = self._real_gas.log_fugacity(
-            temperature, pressure_clipped
-        )
-        # jax.debug.print("log_fugacity_in_range = {out}", out=log_fugacity_in_range)
-        log_fugacity_at_Pmax: ArrayLike = self._real_gas.log_fugacity(
-            temperature, self._pressure_max
-        )
-        # jax.debug.print("log_fugacity_at_Pmax = {out}", out=log_fugacity_at_Pmax)
-
-        # Compute the difference in volume relative to ideal at the maximum calibration pressure
-        dvolume: ArrayLike = self._real_gas.volume(
-            temperature, self._pressure_max
-        ) - self.ideal_volume(temperature, self._pressure_max)
-
-        # VdP taking account of the extrapolated volume change above the calibration pressure.
-        log_fugacity_above: ArrayLike = (
-            log_fugacity_at_Pmax
-            + jnp.log(pressure / self._pressure_max)
-            + dvolume * (pressure - self._pressure_max) / (GAS_CONSTANT_BAR * temperature)
-        )
-
-        log_fugacity = lax.select(
-            pressure > self._pressure_min, log_fugacity_in_range, log_fugacity_below
-        )
-        log_fugacity = lax.select(pressure < self._pressure_max, log_fugacity, log_fugacity_above)
-
-        return log_fugacity
-
-    @override
-    @jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        pressure_clipped: Array = jnp.clip(pressure, self._pressure_min, self._pressure_max)
-
-        # Calculate volume in different regions
-        ideal_volume: ArrayLike = self.ideal_volume(temperature, pressure)
-        # jax.debug.print("volume_below = {out}", out=volume_below)
-        # Evaluate the function within bounds to help to ensure a more stable numerical solution
-        volume_in_range: ArrayLike = self._real_gas.volume(temperature, pressure_clipped)
-
-        # Compute the difference in volume relative to ideal at the maximum calibration pressure
-        dvolume: ArrayLike = self._real_gas.volume(
-            temperature, self._pressure_max
-        ) - self.ideal_volume(temperature, self._pressure_max)
-
-        # Determine the appropriate volume based on pressure ranges
-        volume = lax.select(pressure > self._pressure_min, volume_in_range, ideal_volume)
-        volume = lax.select(pressure < self._pressure_max, volume, ideal_volume + dvolume)
-
-        return volume
-
-    @override
-    @jit
-    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
-
-    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
-        children: tuple = ()
-        aux_data = {"real_gas": self._real_gas, "calibration": self._calibration}
-        return (children, aux_data)
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
-
-
-# @dataclass(kw_only=True)
-# class CombinedEOSModel(RealGas):
-#     """Combines multiple EOS models for different pressure ranges into a single EOS model.
-
-#     Args:
-#         models: EOS models ordered by increasing pressure from lowest to highest
-#         upper_pressure_bounds: Upper pressure bound in bar relevant to the EOS by position
-#     """
-
-#     models: tuple[RealGas, ...]
-#     """EOS models ordered by increasing pressure from lowest to highest"""
-#     upper_pressure_bounds: Array
-#     """Upper pressure bound in bar relevant to the EOS by position"""
-
-#     def _get_index(self, pressure: ArrayLike) -> int:
-#         """Gets the index of the appropriate EOS model using the upper pressure bound
-
-#         Args:
-#             pressure: Pressure in bar
-
-#         Returns:
-#             Index of the relevant EOS model
-#         """
-
-#         def body_fun(i: int, carry: int) -> int:
-#             pressure_high: Array = self.upper_pressure_bounds[i]
-#             condition = pressure >= pressure_high
-# TODO: Careful. Maybe jnp.where is better for array-based operations
-#             new_index: int = lax.cond(condition, lambda _: i + 1, lambda _: carry, None)
-
-#             return new_index
-
-#         init_carry: int = 0  # Initial carry value
-#         index = lax.fori_loop(0, len(self.upper_pressure_bounds), body_fun, init_carry)
-
-#         return index
-
-#     @override
-#     def volume(self, temperature: float, pressure: ArrayLike) -> Array:
-#         index = self._get_index(pressure)
-#         volume: Array = lax.switch(
-#             index, [model.volume for model in self.models], temperature, pressure
-#         )
-#         return volume
-
-#     @override
-#     def volume_integral(self, temperature: float, pressure: ArrayLike) -> Array:
-#         index: int = self._get_index(pressure)
-
-#         def compute_integral(i: int, pressure_high: ArrayLike, pressure_low: ArrayLike) -> Array:
-#             """Compute pressure integral."""
-#             return self.models[i].volume_integral(temperature, pressure_high) - self.models[
-#                 i
-#             ].volume_integral(temperature, pressure_low)
-
-#         def case_0() -> Array:
-#             return self.models[0].volume_integral(temperature, pressure)
-
-#         def case_1() -> Array:
-#             volume0 = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
-#             dvolume = compute_integral(1, pressure, self.upper_pressure_bounds[0])
-#             return volume0 + dvolume
-
-#         def case_2() -> Array:
-#             volume0 = self.models[0].volume_integral(temperature, self.upper_pressure_bounds[0])
-#             dvolume0 = compute_integral(
-#                 1, self.upper_pressure_bounds[1], self.upper_pressure_bounds[0]
-#             )
-#             dvolume1 = compute_integral(2, pressure, self.upper_pressure_bounds[1])
-#             return volume0 + dvolume0 + dvolume1
-
-#         return lax.switch(index, [case_0, case_1, case_2])

@@ -366,7 +366,7 @@ class CriticalData(NamedTuple):
         pressure: Critical pressure in bar
     """
 
-    temperature: float
+    temperature: float = 1
     """Critical temperature in K"""
-    pressure: float
+    pressure: float = 1
     """Critical pressure in bar"""

@@ -16,6 +16,9 @@
 #
 """Tests for the EOS models from :cite:t:`HWZ58`"""
 
+import logging
+
+from atmodeller import debug_logger
 from atmodeller.utilities import unit_conversion
 
 # Probably due to rounding of the model parameters in the paper, some compressibilities in the
@@ -26,6 +29,8 @@ ATOL: float = 1.0e-4
 """Absolute tolerance"""
 MODEL_SUFFIX: str = "beattie_holley58"
 """Suffix of the :cite:t:`HWZ58` models"""
+
+logger: logging.Logger = debug_logger()
 
 
 def test_H2_low(check_values) -> None:

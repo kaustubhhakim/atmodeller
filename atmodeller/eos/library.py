@@ -30,26 +30,27 @@ from pathlib import Path
 
 from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
+from atmodeller.eos._saxena import get_saxena_eos_models
+from atmodeller.eos.aggregators import RealGasBounded
 from atmodeller.eos.classes import Chabrier
-from atmodeller.eos.core import RealGas, RealGasBounded
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibrationNew
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-H2_chabrier21: RealGas = Chabrier(Path("TABLE_H_TP_v1"))
+H2_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
 # TODO: Update calibration bounds. Kaustubh to do.
-H2_chabrier21_bounded: RealGas = RealGasBounded(
+H2_chabrier21_bounded: RealGasProtocol = RealGasBounded(
     H2_chabrier21, ExperimentalCalibrationNew(100, 4000, 0.1, 50e9)
 )
-He_chabrier21: RealGas = Chabrier(Path("TABLE_HE_TP_v1"))
+He_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
-H2_He_Y0275_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0275_v1"))
+H2_He_Y0275_chabrier21: RealGasProtocol = Chabrier(Path("TABLEEOS_2021_TP_Y0275_v1"))
 """H2HeY0275 :cite:p:`CD21`"""
-H2_He_Y0292_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0292_v1"))
+H2_He_Y0292_chabrier21: RealGasProtocol = Chabrier(Path("TABLEEOS_2021_TP_Y0292_v1"))
 """H2HeY0292 :cite:p:`CD21`"""
-H2_He_Y0297_chabrier21: RealGas = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
+H2_He_Y0297_chabrier21: RealGasProtocol = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
 """H2HeY0297 :cite:p:`CD21`"""
 
 
@@ -77,5 +78,7 @@ def get_eos_models() -> dict[str, RealGasProtocol]:
     eos_models |= get_holley_eos_models()
     # Merge Holland and Powell models
     eos_models |= get_holland_eos_models()
+    # Merge Saxena models
+    eos_models |= get_saxena_eos_models()
 
     return eos_models
