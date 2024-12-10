@@ -386,6 +386,14 @@ class Chabrier(RealGas):
 
         return volume
 
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        log_fugacity: Array = self.log_fugacity(temperature, pressure)
+        volume_integral: Array = log_fugacity * GAS_CONSTANT_BAR * temperature
+
+        return volume_integral
+
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()
         aux_data = {"filename": self._filename}

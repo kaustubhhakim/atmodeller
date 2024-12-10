@@ -261,7 +261,7 @@ class RedlichKwongABC(RealGas):
 
         Returns:
             `a` parameter in
-            :math:`(\mathrm{m}^3\mathrm{mol}^{-1})^2\mathrm{K}^{1/2}\mathrm{bar}`
+            :math:`(\mathrm{m}^3\ \mathrm{mol}^{-1})^2\ \mathrm{K}^{1/2}\ \mathrm{bar}`
         """
 
     @abstractmethod
@@ -269,9 +269,10 @@ class RedlichKwongABC(RealGas):
         r"""Gets the `b` parameter
 
         Returns:
-            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`
+            `b` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
 
+    @override
     @jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral
@@ -619,7 +620,7 @@ class VirialCompensation:
             critical_data: Critical data
 
         Returns:
-            `a` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^{-1}`
+            `a` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}\ \mathrm{bar}^{-1}`
         """
         a: Array = (
             self.a_coefficients[1] * jnp.asarray(temperature)
@@ -640,7 +641,7 @@ class VirialCompensation:
             critical_data: Critical data
 
         Returns:
-            `b` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{2}`
+            `b` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}\ \mathrm{bar}^{-1/2}`
         """
         b: Array = (
             self.b_coefficients[1] * jnp.asarray(temperature)
@@ -659,7 +660,7 @@ class VirialCompensation:
             critical_data: Critical data
 
         Returns:
-            `c` parameter in :math:`\mathrm{m}^3\mathrm{mol}^{-1}\mathrm{bar}^\frac{-1}{4}`
+            `c` parameter in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}\ \mathrm{bar}^{-1/4}`
         """
         c: Array = (
             self.c_coefficients[1] * jnp.asarray(temperature)
@@ -807,9 +808,11 @@ class CORK(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        return self._mrk.volume(temperature, pressure) + self._virial.volume(
+        volume: Array = self._mrk.volume(temperature, pressure) + self._virial.volume(
             temperature, pressure, self._critical_data
         )
+
+        return volume
 
     @override
     @jit
@@ -823,9 +826,11 @@ class CORK(RealGas):
         Returns:
             Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
         """
-        return self._mrk.volume_integral(temperature, pressure) + self._virial.volume_integral(
-            temperature, pressure, self._critical_data
-        )
+        volume_integral: Array = self._mrk.volume_integral(
+            temperature, pressure
+        ) + self._virial.volume_integral(temperature, pressure, self._critical_data)
+
+        return volume_integral
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()
@@ -941,10 +946,9 @@ class RealGasBounded(RealGas):
 
         return volume
 
-    # # FIXME: TODO
-    # @override
-    # @jit
-    # def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()
