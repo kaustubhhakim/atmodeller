@@ -87,32 +87,30 @@ class RealGas(ABC):
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
 
-    # TODO: To include
-    # @abstractmethod
-    # def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-    #     r"""Volume integral in units required for internal Atmodeller operations.
+    @abstractmethod
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume integral in units required for internal Atmodeller operations.
 
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
-    #     Returns:
-    #         Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
-    #     """
+        Returns:
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+        """
 
-    # TODO: To include
-    # @jit
-    # def volume_integral_J(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-    #     r"""Volume integral in J
+    @jit
+    def volume_integral_J(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume integral in J
 
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
 
-    #     Returns:
-    #         Volume integral in :math:`\mathrm{J}\ \mathrm{mol}^{-1}
-    #     """
-    #     return 1e5 * self.volume_integral(temperature, pressure)
+        Returns:
+            Volume integral in :math:`\mathrm{J}\ \mathrm{mol}^{-1}
+        """
+        return 1e5 * self.volume_integral(temperature, pressure)
 
     @jit
     def dvolume_dpressure(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:

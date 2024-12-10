@@ -72,6 +72,11 @@ class IdealGas(PyTreeNoData, RealGas):
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         return self.ideal_volume(temperature, pressure)
 
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        return GAS_CONSTANT_BAR * temperature * self.log_fugacity(temperature, pressure)
+
 
 @register_pytree_node_class
 class BeattieBridgeman(RealGas):
@@ -231,6 +236,11 @@ class BeattieBridgeman(RealGas):
         # jax.debug.print("volume = {out}", out=volume)
 
         return volume
+
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        return GAS_CONSTANT_BAR * temperature * self.log_fugacity(temperature, pressure)
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
         children: tuple = ()
