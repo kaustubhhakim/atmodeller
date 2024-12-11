@@ -34,7 +34,7 @@ from atmodeller.eos._holley import get_holley_eos_models
 from atmodeller.eos._saxena import get_saxena_eos_models
 from atmodeller.eos.classes import Chabrier
 from atmodeller.interfaces import RealGasProtocol
-from atmodeller.utilities import ExperimentalCalibrationNew
+from atmodeller.utilities import ExperimentalCalibration
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ H2_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
 # TODO: Update calibration bounds. Kaustubh to do.
 H2_chabrier21_bounded: RealGasProtocol = RealGasBounded(
-    H2_chabrier21, ExperimentalCalibrationNew(100, 4000, 0.1, 50e9)
+    H2_chabrier21, ExperimentalCalibration(100, 4000, 0.1, 50e9)
 )
 He_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""

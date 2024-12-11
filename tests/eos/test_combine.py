@@ -22,7 +22,7 @@ from atmodeller import debug_logger
 from atmodeller.eos import IdealGas, get_eos_models
 from atmodeller.eos.aggregators import CombinedRealGas, CombinedRealGasRemoveSteps
 from atmodeller.interfaces import RealGasProtocol
-from atmodeller.utilities import ExperimentalCalibrationNew
+from atmodeller.utilities import ExperimentalCalibration
 
 logger: logging.Logger = debug_logger()
 
@@ -36,7 +36,7 @@ def test_bounded() -> None:
     model1: RealGasProtocol = eos_models["CH4_cork_cs_holland91"]
     models = [model0, model1]
 
-    experimental_calibration_holland91: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+    experimental_calibration_holland91: ExperimentalCalibration = ExperimentalCalibration(
         100, 4000, 0.1, 50e3
     )
     calibrations = [None, experimental_calibration_holland91]

@@ -26,7 +26,7 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller.interfaces import RedoxBufferProtocol
-from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
+from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -64,7 +64,7 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
         self.evaluation_pressure: ArrayLike | None = evaluation_pressure
 
     @property
-    def calibration(self) -> ExperimentalCalibrationNew:
+    def calibration(self) -> ExperimentalCalibration:
         """Experimental calibration"""
         return self._calibration
 
@@ -147,7 +147,7 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
 
     @override
     def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0):
-        self._calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+        self._calibration: ExperimentalCalibration = ExperimentalCalibration(
             pressure_max=27.5 * unit_conversion.GPa_to_bar
         )
         super().__init__(log10_shift, evaluation_pressure)
@@ -202,7 +202,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
     @override
     def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0):
         super().__init__(log10_shift, evaluation_pressure)
-        self._calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+        self._calibration: ExperimentalCalibration = ExperimentalCalibration(
             temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
         )
         self._a: tuple[float, ...] = (6.844864, 1.175691e-1, 1.143873e-3, 0, 0)
@@ -360,7 +360,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         self._high_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann21(
             log10_shift, evaluation_pressure
         )
-        self._calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+        self._calibration: ExperimentalCalibration = ExperimentalCalibration(
             pressure_max=100 * unit_conversion.GPa_to_bar
         )
 

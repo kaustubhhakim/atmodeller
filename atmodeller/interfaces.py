@@ -21,7 +21,7 @@ from typing import Protocol
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.utilities import ExperimentalCalibrationNew
+from atmodeller.utilities import ExperimentalCalibration
 
 
 class ActivityProtocol(Protocol):
@@ -54,14 +54,14 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
 
     log10_shift: ArrayLike
     evaluation_pressure: ArrayLike | None
-    _calibration: ExperimentalCalibrationNew
+    _calibration: ExperimentalCalibration
 
     def __init__(
         self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0
     ): ...
 
     @property
-    def calibration(self) -> ExperimentalCalibrationNew: ...
+    def calibration(self) -> ExperimentalCalibration: ...
 
     @property
     def value(self) -> ArrayLike:

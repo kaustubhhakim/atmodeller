@@ -32,7 +32,7 @@ from jax.typing import ArrayLike
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import RealGas
 from atmodeller.interfaces import RealGasProtocol
-from atmodeller.utilities import ExperimentalCalibrationNew
+from atmodeller.utilities import ExperimentalCalibration
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -59,10 +59,10 @@ class CombinedRealGasABC(RealGas, ABC):
     def __init__(
         self,
         real_gases: list[RealGas],
-        calibrations: list[ExperimentalCalibrationNew | None],
+        calibrations: list[ExperimentalCalibration | None],
     ):
         self._real_gases: list[RealGas] = real_gases
-        self._calibrations: list[ExperimentalCalibrationNew | None] = calibrations
+        self._calibrations: list[ExperimentalCalibration | None] = calibrations
         self._upper_pressure_bounds: Array = self._get_upper_pressure_bounds()
 
     @property
@@ -90,7 +90,7 @@ class CombinedRealGasABC(RealGas, ABC):
                     logger.debug("Last entry has no calibration")
                     continue
                 try:
-                    assert isinstance(calibration_next, ExperimentalCalibrationNew)
+                    assert isinstance(calibration_next, ExperimentalCalibration)
                 except AssertionError:
                     msg = "'None' entries must be bracketed by experimental calibrations"
                     raise ValueError(msg)
@@ -278,16 +278,16 @@ class RealGasBounded(RealGas):
     def __init__(
         self,
         real_gas: RealGasProtocol,
-        calibration: ExperimentalCalibrationNew = ExperimentalCalibrationNew(),
+        calibration: ExperimentalCalibration = ExperimentalCalibration(),
     ):
         super().__init__()
         self._real_gas: RealGasProtocol = real_gas
-        self._calibration: ExperimentalCalibrationNew = calibration
+        self._calibration: ExperimentalCalibration = calibration
         self._pressure_min: Array = jnp.array(calibration.pressure_min)
         self._pressure_max: Array = jnp.array(calibration.pressure_max)
 
     @property
-    def calibration(self) -> ExperimentalCalibrationNew:
+    def calibration(self) -> ExperimentalCalibration:
         """Experimental calibration"""
         return self._calibration
 

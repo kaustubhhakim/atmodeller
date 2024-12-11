@@ -345,7 +345,7 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> Arra
 
 
 # TODO: Eventually rename to ExperimentalCalibration once the old class is removed.
-class ExperimentalCalibrationNew(NamedTuple):
+class ExperimentalCalibration(NamedTuple):
     """Experimental calibration
 
     Args:

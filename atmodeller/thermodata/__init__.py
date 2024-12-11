@@ -24,13 +24,13 @@
 # """Data directory, which is the same as the package directory"""
 
 # Expose public API
-from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: F401
-from atmodeller.thermodata.core import (  # noqa: F401
+from atmodeller.thermodata._core import (  # noqa: F401
     CondensateActivity,
     CriticalData,
     SpeciesData,
     ThermoCoefficients,
 )
+from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: F401
 from atmodeller.thermodata.library import (  # noqa: F401
     get_thermodata,
     select_critical_data,

@@ -26,10 +26,14 @@ from jax.typing import ArrayLike
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, Species
-from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
+from atmodeller.interfaces import (
+    FugacityConstraintProtocol,
+    RedoxBufferProtocol,
+    SolubilityProtocol,
+)
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
-from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 # from atmodeller.constraints import (

@@ -39,7 +39,7 @@ from atmodeller.eos.core import (
 )
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData, select_critical_data
-from atmodeller.utilities import ExperimentalCalibrationNew, PyTreeNoData
+from atmodeller.utilities import ExperimentalCalibration, PyTreeNoData
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -744,7 +744,7 @@ whether or not the virial contribution is added. The unit conversions to SI and 
 mean that every virial coefficient has been multiplied by 1e-2 compared to the values in 
 :cite:t:`HP91{Table 2}`.
 """
-experimental_calibration_holland91: ExperimentalCalibrationNew = ExperimentalCalibrationNew(
+experimental_calibration_holland91: ExperimentalCalibration = ExperimentalCalibration(
     100, 4000, 0.1, 50e3
 )
 """Experimental calibration for :cite:`HP91,HP11` models"""
@@ -827,7 +827,7 @@ CO2_cork_holland91: RealGas = CORK(
 )
 """CO2 cork :cite:p:`HP91`
 
-TODO: ExperimentalCalibrationNew(400, 1900, 0, 50e3)
+TODO: ExperimentalCalibration(400, 1900, 0, 50e3)
 """
 H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((-3.2297554e-3, 2.2215221e-6), 1.0),

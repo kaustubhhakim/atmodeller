@@ -27,10 +27,10 @@ from atmodeller import INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, SolverParameters, Species
 from atmodeller.eos.library import get_eos_models
-from atmodeller.interfaces import RealGasProtocol, SolubilityProtocol
+from atmodeller.interfaces import RealGasProtocol, RedoxBufferProtocol, SolubilityProtocol
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
-from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import OptxSolver, earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()

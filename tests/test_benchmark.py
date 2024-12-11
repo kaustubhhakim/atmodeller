@@ -25,8 +25,9 @@ from jax.typing import ArrayLike
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
+from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.output import Output
-from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()

@@ -33,7 +33,7 @@ from atmodeller.eos._aggregators import CombinedRealGasRemoveSteps
 from atmodeller.eos.core import RealGas
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData, select_critical_data
-from atmodeller.utilities import ExperimentalCalibrationNew
+from atmodeller.utilities import ExperimentalCalibration
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -392,7 +392,7 @@ pressure.
 H2_SS92: RealGasProtocol = CombinedRealGasRemoveSteps(
     [_H2_low_pressure_SS92, _H2_high_pressure_SS92],
     [
-        ExperimentalCalibrationNew(pressure_max=1000),
+        ExperimentalCalibration(pressure_max=1000),
         None,  # No limit on the maximum pressure for the high pressure model
     ],
 )
@@ -478,7 +478,7 @@ _H2S_high_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
 
 H2S_SS92: RealGasProtocol = CombinedRealGasRemoveSteps(
     [_H2S_low_pressure_SS92, _H2S_high_pressure_SS92],
-    [ExperimentalCalibrationNew(pressure_max=500), None],
+    [ExperimentalCalibration(pressure_max=500), None],
 )
 """H2S EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1d}`
 
@@ -536,8 +536,8 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
     combined_model: RealGasProtocol = CombinedRealGasRemoveSteps(
         [low_pressure, medium_pressure, high_pressure],
         [
-            ExperimentalCalibrationNew(pressure_max=1000),
-            ExperimentalCalibrationNew(pressure_min=1000, pressure_max=5000),
+            ExperimentalCalibration(pressure_max=1000),
+            ExperimentalCalibration(pressure_min=1000, pressure_max=5000),
             None,
         ],
     )
