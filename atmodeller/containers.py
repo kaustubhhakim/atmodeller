@@ -52,8 +52,7 @@ from atmodeller.interfaces import (
     SolubilityProtocol,
 )
 from atmodeller.solubility.library import NoSolubility
-from atmodeller.thermodata import select_thermodata
-from atmodeller.thermodata.core import CondensateActivity, SpeciesData
+from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
 from atmodeller.utilities import (
     OptxSolver,
     get_log_number_density_from_log_pressure,

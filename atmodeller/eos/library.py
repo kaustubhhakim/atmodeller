@@ -28,10 +28,10 @@ Usage:
 import logging
 from pathlib import Path
 
+from atmodeller.eos._aggregators import RealGasBounded
 from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
 from atmodeller.eos._saxena import get_saxena_eos_models
-from atmodeller.eos.aggregators import RealGasBounded
 from atmodeller.eos.classes import Chabrier
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibrationNew

@@ -32,7 +32,7 @@ from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasProtocol
-from atmodeller.thermodata.core import CriticalData
+from atmodeller.thermodata import CriticalData
 from atmodeller.utilities import (
     safe_exp,
 )

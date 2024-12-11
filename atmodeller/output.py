@@ -56,7 +56,8 @@ from atmodeller.engine import (
     get_total_pressure,
     objective_function,
 )
-from atmodeller.thermodata.redox_buffers import IronWustiteBuffer, RedoxBufferProtocol
+from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion
 
 if TYPE_CHECKING:

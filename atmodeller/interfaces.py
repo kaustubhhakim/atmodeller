@@ -21,6 +21,8 @@ from typing import Protocol
 from jax import Array
 from jax.typing import ArrayLike
 
+from atmodeller.utilities import ExperimentalCalibrationNew
+
 
 class ActivityProtocol(Protocol):
     def log_activity(
@@ -45,6 +47,31 @@ class RealGasProtocol(ActivityProtocol, Protocol):
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+
+
+class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
+    """Redox buffer protocol"""
+
+    log10_shift: ArrayLike
+    evaluation_pressure: ArrayLike | None
+    _calibration: ExperimentalCalibrationNew
+
+    def __init__(
+        self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0
+    ): ...
+
+    @property
+    def calibration(self) -> ExperimentalCalibrationNew: ...
+
+    @property
+    def value(self) -> ArrayLike:
+        return self.log10_shift
+
+    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
 class SolubilityProtocol(Protocol):

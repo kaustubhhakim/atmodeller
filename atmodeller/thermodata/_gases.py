@@ -19,7 +19,7 @@
 https://ntrs.nasa.gov/citations/20020085330
 """
 
-from atmodeller.thermodata.core import CriticalData, SpeciesData, ThermoCoefficients
+from atmodeller.thermodata import CriticalData, SpeciesData, ThermoCoefficients
 
 _C_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (8.545763110e4, 8.410597850e4, 2.355273444e6),

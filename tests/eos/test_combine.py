@@ -20,7 +20,7 @@ import logging
 
 from atmodeller import debug_logger
 from atmodeller.eos import IdealGas, get_eos_models
-from atmodeller.eos.aggregators import CombinedRealGas, CombinedRealGasPhaseTransition
+from atmodeller.eos.aggregators import CombinedRealGas, CombinedRealGasRemoveSteps
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibrationNew
 
@@ -42,7 +42,7 @@ def test_bounded() -> None:
     calibrations = [None, experimental_calibration_holland91]
 
     a = CombinedRealGas(models, calibrations)
-    a = CombinedRealGasPhaseTransition(models, calibrations)
+    a = CombinedRealGasRemoveSteps(models, calibrations)
 
     b = a._get_index(0.01)
     logger.debug("b = %s", b)

@@ -28,7 +28,7 @@ from jax.typing import ArrayLike
 from scipy.constants import kilo
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.eos.aggregators import RealGasBounded
+from atmodeller.eos._aggregators import RealGasBounded
 from atmodeller.eos.core import (
     CORK,
     RealGas,

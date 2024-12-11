@@ -84,13 +84,18 @@ class CombinedRealGasABC(RealGas, ABC):
 
         for nn, calibration in enumerate(self._calibrations):
             if calibration is None:
-                calibration_next = self._calibrations[nn + 1]
+                try:
+                    calibration_next = self._calibrations[nn + 1]
+                except IndexError:
+                    logger.debug("Last entry has no calibration")
+                    continue
                 try:
                     assert isinstance(calibration_next, ExperimentalCalibrationNew)
                 except AssertionError:
-                    msg: str = "'None' entries must be bracketed by experimental calibrations"
+                    msg = "'None' entries must be bracketed by experimental calibrations"
                     raise ValueError(msg)
 
+                # Minimum pressure of the next entry used as the maximum pressure of this entry.
                 pressure_bound: float = calibration_next.pressure_min
             else:
                 try:
@@ -181,7 +186,7 @@ class CombinedRealGas(CombinedRealGasABC):
 
 
 @register_pytree_node_class
-class CombinedRealGasPhaseTransition(CombinedRealGasABC):
+class CombinedRealGasRemoveSteps(CombinedRealGasABC):
     """Combined real gas EOS with separate integrations for each EOS
 
     This class computes the contribution to the volume integral separately for each EOS based on

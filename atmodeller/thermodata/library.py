@@ -18,6 +18,7 @@
 
 import logging
 
+from atmodeller.thermodata import CriticalData, SpeciesData
 from atmodeller.thermodata._condensates import (
     C_cr,
     H2O_cr,
@@ -49,7 +50,6 @@ from atmodeller.thermodata._gases import (
     SO_g,
     critical_data,
 )
-from atmodeller.thermodata.core import CriticalData, SpeciesData
 
 logger: logging.Logger = logging.getLogger(__name__)
 

@@ -18,14 +18,14 @@
 
 import sys
 from abc import ABC, abstractmethod
-from typing import Protocol, Type
+from typing import Type
 
 import jax.numpy as jnp
 from jax import Array, jit
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
-from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import ExperimentalCalibrationNew, unit_conversion
 
 if sys.version_info < (3, 11):
@@ -37,31 +37,6 @@ if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
-
-
-class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
-    """Redox buffer protocol"""
-
-    log10_shift: ArrayLike
-    evaluation_pressure: ArrayLike | None
-    _calibration: ExperimentalCalibrationNew
-
-    def __init__(
-        self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0
-    ): ...
-
-    @property
-    def calibration(self) -> ExperimentalCalibrationNew: ...
-
-    @property
-    def value(self) -> ArrayLike:
-        return self.log10_shift
-
-    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
-
-    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
-
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
 class RedoxBuffer(ABC, RedoxBufferProtocol):
