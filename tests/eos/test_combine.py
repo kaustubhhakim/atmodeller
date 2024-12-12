@@ -19,8 +19,7 @@
 import logging
 
 from atmodeller import debug_logger
-from atmodeller.eos import IdealGas, get_eos_models
-from atmodeller.eos.aggregators import CombinedRealGas, CombinedRealGasRemoveSteps
+from atmodeller.eos import CombinedRealGas, CombinedRealGasRemoveSteps, IdealGas, get_eos_models
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration
 
