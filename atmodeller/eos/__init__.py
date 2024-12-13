@@ -31,6 +31,6 @@ from atmodeller.eos._aggregators import (  # noqa: E402, F401
 from atmodeller.eos.classes import (  # noqa: E402, F401
     BeattieBridgeman,
     Chabrier,
-    IdealGas,
 )
+from atmodeller.eos.core import IdealGas  # noqa: E402, F401
 from atmodeller.eos.library import get_eos_models  # noqa: E402, F401

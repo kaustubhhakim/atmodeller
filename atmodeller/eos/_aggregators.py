@@ -30,7 +30,7 @@ from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.eos.core import RealGas
+from atmodeller.eos.core import IdealGas, RealGas
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration
 
@@ -50,19 +50,40 @@ logger: logging.Logger = logging.getLogger(__name__)
 class CombinedRealGasABC(RealGas, ABC):
     """Base class for combining real gas EOS
 
+    This class allows EOS to be combined, with additional options that specify how extrapolation
+    occurs below the minimum calibration pressure and above the maximum calibration pressure.
+    Reasonable extrapolation behaviour is required to ensure that the function is bounded to avoid
+    throwing NaNs or infs which will crash the solver. Physically, it is reasonable to extend the
+    lower bound using the ideal gas law and the upper bound assuming a linear pressure dependence
+    of the compressibility factor.
+
     Args:
         real_gases: Real gases to combine
         calibrations: Experimental calibrations (or None) that correspond by position to the
             entries in `real_gases`.
+        lower_bound: Extrapolate below the minimum pressure bound using an ideal gas model.
+            Defaults to True.
+        upper_bound: Extrapolate above the maximum pressure bound using a EOS that imposes a
+            compressibility factor as a function of pressure. Defaults to True.
+        dzdp: Constant compressibility (pressure) gradient for the upper bound extrapolation.
+            Defaults to 0.
     """
 
     def __init__(
         self,
-        real_gases: list[RealGas],
-        calibrations: list[ExperimentalCalibration | None],
+        real_gases: list[RealGasProtocol],
+        calibrations: list[ExperimentalCalibration],
+        lower_bound: bool = True,
+        upper_bound: bool = True,
+        dzdp: float = 0.0,
     ):
-        self._real_gases: list[RealGas] = real_gases
-        self._calibrations: list[ExperimentalCalibration | None] = calibrations
+        self._real_gases: list[RealGasProtocol] = real_gases
+        self._calibrations: list[ExperimentalCalibration] = calibrations
+        self._upper_bound: bool = upper_bound
+        self._dzdp: float = dzdp
+        if lower_bound:
+            self._append_lower_bound()
+        logger.debug("After append lower bound")
         self._upper_pressure_bounds: Array = self._get_upper_pressure_bounds()
 
     @property
@@ -72,6 +93,21 @@ class CombinedRealGasABC(RealGas, ABC):
     @property
     def volume_integral_functions(self) -> list[Callable]:
         return [eos.volume_integral for eos in self._real_gases]
+
+    def _append_lower_bound(self) -> None:
+        """Appends the lower bound"""
+        logger.debug("appending lower bound")
+        self._real_gases.insert(0, IdealGas())
+        # Ensure continuity of the ideal gas law with the first user-defined EOS
+        try:
+            assert self._calibrations[0].pressure_min is not None
+        except AssertionError:
+            msg: str = "Minimum pressure cannot be None when lower_bound=True"
+            raise ValueError(msg)
+
+        pressure_max: float = self._calibrations[0].pressure_min
+        calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_max=pressure_max)
+        self._calibrations.insert(0, calibration)
 
     # Do not jit. Causes problems with initialization.
     def _get_upper_pressure_bounds(self) -> Array:
@@ -83,28 +119,17 @@ class CombinedRealGasABC(RealGas, ABC):
         upper_pressure_bounds: list[float] = []
 
         for nn, calibration in enumerate(self._calibrations):
+            # This deals with the upper bound being False, in which case the final EOS is used
+            # for the extrapolation
             if calibration is None:
-                try:
-                    calibration_next = self._calibrations[nn + 1]
-                except IndexError:
-                    logger.debug("Last entry has no calibration")
-                    continue
-                try:
-                    assert isinstance(calibration_next, ExperimentalCalibration)
-                except AssertionError:
-                    msg = "'None' entries must be bracketed by experimental calibrations"
-                    raise ValueError(msg)
+                continue
+            try:
+                assert calibration.pressure_max is not None
+            except AssertionError:
+                msg: str = "Maximum pressure cannot be None"
+                raise ValueError(msg)
 
-                # Minimum pressure of the next entry used as the maximum pressure of this entry.
-                pressure_bound: float = calibration_next.pressure_min
-            else:
-                try:
-                    assert calibration.pressure_max is not None
-                except AssertionError:
-                    msg = "Maximum pressure cannot be None"
-                    raise ValueError(msg)
-
-                pressure_bound = calibration.pressure_max
+            pressure_bound = calibration.pressure_max
 
             upper_pressure_bounds.append(pressure_bound)
 
@@ -158,6 +183,10 @@ class CombinedRealGasABC(RealGas, ABC):
         aux_data = {
             "real_gases": self._real_gases,
             "calibrations": self._calibrations,
+            # Must be False to avoid re-appending the bounding EOS
+            "lower_bound": False,
+            "upper_bound": self._upper_bound,
+            "dzdp": self._dzdp,
         }
         return (children, aux_data)
 

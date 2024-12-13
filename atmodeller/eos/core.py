@@ -34,6 +34,7 @@ from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData
 from atmodeller.utilities import (
+    PyTreeNoData,
     safe_exp,
 )
 
@@ -234,6 +235,34 @@ class RealGas(ABC):
         ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
 
         return ideal_volume
+
+
+@register_pytree_node_class
+class IdealGas(PyTreeNoData, RealGas):
+    r"""Ideal gas equation of state:
+
+    .. math::
+
+        R T = P V
+
+    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`P` is pressure, and
+    :math:`V` is volume.
+    """
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        return self.ideal_log_fugacity(temperature, pressure)
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        return self.ideal_volume(temperature, pressure)
+
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        return GAS_CONSTANT_BAR * temperature * self.log_fugacity(temperature, pressure)
 
 
 class RedlichKwongABC(RealGas):

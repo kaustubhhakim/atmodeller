@@ -37,7 +37,7 @@ from atmodeller import PRESSURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos.core import RealGas
-from atmodeller.utilities import PyTreeNoData, unit_conversion
+from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -48,34 +48,6 @@ if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
-
-
-@register_pytree_node_class
-class IdealGas(PyTreeNoData, RealGas):
-    r"""Ideal gas equation of state:
-
-    .. math::
-
-        R T = P V
-
-    where :math:`R` is the gas constant, :math:`T` is temperature, :math:`P` is pressure, and
-    :math:`V` is volume.
-    """
-
-    @override
-    @jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        return self.ideal_log_fugacity(temperature, pressure)
-
-    @override
-    @jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        return self.ideal_volume(temperature, pressure)
-
-    @override
-    @jit
-    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        return GAS_CONSTANT_BAR * temperature * self.log_fugacity(temperature, pressure)
 
 
 @register_pytree_node_class

@@ -19,7 +19,7 @@
 import logging
 
 from atmodeller import debug_logger
-from atmodeller.eos import CombinedRealGas, CombinedRealGasRemoveSteps, IdealGas, get_eos_models
+from atmodeller.eos import CombinedRealGasRemoveSteps, get_eos_models
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration
 
@@ -31,17 +31,19 @@ eos_models = get_eos_models()
 def test_bounded() -> None:
     """TODO"""
 
-    model0: RealGasProtocol = IdealGas()
+    # model0: RealGasProtocol = IdealGas()
     model1: RealGasProtocol = eos_models["CH4_cork_cs_holland91"]
-    models = [model0, model1]
+    models = [model1]
 
     experimental_calibration_holland91: ExperimentalCalibration = ExperimentalCalibration(
         100, 4000, 0.1, 50e3
     )
-    calibrations = [None, experimental_calibration_holland91]
+    calibrations = [experimental_calibration_holland91]
 
-    a = CombinedRealGas(models, calibrations)
+    # a = CombinedRealGas(models, calibrations)
+    # logger.debug("HERE")
     a = CombinedRealGasRemoveSteps(models, calibrations)
+    logger.debug("NOW HERE: %s", type(a))
 
     b = a._get_index(0.01)
     logger.debug("b = %s", b)

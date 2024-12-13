@@ -45,7 +45,7 @@ from atmodeller import (
     LOG_STABILITY_UPPER,
 )
 from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
-from atmodeller.eos.classes import IdealGas
+from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import (
     ActivityProtocol,
     FugacityConstraintProtocol,
