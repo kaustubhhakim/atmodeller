@@ -20,6 +20,7 @@ import logging
 
 from atmodeller import debug_logger
 from atmodeller.eos import CombinedRealGasRemoveSteps, get_eos_models
+from atmodeller.eos._aggregators import UpperBoundRealGas
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration
 
@@ -58,3 +59,11 @@ def test_bounded() -> None:
     logger.debug("c = %s", c)
     d = a.fugacity(1000, 10)
     logger.debug("fugacity = %f", d)
+
+
+def test_upper_bound() -> None:
+    """TODO"""
+    a = UpperBoundRealGas(dzdp=0.001)
+
+    fugacity = a.fugacity(1000, 100)
+    logger.debug("fugacity = %s", fugacity)

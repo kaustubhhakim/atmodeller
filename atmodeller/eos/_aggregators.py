@@ -50,41 +50,46 @@ logger: logging.Logger = logging.getLogger(__name__)
 class CombinedRealGasABC(RealGas, ABC):
     """Base class for combining real gas EOS
 
-    This class allows EOS to be combined, with additional options that specify how extrapolation
-    occurs below the minimum calibration pressure and above the maximum calibration pressure.
-    Reasonable extrapolation behaviour is required to ensure that the function is bounded to avoid
-    throwing NaNs or infs which will crash the solver. Physically, it is reasonable to extend the
-    lower bound using the ideal gas law and the upper bound assuming a linear pressure dependence
-    of the compressibility factor.
+    This class allows EOS to be combined and automatically applies appropriate extrapolation below
+    the minimum calibration pressure and above the maximum calibration pressure. Reasonable
+    extrapolation behaviour is required to ensure that the function is bounded to avoid throwing
+    NaNs or infs which will crash the solver. Physically, it is reasonable to extend the lower
+    bound using the ideal gas law and the upper bound assuming a linear pressure dependence of the
+    compressibility factor.
 
     Args:
         real_gases: Real gases to combine
-        calibrations: Experimental calibrations (or None) that correspond by position to the
-            entries in `real_gases`.
-        lower_bound: Extrapolate below the minimum pressure bound using an ideal gas model.
-            Defaults to True.
-        upper_bound: Extrapolate above the maximum pressure bound using a EOS that imposes a
-            compressibility factor as a function of pressure. Defaults to True.
-        dzdp: Constant compressibility (pressure) gradient for the upper bound extrapolation.
-            Defaults to 0.
+        calibrations: Experimental calibrations that correspond to `real_gases`.
+        dzdp: Constant compressibility (pressure) gradient for the upper bound extrapolation (if
+            relevant). Defaults to 0.
+        extrapolate: Extrapolate the EOS to have reasonable behaviour below the minimum and above
+            the maximum calibration pressure if required. Defaults to True.
     """
 
     def __init__(
         self,
         real_gases: list[RealGasProtocol],
         calibrations: list[ExperimentalCalibration],
-        lower_bound: bool = True,
-        upper_bound: bool = True,
         dzdp: float = 0.0,
+        extrapolate: bool = True,
     ):
         self._real_gases: list[RealGasProtocol] = real_gases
         self._calibrations: list[ExperimentalCalibration] = calibrations
-        self._upper_bound: bool = upper_bound
         self._dzdp: float = dzdp
-        if lower_bound:
+        self._extrapolate: bool = extrapolate
+        if self.extrapolate_lower:
             self._append_lower_bound()
-        logger.debug("After append lower bound")
+        if self.extrapolate_upper:
+            self._append_upper_bound()
         self._upper_pressure_bounds: Array = self._get_upper_pressure_bounds()
+
+    @property
+    def extrapolate_lower(self) -> bool:
+        return self._calibrations[0].pressure_min is not None and self._extrapolate
+
+    @property
+    def extrapolate_upper(self) -> bool:
+        return self._calibrations[-1].pressure_max is not None and self._extrapolate
 
     @property
     def volume_functions(self) -> list[Callable]:
@@ -96,18 +101,23 @@ class CombinedRealGasABC(RealGas, ABC):
 
     def _append_lower_bound(self) -> None:
         """Appends the lower bound"""
-        logger.debug("appending lower bound")
+        logger.debug("Appending lower bound")
         self._real_gases.insert(0, IdealGas())
-        # Ensure continuity of the ideal gas law with the first user-defined EOS
-        try:
-            assert self._calibrations[0].pressure_min is not None
-        except AssertionError:
-            msg: str = "Minimum pressure cannot be None when lower_bound=True"
-            raise ValueError(msg)
-
         pressure_max: float = self._calibrations[0].pressure_min
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_max=pressure_max)
         self._calibrations.insert(0, calibration)
+
+    def _append_upper_bound(self) -> None:
+        """Appends the upper bound"""
+        logger.debug("Appending upper bound")
+        assert self._calibrations[-1].pressure_max is not None
+        pressure_min: float = self._calibrations[-1].pressure_max
+        real_gas: RealGasProtocol = UpperBoundRealGas(
+            self._real_gases[-1], pressure_min, self._dzdp
+        )
+        self._real_gases.append(real_gas)
+        calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=pressure_min)
+        self._calibrations.append(calibration)
 
     # Do not jit. Causes problems with initialization.
     def _get_upper_pressure_bounds(self) -> Array:
@@ -118,16 +128,19 @@ class CombinedRealGasABC(RealGas, ABC):
         """
         upper_pressure_bounds: list[float] = []
 
-        for nn, calibration in enumerate(self._calibrations):
+        for ii, calibration in enumerate(self._calibrations):
             # This deals with the upper bound being False, in which case the final EOS is used
             # for the extrapolation
-            if calibration is None:
-                continue
+            # if calibration is None:
+            #    continue
             try:
                 assert calibration.pressure_max is not None
             except AssertionError:
-                msg: str = "Maximum pressure cannot be None"
-                raise ValueError(msg)
+                if ii == len(self._calibrations) - 1:
+                    continue
+                else:
+                    msg: str = "Maximum pressure cannot be None"
+                    raise ValueError(msg)
 
             pressure_bound = calibration.pressure_max
 
@@ -183,9 +196,87 @@ class CombinedRealGasABC(RealGas, ABC):
         aux_data = {
             "real_gases": self._real_gases,
             "calibrations": self._calibrations,
-            # Must be False to avoid re-appending the bounding EOS
-            "lower_bound": False,
-            "upper_bound": self._upper_bound,
+            "dzdp": self._dzdp,
+            # Must be False to avoid re-appending extrapolation bounds during JAX operations
+            "extrapolate": False,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
+
+
+# Might be able to subclass general infrastructure that assumes a polynomial form for the
+# compressibility factor.
+@register_pytree_node_class
+class UpperBoundRealGas(RealGas):
+    """An upper bound for an EOS
+
+    This is used to extrapolate an EOS assuming that the compressibility factor is a linear
+    function of pressure.
+
+    Args:
+        real_gas: Real gas to evaluate the compressibility factor at `p_eval`.
+        p_eval: Evaluation pressure in bar. This is usually the maximum calibration pressure
+            of `real_gas`. Defaults to 1 bar.
+        dzdp: Gradient of the compressibility factor. Defaults to 0.
+    """
+
+    def __init__(self, real_gas: RealGasProtocol, p_eval: float = 1, dzdp: float = 0):
+        self._real_gas: RealGasProtocol = real_gas
+        self._p_eval: float = p_eval
+        self._dzdp: float = dzdp
+
+    @jit
+    def _z0(self, temperature: ArrayLike) -> ArrayLike:
+        """Compressibility factor of the previous EOS to blend smoothly with.
+
+        Args:
+            temperature: Temperature in K
+        """
+        return self._real_gas.compressibility_factor(temperature, self._p_eval)
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
+        )
+
+        return log_fugacity
+
+    @override
+    @jit
+    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        compressibility_factor: ArrayLike = self._z0(temperature) + self._dzdp * (
+            pressure - self._p_eval
+        )
+
+        return compressibility_factor
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        return self.compressibility_factor(temperature, pressure) * self.ideal_volume(
+            temperature, pressure
+        )
+
+    @override
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        volume_integral: Array = jnp.log(pressure / self._p_eval) * (
+            GAS_CONSTANT_BAR * temperature * (self._z0(temperature) - self._dzdp * self._p_eval)
+        ) + GAS_CONSTANT_BAR * temperature * self._dzdp * (pressure - self._p_eval)
+
+        return volume_integral
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
+        children: tuple = ()
+        aux_data = {
+            "real_gas": self._real_gas,
+            "p_eval": self._p_eval,
             "dzdp": self._dzdp,
         }
         return (children, aux_data)

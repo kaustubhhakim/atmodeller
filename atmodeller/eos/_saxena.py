@@ -58,7 +58,7 @@ class SaxenaABC(RealGas):
         b_coefficients: `b` coefficients
         c_coefficients: `c` coefficients
         d_coefficients: `d` coefficients
-        critical_data: Critical data. Defaults to unity values meaning unused.
+        critical_data: Critical data. Defaults to unity values meaning effectively unused.
     """
 
     def __init__(
@@ -393,7 +393,7 @@ H2_SS92: RealGasProtocol = CombinedRealGasRemoveSteps(
     [_H2_low_pressure_SS92, _H2_high_pressure_SS92],
     [
         ExperimentalCalibration(pressure_max=1000),
-        None,  # No limit on the maximum pressure for the high pressure model
+        ExperimentalCalibration(pressure_min=1000),
     ],
 )
 """H2 EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1b}`"""
@@ -478,12 +478,12 @@ _H2S_high_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
 
 H2S_SS92: RealGasProtocol = CombinedRealGasRemoveSteps(
     [_H2S_low_pressure_SS92, _H2S_high_pressure_SS92],
-    [ExperimentalCalibration(pressure_max=500), None],
+    [
+        ExperimentalCalibration(pressure_max=500),
+        ExperimentalCalibration(pressure_min=500, pressure_max=10000),
+    ],
 )
-"""H2S EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1d}`
-
-Note that the upper limit of 10000 bar is not imposed
-"""
+"""H2S EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1d}`"""
 
 
 def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
@@ -538,7 +538,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
         [
             ExperimentalCalibration(pressure_max=1000),
             ExperimentalCalibration(pressure_min=1000, pressure_max=5000),
-            None,
+            ExperimentalCalibration(pressure_min=5000),
         ],
     )
 
