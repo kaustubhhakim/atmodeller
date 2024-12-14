@@ -19,7 +19,7 @@
 import logging
 
 from atmodeller.constants import ATMOSPHERE
-from atmodeller.eos._aggregators import RealGasBounded
+from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.classes import BeattieBridgeman
 from atmodeller.eos.core import RealGas
 from atmodeller.interfaces import RealGasProtocol
@@ -54,9 +54,9 @@ H2_beattie_holley58: RealGas = BeattieBridgeman(
     c=volume_conversion(0.0504e4),
 )
 """H2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-H2_beattie_holley58_bounded: RealGas = RealGasBounded(
-    H2_beattie_holley58,
-    ExperimentalCalibration(100, 1000, atm2bar(0.1), atm2bar(1000)),
+H2_beattie_holley58_bounded: RealGas = CombinedRealGas(
+    [H2_beattie_holley58],
+    [ExperimentalCalibration(100, 1000, atm2bar(0.1), atm2bar(1000))],
 )
 """H2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -68,8 +68,8 @@ N2_beattie_holley58: RealGas = BeattieBridgeman(
     c=volume_conversion(4.2e4),
 )
 """N2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-N2_beattie_holley58_bounded: RealGas = RealGasBounded(
-    N2_beattie_holley58, ExperimentalCalibration(200, 1000, atm2bar(0.1), atm2bar(1000))
+N2_beattie_holley58_bounded: RealGas = CombinedRealGas(
+    [N2_beattie_holley58], [ExperimentalCalibration(200, 1000, atm2bar(0.1), atm2bar(1000))]
 )
 """N2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -81,8 +81,8 @@ O2_beattie_holley58: RealGas = BeattieBridgeman(
     c=volume_conversion(4.8e4),
 )
 """O2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-O2_beattie_holley58_bounded: RealGas = RealGasBounded(
-    O2_beattie_holley58, ExperimentalCalibration(200, 1000, atm2bar(0.1), atm2bar(1000))
+O2_beattie_holley58_bounded: RealGas = CombinedRealGas(
+    [O2_beattie_holley58], [ExperimentalCalibration(200, 1000, atm2bar(0.1), atm2bar(1000))]
 )
 """O2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -94,9 +94,9 @@ CO2_beattie_holley58: RealGas = BeattieBridgeman(
     c=volume_conversion(66e4),
 )
 """CO2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-CO2_beattie_holley58_bounded: RealGas = RealGasBounded(
-    CO2_beattie_holley58,
-    ExperimentalCalibration(400, 1000, atm2bar(0.1), atm2bar(1000)),
+CO2_beattie_holley58_bounded: RealGas = CombinedRealGas(
+    [CO2_beattie_holley58],
+    [ExperimentalCalibration(400, 1000, atm2bar(0.1), atm2bar(1000))],
 )
 """CO2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -108,8 +108,8 @@ NH3_beattie_holley58: RealGas = BeattieBridgeman(
     c=volume_conversion(476.87e4),
 )
 """NH3 Beattie-Bridgeman :cite:p:`HWZ58`"""
-NH3_beattie_holley58_bounded: RealGas = RealGasBounded(
-    NH3_beattie_holley58, ExperimentalCalibration(500, 1000, atm2bar(0.1), atm2bar(500))
+NH3_beattie_holley58_bounded: RealGas = CombinedRealGas(
+    [NH3_beattie_holley58], [ExperimentalCalibration(500, 1000, atm2bar(0.1), atm2bar(500))]
 )
 """NH3 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -121,9 +121,9 @@ CH4_beattie_holley58: RealGas = BeattieBridgeman(
     c=volume_conversion(12.83e4),
 )
 """CH4 Beattie-Bridgeman :cite:p:`HWZ58`"""
-CH4_beattie_holley58_bounded: RealGas = RealGasBounded(
-    CH4_beattie_holley58,
-    ExperimentalCalibration(200, 1000, atm2bar(0.1), atm2bar(1000)),
+CH4_beattie_holley58_bounded: RealGas = CombinedRealGas(
+    [CH4_beattie_holley58],
+    [ExperimentalCalibration(200, 1000, atm2bar(0.1), atm2bar(1000))],
 )
 """CH4 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
@@ -135,39 +135,29 @@ He_beattie_holley58: RealGas = BeattieBridgeman(
     c=volume_conversion(0.004e4),
 )
 """He Beattie-Bridgeman :cite:p:`HWZ58`"""
-He_beattie_holley58_bounded: RealGas = RealGasBounded(
-    He_beattie_holley58,
-    ExperimentalCalibration(100, 1000, atm2bar(0.1), atm2bar(1000)),
+He_beattie_holley58_bounded: RealGas = CombinedRealGas(
+    [He_beattie_holley58],
+    [ExperimentalCalibration(100, 1000, atm2bar(0.1), atm2bar(1000))],
 )
 """He Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
 
 
 def get_holley_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of Holley models
+    """Gets a dictionary of Holley EOS models that are bounded
 
     The naming convention is as follows:
-        [species]_[eos model]_[citation], with an optional suffix of 'bounded'
-
-    'cs' refers to corresponding states and `bounded` means that the EOS is reasonably well-behaved
-    outside its calibrated range to mitigate the solver throwing inf/nans.
+        [species]_[eos model]_[citation]
 
     Returns:
         Dictionary of EOS models
     """
     eos_models: dict[str, RealGasProtocol] = {}
-    eos_models["CH4_beattie_holley58"] = CH4_beattie_holley58
-    eos_models["CH4_beattie_holley58_bounded"] = CH4_beattie_holley58_bounded
-    eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58
-    eos_models["CO2_beattie_holley58_bounded"] = CO2_beattie_holley58_bounded
-    eos_models["H2_beattie_holley58"] = H2_beattie_holley58
-    eos_models["H2_beattie_holley58_bounded"] = H2_beattie_holley58_bounded
-    eos_models["He_beattie_holley58"] = He_beattie_holley58
-    eos_models["He_beattie_holley58_bounded"] = He_beattie_holley58_bounded
-    eos_models["N2_beattie_holley58"] = N2_beattie_holley58
-    eos_models["N2_beattie_holley58_bounded"] = N2_beattie_holley58_bounded
-    eos_models["NH3_beattie_holley58"] = NH3_beattie_holley58
-    eos_models["NH3_beattie_holley58_bounded"] = NH3_beattie_holley58_bounded
-    eos_models["O2_beattie_holley58"] = O2_beattie_holley58
-    eos_models["O2_beattie_holley58_bounded"] = O2_beattie_holley58_bounded
+    eos_models["CH4_beattie_holley58"] = CH4_beattie_holley58_bounded
+    eos_models["CO2_beattie_holley58"] = CO2_beattie_holley58_bounded
+    eos_models["H2_beattie_holley58"] = H2_beattie_holley58_bounded
+    eos_models["He_beattie_holley58"] = He_beattie_holley58_bounded
+    eos_models["N2_beattie_holley58"] = N2_beattie_holley58_bounded
+    eos_models["NH3_beattie_holley58"] = NH3_beattie_holley58_bounded
+    eos_models["O2_beattie_holley58"] = O2_beattie_holley58_bounded
 
     return eos_models

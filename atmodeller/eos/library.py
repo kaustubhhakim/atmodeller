@@ -28,7 +28,7 @@ Usage:
 import logging
 from pathlib import Path
 
-from atmodeller.eos._aggregators import RealGasBounded
+from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
 from atmodeller.eos._saxena import get_saxena_eos_models
@@ -41,8 +41,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 H2_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
 # TODO: Update calibration bounds. Kaustubh to do.
-H2_chabrier21_bounded: RealGasProtocol = RealGasBounded(
-    H2_chabrier21, ExperimentalCalibration(100, 4000, 0.1, 50e9)
+H2_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
+    [H2_chabrier21], [ExperimentalCalibration(100, 4000, 0.1, 50e9)]
 )
 He_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
@@ -67,8 +67,7 @@ def get_eos_models() -> dict[str, RealGasProtocol]:
         Dictionary of EOS models
     """
     eos_models: dict[str, RealGasProtocol] = {}
-    eos_models["H2_chabrier21"] = H2_chabrier21
-    eos_models["H2_chabrier21_bounded"] = H2_chabrier21_bounded
+    eos_models["H2_chabrier21"] = H2_chabrier21_bounded
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21
     eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21
     eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21

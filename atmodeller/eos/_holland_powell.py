@@ -28,7 +28,7 @@ from jax.typing import ArrayLike
 from scipy.constants import kilo
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.eos._aggregators import RealGasBounded
+from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import (
     CORK,
     RealGas,
@@ -753,24 +753,24 @@ CH4_cork_cs_holland91: RealGasProtocol = CORK(
     CH4_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CH4_g")
 )
 """CH4 CORK corresponding states :cite:p:`HP91`"""
-CH4_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
-    CH4_cork_cs_holland91, experimental_calibration_holland91
+CH4_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [CH4_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CH4 CORK corresponding states bounded :cite:p:`HP91`"""
 CO_cork_cs_holland91: RealGasProtocol = CORK(
     CO_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO_g")
 )
 """CO CORK corresponding states :cite:p:`HP91`"""
-CO_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
-    CO_cork_cs_holland91, experimental_calibration_holland91
+CO_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [CO_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CO CORK corresponding states bounded :cite:p:`HP91`"""
 CO2_cork_cs_holland91: RealGasProtocol = CORK(
     CO2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO2_g")
 )
 """CO2 CORK corresponding states :cite:p:`HP91`"""
-CO2_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
-    CO2_cork_cs_holland91, experimental_calibration_holland91
+CO2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [CO2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CO2 CORK corresponding states bounded :cite:p:`HP91`"""
 H2_cork_cs_holland91: RealGasProtocol = CORK(
@@ -779,32 +779,32 @@ H2_cork_cs_holland91: RealGasProtocol = CORK(
     select_critical_data("H2_g_Holland"),
 )
 """H2 CORK corresponding states :cite:p:`HP91`"""
-H2_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
-    H2_cork_cs_holland91, experimental_calibration_holland91
+H2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [H2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """H2 CORK corresponding states bounded :cite:p:`HP91`"""
 H2S_cork_cs_holland11: RealGasProtocol = CORK(
     H2S_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("H2S_g")
 )
 """H2S CORK corresponding states :cite:p:`HP91`"""
-H2S_cork_cs_holland11_bounded: RealGasProtocol = RealGasBounded(
-    H2S_cork_cs_holland11, experimental_calibration_holland91
+H2S_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas(
+    [H2S_cork_cs_holland11], [experimental_calibration_holland91]
 )
 """H2S CORK corresponding states bounded :cite:p:`HP91`"""
 N2_cork_cs_holland91: RealGasProtocol = CORK(
     N2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("N2_g")
 )
 """N2 CORK corresponding states :cite:p:`HP91`"""
-N2_cork_cs_holland91_bounded: RealGasProtocol = RealGasBounded(
-    N2_cork_cs_holland91, experimental_calibration_holland91
+N2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [N2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """N2 CORK corresponding states bounded :cite:p:`HP91`"""
 S2_cork_cs_holland11: RealGasProtocol = CORK(
     S2_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("S2_g")
 )
 """S2 CORK corresponding states :cite:p:`HP91`"""
-S2_cork_cs_holland11_bounded: RealGasProtocol = RealGasBounded(
-    S2_cork_cs_holland11, experimental_calibration_holland91
+S2_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas(
+    [S2_cork_cs_holland11], [experimental_calibration_holland91]
 )
 """S2 CORK corresponding states bounded :cite:p:`HP91`"""
 
@@ -874,32 +874,25 @@ TODO: calibration=ExperimentalCalibration(400, 1700, 0, 120e3),
 
 
 def get_holland_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of Holland and Powell EOS models
+    """Gets a dictionary of Holland and Powell EOS models that are bounded
 
     The naming convention is as follows:
-        [species]_[eos model]_[citation], with an optional suffix of 'bounded'
-
-    'cs' refers to corresponding states and `bounded` means that the EOS is reasonably well-behaved
-    outside its calibrated range to mitigate the solver throwing inf/nans.
+        [species]_[eos model]_[citation]
 
     Returns:
         Dictionary of EOS models
     """
     eos_models: dict[str, RealGasProtocol] = {}
-    eos_models["CH4_cork_cs_holland91"] = CH4_cork_cs_holland91
-    eos_models["CH4_cork_cs_holland91_bounded"] = CH4_cork_cs_holland91_bounded
+    eos_models["CH4_cork_cs_holland91"] = CH4_cork_cs_holland91_bounded
     eos_models["CH4_mrk_cs_holland91"] = CH4_mrk_cs_holland91
-    eos_models["CO_cork_cs_holland91"] = CO_cork_cs_holland91
-    eos_models["CO_cork_cs_holland91_bounded"] = CO_cork_cs_holland91_bounded
+    eos_models["CO_cork_cs_holland91"] = CO_cork_cs_holland91_bounded
     eos_models["CO_mrk_cs_holland91"] = CO_mrk_cs_holland91
     eos_models["CO2_cork_holland91"] = CO2_cork_holland91
     eos_models["CO2_cork_holland98"] = CO2_cork_holland98
-    eos_models["CO2_cork_cs_holland91"] = CO2_cork_cs_holland91
-    eos_models["CO2_cork_cs_holland91_bounded"] = CO2_cork_cs_holland91_bounded
+    eos_models["CO2_cork_cs_holland91"] = CO2_cork_cs_holland91_bounded
     eos_models["CO2_mrk_cs_holland91"] = CO2_mrk_cs_holland91
     eos_models["CO2_mrk_holland91"] = CO2MrkHolland91
-    eos_models["H2_cork_cs_holland91"] = H2_cork_cs_holland91
-    eos_models["H2_cork_cs_holland91_bounded"] = H2_cork_cs_holland91_bounded
+    eos_models["H2_cork_cs_holland91"] = H2_cork_cs_holland91_bounded
     eos_models["H2_mrk_cs_holland91"] = H2_mrk_cs_holland91
     eos_models["H2O_cork_holland91"] = H2O_cork_holland91
     eos_models["H2O_cork_holland98"] = H2O_cork_holland98
@@ -910,14 +903,11 @@ def get_holland_eos_models() -> dict[str, RealGasProtocol]:
     eos_models["H2O_mrk_gas_holland91"] = H2O_mrk_gas_holland91
     # TODO: include the liquid as a condensed activity model
     eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
-    eos_models["H2S_cork_cs_holland11"] = H2S_cork_cs_holland11
-    eos_models["H2S_cork_cs_holland11_bounded"] = H2S_cork_cs_holland11_bounded
+    eos_models["H2S_cork_cs_holland11"] = H2S_cork_cs_holland11_bounded
     eos_models["H2S_mrk_cs_holland11"] = H2S_mrk_cs_holland11
-    eos_models["N2_cork_cs_holland91"] = N2_cork_cs_holland91
-    eos_models["N2_cork_cs_holland91_bounded"] = N2_cork_cs_holland91_bounded
+    eos_models["N2_cork_cs_holland91"] = N2_cork_cs_holland91_bounded
     eos_models["N2_mrk_cs_holland91"] = N2_mrk_cs_holland91
-    eos_models["S2_cork_cs_holland11"] = S2_cork_cs_holland11
-    eos_models["S2_cork_cs_holland11_bounded"] = S2_cork_cs_holland11_bounded
+    eos_models["S2_cork_cs_holland11"] = S2_cork_cs_holland11_bounded
     eos_models["S2_mrk_cs_holland11"] = S2_mrk_cs_holland11
 
     return eos_models
