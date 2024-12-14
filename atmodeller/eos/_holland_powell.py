@@ -745,7 +745,9 @@ mean that every virial coefficient has been multiplied by 1e-2 compared to the v
 :cite:t:`HP91{Table 2}`.
 """
 experimental_calibration_holland91: ExperimentalCalibration = ExperimentalCalibration(
-    100, 4000, 0.1, 50e3
+    temperature_min=100,
+    temperature_max=4000,
+    pressure_max=50e3,  # TODO: Add back in pressure_min=0.1
 )
 """Experimental calibration for :cite:`HP91,HP11` models"""
 

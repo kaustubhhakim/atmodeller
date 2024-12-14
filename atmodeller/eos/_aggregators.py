@@ -103,6 +103,7 @@ class CombinedRealGasABC(RealGas, ABC):
         """Appends the lower bound"""
         logger.debug("Appending lower bound")
         self._real_gases.insert(0, IdealGas())
+        assert self._calibrations[0].pressure_min is not None
         pressure_max: float = self._calibrations[0].pressure_min
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_max=pressure_max)
         self._calibrations.insert(0, calibration)
@@ -129,10 +130,6 @@ class CombinedRealGasABC(RealGas, ABC):
         upper_pressure_bounds: list[float] = []
 
         for ii, calibration in enumerate(self._calibrations):
-            # This deals with the upper bound being False, in which case the final EOS is used
-            # for the extrapolation
-            # if calibration is None:
-            #    continue
             try:
                 assert calibration.pressure_max is not None
             except AssertionError:
@@ -288,7 +285,7 @@ class UpperBoundRealGas(RealGas):
 
 
 @register_pytree_node_class
-class CombinedRealGas(CombinedRealGasABC):
+class CombinedRealGasSwitch(CombinedRealGasABC):
     """Combined real gas EOS
 
     This class selects the volume integral to use based on an index.
@@ -306,7 +303,7 @@ class CombinedRealGas(CombinedRealGasABC):
 
 
 @register_pytree_node_class
-class CombinedRealGasRemoveSteps(CombinedRealGasABC):
+class CombinedRealGas(CombinedRealGasABC):
     """Combined real gas EOS with separate integrations for each EOS
 
     This class computes the contribution to the volume integral separately for each EOS based on

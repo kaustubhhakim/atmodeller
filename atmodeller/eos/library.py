@@ -28,6 +28,7 @@ Usage:
 import logging
 from pathlib import Path
 
+# from atmodeller.eos._aggregators import CombinedRealGasSwitch as CombinedRealGas
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
@@ -42,7 +43,10 @@ H2_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
 # TODO: Update calibration bounds. Kaustubh to do.
 H2_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
-    [H2_chabrier21], [ExperimentalCalibration(100, 4000, 0.1, 50e9)]
+    [H2_chabrier21],
+    [
+        ExperimentalCalibration(temperature_min=100, temperature_max=4000, pressure_max=50e9)
+    ],  # TODO: add back in pressure_min=0.1
 )
 He_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""

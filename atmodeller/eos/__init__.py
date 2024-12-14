@@ -25,7 +25,6 @@ DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 # Expose the public API
 from atmodeller.eos._aggregators import (  # noqa: E402, F401
     CombinedRealGas,
-    CombinedRealGasRemoveSteps,
 )
 from atmodeller.eos.classes import (  # noqa: E402, F401
     BeattieBridgeman,

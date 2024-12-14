@@ -29,7 +29,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import PRESSURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.eos._aggregators import CombinedRealGasRemoveSteps
+from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData, select_critical_data
@@ -389,7 +389,7 @@ are set to zero :cite:p:`SS92{Table 1b}`. The refitting is performed using reduc
 pressure.
 """
 
-H2_SS92: RealGasProtocol = CombinedRealGasRemoveSteps(
+H2_SS92: RealGasProtocol = CombinedRealGas(
     [_H2_low_pressure_SS92, _H2_high_pressure_SS92],
     [
         ExperimentalCalibration(pressure_max=1000),
@@ -476,7 +476,7 @@ _H2S_high_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
 )
 """H2S high pressure (500-10000 bar) :cite:p:`SS92{Table 1d}`"""
 
-H2S_SS92: RealGasProtocol = CombinedRealGasRemoveSteps(
+H2S_SS92: RealGasProtocol = CombinedRealGas(
     [_H2S_low_pressure_SS92, _H2S_high_pressure_SS92],
     [
         ExperimentalCalibration(pressure_max=500),
@@ -533,7 +533,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
         critical_data=critical_data,
     )
 
-    combined_model: RealGasProtocol = CombinedRealGasRemoveSteps(
+    combined_model: RealGasProtocol = CombinedRealGas(
         [low_pressure, medium_pressure, high_pressure],
         [
             ExperimentalCalibration(pressure_max=1000),

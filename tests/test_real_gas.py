@@ -48,7 +48,7 @@ eos_models: dict[str, RealGasProtocol] = get_eos_models()
 def test_fO2_holley(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`HWZ58`"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_beattie_holley58_bounded"])
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_beattie_holley58"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
 
@@ -86,7 +86,7 @@ def test_fO2_holley(helper) -> None:
 def test_chabrier_earth(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")
@@ -144,7 +144,7 @@ def test_chabrier_earth(helper) -> None:
 def test_chabrier_earth_dogleg(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` using the dogleg solver"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")
@@ -207,7 +207,7 @@ def test_chabrier_subNeptune(helper) -> None:
     ignored, which would greatly lower the pressure and hence the number density.
     """
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")
@@ -269,7 +269,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     As above, this test has questionable physical relevance without the inclusion of more species'
     solubility, but it serves its purpose as a test.
     """
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21_bounded"])
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas(
         "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
     )

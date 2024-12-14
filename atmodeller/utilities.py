@@ -28,7 +28,6 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
-from atmodeller import PRESSURE_REFERENCE
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 if sys.version_info < (3, 11):
@@ -351,7 +350,7 @@ class ExperimentalCalibration(NamedTuple):
     Args:
         temperature_min: Minimum calibrated temperature. Defaults to None.
         temperature_max: Maximum calibrated temperature. Defaults to None.
-        pressure_min: Minimum calibrated pressure. Defaults to the standard pressure.
+        pressure_min: Minimum calibrated pressure. Defaults to None.
         pressure_max: Maximum calibrated pressure. Defaults to None.
         log10_fO2_min: Minimum calibrated log10 fO2. Defaults to None.
         log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
@@ -359,7 +358,7 @@ class ExperimentalCalibration(NamedTuple):
 
     temperature_min: float | None = None
     temperature_max: float | None = None
-    pressure_min: float = PRESSURE_REFERENCE
+    pressure_min: float | None = None
     pressure_max: float | None = None
     log10_fO2_min: float | None = None
     log10_fO2_max: float | None = None

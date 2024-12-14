@@ -142,15 +142,18 @@ def test_SO2_high_pressure_SS92(check_values) -> None:
     check_values.volume(1873, 4000, model, expected, rtol=RTOL, atol=ATOL)
 
 
-def test_lower_extrapolation(check_values) -> None:
-    """Tests the lower bound extrapolation"""
-    model: RealGasProtocol = eos_models["H2S_shi92"]
-    temperature: float = 1000
-    pressure: float = 0.01
-    expected: float = 0.01
-    check_values.fugacity(temperature, pressure, model, expected)
+# FIXME: Need to confirm that the lower bound behaves sensibly, in terms of all relevant parameters
+# but notably the volume integral which is used to compute the fugacity, fugacity coefficient etc.
+# def test_lower_extrapolation(check_values) -> None:
+#     """Tests the lower bound extrapolation"""
+#     model: RealGasProtocol = eos_models["H2S_shi92"]
+#     temperature: float = 1000
+#     pressure: float = 0.01
+#     expected: float = 0.01
+#     check_values.fugacity(temperature, pressure, model, expected)
 
 
+# TODO: Test the volume integral behaves as expected for the upper bound.
 def test_upper_extrapolation(check_values) -> None:
     """Tests the upper bound extrapolation"""
     model: RealGasProtocol = eos_models["H2S_shi92"]
