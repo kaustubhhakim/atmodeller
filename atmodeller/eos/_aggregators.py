@@ -99,6 +99,7 @@ class CombinedRealGasABC(RealGas, ABC):
     def volume_integral_functions(self) -> list[Callable]:
         return [eos.volume_integral for eos in self._real_gases]
 
+    # Do not jit. Causes problems with initialization.
     def _append_lower_bound(self) -> None:
         """Appends the lower bound"""
         logger.debug("Appending lower bound")
@@ -108,6 +109,7 @@ class CombinedRealGasABC(RealGas, ABC):
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_max=pressure_max)
         self._calibrations.insert(0, calibration)
 
+    # Do not jit. Causes problems with initialization.
     def _append_upper_bound(self) -> None:
         """Appends the upper bound"""
         logger.debug("Appending upper bound")
@@ -159,8 +161,9 @@ class CombinedRealGasABC(RealGas, ABC):
         """
 
         def body_fun(i: int, carry: int) -> int:
-            pressure_high: Array = lax.dynamic_slice(self._upper_pressure_bounds, (i,), (1,))
-            pressure_high = jnp.squeeze(pressure_high)
+            pressure_high: Array = lax.dynamic_index_in_dim(
+                self._upper_pressure_bounds, i, keepdims=False
+            )
             condition = pressure >= pressure_high
             new_index: int = lax.cond(condition, lambda _: i + 1, lambda _: carry, None)
 
@@ -360,6 +363,7 @@ class CombinedRealGas(CombinedRealGasABC):
         # jax.debug.print("total_integral after lax.fori_loop = {out}", out=total_integral)
 
         def add_final_integral(total_integral: Array) -> Array:
+            # FIXME: Feel like this is wrong and is creating negative estimates
             # Account for the first integral, which thus far has not been included for index > 0.
             pressure_high = lax.dynamic_index_in_dim(
                 self._upper_pressure_bounds, 0, keepdims=False
