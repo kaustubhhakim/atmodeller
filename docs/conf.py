@@ -32,7 +32,12 @@ release = "0.2.0"
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinxcontrib.bibtex", "sphinx_rtd_theme", "sphinx.ext.napoleon"]
+extensions = [
+    "sphinxcontrib.bibtex",
+    "sphinx_rtd_theme",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.autodoc",
+]
 
 bibtex_bibfiles = ["refs.bib"]
 
