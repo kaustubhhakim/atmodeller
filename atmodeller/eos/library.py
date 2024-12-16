@@ -28,7 +28,6 @@ Usage:
 import logging
 from pathlib import Path
 
-# from atmodeller.eos._aggregators import CombinedRealGasSwitch as CombinedRealGas
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
@@ -41,12 +40,16 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 H2_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
-# TODO: Update calibration bounds. Kaustubh to do.
+# TODO: Kaustubh. Update calibration bounds. Although imposing a pressure_min=0.1 breaks simple
+# tests, other values seem fine. Or pressure_min can be set to None to impose no lower
+# extrapolation.
 H2_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
     [H2_chabrier21],
     [
-        ExperimentalCalibration(temperature_min=100, temperature_max=4000, pressure_max=50e9)
-    ],  # TODO: add back in pressure_min=0.1
+        ExperimentalCalibration(
+            temperature_min=100, temperature_max=4000, pressure_min=None, pressure_max=50e9
+        )
+    ],
 )
 He_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
@@ -72,10 +75,10 @@ def get_eos_models() -> dict[str, RealGasProtocol]:
     """
     eos_models: dict[str, RealGasProtocol] = {}
     eos_models["H2_chabrier21"] = H2_chabrier21_bounded
-    eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21
-    eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21
-    eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21
-    eos_models["He_chabrier21"] = He_chabrier21
+    eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21  # TODO: Bound
+    eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21  # TODO: Bound
+    eos_models["H2_He_Y0297_chabrier21"] = H2_He_Y0297_chabrier21  # TODO: Bound
+    eos_models["He_chabrier21"] = He_chabrier21  # TODO: Bound
 
     # Merge Holley models
     eos_models |= get_holley_eos_models()

@@ -623,6 +623,13 @@ class VirialCompensation:
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
             significantly and may be determined from experimental data.
+
+    Attributes:
+        a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`.
+        b_coefficients: As above for the b coefficients
+        c_coefficients: As above for the c coefficients
+        P0: Pressure at which the MRK equation begins to overestimate the molar volume
+            significantly and may be determined from experimental data.
     """
 
     def __init__(
