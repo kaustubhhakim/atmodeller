@@ -16,9 +16,11 @@
 #
 """Utilities for tests"""
 
+from typing import Callable
+
+import numpy.testing as nptest
 import pytest
 from jax.typing import ArrayLike
-from pytest import approx
 
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import RealGasProtocol
@@ -35,6 +37,36 @@ eos_models: dict[str, RealGasProtocol] = get_eos_models()
 class CheckValues:
     """Helper class with methods to check and confirm values"""
 
+    @classmethod
+    def _check_property(
+        cls,
+        property_name: str,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        eos: RealGasProtocol,
+        expected: ArrayLike,
+        *,
+        rtol=RTOL,
+        atol=ATOL,
+    ) -> None:
+        """Generalized method to check a property (e.g., compressibility, fugacity, etc.)
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            fugacity_model: Fugacity model
+            expected: The expected value
+            rtol: Relative tolerance. Defaults to RTOL.
+            atol: Absolute tolerance. Dedfaults to ATOL.
+        """
+        # Dynamically get the method from the eos model based on property_name
+        method: Callable = getattr(eos, property_name)
+        # Call the method with the provided temperature and pressure
+        result: ArrayLike = method(temperature, pressure)
+
+        # Compare the result with the expected value
+        nptest.assert_allclose(result, expected, rtol, atol)
+
     @staticmethod
     def get_eos_model(species_name: str, suffix: str) -> RealGasProtocol:
         """Gets a model for a species
@@ -48,102 +80,30 @@ class CheckValues:
         """
         return eos_models[f"{species_name}_{suffix}"]
 
-    @staticmethod
-    def compressibility(
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        eos: RealGasProtocol,
-        expected: float,
-        *,
-        rtol=RTOL,
-        atol=ATOL,
-    ) -> None:
-        """Checks the compressibility parameter
+    @classmethod
+    def compressibility(cls, *args, **kwargs) -> None:
+        """Checks the compressibility parameter"""
+        cls._check_property("compressibility_factor", *args, **kwargs)
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure
-            fugacity_model: Fugacity model
-            expected: The expected value
-            rtol: Relative tolerance
-            atol: Absolute tolerance
-        """
-        compressibility: ArrayLike = eos.compressibility_factor(temperature, pressure)
+    @classmethod
+    def fugacity(cls, *args, **kwargs) -> None:
+        """Checks the fugacity"""
+        cls._check_property("fugacity", *args, **kwargs)
 
-        assert compressibility == approx(expected, rtol, atol)
+    @classmethod
+    def fugacity_coefficient(cls, *args, **kwargs) -> None:
+        """Checks the fugacity coefficient"""
+        cls._check_property("fugacity_coefficient", *args, **kwargs)
 
-    @staticmethod
-    def fugacity(
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        eos: RealGasProtocol,
-        expected: float,
-        *,
-        rtol=RTOL,
-        atol=ATOL,
-    ) -> None:
-        """Checks the fugacity.
+    @classmethod
+    def volume(cls, *args, **kwargs) -> None:
+        """Checks the volume"""
+        cls._check_property("volume", *args, **kwargs)
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure
-            fugacity_model: Fugacity model
-            expected: The expected value
-            rtol: Relative tolerance
-            atol: Absolute tolerance
-        """
-
-        fugacity: ArrayLike = eos.fugacity(temperature, pressure)
-
-        assert fugacity == approx(expected, rtol, atol)
-
-    @staticmethod
-    def fugacity_coefficient(
-        temperature: float,
-        pressure: float,
-        eos: RealGasProtocol,
-        expected: float,
-        *,
-        rtol=RTOL,
-        atol=ATOL,
-    ) -> None:
-        """Checks the fugacity coefficient.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure
-            fugacity_model: Fugacity model
-            expected: The expected value
-            rtol: Relative tolerance
-            atol: Absolute tolerance
-        """
-
-        fugacity_coeff: ArrayLike = eos.fugacity_coefficient(temperature, pressure)
-
-        assert fugacity_coeff == approx(expected, rtol, atol)
-
-    @staticmethod
-    def volume(
-        temperature: float,
-        pressure: float,
-        eos: RealGasProtocol,
-        expected: float,
-        *,
-        rtol=RTOL,
-        atol=ATOL,
-    ) -> None:
-        """Checks the volume.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure
-            fugacity_model: Fugacity model
-            expected: The expected value
-        """
-
-        volume: ArrayLike = eos.volume(temperature, pressure)
-
-        assert volume == approx(expected, rtol, atol)
+    @classmethod
+    def volume_integral(cls, *args, **kwargs) -> None:
+        """Checks the volume integral"""
+        cls._check_property("volume_integral", *args, **kwargs)
 
 
 @pytest.fixture(scope="module")
