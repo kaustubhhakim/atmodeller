@@ -283,7 +283,8 @@ class CombinedRealGas(CombinedRealGasABC):
         dzdp: Constant compressibility (pressure) gradient for the upper bound extrapolation (if
             relevant). Defaults to 0.
         extrapolate: Extrapolate the EOS to have reasonable behaviour below the minimum and above
-            the maximum calibration pressure if required. Defaults to True.
+            the maximum calibration pressure if required. This argument is always set to False for
+            tree flattening and unflattening operations. Defaults to True.
     """
 
     @override

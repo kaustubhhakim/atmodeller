@@ -30,10 +30,10 @@ from atmodeller.thermodata import IronWustiteBuffer
 logger: logging.Logger = debug_logger()
 # logger.setLevel(logging.INFO)
 
-#RTOL: float = 1.0e-8
+# RTOL: float = 1.0e-8
 RTOL: float = 0.05
 """Relative tolerance"""
-#ATOL: float = 1.0e-8
+# ATOL: float = 1.0e-8
 ATOL: float = 0.05
 """Absolute tolerance"""
 
@@ -55,7 +55,7 @@ solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 
 
 def test_H2_andesite_hirschmann(check_values) -> None:
-    """Tests H2 in synthetic andesite :cite:p:`HWA12`, 
+    """Tests H2 in synthetic andesite :cite:p:`HWA12`,
     eference Parameters (fH2, H2 Conc) from Table 2 Values for Andesite, Experiment 901"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -74,7 +74,7 @@ def test_H2_andesite_hirschmann(check_values) -> None:
 
 
 def test_H2_basalt_hirschmann(check_values) -> None:
-    """Tests H2 in synthetic basalt :cite:p:`HWA12`, 
+    """Tests H2 in synthetic basalt :cite:p:`HWA12`,
     Reference Parameters (fH2, H2 Conc) from Table 2 Values for Basalt, Average of Experiments A697 and A711"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
@@ -170,7 +170,7 @@ def test_H2O_basalt_mitchell(check_values) -> None:
 
 def test_H2O_basalt_wilson(check_values) -> None:
     """Tests H2O in basalt :cite:p:`WH81,HBO64`,
-    Reference Parameters (fH2O and H2O Conc) from Hamilton et al. 1964, Table 3, Run No. 196; 
+    Reference Parameters (fH2O and H2O Conc) from Hamilton et al. 1964, Table 3, Run No. 196;
     And Confirmed with Figure 1 that pressure in the table refers to water pressure (fH2O)"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
