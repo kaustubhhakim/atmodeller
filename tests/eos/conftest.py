@@ -20,7 +20,6 @@ import pytest
 from jax.typing import ArrayLike
 from pytest import approx
 
-from atmodeller.eos.core import RealGas
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import RealGasProtocol
 
@@ -51,7 +50,13 @@ class CheckValues:
 
     @staticmethod
     def compressibility(
-        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        eos: RealGasProtocol,
+        expected: float,
+        *,
+        rtol=RTOL,
+        atol=ATOL,
     ) -> None:
         """Checks the compressibility parameter
 
@@ -69,7 +74,13 @@ class CheckValues:
 
     @staticmethod
     def fugacity(
-        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        eos: RealGasProtocol,
+        expected: float,
+        *,
+        rtol=RTOL,
+        atol=ATOL,
     ) -> None:
         """Checks the fugacity.
 
@@ -88,7 +99,13 @@ class CheckValues:
 
     @staticmethod
     def fugacity_coefficient(
-        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
+        temperature: float,
+        pressure: float,
+        eos: RealGasProtocol,
+        expected: float,
+        *,
+        rtol=RTOL,
+        atol=ATOL,
     ) -> None:
         """Checks the fugacity coefficient.
 
@@ -107,7 +124,13 @@ class CheckValues:
 
     @staticmethod
     def volume(
-        temperature: float, pressure: float, eos: RealGas, expected: float, *, rtol=RTOL, atol=ATOL
+        temperature: float,
+        pressure: float,
+        eos: RealGasProtocol,
+        expected: float,
+        *,
+        rtol=RTOL,
+        atol=ATOL,
     ) -> None:
         """Checks the volume.
 

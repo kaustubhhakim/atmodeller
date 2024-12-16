@@ -824,7 +824,7 @@ CO2_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     5000,
 )
 """CO2 virial compensation :cite:p:`HP91`"""
-CO2_cork_holland91: RealGas = CORK(
+CO2_cork_holland91: RealGasProtocol = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland91, dummy_critical_data
 )
 """CO2 cork :cite:p:`HP91`
@@ -838,7 +838,7 @@ H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     2000,
 )
 """H2O virial compensation :cite:p:`HP91`"""
-H2O_cork_holland91: RealGas = CORK(
+H2O_cork_holland91: RealGasProtocol = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland91, dummy_critical_data
 )
 """H2O cork :cite:p:`HP91`
@@ -853,7 +853,7 @@ CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     5000,
 )
 """CO2 virial compensation :cite:p:`HP98`"""
-CO2_cork_holland98: RealGas = CORK(
+CO2_cork_holland98: RealGasProtocol = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland98, dummy_critical_data
 )
 """CO2 cork :cite:p:`HP98`
