@@ -14,7 +14,11 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOSs from :cite:t:`SF87,SF87a,SF88,SS92`"""
+"""Real gas EOSs from :cite:t:`SF87,SF87a,SF88,SS92`
+
+The papers state a volume integration from P0 to P, where f(P0=1 bar)=1. Hence for bounded EOS a
+minimum pressure of 1 bar is assumed.
+"""
 
 from __future__ import annotations
 
@@ -393,7 +397,7 @@ pressure.
 H2_SS92: RealGasProtocol = CombinedRealGas(
     [_H2_low_pressure_SS92, _H2_high_pressure_SS92],
     [
-        ExperimentalCalibration(pressure_max=1000),
+        ExperimentalCalibration(pressure_min=1, pressure_max=1000),
         ExperimentalCalibration(pressure_min=1000),
     ],
 )
@@ -439,7 +443,11 @@ SO2_SS92: RealGasProtocol = SaxenaEightCoefficients(
     d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
     critical_data=select_critical_data("SO2_g"),
 )
-"""SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar(?)"""
+"""SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar"""
+SO2_SS92_bounded: RealGasProtocol = CombinedRealGas(
+    [SO2_SS92], [ExperimentalCalibration(pressure_min=1, pressure_max=10000)]
+)
+"""SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar"""
 
 _H2S_low_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
     a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
@@ -480,7 +488,7 @@ _H2S_high_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
 H2S_SS92: RealGasProtocol = CombinedRealGas(
     [_H2S_low_pressure_SS92, _H2S_high_pressure_SS92],
     [
-        ExperimentalCalibration(pressure_max=500),
+        ExperimentalCalibration(pressure_min=1.0, pressure_max=500),
         ExperimentalCalibration(pressure_min=500, pressure_max=10000),
     ],
 )
@@ -537,7 +545,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
     combined_model: RealGasProtocol = CombinedRealGas(
         [low_pressure, medium_pressure, high_pressure],
         [
-            ExperimentalCalibration(pressure_max=1000),
+            ExperimentalCalibration(pressure_min=1, pressure_max=1000),
             ExperimentalCalibration(pressure_min=1000, pressure_max=5000),
             ExperimentalCalibration(pressure_min=5000),
         ],
@@ -579,13 +587,9 @@ also adopted.
 
 
 def get_saxena_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of the preferred Saxena and colleagues EOS models for each species.
+    """Gets a dictionary of Saxena and colleagues EOS models that are bounded
 
-    The latest and/or most sophisticated EOS model is chosen for each species. Corresponding
-    states models are used when a bespoke fit to just that species is not available.
-
-    'cs' refers to corresponding states and `bounded` means that the EOS is reasonably well-behaved
-    outside its calibrated range to mitigate the solver throwing inf/nans.
+    'cs' refers to corresponding states.
 
     Returns:
         Dictionary of EOS models
@@ -601,6 +605,6 @@ def get_saxena_eos_models() -> dict[str, RealGasProtocol]:
     eos_models["N2_cs_saxena87"] = N2_SF87
     eos_models["O2_cs_shi92"] = O2_SS92
     eos_models["S2_cs_shi92"] = S2_SS92
-    eos_models["SO2_shi92"] = SO2_SS92
+    eos_models["SO2_shi92"] = SO2_SS92_bounded
 
     return eos_models
