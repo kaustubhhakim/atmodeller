@@ -880,6 +880,7 @@ H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((8.0331e-2, 0), 0.25),
     2000,
 )
+"""H2O virial compensation :cite:p:`HP98`"""
 H2O_cork_holland98: RealGasProtocol = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
@@ -895,6 +896,8 @@ def get_holland_eos_models() -> dict[str, RealGasProtocol]:
 
     The naming convention is as follows:
         [species]_[eos model]_[citation]
+
+    'cs' refers to corresponding states.
 
     Returns:
         Dictionary of EOS models
@@ -913,7 +916,7 @@ def get_holland_eos_models() -> dict[str, RealGasProtocol]:
     # Gas (subcritical) only
     eos_models["H2O_mrk_gas_holland91"] = H2O_mrk_gas_holland91
     # TODO: include the liquid as a condensed activity model
-    eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
+    # eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
     eos_models["H2S_cork_cs_holland11"] = H2S_cork_cs_holland11_bounded
     eos_models["N2_cork_cs_holland91"] = N2_cork_cs_holland91_bounded
     eos_models["S2_cork_cs_holland11"] = S2_cork_cs_holland11_bounded
