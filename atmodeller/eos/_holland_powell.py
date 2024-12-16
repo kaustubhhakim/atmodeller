@@ -337,8 +337,8 @@ class MRKImplicitHP91ABCMixin:
     Args:
         a_coefficients: `a` coefficients
         b: `b` coefficient
-        Ta: Temperature at which the `a` parameter is equal for the dense fluid and gas
-        Tc: Critical temperature
+        Ta: Temperature at which the `a` parameter is equal for the dense fluid and gas in K
+        Tc: Critical temperature in K
     """
 
     def __init__(self, a_coefficients: tuple[float, ...], b: float, Ta: float, Tc: float):
@@ -525,15 +525,15 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         mrk_fluid: The MRK for the supercritical fluid
         mrk_gas: The MRK for the subcritical gas
         mrk_liquid: The MRK for the subcritical liquid
-        Ta: Temperature at which a_gas = a in the MRK formulation
-        Tc: Critical temperature
+        Ta: Temperature at which a_gas = a in the MRK formulation in K
+        Tc: Critical temperature in K
 
     Attributes:
         mrk_fluid: The MRK for the supercritical fluid
         mrk_gas: The MRK for the subcritical gas
         mrk_liquid: The MRK for the subcritical liquid
-        Ta: Temperature at which a_gas = a in the MRK formulation
-        Tc: Critical temperature
+        Ta: Temperature at which a_gas = a in the MRK formulation in K
+        Tc: Critical temperature in K
     """
 
     mrk_fluid: MRKImplicitFluidHP91 = H2OMrkFluidHolland91
@@ -744,12 +744,21 @@ whether or not the virial contribution is added. The unit conversions to SI and 
 mean that every virial coefficient has been multiplied by 1e-2 compared to the values in 
 :cite:t:`HP91{Table 2}`.
 """
+
 experimental_calibration_holland91: ExperimentalCalibration = ExperimentalCalibration(
-    temperature_min=100,
-    temperature_max=4000,
-    pressure_max=50e3,  # TODO: Add back in pressure_min=0.1
+    temperature_min=373,
+    temperature_max=4000,  # TODO: Should be 1873 K, but may be some extrapolation is OK?
+    pressure_min=1,
+    pressure_max=50e3,
 )
 """Experimental calibration for :cite:`HP91,HP11` models"""
+experimental_calibration_holland98: ExperimentalCalibration = ExperimentalCalibration(
+    temperature_min=373,
+    temperature_max=4000,  # TODO: Should be 1873 K, but may be some extrapolation is OK?
+    pressure_min=1,
+    pressure_max=120e3,
+)
+"""Experimental calibration for :cite:`HP98` models"""
 
 CH4_cork_cs_holland91: RealGasProtocol = CORK(
     CH4_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CH4_g")
@@ -827,10 +836,12 @@ CO2_virial_compensation_holland91: VirialCompensation = VirialCompensation(
 CO2_cork_holland91: RealGasProtocol = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland91, dummy_critical_data
 )
-"""CO2 cork :cite:p:`HP91`
+"""CO2 cork :cite:p:`HP91`"""
+CO2_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [CO2_cork_holland91], [experimental_calibration_holland91]
+)
+"""CO2 cork bounded :cite:p:`HP91`"""
 
-TODO: ExperimentalCalibration(400, 1900, 0, 50e3)
-"""
 H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((-3.2297554e-3, 2.2215221e-6), 1.0),
     FullUnitConverter.convert_virial_coefficients((-3.025650e-2, -5.343144e-6), 0.5),
@@ -841,10 +852,11 @@ H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
 H2O_cork_holland91: RealGasProtocol = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland91, dummy_critical_data
 )
-"""H2O cork :cite:p:`HP91`
-
-TODO: calibration=ExperimentalCalibration(400, 1700, 0, 50e3),
-"""
+"""H2O cork :cite:p:`HP91`"""
+H2O_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [H2O_cork_holland91], [experimental_calibration_holland91]
+)
+"""H2O cork bounded :cite:p:`HP91`"""
 
 CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((5.40776e-3, -1.59046e-6), 1.0),
@@ -856,10 +868,12 @@ CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
 CO2_cork_holland98: RealGasProtocol = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland98, dummy_critical_data
 )
-"""CO2 cork :cite:p:`HP98`
+"""CO2 cork :cite:p:`HP98`"""
+CO2_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
+    [CO2_cork_holland98], [experimental_calibration_holland98]
+)
+"""CO2 cork bounded :cite:p:`HP98"""
 
-TODO: calibration=ExperimentalCalibration(400, 1900, 0, 120e3),
-"""
 H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((1.9853e-3, 0), 1.0),
     FullUnitConverter.convert_virial_coefficients((-8.9090e-2, 0), 0.5),
@@ -869,10 +883,11 @@ H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
 H2O_cork_holland98: RealGasProtocol = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
-"""H2O cork :cite:p:`HP98`
-
-TODO: calibration=ExperimentalCalibration(400, 1700, 0, 120e3),
-"""
+"""H2O cork :cite:p:`HP98`"""
+H2O_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
+    [H2O_cork_holland98], [experimental_calibration_holland98]
+)
+"""H2O cork bounded :cite:p:`HP98`"""
 
 
 def get_holland_eos_models() -> dict[str, RealGasProtocol]:
@@ -886,19 +901,13 @@ def get_holland_eos_models() -> dict[str, RealGasProtocol]:
     """
     eos_models: dict[str, RealGasProtocol] = {}
     eos_models["CH4_cork_cs_holland91"] = CH4_cork_cs_holland91_bounded
-    eos_models["CH4_mrk_cs_holland91"] = CH4_mrk_cs_holland91
     eos_models["CO_cork_cs_holland91"] = CO_cork_cs_holland91_bounded
-    eos_models["CO_mrk_cs_holland91"] = CO_mrk_cs_holland91
-    eos_models["CO2_cork_holland91"] = CO2_cork_holland91
-    eos_models["CO2_cork_holland98"] = CO2_cork_holland98
+    eos_models["CO2_cork_holland91"] = CO2_cork_holland91_bounded
+    eos_models["CO2_cork_holland98"] = CO2_cork_holland98_bounded
     eos_models["CO2_cork_cs_holland91"] = CO2_cork_cs_holland91_bounded
-    eos_models["CO2_mrk_cs_holland91"] = CO2_mrk_cs_holland91
-    eos_models["CO2_mrk_holland91"] = CO2MrkHolland91
     eos_models["H2_cork_cs_holland91"] = H2_cork_cs_holland91_bounded
-    eos_models["H2_mrk_cs_holland91"] = H2_mrk_cs_holland91
-    eos_models["H2O_cork_holland91"] = H2O_cork_holland91
-    eos_models["H2O_cork_holland98"] = H2O_cork_holland98
-    eos_models["H2O_mrk_holland91"] = H2OMrkHolland91
+    eos_models["H2O_cork_holland91"] = H2O_cork_holland91_bounded
+    eos_models["H2O_cork_holland98"] = H2O_cork_holland98_bounded
     # Supercritical fluid only
     eos_models["H2O_mrk_fluid_holland91"] = H2O_mrk_fluid_holland91
     # Gas (subcritical) only
@@ -906,10 +915,7 @@ def get_holland_eos_models() -> dict[str, RealGasProtocol]:
     # TODO: include the liquid as a condensed activity model
     eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
     eos_models["H2S_cork_cs_holland11"] = H2S_cork_cs_holland11_bounded
-    eos_models["H2S_mrk_cs_holland11"] = H2S_mrk_cs_holland11
     eos_models["N2_cork_cs_holland91"] = N2_cork_cs_holland91_bounded
-    eos_models["N2_mrk_cs_holland91"] = N2_mrk_cs_holland91
     eos_models["S2_cork_cs_holland11"] = S2_cork_cs_holland11_bounded
-    eos_models["S2_mrk_cs_holland11"] = S2_mrk_cs_holland11
 
     return eos_models
