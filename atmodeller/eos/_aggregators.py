@@ -66,10 +66,12 @@ class CombinedRealGasABC(RealGas, ABC):
 
     @property
     def volume_functions(self) -> list[Callable]:
+        """Volume functions"""
         return [eos.volume for eos in self._real_gases]
 
     @property
     def volume_integral_functions(self) -> list[Callable]:
+        """Volume integral functions"""
         return [eos.volume_integral for eos in self._real_gases]
 
     # Do not jit. Causes problems with initialization.
@@ -92,10 +94,7 @@ class CombinedRealGasABC(RealGas, ABC):
                     raise ValueError(msg)
 
             pressure_bound = calibration.pressure_max
-
             upper_pressure_bounds.append(pressure_bound)
-
-        logger.debug("upper_pressure_bounds = %s", upper_pressure_bounds)
 
         return jnp.array(upper_pressure_bounds)
 
@@ -155,8 +154,6 @@ class CombinedRealGasABC(RealGas, ABC):
         return cls(**aux_data)
 
 
-# Might be able to subclass general infrastructure that assumes a polynomial form for the
-# compressibility factor.
 @register_pytree_node_class
 class UpperBoundRealGas(RealGas):
     """An upper bound for an EOS
@@ -270,12 +267,11 @@ class CombinedRealGas(CombinedRealGasABC):
     This class computes the contribution to the volume integral separately for each EOS based on
     the range covered by its P-T calibration, and then combines them.
 
-    This class also allows EOS to be combined and automatically applies appropriate extrapolation
-    below the minimum calibration pressure and above the maximum calibration pressure. Reasonable
-    extrapolation behaviour is required to ensure that the function is bounded to avoid throwing
-    NaNs or infs which will crash the solver. Physically, it is reasonable to extend the lower
-    bound using the ideal gas law and the upper bound assuming a linear pressure dependence of the
-    compressibility factor.
+    This class also automatically applies appropriate extrapolation below the minimum calibration
+    pressure and above the maximum calibration pressure. Reasonable extrapolation behaviour is
+    required to ensure that the function is bounded to avoid throwing NaNs or infs which will crash
+    the solver. Physically, it is reasonable to extend the lower bound using the ideal gas law and
+    the upper bound assuming a linear pressure dependence of the compressibility factor.
 
     Args:
         real_gases: Real gases to combine
@@ -307,28 +303,26 @@ class CombinedRealGas(CombinedRealGasABC):
 
     @property
     def extrapolate_lower(self) -> bool:
+        """Include extrapolation below the minimum calibration pressure"""
         return self._calibrations[0].pressure_min is not None and self._extrapolate
 
     @property
     def extrapolate_upper(self) -> bool:
+        """Include extrapolation above the maximum calibration pressure"""
         return self._calibrations[-1].pressure_max is not None and self._extrapolate
 
     # Do not jit. Causes problems with initialization.
     def _append_lower_bound(self) -> None:
-        """Appends the lower bound"""
-        logger.debug("Appending lower bound")
+        """Appends the lower bound, which gives ideal gas behaviour"""
         self._real_gases.insert(0, IdealGas())
-        assert self._calibrations[0].pressure_min is not None
-        pressure_max: float = self._calibrations[0].pressure_min
+        pressure_max: float = self._calibrations[0].pressure_min  # type: ignore check done before
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_max=pressure_max)
         self._calibrations.insert(0, calibration)
 
     # Do not jit. Causes problems with initialization.
     def _append_upper_bound(self) -> None:
         """Appends the upper bound"""
-        logger.debug("Appending upper bound")
-        assert self._calibrations[-1].pressure_max is not None
-        pressure_min: float = self._calibrations[-1].pressure_max
+        pressure_min: float = self._calibrations[-1].pressure_max  # type: ignore check done before
         real_gas: RealGasProtocol = UpperBoundRealGas(
             self._real_gases[-1], pressure_min, self._dzdp
         )
@@ -345,26 +339,32 @@ class CombinedRealGas(CombinedRealGasABC):
             volume_integral_high: Array = lax.switch(
                 ii, self.volume_integral_functions, temperature, pressure_high
             )
-            # jax.debug.print("volume_integral_high = {out}", out=volume_integral_high)
+            # jax.debug.print("compute_integral: index = {ii}", ii=ii)
+            # jax.debug.print(
+            #    "compute_integral: volume_integral_high = {out}", out=volume_integral_high
+            # )
             volume_integral_low: Array = lax.switch(
                 ii, self.volume_integral_functions, temperature, pressure_low
             )
-            # jax.debug.print("volume_integral_low = {out}", out=volume_integral_low)
+            # jax.debug.print(
+            #    "compute_integral: volume_integral_low = {out}", out=volume_integral_low
+            # )
             integral_contribution = volume_integral_high - volume_integral_low
 
             return integral_contribution
 
         def body_fun(ii: int, carry: Array) -> Array:
-            # jax.debug.print("index = {out}", out=index)
+            # jax.debug.print("body_fun: index = {out}", out=index)
             pressure_high: Array = lax.dynamic_index_in_dim(
                 self._upper_pressure_bounds, ii, keepdims=False
             )
-            # jax.debug.print("pressure_high = {out}", out=pressure_high)
+            # jax.debug.print("body_fun: pressure_high = {out}", out=pressure_high)
             pressure_low: Array = lax.dynamic_index_in_dim(
                 self._upper_pressure_bounds, ii - 1, keepdims=False
             )
-            # jax.debug.print("pressure_low = {out}", out=pressure_low)
+            # jax.debug.print("body_fun: pressure_low = {out}", out=pressure_low)
             carry = carry + compute_integral(ii, pressure_high, pressure_low)
+            # jax.debug.print("body_fun: carry = {out}", out=carry)
 
             return carry
 
@@ -373,6 +373,7 @@ class CombinedRealGas(CombinedRealGasABC):
 
         def add_only_first_integral(total_integral: Array) -> Array:
             integral: Array = lax.switch(0, self.volume_integral_functions, temperature, pressure)
+            # jax.debug.print("add_only_first_integral: integral = {out}", out=integral)
 
             return total_integral + integral
 
@@ -396,6 +397,7 @@ class CombinedRealGas(CombinedRealGasABC):
             first_integral: Array = lax.switch(
                 0, self.volume_integral_functions, temperature, pressure_high
             )
+            # jax.debug.print("first_integral = {out}", out=first_integral)
 
             pressure_low: Array = lax.dynamic_index_in_dim(
                 self._upper_pressure_bounds, index - 1, keepdims=False
