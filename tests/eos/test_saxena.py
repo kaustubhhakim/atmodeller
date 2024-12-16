@@ -153,15 +153,52 @@ def test_SO2_high_pressure_SS92(check_values) -> None:
 #     check_values.fugacity(temperature, pressure, model, expected)
 
 
-# TODO: Test the volume integral behaves as expected for the upper bound.
 def test_upper_extrapolation(check_values) -> None:
     """Tests the upper bound extrapolation"""
     model: RealGasProtocol = eos_models["H2S_shi92"]
-    temperature: float = 3000
+    temperature: float = 1073
     pressure: float = 10e3  # Maximum pressure of the highest pressure EOS in this composite EOS
     pressure_above_max: float = 20e3  # To test pressure above the maximum
     # Expected compressibility factor at 3000 K and (the maximum calibrated pressure) 10000 bar
-    expected: float = 1.414866027665503
+    expected: float = 4.472116811082408
     check_values.compressibility(temperature, pressure, model, expected)
     # The upper bound extrapolation should maintain the same compressibility for higher pressures
     check_values.compressibility(temperature, pressure_above_max, model, expected)
+
+
+def test_volume_integral_standard_pressure(check_values) -> None:
+    """Tests the volume integral"""
+    model: RealGasProtocol = eos_models["H2S_shi92"]
+    temperature: float = 1873
+    pressure: float = 1.0
+    # At the standard pressure the volume integral is zero by construction
+    expected: float = 0.0
+    check_values.volume_integral(temperature, pressure, model, expected)
+
+
+def test_volume_integral_index0(check_values) -> None:
+    """Tests the volume integral for the first EOS"""
+    model: RealGasProtocol = eos_models["H2S_shi92"]
+    # Within ranges of experimental data, otherwise the extrapolated behaviour might be unphysical
+    temperature: float = 1073
+    pressure: float = 1000.0
+    expected: float = 0.619184870412741
+    check_values.volume_integral(temperature, pressure, model, expected)
+
+
+def test_volume_integral_index1(check_values) -> None:
+    """Tests the volume integral for the first and second EOS"""
+    model: RealGasProtocol = eos_models["H2S_shi92"]
+    temperature: float = 1073
+    pressure: float = 9999
+    expected: float = 1.088570827561088
+    check_values.volume_integral(temperature, pressure, model, expected)
+
+
+def test_volume_integral_index2(check_values) -> None:
+    """Tests the volume integral in the extrapolated region above the maximum pressure"""
+    model: RealGasProtocol = eos_models["H2S_shi92"]
+    temperature: float = 1073
+    pressure: float = 20000
+    expected: float = 1.365159989447105
+    check_values.volume_integral(temperature, pressure, model, expected)
