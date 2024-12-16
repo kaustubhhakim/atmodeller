@@ -16,8 +16,8 @@
 #
 """Real gas EOSs from :cite:t:`SF87,SF87a,SF88,SS92`
 
-The papers state a volume integration from P0 to P, where f(P0=1 bar)=1. Hence for bounded EOS a
-minimum pressure of 1 bar is assumed.
+The papers state a volume integration from :math:`P_0` to :math:`P`, where :math:`f(P_0=1)=1`.
+Hence for bounded EOS a minimum pressure of 1 bar is assumed.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class SaxenaABC(RealGas):
         b_coefficients: `b` coefficients
         c_coefficients: `c` coefficients
         d_coefficients: `d` coefficients
-        critical_data: Critical data. Defaults to unity values meaning effectively unused.
+        critical_data: Critical data. Defaults to unity values, effectively meaning unused.
     """
 
     def __init__(
@@ -87,7 +87,7 @@ class SaxenaABC(RealGas):
         :cite:p:`SS92{Equation 1}`
 
         Args:
-            scaled_temperature: Scaled temperature
+            scaled_temperature: Scaled temperature, which is dimensionless
             coefficients: Tuple of the coefficients `a`, `b`, `c`, or `d`.
 
         Returns
@@ -109,7 +109,7 @@ class SaxenaABC(RealGas):
         """`a` parameter
 
         Args:
-            scaled_temperature: Scaled temperature
+            scaled_temperature: Scaled temperature, which is dimensionless
 
         Returns:
             a parameter
@@ -123,7 +123,7 @@ class SaxenaABC(RealGas):
         """`b` parameter
 
         Args:
-            scaled_temperature: Scaled temperature
+            scaled_temperature: Scaled temperature, which is dimensionless
 
         Returns:
             b parameter
@@ -137,7 +137,7 @@ class SaxenaABC(RealGas):
         """`c` parameter
 
         Args:
-            scaled_temperature: Scaled temperature
+            scaled_temperature: Scaled temperature, which is dimensionless
 
         Returns:
             c parameter
@@ -151,7 +151,7 @@ class SaxenaABC(RealGas):
         """`d` parameter
 
         Args:
-            scaled_temperature: Scaled temperature
+            scaled_temperature: Scaled temperature, which is dimensionless
 
         Returns:
             d parameter
@@ -299,7 +299,7 @@ class SaxenaFiveCoefficients(SaxenaABC):
         :cite:p:`SS92{Equation 3b}`
 
         Args:
-            temperature: Scaled temperature
+            temperature: Scaled temperature, which is dimensionless
             coefficients: Tuple of the coefficients `a`, `b`, `c`, or `d`.
 
         Returns
@@ -329,7 +329,7 @@ class SaxenaEightCoefficients(SaxenaABC):
         :cite:p:`SS92{Equation 3a}`
 
         Args:
-            temperature: Scaled temperature
+            temperature: Scaled temperature, which is dimensionless
             coefficients: Tuple of the coefficients `a`, `b`, `c`, or `d`.
 
         Returns
