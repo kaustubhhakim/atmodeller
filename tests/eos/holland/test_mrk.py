@@ -14,12 +14,21 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Tests for the MRK EOS models from :cite:t:`HP91,HP98`"""
+"""Tests for the MRK EOS models from :cite:t:`HP91,HP98`
+
+These are not intended to be used directly, but rather as a building block of the CORK models they
+serve as convenient tests in the absence of a virial correction term."""
 
 import logging
 
 from atmodeller import debug_logger
-from atmodeller.eos import get_eos_models
+from atmodeller.eos._holland_powell import (
+    CO2_mrk_cs_holland91,
+    CO2MrkHolland91,
+    H2O_mrk_fluid_holland91,
+    H2O_mrk_gas_holland91,
+    H2OMrkHolland91,
+)
 from atmodeller.interfaces import RealGasProtocol
 
 RTOL: float = 1.0e-8
@@ -29,26 +38,24 @@ ATOL: float = 1.0e-8
 
 logger: logging.Logger = debug_logger()
 
-eos_models: dict[str, RealGasProtocol] = get_eos_models()
-
 
 def test_CO2_corresponding_states(check_values) -> None:
     """CO2 corresponding states"""
-    model: RealGasProtocol = eos_models["CO2_mrk_cs_holland91"]
+    model: RealGasProtocol = CO2_mrk_cs_holland91
     expected: float = 1.5831992703027848
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2(check_values) -> None:
     """CO2"""
-    model: RealGasProtocol = eos_models["CO2_mrk_holland91"]
+    model: RealGasProtocol = CO2MrkHolland91
     expected: float = 1.575457075165528
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_above_Tc(check_values) -> None:
     """H2O above Tc"""
-    model: RealGasProtocol = eos_models["H2O_mrk_fluid_holland91"]
+    model: RealGasProtocol = H2O_mrk_fluid_holland91
     expected: float = 1.048278616058322
     check_values.fugacity_coefficient(2000, 1e3, model, expected, rtol=RTOL, atol=ATOL)
 
@@ -56,7 +63,7 @@ def test_H2O_above_Tc(check_values) -> None:
 def test_H2O_below_Tc_below_Psat(check_values) -> None:
     """H2O below Tc and below Psat"""
     # Psat = 0.118224 kbar at T = 600 K
-    model: RealGasProtocol = eos_models["H2O_mrk_gas_holland91"]
+    model: RealGasProtocol = H2O_mrk_gas_holland91
     expected: float = 0.7910907770688191
     check_values.fugacity_coefficient(600, 0.1e3, model, expected, rtol=RTOL, atol=ATOL)
 
@@ -65,6 +72,4 @@ def test_H2O_below_Tc_above_Psat(check_values) -> None:
     """H2O below Tc and above Psat"""
     # Psat = 0.118224 kbar at T = 600 K
     expected: float = 0.13704706029361396
-    check_values.fugacity_coefficient(
-        600, 1e3, eos_models["H2O_mrk_holland91"], expected, rtol=RTOL, atol=ATOL
-    )
+    check_values.fugacity_coefficient(600, 1e3, H2OMrkHolland91, expected, rtol=RTOL, atol=ATOL)

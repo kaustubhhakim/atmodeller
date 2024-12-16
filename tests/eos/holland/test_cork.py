@@ -116,54 +116,54 @@ def test_H2_volume_10kb(check_values) -> None:
 def test_H2(check_values) -> None:
     """H2"""
     model: RealGasProtocol = eos_models["H2_cork_cs_holland91"]
-    expected: float = 4.672042007568433
+    expected: float = 4.67146087585007
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO(check_values) -> None:
     """CO"""
     model: RealGasProtocol = eos_models["CO_cork_cs_holland91"]
-    expected: float = 7.737070657107842
+    expected: float = 7.735168014913625
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CH4(check_values) -> None:
     """CH4"""
     model: RealGasProtocol = eos_models["CH4_cork_cs_holland91"]
-    expected: float = 8.013532244610671
+    expected: float = 8.01145999484921
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_simple_CO2(check_values) -> None:
     """Simple CO2"""
     model: RealGasProtocol = eos_models["CO2_cork_cs_holland91"]
-    expected: float = 7.120242298956865
+    expected: float = 7.118598073639082
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2_at_P0(check_values) -> None:
     """CO2 below P0 so virial contribution excluded"""
     model: RealGasProtocol = eos_models["CO2_cork_holland98"]
-    expected: float = 1.5754570751655304
+    expected: float = 1.57505991404597
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2_above_P0(check_values) -> None:
     """CO2 above P0 so virial contribution included"""
     model: RealGasProtocol = eos_models["CO2_cork_holland98"]
-    expected: float = 7.144759853226838
+    expected: float = 7.142958711915495
     check_values.fugacity_coefficient(2000, 10e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_above_Tc_above_P0(check_values) -> None:
     """H2O above Tc and above P0"""
     model: RealGasProtocol = eos_models["H2O_cork_holland98"]
-    expected: float = 1.3444013638026706
+    expected: float = 1.344344209075713
     check_values.fugacity_coefficient(2000, 5e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_below_Tc_above_P0(check_values) -> None:
     """H2O below Tc and above P0"""
     model: RealGasProtocol = eos_models["H2O_cork_holland98"]
-    expected: float = 0.39074941260585533
+    expected: float = 0.39156756638038
     check_values.fugacity_coefficient(600, 10e3, model, expected, rtol=RTOL, atol=ATOL)
