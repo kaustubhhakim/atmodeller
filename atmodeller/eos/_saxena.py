@@ -251,12 +251,13 @@ class SaxenaABC(RealGas):
         """
         Tr: ArrayLike = self.scaled_temperature(temperature)
         Pr: ArrayLike = self.scaled_pressure(pressure)
+        PRESSURE_REFERENCE_SCALED: float = PRESSURE_REFERENCE / self.critical_pressure
         volume_integral: Array = (
             (
-                self._a(Tr) * jnp.log(Pr / PRESSURE_REFERENCE)
-                + self._b(Tr) * (Pr - PRESSURE_REFERENCE)
-                + (1.0 / 2) * self._c(Tr) * (jnp.square(Pr) - PRESSURE_REFERENCE**2)
-                + (1.0 / 3) * self._d(Tr) * (jnp.power(Pr, 3) - PRESSURE_REFERENCE**3)
+                self._a(Tr) * jnp.log(Pr / PRESSURE_REFERENCE_SCALED)
+                + self._b(Tr) * (Pr - PRESSURE_REFERENCE_SCALED)
+                + (1.0 / 2) * self._c(Tr) * (jnp.square(Pr) - PRESSURE_REFERENCE_SCALED**2)
+                + (1.0 / 3) * self._d(Tr) * (jnp.power(Pr, 3) - PRESSURE_REFERENCE_SCALED**3)
             )
             * GAS_CONSTANT_BAR
             * temperature
