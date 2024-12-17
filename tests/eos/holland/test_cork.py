@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 
 from atmodeller import debug_logger
+from atmodeller.eos._holland_powell import H2O_cork_holland91_bounded, H2O_cork_holland98_bounded
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import unit_conversion
@@ -38,7 +39,7 @@ eos_models: dict = get_eos_models()
 
 def test_H2O_volume_1kbar(check_values) -> None:
     """:cite:t:`HP91{Figure 2a}`"""
-    model: RealGasProtocol = eos_models["H2O_cork_holland91"]
+    model: RealGasProtocol = H2O_cork_holland91_bounded
     expected: float = 47.502083040419844 * unit_conversion.cm3_to_m3
     check_values.volume(873, 1000, model, expected, rtol=RTOL, atol=ATOL)
 
@@ -157,13 +158,13 @@ def test_CO2_above_P0(check_values) -> None:
 
 def test_H2O_above_Tc_above_P0(check_values) -> None:
     """H2O above Tc and above P0"""
-    model: RealGasProtocol = eos_models["H2O_cork_holland98"]
+    model: RealGasProtocol = H2O_cork_holland98_bounded
     expected: float = 1.344344209075713
     check_values.fugacity_coefficient(2000, 5e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_below_Tc_above_P0(check_values) -> None:
     """H2O below Tc and above P0"""
-    model: RealGasProtocol = eos_models["H2O_cork_holland98"]
+    model: RealGasProtocol = H2O_cork_holland98_bounded
     expected: float = 0.39156756638038
     check_values.fugacity_coefficient(600, 10e3, model, expected, rtol=RTOL, atol=ATOL)

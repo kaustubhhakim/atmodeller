@@ -31,7 +31,7 @@ from atmodeller.thermodata._redox_buffers import (
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 LOG10_SHIFT: ArrayLike = 0
 """Log10 shift"""

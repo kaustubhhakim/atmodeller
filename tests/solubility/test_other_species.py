@@ -29,7 +29,7 @@ from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""

@@ -25,13 +25,13 @@ from jax.typing import ArrayLike
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, Species
-from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -94,7 +94,9 @@ def test_CHO_reduced(helper) -> None:
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(-2)}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+        O2_g.name: IronWustiteBuffer(-2)
+    }
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -141,7 +143,9 @@ def test_CHO_IW(helper) -> None:
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(0.5)}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+        O2_g.name: IronWustiteBuffer(0.5)
+    }
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -199,7 +203,7 @@ def test_CHO_oxidised(helper) -> None:
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(2)}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer(2)}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -247,7 +251,7 @@ def test_CHO_highly_oxidised(helper) -> None:
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(4)}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer(4)}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -290,7 +294,7 @@ def test_CHO_middle_temperature(helper) -> None:
     planet: Planet = Planet(surface_temperature=873.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer()}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -440,7 +444,9 @@ def test_graphite_unstable(helper) -> None:
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer(0.5)}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+        O2_g.name: IronWustiteBuffer(0.5)
+    }
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)

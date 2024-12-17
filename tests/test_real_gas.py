@@ -25,16 +25,21 @@ from jax.typing import ArrayLike
 
 from atmodeller import INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
-from atmodeller.containers import Planet, SolverParameters, Species
+from atmodeller.containers import ConstantFugacityConstraint, Planet, SolverParameters, Species
 from atmodeller.eos.library import get_eos_models
-from atmodeller.interfaces import RealGasProtocol, RedoxBufferProtocol, SolubilityProtocol
+from atmodeller.interfaces import (
+    FugacityConstraintProtocol,
+    RealGasProtocol,
+    RedoxBufferProtocol,
+    SolubilityProtocol,
+)
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import OptxSolver, earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-# logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -140,7 +145,7 @@ def test_chabrier_earth(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="Fails. Might require improved initial condition or bounding")
+# @pytest.mark.skip(reason="Fails. Might require improved initial condition or bounding")
 def test_chabrier_earth_dogleg(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` using the dogleg solver"""
 
@@ -314,6 +319,102 @@ def test_chabrier_subNeptune_batch(helper) -> None:
         "H2_g": np.array([2.003779275377057, 0.170286601371338, 0.027748065184473]),
         "H2_g_activity": np.array([26.950066680710645, 14.769839969937074, 11.271846166572525]),
         "O2_g": np.array([34647.5851511399, 118713.0248545309, 205315.21994142563]),
+    }
+
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+
+
+def test_pH2_fO2_real_gas(helper) -> None:
+    """Tests H2-H2O at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`.
+
+    Applies a constraint to the fugacity of H2.
+    """
+    H2O_g: Species = Species.create_gas(
+        "H2O_g",
+        solubility=solubility_models["H2O_peridotite_sossi23"],
+        activity=eos_models["H2O_cork_holland98"],
+    )
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_cork_cs_holland91"])
+    O2_g: Species = Species.create_gas("O2_g")
+
+    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
+
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+        O2_g.name: ConstantFugacityConstraint(1.0453574209588085e-07),
+        # Gives a H2 partial pressure of around 1000 bar
+        H2_g.name: ConstantFugacityConstraint(1000.0),  # 1493.1),
+    }
+
+    interior_atmosphere.initialise_solve(
+        planet=planet,
+        fugacity_constraints=fugacity_constraints,
+    )
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
+
+    target: dict[str, float] = {
+        "H2O_g": 1470.2567650857518,
+        "H2_g": 999.9971214963639,
+        "O2_g": 1.045357420958815e-07,
+    }
+
+    assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
+
+
+@pytest.mark.skip(reason="Takes a bit longer to compile and run than other models")
+def test_H_and_C_real_gas(helper) -> None:
+    """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
+
+    H2_g: Species = Species.create_gas(
+        "H2_g",
+        solubility=solubility_models["H2_basalt_hirschmann12"],
+        activity=eos_models["H2_cork_cs_holland91"],
+    )
+    H2O_g: Species = Species.create_gas(
+        "H2O_g",
+        solubility=solubility_models["H2O_peridotite_sossi23"],
+        activity=eos_models["H2O_cork_holland98"],
+    )
+    O2_g: Species = Species.create_gas("O2_g")
+    CO_g: Species = Species.create_gas("CO_g", activity=eos_models["CO_cork_cs_holland91"])
+    CO2_g: Species = Species.create_gas(
+        "CO2_g",
+        solubility=solubility_models["CO2_basalt_dixon95"],
+        activity=eos_models["CO2_cork_holland98"],
+    )
+    CH4_g: Species = Species.create_gas("CH4_g", activity=eos_models["CH4_cork_cs_holland91"])
+
+    species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, CO_g, CO2_g, CH4_g)
+    planet: Planet = Planet()
+    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
+
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
+        H2_g.name: ConstantFugacityConstraint(958.0),
+        O2_g.name: ConstantFugacityConstraint(1.0132255325169718e-07),
+    }
+
+    oceans: ArrayLike = 10.0
+    h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
+    c_kg: ArrayLike = h_kg
+    mass_constraints: dict[str, ArrayLike] = {"C": c_kg}
+
+    interior_atmosphere.initialise_solve(
+        planet=planet,
+        fugacity_constraints=fugacity_constraints,
+        mass_constraints=mass_constraints,
+    )
+    output: Output = interior_atmosphere.solve()
+    solution: dict[str, ArrayLike] = output.quick_look()
+
+    target: dict[str, float] = {
+        "CH4_g": 11.612216513852113,
+        "CO2_g": 67.19430723726805,
+        "CO_g": 276.8796027243849,
+        "H2O_g": 955.2659883622448,
+        "H2_g": 694.2030982090682,
+        "O2_g": 1.0132255325169676e-07,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
