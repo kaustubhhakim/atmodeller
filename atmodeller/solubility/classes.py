@@ -27,6 +27,11 @@ from jax.typing import ArrayLike
 from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.utilities import PyTreeNoData, power_law
 
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
+
 if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
@@ -65,7 +70,17 @@ class Solubility(ABC, SolubilityProtocol):
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> ArrayLike:
-        """Wrapper to pass concentration arguments by position to use with JAX lax.switch"""
+        """Wrapper to pass concentration arguments by position to use with JAX lax.switch
+
+        Args:
+            fugacity: Fugacity in bar
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            fO2: fO2 in bar
+
+        Returns:
+            Concentration in ppmw
+        """
         return self.concentration(fugacity, temperature=temperature, pressure=pressure, fO2=fO2)
 
 
@@ -73,6 +88,7 @@ class Solubility(ABC, SolubilityProtocol):
 class NoSolubility(PyTreeNoData, Solubility):
     """No solubility"""
 
+    @override
     @jit
     def concentration(
         self,
@@ -107,20 +123,13 @@ class SolubilityPowerLaw(Solubility):
         self.constant: float = constant
         self.exponent: float = exponent
 
+    @override
     @jit
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
+    def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> ArrayLike:
+        del args
         del kwargs
 
         return power_law(fugacity, self.constant, self.exponent)
-
-    @jit
-    def jax_concentration(
-        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ) -> ArrayLike:
-        del temperature
-        del pressure
-        del fO2
-        return self.concentration(fugacity)
 
     def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
         children: tuple = ()
@@ -150,6 +159,7 @@ class SolubilityPowerLawLog10(Solubility):
         self.log10_constant: float = log10_constant
         self.log10_exponent: float = log10_exponent
 
+    @override
     @jit
     def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
         del kwargs
