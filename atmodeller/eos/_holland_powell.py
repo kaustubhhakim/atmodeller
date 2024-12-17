@@ -514,7 +514,138 @@ Critical behaviour is not considered for CO2 by :cite:t:`HP91`, but for consiste
 formulation for H2O, the CO2 critical temperature is set.
 """
 
-# TODO: Stitch together the H2O gas and H2O fluid for a single EOS
+
+@register_pytree_node_class
+class H2OMrkGasFluid91(PyTreeNoData, RealGas):
+    """A MRK model for H2O for the gas and supercritical fluid
+
+    Args:
+        mrk_fluid: The MRK for the supercritical fluid
+        mrk_gas: The MRK for the subcritical gas
+        Ta: Temperature at which a_gas = a in the MRK formulation in K
+        Tc: Critical temperature in K
+
+    Attributes:
+        mrk_fluid: The MRK for the supercritical fluid
+        mrk_gas: The MRK for the subcritical gas
+        Ta: Temperature at which a_gas = a in the MRK formulation in K
+        Tc: Critical temperature in K
+    """
+
+    mrk_fluid: MRKImplicitFluidHP91 = H2OMrkFluidHolland91
+    mrk_gas: MRKImplicitGasHP91 = H2OMrkGasHolland91
+    Ta: float = Ta_H2O
+    Tc: float = Tc_H2O
+
+    @jit
+    def _select_condition(self, temperature: ArrayLike) -> Array:
+        """Selects the condition
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Integer denoting the condition, i.e. the region of phase space
+        """
+        temperature_array: Array = jnp.asarray(temperature)
+
+        # Supercritical
+        cond0: Array = temperature_array >= self.Tc
+        # jax.debug.print("cond0 = {cond}", cond=cond0)
+        # Below Ta
+        cond1: Array = temperature_array <= self.Ta
+        # jax.debug.print("cond1 = {cond}", cond=cond1)
+        # Below Tc
+        cond2: Array = temperature_array < self.Tc
+        # Ensure cond2 is exclusive of cond1
+        cond2 = jnp.logical_and(cond2, ~cond1)
+
+        # All conditions are mutually exclusive
+        condition: Array = jnp.select([cond0, cond1, cond2], [0, 1, 2])
+        # jax.debug.print("condition = {condition}", condition=condition)
+
+        return condition
+
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume integral :cite:p:`HP91{Appendix A}`
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+        """
+        condition: Array = self._select_condition(temperature)
+
+        def volume_integral0() -> Array:
+            return self.mrk_fluid.volume_integral(temperature, pressure)
+
+        def volume_integral1() -> Array:
+            return self.mrk_gas.volume_integral(temperature, pressure)
+
+        def volume_integral2() -> Array:
+            return self.mrk_fluid.volume_integral(temperature, pressure)
+
+        volume_integral_funcs: list[Callable] = [
+            volume_integral0,
+            volume_integral1,
+            volume_integral2,
+        ]
+
+        volume_integral: Array = lax.switch(condition, volume_integral_funcs)
+        # jax.debug.print("volume_integral = {out}", out=volume_integral)
+
+        return volume_integral
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Log fugacity :cite:p:`HP91{Equation 8}`
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity
+        """
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
+        )
+
+        return log_fugacity
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
+        """
+        condition: Array = self._select_condition(temperature)
+
+        def volume0() -> Array:
+            return self.mrk_fluid.volume(temperature, pressure)
+
+        def volume1() -> Array:
+            return self.mrk_gas.volume(temperature, pressure)
+
+        def volume2() -> Array:
+            return self.mrk_fluid.volume(temperature, pressure)
+
+        volume_funcs: list[Callable] = [volume0, volume1, volume2]
+
+        volume: Array = lax.switch(condition, volume_funcs)
+        # jax.debug.print("volume = {out}", out=volume)
+
+        return volume
 
 
 @register_pytree_node_class
@@ -706,7 +837,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
 
 H2OMrkHolland91: RealGasProtocol = H2OMrkHP91()
-"""H2O MRK that includes critical behaviour"""
+"""H2O MRK that includes critical behaviour (also the liquid phase)"""
 CO2_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CO2_g")
 """CO2 MRK corresponding states :cite:p:`HP91`"""
 CH4_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CH4_g")
@@ -727,6 +858,8 @@ H2O_mrk_gas_holland91: RealGasProtocol = H2OMrkGasHolland91
 """H2O MRK gas :cite:p:`HP91`"""
 H2O_mrk_liquid_holland91: RealGasProtocol = H2OMrkLiquidHolland91
 """H2O MRK liquid :cite:p:`HP91`"""
+H2O_mrk_gas_fluid_holland91: RealGasProtocol = H2OMrkGasFluid91()
+"""H2O MRK for the gas and supercritical fluid :cite:p:`HP91`"""
 
 coefficients_P: tuple[float, ...] = CorrespondingStatesUnitConverter.convert_virial_coefficients(
     (6.93054e-7, -8.38293e-8)
@@ -857,6 +990,14 @@ H2O_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
     [H2O_cork_holland91], [experimental_calibration_holland91]
 )
 """H2O cork bounded :cite:p:`HP91`"""
+H2O_cork_gas_fluid_holland91: RealGasProtocol = CORK(
+    H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland91, dummy_critical_data
+)
+"""H2O cork for the gas and supercritical fluid :citep:`HP91`"""
+H2O_cork_gas_fluid_holland91_bounded: RealGasProtocol = CombinedRealGas(
+    [H2O_cork_gas_fluid_holland91], [experimental_calibration_holland91]
+)
+"""H2O cork for the gas and supercritical fluid bounded :citep:`HP91`"""
 
 CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((5.40776e-3, -1.59046e-6), 1.0),
@@ -889,6 +1030,14 @@ H2O_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
     [H2O_cork_holland98], [experimental_calibration_holland98]
 )
 """H2O cork bounded :cite:p:`HP98`"""
+H2O_cork_gas_fluid_holland98: RealGasProtocol = CORK(
+    H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland98, dummy_critical_data
+)
+"""H2O cork for the gas and supercritical fluid :citep:`HP98`"""
+H2O_cork_gas_fluid_holland98_bounded: RealGasProtocol = CombinedRealGas(
+    [H2O_cork_gas_fluid_holland98], [experimental_calibration_holland98]
+)
+"""H2O cork for the gas and supercritical fluid bounded :citep:`HP98`"""
 
 
 def get_holland_eos_models() -> dict[str, RealGasProtocol]:
@@ -909,14 +1058,8 @@ def get_holland_eos_models() -> dict[str, RealGasProtocol]:
     eos_models["CO2_cork_holland98"] = CO2_cork_holland98_bounded
     eos_models["CO2_cork_cs_holland91"] = CO2_cork_cs_holland91_bounded
     eos_models["H2_cork_cs_holland91"] = H2_cork_cs_holland91_bounded
-    eos_models["H2O_cork_holland91"] = H2O_cork_holland91_bounded
-    eos_models["H2O_cork_holland98"] = H2O_cork_holland98_bounded
-    # Supercritical fluid only
-    eos_models["H2O_mrk_fluid_holland91"] = H2O_mrk_fluid_holland91
-    # Gas (subcritical) only
-    eos_models["H2O_mrk_gas_holland91"] = H2O_mrk_gas_holland91
-    # TODO: include the liquid as a condensed activity model
-    # eos_models["H2O_mrk_liquid_holland91"] = H2O_mrk_liquid_holland91
+    eos_models["H2O_cork_holland91"] = H2O_cork_gas_fluid_holland91_bounded
+    eos_models["H2O_cork_holland98"] = H2O_cork_gas_fluid_holland98_bounded
     eos_models["H2S_cork_cs_holland11"] = H2S_cork_cs_holland11_bounded
     eos_models["N2_cork_cs_holland91"] = N2_cork_cs_holland91_bounded
     eos_models["S2_cork_cs_holland11"] = S2_cork_cs_holland11_bounded
