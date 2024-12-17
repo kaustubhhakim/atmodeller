@@ -14,19 +14,17 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Solubility package"""
 
-# Expose the public API
-from atmodeller.solubility.classes import (
-    NoSolubility as NoSolubility,
-)
-from atmodeller.solubility.classes import (
-    Solubility as Solubility,
-)
-from atmodeller.solubility.classes import (
-    SolubilityPowerLaw as SolubilityPowerLaw,
-)
-from atmodeller.solubility.classes import (
-    SolubilityPowerLawLog10 as SolubilityPowerLawLog10,
-)
-from atmodeller.solubility.library import get_solubility_models as get_solubility_models
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.3
+    hooks:
+      - id: ruff-format
+        types_or: [ python, pyi, jupyter ]
+      - id: ruff
+        types_or: [ python, pyi, jupyter ]
+        args: [ --fix ]
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.390
+    hooks:
+    - id: pyright

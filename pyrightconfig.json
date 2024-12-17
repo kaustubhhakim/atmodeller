@@ -6,6 +6,7 @@
     "typeCheckingMode": "standard",
     "pythonVersion": "3.10",
     "pythonPlatform": "All",
-    // Protocols do not enforce that an abstract method should necessarily be jitted 
-    "reportIncompatibleMethodOverride": "none"
+    "reportIncompatibleMethodOverride": "none",
+    "venvPath": ".",
+    "venv": ".venv"
 }
