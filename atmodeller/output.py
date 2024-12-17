@@ -216,8 +216,6 @@ class Output:
                 self.traced_parameters.mass_constraints.asdict(), self.number_solutions
             )
         if fugacity_matrix.size > 0:
-            # FIXME: This fails when fugacity constraints have a single value but mass constraints
-            # have multiple values
             out["constraints"] |= self.traced_parameters.fugacity_constraints.asdict(
                 temperature, pressure
             )
