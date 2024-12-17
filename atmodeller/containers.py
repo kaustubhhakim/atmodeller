@@ -242,9 +242,10 @@ class ConstantFugacityConstraint(NamedTuple):
         return self.fugacity
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        del temperature
         del pressure
-        return jnp.log(self.fugacity)
+        log_fugacity_value: ArrayLike = jnp.log(self.fugacity)
+
+        return jnp.full_like(temperature, log_fugacity_value)
 
 
 class FugacityConstraints(NamedTuple):
@@ -321,10 +322,12 @@ class FugacityConstraints(NamedTuple):
         fugacity_funcs: list[Callable] = [
             constraint.log_fugacity for constraint in self.constraints.values()
         ]
+        # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
         def apply_fugacity_function(
             index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
         ) -> Array:
+            # jax.debug.print("index = {out}", out=index)
             return lax.switch(
                 index,
                 fugacity_funcs,
@@ -335,6 +338,7 @@ class FugacityConstraints(NamedTuple):
         vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
         indices: Array = jnp.arange(len(self.constraints))
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
+        # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity
 
