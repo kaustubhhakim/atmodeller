@@ -37,4 +37,5 @@ jobs:
 
       - name: Run pre-commit hooks
         run: |
-          poetry run pre-commit run --all-files
+          source $VENV
+          pre-commit run --all-files
