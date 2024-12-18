@@ -251,7 +251,7 @@ class SaxenaABC(RealGas):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         Tr: ArrayLike = self.scaled_temperature(temperature)
         Pr: ArrayLike = self.scaled_pressure(pressure)

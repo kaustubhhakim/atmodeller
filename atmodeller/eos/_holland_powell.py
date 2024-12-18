@@ -524,18 +524,16 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
         mrk_gas: The MRK for the subcritical gas
         Ta: Temperature at which a_gas = a in the MRK formulation in K
         Tc: Critical temperature in K
-
-    Attributes:
-        mrk_fluid: The MRK for the supercritical fluid
-        mrk_gas: The MRK for the subcritical gas
-        Ta: Temperature at which a_gas = a in the MRK formulation in K
-        Tc: Critical temperature in K
     """
 
     mrk_fluid: MRKImplicitFluidHP91 = H2OMrkFluidHolland91
+    """The MRK for the supercritical fluid"""
     mrk_gas: MRKImplicitGasHP91 = H2OMrkGasHolland91
+    """The MRK for the subcritical gas"""
     Ta: float = Ta_H2O
+    """ Temperature at which a_gas = a in the MRK formulation in K"""
     Tc: float = Tc_H2O
+    """Critical temperature in K"""
 
     @jit
     def _select_condition(self, temperature: ArrayLike) -> Array:
@@ -575,7 +573,7 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         condition: Array = self._select_condition(temperature)
 
@@ -658,20 +656,18 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         mrk_liquid: The MRK for the subcritical liquid
         Ta: Temperature at which a_gas = a in the MRK formulation in K
         Tc: Critical temperature in K
-
-    Attributes:
-        mrk_fluid: The MRK for the supercritical fluid
-        mrk_gas: The MRK for the subcritical gas
-        mrk_liquid: The MRK for the subcritical liquid
-        Ta: Temperature at which a_gas = a in the MRK formulation in K
-        Tc: Critical temperature in K
     """
 
     mrk_fluid: MRKImplicitFluidHP91 = H2OMrkFluidHolland91
+    """The MRK for the supercritical fluid"""
     mrk_gas: MRKImplicitGasHP91 = H2OMrkGasHolland91
+    """The MRK for the subcritical gas"""
     mrk_liquid: MRKImplicitLiquidHP91 = H2OMrkLiquidHolland91
+    """The MRK for the subcritical liquid"""
     Ta: float = Ta_H2O
+    """Temperature at which a_gas = a in the MRK formulation in K"""
     Tc: float = Tc_H2O
+    """Critical temperature in K"""
 
     @jit
     def Psat(self, temperature: ArrayLike) -> Array:
@@ -744,7 +740,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         condition: Array = self._select_condition(temperature, pressure)
         Psat: Array = self.Psat(temperature)
@@ -993,11 +989,11 @@ H2O_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
 H2O_cork_gas_fluid_holland91: RealGasProtocol = CORK(
     H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland91, dummy_critical_data
 )
-"""H2O cork for the gas and supercritical fluid :citep:`HP91`"""
+"""H2O cork for the gas and supercritical fluid :cite:p:`HP91`"""
 H2O_cork_gas_fluid_holland91_bounded: RealGasProtocol = CombinedRealGas(
     [H2O_cork_gas_fluid_holland91], [experimental_calibration_holland91]
 )
-"""H2O cork for the gas and supercritical fluid bounded :citep:`HP91`"""
+"""H2O cork for the gas and supercritical fluid bounded :cite:p:`HP91`"""
 
 CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((5.40776e-3, -1.59046e-6), 1.0),
@@ -1013,7 +1009,7 @@ CO2_cork_holland98: RealGasProtocol = CORK(
 CO2_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
     [CO2_cork_holland98], [experimental_calibration_holland98]
 )
-"""CO2 cork bounded :cite:p:`HP98"""
+"""CO2 cork bounded :cite:p:`HP98`"""
 
 H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((1.9853e-3, 0), 1.0),
@@ -1033,11 +1029,11 @@ H2O_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
 H2O_cork_gas_fluid_holland98: RealGasProtocol = CORK(
     H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
-"""H2O cork for the gas and supercritical fluid :citep:`HP98`"""
+"""H2O cork for the gas and supercritical fluid :cite:p:`HP98`"""
 H2O_cork_gas_fluid_holland98_bounded: RealGasProtocol = CombinedRealGas(
     [H2O_cork_gas_fluid_holland98], [experimental_calibration_holland98]
 )
-"""H2O cork for the gas and supercritical fluid bounded :citep:`HP98`"""
+"""H2O cork for the gas and supercritical fluid bounded :cite:p:`HP98`"""
 
 
 def get_holland_eos_models() -> dict[str, RealGasProtocol]:
