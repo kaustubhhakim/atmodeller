@@ -7,4 +7,10 @@
     "pythonVersion": "3.10",
     "pythonPlatform": "All",
     "reportIncompatibleMethodOverride": "none",
+<<<<<<< HEAD
 }
+=======
+    "venvPath": ".",
+    "venv": ".venv"
+}
+>>>>>>> main
