@@ -1,9 +1,9 @@
 {
     "include": [
         "atmodeller",
-        "tests"
+        "tests",
     ],
-    "exclude": [
+    "exclude":[
         "docs"
     ],
     "typeCheckingMode": "standard",
