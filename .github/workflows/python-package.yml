@@ -1,4 +1,4 @@
-name: Run Pre-commit Hooks
+name: Python package
 
 on:
   pull_request:
@@ -48,9 +48,6 @@ jobs:
         
       - name: Install project
         run: poetry install --no-interaction
-
-      #- name: Set path for pyright pre-commit
-      #  run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
 
       - name: Checks with pre-commit
         run: poetry run pre-commit run --all-files
