@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [ "3.10", "3.11", "3.12" ]
+        python-version: [ "3.10" ] #, "3.11", "3.12" ]
         os: [ "ubuntu-latest" ]
       fail-fast: false
     runs-on: ${{ matrix.os }}
@@ -56,34 +56,5 @@ jobs:
       - name: Checks with pre-commit
         run: poetry run pre-commit run --all-files
 
-      #- name: Run tests
-      #  run: poetry run pytest
-
-      - name: Run coverage
-        run: |
-          poetry run coverage run -m pytest
-          poetry run coverage report -m
-
-      - name: Coverage Badge
-        uses: tj-actions/coverage-badge-py@v2
-
-      - name: Verify Changed files
-        uses: tj-actions/verify-changed-files@v16
-        id: verify-changed-files
-        with:
-          files: coverage.svg
-
-      - name: Commit files
-        if: steps.verify-changed-files.outputs.files_changed == 'true'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add coverage.svg
-          git commit -m "Updated coverage.svg"
-
-      - name: Push changes
-        if: steps.verify-changed-files.outputs.files_changed == 'true'
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.github_token }}
-          branch: ${{ github.ref }}
+      - name: Run tests
+        run: poetry run pytest
