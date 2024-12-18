@@ -56,12 +56,12 @@ jobs:
       - name: Checks with pre-commit
         run: poetry run pre-commit run --all-files
 
-      - name: Run tests
-        run: poetry run pytest
+      #- name: Run tests
+      #  run: poetry run pytest
 
       - name: Run coverage
         run: |
-          poetry run coverage run ...
+          poetry run coverage run -m pytest
           poetry run coverage report -m
 
       - name: Coverage Badge
