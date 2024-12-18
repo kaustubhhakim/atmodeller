@@ -3,6 +3,9 @@
         "atmodeller",
         "tests"
     ],
+    "exclude": [
+        "docs"
+    ],
     "typeCheckingMode": "standard",
     "pythonVersion": "3.10",
     "pythonPlatform": "All",
