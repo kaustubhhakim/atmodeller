@@ -7,7 +7,7 @@ Atmodeller Documentation
 
 *Atmodeller* is available at https://github.com/ExPlanetology/atmodeller
 
-If you use *Atmodeller* please cite :cite:t:`BTT24`
+If you use *Atmodeller* please cite :cite:t:`BTT25`
 
 .. toctree::
    :maxdepth: 2
