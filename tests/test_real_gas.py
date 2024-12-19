@@ -30,7 +30,6 @@ from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     RealGasProtocol,
-    RedoxBufferProtocol,
     SolubilityProtocol,
 )
 from atmodeller.output import Output
@@ -62,7 +61,7 @@ def test_fO2_holley(helper) -> None:
     planet: Planet = Planet(surface_temperature=1000.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, RedoxBufferProtocol] = {O2_g.name: IronWustiteBuffer()}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer()}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
