@@ -57,7 +57,7 @@ class CheckValues:
             fugacity_model: Fugacity model
             expected: The expected value
             rtol: Relative tolerance. Defaults to RTOL.
-            atol: Absolute tolerance. Dedfaults to ATOL.
+            atol: Absolute tolerance. Defaults to ATOL.
         """
         # Dynamically get the method from the eos model based on property_name
         method: Callable = getattr(eos, property_name)

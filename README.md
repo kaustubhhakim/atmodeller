@@ -20,7 +20,7 @@ If you use Atmodeller please cite (prior to manuscript submission, check back to
 
 ## Development
 
-Community development of the code is strongly encouraged so please contact the lead developer if you or your team would like to contribute. Atmodeller uses JAX so familiarise yourself with [How to think in JAX](https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html) and  [JAX - The Sharp Bits](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html), as well as other resources offered on the JAX site and the web in general. You are welcome to enquire about the reasoning behind the structure and design of the code with the development team. Please add a corresponding unit test for new features that you develop.
+Community development of the code is strongly encouraged so please contact the lead developer if you or your team would like to contribute. Atmodeller uses JAX so familiarise yourself with [How to think in JAX](https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html) and [JAX - The Sharp Bits](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html), as well as other resources offered on the JAX site and the web in general. You are welcome to enquire about the reasoning behind the structure and design of the code with the development team. Please add a corresponding unit test for new features that you develop.
 
 Current development team:
 
@@ -32,7 +32,6 @@ Current development team:
 ## Basic usage
 
 There are Jupyter notebooks in `notebooks/` that provide code snippets for how to perform single and batch calculations, as well as include Atmodeller into a time integration.
-
 
 Atmodeller contains three sub-packages that provide real gas equations of state (EOS), solubility laws, and thermodynamic data
 
@@ -133,7 +132,6 @@ logger.info(solution_asdict)
 # Write the complete solution to Excel
 output.to_excel("example_single")
 ```
-
 
 ## Installation
 
