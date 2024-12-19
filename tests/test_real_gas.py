@@ -26,7 +26,7 @@ from jax.typing import ArrayLike
 from atmodeller import INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, SolverParameters, Species
-from atmodeller.eos.library import get_eos_models
+from atmodeller.eos.library import H2_chabrier21, get_eos_models
 from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     RealGasProtocol,
@@ -144,11 +144,11 @@ def test_chabrier_earth(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="Fails. Might require improved initial condition or bounding")
+# @pytest.mark.skip(reason="Fails. Might require improved initial condition or bounding")
 def test_chabrier_earth_dogleg(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` using the dogleg solver"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
+    H2_g: Species = Species.create_gas("H2_g", activity=H2_chabrier21)
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")
@@ -170,8 +170,9 @@ def test_chabrier_earth_dogleg(helper) -> None:
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
     interior_atmosphere.initialise_solve(
-        planet=planet, mass_constraints=mass_constraints, solver_parameters=solver_parameters
-    )
+        planet=planet, mass_constraints=mass_constraints
+    )  # , solver_parameters=solver_parameters
+    # )
     output: Output = interior_atmosphere.solve()
     solution: dict[str, ArrayLike] = output.quick_look()
 
