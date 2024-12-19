@@ -96,7 +96,7 @@ class RealGas(ABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
 
     @jit
@@ -108,7 +108,7 @@ class RealGas(ABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{J}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{J}\ \mathrm{mol}^{-1}`
         """
         return 1e5 * self.volume_integral(temperature, pressure)
 
@@ -310,7 +310,7 @@ class RedlichKwongABC(RealGas):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         a: ArrayLike = self.a(temperature, pressure)
 
@@ -469,7 +469,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         log_fugacity: Array = self.log_fugacity(temperature, pressure)
         volume_integral: Array = log_fugacity * GAS_CONSTANT_BAR * temperature
@@ -763,7 +763,7 @@ class VirialCompensation:
             critical_data: Critical data
 
         Returns:
-            Volume integral contribution in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral contribution in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         delta_pressure: Array = self._delta_pressure(pressure)
         volume_integral: Array = (
@@ -859,7 +859,7 @@ class CORK(RealGas):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         volume_integral: Array = self._mrk.volume_integral(
             temperature, pressure

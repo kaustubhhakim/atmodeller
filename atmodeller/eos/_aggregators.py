@@ -217,7 +217,7 @@ class UpperBoundRealGas(RealGas):
             pressure: Pressure in bar
 
         Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         volume_integral: Array = jnp.log(pressure / self._p_eval) * (
             GAS_CONSTANT_BAR * temperature * (self._z0(temperature) - self._dzdp * self._p_eval)

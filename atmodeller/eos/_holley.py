@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Real gas EOS from :cite:`HWZ58"""
+"""Real gas EOS from :cite:`HWZ58`"""
 
 import logging
 

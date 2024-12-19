@@ -64,9 +64,9 @@ def test_S2_sulfate_andesite_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_andesite_boulliung23"]
-    #target_concentration: ArrayLike = 0.0002601378182149385
+    # target_concentration: ArrayLike = 0.0002601378182149385
     target_concentration: ArrayLike = 95
-    test_fugacity_S2_sulfate_boulliung_andesite: ArrayLike = 4.16869E-16
+    test_fugacity_S2_sulfate_boulliung_andesite: ArrayLike = 4.16869e-16
     test_fo2_sulfate_boulliung_andesite: ArrayLike = 0.079432823
     test_temperature_sulfate_boulliung_andesite: ArrayLike = 1523
     check_values.concentration(
@@ -85,10 +85,10 @@ def test_S2_sulfide_andesite_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_andesite_boulliung23"]
-    #target_concentration: ArrayLike = 2765.534194086474
+    # target_concentration: ArrayLike = 2765.534194086474
     target_concentration: ArrayLike = 376
     test_fugacity_S2_sulfide_boulliung_andesite: ArrayLike = 0.089125094
-    test_fo2_sulfide_boulliung_andesite: ArrayLike = 3.98107E-10
+    test_fo2_sulfide_boulliung_andesite: ArrayLike = 3.98107e-10
     test_temperature_sulfide_boulliung_andesite: ArrayLike = 1473
     check_values.concentration(
         function_name,
@@ -124,9 +124,9 @@ def test_S2_sulfate_basalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_basalt_boulliung23"]
-    #target_concentration: ArrayLike = 0.00020528360011091678
+    # target_concentration: ArrayLike = 0.00020528360011091678
     target_concentration: ArrayLike = 210
-    test_fugacity_S2_sulfate_boulliung_basalt: ArrayLike = 1.38038E-14
+    test_fugacity_S2_sulfate_boulliung_basalt: ArrayLike = 1.38038e-14
     test_fo2_sulfate_boulliung_basalt: ArrayLike = 0.079432823
     test_temperature_sulfate_boulliung_basalt: ArrayLike = 1623
     check_values.concentration(
@@ -145,10 +145,10 @@ def test_S2_sulfide_basalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_basalt_boulliung23"]
-    #target_concentration: ArrayLike = 7576.212242182479
+    # target_concentration: ArrayLike = 7576.212242182479
     target_concentration: ArrayLike = 760
     test_fugacity_S2_sulfide_boulliung_basalt: ArrayLike = 0.089125094
-    test_fo2_sulfide_boulliung_basalt: ArrayLike = 3.98107E-10
+    test_fo2_sulfide_boulliung_basalt: ArrayLike = 3.98107e-10
     test_temperature_sulfide_boulliung_basalt: ArrayLike = 1473
     check_values.concentration(
         function_name,
@@ -184,9 +184,9 @@ def test_S2_sulfate_trachybasalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_trachybasalt_boulliung23"]
-    #target_concentration: ArrayLike = 0.0007002721319248917
+    # target_concentration: ArrayLike = 0.0007002721319248917
     target_concentration: ArrayLike = 230
-    test_fugacity_S2_sulfate_boulliung_trachybasalt: ArrayLike = 2.51189E-15
+    test_fugacity_S2_sulfate_boulliung_trachybasalt: ArrayLike = 2.51189e-15
     test_fo2_sulfate_boulliung_trachybasalt: ArrayLike = 0.079432823
     test_temperature_sulfate_boulliung_trachybasalt: ArrayLike = 1573
     check_values.concentration(
@@ -205,10 +205,10 @@ def test_S2_sulfide_trachybasalt_boulliung(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_trachybasalt_boulliung23"]
-    #target_concentration: ArrayLike = 9573.602305681254
+    # target_concentration: ArrayLike = 9573.602305681254
     target_concentration: ArrayLike = 1157
     test_fugacity_S2_sulfide_boulliung_trachybasalt: ArrayLike = 0.089125094
-    test_fo2_sulfide_boulliung_trachybasalt: ArrayLike = 3.98107E-10
+    test_fo2_sulfide_boulliung_trachybasalt: ArrayLike = 3.98107e-10
     test_temperature_sulfide_boulliung_trachybasalt: ArrayLike = 1473
     check_values.concentration(
         function_name,

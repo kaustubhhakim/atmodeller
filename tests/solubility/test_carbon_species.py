@@ -63,7 +63,7 @@ def test_CH4_basalt_ardia(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["CH4_basalt_ardia13"]
-    #target_concentration: ArrayLike = 0.0005831884445042942
+    # target_concentration: ArrayLike = 0.0005831884445042942
     target_concentration: ArrayLike = 69.39
     test_fugacity_CH4_ardia_basalt: ArrayLike = 19360
     test_pressureGPa_CH4_ardia_basalt: ArrayLike = 7000
@@ -83,10 +83,10 @@ def test_CO_basalt_armstrong(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["CO_basalt_armstrong15"]
-    #target_concentration: ArrayLike = 0.027396953726422667
+    # target_concentration: ArrayLike = 0.027396953726422667
     target_concentration: ArrayLike = 17.3
     test_fugacity_CO_armstrong_basalt: ArrayLike = 1000
-    test_pressure_CO_armstrong_basalt: ArrayLike = 1.20E4
+    test_pressure_CO_armstrong_basalt: ArrayLike = 1.20e4
     check_values.concentration(
         function_name,
         solubility_model,
@@ -103,7 +103,7 @@ def test_CO_basalt_yoshioka(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["CO_basalt_yoshioka19"]
-    #target_concentration: ArrayLike = 0.1098560543306116
+    # target_concentration: ArrayLike = 0.1098560543306116
     target_concentration: ArrayLike = 59
     test_fugacity_CO_yoshioka_basalt: ArrayLike = 5248
     check_values.concentration(
@@ -122,7 +122,7 @@ def test_CO_rhyolite_yoshioka(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["CO_rhyolite_yoshioka19"]
-    #target_concentration: ArrayLike = 1.19271202468211
+    # target_concentration: ArrayLike = 1.19271202468211
     target_concentration: ArrayLike = 161
     test_fugacity_CO_yoshioka_rhyolite: ArrayLike = 31623
     check_values.concentration(
@@ -141,7 +141,7 @@ def test_CO2_basalt_dixon(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["CO2_basalt_dixon95"]
-    #target_concentration: ArrayLike = 0.8527333099685608
+    # target_concentration: ArrayLike = 0.8527333099685608
     target_concentration: ArrayLike = 11
     test_fugacity_CO2_dixon_basalt: ArrayLike = 25
     test_temperature_CO2_dixon_basalt: ArrayLike = 1473.15

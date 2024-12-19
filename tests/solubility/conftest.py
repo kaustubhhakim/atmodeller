@@ -48,13 +48,16 @@ class CheckValues:
         temperature: ArrayLike,
         pressure: ArrayLike,
         fO2: ArrayLike,
+        *,
+        rtol=RTOL,
+        atol=ATOL,
     ) -> None:
         concentration: ArrayLike = solubility_model.concentration(
             fugacity, temperature=temperature, pressure=pressure, fO2=fO2
         )
         logger.debug("%s, concentration = %s ppmw", function_name, concentration)
 
-        assert concentration == approx(expected_concentration, RTOL, ATOL)
+        assert concentration == approx(expected_concentration, rtol, atol)
 
 
 @pytest.fixture(scope="module")
