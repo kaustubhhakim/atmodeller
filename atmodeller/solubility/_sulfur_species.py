@@ -56,8 +56,9 @@ class _S2_sulfate_andesite_boulliung23(PyTreeNoData, Solubility):
     ) -> ArrayLike:
         del kwargs
         logcs: Array = -12.948 + (31586.2393 / jnp.asarray(temperature))
-        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
-        s_wtp: Array = jnp.power(10, logs_wtp)
+        logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
+        so4_wtp: Array = jnp.power(10, logso4_wtp)
+        s_wtp: Array = so4_wtp * (32.065 / 96.06)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
@@ -245,8 +246,9 @@ class _S2_sulfate_trachybasalt_boulliung23(PyTreeNoData, Solubility):
     ) -> ArrayLike:
         del kwargs
         logcs: Array = -12.948 + (32446.366 / jnp.asarray(temperature))
-        logs_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
-        s_wtp: Array = jnp.power(10, logs_wtp)
+        logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
+        so4_wtp: Array = jnp.power(10, logso4_wtp)
+        s_wtp: Array = so4_wtp * (32.065 / 96.06)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
 
         return ppmw
