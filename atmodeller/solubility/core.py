@@ -26,7 +26,6 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-
 if sys.version_info < (3, 12):
     pass
 else:
@@ -75,6 +74,6 @@ def fo2_temp_correc(
         + 0.055 * (pressure - 1) / reference_temperature
         - 0.8853 * jnp.log(reference_temperature)
     )
-    adjusted_fo2: Array = 10 ** (logiw_fugacity_at_reference_temp + fo2_shift)
+    adjusted_fo2: Array = jnp.power(10, logiw_fugacity_at_reference_temp + fo2_shift)
 
     return adjusted_fo2
