@@ -29,6 +29,7 @@ from jax.typing import ArrayLike
 from atmodeller.constants import GAS_CONSTANT
 from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.classes import Solubility, SolubilityPowerLaw, power_law
+from atmodeller.solubility.core import fo2_temp_correc
 from atmodeller.utilities import PyTreeNoData, unit_conversion
 
 if sys.version_info < (3, 12):
@@ -204,10 +205,29 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
 
     @override
     @jit
-    def concentration(self, fugacity: ArrayLike, *, fO2: ArrayLike, **kwargs) -> Array:
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+        **kwargs,
+    ) -> Array:
         del kwargs
+
+        # Libourel performed the experiment at 1698 K and fitted for fO2 at this temperature.
+        # Correciton is necessary.
+        libourel_temperature: ArrayLike = 1698.15
+        corrected_fo2: ArrayLike = fo2_temp_correc(
+            fO2=fO2,
+            pressure=pressure,
+            temperature=temperature,
+            reference_temperature=libourel_temperature,
+        )
+
         ppmw: Array = power_law(fugacity, 0.0611, 1)
-        constant: Array = power_law(fO2, 5.97e-10, -0.75)
+        constant: Array = power_law(corrected_fo2, 5.97e-10, -0.75)
         ppmw2: Array = power_law(fugacity, constant, 0.5)
         ppmw = ppmw + ppmw2
 
