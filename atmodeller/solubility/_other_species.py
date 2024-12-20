@@ -29,6 +29,7 @@ from jax.typing import ArrayLike
 from atmodeller.constants import GAS_CONSTANT
 from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.classes import Solubility, SolubilityPowerLaw, power_law
+from atmodeller.solubility.core import fo2_temp_correc
 from atmodeller.utilities import PyTreeNoData, unit_conversion
 
 if sys.version_info < (3, 12):
@@ -219,28 +220,18 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
     ) -> Array:
         del kwargs
 
-        # TODO: Check. Should this be hard-coded or be self-consistent with any imposed buffer that
-        # the interior-atmosphere system uses?
-        logiw_fugacity_at_current_temp: ArrayLike = (
-            -28776.8 / temperature
-            + 14.057
-            + 0.055 * (pressure - 1) / temperature
-            - 0.8853 * jnp.log(temperature)
+        # Libourel performed the experiment at 1698 K and fitted for fO2 at this temperature.
+        # Correciton is necessary.
+        libourel_temperature: ArrayLike = 1698.15
+        corrected_fo2: ArraLike = fo2_temp_correc(
+            fO2=fO2,
+            pressure=pressure,
+            temperature=temperature,
+            reference_temperature=libourel_temperature,
         )
-        fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity_at_current_temp
-
-        libourel_temperature: ArrayLike = 1698.15 # K
-
-        logiw_fugacity_at_libourel_temp: ArrayLike = (
-            -28776.8 / libourel_temperature
-            + 14.057
-            + 0.055 * (pressure - 1) / libourel_temperature
-            - 0.8853 * jnp.log(libourel_temperature)
-        )
-        adjusted_fO2: Array = 10 ** (logiw_fugacity_at_libourel_temp + fo2_shift)
 
         ppmw: Array = power_law(fugacity, 0.0611, 1)
-        constant: Array = power_law(adjusted_fO2, 5.97e-10, -0.75)
+        constant: Array = power_law(corrected_fo2, 5.97e-10, -0.75)
         ppmw2: Array = power_law(fugacity, constant, 0.5)
         ppmw = ppmw + ppmw2
 
