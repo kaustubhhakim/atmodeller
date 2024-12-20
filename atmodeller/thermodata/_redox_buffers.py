@@ -52,7 +52,7 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
 
     Attributes:
         log10_shift: Log10 shift relative to the buffer
-        evaluation_pressure: Pressure to evaluate the buffer at.
+        evaluation_pressure: Pressure to evaluate the buffer at
     """
 
     def __init__(
@@ -141,8 +141,8 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
             should be used with caution.
 
     Attributes:
-        log10_shift: Log10 shift relative to the buffer.
-        evaluation_pressure: Pressure to evaluate the buffer at.
+        log10_shift: Log10 shift relative to the buffer
+        evaluation_pressure: Pressure to evaluate the buffer at
     """
 
     @override
@@ -345,7 +345,18 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
 @register_pytree_node_class
 class IronWustiteBufferHirschmann(RedoxBuffer):
-    """Composite iron-wustite buffer using :cite:t:`OP93,HGD08` and :cite:t:`H21`"""
+    """Composite iron-wustite buffer using :cite:t:`OP93,HGD08` and :cite:t:`H21`
+
+    Args:
+        log10_shift: Log10 shift relative to the buffer. Defaults to 0.
+        evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
+            the total pressure will be used, but this can give rise to multiple solutions and
+            should be used with caution.
+
+    Attributes:
+        log10_shift: Log10 shift relative to the buffer
+        evaluation_pressure: Pressure to evaluate the buffer at
+    """
 
     @override
     def __init__(
@@ -401,7 +412,6 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         def high_temperature_case() -> ArrayLike:
             return self._high_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
 
-        # Apply the low or high temperature case functions element-wise using jnp.where
         buffer_value: Array = jnp.where(
             self._use_low_temperature(temperature),
             low_temperature_case(),

@@ -72,7 +72,12 @@ pygments_style = "sphinx"
 
 autodoc_member_order = "bysource"
 
-autodoc_default_options = {"inherited-members": True}
+autodoc_default_options = {
+    "members": True,
+    "show-inheritance": True,
+    "inherited-members": True,
+    "undoc-members": False,
+}
 
 # Disable the automatic inclusion of the Python module index in the LaTeX PDF output
 latex_domain_indices = False
