@@ -17,13 +17,16 @@ If you use *Atmodeller* please cite :cite:t:`BTT25`
    installation.rst
    tutorial.rst
    output.rst
+   development.rst
    troubleshooting.rst
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Programmer Reference
+.. only:: html
 
-   source/modules.rst
+   .. toctree::
+      :maxdepth: 2
+      :caption: Programmer Reference
+
+      source/modules.rst
 
 .. toctree::
    :caption: Bibliography

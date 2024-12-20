@@ -10,7 +10,7 @@
 [![Python package](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml/badge.svg)](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml)
 
 ## About
-Atmodeller is a Python package that leverages [JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under The GNU General Public License v3.0 or later.
+Atmodeller is a Python package that leverages [JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under [The GNU General Public License v3.0 or later](https://www.gnu.org/licenses/gpl-3.0.en.html).
 
 ## Citation
 
@@ -27,7 +27,7 @@ Current development team:
 - Dan J. Bower (lead developer, ETH Zurich)
 - Maggie A. Thompson (ETH Zurich/Carnegie)
 - Meng Tian (LMU Munich)
-- Paolo Sossi (ETH Zurich)
+- Paolo A. Sossi (ETH Zurich)
 
 ## Basic usage
 

@@ -1,6 +1,5 @@
 {
     "autoDocstring.docstringFormat": "google-notypes",
-    "cSpell.diagnosticLevel": "Hint",
     "python.analysis.diagnosticMode": "workspace",
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
@@ -8,18 +7,28 @@
         "editor.codeActionsOnSave": {
             "source.fixAll": "explicit",
             "source.organizeImports": "explicit"
-        }
+        },
+        "editor.rulers": [
+            99
+        ],
     },
     "notebook.formatOnSave.enabled": true,
     "notebook.codeActionsOnSave": {
         "notebook.source.organizeImports": "explicit"
     },
-    "editor.rulers": [
-        99
-    ],
     "python.testing.pytestArgs": [
         "tests"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
+    "[restructuredtext]": {
+        "editor.formatOnSave": true,
+        "editor.wordWrap": "bounded",
+        "editor.rulers": [
+            79
+        ]
+    },
+    "files.associations": {
+        "*.rst": "restructuredtext"
+    },
 }

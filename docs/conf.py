@@ -74,6 +74,9 @@ autodoc_member_order = "bysource"
 
 autodoc_default_options = {"inherited-members": True}
 
+# Disable the automatic inclusion of the Python module index in the LaTeX PDF output
+latex_domain_indices = False
+
 # Napoleon settings
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False
