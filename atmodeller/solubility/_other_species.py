@@ -65,9 +65,13 @@ _He_henry_sol_constant_jambon86: float = 56e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert He conc from mol/g to g H2/g total and then to ppmw
 _He_henry_sol_constant_jambon86 = (
-    (_He_henry_sol_constant_jambon86 / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
+    (_He_henry_sol_constant_jambon86 / 2.24e4)
+    * 4.0026
+    * unit_conversion.fraction_to_ppm
 )
-He_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_He_henry_sol_constant_jambon86, 1)
+He_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(
+    _He_henry_sol_constant_jambon86, 1
+)
 """Solubility of He in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -162,9 +166,9 @@ class _N2_basalt_dasgupta22(Solubility):
             - 0.8853 * jnp.log(temperature)
         )
         fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity
-        ppmw: Array = jnp.exp((5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)) * (
-            fugacity_gpa**0.5
-        )
+        ppmw: Array = jnp.exp(
+            (5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)
+        ) * (fugacity_gpa**0.5)
         ppmw = ppmw + fugacity_gpa * jnp.exp(
             4.67 + (7.11 * self.xsio2) - (13.06 * self.xal2o3) - (120.67 * self.xtio2)
         )
@@ -204,10 +208,39 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
 
     @override
     @jit
-    def concentration(self, fugacity: ArrayLike, *, fO2: ArrayLike, **kwargs) -> Array:
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+        **kwargs,
+    ) -> Array:
         del kwargs
+
+        # TODO: Check. Should this be hard-coded or be self-consistent with any imposed buffer that
+        # the interior-atmosphere system uses?
+        logiw_fugacity_at_current_temp: ArrayLike = (
+            -28776.8 / temperature
+            + 14.057
+            + 0.055 * (pressure - 1) / temperature
+            - 0.8853 * jnp.log(temperature)
+        )
+        fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity_at_current_temp
+
+        libourel_temperature: ArrayLike = 1698.15 # K
+
+        logiw_fugacity_at_libourel_temp: ArrayLike = (
+            -28776.8 / libourel_temperature
+            + 14.057
+            + 0.055 * (pressure - 1) / libourel_temperature
+            - 0.8853 * jnp.log(libourel_temperature)
+        )
+        adjusted_fO2: Array = 10 ** (logiw_fugacity_at_libourel_temp + fo2_shift)
+
         ppmw: Array = power_law(fugacity, 0.0611, 1)
-        constant: Array = power_law(fO2, 5.97e-10, -0.75)
+        constant: Array = power_law(adjusted_fO2, 5.97e-10, -0.75)
         ppmw2: Array = power_law(fugacity, constant, 0.5)
         ppmw = ppmw + ppmw2
 
