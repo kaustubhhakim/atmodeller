@@ -66,13 +66,9 @@ _He_henry_sol_constant_jambon86: float = 56e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert He conc from mol/g to g H2/g total and then to ppmw
 _He_henry_sol_constant_jambon86 = (
-    (_He_henry_sol_constant_jambon86 / 2.24e4)
-    * 4.0026
-    * unit_conversion.fraction_to_ppm
+    (_He_henry_sol_constant_jambon86 / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
 )
-He_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(
-    _He_henry_sol_constant_jambon86, 1
-)
+He_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_He_henry_sol_constant_jambon86, 1)
 """Solubility of He in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -167,9 +163,9 @@ class _N2_basalt_dasgupta22(Solubility):
             - 0.8853 * jnp.log(temperature)
         )
         fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity
-        ppmw: Array = jnp.exp(
-            (5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)
-        ) * (fugacity_gpa**0.5)
+        ppmw: Array = jnp.exp((5908.0 * (pressure_gpa**0.5) / temperature) - (1.6 * fo2_shift)) * (
+            fugacity_gpa**0.5
+        )
         ppmw = ppmw + fugacity_gpa * jnp.exp(
             4.67 + (7.11 * self.xsio2) - (13.06 * self.xal2o3) - (120.67 * self.xtio2)
         )
@@ -223,7 +219,7 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
         # Libourel performed the experiment at 1698 K and fitted for fO2 at this temperature.
         # Correciton is necessary.
         libourel_temperature: ArrayLike = 1698.15
-        corrected_fo2: ArraLike = fo2_temp_correc(
+        corrected_fo2: ArrayLike = fo2_temp_correc(
             fO2=fO2,
             pressure=pressure,
             temperature=temperature,
