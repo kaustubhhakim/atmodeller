@@ -19,60 +19,46 @@
 Units for temperature and pressure are K and bar, respectively.
 """
 
-import logging
-import sys
-
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-if sys.version_info < (3, 12):
-    pass
-else:
-    pass
+from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 
-if sys.version_info < (3, 11):
-    pass
-else:
-    pass
-
-logger: logging.Logger = logging.getLogger(__name__)
+iron_wustite_buffer: RedoxBufferProtocol = IronWustiteBuffer()
 
 
-def fo2_temp_correc(
+def fO2_temperature_correction(
     fO2: ArrayLike,
     *,
-    pressure: ArrayLike,
     temperature: ArrayLike,
+    pressure: ArrayLike,
     reference_temperature: ArrayLike,
-) -> ArrayLike:
-    """Apply a temperature correction to fO2.
+) -> Array:
+    """Applies a temperature correction to fO2.
 
     Some experimentally derived solubility laws operate on absolute fO2, which depends on
     temperature and pressure. A temperature correction has to be applied to maintain the same
-    fO2_shift at arbitrary temperature.
+    fO2 shift at arbitrary temperature.
 
     Args:
-        fO2: Absolute oxygen fugacity at `temperature`, in bar.
-        pressure: Absolute pressure in bar.
-        temperature: Temperature, in K.
-        reference_temperature: Reference temperature, usually the temperature at which the
-                               experiment was performed.
+        fO2: Absolute oxygen fugacity at `temperature`, in bar
+        temperature: Temperature in K
+        pressure: Absolute pressure in bar
+        reference_temperature: Reference temperature, which is usually the temperature at which the
+            experiment was performed.
 
+    Returns:
+        Adjusted fO2
     """
-    logiw_fugacity_at_current_temp: ArrayLike = (
-        -28776.8 / temperature
-        + 14.057
-        + 0.055 * (pressure - 1) / temperature
-        - 0.8853 * jnp.log(temperature)
+    logiw_fugacity_at_current_temp: ArrayLike = iron_wustite_buffer.log10_fugacity(
+        temperature, pressure
     )
     fo2_shift: Array = jnp.log10(fO2) - logiw_fugacity_at_current_temp
 
-    logiw_fugacity_at_reference_temp: ArrayLike = (
-        -28776.8 / reference_temperature
-        + 14.057
-        + 0.055 * (pressure - 1) / reference_temperature
-        - 0.8853 * jnp.log(reference_temperature)
+    logiw_fugacity_at_reference_temp: ArrayLike = iron_wustite_buffer.log10_fugacity(
+        reference_temperature, pressure
     )
     adjusted_fo2: Array = jnp.power(10, logiw_fugacity_at_reference_temp + fo2_shift)
 
