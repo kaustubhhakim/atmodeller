@@ -119,3 +119,12 @@ A common scenario is to calculate how volatiles partition between a magma ocean 
 
     # Write the complete solution to Excel
     # output.to_excel("example_single")
+
+Model with mixed constraints
+----------------------------
+
+Sometimes it is convenient to define the oxygen fugacity as a constraint on the system.
+
+.. code-block:: python
+
+    pass

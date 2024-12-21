@@ -4,7 +4,7 @@ Developer's Guide
 Introduction
 ------------
 
-Community development of the code is strongly encouraged so please contact the lead developer if you or your team would like to contribute. *Atmodeller* uses JAX so familiarise yourself with `How to think in JAX <https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html>`_ and `JAX - The Sharp Bits <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`_, as well as other resources offered on the JAX site and the web in general. You are welcome to enquire about the reasoning behind the structure and design of the code with the development team. Please add a corresponding unit test for new features that you develop.
+Community development of the code is strongly encouraged so please contact the lead developer if you or your team would like to contribute. *Atmodeller* uses JAX so familiarise yourself with `How to think in JAX <https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html>`_ and `JAX - The Sharp Bits <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`_, as well as other resources offered on the JAX site and the web in general. You are welcome to enquire about the reasoning behind the structure and design of the code with the development team.
 
 Installation
 ------------
@@ -46,4 +46,4 @@ You can confirm that all tests pass by running::
     
     pytest
     
-in the root directory of *Atmodeller*. Please add more tests if you add new features.
+in the root directory of *Atmodeller*. Please add a corresponding unit test for new features that you develop.
