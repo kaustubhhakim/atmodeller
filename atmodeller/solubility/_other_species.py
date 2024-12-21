@@ -211,7 +211,7 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
         # Libourel performed the experiment at 1698 K and fitted for fO2 at this temperature hence
         # a correction is necessary.
         libourel_temperature: ArrayLike = 1698.15
-        adjusted_fO2: ArrayLike = fO2_temperature_correction(
+        adjusted_fO2: Array = fO2_temperature_correction(
             fO2,
             temperature=temperature,
             pressure=pressure,
