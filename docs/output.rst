@@ -25,7 +25,7 @@ All gas species
      - moles
      - Number of moles in the atmosphere
    * - atmosphere_number
-     - molecule count
+     - molecules
      - Number of molecules in the atmosphere
    * - atmosphere_number_density
      - molecules m\ :math:`^{-3}`
@@ -37,13 +37,13 @@ All gas species
      - moles
      - Number of moles in the melt
    * - dissolved_number
-     - molecule count
+     - molecules
      - Number of molecules in the melt
    * - dissolved_number_density
      - molecules m\ :math:`^{-3}`
      - Number density in the melt
    * - dissolved_ppmw
-     - ppm by weight
+     - kg kg\ :math:`^{-1}` (ppm by weight)
      - Dissolved mass relative to melt mass
    * - fugacity
      - bar
@@ -64,14 +64,14 @@ All gas species
      - moles
      - Number of moles in all reservoirs
    * - total_number
-     - molecule count
+     - molecules
      - Number of molecules in all reservoirs
    * - total_number_density
      - molecules m\ :math:`^{-3}`
      - Number density in all reservoirs
    * - volume_mixing_ratio
      - dimensionless
-     - Volume mixing ratio
+     - Volume mixing ratio (atmosphere)
 
 O2_g additional outputs
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,3 +89,150 @@ O2_g additional outputs
    * - log10dIW_P
      - dimensionless
      - Log10 shift relative to the IW buffer at the total pressure
+
+Condensed species
+-----------------
+
+Species output have a dictionary key associated with the species name and its state of aggregation (e.g., H2O_l, S_alpha).
+
+.. list-table:: Outputs for condensed species
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Units
+     - Description
+   * - activity
+     - dimensionless
+     - Activity
+   * - molar_mass
+     - kg mole\ :math:`^{-1}`
+     - Molar mass
+   * - total_mass
+     - kg
+     - Mass in all reservoirs
+   * - total_moles
+     - moles
+     - Number of moles in all reservoirs
+   * - total_number
+     - molecules
+     - Number of molecules in all reservoirs
+   * - total_number_density
+     - molecules m\ :math:`^{-3}`
+     - Number density in all reservoirs
+
+Elements
+--------
+
+Element outputs have a dictionary key associated with the element name with an `element_` prefix (e.g., element_H, element_S).
+
+.. list-table:: Outputs for elements
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Units
+     - Description
+   * - atmosphere_mass
+     - kg
+     - Mass in the atmosphere
+   * - atmosphere_moles
+     - moles
+     - Number of moles in the atmosphere
+   * - atmosphere_number
+     - molecules
+     - Number of molecules in the atmosphere
+   * - atmosphere_number_density
+     - molecules m\ :math:`^{-3}`
+     - Number density in the atmosphere
+   * - condensed_mass
+     - kg
+     - Mass in condensed species
+   * - condensed_moles
+     - moles
+     - Number of moles in condensed species
+   * - condensed_number
+     - molecules
+     - Number of molecules in condensed species
+   * - condensed_number_density
+     - molecules m\ :math:`^{-3}`
+     - Number density in condensed species
+   * - degree_of_condensation
+     - dimensionless
+     - Degree of condensation
+   * - dissolved_mass
+     - kg
+     - Mass dissolved in the melt
+   * - dissolved_moles
+     - moles
+     - Number of moles in the melt
+   * - dissolved_number
+     - molecules
+     - Number of molecules in the melt
+   * - dissolved_number_density
+     - molecules m\ :math:`^{-3}`
+     - Number density in the melt
+   * - logarithmic_abundance
+     - dimensionless
+     - Logarithmic abundance
+   * - molar_mass
+     - kg mole\ :math:`^{-1}`
+     - Molar mass
+   * - total_mass
+     - kg
+     - Mass in all reservoirs
+   * - total_moles
+     - moles
+     - Number of moles in all reservoirs
+   * - total_number
+     - molecules
+     - Number of molecules in all reservoirs
+   * - total_number_density
+     - molecules m\ :math:`^{-3}`
+     - Number density in all reservoirs
+   * - volume_mixing_ratio
+     - dimensionless
+     - Volume mixing ratio (atmosphere)
+
+Planet
+------
+
+The planet output has a dictionary key of `planet`
+
+.. list-table:: Outputs for planet
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Units
+     - Description
+   * - core_mass_fraction
+     - kg kg\ :math:`^{-1}`
+     - Mass fraction of iron core relative to total planet mass
+   * - mantle_mass
+     - kg
+     - Mass of the silicate mantle
+   * - mantle_melt_fraction
+     - kg kg\ :math:`^{-1}`
+     - Fraction of silicate mantle that is molten
+   * - mantle_melt_mass
+     - kg
+     - Mass of molten silicate
+   * - mantle_solid_mass
+     - kg
+     - Mass of solid silicate
+   * - planet_mass
+     - kg
+     - Total mass of the planet
+   * - surface_area
+     - m\ :math:`^2`
+     - Surface area at the surface radius
+   * - surface_gravity
+     - m s\ :math:`^{-2}`
+     - Gravitational acceleration at the surface radius
+   * - surface_radius
+     - m
+     - Radius of the planetary surface
+   * - surface_temperature
+     - K
+     - Temperature at the planetary surface
