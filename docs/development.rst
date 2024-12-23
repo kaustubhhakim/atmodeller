@@ -9,8 +9,8 @@ Community development of the code is strongly encouraged so please contact the l
 Installation
 ------------
 
-For instructions on developer installation, see :ref:`developer_install`. Note that you may need to install the group dependencies for dev and docs manually if you are using `pip` to install.
-
+For instructions on developer installation, see :ref:`developer_install`. Note that you may need to install the group dependencies for dev and docs manually if you are using `pip` to install. For example, you may need to install `pytest` manually into your development environment.
+ 
 Pre-commit
 ----------
 

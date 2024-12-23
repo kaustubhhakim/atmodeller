@@ -49,6 +49,15 @@ atmodeller.solubility.classes module
    :show-inheritance:
    :private-members:
 
+atmodeller.solubility.core module
+---------------------------------
+
+.. automodule:: atmodeller.solubility.core
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :private-members:
+
 atmodeller.solubility.library module
 ------------------------------------
 

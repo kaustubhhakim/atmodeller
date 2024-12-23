@@ -140,10 +140,10 @@ Element outputs have a dictionary key associated with the element name with an `
      - moles
      - Number of moles in the atmosphere
    * - atmosphere_number
-     - molecules
-     - Number of molecules in the atmosphere
+     - atoms
+     - Number of atoms in the atmosphere
    * - atmosphere_number_density
-     - molecules m\ :math:`^{-3}`
+     - atoms m\ :math:`^{-3}`
      - Number density in the atmosphere
    * - condensed_mass
      - kg
@@ -152,10 +152,10 @@ Element outputs have a dictionary key associated with the element name with an `
      - moles
      - Number of moles in condensed species
    * - condensed_number
-     - molecules
-     - Number of molecules in condensed species
+     - atoms
+     - Number of atoms in condensed species
    * - condensed_number_density
-     - molecules m\ :math:`^{-3}`
+     - atoms m\ :math:`^{-3}`
      - Number density in condensed species
    * - degree_of_condensation
      - dimensionless
@@ -167,10 +167,10 @@ Element outputs have a dictionary key associated with the element name with an `
      - moles
      - Number of moles in the melt
    * - dissolved_number
-     - molecules
-     - Number of molecules in the melt
+     - atoms
+     - Number of atoms in the melt
    * - dissolved_number_density
-     - molecules m\ :math:`^{-3}`
+     - atoms m\ :math:`^{-3}`
      - Number density in the melt
    * - logarithmic_abundance
      - dimensionless
@@ -185,10 +185,10 @@ Element outputs have a dictionary key associated with the element name with an `
      - moles
      - Number of moles in all reservoirs
    * - total_number
-     - molecules
-     - Number of molecules in all reservoirs
+     - atoms
+     - Number of atoms in all reservoirs
    * - total_number_density
-     - molecules m\ :math:`^{-3}`
+     - atoms m\ :math:`^{-3}`
      - Number density in all reservoirs
    * - volume_mixing_ratio
      - dimensionless
@@ -197,7 +197,7 @@ Element outputs have a dictionary key associated with the element name with an `
 Planet
 ------
 
-The planet output has a dictionary key of `planet`
+The planet output has a dictionary key of `planet`.
 
 .. list-table:: Outputs for planet
    :widths: 25 25 50
@@ -236,3 +236,49 @@ The planet output has a dictionary key of `planet`
    * - surface_temperature
      - K
      - Temperature at the planetary surface
+
+Atmosphere
+----------
+
+The atmosphere output has a dictionary key of `atmosphere`.
+
+.. list-table:: Outputs for atmosphere
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Units
+     - Description
+   * - species_mass
+     - kg
+     - Mass of species
+   * - species_moles
+     - moles
+     - Number of moles of species
+   * - species_number
+     - molecules
+     - Number of molecules of species
+   * - species_number_density
+     - molecules m\ :math:`^{-3}`
+     - Number density of species
+   * - molar_mass
+     - kg mole\ :math:`^{-1}`
+     - Molar mass
+   * - pressure
+     - bar
+     - Total pressure of the atmosphere
+   * - volume
+     - m\ :math:`^{3}`
+     - Volume of the atmosphere
+   * - element_moles
+     - moles
+     - Number of moles of elements
+   * - element_number
+     - atoms
+     - Number of atoms of elements
+   * - element_number_density
+     - atoms m\ :math:`^{-3}`
+     - Number density of elements
+   * - Temperature
+     - K
+     - Temperature of the atmosphere

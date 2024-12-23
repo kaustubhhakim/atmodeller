@@ -15,7 +15,13 @@ https://www.sphinx-doc.org/en/master/usage/configuration.html
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+import os
+from pathlib import Path
+
 import sphinx.builders.latex.transforms
+
+# Get path to directory containing this file, conf.py.
+DOCS_DIRECTORY: Path = Path(__file__).resolve().parent
 
 # -- Project information -----------------------------------------------------
 
@@ -33,6 +39,8 @@ release = "0.2.0"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "nbsphinx",
+    "nbsphinx_link",
     "sphinxcontrib.bibtex",
     "sphinx_rtd_theme",
     "sphinx.ext.napoleon",
@@ -107,3 +115,34 @@ class DummyTransform(sphinx.builders.latex.transforms.BibliographyTransform):
 
 
 sphinx.builders.latex.transforms.BibliographyTransform = DummyTransform
+
+
+# https://stackoverflow.com/questions/62398231/building-docs-fails-due-to-missing-pandoc
+def ensure_pandoc_installed(_):
+    import pypandoc
+
+    # Download pandoc if necessary. If pandoc is already installed and on the PATH, the installed
+    # version will be used. Otherwise, we will download a copy of pandoc into docs/bin/ and add
+    # that to our PATH.
+    pandoc_dir: Path = DOCS_DIRECTORY / "bin"
+
+    # Add dir containing pandoc binary to the PATH environment variable, if not already included
+    if str(pandoc_dir) not in os.environ["PATH"].split(os.pathsep):
+        os.environ["PATH"] += os.pathsep + str(pandoc_dir)
+    pypandoc.ensure_pandoc_installed(
+        targetfolder=str(pandoc_dir),
+        delete_installer=True,
+    )
+
+
+def setup(app):
+    app.connect("builder-inited", ensure_pandoc_installed)
+
+
+# This avoids a warning about unable to copy the examples notebook
+# Path to the existing file in the build output
+destination_path = Path("_build/html/examples.ipynb")
+
+# Remove the file if it already exists
+if destination_path.exists():
+    destination_path.unlink()

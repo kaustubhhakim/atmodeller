@@ -12,15 +12,7 @@
 ## About
 Atmodeller is a Python package that leverages [JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under [The GNU General Public License v3.0 or later](https://www.gnu.org/licenses/gpl-3.0.en.html).
 
-## Citation
-
-If you use Atmodeller please cite (prior to manuscript submission, check back to see if this reference has been updated):
-
-- Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, non-ideality and condensation, The Astrophysical Journal, to be submitted.
-
-## Development
-
-Community development of the code is strongly encouraged so please contact the lead developer if you or your team would like to contribute. Atmodeller uses JAX so familiarise yourself with [How to think in JAX](https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html) and [JAX - The Sharp Bits](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html), as well as other resources offered on the JAX site and the web in general. You are welcome to enquire about the reasoning behind the structure and design of the code with the development team. Please add a corresponding unit test for new features that you develop.
+Documentation will eventually be available on readthedocs, but for the time being you can access the latest manual [here](https://www.dropbox.com/scl/fi/pmlldk2kcd8n0be7rvcw7/atmodeller.pdf?rlkey=rdsa6o7s3l83kbnpqqtj7u61n&dl=0)
 
 Current development team:
 
@@ -29,62 +21,15 @@ Current development team:
 - Meng Tian (LMU Munich)
 - Paolo A. Sossi (ETH Zurich)
 
+## Citation
+
+If you use Atmodeller please cite (prior to manuscript submission, check back to see if this reference has been updated):
+
+- Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, non-ideality and condensation, The Astrophysical Journal, to be submitted.
+
 ## Basic usage
 
 There are Jupyter notebooks in `notebooks/` that provide code snippets for how to perform single and batch calculations, as well as include Atmodeller into a time integration.
-
-Atmodeller contains three sub-packages that provide real gas equations of state (EOS), solubility laws, and thermodynamic data
-
-Accessing real gas EOS:
-
-```
-from atmodeller.eos import get_eos_models
-
-eos_models = get_eos_models()
-# Find the available models
-eos_models.keys()
-
-# Get a CH4 model
-CH4_eos_model = eos_models['CH4_beattie_holley58']
-# Compute the fugacity at 800 K and 100 bar
-CH4_eos_model.fugacity(800, 100)
-# Compute the compressibility factor at the same conditions
-CH4_eos_model.compressibility_factor(800, 100)
-# Etc., other methods are available to compute other quantities
-```
-
-Accessing solubility laws:
-
-```
-from atmodeller.solubility import get_solubility_models
-
-sol_models = get_solubility_models()
-# Find the available models
-sol_models.keys()
-CO2_basalt = sol_models["CO2_basalt_dixon95"]
-# Compute the concentration at fCO2=0.5 bar, 1300 K, and 1 bar
-# Note that fugacity is the first argument and others are keyword only
-CO2_basalt.concentration(0.5, temperature=1300, pressure=1)
-```
-
-Accessing thermodynamic data for species:
-
-```
-from atmodeller.thermodata import get_thermodata
-
-species_data = get_thermodata()
-# Find the available species
-species_data.keys()
-# Get CO2 gas
-CO2_g = species_data["CO2_g"]
-# Compute the Gibbs energy relative to RT at 2000 K
-CO2_g.get_gibbs_over_RT(2000.0)
-# Compute the composition
-CO2_g.composition
-# Etc., other methods are available to compute other quantities
-```
-
-Running a model:
 
 ```
 from atmodeller import Species, InteriorAtmosphere, Planet, earth_oceans_to_hydrogen_mass
@@ -184,25 +129,6 @@ If desired, you will need to manually install the dependencies for testing and d
 
 See this [developer setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3) to set up your system to develop Atmodeller using [VS Code](https://code.visualstudio.com) and [Poetry](https://python-poetry.org).
 
-## Documentation
+## Examples
 
-Documentation will eventually be available on readthedocs, but for the time being you can compile (and contribute if you wish) to the documentation in the `docs/` directory. To compile the documentation you will need to use Poetry and the option `--with docs` when you run `poetry install`. See [here](https://python-poetry.org/docs/managing-dependencies/) for further information.
-
-Once the necessary dependencies are installed to compile the documentation, you can navigate into the `docs/` directory and run:
-
-	make html
-	
-And/or to compile the documentation as a PDF (`latexpdf` must be available on your system):
-
-	make latexpdf
-	
-	
-This will build the documentation in the appropriately named subdirectory in `_build`.
-
-## Tutorial
-
-Several Jupyter notebook tutorials are provided in `notebooks/`.
-
-## Tests
-
-You can confirm that all tests pass by running `pytest` in the root directory of Atmodeller. Please add more tests if you add new features. Note that `pip install .` in the *Quick install* instructions will not install `pytest` so you will need to install `pytest` into the environment separately.
+Several examples are provided in `notebooks/`.
