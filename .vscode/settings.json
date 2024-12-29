@@ -31,4 +31,6 @@
     "files.associations": {
         "*.rst": "restructuredtext"
     },
+    // https://github.com/microsoft/vscode-python/discussions/23785
+    "python.experiments.optOutFrom": ["pythonTestAdapter"]
 }
