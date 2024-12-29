@@ -163,6 +163,8 @@ cython_debug/
 
 poetry.lock
 
+docs/bin/pandoc
+
 # Atmodeller output file formats
 *.pdf
 *.pkl
