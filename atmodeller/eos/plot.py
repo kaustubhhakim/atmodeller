@@ -35,10 +35,11 @@ def plotter():
 
     fig, ax = plt.subplots(1, 1)
 
-    eos_model = eos_models["H2O_cork_holland98"]
+    # eos_model = eos_models["H2O_cork_holland98"]
+    eos_model = eos_models["H2_shi92"]
 
     temperature = 2000.0
-    log10_pressure = np.linspace(-8, 5, num=1000)
+    log10_pressure = np.linspace(-6, 3.1, num=1000)
     pressure = 10**log10_pressure
 
     logger.info("temperature = %s", temperature)
@@ -51,10 +52,11 @@ def plotter():
         fugacity_list.append(fugacity)
 
     fugacity_coefficient = np.array(fugacity_list) / pressure
-    ax.loglog(pressure, fugacity_coefficient)
+    ax.plot(pressure, fugacity_list)  # _coefficient)
 
     ax.set_xlabel("Pressure (bar)")
-    ax.set_ylabel("Fugacity coefficient")
+    # ax.set_ylabel("Fugacity coefficient")
+    ax.set_ylabel("Fugacity (bar)")
     plt.show()
 
 
