@@ -380,6 +380,7 @@ class CombinedRealGas(CombinedRealGasABC):
             index == 0, add_only_first_integral, lambda x: x, total_integral
         )
 
+        # FIXME: Use lax scan for reverse differentiation compatibility
         # Loop over and accumulate the vdP integrations over the EOS. This will only do something
         # if index >= 2, so will effectively be ignored for index = 1, as desired
         total_integral: Array = lax.fori_loop(1, index, body_fun, total_integral)
