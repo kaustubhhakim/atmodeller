@@ -72,7 +72,7 @@ def partial_rref_jax(matrix: Array) -> Array:
 
     This function is currently not used, since the reduction of matrices is performed prior to
     JAX operations. But since this function took some time to figure out, it is retained for
-    potential future use.
+    potential future use. Note that lax.fori_loop is not compatible with reverse differentiation
 
     Args:
         matrix: The matrix to compute the reduced row echelon form
