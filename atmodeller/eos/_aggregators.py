@@ -109,17 +109,16 @@ class CombinedRealGasABC(RealGas, ABC):
             Index of the relevant EOS model
         """
 
-        def body_fun(i: int, carry: int) -> int:
+        def body_fun(carry: int, i: int) -> tuple[int, int]:
             pressure_high: Array = lax.dynamic_index_in_dim(
                 self._upper_pressure_bounds, i, keepdims=False
             )
-            condition = pressure >= pressure_high
+            condition: Array = jnp.greater_equal(pressure, pressure_high)
             new_index: int = lax.cond(condition, lambda _: i + 1, lambda _: carry, None)
-
-            return new_index
+            return new_index, new_index
 
         initial_carry: int = 0
-        index: int = lax.fori_loop(0, len(self._upper_pressure_bounds), body_fun, initial_carry)
+        index, _ = lax.scan(body_fun, initial_carry, jnp.arange(len(self._upper_pressure_bounds)))  # type:ignore
 
         return index
 
