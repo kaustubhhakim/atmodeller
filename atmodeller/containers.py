@@ -625,10 +625,12 @@ class SolverParameters(NamedTuple):
 
     Args:
         solver: Solver
-        throw: How to report any failures
-        max_steps: The maximum number of steps the solver can take
-        lower: Lower bound on the hypercube which contains the root
-        upper: Upper bound on the hypercube which contains the root
+        throw: How to report any failures. Defaults to True.
+        max_steps: The maximum number of steps the solver can take. Defaults to 256
+        lower: Lower bound on the hypercube which contains the root. Defaults to empty.
+        upper: Upper bound on the hypercube which contains the root. Defaults to empty.
+        jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
+            Can be either fwd or bwd. Defaults to fwd.
     """
 
     solver: OptxSolver
@@ -641,6 +643,8 @@ class SolverParameters(NamedTuple):
     """Lower bound on the hypercube which contains the root"""
     upper: tuple[float, ...] = ()
     """Upper bound on the hypercube which contains the root"""
+    jac: str = "fwd"
+    """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
 
     @classmethod
     def create(
@@ -675,7 +679,7 @@ class SolverParameters(NamedTuple):
             species, LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER
         )
 
-        return cls(solver, throw=throw, max_steps=max_steps, lower=lower, upper=upper)
+        return cls(solver, throw=throw, max_steps=max_steps, lower=lower, upper=upper, jac="fwd")
 
     @classmethod
     def _get_hypercube_bound(

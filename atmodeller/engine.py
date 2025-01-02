@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Callable
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -64,10 +64,10 @@ def solve(
     Returns:
         The solution
     """
-
-    options: dict[str, ArrayLike] = {
+    options: dict[str, Any] = {
         "lower": np.asarray(solver_parameters.lower),
         "upper": np.asarray(solver_parameters.upper),
+        "jac": solver_parameters.jac,
     }
 
     sol = optx.root_find(
