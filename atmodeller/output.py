@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pandas as pd
 from jax import Array
 from jax.tree_util import tree_map
@@ -237,6 +238,24 @@ class Output:
             log10_shift_at_P: Array = log10_fugacity - buffer_at_P
             logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
+
+        # Convert all arrays in the dictionary to numpy arrays. Using the same functions that the
+        # engine uses makes sense to avoid duplication and ensure consistency, but for the output
+        # we can convert all arrays to numpy. Then the output will only consistent of dictionaries
+        # and numpy arrays, which might simplify the pickling/unpickling process for end-users who
+        # only care about the results. To this point the arrays are of type
+        # <class 'jaxlib.xla_extension.ArrayImpl'>.
+        def convert_to_numpy(d):
+            for key, value in d.items():
+                if isinstance(value, dict):
+                    convert_to_numpy(value)
+                else:
+                    logger.debug("Array type before conversion = %s", type(d[key]))
+                    d[key] = np.array(value)
+                    logger.debug("Array type after conversion = %s", type(d[key]))
+
+        logger.info("Convert all arrays to numpy")
+        convert_to_numpy(out)
 
         return out
 
