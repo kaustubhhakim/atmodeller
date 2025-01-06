@@ -26,10 +26,7 @@ from jax.typing import ArrayLike
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, Species
-from atmodeller.interfaces import (
-    FugacityConstraintProtocol,
-    SolubilityProtocol,
-)
+from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
@@ -48,7 +45,7 @@ solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 
 def test_version():
     """Test version."""
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.2.2"
 
 
 def test_H2O(helper) -> None:

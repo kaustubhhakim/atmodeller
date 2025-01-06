@@ -35,15 +35,10 @@ from jax import Array
 from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from molmass import Formula
+from scipy.constants import mega
 
 from atmodeller.constants import AVOGADRO
-from atmodeller.containers import (
-    FixedParameters,
-    Planet,
-    Solution,
-    Species,
-    TracedParameters,
-)
+from atmodeller.containers import FixedParameters, Planet, Solution, Species, TracedParameters
 from atmodeller.engine import (
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
@@ -279,6 +274,8 @@ class Output:
         out: dict[str, Array] = self._get_number_density_output(
             number_density, molar_mass, "species_"
         )
+        # Species mass is simply mass, so rename for clarity
+        out["mass"] = out.pop("species_mass")
 
         out["molar_mass"] = molar_mass
         # Ensure all arrays are 1-D, which is required for creating dataframes
@@ -411,7 +408,13 @@ class Output:
 
         out["molar_mass"] = molar_mass
         out["degree_of_condensation"] = out["condensed_number"] / out["total_number"]
-        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(out["atmosphere_number"])
+        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(
+            out["atmosphere_number"], axis=1, keepdims=True
+        )
+        out["atmosphere_ppm"] = out["volume_mixing_ratio"] * mega
+        out["atmosphere_ppmw"] = (
+            out["atmosphere_mass"] / jnp.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
+        )
 
         unique_elements: tuple[str, ...] = (
             self._interior_atmosphere.get_unique_elements_in_species()
@@ -595,7 +598,13 @@ class Output:
         out |= self._get_number_density_output(dissolved_gas, molar_mass_gas, "dissolved_")
         out |= self._get_number_density_output(total_gas, molar_mass_gas, "total_")
         out["molar_mass"] = molar_mass
-        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(out["atmosphere_number"])
+        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(
+            out["atmosphere_number"], axis=1, keepdims=True
+        )
+        out["atmosphere_ppm"] = out["volume_mixing_ratio"] * mega
+        out["atmosphere_ppmw"] = (
+            out["atmosphere_mass"] / jnp.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
+        )
         out["pressure"] = pressure_gas
         out["fugacity"] = activity_gas
         out["fugacity_coefficient"] = activity_gas / pressure_gas
