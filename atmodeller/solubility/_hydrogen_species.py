@@ -67,14 +67,6 @@ their experiments and prior studies on H2O solubility in basaltic melt at 1200 C
 below 600 MPa.
 """
 
-H2O_basalt_wilson81: SolubilityProtocol = SolubilityPowerLaw(215, 0.7)
-"""H2O in basalt :cite:p:`WH81,HBO64`
-
-:cite:t:`WH81{Equation 30}`, and converting from weight % to ppmw. Not clear what all
-experimental data is used to derive this fit, but it fits data at 1100 C and 1000-6000 bars H2O
-from :cite:t:`HBO64` decently well (their Table 3).
-"""
-
 H2O_lunar_glass_newcombe17: SolubilityProtocol = SolubilityPowerLaw(683, 0.5)
 """H2O in lunar basalt :cite:p:`NBB17`
 
