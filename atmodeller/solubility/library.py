@@ -40,7 +40,6 @@ from atmodeller.solubility._hydrogen_species import (
     H2O_ano_dio_newcombe17,
     H2O_basalt_dixon95,
     H2O_basalt_mitchell17,
-    H2O_basalt_wilson81,
     H2O_lunar_glass_newcombe17,
     H2O_peridotite_sossi23,
 )
@@ -88,7 +87,6 @@ def get_solubility_models() -> dict[str, SolubilityProtocol]:
     models["H2O_ano_dio_newcombe17"] = H2O_ano_dio_newcombe17
     models["H2O_basalt_dixon95"] = H2O_basalt_dixon95
     models["H2O_basalt_mitchell17"] = H2O_basalt_mitchell17
-    models["H2O_basalt_wilson81"] = H2O_basalt_wilson81
     models["H2O_lunar_glass_newcombe17"] = H2O_lunar_glass_newcombe17
     models["H2O_peridotite_sossi23"] = H2O_peridotite_sossi23
 
