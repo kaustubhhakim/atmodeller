@@ -20,7 +20,6 @@ import inspect
 import logging
 
 import numpy as np
-import pytest
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
@@ -227,25 +226,6 @@ def test_S2_trachybasalt_boulliung(check_values) -> None:
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["S2_trachybasalt_boulliung23"]
     target_concentration: ArrayLike = 9573.603005953386
-
-    check_values.concentration(
-        function_name,
-        solubility_model,
-        target_concentration,
-        TEST_FUGACITY,
-        TEST_TEMPERATURE,
-        TEST_PRESSURE,
-        TEST_FO2,
-    )
-
-
-@pytest.mark.skip(reason="This solubility law should use fS2 and not total pressure")
-def test_S2_mercury_magma_namur(check_values) -> None:
-    """Tests S in reduced mafic silicate melts relevant for Mercury :cite:p:`NCH16`"""
-
-    function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_mercury_magma_namur16"]
-    target_concentration: ArrayLike = 1827.8623756735988
 
     check_values.concentration(
         function_name,
