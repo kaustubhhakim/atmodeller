@@ -317,6 +317,39 @@ H2S_g: SpeciesData = SpeciesData.create(
 )
 "Species data for H2S_g"
 
+_HCl_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (-1.067782299e4, 5.674958050e3),
+    (-7.309305408, -1.642825822e1),
+    (
+        (
+            2.062588287e4,
+            -3.093368855e2,
+            5.275418850,
+            -4.828874220e-3,
+            6.195794600e-6,
+            -3.040023782e-9,
+            4.916790030e-13,
+        ),
+        (
+            9.157749510e5,
+            -2.770550211e3,
+            5.973539790,
+            -3.629810060e-4,
+            4.735529190e-8,
+            2.810262054e-12,
+            -6.656104220e-16,
+        ),
+    ),
+    (200, 1000),
+    (1000, 6000),
+)
+HCl_g: SpeciesData = SpeciesData.create(
+    "HCl",
+    "g",
+    _HCl_g_coeffs,
+)
+"Species data for HCl_g"
+
 _He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.453750000e2, -7.453750000e2, 1.650518960e4),
     (9.287239740e-1, 9.287239740e-1, -4.048814390),
