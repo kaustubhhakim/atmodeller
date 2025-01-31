@@ -40,14 +40,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 H2_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_H_TP_v1"))
 """H2 Chabrier :cite:p:`CD21`"""
-# TODO: Kaustubh. Update calibration bounds. Although imposing a pressure_min=0.1 breaks simple
-# tests, other values seem fine. Or pressure_min can be set to None to impose no lower
-# extrapolation.
 H2_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
     [H2_chabrier21],
     [
         ExperimentalCalibration(
-            temperature_min=100, temperature_max=4000, pressure_min=None, pressure_max=50e9
+            temperature_min=100, temperature_max=1.0e8, pressure_min=None, pressure_max=1.0e17
         )
     ],
 )
