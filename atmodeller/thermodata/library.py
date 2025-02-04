@@ -62,6 +62,8 @@ from atmodeller.thermodata._gases import (
     SO2_g,
     SO3_g,
     SO_g,
+    Ar_g,
+    Ne_g,
     critical_data,
 )
 
@@ -115,6 +117,8 @@ def get_thermodata() -> dict[str, SpeciesData]:
         "SO_g": SO_g,
         "SO2_g": SO2_g,
         "SO3_g": SO3_g,
+        "Ar_g": Ar_g,
+        "Ne_g": Ne_g,
     }
 
     return species_data

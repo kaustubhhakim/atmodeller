@@ -1083,6 +1083,50 @@ _Ar_g_coeffs: ThermoCoefficients = ThermoCoefficients(
 Ar_g: SpeciesData = SpeciesData.create("Ar", "g", _Ar_g_coeffs)
 "Species data for Ar_g"
 
+_He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    b1=(-7.453750000e02 , -7.453750000e02, 1.650518960e04),
+    b2=(9.287239740e-01,  9.287239740e-01, -4.048814390e00),
+    cp_coeffs=(
+        (0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0,),
+        (0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0,),
+        (
+             3.396845420e06, 
+             -2.194037652e03, 
+             3.080231878e00, 
+             -8.068957550e-05, 
+             6.252784910e-09,
+             -2.574990067e-13, 
+             4.429960218e-18,
+        ),
+    ),
+    T_min=(200, 1000, 6000),
+    T_max=(1000, 6000, 20000),
+)
+He_g: SpeciesData = SpeciesData.create("He", "g", _He_g_coeffs)
+"Species data for He_g"
+
+_Ne_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    b1=(-7.453750000e02 , -7.453750000e02, -5.663933630e04),
+    b2=(3.355322720e00,   3.355322720e00,  1.648438697e01),
+    cp_coeffs=(
+        (0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0,),
+        (0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0,),
+        (
+             -1.238252746e07, 
+             6.958579580e03, 
+             1.016709287e00, 
+             1.424664555e-04, 
+             -4.803933930e-09, 
+             -1.170213183e-13, 
+             8.415153652e-18,
+        ),
+    ),
+    T_min=(200, 1000, 6000),
+    T_max=(1000, 6000, 20000),
+)
+Ne_g: SpeciesData = SpeciesData.create("Ne", "g", _Ne_g_coeffs)
+"Species data for Ne_g"
+
 _critical_data_H2O_g: CriticalData = CriticalData(647.25, 221.1925)
 """Critical parameters for H2O_g :cite:p:`SS92{Table 2}`"""
 _critical_data_CO2_g: CriticalData = CriticalData(304.15, 73.8659)
@@ -1127,6 +1171,10 @@ _critical_data_N2_g: CriticalData = CriticalData(126.2, 33.9)
 """Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
 _critical_data_Ar_g: CriticalData = CriticalData(151, 48.6)
 """Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
+_critical_data_He_g: CriticalData = CriticalData(5.2, 2.274)
+"""Critical parameters for He :cite:p:`ADM77"""
+_critical_data_Ne_g: CriticalData = CriticalData(44.49, 26.8)
+"""Critical paramters for Ne :cite:p:`KJS86{Table 4}"""
 
 critical_data: dict[str, CriticalData] = {
     "Ar_g": _critical_data_Ar_g,
@@ -1142,6 +1190,8 @@ critical_data: dict[str, CriticalData] = {
     "O2_g": _critical_data_O2_g,
     "S2_g": _critical_data_S2_g,
     "SO2_g": _critical_data_SO2_g,
+    "He_g": _critical_data_He_g,
+    "Ne_g": _critical_data_Ne_g,
 }
 """Critical parameters for gases
 
