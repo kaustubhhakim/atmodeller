@@ -1053,6 +1053,36 @@ _COS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
 COS_g: SpeciesData = SpeciesData.create("COS", "g", _COS_g_coeffs)
 "Species data for COS_g"
 
+_Ar_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    b1=(-7.453750000e02, -7.449939610e02, -5.078300340e06),
+    b2=(4.379674910e00, 4.379180110e00, 1.465298484e03),
+    cp_coeffs=(
+        (0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0,),
+        (
+             2.010538475e01, 
+             -5.992661070e-02, 
+             2.500069401e00, 
+             -3.992141160e-08, 
+             1.205272140e-11,
+             -1.819015576e-15, 
+             1.078576636e-19,
+        ),
+        (
+            -9.951265080e08, 
+            6.458887260e05, 
+            -1.675894697e02, 
+            2.319933363e-02, 
+            -1.721080911e-06,
+            6.531938460e-11, 
+            -9.740147729e-16,
+        ),
+    ),
+    T_min=(200, 1000, 6000),
+    T_max=(1000, 6000, 20000),
+)
+Ar_g: SpeciesData = SpeciesData.create("Ar", "g", _Ar_g_coeffs)
+"Species data for Ar_g"
+
 _critical_data_H2O_g: CriticalData = CriticalData(647.25, 221.1925)
 """Critical parameters for H2O_g :cite:p:`SS92{Table 2}`"""
 _critical_data_CO2_g: CriticalData = CriticalData(304.15, 73.8659)
