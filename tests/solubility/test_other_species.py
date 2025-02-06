@@ -147,7 +147,7 @@ def test_N2_basalt_dasgupta(check_values) -> None:
     test_fugacity_N2_basalt_dasgupta: ArrayLike = 1550
     test_totalP_N2_basalt_dasgupta: ArrayLike = 1708.7
     test_temperature_N2_basalt_dasgupta: ArrayLike = 1773.15
-    test_fO2_N2_basalt_dasgupta: ArrayLike = 1.0108E-9 
+    test_fO2_N2_basalt_dasgupta: ArrayLike = 1.8e-13
     check_values.concentration(
         function_name,
         solubility_model,
@@ -164,15 +164,20 @@ def test_N2_basalt_libourel(check_values) -> None:
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
     solubility_model: SolubilityProtocol = solubility_models["N2_basalt_libourel03"]
-    target_concentration: ArrayLike = 0.12236470428806222
+    #target_concentration: ArrayLike = 0.12236470428806222
+    target_concentration: ArrayLike = 446.7
+    test_fugacity_N2_basalt_libourel: ArrayLike = 0.20
+    test_temperature_N2_basalt_libourel: ArrayLike = 1698.15
+    test_fO2_N2_basalt_libourel: ArrayLike = 6.31e-17
+    test_totalP_N2_basalt_libourel: ArrayLike = 1
     #target_concentration: ArrayLike = 1000
     
     check_values.concentration(
         function_name,
         solubility_model,
         target_concentration,
-        TEST_FUGACITY,
-        TEST_TEMPERATURE,
-        TEST_PRESSURE,
-        TEST_FO2,
+        test_fugacity_N2_basalt_libourel,
+        test_temperature_N2_basalt_libourel,
+        test_totalP_N2_basalt_libourel,
+        test_fO2_N2_basalt_libourel,
     )
