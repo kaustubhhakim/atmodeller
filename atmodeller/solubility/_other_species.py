@@ -155,7 +155,8 @@ class _N2_basalt_bernadou21(PyTreeNoData, Solubility):
         pressure: ArrayLike,
         fO2: ArrayLike,
     ) -> Array:
-        # Numerator and denominator of k13 and k14 should both have units of J/mol so that k13 and k14 are unitless
+        # Numerator and denominator of k13 and k14 should both have units of J/mol so that k13 and
+        # k14 are unitless
         k13: Array = jnp.exp(
             -(29344 + 121 * temperature + 4 * pressure) / (GAS_CONSTANT_BAR * 1.0e5 * temperature)
         )
