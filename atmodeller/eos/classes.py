@@ -25,7 +25,7 @@ from typing import Any
 import jax.numpy as jnp
 import optimistix as optx
 import pandas as pd
-from jax import Array, jit, lax
+from jax import Array, jit
 from jax.scipy.interpolate import RegularGridInterpolator
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
@@ -339,23 +339,9 @@ class Chabrier(RealGas):
         # jax.debug.print("volumes = {out}", out=volumes)
 
         # Optimized trapezoidal rule (avoids jax.scipy.integrate.trapezoid overhead)
-        # dP: Array = jnp.diff(pressures)
-        # avg_volumes: Array = (volumes[:-1] + volumes[1:]) * 0.5
-        # volume_integral: Array = jnp.sum(avg_volumes * dP)  # Equivalent to trapezoid integration
-
-        # Use `jax.lax.scan` for efficient trapezoidal integration
-        def body_fn(carry, i):
-            v_i: Array = lax.dynamic_index_in_dim(volumes, i, keepdims=False)
-            v_next: Array = lax.dynamic_index_in_dim(volumes, i + 1, keepdims=False)
-            p_i: Array = lax.dynamic_index_in_dim(pressures, i, keepdims=False)
-            p_next: Array = lax.dynamic_index_in_dim(pressures, i + 1, keepdims=False)
-
-            integral: Array = carry + 0.5 * (v_i + v_next) * (p_next - p_i)
-
-            return integral, None
-
-        inputs: Array = jnp.arange(len(volumes) - 1)  # Create array of indices
-        volume_integral, _ = lax.scan(body_fn, 0.0, inputs)
+        dP: Array = jnp.diff(pressures)
+        avg_volumes: Array = (volumes[:-1] + volumes[1:]) * 0.5
+        volume_integral: Array = jnp.sum(avg_volumes * dP)  # Equivalent to trapezoid integration
         # jax.debug.print("volume_integral = {out}", out=volume_integral)
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
