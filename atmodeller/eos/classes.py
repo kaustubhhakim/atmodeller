@@ -25,7 +25,7 @@ from typing import Any
 import jax.numpy as jnp
 import optimistix as optx
 import pandas as pd
-from jax import Array, jit, lax
+from jax import Array, jit
 from jax.scipy.interpolate import RegularGridInterpolator
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
