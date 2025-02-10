@@ -64,7 +64,7 @@ and Cl fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from 0.5
 
 _He_henry_sol_constant_jambon86: float = 56e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
-# Convert He conc from mol/g to g H2/g total and then to ppmw
+# Convert He conc from mol/g to g He/g total and then to ppmw
 _He_henry_sol_constant_jambon86 = (
     (_He_henry_sol_constant_jambon86 / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
 )
@@ -73,6 +73,62 @@ He_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_He_henry_sol_consta
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
 1250-1600 C. Using Henry's Law solubility constant for He from the abstract, convert from STP
+units to mol/g*bar.
+"""
+
+_Ar_henry_sol_constant_jambon86: float = 5.9e-5  # cm3*STP/g*bar
+# Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
+# Convert Ar conc from mol/g to g Ar/g total and then to ppmw
+_Ar_henry_sol_constant_jambon86 = (
+    (_Ar_henry_sol_constant_jambon86 / 2.24e4) * 39.948 * unit_conversion.fraction_to_ppm
+)
+Ar_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Ar_henry_sol_constant_jambon86, 1)
+"""Solubility of Ar in tholeittic basalt melt :cite:p:`JWB86`
+
+Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
+1250-1600 C. Using Henry's Law solubility constant for Ar from the abstract, convert from STP
+units to mol/g*bar.
+"""
+
+_Ne_henry_sol_constant_jambon86: float = 25e-5  # cm3*STP/g*bar
+# Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
+# Convert Ne conc from mol/g to g Ne/g total and then to ppmw
+_Ne_henry_sol_constant_jambon86 = (
+    (_Ne_henry_sol_constant_jambon86 / 2.24e4) * 20.1797 * unit_conversion.fraction_to_ppm
+)
+Ne_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Ne_henry_sol_constant_jambon86, 1)
+"""Solubility of Ne in tholeittic basalt melt :cite:p:`JWB86`
+
+Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
+1250-1600 C. Using Henry's Law solubility constant for Ne from the abstract, convert from STP
+units to mol/g*bar.
+"""
+
+_Kr_henry_sol_constant_jambon86: float = 3.0e-5  # cm3*STP/g*bar
+# Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
+# Convert Kr conc from mol/g to g Kr/g total and then to ppmw
+_Kr_henry_sol_constant_jambon86 = (
+    (_Kr_henry_sol_constant_jambon86 / 2.24e4) * 83.798 * unit_conversion.fraction_to_ppm
+)
+Kr_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Kr_henry_sol_constant_jambon86, 1)
+"""Solubility of Kr in tholeittic basalt melt :cite:p:`JWB86`
+
+Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
+1250-1600 C. Using Henry's Law solubility constant for Kr from the abstract, convert from STP
+units to mol/g*bar.
+"""
+
+_Xe_henry_sol_constant_jambon86: float = 1.7e-5  # cm3*STP/g*bar
+# Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
+# Convert Xe conc from mol/g to g Xe/g total and then to ppmw
+_Xe_henry_sol_constant_jambon86 = (
+    (_Xe_henry_sol_constant_jambon86 / 2.24e4) * 131.293 * unit_conversion.fraction_to_ppm
+)
+Xe_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Xe_henry_sol_constant_jambon86, 1)
+"""Solubility of Xe in tholeittic basalt melt :cite:p:`JWB86`
+
+Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
+1250-1600 C. Using Henry's Law solubility constant for Xe from the abstract, convert from STP
 units to mol/g*bar.
 """
 
@@ -206,7 +262,14 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
     @override
     @jit
     def concentration(
-        self, fugacity: ArrayLike, *, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: ArrayLike,
+        pressure: ArrayLike,
+        fO2: ArrayLike,
+        RTOL=4,
+        ATOL=4,
     ) -> Array:
         # Libourel performed the experiment at 1698 K and fitted for fO2 at this temperature hence
         # a correction is necessary.

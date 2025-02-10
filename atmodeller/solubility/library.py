@@ -50,6 +50,10 @@ from atmodeller.solubility._other_species import (
     N2_basalt_bernadou21,
     N2_basalt_dasgupta22,
     N2_basalt_libourel03,
+    Ne_basalt_jambon86,
+    Ar_basalt_jambon86,
+    Xe_basalt_jambon86,
+    Kr_basalt_jambon86,
 )
 from atmodeller.solubility._sulfur_species import (
     S2_andesite_boulliung23,
@@ -110,6 +114,10 @@ def get_solubility_models() -> dict[str, SolubilityProtocol]:
     models["N2_basalt_bernadou21"] = N2_basalt_bernadou21
     models["N2_basalt_dasgupta22"] = N2_basalt_dasgupta22
     models["N2_basalt_libourel03"] = N2_basalt_libourel03
+    models["Ne_basalt_jambon86"] = Ne_basalt_jambon86
+    models["Ar_basalt_jambon86"] = Ar_basalt_jambon86
+    models["Xe_basalt_jambon86"] = Xe_basalt_jambon86
+    models["Kr_basalt_jambon86"] = Kr_basalt_jambon86
 
     # Sort the dictionary by keys
     sorted_models = {k: models[k] for k in sorted(models)}
