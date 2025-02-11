@@ -26,7 +26,6 @@ import jax.numpy as jnp
 import optimistix as optx
 import pandas as pd
 from jax import Array, jit
-from jax.scipy.integrate import trapezoid
 from jax.scipy.interpolate import RegularGridInterpolator
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
@@ -266,6 +265,7 @@ class Chabrier(RealGas):
         self._He_molar_mass_g_mol: float = Formula("He").mass
         self._integration_steps: int = integration_steps
 
+    @jit
     def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
         r"""Converts density to molar density
 
@@ -335,11 +335,13 @@ class Chabrier(RealGas):
             jnp.log10(PRESSURE_REFERENCE), jnp.log10(pressure), num=self._integration_steps
         )
         # jax.debug.print("pressures = {out}", out=pressures)
-        temperatures: Array = jnp.full_like(pressures, temperature)
-        # jax.debug.print("temperatures = {out}", out=temperatures)
-        volumes: Array = self.volume(temperatures, pressures)
+        volumes: Array = self.volume(temperature, pressures)
         # jax.debug.print("volumes = {out}", out=volumes)
-        volume_integral: Array = trapezoid(volumes, pressures)
+
+        # Optimized trapezoidal rule (avoids jax.scipy.integrate.trapezoid overhead)
+        dP: Array = jnp.diff(pressures)
+        avg_volumes: Array = (volumes[:-1] + volumes[1:]) * 0.5
+        volume_integral: Array = jnp.sum(avg_volumes * dP)  # Equivalent to trapezoid integration
         # jax.debug.print("volume_integral = {out}", out=volume_integral)
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
@@ -367,11 +369,25 @@ class Chabrier(RealGas):
         return volume_integral
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
-        children: tuple = ()
-        aux_data = {"filename": self._filename}
+        children = (self._log10_density_func,)  # Store the interpolator as a child
+        aux_data = {
+            "filename": self._filename,
+            "He_fraction": self._He_fraction,
+            "H2_molar_mass_g_mol": self._H2_molar_mass_g_mol,
+            "He_molar_mass_g_mol": self._He_molar_mass_g_mol,
+            "integration_steps": self._integration_steps,
+        }
+
         return (children, aux_data)
 
     @classmethod
     def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
+        obj = cls.__new__(cls)  # Avoids calling __init__
+        obj._log10_density_func = children[0]  # Restore the interpolator
+        obj._filename = aux_data["filename"]
+        obj._He_fraction = aux_data["He_fraction"]
+        obj._H2_molar_mass_g_mol = aux_data["H2_molar_mass_g_mol"]
+        obj._He_molar_mass_g_mol = aux_data["He_molar_mass_g_mol"]
+        obj._integration_steps = aux_data["integration_steps"]
+
+        return obj
