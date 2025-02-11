@@ -184,6 +184,16 @@ Si_l: SpeciesData = SpeciesData.create(
 )
 "Species data for Si_l"
 
+_SiO_s_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (5.1957e4,),
+    (0,),  # FIXME: Kaustubh to update b2 coefficient (entropy constant of integration)
+    ((-11.68e5, 0, 44.35, 4.946e-3, -7.2e-8, 0, 0),),
+    (1211,),
+    (1565,),
+)
+SiO_s: SpeciesData = SpeciesData.create("SiO", "s", _SiO_s_coeffs)
+"Species data for SiO_s :cite:p:`WPG12`"
+
 _SiO2_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-1.140002976e5,),
     (-5.554279592e1,),
