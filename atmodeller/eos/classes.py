@@ -237,7 +237,10 @@ class Chabrier(RealGas):
     This uses rho-T-P tables to lookup density (rho).
 
     Args:
-        filename: Filename of the density-T-P data
+        log10_density_func: Spline lookup for density from :cite:t:`CD21` T-P-rho tables
+        He_fraction: He fraction
+        H2_molar_mass_g_mol: Molar mass of H2
+        He_molar_mass_g_mol: Molar mass of He
         integration_steps: Number of integration steps. Defaults to 1000.
     """
 
@@ -257,13 +260,43 @@ class Chabrier(RealGas):
     Dictionary keys should correspond to the name of the Chabrier file.
     """
 
-    def __init__(self, filename: Path, integration_steps: int = 1000):
-        self._filename: Path = filename
-        self._log10_density_func: RegularGridInterpolator = self._get_spline()
-        self._He_fraction: float = self.He_fraction_map[self._filename.name]
-        self._H2_molar_mass_g_mol: float = Formula("H2").mass
-        self._He_molar_mass_g_mol: float = Formula("He").mass
+    def __init__(
+        self,
+        log10_density_func: RegularGridInterpolator,
+        He_fraction: float,
+        H2_molar_mass_g_mol: float,
+        He_molar_mass_g_mol: float,
+        integration_steps: int = 1000,
+    ):
+        self._log10_density_func: RegularGridInterpolator = log10_density_func
+        self._He_fraction: float = He_fraction
+        self._H2_molar_mass_g_mol: float = H2_molar_mass_g_mol
+        self._He_molar_mass_g_mol: float = He_molar_mass_g_mol
         self._integration_steps: int = integration_steps
+
+    @classmethod
+    def create(cls, filename: Path, integration_steps: int = 1000) -> Self:
+        """Creates a Chabrier instance
+
+        Args:
+            filename: Filename of the density-T-P data
+            integration_steps: Number of integration steps. Defaults to 1000.
+
+        Returns:
+            Instance
+        """
+        log10_density_func: RegularGridInterpolator = cls._get_interpolator(filename)
+        He_fraction: float = cls.He_fraction_map[filename.name]
+        H2_molar_mass_g_mol: float = Formula("H2").mass
+        He_molar_mass_g_mol: float = Formula("He").mass
+
+        return cls(
+            log10_density_func,
+            He_fraction,
+            H2_molar_mass_g_mol,
+            He_molar_mass_g_mol,
+            integration_steps,
+        )
 
     @jit
     def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
@@ -286,12 +319,16 @@ class Chabrier(RealGas):
 
         return molar_density
 
-    def _get_spline(self) -> RegularGridInterpolator:
+    @classmethod
+    def _get_interpolator(cls, filename: Path) -> RegularGridInterpolator:
         """Gets spline lookup for density from :cite:t:`CD21` T-P-rho tables.
 
         The data tables have a slightly different organisation of the header line. But in all cases
         the first three columns contain the required data: log10 T [K], log10 P [GPa], and
         log10 rho [g/cc].
+
+        Args:
+            filename: Filename of the density-T-P data
 
         Returns:
             Interpolator
@@ -303,7 +340,7 @@ class Chabrier(RealGas):
         column_names: list[str] = [T_name, P_name, rho_name]
 
         data: AbstractContextManager[Path] = importlib.resources.as_file(
-            DATA_DIRECTORY.joinpath(str(self.CHABRIER_DIRECTORY.joinpath(self._filename)))
+            DATA_DIRECTORY.joinpath(str(cls.CHABRIER_DIRECTORY.joinpath(filename)))
         )
         with data as datapath:
             df: pd.DataFrame = pd.read_csv(
@@ -369,9 +406,9 @@ class Chabrier(RealGas):
         return volume_integral
 
     def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
-        children = (self._log10_density_func,)  # Store the interpolator as a child
+        children: tuple = ()
         aux_data = {
-            "filename": self._filename,
+            "log10_density_func": self._log10_density_func,
             "He_fraction": self._He_fraction,
             "H2_molar_mass_g_mol": self._H2_molar_mass_g_mol,
             "He_molar_mass_g_mol": self._He_molar_mass_g_mol,
@@ -382,12 +419,5 @@ class Chabrier(RealGas):
 
     @classmethod
     def tree_unflatten(cls, aux_data, children) -> Self:
-        obj = cls.__new__(cls)  # Avoids calling __init__
-        obj._log10_density_func = children[0]  # Restore the interpolator
-        obj._filename = aux_data["filename"]
-        obj._He_fraction = aux_data["He_fraction"]
-        obj._H2_molar_mass_g_mol = aux_data["H2_molar_mass_g_mol"]
-        obj._He_molar_mass_g_mol = aux_data["He_molar_mass_g_mol"]
-        obj._integration_steps = aux_data["integration_steps"]
-
-        return obj
+        del children
+        return cls(**aux_data)

@@ -42,30 +42,30 @@ calibration_chabrier21: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=100, temperature_max=1.0e8, pressure_min=None, pressure_max=1.0e17
 )
 """Calibration for :cite:t:`CD21`"""
-H2_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_H_TP_v1"))
+H2_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLE_H_TP_v1"))
 """H2 :cite:p:`CD21`"""
 H2_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
     [H2_chabrier21],
     [calibration_chabrier21],
 )
 """H2 bounded :cite:p:`CD21`"""
-He_chabrier21: RealGasProtocol = Chabrier(Path("TABLE_HE_TP_v1"))
+He_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
 He_chabrier21_bounded: RealGasProtocol = CombinedRealGas([He_chabrier21], [calibration_chabrier21])
 """He bounded :cite:p:`CD21`"""
-H2_He_Y0275_chabrier21: RealGasProtocol = Chabrier(Path("TABLEEOS_2021_TP_Y0275_v1"))
+H2_He_Y0275_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLEEOS_2021_TP_Y0275_v1"))
 """H2HeY0275 :cite:p:`CD21`"""
 H2_He_Y0275_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
     [H2_He_Y0275_chabrier21], [calibration_chabrier21]
 )
 """H2HeY0275 bounded :cite:p:`CD21`"""
-H2_He_Y0292_chabrier21: RealGasProtocol = Chabrier(Path("TABLEEOS_2021_TP_Y0292_v1"))
+H2_He_Y0292_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLEEOS_2021_TP_Y0292_v1"))
 """H2HeY0292 :cite:p:`CD21`"""
 H2_He_Y0292_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
     [H2_He_Y0292_chabrier21], [calibration_chabrier21]
 )
 """H2HeY0292 bounded :cite:p:`CD21`"""
-H2_He_Y0297_chabrier21: RealGasProtocol = Chabrier(Path("TABLEEOS_2021_TP_Y0297_v1"))
+H2_He_Y0297_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLEEOS_2021_TP_Y0297_v1"))
 """H2HeY0297 :cite:p:`CD21`"""
 H2_He_Y0297_chabrier21_bounded: RealGasProtocol = CombinedRealGas(
     [H2_He_Y0297_chabrier21], [calibration_chabrier21]
