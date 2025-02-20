@@ -136,6 +136,40 @@ H2SO4_l: SpeciesData = SpeciesData.create(
 )
 "Species data for H2SO4_l"
 
+_NH4Cl_l_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (-3.792881500e4, -8.787975900e5, 2.063363145e7),
+    (2.933013040e1, 3.897936900e3, -3.765976360e4),
+    (
+        (1.593389657e5, 0, -5.965854940, 6.494193170e-2, -5.391456890e-5, 0.0, 0.0),
+        (
+            -1.641820157e7,
+            1.639262758e5,
+            -6.654529630e2,
+            1.447086973,
+            -1.698254160e-3,
+            1.056255415e-6,
+            -2.697574651e-10,
+        ),
+        (
+            8.409592660e8,
+            -3.426760780e6,
+            5.548091470e3,
+            -4.435674300,
+            1.772486202e-3,
+            -2.817160120e-7,
+            0.0,
+        ),
+    ),
+    (298.15, 457.7, 1000.0),
+    (457.7, 1000.0, 1500.0),
+)
+NH4Cl_l: SpeciesData = SpeciesData.create(
+    "NH4Cl",
+    "l",
+    _NH4Cl_l_coeffs,
+)
+"Species data for NH4Cl_l"
+
 _S_alpha_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.516389580e2,),
     (-7.961066980,),
