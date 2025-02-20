@@ -919,6 +919,35 @@ _SO3_g_coeffs: ThermoCoefficients = ThermoCoefficients(
 SO3_g: SpeciesData = SpeciesData.create("SO3", "g", _SO3_g_coeffs)
 "Species data for SO3_g"
 
+_H2SO4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
+    b1=(-9.315660120e4, -5.259092950e4),
+    b2=(3.961096201e1, -1.023603724e2),
+    cp_coeffs=(
+        (
+            -4.129150050e4,
+            6.681589890e2,
+            -2.632753507,
+            5.415382480e-2,
+            -7.067502230e-5,
+            4.684611420e-8,
+            -1.236791238e-11,
+        ),
+        (
+            1.437877914e6,
+            -6.614902530e3,
+            2.157662058e1,
+            -4.806255970e-4,
+            3.010775121e-8,
+            2.334842469e-12,
+            -2.946330375e-16,
+        ),
+    ),
+    T_min=(200, 1000),
+    T_max=(1000, 6000),
+)
+H2SO4_g: SpeciesData = SpeciesData.create("H2SO4", "g", _H2SO4_g_coeffs)
+"Species data for H2SO4_g"
+
 _FeO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     b1=(2.964572665e04, 3.037985806e04),
     b2=(1.326115545e01, -3.633655420e00),
