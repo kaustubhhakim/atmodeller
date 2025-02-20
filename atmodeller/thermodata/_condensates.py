@@ -112,6 +112,30 @@ H2O_l: SpeciesData = SpeciesData.create(
 )
 "Species data for H2O_l"
 
+_H2SO4_l_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (-1.068997367e5,),
+    (-1.353966639e1,),
+    (
+        (
+            -7.749933850e4,
+            1.040538662e3,
+            4.433804910,
+            3.648845480e-2,
+            -1.743440132e-5,
+            1.175631937e-8,
+            -3.170091690e-12,
+        ),
+    ),
+    (283.456,),
+    (1000,),
+)
+H2SO4_l: SpeciesData = SpeciesData.create(
+    "H2SO4",
+    "l",
+    _H2SO4_l_coeffs,
+)
+"Species data for H2SO4_l"
+
 _S_alpha_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.516389580e2,),
     (-7.961066980,),
