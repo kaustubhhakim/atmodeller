@@ -28,7 +28,7 @@ from jax.typing import ArrayLike
 
 from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility.classes import Solubility
-from atmodeller.utilities import PyTreeNoData, unit_conversion
+from atmodeller.utilities import PyTreeNoData, safe_exp, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -50,7 +50,7 @@ class _CH4_basalt_ardia13(PyTreeNoData, Solubility):
         del kwargs
         pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
         one_bar_in_gpa: ArrayLike = unit_conversion.bar_to_GPa
-        k: Array = jnp.exp(4.93 - (1.93 * (pressure_gpa - one_bar_in_gpa)))
+        k: Array = safe_exp(4.93 - (1.93 * (pressure_gpa - one_bar_in_gpa)))
         ppmw: Array = k * fugacity * unit_conversion.bar_to_GPa
 
         return ppmw
@@ -165,7 +165,7 @@ class _CO2_basalt_dixon95(PyTreeNoData, Solubility):
         self, fugacity: ArrayLike, *, temperature: ArrayLike, pressure: ArrayLike, **kwargs
     ) -> Array:
         del kwargs
-        arg: Array = jnp.exp(-23 * (pressure - 1) / (83.15 * temperature)) * fugacity * 3.8e-7
+        arg: Array = safe_exp(-23 * (pressure - 1) / (83.15 * temperature)) * fugacity * 3.8e-7
         ppmw: Array = 1.0e4 * (4400 * arg) / (36.6 - 44 * arg)
 
         return ppmw

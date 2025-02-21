@@ -31,7 +31,7 @@ from atmodeller.interfaces import RedoxBufferProtocol, SolubilityProtocol
 from atmodeller.solubility.classes import Solubility, SolubilityPowerLaw, power_law
 from atmodeller.solubility.core import fO2_temperature_correction
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.utilities import PyTreeNoData, unit_conversion
+from atmodeller.utilities import PyTreeNoData, safe_exp, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -157,10 +157,10 @@ class _N2_basalt_bernadou21(PyTreeNoData, Solubility):
     ) -> Array:
         # Numerator and denominator of k13 and k14 should both have units of J/mol so that k13 and
         # k14 are unitless
-        k13: Array = jnp.exp(
+        k13: Array = safe_exp(
             -(29344 + 121 * temperature + 4 * pressure) / (GAS_CONSTANT_BAR * 1.0e5 * temperature)
         )
-        k14: Array = jnp.exp(
+        k14: Array = safe_exp(
             -(183733 + 172 * temperature - 5 * pressure) / (GAS_CONSTANT_BAR * 1.0e5 * temperature)
         )
         molfrac: Array = (k13 * fugacity) + ((fO2 ** (-3 / 4)) * k14 * (fugacity**0.5))
@@ -217,10 +217,10 @@ class _N2_basalt_dasgupta22(Solubility):
         fo2_shift: Array = jnp.log10(fO2) - self._buffer.log10_fugacity_buffer(
             temperature, pressure
         )
-        ppmw: Array = jnp.exp(
+        ppmw: Array = safe_exp(
             (5908.0 * jnp.sqrt(pressure_gpa) / temperature) - (1.6 * fo2_shift)
         ) * jnp.sqrt(fugacity_gpa)
-        ppmw = ppmw + fugacity_gpa * jnp.exp(
+        ppmw = ppmw + fugacity_gpa * safe_exp(
             4.67 + (7.11 * self.xsio2) - (13.06 * self.xal2o3) - (120.67 * self.xtio2)
         )
 
