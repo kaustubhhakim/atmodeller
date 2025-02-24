@@ -34,10 +34,10 @@ else:
     from typing import Self
 
 
-phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2, "alpha": 3, "beta": 4, "s": 5}
+phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2, "s": 5}
 """Mapping from the JANAF phase string to an integer code.
 
-alpha and beta are used for sulfur phases and s is used for amorphous SiO
+s is used for amorphous SiO
 """
 inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
 """Inverse mapping from the integer code to a JANAF phase string"""

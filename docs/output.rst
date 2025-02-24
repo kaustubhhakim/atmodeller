@@ -93,7 +93,7 @@ O2_g additional outputs
 Condensed species
 -----------------
 
-Species output have a dictionary key associated with the species name and its state of aggregation (e.g., H2O_l, S_alpha).
+Species output have a dictionary key associated with the species name and its state of aggregation (e.g., H2O_l, S_cr).
 
 .. list-table:: Outputs for condensed species
    :widths: 25 25 50

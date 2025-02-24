@@ -170,26 +170,21 @@ NH4Cl_cr: SpeciesData = SpeciesData.create(
 )
 "Species data for NH4Cl_cr"
 
-_S_alpha_coeffs: ThermoCoefficients = ThermoCoefficients(
-    (-7.516389580e2,),
-    (-7.961066980,),
-    ((-1.035710779e4, 0, 1.866766938, 4.256140250e-3, -3.265252270e-06, 0, 0),),
-    (200,),
-    (368.3,),
+_S_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
+    (-7.516389580e2, -6.852714730e2),
+    (
+        -7.961066980,
+        -8.607846750,
+    ),
+    (
+        (-1.035710779e4, 0, 1.866766938, 4.256140250e-3, -3.265252270e-06, 0, 0),
+        (0, 0, 2.080514131, 2.440879557e-3, 0, 0, 0),
+    ),
+    (200, 368.3),
+    (368.3, 388.36),
 )
-
-S_alpha: SpeciesData = SpeciesData.create("S", "alpha", _S_alpha_coeffs)
-"Species data for S_alpha"
-
-_S_beta_coeffs: ThermoCoefficients = ThermoCoefficients(
-    (-6.852714730e2,),
-    (-8.607846750,),
-    ((0, 0, 2.080514131, 2.440879557e-3, 0, 0, 0),),
-    (368.3,),
-    (388.36,),
-)
-S_beta: SpeciesData = SpeciesData.create("S", "beta", _S_beta_coeffs)
-"Species data for S_beta"
+S_cr: SpeciesData = SpeciesData.create("S", "cr", _S_cr_coeffs)
+"Species data for S_alpha and S_beta"
 
 _S_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-6.356594920e5, -9.832222680e5, -2.638846929e4, 1.113013440e4, -8.284589830e2),
