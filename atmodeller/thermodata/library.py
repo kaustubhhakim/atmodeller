@@ -30,7 +30,6 @@ from atmodeller.thermodata._condensates import (
     Si_cr,
     Si_l,
     SiO2_l,
-    SiO_s,
 )
 from atmodeller.thermodata._gases import (
     Ar_g,
@@ -120,7 +119,6 @@ def get_thermodata() -> dict[str, SpeciesData]:
         "SiO2_g": SiO2_g,
         "SiO_g": SiO_g,
         "SiH4_g": SiH4_g,
-        "SiO_s": SiO_s,
         "SiO2_l": SiO2_l,
         "SO_g": SO_g,
         "SO2_g": SO2_g,
