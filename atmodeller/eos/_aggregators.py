@@ -158,7 +158,8 @@ class UpperBoundRealGas(RealGas):
     """An upper bound for an EOS
 
     This is used to extrapolate an EOS assuming that the compressibility factor is a linear
-    function of pressure.
+    function of pressure. Importantly, this class is not intended to be used directly, but rather
+    as a component of `CombinedRealGas`.
 
     Args:
         real_gas: Real gas to evaluate the compressibility factor at `p_eval`.
@@ -184,11 +185,15 @@ class UpperBoundRealGas(RealGas):
     @override
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
-            GAS_CONSTANT_BAR * temperature
-        )
+        """Log fugacity cannot be computed.
 
-        return log_fugacity
+        This method should not be used because the volume integral is only defined above `p_eval`,
+        meaning that the log fugacity cannot be calculated.
+        """
+        del temperature
+        del pressure
+
+        raise NotImplementedError("This method should not be used")
 
     @override
     @jit
@@ -209,18 +214,15 @@ class UpperBoundRealGas(RealGas):
     @override
     @jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Volume integral in units required for internal Atmodeller operations.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
-        """
-        volume_integral: Array = jnp.log(pressure / self._p_eval) * (
-            GAS_CONSTANT_BAR * temperature * (self._z0(temperature) - self._dzdp * self._p_eval)
-        ) + GAS_CONSTANT_BAR * temperature * self._dzdp * (pressure - self._p_eval)
+        volume_integral: Array = (
+            GAS_CONSTANT_BAR
+            * temperature
+            * (
+                jnp.log(pressure / self._p_eval)
+                * (self._z0(temperature) - self._dzdp * self._p_eval)
+                + self._dzdp * (pressure - self._p_eval)
+            )
+        )
 
         return volume_integral
 
@@ -287,6 +289,8 @@ class CombinedRealGas(CombinedRealGasABC):
             tree flattening and unflattening operations. Defaults to True.
     """
 
+    # TODO: Use a class method to create the RealGasProtocol objects one time only. See Chabrier
+    # EOS class for an example. This will optimise the flattening and unflattening operations.
     @override
     def __init__(
         self,
@@ -385,7 +389,7 @@ class CombinedRealGas(CombinedRealGasABC):
             index == 0, add_only_first_integral, lambda x: x, total_integral
         )
 
-        # FIXME: Use lax scan for reverse differentiation compatibility
+        # TODO: Use lax scan for reverse differentiation compatibility
         # Loop over and accumulate the vdP integrations over the EOS. This will only do something
         # if index >= 2, so will effectively be ignored for index = 1, as desired
         total_integral: Array = lax.fori_loop(1, index, body_fun, total_integral)
