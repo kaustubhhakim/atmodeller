@@ -182,7 +182,7 @@ class BeattieBridgeman(RealGas):
         r"""Volume
 
         :cite:t:`HWZ58` doesn't say which root to take, but one real root is very small and the
-        maximum real root gives a volume that agrees with the tabulated compressibility parameter
+        maximum real root gives a volume that agrees with the tabulated compressibility factor
         for all species.
 
         Args:

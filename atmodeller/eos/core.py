@@ -223,7 +223,7 @@ class RealGas(ABC):
     def ideal_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Volume of an ideal gas
 
-        This is required to compute the compressibility parameter.
+        This is required to compute the compressibility factor.
 
         Args:
             temperature: Temperature in K

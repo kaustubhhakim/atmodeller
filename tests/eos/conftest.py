@@ -82,7 +82,7 @@ class CheckValues:
 
     @classmethod
     def compressibility(cls, *args, **kwargs) -> None:
-        """Checks the compressibility parameter"""
+        """Checks the compressibility factor"""
         cls._check_property("compressibility_factor", *args, **kwargs)
 
     @classmethod

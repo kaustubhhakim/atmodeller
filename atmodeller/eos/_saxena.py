@@ -191,7 +191,7 @@ class SaxenaABC(RealGas):
     @override
     @jit
     def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Compressibility parameter :cite:p:`SS92{Equation 2}`
+        """Compressibility factor :cite:p:`SS92{Equation 2}`
 
         This overrides the base class because the compressibility factor is used to determine the
         volume, whereas in the base class the volume is used to determine the compressibility
@@ -202,7 +202,7 @@ class SaxenaABC(RealGas):
             pressure: Pressure in bar
 
         Returns:
-            The compressibility parameter, which is dimensionless
+            The compressibility factor, which is dimensionless
         """
         Tr: ArrayLike = self.scaled_temperature(temperature)
         Pr: ArrayLike = self.scaled_pressure(pressure)
