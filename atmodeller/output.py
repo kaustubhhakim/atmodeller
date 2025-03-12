@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from jax import Array
 from jax.tree_util import tree_map
@@ -77,7 +78,7 @@ class Output:
         interior_atmosphere: Interior atmosphere
         initial_solution: Initial solution
         traced_parameters: Traced parameters
-        optimistix_result: An integer array representing whether the solve was successful or no
+        solver_result: An integer array representing whether the solve was successful or no
     """
 
     def __init__(
@@ -86,7 +87,7 @@ class Output:
         interior_atmosphere: InteriorAtmosphere,
         initial_solution: Solution,
         traced_parameters: TracedParameters,
-        # optimistix_result: npt.NDArray[np.int_],
+        solver_result: Array | npt.NDArray[np.int_],
     ):
         logger.debug("Creating Output")
         # Convert to 2-D to allow the same (sometimes vmapped) functions to be used for single and
@@ -96,7 +97,7 @@ class Output:
         self._initial_solution: Solution = initial_solution
         self._species: SpeciesCollection = self._interior_atmosphere.species
         self._traced_parameters: TracedParameters = traced_parameters
-        # self._optimistix_result: npt.NDArray[np.int_] = np.atleast_1d(optimistix_result)
+        self._solver_result: npt.NDArray[np.int_] = np.atleast_1d(solver_result)
 
         # Calculate the index at which to split the array
         split_index: int = self._solution.shape[1] - self.species.number_of_stability()
@@ -113,10 +114,10 @@ class Output:
             self._interior_atmosphere.species.get_condensed_species_indices(), dtype=int
         )
 
-    # @property
-    # def failed(self) -> npt.NDArray[np.bool_]:
-    #     """Boolean array of failed cases"""
-    #     return self._optimistix_result != 0
+    @property
+    def failed(self) -> npt.NDArray[np.bool_]:
+        """Boolean array of failed cases"""
+        return self._solver_result != 0
 
     @property
     def fixed_parameters(self) -> FixedParameters:
@@ -167,10 +168,10 @@ class Output:
         """Stability species mask"""
         return jnp.array(self.species.get_stability_species_mask())
 
-    # @property
-    # def success(self) -> npt.NDArray[np.bool_]:
-    #     """Boolean array of successful (converged) cases"""
-    #     return self._optimistix_result == 0
+    @property
+    def success(self) -> npt.NDArray[np.bool_]:
+        """Boolean array of successful (converged) cases"""
+        return self._solver_result == 0
 
     @property
     def temperature(self) -> Array:
@@ -855,10 +856,10 @@ class Output:
         """
         out: dict[str, pd.DataFrame] = nested_dict_to_dataframes(self.asdict())
 
-        # if success:
-        #     # Loop through the dictionary and filter the dataframes
-        #     for key, df in out.items():
-        #         out[key] = df[self.success]
+        if success:
+            # Loop through the dictionary and filter the dataframes
+            for key, df in out.items():
+                out[key] = df[self.success]
 
         logger.debug("to_dataframes = %s", out)
 

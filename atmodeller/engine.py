@@ -24,6 +24,7 @@ from typing import Any, Callable
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit, lax
 from jax.typing import ArrayLike
@@ -47,12 +48,55 @@ from atmodeller.utilities import (
 
 
 @partial(jit, static_argnames=["fixed_parameters", "solver_parameters"])
+def root_find(
+    solution_array: Array,
+    traced_parameters: TracedParameters,
+    fixed_parameters: FixedParameters,
+    solver_parameters: SolverParameters,
+) -> tuple[Array, Array | npt.NDArray]:
+    """Solves the system of non-linear equations
+
+    The code breaks if this function returns an optx.Solution instance, so instead only the arrays
+    that are required are extracted and returned.
+
+    Args:
+        solution_array: Array of solution data
+        traced_parameters: Traced parameters
+        fixed_parameters: Fixed parameters
+        solver_parameters: Solver parameters
+
+    Returns:
+        The solution, solver result
+    """
+
+    options: dict[str, Any] = {
+        "lower": np.asarray(solver_parameters.lower),
+        "upper": np.asarray(solver_parameters.upper),
+        "jac": solver_parameters.jac,
+    }
+
+    sol: optx.Solution = optx.root_find(
+        objective_function,
+        solver_parameters.solver,
+        solution_array,
+        args={"traced_parameters": traced_parameters, "fixed_parameters": fixed_parameters},
+        throw=solver_parameters.throw,
+        max_steps=solver_parameters.max_steps,
+        options=options,
+    )
+
+    # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+
+    return sol.value, sol.result._value
+
+
+@partial(jit, static_argnames=["fixed_parameters", "solver_parameters"])
 def solve(
     solution: Solution,
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
-) -> Array:
+) -> tuple[Array, Array | npt.NDArray]:
     """Solves the system of non-linear equations
 
     Args:
@@ -62,27 +106,13 @@ def solve(
         solver_parameters: Solver parameters
 
     Returns:
-        The solution
+        The solution, the result of the solver
     """
-    options: dict[str, Any] = {
-        "lower": np.asarray(solver_parameters.lower),
-        "upper": np.asarray(solver_parameters.upper),
-        "jac": solver_parameters.jac,
-    }
-
-    sol = optx.root_find(
-        objective_function,
-        solver_parameters.solver,
-        solution.data,
-        args={"traced_parameters": traced_parameters, "fixed_parameters": fixed_parameters},
-        throw=solver_parameters.throw,
-        max_steps=solver_parameters.max_steps,
-        options=options,
+    sol, solver_result = root_find(
+        solution.data, traced_parameters, fixed_parameters, solver_parameters
     )
 
-    # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-
-    return sol.value
+    return sol, solver_result
 
 
 @jit

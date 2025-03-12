@@ -30,7 +30,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array
 from jax.tree_util import tree_flatten
 from jax.typing import ArrayLike
 
@@ -277,7 +276,7 @@ class InteriorAtmosphere:
 
         # Compile
         start_time = time.time()
-        self._solver(initial_solution, traced_parameters).block_until_ready()
+        self._solver(initial_solution, traced_parameters)
         end_time = time.time()
         compile_time = end_time - start_time
         logger.info("Compile time: %.6f seconds", compile_time)
@@ -638,13 +637,13 @@ class InteriorAtmosphere:
         traced_parameters: TracedParameters = self.solution_args.get_traced_parameters()
 
         # Execute
-        start_time = time.time()
-        solution: Array = self._solver(initial_solution, traced_parameters).block_until_ready()
-        end_time = time.time()
-        execution_time = end_time - start_time
-        logger.info("Execution time: %.6f seconds", execution_time)
+        # start_time = time.time()
+        solution, solver_result = self._solver(initial_solution, traced_parameters)
+        # end_time = time.time()
+        # execution_time = end_time - start_time
+        # logger.info("Execution time: %.6f seconds", execution_time)
 
-        output: Output = Output(solution, self, initial_solution, traced_parameters)
+        output: Output = Output(solution, self, initial_solution, traced_parameters, solver_result)
 
         if quick_look:
             quick_look_dict: dict[str, ArrayLike] = output.quick_look()
