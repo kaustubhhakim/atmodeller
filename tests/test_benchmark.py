@@ -24,7 +24,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
-from atmodeller.containers import Planet, Species
+from atmodeller.containers import Planet, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.thermodata import IronWustiteBuffer
@@ -44,11 +44,7 @@ TOLERANCE: float = 5.0e-2
 def test_H_O(helper) -> None:
     """Tests H2-H2O at the IW buffer by applying an oxygen abundance constraint."""
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    O2_g: Species = Species.create_gas("O2_g")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection.create(("H2_g", "H2O_g", "O2_g"))
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -83,20 +79,13 @@ def test_CHO_reduced(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 1}`.
     """
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    O2_g: Species = Species.create_gas("O2_g")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
+    )
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        O2_g.name: IronWustiteBuffer(-2)
-    }
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -132,20 +121,13 @@ def test_CHO_IW(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`.
     """
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    O2_g: Species = Species.create_gas("O2_g")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
+    )
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        O2_g.name: IronWustiteBuffer(0.5)
-    }
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -192,18 +174,13 @@ def test_CHO_oxidised(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 3}`.
     """
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    O2_g: Species = Species.create_gas("O2_g")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
+    )
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer(2)}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -240,18 +217,13 @@ def test_CHO_highly_oxidised(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 4}`.
     """
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    O2_g: Species = Species.create_gas("O2_g")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
+    )
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer(4)}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -283,18 +255,13 @@ def test_CHO_highly_oxidised(helper) -> None:
 def test_CHO_middle_temperature(helper) -> None:
     """Tests C-H-O system at 873 K"""
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    O2_g: Species = Species.create_gas("O2_g")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
+    )
     planet: Planet = Planet(surface_temperature=873.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer()}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -327,14 +294,9 @@ def test_CHO_middle_temperature(helper) -> None:
 def test_CHO_low_temperature(helper) -> None:
     """Tests C-H-O system at 450 K"""
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    O2_g: Species = Species.create_gas("O2_g")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, CO_g, CO2_g, CH4_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
+    )
     planet: Planet = Planet(surface_temperature=450.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -355,14 +317,10 @@ def test_CHO_low_temperature(helper) -> None:
     # Correcting for the low CO and O2 helps the solver to latch onto the solution
     initial_log_number_density[2] = 30
     initial_log_number_density[5] = -INITIAL_LOG_NUMBER_DENSITY
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
 
     interior_atmosphere.initialise_solve(
         planet=planet,
         initial_log_number_density=initial_log_number_density,
-        initial_log_stability=initial_log_stability,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.solve()
@@ -383,15 +341,9 @@ def test_CHO_low_temperature(helper) -> None:
 def test_graphite_condensed(helper) -> None:
     """Tests graphite stable with around 50% condensed C mass fraction"""
 
-    O2_g: Species = Species.create_gas("O2_g")
-    H2_g: Species = Species.create_gas("H2_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    C_cr: Species = Species.create_condensed("C_cr")
-
-    species: tuple[Species, ...] = (O2_g, H2_g, CO_g, H2O_g, CO2_g, CH4_g, C_cr)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("O2_g", "H2_g", "CO_g", "H2O_g", "CO2_g", "CH4_g", "C_cr")
+    )
     planet: Planet = Planet(surface_temperature=873.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -432,21 +384,13 @@ def test_graphite_unstable(helper) -> None:
     Similar to :cite:p:`BHS22{Table E, row 2}`
     """
 
-    O2_g: Species = Species.create_gas("O2_g")
-    H2_g: Species = Species.create_gas("H2_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    C_cr: Species = Species.create_condensed("C_cr")
-
-    species: tuple[Species, ...] = (O2_g, H2_g, H2O_g, CO_g, CO2_g, CH4_g, C_cr)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("O2_g", "H2_g", "CO_g", "H2O_g", "CO2_g", "CH4_g", "C_cr")
+    )
     planet: Planet = Planet(surface_temperature=1400.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        O2_g.name: IronWustiteBuffer(0.5)
-    }
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
 
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -481,12 +425,7 @@ def test_graphite_unstable(helper) -> None:
 def test_water_condensed(helper) -> None:
     """Condensed water at 10 bar"""
 
-    H2_g: Species = Species.create_gas("H2_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    O2_g: Species = Species.create_gas("O2_g")
-    H2O_l: Species = Species.create_condensed("H2O_l")
-
-    species: tuple[Species, ...] = (H2_g, H2O_g, O2_g, H2O_l)
+    species: SpeciesCollection = SpeciesCollection.create(("H2_g", "H2O_g", "O2_g", "H2O_l"))
     planet: Planet = Planet(surface_temperature=411.75)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -504,9 +443,7 @@ def test_water_condensed(helper) -> None:
     )
     # For this case, reducing the fO2 is required for the solver to latch onto the solution
     initial_log_number_density[2] = -INITIAL_LOG_NUMBER_DENSITY
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones_like(
-        initial_log_number_density
-    )
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(1)
 
     interior_atmosphere.initialise_solve(
         planet=planet,
@@ -531,16 +468,9 @@ def test_water_condensed(helper) -> None:
 def test_graphite_water_condensed(helper) -> None:
     """Tests C and water in equilibrium at 430 K and 10 bar"""
 
-    O2_g: Species = Species.create_gas("O2_g")
-    H2_g: Species = Species.create_gas("H2_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    H2O_g: Species = Species.create_gas("H2O_g")
-    CO2_g: Species = Species.create_gas("CO2_g")
-    CH4_g: Species = Species.create_gas("CH4_g")
-    C_cr: Species = Species.create_condensed("C_cr")
-    H2O_l: Species = Species.create_condensed("H2O_l")
-
-    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g, CH4_g, H2O_l, C_cr)
+    species: SpeciesCollection = SpeciesCollection.create(
+        ("H2O_g", "H2_g", "O2_g", "CO_g", "CO2_g", "CH4_g", "H2O_l", "C_cr")
+    )
     planet: Planet = Planet(surface_temperature=430.0)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 

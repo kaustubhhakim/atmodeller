@@ -25,7 +25,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
-from atmodeller.containers import ConstantFugacityConstraint, Planet, Species
+from atmodeller.containers import ConstantFugacityConstraint, Planet, Species, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
@@ -45,7 +45,7 @@ solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
 
 def test_version():
     """Test version."""
-    assert __version__ == "0.2.2"
+    assert __version__ == "0.4.0"
 
 
 def test_H2O(helper) -> None:
@@ -55,7 +55,7 @@ def test_H2O(helper) -> None:
         "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
     )
 
-    species: tuple[Species, ...] = (H2O_g,)
+    species: SpeciesCollection = SpeciesCollection((H2O_g,))
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -86,11 +86,11 @@ def test_H_fO2(helper) -> None:
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
-    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer()}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -122,13 +122,13 @@ def test_H_fO2_fH2(helper) -> None:
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
-    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        O2_g.name: IronWustiteBuffer(jnp.array([-1, 0, 1])),
-        H2_g.name: ConstantFugacityConstraint(jnp.array([1.0e-8, 1.0e-7, 1.0e-6])),
+        "O2_g": IronWustiteBuffer(jnp.array([-1, 0, 1])),
+        "H2_g": ConstantFugacityConstraint(jnp.array([1.0e-8, 1.0e-7, 1.0e-6])),
     }
 
     interior_atmosphere.initialise_solve(
@@ -156,7 +156,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
-    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Number of surface temperatures is different to number of species to test array shapes work.
@@ -165,7 +165,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     )
     planet: Planet = Planet(surface_temperature=surface_temperatures)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer()}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -218,7 +218,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
-    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -226,7 +226,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     num: int = 4
     fO2_shifts: npt.NDArray[np.float_] = np.linspace(-10, 10, num, dtype=np.float_)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        O2_g.name: IronWustiteBuffer(fO2_shifts)
+        "O2_g": IronWustiteBuffer(fO2_shifts)
     }
 
     oceans: float = 1
@@ -280,11 +280,11 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     H2_g: Species = Species.create_gas("H2_g")
     O2_g: Species = Species.create_gas("O2_g")
 
-    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g)
+    species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer()}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
@@ -321,11 +321,11 @@ def test_H_and_C(helper) -> None:
         "CO2_g", solubility=solubility_models["CO2_basalt_dixon95"]
     )
 
-    species: tuple[Species, ...] = (H2O_g, H2_g, O2_g, CO_g, CO2_g)
+    species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g, CO_g, CO2_g))
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
-    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {O2_g.name: IronWustiteBuffer()}
+    fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
 
     oceans: float = 1
     ch_ratio: float = 1
