@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import pickle
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -43,6 +43,7 @@ from atmodeller.containers import (
     FixedParameters,
     Planet,
     Solution,
+    SolutionArguments,
     Species,
     SpeciesCollection,
     TracedParameters,
@@ -64,9 +65,6 @@ from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion
 
-if TYPE_CHECKING:
-    from atmodeller.classes import InteriorAtmosphere
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -84,23 +82,25 @@ class Output:
     def __init__(
         self,
         solution: Array,
-        interior_atmosphere: InteriorAtmosphere,
+        solution_args: SolutionArguments,
         initial_solution: Solution,
+        fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
-        solver_result: Array | npt.NDArray[np.int_],
+        solver_status: Array,
     ):
         logger.debug("Creating Output")
         # Convert to 2-D to allow the same (sometimes vmapped) functions to be used for single and
         # batch output.
         self._solution: Array = jnp.atleast_2d(solution)
-        self._interior_atmosphere: InteriorAtmosphere = interior_atmosphere
+        self._solution_args: SolutionArguments = solution_args
         self._initial_solution: Solution = initial_solution
-        self._species: SpeciesCollection = self._interior_atmosphere.species
+        self._fixed_parameters: FixedParameters = fixed_parameters
+        self._species: SpeciesCollection = self._solution_args.species
         self._traced_parameters: TracedParameters = traced_parameters
-        self._solver_result: npt.NDArray[np.int_] = np.atleast_1d(solver_result)
+        self._solver_status: npt.NDArray[np.int_] = np.atleast_1d(solver_status)
 
         # Calculate the index at which to split the array
-        split_index: int = self._solution.shape[1] - self.species.number_of_stability()
+        split_index: int = self._solution.shape[1] - self._species.number_of_stability()
         log_number_density, log_stability = jnp.split(self._solution, [split_index], axis=1)
         # Number of entries in log_number_density is always the total number of species
         self._log_number_density: Array = log_number_density
@@ -110,28 +110,17 @@ class Output:
     @property
     def condensed_species_indices(self) -> Array:
         """Condensed species indices"""
-        return jnp.array(
-            self._interior_atmosphere.species.get_condensed_species_indices(), dtype=int
-        )
+        return jnp.array(self._species.get_condensed_species_indices(), dtype=int)
 
     @property
     def failed(self) -> npt.NDArray[np.bool_]:
         """Boolean array of failed cases"""
-        return self._solver_result != 0
-
-    @property
-    def fixed_parameters(self) -> FixedParameters:
-        """Fixed parameters"""
-        int_atmos: InteriorAtmosphere = self._interior_atmosphere
-        return int_atmos.get_fixed_parameters(
-            int_atmos.solution_args.fugacity_constraints,
-            int_atmos.solution_args.mass_constraints,
-        )
+        return self._solver_status != 0
 
     @property
     def gas_species_indices(self) -> Array:
         """Gas species indices"""
-        return jnp.array(self.fixed_parameters.gas_species_indices, dtype=int)
+        return jnp.array(self._fixed_parameters.gas_species_indices, dtype=int)
 
     @property
     def log_number_density(self) -> Array:
@@ -146,7 +135,7 @@ class Output:
     @property
     def molar_mass(self) -> Array:
         """Molar mass of all species"""
-        return jnp.array(self.fixed_parameters.molar_masses)
+        return jnp.array(self._fixed_parameters.molar_masses)
 
     @property
     def number_solutions(self) -> int:
@@ -156,22 +145,17 @@ class Output:
     @property
     def planet(self) -> Planet:
         """Planet"""
-        return self.traced_parameters.planet
-
-    @property
-    def species(self) -> SpeciesCollection:
-        """Species"""
-        return self._interior_atmosphere.species
+        return self._traced_parameters.planet
 
     @property
     def stability_species_mask(self) -> Array:
         """Stability species mask"""
-        return jnp.array(self.species.get_stability_species_mask())
+        return jnp.array(self._species.get_stability_species_mask())
 
     @property
     def success(self) -> npt.NDArray[np.bool_]:
         """Boolean array of successful (converged) cases"""
-        return self._solver_result == 0
+        return self._solver_status == 0
 
     @property
     def temperature(self) -> Array:
@@ -184,14 +168,9 @@ class Output:
         return self.traced_parameters_vmap.planet.temperature  # type: ignore
 
     @property
-    def traced_parameters(self) -> TracedParameters:
-        """Traced parameters"""
-        return self._traced_parameters
-
-    @property
     def traced_parameters_vmap(self) -> TracedParameters:
         """Axis for traced parameters vmap"""
-        return self._interior_atmosphere.get_traced_parameters_vmap()
+        return self._solution_args.get_traced_parameters_vmap()
 
     def activity(self) -> Array:
         """Gets the activity of all species
@@ -217,9 +196,9 @@ class Output:
         Returns:
             Dictionary of all output
         """
-        fugacity_matrix: Array = jnp.array(self.fixed_parameters.fugacity_matrix)
+        fugacity_matrix: Array = jnp.array(self._fixed_parameters.fugacity_matrix)
         formula_matrix_constraints: Array = jnp.array(
-            self.fixed_parameters.formula_matrix_constraints
+            self._fixed_parameters.formula_matrix_constraints
         )
 
         out: dict[str, dict[str, Array]] = {}
@@ -239,10 +218,10 @@ class Output:
         out["constraints"] = {}
         if formula_matrix_constraints.size > 0:
             out["constraints"] |= expand_dict(
-                self.traced_parameters.mass_constraints.asdict(), self.number_solutions
+                self._traced_parameters.mass_constraints.asdict(), self.number_solutions
             )
         if fugacity_matrix.size > 0:
-            out["constraints"] |= self.traced_parameters.fugacity_constraints.asdict(
+            out["constraints"] |= self._traced_parameters.fugacity_constraints.asdict(
                 temperature, pressure
             )
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
@@ -329,7 +308,7 @@ class Output:
             get_atmosphere_log_molar_mass, in_axes=(None, 0)
         )
         atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
-            self.fixed_parameters, self.log_number_density
+            self._fixed_parameters, self.log_number_density
         )
 
         return atmosphere_log_molar_mass
@@ -353,11 +332,11 @@ class Output:
             in_axes=(
                 None,
                 0,
-                self._interior_atmosphere.solution_args.planet.vmap_axes(),
+                self._solution_args.planet.vmap_axes(),
             ),
         )
         atmosphere_log_volume: Array = atmosphere_log_volume_func(
-            self.fixed_parameters,
+            self._fixed_parameters,
             self.log_number_density,
             self.planet,
         )
@@ -382,7 +361,7 @@ class Output:
             get_total_pressure, in_axes=(None, 0, self.temperature_vmap)
         )
         total_pressure: Array = total_pressure_func(
-            self.fixed_parameters, self.log_number_density, self.temperature
+            self._fixed_parameters, self.log_number_density, self.temperature
         )
 
         return total_pressure
@@ -402,7 +381,7 @@ class Output:
         )
         molar_mass_condensed: Array = jnp.take(molar_mass, self.condensed_species_indices, axis=1)
         condensed_species: tuple[Species, ...] = tuple(
-            self.species[ii] for ii in self.condensed_species_indices
+            self._species[ii] for ii in self.condensed_species_indices
         )
         out: dict[str, Array] = self._get_number_density_output(
             number_density_condensed, molar_mass_condensed, "total_"
@@ -446,9 +425,7 @@ class Output:
             out["atmosphere_mass"] / jnp.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
         )
 
-        unique_elements: tuple[str, ...] = (
-            self._interior_atmosphere.species.get_unique_elements_in_species()
-        )
+        unique_elements: tuple[str, ...] = self._species.get_unique_elements_in_species()
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
             H_total_moles: Array = out["total_moles"][:, index]
@@ -498,9 +475,9 @@ class Output:
             in_axes=(self.traced_parameters_vmap, None, None, 0, 0, 0),
         )
         element_density_dissolved: Array = element_density_dissolved_func(
-            self.traced_parameters,
-            self.fixed_parameters,
-            jnp.array(self.fixed_parameters.formula_matrix),
+            self._traced_parameters,
+            self._fixed_parameters,
+            jnp.array(self._fixed_parameters.formula_matrix),
             self.log_number_density,
             self.log_activity(),
             self.atmosphere_log_volume(),
@@ -530,9 +507,7 @@ class Output:
         Returns:
             Molar mass of elements
         """
-        unique_elements: tuple[str, ...] = (
-            self._interior_atmosphere.species.get_unique_elements_in_species()
-        )
+        unique_elements: tuple[str, ...] = self._species.get_unique_elements_in_species()
         molar_mass: Array = jnp.array([Formula(element).mass for element in unique_elements])
         molar_mass = unit_conversion.g_to_kg * molar_mass
 
@@ -547,7 +522,7 @@ class Output:
         Returns:
             Modified formula matrix
         """
-        formula_matrix: Array = jnp.array(self.fixed_parameters.formula_matrix)
+        formula_matrix: Array = jnp.array(self._fixed_parameters.formula_matrix)
         mask: Array = jnp.zeros_like(formula_matrix, dtype=bool)
         mask = mask.at[:, indices].set(True)
         logger.debug("modified_formula_matrix = %s", mask)
@@ -620,7 +595,7 @@ class Output:
         pressure_gas: Array = jnp.take(self.pressure(), self.gas_species_indices, axis=1)
         molar_mass_gas: Array = jnp.take(molar_mass, self.gas_species_indices, axis=1)
         gas_species: tuple[Species, ...] = tuple(
-            self.species[ii] for ii in self.gas_species_indices
+            self._species[ii] for ii in self.gas_species_indices
         )
 
         out: dict[str, Array] = {}
@@ -661,7 +636,7 @@ class Output:
         # also have stability, so its OK to build a padded array here to keep the size the same.
         log_stability_padded: Array = jnp.zeros_like(log_activity_without_stability)
         log_stability_padded = log_stability_padded.at[
-            :, self.species.get_stability_species_indices()
+            :, self._species.get_stability_species_indices()
         ].set(self.log_stability)
         # Note that the below array contains incorrect entries for species without stability since
         # exp(0)=1. But these are filtered out further below.
@@ -691,10 +666,10 @@ class Output:
         """
         log_activity_func: Callable = jax.vmap(
             get_log_activity,
-            in_axes=(self._interior_atmosphere.get_traced_parameters_vmap(), None, 0),
+            in_axes=(self._solution_args.get_traced_parameters_vmap(), None, 0),
         )
         log_activity: Array = log_activity_func(
-            self.traced_parameters, self.fixed_parameters, self.log_number_density
+            self._traced_parameters, self._fixed_parameters, self.log_number_density
         )
 
         return log_activity
@@ -741,7 +716,7 @@ class Output:
         """
         out: dict[str, ArrayLike] = {}
 
-        for nn, species_ in enumerate(self.species):
+        for nn, species_ in enumerate(self._species):
             pressure: Array = self.pressure()[:, nn]
             activity: Array = self.activity()[:, nn]
             out[species_.name] = pressure
@@ -757,12 +732,12 @@ class Output:
         """
         raw_solution: dict[str, Array] = {}
 
-        species_names: tuple[str, ...] = self.species.get_species_names()
+        species_names: tuple[str, ...] = self._species.get_species_names()
 
         for ii, species_name in enumerate(species_names):
             raw_solution[species_name] = self.log_number_density[:, ii]
 
-        for ii, index in enumerate(self.species.get_stability_species_indices()):
+        for ii, index in enumerate(self._species.get_stability_species_indices()):
             species_name = species_names[index]
             raw_solution[f"{species_name}_stability"] = self.log_stability[:, ii]
 
@@ -788,7 +763,7 @@ class Output:
             self._solution,
             {
                 "traced_parameters": self._traced_parameters,
-                "fixed_parameters": self.fixed_parameters,
+                "fixed_parameters": self._fixed_parameters,
             },
         )
 
@@ -809,8 +784,8 @@ class Output:
             in_axes=(self.traced_parameters_vmap, None, 0, 0, 0),
         )
         species_density_in_melt: Array = species_density_in_melt_func(
-            self.traced_parameters,
-            self.fixed_parameters,
+            self._traced_parameters,
+            self._fixed_parameters,
             self.log_number_density,
             self.log_activity(),
             self.atmosphere_log_volume(),
@@ -828,8 +803,8 @@ class Output:
             get_species_ppmw_in_melt, in_axes=(self.traced_parameters_vmap, None, 0, 0)
         )
         species_ppmw_in_melt: Array = species_ppmw_in_melt_func(
-            self.traced_parameters,
-            self.fixed_parameters,
+            self._traced_parameters,
+            self._fixed_parameters,
             self.log_number_density,
             self.log_activity(),
         )

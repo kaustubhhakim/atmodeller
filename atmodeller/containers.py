@@ -20,6 +20,8 @@ The leaves of pytrees must be JAX-compliant types, which excludes strings. So th
 approach is to encode the data as JAX-compatible types and provide properties and methods that can
 reconstruct other desired quantities, notably strings and other objects. This ensures that similar
 functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
+
+The above constraint will be lifted once we switch over to equinox
 """
 
 from __future__ import annotations
@@ -27,20 +29,23 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Iterable, Mapping
-from typing import Callable, NamedTuple, Type
+from dataclasses import asdict, dataclass
+from typing import Any, Callable, NamedTuple, Type
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax
-from jax.tree_util import register_pytree_node_class
+from jax import Array, jit, lax, tree_flatten
 from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
 from atmodeller import (
+    INITIAL_LOG_NUMBER_DENSITY,
+    INITIAL_LOG_STABILITY,
     LOG_NUMBER_DENSITY_LOWER,
     LOG_NUMBER_DENSITY_UPPER,
     LOG_STABILITY_LOWER,
@@ -69,16 +74,188 @@ else:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@register_pytree_node_class
-class SpeciesCollection(tuple):
+@dataclass
+class SolutionArguments:
+    """Container for the solution arguments
+
+    Args:
+        species: Collection of species
+        planet: Planet
+        initial_log_number_density: Initial log number density
+        initial_log_stability: Initial log stability
+        fugacity_constraints: Fugacity constraints
+        mass_constraints: Mass constraints
+        solver_parameters: Solver parameters
+    """
+
+    species: SpeciesCollection
+    planet: Planet
+    initial_log_number_density: ArrayLike
+    initial_log_stability: ArrayLike
+    fugacity_constraints: FugacityConstraints
+    mass_constraints: MassConstraints
+    solver_parameters: SolverParameters
+
+    @classmethod
+    def create_with_defaults(
+        cls,
+        species: SpeciesCollection,
+        planet: Planet | None = None,
+        initial_log_number_density: ArrayLike | None = None,
+        initial_log_stability: ArrayLike | None = None,
+        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+        solver_parameters: SolverParameters | None = None,
+    ) -> Self:
+        """Creates an instance with defaults applied if arguments are not specified.
+
+        Args:
+            species: Collection of species
+            planet: Planet. Defaults to None.
+            initial_log_number_density: Initial log number density. Defaults to None.
+            initial_log_stability: Initial log stability. Defaults to None.
+            fugacity_constraints: Fugacity constraints. Defaults to None.
+            mass_constraints: Mass constraints. Defaults to None.
+            solver_parameters: Solver parameters. Defaults to None.
+
+        Returns:
+            An instance
+        """
+        if planet is None:
+            planet_: Planet = Planet()
+        else:
+            planet_ = planet
+
+        if initial_log_number_density is None:
+            initial_log_number_density_: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * jnp.ones(
+                len(species), dtype=jnp.float_
+            )
+        else:
+            initial_log_number_density_ = initial_log_number_density
+
+        if initial_log_stability is None:
+            initial_log_stability_: ArrayLike = INITIAL_LOG_STABILITY * jnp.ones(
+                species.number_of_stability(), dtype=jnp.float_
+            )
+        else:
+            initial_log_stability_ = initial_log_stability
+
+        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
+            fugacity_constraints
+        )
+        mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
+
+        if solver_parameters is None:
+            solver_parameters_: SolverParameters = SolverParameters.create(species)
+        else:
+            solver_parameters_ = solver_parameters
+
+        return cls(
+            species,
+            planet_,
+            initial_log_number_density_,
+            initial_log_stability_,
+            fugacity_constraints_,
+            mass_constraints_,
+            solver_parameters_,
+        )
+
+    @property
+    def is_batch(self) -> bool:
+        """Returns if any parameters are batched, thereby necessitating a vmap solve"""
+        leaves1, _ = tree_flatten(self.get_traced_parameters_vmap())
+        leaves2, _ = tree_flatten(self.get_initial_solution_vmap())
+        leaves: list = leaves1 + leaves2
+        # Check if any of the axes should be vmapped, which is defined by an entry of zero
+        contains_zero: bool = any(np.array(leaves) == 0)
+
+        return contains_zero
+
+    def get_initial_solution(self) -> Solution:
+        """Gets the initial solution
+
+        Returns:
+            Initial solution
+        """
+        return Solution.create(self.initial_log_number_density, self.initial_log_stability)
+
+    def get_initial_solution_vmap(self) -> Solution:
+        """Gets the vmapping axes for the initial solution estimate.
+
+        Returns:
+            Vmapping for the initial solution estimate
+        """
+        return self.get_initial_solution().vmap_axes()
+
+    def get_traced_parameters(self) -> TracedParameters:
+        """Gets traced parameters
+
+        Returns:
+            Traced parameters
+        """
+        return TracedParameters(self.planet, self.fugacity_constraints, self.mass_constraints)
+
+    def get_traced_parameters_vmap(self) -> TracedParameters:
+        """Gets the vmapping axes for tracer parameters.
+
+        Returns:
+            Vmapping for tracer parameters
+        """
+        traced_parameters_vmap: TracedParameters = TracedParameters(
+            planet=self.planet.vmap_axes(),
+            fugacity_constraints=self.fugacity_constraints.vmap_axes(),
+            mass_constraints=self.mass_constraints.vmap_axes(),
+        )
+
+        return traced_parameters_vmap
+
+    def override(
+        self,
+        planet: Planet | None = None,
+        initial_log_number_density: ArrayLike | None = None,
+        initial_log_stability: ArrayLike | None = None,
+        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+    ) -> SolutionArguments:
+        """Overrides values
+
+        Args:
+            planet: Planet. Defaults to None.
+            initial_log_number_density. Defaults to None.
+            initial_log_stability: Initial log stability. Defaults to None.
+            fugacity_constraints: Fugacity constraints. Defaults to None.
+            mass_constraints: Mass constraints. Defaults to None.
+
+        Returns:
+            An instance
+        """
+        self_asdict: dict[str, Any] = asdict(self)
+        to_merge: dict[str, Any] = {}
+
+        if planet is not None:
+            to_merge["planet"] = planet
+        if initial_log_number_density is not None:
+            to_merge["initial_log_number_density"] = initial_log_number_density
+        if initial_log_stability is not None:
+            to_merge["initial_log_stability"] = initial_log_stability
+        if fugacity_constraints:
+            to_merge["fugacity_constraints"] = FugacityConstraints.create(fugacity_constraints)
+        if mass_constraints:
+            to_merge["mass_constraints"] = MassConstraints.create(mass_constraints)
+
+        merged_dict: dict[str, Any] = self_asdict | to_merge
+
+        return SolutionArguments(**merged_dict)
+
+
+class SpeciesCollection(eqx.Module):
     """A collection of species
 
     Args:
         species: Species
     """
 
-    def __new__(cls, species: Iterable[Species]):
-        return super().__new__(cls, tuple(species))
+    data: tuple[Species, ...]
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> Self:
@@ -99,28 +276,28 @@ class SpeciesCollection(tuple):
                 species_to_add: Species = Species.create_condensed(species_)
             species_list.append(species_to_add)
 
-        return cls(species_list)
+        return cls(tuple(species_list))
 
-    def get_condensed_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_condensed_species_indices(self) -> tuple[int, ...]:
         """Gets the indices of condensed species
 
         Returns:
             Indices of the condensed species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.phase != "g":
                 indices.append(nn)
 
         return tuple(indices)
 
-    def get_diatomic_oxygen_index(self: tuple[Species, ...]) -> int:
+    def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
         Returns:
             Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
         """
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.hill_formula == "O2":
                 logger.debug("Found O2 at index = %d", nn)
                 return nn
@@ -130,53 +307,55 @@ class SpeciesCollection(tuple):
         # that may depend on fO2.
         return 0
 
-    def get_gas_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_gas_species_indices(self) -> tuple[int, ...]:
         """Gets the indices of gas species
 
         Returns:
             Indices of the gas species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.phase == "g":
                 indices.append(nn)
 
         return tuple(indices)
 
-    def get_molar_masses(self: tuple[Species, ...]) -> tuple[float, ...]:
+    def get_molar_masses(self) -> tuple[float, ...]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: tuple[float, ...] = tuple([species_.data.molar_mass for species_ in self])
+        molar_masses: tuple[float, ...] = tuple(
+            [species_.data.molar_mass for species_ in self.data]
+        )
 
         logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
 
-    def get_species_names(self: tuple[Species, ...]) -> tuple[str, ...]:
+    def get_species_names(self) -> tuple[str, ...]:
         """Gets the names of all species.
 
         Returns:
             Species names
         """
-        return tuple([species_.name for species_ in self])
+        return tuple([species_.name for species_ in self.data])
 
-    def get_stability_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_stability_species_indices(self) -> tuple[int, ...]:
         """Gets the indices of species to solve for stability
 
         Returns:
             Indices of the species to solve for stability
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.solve_for_stability:
                 indices.append(nn)
 
         return tuple(indices)
 
-    def get_stability_species_mask(self: tuple[Species, ...]) -> npt.NDArray[np.bool_]:
+    def get_stability_species_mask(self) -> npt.NDArray[np.bool_]:
         """Gets the stability species mask
 
         Returns:
@@ -184,12 +363,12 @@ class SpeciesCollection(tuple):
         """
         # Find the species to solve for stability
         stability_bool: npt.NDArray[np.bool_] = np.array(
-            [species.solve_for_stability for species in self], dtype=np.bool_
+            [species.solve_for_stability for species in self.data], dtype=np.bool_
         )
 
         return stability_bool
 
-    def get_unique_elements_in_species(self: tuple[Species, ...]) -> tuple[str, ...]:
+    def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements.
 
         Args:
@@ -199,7 +378,7 @@ class SpeciesCollection(tuple):
             Unique elements in the species ordered alphabetically
         """
         elements: list[str] = []
-        for species_ in self:
+        for species_ in self.data:
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         sorted_elements: list[str] = sorted(unique_elements)
@@ -208,23 +387,24 @@ class SpeciesCollection(tuple):
 
         return tuple(sorted_elements)
 
-    def number_of_stability(self: SpeciesCollection) -> int:
+    def number_of_stability(self) -> int:
         """Number of stability solutions"""
         return len(self.get_stability_species_indices())
 
-    def tree_flatten(self) -> tuple[tuple, None]:
-        return (self, None)
+    def __getitem__(self, index):
+        return self.data[index]
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        return cls(children)
+    def __iter__(self):
+        return iter(self.data)
+
+    def __len__(self):
+        return len(self.data)
 
 
 # region: Containers for traced parameters
 
 
-class TracedParameters(NamedTuple):
+class TracedParameters(eqx.Module):
     """Traced parameters
 
     Args:
@@ -241,6 +421,7 @@ class TracedParameters(NamedTuple):
     """Mass constraints"""
 
 
+# TODO: Swap out NamedTuple for eqx.module and ensure all methods work
 class Planet(NamedTuple):
     """Planet properties
 
@@ -349,7 +530,7 @@ class Planet(NamedTuple):
         return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
 
 
-class NormalisedMass(NamedTuple):
+class NormalisedMass(eqx.Module):
     """Normalised mass for conventional outgassing
 
     Default values are for a unit mass (1 kg) system.
@@ -378,7 +559,7 @@ class NormalisedMass(NamedTuple):
         return self.mass * (1 - self.melt_fraction)
 
 
-class ConstantFugacityConstraint(NamedTuple):
+class ConstantFugacityConstraint(eqx.Module):
     """A constant fugacity constraint
 
     This must adhere to FugacityConstraintProtocol
@@ -403,7 +584,7 @@ class ConstantFugacityConstraint(NamedTuple):
         return jnp.full_like(temperature, log_fugacity_value)
 
 
-class FugacityConstraints(NamedTuple):
+class FugacityConstraints(eqx.Module):
     """Fugacity constraints
 
     These are applied as constraints on the gas activity.
@@ -536,7 +717,7 @@ class FugacityConstraints(NamedTuple):
         return bool(self.constraints)
 
 
-class MassConstraints(NamedTuple):
+class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
     Args:
@@ -641,13 +822,13 @@ class MassConstraints(NamedTuple):
 
 
 # region: Containers for fixed parameters
-class FixedParameters(NamedTuple):
+class FixedParameters(eqx.Module):
     """Parameters that are always fixed for a calculation
 
     This container and all objects within it must be hashable.
 
     Args:
-        species: Tuple of species
+        species: Collection of species
         formula_matrix; Formula matrix
         formula_matrix_constraints: Formula matrix for applying mass constraints
         reaction_matrix: Reaction matrix
@@ -662,8 +843,8 @@ class FixedParameters(NamedTuple):
         mass_logarithmic_error: Mass logarithmic error
     """
 
-    species: tuple[Species, ...]
-    """Tuple of species """
+    species: SpeciesCollection
+    """Collection of species"""
     formula_matrix: tuple[tuple[float, ...], ...]
     """Formula matrix"""
     formula_matrix_constraints: tuple[tuple[float, ...], ...]
@@ -692,7 +873,7 @@ class FixedParameters(NamedTuple):
     """Mass logarithmic error"""
 
 
-class Species(NamedTuple):
+class Species(eqx.Module):
     """Species
 
     Args:
@@ -757,7 +938,7 @@ class Species(NamedTuple):
         return cls(species_data, activity, solubility, solve_for_stability)
 
 
-class Solution(NamedTuple):
+class Solution(eqx.Module):
     """Solution
 
     Args:
@@ -807,7 +988,7 @@ class Solution(NamedTuple):
         return Solution(log_number_density_axis, stability_axis)  # type: ignore - container
 
 
-class SolverParameters(NamedTuple):
+class SolverParameters(eqx.Module):
     """Solver parameters
 
     Args:

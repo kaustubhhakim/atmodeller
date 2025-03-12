@@ -20,26 +20,24 @@ from __future__ import annotations
 
 import logging
 import pprint
-import sys
-import time
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
-from typing import Any, Callable
+from typing import Callable
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax.tree_util import tree_flatten
 from jax.typing import ArrayLike
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
+from atmodeller import TAU
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
     MassConstraints,
     Planet,
     Solution,
+    SolutionArguments,
     SolverParameters,
     SpeciesCollection,
     TracedParameters,
@@ -49,165 +47,18 @@ from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.utilities import partial_rref
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
-
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass
-class SolutionArguments:
-    """Container for the solution arguments
-
-    Args:
-        planet: Planet
-        initial_log_number_density: Initial log number density
-        initial_log_stability: Initial log stability
-        fugacity_constraints: Fugacity constraints
-        mass_constraints: Mass constraints
-        solver_parameters: Solver parameters
-    """
-
-    planet: Planet
-    initial_log_number_density: ArrayLike
-    initial_log_stability: ArrayLike
-    fugacity_constraints: FugacityConstraints
-    mass_constraints: MassConstraints
-    solver_parameters: SolverParameters
-
-    @classmethod
-    def create_with_defaults(
-        cls,
-        species: SpeciesCollection,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-        solver_parameters: SolverParameters | None = None,
-    ) -> Self:
-        """Creates an instance with defaults applied if arguments are not specified.
-
-        Args:
-            species: Collection of species
-            planet: Planet. Defaults to None.
-            initial_log_number_density: Initial log number density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-            solver_parameters: Solver parameters. Defaults to None.
-
-        Returns:
-            An instance
-        """
-        if planet is None:
-            planet_: Planet = Planet()
-        else:
-            planet_ = planet
-
-        if initial_log_number_density is None:
-            initial_log_number_density_: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * jnp.ones(
-                len(species), dtype=jnp.float_
-            )
-        else:
-            initial_log_number_density_ = initial_log_number_density
-
-        if initial_log_stability is None:
-            initial_log_stability_: ArrayLike = INITIAL_LOG_STABILITY * jnp.ones(
-                species.number_of_stability(), dtype=jnp.float_
-            )
-        else:
-            initial_log_stability_ = initial_log_stability
-
-        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            fugacity_constraints
-        )
-        mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
-
-        if solver_parameters is None:
-            solver_parameters_: SolverParameters = SolverParameters.create(species)
-        else:
-            solver_parameters_ = solver_parameters
-
-        return cls(
-            planet_,
-            initial_log_number_density_,
-            initial_log_stability_,
-            fugacity_constraints_,
-            mass_constraints_,
-            solver_parameters_,
-        )
-
-    def get_initial_solution(self) -> Solution:
-        """Gets the initial solution
-
-        Returns:
-            Initial solution
-        """
-        return Solution.create(self.initial_log_number_density, self.initial_log_stability)
-
-    def get_traced_parameters(self) -> TracedParameters:
-        """Gets traced parameters
-
-        Returns:
-            Traced parameters
-        """
-        return TracedParameters(self.planet, self.fugacity_constraints, self.mass_constraints)
-
-    def override(
-        self,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-    ) -> SolutionArguments:
-        """Overrides values
-
-        Args:
-            planet: Planet. Defaults to None.
-            initial_log_number_density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-
-        Returns:
-            An instance
-        """
-        self_asdict: dict[str, Any] = asdict(self)
-        to_merge: dict[str, Any] = {}
-
-        if planet is not None:
-            to_merge["planet"] = planet
-        if initial_log_number_density is not None:
-            to_merge["initial_log_number_density"] = initial_log_number_density
-        if initial_log_stability is not None:
-            to_merge["initial_log_stability"] = initial_log_stability
-        if fugacity_constraints:
-            to_merge["fugacity_constraints"] = FugacityConstraints.create(fugacity_constraints)
-        if mass_constraints:
-            to_merge["mass_constraints"] = MassConstraints.create(mass_constraints)
-
-        merged_dict: dict[str, Any] = self_asdict | to_merge
-
-        return SolutionArguments(**merged_dict)
 
 
 class InteriorAtmosphere:
     """Interior atmosphere
 
     Args:
-        species: Tuple of species
+        species: Collection of species
         tau: Tau factor for species stability. Defaults to TAU.
         mass_logarithmic_error: Use logarithmic error for elemental number density and otherwise
             use relative error. Defaults to True.
     """
-
-    # Set during initialise_solve
-    _solution_args: SolutionArguments
-    _solver: Callable
 
     def __init__(
         self, species: SpeciesCollection, tau: float = TAU, mass_logarithmic_error: bool = True
@@ -219,20 +70,10 @@ class InteriorAtmosphere:
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property
-    def is_batch(self) -> bool:
-        """Returns if any parameters are batched, thereby necessitating a vmap solve"""
-        leaves, _ = tree_flatten(self.get_traced_parameters_vmap())
-        # Check if any of the axes should be vmapped, which is defined by an entry of zero
-        contains_zero: bool = any(np.array(leaves) == 0)
+    def output(self) -> Output:
+        return self._output
 
-        return contains_zero
-
-    @property
-    def solution_args(self) -> SolutionArguments:
-        """Solution arguments"""
-        return self._solution_args
-
-    def initialise_solve(
+    def solve(
         self,
         *,
         planet: Planet | None = None,
@@ -241,8 +82,8 @@ class InteriorAtmosphere:
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
         solver_parameters: SolverParameters | None = None,
-    ) -> Callable:
-        """Initialises the solve.
+    ) -> None:
+        """Solves the system and initialises an Output instance for processing the result
 
         Args:
             planet: Planet. Defaults to None.
@@ -250,13 +91,9 @@ class InteriorAtmosphere:
             initial_log_stability: Initial log stability. Defaults to None.
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
-            solver_parameters: Solver parameters, which can only be set here during the
-                solver initialisation. Defaults to None.
-
-        Returns:
-            Solver callable
+            solver_parameters: Solver parameters. Defaults to None.
         """
-        self._solution_args = SolutionArguments.create_with_defaults(
+        solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
             self.species,
             planet,
             initial_log_number_density,
@@ -266,22 +103,44 @@ class InteriorAtmosphere:
             solver_parameters,
         )
 
-        if self.is_batch:
-            self._solver = self._get_solver_vmap()
+        if solution_args.is_batch:
+            solver: Callable = eqx.filter_jit(
+                jax.vmap(
+                    solve,
+                    in_axes=(
+                        solution_args.get_initial_solution_vmap(),
+                        solution_args.get_traced_parameters_vmap(),
+                        None,
+                        None,
+                    ),
+                )
+            )
         else:
-            self._solver = self._get_solver_single()
+            solver = solve
 
-        initial_solution: Solution = self.solution_args.get_initial_solution()
-        traced_parameters: TracedParameters = self.solution_args.get_traced_parameters()
+        fixed_parameters: FixedParameters = self.get_fixed_parameters(
+            solution_args.fugacity_constraints, solution_args.mass_constraints
+        )
+        initial_solution: Solution = solution_args.get_initial_solution()
+        traced_parameters: TracedParameters = solution_args.get_traced_parameters()
 
-        # Compile
-        start_time = time.time()
-        self._solver(initial_solution, traced_parameters)
-        end_time = time.time()
-        compile_time = end_time - start_time
-        logger.info("Compile time: %.6f seconds", compile_time)
+        solution, solver_status = solver(
+            initial_solution,
+            traced_parameters,
+            fixed_parameters,
+            solution_args.solver_parameters,
+        )
 
-        return self._solver
+        self._output: Output = Output(
+            solution,
+            solution_args,
+            initial_solution,
+            fixed_parameters,
+            traced_parameters,
+            solver_status,
+        )
+
+        logger.info("Solve complete")
 
     def get_condensed_species_indices(self) -> tuple[int, ...]:
         """Gets the indices of condensed species
@@ -433,25 +292,6 @@ class InteriorAtmosphere:
 
         return tuple(sorted_elements)
 
-    def get_wrapped_jit_solver(self) -> Callable:
-        """Gets the jit solver with fixed and solver parameters set.
-
-        Returns:
-            jit solver with fixed and solver parameters set
-        """
-        fixed_parameters: FixedParameters = self.get_fixed_parameters(
-            self.solution_args.fugacity_constraints, self.solution_args.mass_constraints
-        )
-        solver_parameters: SolverParameters = self.solution_args.solver_parameters
-
-        def wrapped_jit_solver(
-            solution: Solution,
-            traced_parameters: TracedParameters,
-        ) -> Callable:
-            return solve(solution, traced_parameters, fixed_parameters, solver_parameters)
-
-        return wrapped_jit_solver
-
     def get_molar_masses(self) -> tuple[float, ...]:
         """Gets the molar masses of all species.
 
@@ -564,89 +404,3 @@ class InteriorAtmosphere:
         )
 
         return stability_bool
-
-    def _get_solver_single(self) -> Callable:
-        """Gets the solver for a single solve."""
-        return self.get_wrapped_jit_solver()
-
-    def _get_solver_vmap(self) -> Callable:
-        """Gets the solver for a batch solve."""
-        solver: Callable = jax.jit(
-            jax.vmap(
-                self.get_wrapped_jit_solver(),
-                in_axes=(None, self.get_traced_parameters_vmap()),
-            )
-        )
-
-        return solver
-
-    def get_solution_vmap(self) -> Solution:
-        """Gets the vmapping axes for the initial solution estimate.
-
-        Returns:
-            Vmapping for the initial solution estimate
-        """
-        return self._solution_args.get_initial_solution().vmap_axes()
-
-    def get_traced_parameters_vmap(self) -> TracedParameters:
-        """Gets the vmapping axes for tracer parameters.
-
-        Returns:
-            Vmapping for tracer parameters
-        """
-        traced_parameters_vmap: TracedParameters = TracedParameters(
-            planet=self.solution_args.planet.vmap_axes(),
-            fugacity_constraints=self.solution_args.fugacity_constraints.vmap_axes(),
-            mass_constraints=self.solution_args.mass_constraints.vmap_axes(),
-        )
-
-        return traced_parameters_vmap
-
-    def solve(
-        self,
-        *,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-        quick_look: bool = False,
-    ) -> Output:
-        """Solves the system and returns the processed solution.
-
-        Args:
-            planet: Planet. Defaults to None.
-            initial_log_number_density: Initial log number density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-            quick_look: Show the solution via the logger. Defaults to False.
-
-        Returns:
-            Output
-        """
-        self._solution_args: SolutionArguments = self.solution_args.override(
-            planet,
-            initial_log_number_density,
-            initial_log_stability,
-            fugacity_constraints,
-            mass_constraints,
-        )
-
-        initial_solution: Solution = self.solution_args.get_initial_solution()
-        traced_parameters: TracedParameters = self.solution_args.get_traced_parameters()
-
-        # Execute
-        # start_time = time.time()
-        solution, solver_result = self._solver(initial_solution, traced_parameters)
-        # end_time = time.time()
-        # execution_time = end_time - start_time
-        # logger.info("Execution time: %.6f seconds", execution_time)
-
-        output: Output = Output(solution, self, initial_solution, traced_parameters, solver_result)
-
-        if quick_look:
-            quick_look_dict: dict[str, ArrayLike] = output.quick_look()
-            logger.info("quick_look = %s", pprint.pformat(quick_look_dict))
-
-        return output

@@ -18,15 +18,14 @@
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any, Callable
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax
+from jax import Array, lax
 from jax.typing import ArrayLike
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
@@ -37,7 +36,7 @@ from atmodeller.containers import (
     Planet,
     Solution,
     SolverParameters,
-    Species,
+    SpeciesCollection,
     TracedParameters,
 )
 from atmodeller.utilities import (
@@ -47,56 +46,13 @@ from atmodeller.utilities import (
 )
 
 
-@partial(jit, static_argnames=["fixed_parameters", "solver_parameters"])
-def root_find(
-    solution_array: Array,
-    traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
-    solver_parameters: SolverParameters,
-) -> tuple[Array, Array | npt.NDArray]:
-    """Solves the system of non-linear equations
-
-    The code breaks if this function returns an optx.Solution instance, so instead only the arrays
-    that are required are extracted and returned.
-
-    Args:
-        solution_array: Array of solution data
-        traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
-        solver_parameters: Solver parameters
-
-    Returns:
-        The solution, solver result
-    """
-
-    options: dict[str, Any] = {
-        "lower": np.asarray(solver_parameters.lower),
-        "upper": np.asarray(solver_parameters.upper),
-        "jac": solver_parameters.jac,
-    }
-
-    sol: optx.Solution = optx.root_find(
-        objective_function,
-        solver_parameters.solver,
-        solution_array,
-        args={"traced_parameters": traced_parameters, "fixed_parameters": fixed_parameters},
-        throw=solver_parameters.throw,
-        max_steps=solver_parameters.max_steps,
-        options=options,
-    )
-
-    # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-
-    return sol.value, sol.result._value
-
-
-@partial(jit, static_argnames=["fixed_parameters", "solver_parameters"])
+@eqx.filter_jit
 def solve(
     solution: Solution,
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
-) -> tuple[Array, Array | npt.NDArray]:
+) -> tuple[Array, Array]:
     """Solves the system of non-linear equations
 
     Args:
@@ -106,16 +62,35 @@ def solve(
         solver_parameters: Solver parameters
 
     Returns:
-        The solution, the result of the solver
+        The solution array, the status of the solver
     """
-    sol, solver_result = root_find(
-        solution.data, traced_parameters, fixed_parameters, solver_parameters
+    options: dict[str, Any] = {
+        "lower": np.asarray(solver_parameters.lower),
+        "upper": np.asarray(solver_parameters.upper),
+        "jac": solver_parameters.jac,
+    }
+
+    sol: optx.Solution = optx.root_find(
+        objective_function,
+        solver_parameters.solver,
+        solution.data,
+        args={
+            "traced_parameters": traced_parameters,
+            "fixed_parameters": fixed_parameters,
+        },
+        throw=solver_parameters.throw,
+        max_steps=solver_parameters.max_steps,
+        options=options,
     )
 
-    return sol, solver_result
+    solver_status: Array = sol.result == optx.RESULTS.successful
+
+    # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+
+    return sol.value, solver_status
 
 
-@jit
+@eqx.filter_jit
 def objective_function(solution: Array, kwargs: dict) -> Array:
     """Residual of the reaction network and mass balance
 
@@ -128,7 +103,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     return compute_residual(solution, kwargs)
 
 
-@jit
+@eqx.filter_jit
 def compute_mass_residual(
     mass_logarithmic_error: Array,
     element_density: Array,
@@ -154,14 +129,14 @@ def compute_mass_residual(
 
     def log_error_case(_) -> Array:
         """Log error"""
-        log_element_density = jnp.log(element_density + element_melt_density)
+        log_element_density: Array = jnp.log(element_density + element_melt_density)
         return log_element_density - mass_constraints.log_number_density(log_volume)
 
     def relative_error_case(_) -> Array:
         """Relative error"""
-        element_density_total = element_density + element_melt_density
-        target_density = jnp.exp(mass_constraints.log_number_density(log_volume))
-        # TODO: target density or some fixed mass scale instead?
+        element_density_total: Array = element_density + element_melt_density
+        target_density: Array = jnp.exp(mass_constraints.log_number_density(log_volume))
+        # FIXME: implement logarithm for better stability?
         return (element_density_total - target_density) / target_density
 
     # Use lax.cond to switch based on mass_logarithmic_error
@@ -172,7 +147,7 @@ def compute_mass_residual(
     return jnp.asarray(mass_residual)
 
 
-@jit
+@eqx.filter_jit
 def get_min_log_elemental_abundance_per_species(
     formula_matrix: Array, mass_constraints: MassConstraints
 ) -> Array:
@@ -219,7 +194,7 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
-@jit
+@eqx.filter_jit
 def compute_residual(solution: Array, kwargs: dict) -> Array:
     """Residual of the reaction network and mass balance
 
@@ -388,7 +363,7 @@ def compute_residual(solution: Array, kwargs: dict) -> Array:
     return residual
 
 
-@jit
+@eqx.filter_jit
 def get_atmosphere_log_molar_mass(
     fixed_parameters: FixedParameters, log_number_density: Array
 ) -> Array:
@@ -412,7 +387,7 @@ def get_atmosphere_log_molar_mass(
     return molar_mass
 
 
-@jit
+@eqx.filter_jit
 def get_atmosphere_log_volume(
     fixed_parameters: FixedParameters,
     log_number_density: Array,
@@ -439,7 +414,7 @@ def get_atmosphere_log_volume(
     return log_volume
 
 
-@jit
+@eqx.filter_jit
 def get_total_pressure(
     fixed_parameters: FixedParameters, log_number_density: Array, temperature: ArrayLike
 ) -> Array:
@@ -461,7 +436,7 @@ def get_total_pressure(
     return jnp.sum(gas_pressure)
 
 
-@jit
+@eqx.filter_jit
 def get_element_density(formula_matrix: Array, log_number_density: Array) -> Array:
     """Number density of elements in the gas or condensed phase
 
@@ -477,7 +452,7 @@ def get_element_density(formula_matrix: Array, log_number_density: Array) -> Arr
     return element_density
 
 
-@jit
+@eqx.filter_jit
 def get_element_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
@@ -507,7 +482,7 @@ def get_element_density_in_melt(
     return element_melt_density
 
 
-@jit
+@eqx.filter_jit
 def get_gas_species_data(fixed_parameters: FixedParameters, some_array: ArrayLike) -> Array:
     """Gets the gas species data from an array
 
@@ -524,11 +499,11 @@ def get_gas_species_data(fixed_parameters: FixedParameters, some_array: ArrayLik
     return gas_data
 
 
-@jit
+@eqx.filter_jit
 def get_log_activity(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    log_number_density: ArrayLike,
+    log_number_density: Array,
 ) -> Array:
     """Gets the log activity
 
@@ -542,7 +517,7 @@ def get_log_activity(
     """
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.temperature
-    species: tuple[Species, ...] = fixed_parameters.species
+    species: SpeciesCollection = fixed_parameters.species
     total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
@@ -568,7 +543,7 @@ def get_log_activity(
     return log_activity
 
 
-@jit
+@eqx.filter_jit
 def get_log_activity_ideal_mixing(
     fixed_parameters: FixedParameters, log_number_density: Array, log_activity_pure_species: Array
 ) -> Array:
@@ -600,7 +575,7 @@ def get_log_activity_ideal_mixing(
     return log_activity
 
 
-@jit
+@eqx.filter_jit
 def get_log_pressure_from_log_number_density(
     log_number_density: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -620,9 +595,9 @@ def get_log_pressure_from_log_number_density(
     return log_pressure
 
 
-@jit
+@eqx.filter_jit
 def get_log_Kp(
-    species: tuple[Species, ...], reaction_matrix: Array, temperature: ArrayLike
+    species: SpeciesCollection, reaction_matrix: Array, temperature: ArrayLike
 ) -> Array:
     """Gets log of the equilibrium constant in terms of partial pressures
 
@@ -645,7 +620,7 @@ def get_log_Kp(
     return log_Kp
 
 
-@jit
+@eqx.filter_jit
 def get_log_reaction_equilibrium_constant(
     fixed_parameters: FixedParameters,
     temperature: ArrayLike,
@@ -659,7 +634,7 @@ def get_log_reaction_equilibrium_constant(
     Returns:
         Log equilibrium constant of the reactions
     """
-    species: tuple[Species, ...] = fixed_parameters.species
+    species: SpeciesCollection = fixed_parameters.species
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
 
@@ -673,7 +648,7 @@ def get_log_reaction_equilibrium_constant(
     return log_Kc
 
 
-@jit
+@eqx.filter_jit
 def get_pressure_from_log_number_density(
     log_number_density: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -689,7 +664,7 @@ def get_pressure_from_log_number_density(
     return safe_exp(get_log_pressure_from_log_number_density(log_number_density, temperature))
 
 
-@jit
+@eqx.filter_jit
 def get_species_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
@@ -728,7 +703,7 @@ def get_species_density_in_melt(
     return species_melt_density
 
 
-@jit
+@eqx.filter_jit
 def get_species_ppmw_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
@@ -746,7 +721,7 @@ def get_species_ppmw_in_melt(
     Returns:
         ppmw of species dissolved in melt
     """
-    species: tuple[Species, ...] = fixed_parameters.species
+    species: SpeciesCollection = fixed_parameters.species
     diatomic_oxygen_index: Array = jnp.array(fixed_parameters.diatomic_oxygen_index)
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.temperature
@@ -777,7 +752,7 @@ def get_species_ppmw_in_melt(
     return species_ppmw
 
 
-@jit
+@eqx.filter_jit
 def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
     """Computes the log-sum-exp in a numerically stable way.
 
