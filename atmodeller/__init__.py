@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-__version__: str = "0.2.2"
+__version__: str = "0.4.0"
 
 import logging
 
@@ -166,7 +166,12 @@ def debug_file_logger() -> logging.Logger:
 
 
 from atmodeller.classes import InteriorAtmosphere  # noqa: E402, F401
-from atmodeller.containers import Planet, SolverParameters, Species  # noqa: E402, F401
+from atmodeller.containers import (  # noqa: E402, F401
+    Planet,
+    SolverParameters,
+    Species,
+    SpeciesCollection,
+)
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,
     earth_oceans_to_hydrogen_mass,

@@ -26,14 +26,16 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Callable, NamedTuple, Type
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit, lax
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
@@ -65,6 +67,159 @@ else:
     from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+@register_pytree_node_class
+class SpeciesCollection(tuple):
+    """A collection of species
+
+    Args:
+        species: Species
+    """
+
+    def __new__(cls, species: Iterable[Species]):
+        return super().__new__(cls, tuple(species))
+
+    @classmethod
+    def create(cls, species_names: Iterable[str]) -> Self:
+        """Creates an instance
+
+        Args:
+            species_names: A list or tuple of species names. This must match the available species
+                in Atmodeller, but a complete list is returned if any of the entries are incorrect.
+
+        Returns
+            An instance
+        """
+        species_list: list[Species] = []
+        for species_ in species_names:
+            if species_[-1] == "g":
+                species_to_add: Species = Species.create_gas(species_)
+            else:
+                species_to_add: Species = Species.create_condensed(species_)
+            species_list.append(species_to_add)
+
+        return cls(species_list)
+
+    def get_condensed_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+        """Gets the indices of condensed species
+
+        Returns:
+            Indices of the condensed species
+        """
+        indices: list[int] = []
+        for nn, species_ in enumerate(self):
+            if species_.data.phase != "g":
+                indices.append(nn)
+
+        return tuple(indices)
+
+    def get_diatomic_oxygen_index(self: tuple[Species, ...]) -> int:
+        """Gets the species index corresponding to diatomic oxygen.
+
+        Returns:
+            Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
+        """
+        for nn, species_ in enumerate(self):
+            if species_.data.hill_formula == "O2":
+                logger.debug("Found O2 at index = %d", nn)
+                return nn
+
+        # TODO: Bad practice to return the first index because it could be wrong and therefore give
+        # rise to spurious results, but an index must be passed to evaluate the species solubility
+        # that may depend on fO2.
+        return 0
+
+    def get_gas_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+        """Gets the indices of gas species
+
+        Returns:
+            Indices of the gas species
+        """
+        indices: list[int] = []
+        for nn, species_ in enumerate(self):
+            if species_.data.phase == "g":
+                indices.append(nn)
+
+        return tuple(indices)
+
+    def get_molar_masses(self: tuple[Species, ...]) -> tuple[float, ...]:
+        """Gets the molar masses of all species.
+
+        Returns:
+            Molar masses of all species
+        """
+        molar_masses: tuple[float, ...] = tuple([species_.data.molar_mass for species_ in self])
+
+        logger.debug("molar_masses = %s", molar_masses)
+
+        return molar_masses
+
+    def get_species_names(self: tuple[Species, ...]) -> tuple[str, ...]:
+        """Gets the names of all species.
+
+        Returns:
+            Species names
+        """
+        return tuple([species_.name for species_ in self])
+
+    def get_stability_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+        """Gets the indices of species to solve for stability
+
+        Returns:
+            Indices of the species to solve for stability
+        """
+        indices: list[int] = []
+        for nn, species_ in enumerate(self):
+            if species_.solve_for_stability:
+                indices.append(nn)
+
+        return tuple(indices)
+
+    def get_stability_species_mask(self: tuple[Species, ...]) -> npt.NDArray[np.bool_]:
+        """Gets the stability species mask
+
+        Returns:
+            Mask for the species to solve for the stability
+        """
+        # Find the species to solve for stability
+        stability_bool: npt.NDArray[np.bool_] = np.array(
+            [species.solve_for_stability for species in self], dtype=np.bool_
+        )
+
+        return stability_bool
+
+    def get_unique_elements_in_species(self: tuple[Species, ...]) -> tuple[str, ...]:
+        """Gets unique elements.
+
+        Args:
+            species: A list of species
+
+        Returns:
+            Unique elements in the species ordered alphabetically
+        """
+        elements: list[str] = []
+        for species_ in self:
+            elements.extend(species_.data.elements)
+        unique_elements: list[str] = list(set(elements))
+        sorted_elements: list[str] = sorted(unique_elements)
+
+        logger.debug("unique_elements_in_species = %s", sorted_elements)
+
+        return tuple(sorted_elements)
+
+    def number_of_stability(self: SpeciesCollection) -> int:
+        """Number of stability solutions"""
+        return len(self.get_stability_species_indices())
+
+    def tree_flatten(self) -> tuple[tuple, None]:
+        return (self, None)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del aux_data
+        return cls(children)
+
 
 # region: Containers for traced parameters
 
@@ -382,14 +537,14 @@ class FugacityConstraints(NamedTuple):
 
 
 class MassConstraints(NamedTuple):
-    """Mass constraints
+    """Mass constraints of elements
 
     Args:
-        log_molecules: Log number of molecules of the species
+        log_abundance: Log number of atoms of elements
     """
 
-    log_molecules: ImmutableMap[str, ArrayLike]
-    """Log number of molecules"""
+    log_abundance: ImmutableMap[str, ArrayLike]
+    """Log number of atoms of elements"""
 
     @classmethod
     def create(cls, mass_constraints: Mapping[str, ArrayLike] | None = None) -> Self:
@@ -407,16 +562,16 @@ class MassConstraints(NamedTuple):
             init_dict = dict(mass_constraints)
 
         sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
-        log_number_of_molecules: dict[str, ArrayLike] = {}
+        log_abundance: dict[str, ArrayLike] = {}
 
         for element, mass_constraint in sorted_mass.items():
             molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log_number_of_molecules_: Array = (
+            log_abundance_: Array = (
                 jnp.log(mass_constraint) + jnp.log(AVOGADRO) - jnp.log(molar_mass)
             )
-            log_number_of_molecules[element] = log_number_of_molecules_
+            log_abundance[element] = log_abundance_
 
-        init_map: ImmutableMap[str, ArrayLike] = ImmutableMap(log_number_of_molecules)
+        init_map: ImmutableMap[str, ArrayLike] = ImmutableMap(log_abundance)
 
         return cls(init_map)
 
@@ -428,7 +583,7 @@ class MassConstraints(NamedTuple):
         """
         out: dict[str, Array] = {
             f"{key}_number": jnp.exp(jnp.asarray(value))
-            for key, value in self.log_molecules.items()
+            for key, value in self.log_abundance.items()
         }
 
         return out
@@ -443,10 +598,21 @@ class MassConstraints(NamedTuple):
         Returns:
             Log number density
         """
-        log_molecules: Array = jnp.array(list(self.log_molecules.values()))
-        log_number_density: Array = log_molecules - log_atmosphere_volume
+        log_abundance: Array = jnp.array(list(self.log_abundance.values()))
+        log_number_density: Array = log_abundance - log_atmosphere_volume
 
         return log_number_density
+
+    @jit
+    def log_maximum_number(self) -> Array:
+        """Log of the maximum abundance
+
+        Returns:
+            Log of the maximum abundance
+        """
+        log_abundance: Array = jnp.array(list(self.log_abundance.values()))
+
+        return jnp.max(log_abundance)
 
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
@@ -454,21 +620,21 @@ class MassConstraints(NamedTuple):
         Returns:
             vmap axes
         """
-        log_molecules_vmap: dict[str, int | None] = {}
+        log_abundance_vmap: dict[str, int | None] = {}
 
-        for key, log_molecules in self.log_molecules.items():
-            if jnp.isscalar(log_molecules):
+        for key, log_abundance in self.log_abundance.items():
+            if jnp.isscalar(log_abundance):
                 vmap_axis: int | None = None
             else:
                 vmap_axis = 0
-            log_molecules_vmap[key] = vmap_axis
+            log_abundance_vmap[key] = vmap_axis
 
-        logger.debug("log_molecules_vmap = %s", log_molecules_vmap)
+        logger.debug("log_abundance_vmap = %s", log_abundance_vmap)
 
-        return MassConstraints(ImmutableMap(log_molecules_vmap))  # type: ignore - container
+        return MassConstraints(ImmutableMap(log_abundance_vmap))  # type: ignore - container
 
     def __bool__(self) -> bool:
-        return bool(self.log_molecules)
+        return bool(self.log_abundance)
 
 
 # endregion
@@ -493,6 +659,7 @@ class FixedParameters(NamedTuple):
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
         tau: Tau factor for species stability
+        mass_logarithmic_error: Mass logarithmic error
     """
 
     species: tuple[Species, ...]
@@ -521,6 +688,8 @@ class FixedParameters(NamedTuple):
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""
+    mass_logarithmic_error: int
+    """Mass logarithmic error"""
 
 
 class Species(NamedTuple):
@@ -619,6 +788,24 @@ class Solution(NamedTuple):
         """Combined data in a single array"""
         return jnp.concatenate((self.log_number_density, self.stability))
 
+    def vmap_axes(self) -> Self:
+        """Gets vmap axes.
+
+        Returns:
+            vmap axes
+        """
+        if jnp.ndim(self.log_number_density) == 2:
+            log_number_density_axis: int | None = 0
+        else:
+            log_number_density_axis = None
+
+        if jnp.ndim(self.stability) == 2:
+            stability_axis: int | None = 0
+        else:
+            stability_axis = None
+
+        return Solution(log_number_density_axis, stability_axis)  # type: ignore - container
+
 
 class SolverParameters(NamedTuple):
     """Solver parameters
@@ -649,7 +836,7 @@ class SolverParameters(NamedTuple):
     @classmethod
     def create(
         cls,
-        species: tuple[Species, ...],
+        species: SpeciesCollection,
         solver_class: Type[OptxSolver] = optx.Newton,
         rtol: float = 1.0e-8,
         atol: float = 1.0e-8,
@@ -684,7 +871,7 @@ class SolverParameters(NamedTuple):
     @classmethod
     def _get_hypercube_bound(
         cls,
-        species: tuple[Species, ...],
+        species: SpeciesCollection,
         log_number_density_bound: float,
         stability_bound: float,
     ) -> tuple[float, ...]:
@@ -705,7 +892,7 @@ class SolverParameters(NamedTuple):
             np.concatenate(
                 (
                     log_number_density,
-                    stability_bound * np.ones(num_species),
+                    stability_bound * np.ones(species.number_of_stability()),
                 )
             ).tolist()
         )

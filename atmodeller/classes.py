@@ -42,7 +42,7 @@ from atmodeller.containers import (
     Planet,
     Solution,
     SolverParameters,
-    Species,
+    SpeciesCollection,
     TracedParameters,
 )
 from atmodeller.engine import solve
@@ -81,7 +81,7 @@ class SolutionArguments:
     @classmethod
     def create_with_defaults(
         cls,
-        species: tuple[Species, ...],
+        species: SpeciesCollection,
         planet: Planet | None = None,
         initial_log_number_density: ArrayLike | None = None,
         initial_log_stability: ArrayLike | None = None,
@@ -92,6 +92,7 @@ class SolutionArguments:
         """Creates an instance with defaults applied if arguments are not specified.
 
         Args:
+            species: Collection of species
             planet: Planet. Defaults to None.
             initial_log_number_density: Initial log number density. Defaults to None.
             initial_log_stability: Initial log stability. Defaults to None.
@@ -116,7 +117,7 @@ class SolutionArguments:
 
         if initial_log_stability is None:
             initial_log_stability_: ArrayLike = INITIAL_LOG_STABILITY * jnp.ones(
-                len(species), dtype=jnp.float_
+                species.number_of_stability(), dtype=jnp.float_
             )
         else:
             initial_log_stability_ = initial_log_stability
@@ -201,15 +202,20 @@ class InteriorAtmosphere:
     Args:
         species: Tuple of species
         tau: Tau factor for species stability. Defaults to TAU.
+        mass_logarithmic_error: Use logarithmic error for elemental number density and otherwise
+            use relative error. Defaults to True.
     """
 
     # Set during initialise_solve
     _solution_args: SolutionArguments
     _solver: Callable
 
-    def __init__(self, species: tuple[Species, ...], tau: float = TAU):
-        self.species: tuple[Species, ...] = species
+    def __init__(
+        self, species: SpeciesCollection, tau: float = TAU, mass_logarithmic_error: bool = True
+    ):
+        self.species: SpeciesCollection = species
         self.tau: float = tau
+        self.mass_logarithmic_error: bool = mass_logarithmic_error
         logger.info("species = %s", [species.name for species in self.species])
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
@@ -334,7 +340,7 @@ class InteriorAtmosphere:
         # Formula matrix for elements that are constrained by mass constraints
         unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
         indices: list[int] = []
-        for element in mass_constraints.log_molecules.keys():
+        for element in mass_constraints.log_abundance.keys():
             index: int = unique_elements.index(element)
             indices.append(index)
         formula_matrix_constraints: npt.NDArray[np.int_] = formula_matrix.copy()
@@ -364,6 +370,7 @@ class InteriorAtmosphere:
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
             tau=self.tau,
+            mass_logarithmic_error=self.mass_logarithmic_error,
         )
 
         return fixed_parameters
@@ -573,6 +580,14 @@ class InteriorAtmosphere:
         )
 
         return solver
+
+    def get_solution_vmap(self) -> Solution:
+        """Gets the vmapping axes for the initial solution estimate.
+
+        Returns:
+            Vmapping for the initial solution estimate
+        """
+        return self._solution_args.get_initial_solution().vmap_axes()
 
     def get_traced_parameters_vmap(self) -> TracedParameters:
         """Gets the vmapping axes for tracer parameters.

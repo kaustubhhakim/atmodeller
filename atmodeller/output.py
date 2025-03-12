@@ -38,8 +38,16 @@ from molmass import Formula
 from scipy.constants import mega
 
 from atmodeller.constants import AVOGADRO
-from atmodeller.containers import FixedParameters, Planet, Solution, Species, TracedParameters
+from atmodeller.containers import (
+    FixedParameters,
+    Planet,
+    Solution,
+    Species,
+    SpeciesCollection,
+    TracedParameters,
+)
 from atmodeller.engine import (
+    compute_residual,
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
     get_element_density,
@@ -50,7 +58,6 @@ from atmodeller.engine import (
     get_species_density_in_melt,
     get_species_ppmw_in_melt,
     get_total_pressure,
-    objective_function,
 )
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
@@ -70,6 +77,7 @@ class Output:
         interior_atmosphere: Interior atmosphere
         initial_solution: Initial solution
         traced_parameters: Traced parameters
+        optimistix_result: An integer array representing whether the solve was successful or no
     """
 
     def __init__(
@@ -78,23 +86,37 @@ class Output:
         interior_atmosphere: InteriorAtmosphere,
         initial_solution: Solution,
         traced_parameters: TracedParameters,
+        # optimistix_result: npt.NDArray[np.int_],
     ):
-        logger.info("Creating Output")
+        logger.debug("Creating Output")
         # Convert to 2-D to allow the same (sometimes vmapped) functions to be used for single and
         # batch output.
         self._solution: Array = jnp.atleast_2d(solution)
         self._interior_atmosphere: InteriorAtmosphere = interior_atmosphere
         self._initial_solution: Solution = initial_solution
+        self._species: SpeciesCollection = self._interior_atmosphere.species
         self._traced_parameters: TracedParameters = traced_parameters
+        # self._optimistix_result: npt.NDArray[np.int_] = np.atleast_1d(optimistix_result)
 
-        log_number_density, log_stability = jnp.split(self._solution, 2, axis=1)
+        # Calculate the index at which to split the array
+        split_index: int = self._solution.shape[1] - self.species.number_of_stability()
+        log_number_density, log_stability = jnp.split(self._solution, [split_index], axis=1)
+        # Number of entries in log_number_density is always the total number of species
         self._log_number_density: Array = log_number_density
+        # Number of entries in log_stability could be between 0 and the total number of species
         self._log_stability: Array = log_stability
 
     @property
     def condensed_species_indices(self) -> Array:
         """Condensed species indices"""
-        return jnp.array(self._interior_atmosphere.get_condensed_species_indices(), dtype=int)
+        return jnp.array(
+            self._interior_atmosphere.species.get_condensed_species_indices(), dtype=int
+        )
+
+    # @property
+    # def failed(self) -> npt.NDArray[np.bool_]:
+    #     """Boolean array of failed cases"""
+    #     return self._optimistix_result != 0
 
     @property
     def fixed_parameters(self) -> FixedParameters:
@@ -117,7 +139,7 @@ class Output:
 
     @property
     def log_stability(self) -> Array:
-        """Log stability of all species"""
+        """Log stability of relevant species"""
         return self._log_stability
 
     @property
@@ -136,14 +158,19 @@ class Output:
         return self.traced_parameters.planet
 
     @property
-    def species(self) -> tuple[Species, ...]:
+    def species(self) -> SpeciesCollection:
         """Species"""
         return self._interior_atmosphere.species
 
     @property
     def stability_species_mask(self) -> Array:
         """Stability species mask"""
-        return jnp.array(self._interior_atmosphere.get_stability_species_mask())
+        return jnp.array(self.species.get_stability_species_mask())
+
+    # @property
+    # def success(self) -> npt.NDArray[np.bool_]:
+    #     """Boolean array of successful (converged) cases"""
+    #     return self._optimistix_result == 0
 
     @property
     def temperature(self) -> Array:
@@ -184,6 +211,8 @@ class Output:
     def asdict(self) -> dict[str, dict[str, Array]]:
         """All output in a dictionary
 
+        Note that this also includes failed cases.
+
         Returns:
             Dictionary of all output
         """
@@ -218,7 +247,7 @@ class Output:
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
 
         if "O2_g" in out:
-            logger.info("Found O2_g so back-computing log10 shift for fO2")
+            logger.debug("Found O2_g so back-computing log10 shift for fO2")
             log10_fugacity: Array = jnp.log10(out["O2_g"]["fugacity"])
             temperature: Array = out["planet"]["surface_temperature"]
             pressure: Array = out["atmosphere"]["pressure"]
@@ -249,7 +278,7 @@ class Output:
                     d[key] = np.array(value)
                     logger.debug("Array type after conversion = %s", type(d[key]))
 
-        logger.info("Convert all arrays to numpy")
+        logger.debug("Convert all arrays to numpy")
         convert_to_numpy(out)
 
         return out
@@ -417,7 +446,7 @@ class Output:
         )
 
         unique_elements: tuple[str, ...] = (
-            self._interior_atmosphere.get_unique_elements_in_species()
+            self._interior_atmosphere.species.get_unique_elements_in_species()
         )
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
@@ -501,7 +530,7 @@ class Output:
             Molar mass of elements
         """
         unique_elements: tuple[str, ...] = (
-            self._interior_atmosphere.get_unique_elements_in_species()
+            self._interior_atmosphere.species.get_unique_elements_in_species()
         )
         molar_mass: Array = jnp.array([Formula(element).mass for element in unique_elements])
         molar_mass = unit_conversion.g_to_kg * molar_mass
@@ -627,13 +656,23 @@ class Output:
             Log activity of all species
         """
         log_activity_without_stability: Array = self.log_activity_without_stability()
+        # We select the relevant log_activity at the end of this method depending which species
+        # also have stability, so its OK to build a padded array here to keep the size the same.
+        log_stability_padded: Array = jnp.zeros_like(log_activity_without_stability)
+        log_stability_padded = log_stability_padded.at[
+            :, self.species.get_stability_species_indices()
+        ].set(self.log_stability)
+        # Note that the below array contains incorrect entries for species without stability since
+        # exp(0)=1. But these are filtered out further below.
         log_activity_with_stability: Array = log_activity_without_stability - jnp.exp(
-            self.log_stability
+            log_stability_padded
         )
+
+        # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = jnp.broadcast_to(
             self.stability_species_mask, log_activity_without_stability.shape
         )
-        logger.debug("condition_broadcasted = %s", condition_broadcasted)
+        # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
         log_activity: Array = jnp.where(
             condition_broadcasted,
@@ -717,10 +756,14 @@ class Output:
         """
         raw_solution: dict[str, Array] = {}
 
-        for ii, species_ in enumerate(self.species):
-            species_name: str = species_.name
-            raw_solution[species_name] = self._log_number_density[:, ii]
-            raw_solution[f"{species_name}_stability"] = self._log_stability[:, ii]
+        species_names: tuple[str, ...] = self.species.get_species_names()
+
+        for ii, species_name in enumerate(species_names):
+            raw_solution[species_name] = self.log_number_density[:, ii]
+
+        for ii, index in enumerate(self.species.get_stability_species_indices()):
+            species_name = species_names[index]
+            raw_solution[f"{species_name}_stability"] = self.log_stability[:, ii]
 
         return raw_solution
 
@@ -731,7 +774,7 @@ class Output:
             Dictionary of the residual
         """
         residual_func: Callable = jax.vmap(
-            objective_function,
+            compute_residual,
             in_axes=(
                 0,
                 {
@@ -793,20 +836,30 @@ class Output:
         return species_ppmw_in_melt
 
     def stability(self) -> Array:
-        """Gets stability of all species
+        """Gets stability of relevant species
 
         Returns:
-            Stability of all the species
+            Stability of relevant species
         """
         return jnp.exp(self.log_stability)
 
-    def to_dataframes(self) -> dict[str, pd.DataFrame]:
+    def to_dataframes(self, success: bool = True) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
+
+        Args:
+            success: Only output successful (converged) models. Otherwise all models are output.
+                Defaults to True.
 
         Returns:
             Output in a dictionary of dataframes
         """
         out: dict[str, pd.DataFrame] = nested_dict_to_dataframes(self.asdict())
+
+        # if success:
+        #     # Loop through the dictionary and filter the dataframes
+        #     for key, df in out.items():
+        #         out[key] = df[self.success]
+
         logger.debug("to_dataframes = %s", out)
 
         return out

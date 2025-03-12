@@ -95,8 +95,116 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     Returns:
         Residual
     """
+    return compute_residual(solution, kwargs)
+
+
+@jit
+def compute_mass_residual(
+    mass_logarithmic_error: Array,
+    element_density: Array,
+    element_melt_density: Array,
+    mass_constraints: MassConstraints,
+    log_volume: Array,
+) -> Array:
+    """Computes the mass residual
+
+    Some scaling must be applied to the mass residual so that all components of the final residual
+    are of similar magnitude.
+
+    Args:
+        mass_logarithmic_error: Use logarithmic error metric
+        element_density: Element density
+        element_melt_density: Element melt density
+        mass_constraints: Mass constraints
+        log_volume: Log volume of the atmosphere
+
+    Returns:
+        Mass residual
+    """
+
+    def log_error_case(_) -> Array:
+        """Log error"""
+        log_element_density = jnp.log(element_density + element_melt_density)
+        return log_element_density - mass_constraints.log_number_density(log_volume)
+
+    def relative_error_case(_) -> Array:
+        """Relative error"""
+        element_density_total = element_density + element_melt_density
+        target_density = jnp.exp(mass_constraints.log_number_density(log_volume))
+        # TODO: target density or some fixed mass scale instead?
+        return (element_density_total - target_density) / target_density
+
+    # Use lax.cond to switch based on mass_logarithmic_error
+    mass_residual: Array = lax.cond(
+        mass_logarithmic_error, log_error_case, relative_error_case, None
+    )
+
+    return jnp.asarray(mass_residual)
+
+
+@jit
+def get_min_log_elemental_abundance_per_species(
+    formula_matrix: Array, mass_constraints: MassConstraints
+) -> Array:
+    """For each species, find the elemental mass constraint with the lowest abundance.
+
+    If species are present for which there are no elemental mass constraints (for example,
+    oxygen if a fugacity constraint is applied instead) the maximum of all elements will be
+    returned for that particular species. However, the return array from this function is
+    subsequently filtered depending on whether a stability calculation is required for each
+    species.
+
+    # TODO: This could be precomputed rather than calculated within the residual calculation.
+
+    Args:
+        formula_matrix: Formula matrix
+        mass_constraints: Mass constraints
+
+    Returns:
+        A vector of the minimum log elemental abundance for each species
+    """
+    # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
+    mask: Array = (formula_matrix != 0).astype(jnp.int_)
+    # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
+    # jax.debug.print("mask = {out}", out=mask)
+
+    # Convert to column vector to align for element-wise multiplication
+    log_abundance: Array = jnp.expand_dims(
+        jnp.array(list(mass_constraints.log_abundance.values())), axis=1
+    )
+    # jax.debug.print("log_abundance = {out}", out=log_abundance)
+
+    # Element-wise multiplication (broadcasted correctly)
+    masked_abundance: Array = mask * log_abundance  # Shape: (n_elements, n_species)
+    # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
+
+    # Replace zeros (or masked-out values) with the max value before taking the min
+    masked_abundance = jnp.where(mask != 0, masked_abundance, jnp.max(log_abundance))
+    # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
+
+    # Find the minimum log abundance per species
+    min_abundance_per_species: Array = jnp.min(masked_abundance, axis=0)
+    # jax.debug.print("min_abundance_per_species = {out}", out=min_abundance_per_species)
+
+    return min_abundance_per_species
+
+
+@jit
+def compute_residual(solution: Array, kwargs: dict) -> Array:
+    """Residual of the reaction network and mass balance
+
+    Args:
+        solution: Solution array
+        kwargs: Dictionary of pytrees required to compute the residual
+
+    Returns:
+        Residual
+    """
     traced_parameters: TracedParameters = kwargs["traced_parameters"]
     fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
+    mass_logarithmic_error: Array = jnp.asarray(
+        fixed_parameters.mass_logarithmic_error, dtype=bool
+    )
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.temperature
     fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
@@ -107,15 +215,31 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     reaction_stability_matrix: Array = jnp.array(fixed_parameters.reaction_stability_matrix)
     stability_species_indices: Array = jnp.array(fixed_parameters.stability_species_indices)
     fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
-    # For the objective function we only need the formula matrix for elements with mass constraints
+    # We only need the formula matrix for elements with mass constraints
     formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
-
-    # jax.debug.print("Starting new objective function evaluation")
+    # jax.debug.print("Starting new residual evaluation")
 
     # Species
-    log_number_density, log_stability = jnp.split(solution, 2)
+    if stability_species_indices.size > 0:
+        split_idx: int = -len(stability_species_indices)
+        log_number_density: Array = solution[:split_idx]
+        log_stability: Array = solution[split_idx:]
+        # jax.debug.print("log_stability = {out}", out=log_stability)
+    else:
+        log_number_density = solution
+
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
-    # jax.debug.print("log_stability = {out}", out=log_stability)
+
+    # Stability
+    # The reaction_stability_matrix has zero entries so its OK to pad with any value for
+    # species without stability since the result is always zero
+    log_stability_padded: Array = jnp.zeros_like(log_number_density)
+    if stability_species_indices.size > 0:
+        log_stability_padded = log_stability_padded.at[stability_species_indices].set(
+            log_stability  # type: ignore since log_stability is known
+        )
+    # jax.debug.print("log_stability_padded = {out}", out=log_stability_padded)
+
     log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, log_number_density)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
@@ -148,9 +272,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         )
         # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
 
-        # Account for species stability
         reaction_residual = reaction_residual - reaction_stability_matrix.dot(
-            safe_exp(log_stability)
+            safe_exp(log_stability_padded)
         )
         # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
 
@@ -164,8 +287,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
             log_activity_number_density, fugacity_species_indices
         )
         # jax.debug.print(
-        #     "fugacity_log_activity_number_density = {out}",
-        #     out=fugacity_log_activity_number_density,
+        #    "fugacity_log_activity_number_density = {out}",
+        #    out=fugacity_log_activity_number_density,
         # )
         # jax.debug.print("fugacity_matrix = {out}", out=fugacity_matrix)
         # TODO: Check if there is a need to consider the stability of the species for which the
@@ -196,22 +319,39 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
             log_activity,
             log_volume,
         )
-        log_element_density: Array = jnp.log(element_density + element_melt_density)
-        mass_residual = log_element_density - mass_constraints.log_number_density(log_volume)
-        # jax.debug.print("mass_residual = {out}", out=mass_residual)
+        # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
+
+        mass_residual = compute_mass_residual(
+            mass_logarithmic_error,
+            element_density,
+            element_melt_density,
+            mass_constraints,
+            log_volume,
+        )
+        # jax.debug.print("element_density = {out}", out=mass_residual)
+
+        residual = jnp.concatenate([residual, mass_residual])
 
         # Stability residual
-        # Get minimum scaled log number of molecules
-        log_min_number_density: Array = jnp.min(
-            mass_constraints.log_number_density(log_volume)
-        ) + jnp.log(fixed_parameters.tau)
+        if stability_species_indices.size > 0:
+            log_min_number_density: Array = (
+                get_min_log_elemental_abundance_per_species(
+                    formula_matrix_constraints, mass_constraints
+                )
+                - log_volume
+                + jnp.log(fixed_parameters.tau)
+            )
+            log_min_number_density = jnp.take(log_min_number_density, stability_species_indices)
 
-        stability_residual: Array = log_number_density + log_stability - log_min_number_density
-        # Only consider residuals for species that should have their stability solved for
-        stability_residual = jnp.take(stability_residual, stability_species_indices)
-        # jax.debug.print("stability_residual = {out}", out=stability_residual)
+            log_number_density_stability: Array = jnp.take(
+                log_number_density, stability_species_indices
+            )
+            stability_residual: Array = (
+                log_number_density_stability + log_stability - log_min_number_density  # type: ignore
+            )
+            # jax.debug.print("stability_residual = {out}", out=stability_residual)
 
-        residual = jnp.concatenate([residual, mass_residual, stability_residual])
+            residual = jnp.concatenate([residual, stability_residual])
 
     # jax.debug.print("residual = {out}", out=residual)
 
