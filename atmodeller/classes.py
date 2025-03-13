@@ -131,6 +131,10 @@ class InteriorAtmosphere:
             solution_args.solver_parameters,
         )
 
+        # Ensure computation is complete before proceeding
+        solution.block_until_ready()
+        solver_status.block_until_ready()
+
         self._output: Output = Output(
             solution,
             solution_args,
