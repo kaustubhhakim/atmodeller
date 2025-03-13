@@ -20,8 +20,6 @@ The leaves of pytrees must be JAX-compliant types, which excludes strings. So th
 approach is to encode the data as JAX-compatible types and provide properties and methods that can
 reconstruct other desired quantities, notably strings and other objects. This ensures that similar
 functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
-
-The above constraint will be lifted once we switch over to equinox
 """
 
 from __future__ import annotations
@@ -32,13 +30,13 @@ from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, NamedTuple, Type
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit, lax, tree_flatten
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
@@ -248,14 +246,16 @@ class SolutionArguments:
         return SolutionArguments(**merged_dict)
 
 
-class SpeciesCollection(eqx.Module):
+@register_pytree_node_class
+class SpeciesCollection(tuple):
     """A collection of species
 
     Args:
         species: Species
     """
 
-    data: tuple[Species, ...]
+    def __new__(cls, species: Iterable[Species]):
+        return super().__new__(cls, tuple(species))
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> Self:
@@ -276,28 +276,28 @@ class SpeciesCollection(eqx.Module):
                 species_to_add: Species = Species.create_condensed(species_)
             species_list.append(species_to_add)
 
-        return cls(tuple(species_list))
+        return cls(species_list)
 
-    def get_condensed_species_indices(self) -> tuple[int, ...]:
+    def get_condensed_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
         """Gets the indices of condensed species
 
         Returns:
             Indices of the condensed species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
+        for nn, species_ in enumerate(self):
             if species_.data.phase != "g":
                 indices.append(nn)
 
         return tuple(indices)
 
-    def get_diatomic_oxygen_index(self) -> int:
+    def get_diatomic_oxygen_index(self: tuple[Species, ...]) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
         Returns:
             Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
         """
-        for nn, species_ in enumerate(self.data):
+        for nn, species_ in enumerate(self):
             if species_.data.hill_formula == "O2":
                 logger.debug("Found O2 at index = %d", nn)
                 return nn
@@ -307,55 +307,53 @@ class SpeciesCollection(eqx.Module):
         # that may depend on fO2.
         return 0
 
-    def get_gas_species_indices(self) -> tuple[int, ...]:
+    def get_gas_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
         """Gets the indices of gas species
 
         Returns:
             Indices of the gas species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
+        for nn, species_ in enumerate(self):
             if species_.data.phase == "g":
                 indices.append(nn)
 
         return tuple(indices)
 
-    def get_molar_masses(self) -> tuple[float, ...]:
+    def get_molar_masses(self: tuple[Species, ...]) -> tuple[float, ...]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: tuple[float, ...] = tuple(
-            [species_.data.molar_mass for species_ in self.data]
-        )
+        molar_masses: tuple[float, ...] = tuple([species_.data.molar_mass for species_ in self])
 
         logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
 
-    def get_species_names(self) -> tuple[str, ...]:
+    def get_species_names(self: tuple[Species, ...]) -> tuple[str, ...]:
         """Gets the names of all species.
 
         Returns:
             Species names
         """
-        return tuple([species_.name for species_ in self.data])
+        return tuple([species_.name for species_ in self])
 
-    def get_stability_species_indices(self) -> tuple[int, ...]:
+    def get_stability_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
         """Gets the indices of species to solve for stability
 
         Returns:
             Indices of the species to solve for stability
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
+        for nn, species_ in enumerate(self):
             if species_.solve_for_stability:
                 indices.append(nn)
 
         return tuple(indices)
 
-    def get_stability_species_mask(self) -> npt.NDArray[np.bool_]:
+    def get_stability_species_mask(self: tuple[Species, ...]) -> npt.NDArray[np.bool_]:
         """Gets the stability species mask
 
         Returns:
@@ -363,12 +361,12 @@ class SpeciesCollection(eqx.Module):
         """
         # Find the species to solve for stability
         stability_bool: npt.NDArray[np.bool_] = np.array(
-            [species.solve_for_stability for species in self.data], dtype=np.bool_
+            [species.solve_for_stability for species in self], dtype=np.bool_
         )
 
         return stability_bool
 
-    def get_unique_elements_in_species(self) -> tuple[str, ...]:
+    def get_unique_elements_in_species(self: tuple[Species, ...]) -> tuple[str, ...]:
         """Gets unique elements.
 
         Args:
@@ -378,7 +376,7 @@ class SpeciesCollection(eqx.Module):
             Unique elements in the species ordered alphabetically
         """
         elements: list[str] = []
-        for species_ in self.data:
+        for species_ in self:
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         sorted_elements: list[str] = sorted(unique_elements)
@@ -387,24 +385,23 @@ class SpeciesCollection(eqx.Module):
 
         return tuple(sorted_elements)
 
-    def number_of_stability(self) -> int:
+    def number_of_stability(self: SpeciesCollection) -> int:
         """Number of stability solutions"""
         return len(self.get_stability_species_indices())
 
-    def __getitem__(self, index):
-        return self.data[index]
+    def tree_flatten(self) -> tuple[tuple, None]:
+        return (self, None)
 
-    def __iter__(self):
-        return iter(self.data)
-
-    def __len__(self):
-        return len(self.data)
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del aux_data
+        return cls(children)
 
 
 # region: Containers for traced parameters
 
 
-class TracedParameters(eqx.Module):
+class TracedParameters(NamedTuple):
     """Traced parameters
 
     Args:
@@ -421,7 +418,6 @@ class TracedParameters(eqx.Module):
     """Mass constraints"""
 
 
-# TODO: Swap out NamedTuple for eqx.module and ensure all methods work
 class Planet(NamedTuple):
     """Planet properties
 
@@ -530,7 +526,7 @@ class Planet(NamedTuple):
         return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
 
 
-class NormalisedMass(eqx.Module):
+class NormalisedMass(NamedTuple):
     """Normalised mass for conventional outgassing
 
     Default values are for a unit mass (1 kg) system.
@@ -559,7 +555,7 @@ class NormalisedMass(eqx.Module):
         return self.mass * (1 - self.melt_fraction)
 
 
-class ConstantFugacityConstraint(eqx.Module):
+class ConstantFugacityConstraint(NamedTuple):
     """A constant fugacity constraint
 
     This must adhere to FugacityConstraintProtocol
@@ -584,7 +580,7 @@ class ConstantFugacityConstraint(eqx.Module):
         return jnp.full_like(temperature, log_fugacity_value)
 
 
-class FugacityConstraints(eqx.Module):
+class FugacityConstraints(NamedTuple):
     """Fugacity constraints
 
     These are applied as constraints on the gas activity.
@@ -717,7 +713,7 @@ class FugacityConstraints(eqx.Module):
         return bool(self.constraints)
 
 
-class MassConstraints(eqx.Module):
+class MassConstraints(NamedTuple):
     """Mass constraints of elements
 
     Args:
@@ -822,7 +818,7 @@ class MassConstraints(eqx.Module):
 
 
 # region: Containers for fixed parameters
-class FixedParameters(eqx.Module):
+class FixedParameters(NamedTuple):
     """Parameters that are always fixed for a calculation
 
     This container and all objects within it must be hashable.
@@ -873,7 +869,7 @@ class FixedParameters(eqx.Module):
     """Mass logarithmic error"""
 
 
-class Species(eqx.Module):
+class Species(NamedTuple):
     """Species
 
     Args:
@@ -938,7 +934,7 @@ class Species(eqx.Module):
         return cls(species_data, activity, solubility, solve_for_stability)
 
 
-class Solution(eqx.Module):
+class Solution(NamedTuple):
     """Solution
 
     Args:
@@ -988,7 +984,7 @@ class Solution(eqx.Module):
         return Solution(log_number_density_axis, stability_axis)  # type: ignore - container
 
 
-class SolverParameters(eqx.Module):
+class SolverParameters(NamedTuple):
     """Solver parameters
 
     Args:
