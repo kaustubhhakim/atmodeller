@@ -37,7 +37,6 @@ from atmodeller.containers import (
     FugacityConstraints,
     MassConstraints,
     Planet,
-    Solution,
     SolutionArguments,
     SolverParameters,
     SpeciesCollection,
@@ -89,7 +88,6 @@ class InteriorAtmosphere:
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
         solver_parameters: SolverParameters | None = None,
-        multistart: int = 1,
     ) -> None:
         """Solves the system and initialises an Output instance for processing the result
 
@@ -100,7 +98,6 @@ class InteriorAtmosphere:
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
-            multistep: Multistep. Defualts to 1.
         """
         solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
             self.species,
@@ -110,31 +107,29 @@ class InteriorAtmosphere:
             fugacity_constraints,
             mass_constraints,
             solver_parameters,
-            multistart,
         )
 
         if solution_args.is_batch:
             initial_solution_axes = solution_args.get_initial_solution_vmap()
             traced_parameters_axes = solution_args.get_traced_parameters_vmap()
 
-            self._solver: Callable = eqx.filter_jit(
-                jax.vmap(
-                    jax.vmap(
-                        solve,
-                        # FIXME: what about initial_solution_axes?
-                        in_axes=(None, traced_parameters_axes, None, None),
-                    ),
-                    in_axes=(0, None, None, None),  # Outer vmap over multistart
-                )
+            # Create an inner vmap callable for batch processing
+            inner_solver: Callable = jax.vmap(
+                solve,
+                in_axes=(initial_solution_axes, traced_parameters_axes, None, None),
             )
         else:
-            self._solver = eqx.filter_jit(jax.vmap(solve, in_axes=(0, None, None, None)))
+            inner_solver = solve  # No batching, use the raw solver
+
+        # Apply an outer vmap over the multistart dimension
+        self._solver: Callable = eqx.filter_jit(
+            jax.vmap(inner_solver, in_axes=(0, None, None, None))
+        )
 
         fixed_parameters: FixedParameters = self.get_fixed_parameters(
             solution_args.fugacity_constraints, solution_args.mass_constraints
         )
-        initial_solution: Solution = solution_args.get_initial_solution()
-        initial_solution_array: Array = initial_solution.data
+        initial_solution_array: Array = solution_args.solution
         traced_parameters: TracedParameters = solution_args.get_traced_parameters()
 
         solution, solver_status = self._solver(
@@ -148,10 +143,15 @@ class InteriorAtmosphere:
         solution.block_until_ready()
         solver_status.block_until_ready()
 
+        # Batch over temperature with multistart is (10,4,3)
+        # Multistart with single is (2,3)
+
+        print(solution)
+        print(solver_status)
+
         self._output: Output = Output(
             solution,
             solution_args,
-            initial_solution,
             fixed_parameters,
             traced_parameters,
             solver_status,
@@ -192,7 +192,7 @@ class InteriorAtmosphere:
         fixed_parameters: FixedParameters = self.get_fixed_parameters(
             solution_args.fugacity_constraints, solution_args.mass_constraints
         )
-        initial_solution: Solution = solution_args.get_initial_solution()
+        initial_solution: Array = solution_args.solution
         traced_parameters: TracedParameters = solution_args.get_traced_parameters()
 
         solution, solver_status = self._solver(
@@ -209,7 +209,6 @@ class InteriorAtmosphere:
         self._output: Output = Output(
             solution,
             solution_args,
-            initial_solution,
             fixed_parameters,
             traced_parameters,
             solver_status,

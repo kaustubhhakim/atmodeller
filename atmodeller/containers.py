@@ -90,8 +90,7 @@ class SolutionArguments:
 
     species: SpeciesCollection
     planet: Planet
-    initial_log_number_density: ArrayLike
-    initial_log_stability: ArrayLike
+    solution: Array
     fugacity_constraints: FugacityConstraints
     mass_constraints: MassConstraints
     solver_parameters: SolverParameters
@@ -106,7 +105,6 @@ class SolutionArguments:
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
         solver_parameters: SolverParameters | None = None,
-        multistart: int = 1,
     ) -> Self:
         """Creates an instance with defaults applied if arguments are not specified.
 
@@ -118,11 +116,17 @@ class SolutionArguments:
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
-            multistart: Multistart. Defaults to 1.
 
         Returns:
             An instance
         """
+        if solver_parameters is None:
+            solver_parameters_: SolverParameters = SolverParameters.create(species)
+        else:
+            solver_parameters_ = solver_parameters
+
+        multistart: int = solver_parameters_.multistart
+
         if planet is None:
             planet_: Planet = Planet()
         else:
@@ -176,16 +180,17 @@ class SolutionArguments:
         )
         mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
 
-        if solver_parameters is None:
-            solver_parameters_: SolverParameters = SolverParameters.create(species)
-        else:
-            solver_parameters_ = solver_parameters
+        # Ensure both arrays have the same shape before concatenation
+        if log_number_density.ndim != log_stability.ndim:
+            raise ValueError(
+                f"Shape mismatch: log_number_density {log_number_density.shape} != log_stability {log_stability.shape}"
+            )
+        solution: Array = jnp.concatenate((log_number_density, log_stability), axis=-1)
 
         return cls(
             species,
             planet_,
-            log_number_density,
-            log_stability,
+            solution,
             fugacity_constraints_,
             mass_constraints_,
             solver_parameters_,
@@ -202,21 +207,16 @@ class SolutionArguments:
 
         return contains_zero
 
-    def get_initial_solution(self) -> Solution:
-        """Gets the initial solution
-
-        Returns:
-            Initial solution
-        """
-        return Solution.create(self.initial_log_number_density, self.initial_log_stability)
-
-    def get_initial_solution_vmap(self) -> Solution:
+    def get_initial_solution_vmap(self) -> int | None:
         """Gets the vmapping axes for the initial solution estimate.
 
         Returns:
             Vmapping for the initial solution estimate
         """
-        return self.get_initial_solution().vmap_axes()
+        if np.ndim(self.solution) == 3:
+            return 1
+        else:
+            return None
 
     def get_traced_parameters(self) -> TracedParameters:
         """Gets traced parameters
@@ -967,56 +967,6 @@ class Species(NamedTuple):
         return cls(species_data, activity, solubility, solve_for_stability)
 
 
-class Solution(NamedTuple):
-    """Solution
-
-    Args:
-        log_number_density: Log number density of species
-        stability: Stability of species
-    """
-
-    log_number_density: ArrayLike
-    """Log number density of species"""
-    stability: ArrayLike
-    """Stability of species"""
-
-    @classmethod
-    def create(cls, log_number_density: ArrayLike, stability: ArrayLike) -> Self:
-        """Creates an instance.
-
-        Args:
-            log_number_density: Log number density
-            stability: Stability
-
-        Returns:
-            An instance
-        """
-        return cls(log_number_density, stability)
-
-    @property
-    def data(self) -> Array:
-        """Combined data in a single array"""
-        return jnp.concatenate((self.log_number_density, self.stability), axis=-1)
-
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        if jnp.ndim(self.log_number_density) == 3:
-            log_number_density_axis: int | None = 1
-        else:
-            log_number_density_axis = None
-
-        if jnp.ndim(self.stability) == 3:
-            stability_axis: int | None = 1
-        else:
-            stability_axis = None
-
-        return Solution(log_number_density_axis, stability_axis)  # type: ignore - container
-
-
 class SolverParameters(NamedTuple):
     """Solver parameters
 
@@ -1042,6 +992,8 @@ class SolverParameters(NamedTuple):
     """Upper bound on the hypercube which contains the root"""
     jac: str = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
+    multistart: int = 10
+    """Number of multistarts"""
 
     @classmethod
     def create(
@@ -1053,6 +1005,7 @@ class SolverParameters(NamedTuple):
         throw: bool = True,
         max_steps: int = 256,
         norm: Callable = optx.rms_norm,
+        multistart: int = 10,
     ) -> Self:
         """Creates an instance
 
@@ -1064,6 +1017,7 @@ class SolverParameters(NamedTuple):
             throw. How to report any failures. Defaults to True.
             max_steps: The maximum number of steps the solver can take. Defaults to 256.
             norm: The norm. Defaults to optimistix RMS norm.
+            multi_start: Number of multistarts. Defaults to 1.
 
         Returns:
             An instance
@@ -1076,7 +1030,15 @@ class SolverParameters(NamedTuple):
             species, LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER
         )
 
-        return cls(solver, throw=throw, max_steps=max_steps, lower=lower, upper=upper, jac="fwd")
+        return cls(
+            solver,
+            throw=throw,
+            max_steps=max_steps,
+            lower=lower,
+            upper=upper,
+            jac="fwd",
+            multistart=multistart,
+        )
 
     @classmethod
     def _get_hypercube_bound(

@@ -42,7 +42,6 @@ from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
     Planet,
-    Solution,
     SolutionArguments,
     Species,
     SpeciesCollection,
@@ -83,7 +82,6 @@ class Output:
         self,
         solution: Array,
         solution_args: SolutionArguments,
-        initial_solution: Solution,
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
         solver_status: Array,
@@ -91,10 +89,12 @@ class Output:
         logger.debug("Creating Output")
         # Convert to 2-D to allow the same (sometimes vmapped) functions to be used for single and
         # batch output.
+        # TODO: Might need to force a size?  Or filter before this function?
+
         self._solution: Array = jnp.atleast_2d(solution)
-        print(self._solution)
+        print(self._solution.shape)
+
         self._solution_args: SolutionArguments = solution_args
-        self._initial_solution: Solution = initial_solution
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._species: SpeciesCollection = self._solution_args.species
         self._traced_parameters: TracedParameters = traced_parameters

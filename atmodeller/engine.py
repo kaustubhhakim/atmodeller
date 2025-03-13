@@ -84,6 +84,8 @@ def solve(
 
     solver_status: Array = sol.result == optx.RESULTS.successful
 
+    # TODO: Since this function is jitted let's also filter the multistart results
+
     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
 
     return sol.value, solver_status
