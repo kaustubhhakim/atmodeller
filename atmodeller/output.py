@@ -97,7 +97,7 @@ class Output:
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._species: SpeciesCollection = self._solution_args.species
         self._traced_parameters: TracedParameters = traced_parameters
-        self._solver_status: npt.NDArray[np.int_] = np.atleast_1d(solver_status)
+        self._solver_status: npt.NDArray = np.atleast_1d(solver_status)
 
         # Calculate the index at which to split the array
         split_index: int = self._solution.shape[1] - self._species.number_of_stability()
@@ -111,11 +111,6 @@ class Output:
     def condensed_species_indices(self) -> Array:
         """Condensed species indices"""
         return jnp.array(self._species.get_condensed_species_indices(), dtype=int)
-
-    @property
-    def failed(self) -> npt.NDArray[np.bool_]:
-        """Boolean array of failed cases"""
-        return self._solver_status != 0
 
     @property
     def gas_species_indices(self) -> Array:
@@ -151,11 +146,6 @@ class Output:
     def stability_species_mask(self) -> Array:
         """Stability species mask"""
         return jnp.array(self._species.get_stability_species_mask())
-
-    @property
-    def success(self) -> npt.NDArray[np.bool_]:
-        """Boolean array of successful (converged) cases"""
-        return self._solver_status == 0
 
     @property
     def temperature(self) -> Array:
@@ -196,6 +186,7 @@ class Output:
         Returns:
             Dictionary of all output
         """
+        logger.info("Writing output to dictionary")
         fugacity_matrix: Array = jnp.array(self._fixed_parameters.fugacity_matrix)
         formula_matrix_constraints: Array = jnp.array(
             self._fixed_parameters.formula_matrix_constraints
@@ -225,6 +216,7 @@ class Output:
                 temperature, pressure
             )
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
+        out["solver_converged"] = self._solver_status  # type: ignore since is an array
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
@@ -249,7 +241,7 @@ class Output:
         # and numpy arrays, which might simplify the pickling/unpickling process for end-users who
         # only care about the results. To this point the arrays are of type
         # <class 'jaxlib.xla_extension.ArrayImpl'>.
-        def convert_to_numpy(d):
+        def convert_to_numpy(d) -> None:
             for key, value in d.items():
                 if isinstance(value, dict):
                     convert_to_numpy(value)
@@ -823,18 +815,19 @@ class Output:
         """Gets the output in a dictionary of dataframes.
 
         Args:
-            success: Only output successful (converged) models. Otherwise all models are output.
-                Defaults to True.
+            success: Only output successful (converged) models. Otherwise all models are output
+                which can be useful for seeing where the solver failed. Defaults to True.
 
         Returns:
             Output in a dictionary of dataframes
         """
+        logger.info("Writing output to dataframes")
         out: dict[str, pd.DataFrame] = nested_dict_to_dataframes(self.asdict())
 
         if success:
             # Loop through the dictionary and filter the dataframes
             for key, df in out.items():
-                out[key] = df[self.success]
+                out[key] = df[self._solver_status]
 
         logger.debug("to_dataframes = %s", out)
 
@@ -846,6 +839,7 @@ class Output:
         Args:
             file_prefix: Prefix of the output file. Defaults to new_atmodeller_out.
         """
+        logger.info("Writing output to excel")
         out: dict[str, pd.DataFrame] = self.to_dataframes()
         output_file: Path = Path(f"{file_prefix}.xlsx")
 
@@ -861,6 +855,7 @@ class Output:
         Args:
             file_prefix: Prefix of the output file. Defaults to new_atmodeller_out.
         """
+        logger.info("Writing output to pickle")
         output_file: Path = Path(f"{file_prefix}.pkl")
         dataframes: dict[str, pd.DataFrame] = self.to_dataframes()
 
