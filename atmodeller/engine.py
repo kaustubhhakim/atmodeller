@@ -82,13 +82,55 @@ def solve(
         options=options,
     )
 
-    solver_status: Array = sol.result == optx.RESULTS.successful
-
-    # TODO: Since this function is jitted let's also filter the multistart results
-
     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
 
+    solver_status: Array = sol.result == optx.RESULTS.successful
+
     return sol.value, solver_status
+
+
+@jit
+def select_valid_solutions(sol: Array, solver_status: Array) -> Array:
+    """Selects a single valid solution for each simulation from sol, using solver_status.
+
+    Args:
+        sol: Solution array of shape (multistarts, simulations, solution) or
+            (multistarts, solution)
+        solver_status: Status array of shape (multistarts, simulations) or (multistarts,)
+
+    Returns:
+        Reduced array of shape (simulations, solution)
+    """
+    # jax.debug.print("sol = {out}", out=sol)
+    # jax.debug.print("solver_status = {out}", out=solver_status)
+    # Check if input is 3D (multistarts, simulations, solution) or 2D (multistarts, solution)
+    is_3d: int = sol.ndim == 3
+
+    if is_3d:
+        _, simulations, _ = sol.shape  # Get shape
+    else:
+        _, _ = sol.shape
+        simulations: int = 1  # Treat as single simulation for uniform indexing
+
+        # Expand dims for uniform processing
+        sol = sol[:, None, :]  # (multistarts, 1, solution)
+        solver_status = solver_status[:, None]  # (multistarts, 1)
+
+    # Find the first valid index per simulation using jnp.argmax
+    first_valid_index: Array = jnp.argmax(solver_status, axis=0)  # (simulations,)
+    # jax.debug.print("first_valid_index = {out}", out=first_valid_index)
+
+    # Gather the selected solutions (simulations, solution_dim)
+    selected_solutions: Array = sol[first_valid_index, jnp.arange(simulations)]
+    # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
+
+    # Keep the same dimensions for all output
+    # if not is_3d:
+    #    selected_solutions = selected_solutions.squeeze(0)  # Remove extra dimension for 2D case
+
+    # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
+
+    return selected_solutions
 
 
 @jit

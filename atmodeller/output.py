@@ -30,7 +30,6 @@ from typing import Any, Callable
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 from jax import Array
 from jax.tree_util import tree_map
@@ -84,21 +83,15 @@ class Output:
         solution_args: SolutionArguments,
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
-        solver_status: Array,
     ):
         logger.debug("Creating Output")
-        # Convert to 2-D to allow the same (sometimes vmapped) functions to be used for single and
+        # Input is 2-D to allow the same (sometimes vmapped) functions to be used for single and
         # batch output.
-        # TODO: Might need to force a size?  Or filter before this function?
-
-        self._solution: Array = jnp.atleast_2d(solution)
-        print(self._solution.shape)
-
+        self._solution: Array = solution
         self._solution_args: SolutionArguments = solution_args
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._species: SpeciesCollection = self._solution_args.species
         self._traced_parameters: TracedParameters = traced_parameters
-        self._solver_status: npt.NDArray = np.atleast_1d(solver_status)
 
         # Calculate the index at which to split the array
         split_index: int = self._solution.shape[1] - self._species.number_of_stability()
@@ -217,7 +210,6 @@ class Output:
                 temperature, pressure
             )
         out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
-        out["solver_converged"] = self._solver_status  # type: ignore since is an array
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
@@ -824,11 +816,6 @@ class Output:
         """
         logger.info("Writing output to dataframes")
         out: dict[str, pd.DataFrame] = nested_dict_to_dataframes(self.asdict())
-
-        if success:
-            # Loop through the dictionary and filter the dataframes
-            for key, df in out.items():
-                out[key] = df[self._solver_status]
 
         logger.debug("to_dataframes = %s", out)
 

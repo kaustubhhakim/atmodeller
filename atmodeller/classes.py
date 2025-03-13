@@ -42,7 +42,7 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import solve
+from atmodeller.engine import select_valid_solutions, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.utilities import partial_rref
@@ -143,18 +143,13 @@ class InteriorAtmosphere:
         solution.block_until_ready()
         solver_status.block_until_ready()
 
-        # Batch over temperature with multistart is (10,4,3)
-        # Multistart with single is (2,3)
-
-        print(solution)
-        print(solver_status)
+        valid_solutions: Array = select_valid_solutions(solution, solver_status)
 
         self._output: Output = Output(
-            solution,
+            valid_solutions,
             solution_args,
             fixed_parameters,
             traced_parameters,
-            solver_status,
         )
 
         logger.info("Solve complete")
@@ -206,12 +201,13 @@ class InteriorAtmosphere:
         solution.block_until_ready()
         solver_status.block_until_ready()
 
+        valid_solutions: Array = select_valid_solutions(solution, solver_status)
+
         self._output: Output = Output(
-            solution,
+            valid_solutions,
             solution_args,
             fixed_parameters,
             traced_parameters,
-            solver_status,
         )
 
         logger.info("Fast solve complete")

@@ -982,7 +982,7 @@ class SolverParameters(NamedTuple):
 
     solver: OptxSolver
     """Solver"""
-    throw: bool = True
+    throw: bool = False
     """How to report any failures"""
     max_steps: int = 256
     """Maximum number of steps the solver can take"""
@@ -1002,7 +1002,7 @@ class SolverParameters(NamedTuple):
         solver_class: Type[OptxSolver] = optx.Newton,
         rtol: float = 1.0e-8,
         atol: float = 1.0e-8,
-        throw: bool = True,
+        throw: bool = False,
         max_steps: int = 256,
         norm: Callable = optx.rms_norm,
         multistart: int = 10,
@@ -1017,7 +1017,7 @@ class SolverParameters(NamedTuple):
             throw. How to report any failures. Defaults to True.
             max_steps: The maximum number of steps the solver can take. Defaults to 256.
             norm: The norm. Defaults to optimistix RMS norm.
-            multi_start: Number of multistarts. Defaults to 1.
+            multistart: Number of multistarts. Defaults to 1.
 
         Returns:
             An instance
