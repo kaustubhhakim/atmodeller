@@ -984,7 +984,7 @@ class SolverParameters(NamedTuple):
     """Solver"""
     throw: bool = False
     """How to report any failures"""
-    max_steps: int = 256
+    max_steps: int = 1024
     """Maximum number of steps the solver can take"""
     lower: tuple[float, ...] = ()
     """Lower bound on the hypercube which contains the root"""
@@ -992,7 +992,7 @@ class SolverParameters(NamedTuple):
     """Upper bound on the hypercube which contains the root"""
     jac: str = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
-    multistart: int = 10
+    multistart: int = 20
     """Number of multistarts"""
 
     @classmethod
@@ -1000,20 +1000,20 @@ class SolverParameters(NamedTuple):
         cls,
         species: SpeciesCollection,
         solver_class: Type[OptxSolver] = optx.Newton,
-        rtol: float = 1.0e-8,
-        atol: float = 1.0e-8,
+        rtol: float = 1.0e-3,
+        atol: float = 1.0e-3,
         throw: bool = False,
-        max_steps: int = 256,
+        max_steps: int = 1024,
         norm: Callable = optx.rms_norm,
-        multistart: int = 10,
+        multistart: int = 20,
     ) -> Self:
         """Creates an instance
 
         Args:
             species: A tuple of species
             solver_class: Solver class. Defaults to optimistix Newton.
-            rtol: Relative tolerance. Defaults to 1.0e-8.
-            atol: Absolute tolerance. Defaults to 1.0e-8.
+            rtol: Relative tolerance. Defaults to 1.0e-3.
+            atol: Absolute tolerance. Defaults to 1.0e-3.
             throw. How to report any failures. Defaults to True.
             max_steps: The maximum number of steps the solver can take. Defaults to 256.
             norm: The norm. Defaults to optimistix RMS norm.
