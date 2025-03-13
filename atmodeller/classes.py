@@ -28,6 +28,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import TAU
@@ -88,6 +89,7 @@ class InteriorAtmosphere:
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
         solver_parameters: SolverParameters | None = None,
+        multistart: int = 1,
     ) -> None:
         """Solves the system and initialises an Output instance for processing the result
 
@@ -98,6 +100,7 @@ class InteriorAtmosphere:
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
+            multistep: Multistep. Defualts to 1.
         """
         solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
             self.species,
@@ -107,31 +110,35 @@ class InteriorAtmosphere:
             fugacity_constraints,
             mass_constraints,
             solver_parameters,
+            multistart,
         )
 
         if solution_args.is_batch:
+            initial_solution_axes = solution_args.get_initial_solution_vmap()
+            traced_parameters_axes = solution_args.get_traced_parameters_vmap()
+
             self._solver: Callable = eqx.filter_jit(
                 jax.vmap(
-                    solve,
-                    in_axes=(
-                        solution_args.get_initial_solution_vmap(),
-                        solution_args.get_traced_parameters_vmap(),
-                        None,
-                        None,
+                    jax.vmap(
+                        solve,
+                        # FIXME: what about initial_solution_axes?
+                        in_axes=(None, traced_parameters_axes, None, None),
                     ),
+                    in_axes=(0, None, None, None),  # Outer vmap over multistart
                 )
             )
         else:
-            self._solver = solve
+            self._solver = eqx.filter_jit(jax.vmap(solve, in_axes=(0, None, None, None)))
 
         fixed_parameters: FixedParameters = self.get_fixed_parameters(
             solution_args.fugacity_constraints, solution_args.mass_constraints
         )
         initial_solution: Solution = solution_args.get_initial_solution()
+        initial_solution_array: Array = initial_solution.data
         traced_parameters: TracedParameters = solution_args.get_traced_parameters()
 
         solution, solver_status = self._solver(
-            initial_solution,
+            initial_solution_array,
             traced_parameters,
             fixed_parameters,
             solution_args.solver_parameters,

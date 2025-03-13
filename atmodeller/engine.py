@@ -34,7 +34,6 @@ from atmodeller.containers import (
     FugacityConstraints,
     MassConstraints,
     Planet,
-    Solution,
     SolverParameters,
     SpeciesCollection,
     TracedParameters,
@@ -48,7 +47,7 @@ from atmodeller.utilities import (
 
 @eqx.filter_jit
 def solve(
-    solution: Solution,
+    solution_array: Array,
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
@@ -56,7 +55,7 @@ def solve(
     """Solves the system of non-linear equations
 
     Args:
-        solution: Solution
+        solution_array: Solution array
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
         solver_parameters: Solver parameters
@@ -73,7 +72,7 @@ def solve(
     sol: optx.Solution = optx.root_find(
         objective_function,
         solver_parameters.solver,
-        solution.data,
+        solution_array,
         args={
             "traced_parameters": traced_parameters,
             "fixed_parameters": fixed_parameters,

@@ -71,6 +71,8 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+np.random.seed(0)
+
 
 @dataclass
 class SolutionArguments:
@@ -104,6 +106,7 @@ class SolutionArguments:
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
         solver_parameters: SolverParameters | None = None,
+        multistart: int = 1,
     ) -> Self:
         """Creates an instance with defaults applied if arguments are not specified.
 
@@ -115,6 +118,7 @@ class SolutionArguments:
             fugacity_constraints: Fugacity constraints. Defaults to None.
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
+            multistart: Multistart. Defaults to 1.
 
         Returns:
             An instance
@@ -125,18 +129,47 @@ class SolutionArguments:
             planet_ = planet
 
         if initial_log_number_density is None:
-            initial_log_number_density_: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * jnp.ones(
+            base_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
                 len(species), dtype=jnp.float_
             )
         else:
-            initial_log_number_density_ = initial_log_number_density
+            base_log_number_density = initial_log_number_density
 
         if initial_log_stability is None:
-            initial_log_stability_: ArrayLike = INITIAL_LOG_STABILITY * jnp.ones(
+            base_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
                 species.number_of_stability(), dtype=jnp.float_
             )
         else:
-            initial_log_stability_ = initial_log_stability
+            base_log_stability = initial_log_stability
+
+        # base_log_number_density and base_log_stability could be 1-D arrays if the default values
+        # are taken or a 1-D array specified by the user, otherwise they could be 2-D arrays if the
+        # user has provided a batch of initial solutions. We append another dimension to the axes
+        # to account for the multistart dimension. Hence the shape becomes (1, ?)
+        base_log_number_density = np.expand_dims(base_log_number_density, axis=0)
+        base_log_stability = np.expand_dims(base_log_stability, axis=0)
+
+        # The point of multistart is to run the solver multiple times with different initial
+        # conditions.
+        base_log_number_density = np.repeat(base_log_number_density, multistart, axis=0)
+        base_log_stability = np.repeat(base_log_stability, multistart, axis=0)
+
+        # Apply perturbation only if first axis is greater than 1
+        if multistart > 1:
+            # TODO: random_perturbation should be a property of the solver_parameters. A value of
+            # 30 allows condensates to turn on and off and provides a good range for the gas
+            # species.
+            log_number_perturbation: ArrayLike = 30 * (
+                2 * np.random.uniform(size=base_log_number_density.shape) - 1
+            )
+            log_stability_pertubation: ArrayLike = 30 * (
+                2 * np.random.uniform(size=base_log_stability.shape) - 1
+            )
+            log_number_density: ArrayLike = base_log_number_density + log_number_perturbation
+            log_stability: ArrayLike = base_log_stability + log_stability_pertubation
+        else:
+            log_number_density = base_log_number_density
+            log_stability = base_log_stability
 
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             fugacity_constraints
@@ -151,8 +184,8 @@ class SolutionArguments:
         return cls(
             species,
             planet_,
-            initial_log_number_density_,
-            initial_log_stability_,
+            log_number_density,
+            log_stability,
             fugacity_constraints_,
             mass_constraints_,
             solver_parameters_,
@@ -963,7 +996,7 @@ class Solution(NamedTuple):
     @property
     def data(self) -> Array:
         """Combined data in a single array"""
-        return jnp.concatenate((self.log_number_density, self.stability))
+        return jnp.concatenate((self.log_number_density, self.stability), axis=-1)
 
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
@@ -971,13 +1004,13 @@ class Solution(NamedTuple):
         Returns:
             vmap axes
         """
-        if jnp.ndim(self.log_number_density) == 2:
-            log_number_density_axis: int | None = 0
+        if jnp.ndim(self.log_number_density) == 3:
+            log_number_density_axis: int | None = 1
         else:
             log_number_density_axis = None
 
-        if jnp.ndim(self.stability) == 2:
-            stability_axis: int | None = 0
+        if jnp.ndim(self.stability) == 3:
+            stability_axis: int | None = 1
         else:
             stability_axis = None
 

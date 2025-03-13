@@ -92,6 +92,7 @@ class Output:
         # Convert to 2-D to allow the same (sometimes vmapped) functions to be used for single and
         # batch output.
         self._solution: Array = jnp.atleast_2d(solution)
+        print(self._solution)
         self._solution_args: SolutionArguments = solution_args
         self._initial_solution: Solution = initial_solution
         self._fixed_parameters: FixedParameters = fixed_parameters
