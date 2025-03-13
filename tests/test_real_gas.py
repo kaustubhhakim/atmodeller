@@ -73,12 +73,12 @@ def test_fO2_holley(helper) -> None:
         "H": h_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -109,8 +109,8 @@ def test_chabrier_earth(helper) -> None:
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    interior_atmosphere.initialise_solve(planet=planet, mass_constraints=mass_constraints)
-    output: Output = interior_atmosphere.solve()
+    interior_atmosphere.solve(planet=planet, mass_constraints=mass_constraints)
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -178,11 +178,11 @@ def test_chabrier_subNeptune(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -243,8 +243,8 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    interior_atmosphere.initialise_solve(planet=planet, mass_constraints=mass_constraints)
-    output: Output = interior_atmosphere.solve()
+    interior_atmosphere.solve(planet=planet, mass_constraints=mass_constraints)
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     # Some pertinent output here for testing, no need to specify all the species
@@ -281,11 +281,11 @@ def test_pH2_fO2_real_gas(helper) -> None:
         "H2_g": ConstantFugacityConstraint(1493.1),
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -334,12 +334,12 @@ def test_H_and_C_real_gas(helper) -> None:
     c_kg: ArrayLike = h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {

@@ -63,11 +63,11 @@ def test_H2O(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -96,12 +96,12 @@ def test_H_fO2(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -131,11 +131,11 @@ def test_H_fO2_fH2(helper) -> None:
         "H2_g": ConstantFugacityConstraint(jnp.array([1.0e-8, 1.0e-7, 1.0e-6])),
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
@@ -171,12 +171,12 @@ def test_H_fO2_batch_temperature(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
@@ -233,12 +233,12 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
@@ -291,12 +291,12 @@ def test_H_fO2_batch_H_mass(helper) -> None:
     # Set up a range of H masses
     mass_constraints: dict[str, ArrayLike] = {"H": np.array([h_kg, 10 * h_kg, 100 * h_kg])}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
@@ -333,12 +333,12 @@ def test_H_and_C(helper) -> None:
     c_kg: ArrayLike = ch_ratio * h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {

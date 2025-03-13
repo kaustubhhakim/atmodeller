@@ -56,11 +56,11 @@ def test_H_O(helper) -> None:
         "O": o_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     fastchem_result: dict[str, float] = {
@@ -95,12 +95,12 @@ def test_CHO_reduced(helper) -> None:
         "C": c_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -137,12 +137,12 @@ def test_CHO_IW(helper) -> None:
         "C": c_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -190,12 +190,12 @@ def test_CHO_oxidised(helper) -> None:
         "C": c_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -232,12 +232,12 @@ def test_CHO_highly_oxidised(helper) -> None:
     # o_kg: ArrayLike = 3.25196e21
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -271,12 +271,12 @@ def test_CHO_middle_temperature(helper) -> None:
         "H": h_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -318,12 +318,12 @@ def test_CHO_low_temperature(helper) -> None:
     initial_log_number_density[2] = 30
     initial_log_number_density[5] = -INITIAL_LOG_NUMBER_DENSITY
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         initial_log_number_density=initial_log_number_density,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -357,11 +357,11 @@ def test_graphite_condensed(helper) -> None:
         "O": o_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -400,12 +400,12 @@ def test_graphite_unstable(helper) -> None:
         "H": h_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -445,13 +445,13 @@ def test_water_condensed(helper) -> None:
     initial_log_number_density[2] = -INITIAL_LOG_NUMBER_DENSITY
     initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(1)
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         initial_log_number_density=initial_log_number_density,
         initial_log_stability=initial_log_stability,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
@@ -483,11 +483,11 @@ def test_graphite_water_condensed(helper) -> None:
         "O": o_kg,
     }
 
-    interior_atmosphere.initialise_solve(
+    interior_atmosphere.solve(
         planet=planet,
         mass_constraints=mass_constraints,
     )
-    output: Output = interior_atmosphere.solve()
+    output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     factsage_result: dict[str, float] = {
