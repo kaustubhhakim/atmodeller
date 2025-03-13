@@ -179,8 +179,9 @@ def compute_mass_residual(
         """Relative error"""
         element_density_total: Array = element_density + element_melt_density
         target_density: Array = jnp.exp(mass_constraints.log_number_density(log_volume))
-        # FIXME: implement logarithm for better stability?
         return (element_density_total - target_density) / target_density
+        # TODO: Testing logarithm for better stability
+        # return jnp.log(element_density_total - target_density) - jnp.log(target_density)
 
     # Use lax.cond to switch based on mass_logarithmic_error
     mass_residual: Array = lax.cond(
