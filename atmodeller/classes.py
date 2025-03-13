@@ -60,6 +60,9 @@ class InteriorAtmosphere:
             use relative error. Defaults to True.
     """
 
+    # Save the jit compiled solver for repeat calculations
+    _solver: Callable
+
     def __init__(
         self, species: SpeciesCollection, tau: float = TAU, mass_logarithmic_error: bool = True
     ):
@@ -104,7 +107,7 @@ class InteriorAtmosphere:
         )
 
         if solution_args.is_batch:
-            solver: Callable = eqx.filter_jit(
+            self._solver: Callable = eqx.filter_jit(
                 jax.vmap(
                     solve,
                     in_axes=(
@@ -116,7 +119,7 @@ class InteriorAtmosphere:
                 )
             )
         else:
-            solver = solve
+            self._solver = solve
 
         fixed_parameters: FixedParameters = self.get_fixed_parameters(
             solution_args.fugacity_constraints, solution_args.mass_constraints
@@ -124,7 +127,7 @@ class InteriorAtmosphere:
         initial_solution: Solution = solution_args.get_initial_solution()
         traced_parameters: TracedParameters = solution_args.get_traced_parameters()
 
-        solution, solver_status = solver(
+        solution, solver_status = self._solver(
             initial_solution,
             traced_parameters,
             fixed_parameters,
@@ -145,6 +148,64 @@ class InteriorAtmosphere:
         )
 
         logger.info("Solve complete")
+
+    def solve_fast(
+        self,
+        *,
+        planet: Planet | None = None,
+        initial_log_number_density: ArrayLike | None = None,
+        initial_log_stability: ArrayLike | None = None,
+        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+    ) -> None:
+        """Solves the system and initialises an Output instance for processing the result
+
+        The idea is that this method is faster than the solve method because it does not recompile
+        the solver function each time it is called. In reality though this might not save much time
+        and benchmarking and comparison with the solve method is required.
+
+        Args:
+            planet: Planet. Defaults to None.
+            initial_log_number_density: Initial log number density. Defaults to None.
+            initial_log_stability: Initial log stability. Defaults to None.
+            fugacity_constraints: Fugacity constraints. Defaults to None.
+            mass_constraints: Mass constraints. Defaults to None.
+        """
+        solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
+            self.species,
+            planet,
+            initial_log_number_density,
+            initial_log_stability,
+            fugacity_constraints,
+            mass_constraints,
+        )
+        fixed_parameters: FixedParameters = self.get_fixed_parameters(
+            solution_args.fugacity_constraints, solution_args.mass_constraints
+        )
+        initial_solution: Solution = solution_args.get_initial_solution()
+        traced_parameters: TracedParameters = solution_args.get_traced_parameters()
+
+        solution, solver_status = self._solver(
+            initial_solution,
+            traced_parameters,
+            fixed_parameters,
+            solution_args.solver_parameters,
+        )
+
+        # Ensure computation is complete before proceeding
+        solution.block_until_ready()
+        solver_status.block_until_ready()
+
+        self._output: Output = Output(
+            solution,
+            solution_args,
+            initial_solution,
+            fixed_parameters,
+            traced_parameters,
+            solver_status,
+        )
+
+        logger.info("Fast solve complete")
 
     def get_condensed_species_indices(self) -> tuple[int, ...]:
         """Gets the indices of condensed species
