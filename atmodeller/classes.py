@@ -53,6 +53,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 class InteriorAtmosphere:
     """Interior atmosphere
 
+    This is the main class that the user interacts with to build interior-atmosphere systems,
+    solve them, and retreive the results.
+
     Args:
         species: Collection of species
         tau: Tau factor for species stability. Defaults to TAU.
