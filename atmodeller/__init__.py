@@ -54,7 +54,7 @@ Empirically determined. Preliminary testing seems to reveal that starting from a
 value improves the performance of the solver. This asserts that all species are stable.
 """
 
-# Maximum x for which exp(x) is finite in 64-bit precision
+# Maximum x for which exp(x) is finite in 64-bit precision (to prevent overflow)
 max_exp_input = np.log(np.finfo(np.float64).max)
 # Minimum x for which exp(x) is non-zero in 64-bit precision
 min_exp_input = np.log(jnp.finfo(np.float64).tiny)

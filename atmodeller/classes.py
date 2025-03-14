@@ -60,14 +60,15 @@ class InteriorAtmosphere:
         species: Collection of species
         tau: Tau factor for species stability. Defaults to TAU.
         mass_logarithmic_error: Use logarithmic error for elemental number density and otherwise
-            use relative error. Defaults to True.
+            use relative error. Defaults to False. This option was mostly for testing purposes
+            and will be removed in the future.
     """
 
     # Save the jit compiled solver for repeat calculations
     _solver: Callable
 
     def __init__(
-        self, species: SpeciesCollection, tau: float = TAU, mass_logarithmic_error: bool = True
+        self, species: SpeciesCollection, tau: float = TAU, mass_logarithmic_error: bool = False
     ):
         self.species: SpeciesCollection = species
         self.tau: float = tau

@@ -171,17 +171,22 @@ def compute_mass_residual(
     """
 
     def log_error_case(_) -> Array:
-        """Log error"""
+        """Log error
+
+        Used for testing but can be removed in the future.
+        """
         log_element_density: Array = jnp.log(element_density + element_melt_density)
         return log_element_density - mass_constraints.log_number_density(log_volume)
 
     def relative_error_case(_) -> Array:
-        """Relative error"""
+        """Relative error
+
+        Computed in log-space for numerical stability.
+        """
         element_density_total: Array = element_density + element_melt_density
-        target_density: Array = jnp.exp(mass_constraints.log_number_density(log_volume))
-        return (element_density_total - target_density) / target_density
-        # TODO: Testing logarithm for better stability
-        # return jnp.log(element_density_total - target_density) - jnp.log(target_density)
+        log_element_density_total: Array = jnp.log(element_density_total)
+        log_target_density: Array = mass_constraints.log_number_density(log_volume)
+        return safe_exp(log_element_density_total - log_target_density) - 1
 
     # Use lax.cond to switch based on mass_logarithmic_error
     mass_residual: Array = lax.cond(
