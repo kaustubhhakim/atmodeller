@@ -51,7 +51,7 @@ def solve(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
-) -> tuple[Array, Array]:
+) -> tuple[Array, Array, Array]:
     """Solves the system of non-linear equations
 
     Args:
@@ -83,14 +83,16 @@ def solve(
     )
 
     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-
+    solver_steps: Array = sol.stats["num_steps"]
     solver_status: Array = sol.result == optx.RESULTS.successful
 
-    return sol.value, solver_status
+    return sol.value, solver_status, solver_steps
 
 
 @jit
-def select_valid_solutions(sol: Array, solver_status: Array) -> tuple[Array, Array]:
+def select_valid_solutions(
+    sol: Array, solver_status: Array, solver_steps: Array
+) -> tuple[Array, Array, Array]:
     """Selects a single valid solution for each simulation from sol, using solver_status.
 
     Args:
@@ -101,9 +103,11 @@ def select_valid_solutions(sol: Array, solver_status: Array) -> tuple[Array, Arr
     Returns:
         Reduced array of shape (simulations, solution)
         First valid index for each simulation
+        Number of steps for each simulation
     """
     # jax.debug.print("sol = {out}", out=sol)
     # jax.debug.print("solver_status = {out}", out=solver_status)
+    # jax.debug.print("solver_steps = {out}", out=solver_steps)
     # Check if input is 3D (multistarts, simulations, solution) or 2D (multistarts, solution)
     is_3d: int = sol.ndim == 3
 
@@ -123,7 +127,9 @@ def select_valid_solutions(sol: Array, solver_status: Array) -> tuple[Array, Arr
 
     # Gather the selected solutions (simulations, solution_dim)
     selected_solutions: Array = sol[first_valid_index, jnp.arange(simulations)]
+    selected_steps: Array = solver_steps[first_valid_index, jnp.arange(simulations)]
     # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
+    # jax.debug.print("selected_steps = {out}", out=selected_steps)
 
     # Keep the same dimensions for all output, so below line is commented out
     # if not is_3d:
@@ -131,7 +137,7 @@ def select_valid_solutions(sol: Array, solver_status: Array) -> tuple[Array, Arr
 
     # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
 
-    return selected_solutions, first_valid_index
+    return selected_solutions, first_valid_index, selected_steps
 
 
 @jit

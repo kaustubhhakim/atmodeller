@@ -72,11 +72,10 @@ class Output:
     Args:
         solution: Array output from solve
         first_valid_index: First valid index
+        solver_steps: Number of solver steps
         interior_atmosphere: Interior atmosphere
         initial_solution: Initial solution
         traced_parameters: Traced parameters
-
-        # FIXME: Add multistart success ID
         solver_result: An integer array representing whether the solve was successful or no
     """
 
@@ -84,6 +83,7 @@ class Output:
         self,
         solution: Array,
         first_valid_index: Array,
+        solver_steps: Array,
         solution_args: SolutionArguments,
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
@@ -93,6 +93,7 @@ class Output:
         # batch output.
         self._solution: Array = solution
         self._first_valid_index: Array = first_valid_index
+        self._solver_steps: Array = solver_steps
         self._solution_args: SolutionArguments = solution_args
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._species: SpeciesCollection = self._solution_args.species
@@ -240,7 +241,7 @@ class Output:
             logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
-        out["solver"] = {"multisolve_id": self._first_valid_index}
+        out["solver"] = {"multisolve_id": self._first_valid_index, "steps": self._solver_steps}
 
         # Convert all arrays in the dictionary to numpy arrays. Using the same functions that the
         # engine uses makes sense to avoid duplication and ensure consistency, but for the output
