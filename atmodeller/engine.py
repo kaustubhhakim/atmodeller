@@ -100,6 +100,7 @@ def select_valid_solutions(sol: Array, solver_status: Array) -> tuple[Array, Arr
 
     Returns:
         Reduced array of shape (simulations, solution)
+        First valid index for each simulation
     """
     # jax.debug.print("sol = {out}", out=sol)
     # jax.debug.print("solver_status = {out}", out=solver_status)
