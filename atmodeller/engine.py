@@ -120,6 +120,7 @@ def select_valid_solutions(
         # Expand dims for uniform processing
         sol = sol[:, None, :]  # (multistarts, 1, solution)
         solver_status = solver_status[:, None]  # (multistarts, 1)
+        solver_steps = solver_steps[:, None]  # (multistarts, 1)
 
     # Find the first valid index per simulation using jnp.argmax
     first_valid_index: Array = jnp.argmax(solver_status, axis=0)  # (simulations,)
