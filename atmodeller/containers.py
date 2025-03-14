@@ -149,16 +149,23 @@ class SolutionArguments:
         else:
             base_log_stability = initial_log_stability
 
+        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
+        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
+
         # base_log_number_density and base_log_stability could be 1-D arrays if the default values
         # are taken or a 1-D array specified by the user, otherwise they could be 2-D arrays if the
         # user has provided a batch of initial solutions. We append another dimension to the axes
         # to account for the multistart dimension. Hence the shape becomes (1, ?)
         base_log_number_density = np.expand_dims(base_log_number_density, axis=0)
         base_log_stability = np.expand_dims(base_log_stability, axis=0)
+        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
+        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
 
         # Multistart runs each simulation multiple times with different initial conditions.
         base_log_number_density = np.repeat(base_log_number_density, multistart, axis=0)
         base_log_stability = np.repeat(base_log_stability, multistart, axis=0)
+        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
+        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
 
         if multistart > 1:
             multistart_perturbation: float = solver_parameters_.multistart_perturbation
@@ -178,6 +185,9 @@ class SolutionArguments:
         else:
             log_number_density = base_log_number_density
             log_stability = base_log_stability
+
+        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
+        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
 
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             fugacity_constraints
@@ -222,7 +232,7 @@ class SolutionArguments:
             Vmapping for the initial solution estimate
         """
         if np.ndim(self.solution) == 3:
-            return 1
+            return 0
         else:
             return None
 
