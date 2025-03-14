@@ -20,6 +20,8 @@ The leaves of pytrees must be JAX-compliant types, which excludes strings. So th
 approach is to encode the data as JAX-compatible types and provide properties and methods that can
 reconstruct other desired quantities, notably strings and other objects. This ensures that similar
 functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
+
+This could be improved using equinox dataclasses instead.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ import optimistix as optx
 from jax import Array, jit, lax, tree_flatten
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
+from lineax import QR, AbstractLinearSolver
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
@@ -71,6 +74,7 @@ else:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+# Required for multistart and helpful for reproducibility and debugging
 np.random.seed(0)
 
 
@@ -81,8 +85,7 @@ class SolutionArguments:
     Args:
         species: Collection of species
         planet: Planet
-        initial_log_number_density: Initial log number density
-        initial_log_stability: Initial log stability
+        solution: Solution array
         fugacity_constraints: Fugacity constraints
         mass_constraints: Mass constraints
         solver_parameters: Solver parameters
@@ -153,24 +156,25 @@ class SolutionArguments:
         base_log_number_density = np.expand_dims(base_log_number_density, axis=0)
         base_log_stability = np.expand_dims(base_log_stability, axis=0)
 
-        # The point of multistart is to run the solver multiple times with different initial
-        # conditions.
+        # Multistart runs each simulation multiple times with different initial conditions.
         base_log_number_density = np.repeat(base_log_number_density, multistart, axis=0)
         base_log_stability = np.repeat(base_log_stability, multistart, axis=0)
 
-        # Apply perturbation only if first axis is greater than 1
         if multistart > 1:
-            # TODO: random_perturbation should be a property of the solver_parameters. A value of
-            # 30 allows condensates to turn on and off and provides a good range for the gas
-            # species.
-            log_number_perturbation: ArrayLike = 30 * (
+            multistart_perturbation: float = solver_parameters_.multistart_perturbation
+            log_number_perturbation: ArrayLike = multistart_perturbation * (
                 2 * np.random.uniform(size=base_log_number_density.shape) - 1
             )
-            log_stability_pertubation: ArrayLike = 30 * (
+            log_stability_perturbation: ArrayLike = multistart_perturbation * (
                 2 * np.random.uniform(size=base_log_stability.shape) - 1
             )
+
+            # Ensure first multistart retains base values
+            log_number_perturbation[0] = 0
+            log_stability_perturbation[0] = 0
+
             log_number_density: ArrayLike = base_log_number_density + log_number_perturbation
-            log_stability: ArrayLike = base_log_stability + log_stability_pertubation
+            log_stability: ArrayLike = base_log_stability + log_stability_perturbation
         else:
             log_number_density = base_log_number_density
             log_stability = base_log_stability
@@ -198,7 +202,11 @@ class SolutionArguments:
 
     @property
     def is_batch(self) -> bool:
-        """Returns if any parameters are batched, thereby necessitating a vmap solve"""
+        """Returns if any parameters are batched, thereby necessitating a vmap solve
+
+        This deals with potential vectorisation over planet properties, fugacity constraints, and
+        mass constraints.
+        """
         leaves1, _ = tree_flatten(self.get_traced_parameters_vmap())
         leaves2, _ = tree_flatten(self.get_initial_solution_vmap())
         leaves: list = leaves1 + leaves2
@@ -283,6 +291,8 @@ class SolutionArguments:
 class SpeciesCollection(tuple):
     """A collection of species
 
+    TODO: Tidy up this class. Bit clunky subclassing a tuple, but it works for now.
+
     Args:
         species: Species
     """
@@ -311,6 +321,11 @@ class SpeciesCollection(tuple):
 
         return cls(species_list)
 
+    @property
+    def number(self: tuple[Species, ...]) -> int:
+        """Number of species"""
+        return len(self)
+
     def get_condensed_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
         """Gets the indices of condensed species
 
@@ -337,7 +352,9 @@ class SpeciesCollection(tuple):
 
         # TODO: Bad practice to return the first index because it could be wrong and therefore give
         # rise to spurious results, but an index must be passed to evaluate the species solubility
-        # that may depend on fO2.
+        # that may depend on fO2. Otherwise, a precheck could be be performed in which all the
+        # solubility laws chosen by the user are checked to see if they depend on fO2. And if so,
+        # and fO2 is not included in the model, an error is raised.
         return 0
 
     def get_gas_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
@@ -436,6 +453,9 @@ class SpeciesCollection(tuple):
 
 class TracedParameters(NamedTuple):
     """Traced parameters
+
+    As the name says, these are parameters that should be traced, inasmuch as they may be
+    updated by the suer a
 
     Args:
         planet: Planet
@@ -561,6 +581,8 @@ class Planet(NamedTuple):
 
 class NormalisedMass(NamedTuple):
     """Normalised mass for conventional outgassing
+
+    This is not currently used, but it is a placeholder for future development.
 
     Default values are for a unit mass (1 kg) system.
 
@@ -972,12 +994,14 @@ class SolverParameters(NamedTuple):
 
     Args:
         solver: Solver
-        throw: How to report any failures. Defaults to True.
+        throw: How to report any failures. Defaults to False.
         max_steps: The maximum number of steps the solver can take. Defaults to 256
         lower: Lower bound on the hypercube which contains the root. Defaults to empty.
         upper: Upper bound on the hypercube which contains the root. Defaults to empty.
         jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
             Can be either fwd or bwd. Defaults to fwd.
+        multistart: Number of multistarts. Defaults to 1.
+        multistart_perturbation: Perturbation for multistart. Defaults to 30.
     """
 
     solver: OptxSolver
@@ -994,35 +1018,46 @@ class SolverParameters(NamedTuple):
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
     multistart: int = 20
     """Number of multistarts"""
+    multistart_perturbation: float = 30.0
+    """Perturbation for multistart"""
 
     @classmethod
     def create(
         cls,
         species: SpeciesCollection,
         solver_class: Type[OptxSolver] = optx.Newton,
-        rtol: float = 1.0e-3,
-        atol: float = 1.0e-3,
+        linear_solver: Type[AbstractLinearSolver] = QR,
+        rtol: float = 1.0e-6,
+        atol: float = 1.0e-6,
         throw: bool = False,
-        max_steps: int = 1024,
+        max_steps: int = 256,
         norm: Callable = optx.rms_norm,
         multistart: int = 20,
+        multistart_perturbation: float = 30.0,
     ) -> Self:
         """Creates an instance
 
         Args:
-            species: A tuple of species
+            species: A collection of species
             solver_class: Solver class. Defaults to optimistix Newton.
+            linear_solver: Linear solver. Defaults to QR.
             rtol: Relative tolerance. Defaults to 1.0e-3.
             atol: Absolute tolerance. Defaults to 1.0e-3.
-            throw. How to report any failures. Defaults to True.
+            throw. How to report any failures. Defaults to False.
             max_steps: The maximum number of steps the solver can take. Defaults to 256.
             norm: The norm. Defaults to optimistix RMS norm.
             multistart: Number of multistarts. Defaults to 1.
+            mutlistart_perturbation: Perturbation for multistart. Defaults to 30.
 
         Returns:
             An instance
         """
-        solver: OptxSolver = solver_class(rtol=rtol, atol=atol, norm=norm)
+        solver: OptxSolver = solver_class(
+            rtol=rtol,
+            atol=atol,
+            norm=norm,
+            linear_solver=linear_solver(),  # type: ignore
+        )
         lower: tuple[float, ...] = cls._get_hypercube_bound(
             species, LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER
         )
@@ -1038,6 +1073,7 @@ class SolverParameters(NamedTuple):
             upper=upper,
             jac="fwd",
             multistart=multistart,
+            multistart_perturbation=multistart_perturbation,
         )
 
     @classmethod
@@ -1050,15 +1086,14 @@ class SolverParameters(NamedTuple):
         """Gets the bound on the hypercube
 
         Args:
-            species: Tuple of species
+            species: Collection of species
             log_number_density_bound: Bound on the log number density
             stability_bound: Bound on the stability
 
         Returns:
             Bound on the hypercube which contains the root
         """
-        num_species: int = len(species)
-        log_number_density: ArrayLike = log_number_density_bound * np.ones(num_species)
+        log_number_density: ArrayLike = log_number_density_bound * np.ones(species.number)
 
         bound: tuple[float, ...] = tuple(
             np.concatenate(
