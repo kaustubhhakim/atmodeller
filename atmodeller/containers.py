@@ -1018,7 +1018,7 @@ class SolverParameters(NamedTuple):
     """Solver"""
     throw: bool = False
     """How to report any failures"""
-    max_steps: int = 1024
+    max_steps: int = 256
     """Maximum number of steps the solver can take"""
     lower: tuple[float, ...] = ()
     """Lower bound on the hypercube which contains the root"""
