@@ -312,14 +312,14 @@ def test_CHO_low_temperature(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = jnp.ones(len(species)) * INITIAL_LOG_NUMBER_DENSITY
+    initial_log_number_density: ArrayLike = np.ones(len(species)) * INITIAL_LOG_NUMBER_DENSITY
     # Correcting for the low CO and O2 helps the solver to latch onto the solution
     initial_log_number_density[2] = 30
     initial_log_number_density[5] = -INITIAL_LOG_NUMBER_DENSITY
 
     interior_atmosphere.solve(
         planet=planet,
-        initial_log_number_density=initial_log_number_density,
+        initial_log_number_density=jnp.array(initial_log_number_density),
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.output
@@ -437,17 +437,17 @@ def test_water_condensed(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * jnp.ones(
+    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
         len(species), dtype=np.float_
     )
     # For this case, reducing the fO2 is required for the solver to latch onto the solution
     initial_log_number_density[2] = -INITIAL_LOG_NUMBER_DENSITY
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * jnp.ones(1)
+    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(1)
 
     interior_atmosphere.solve(
         planet=planet,
-        initial_log_number_density=initial_log_number_density,
-        initial_log_stability=initial_log_stability,
+        initial_log_number_density=jnp.array(initial_log_number_density),
+        initial_log_stability=jnp.array(initial_log_stability),
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.output
