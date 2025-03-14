@@ -26,6 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
 from jax import Array, jit, lax
+from jax.scipy.special import logsumexp
 from jax.typing import ArrayLike
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
@@ -437,7 +438,7 @@ def get_atmosphere_log_molar_mass(
     gas_molar_mass: Array = get_gas_species_data(
         fixed_parameters, jnp.array(fixed_parameters.molar_masses)
     )
-    molar_mass: Array = logsumexp(gas_log_number_density, gas_molar_mass) - logsumexp(
+    molar_mass: Array = logsumexp(gas_log_number_density, b=gas_molar_mass) - logsumexp(
         gas_log_number_density
     )
 
@@ -807,20 +808,3 @@ def get_species_ppmw_in_melt(
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
     return species_ppmw
-
-
-@jit
-def logsumexp(log_values: Array, prefactors: ArrayLike = 1.0) -> Array:
-    """Computes the log-sum-exp in a numerically stable way.
-
-    Args:
-        log_values: Array of log values to sum
-        prefactors: Array of prefactors corresponding to each log value. Defaults to 1.
-
-    Returns:
-        The log of the sum of prefactors multiplied by exponentials of the input values
-    """
-    max_log: Array = jnp.max(log_values)
-    value_sum: Array = jnp.sum(prefactors * safe_exp(log_values - max_log))
-
-    return max_log + jnp.log(value_sum)
