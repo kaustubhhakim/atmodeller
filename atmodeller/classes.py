@@ -60,8 +60,8 @@ class InteriorAtmosphere:
         species: Collection of species
         tau: Tau factor for species stability. Defaults to TAU.
         mass_logarithmic_error: Use logarithmic error for elemental number density and otherwise
-            use relative error. Defaults to False. This option was mostly for testing purposes
-            and will be removed in the future.
+            use relative error. This option was mostly for testing purposes and will be removed in
+            the future. Defaults to False.
     """
 
     # Save the jit compiled solver for repeat calculations
