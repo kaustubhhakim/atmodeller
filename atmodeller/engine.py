@@ -125,7 +125,7 @@ def select_valid_solutions(sol: Array, solver_status: Array) -> tuple[Array, Arr
     selected_solutions: Array = sol[first_valid_index, jnp.arange(simulations)]
     # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
 
-    # Keep the same dimensions for all output
+    # Keep the same dimensions for all output, so below line is commented out
     # if not is_3d:
     #    selected_solutions = selected_solutions.squeeze(0)  # Remove extra dimension for 2D case
 
