@@ -90,10 +90,8 @@ class BeattieBridgeman(RealGas):
         self._c: float = c
 
     @jit
-    def _objective_function(
-        self, compressibility_factor: ArrayLike, kwargs: dict[str, ArrayLike]
-    ) -> Array:
-        r"""Objective function to solve for the compressibility factor :cite:p:`HWZ58{Equation 2}`
+    def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
+        r"""Objective function to solve for the volume :cite:p:`HWZ58{Equation 2}`
 
         .. math::
 
@@ -101,7 +99,7 @@ class BeattieBridgeman(RealGas):
             +\left(RTbB_0+\frac{RcB_0}{T^2}-aA_0\right)V - \frac{RcbB_0}{T^2}=0
 
         Args:
-            compressibility_factor: Compressibility factor
+            volume: Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
             kwargs: Dictionary with other required parameters
 
         Returns:
@@ -109,7 +107,10 @@ class BeattieBridgeman(RealGas):
         """
         temperature: ArrayLike = kwargs["temperature"]
         pressure: ArrayLike = kwargs["pressure"]
-        volume: Array = compressibility_factor * self.ideal_volume(temperature, pressure)
+
+        # jax.debug.print("volume = {out}", out=volume)
+        # jax.debug.print("temperature = {out}", out=temperature)
+        # jax.debug.print("pressure = {out}", out=pressure)
 
         coeff0: Array = (
             1 / jnp.square(temperature) * -GAS_CONSTANT_BAR * self._c * self._b * self._B0
@@ -179,7 +180,7 @@ class BeattieBridgeman(RealGas):
     @override
     @jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Volume
+        r"""Solves the BB equation numerically to compute the volume.
 
         :cite:t:`HWZ58` doesn't say which root to take, but one real root is very small and the
         maximum real root gives a volume that agrees with the tabulated compressibility factor
@@ -192,18 +193,15 @@ class BeattieBridgeman(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        # Based on the tabulated data, most compressibility factors are around unity
-        initial_compressibility_factor: float = 1.0
+        initial_volume: ArrayLike = self.ideal_volume(temperature, pressure)
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
-        solver = optx.Newton(rtol=1.0e-8, atol=1.0e-8)
+        # atol reduced since typical volumes are around 1e-5 to 1e-6
+        solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
         sol = optx.root_find(
-            self._objective_function,
-            solver,
-            initial_compressibility_factor,
-            args=kwargs,
+            self._objective_function, solver, initial_volume, args=kwargs, throw=False
         )
-        volume: ArrayLike = sol.value * self.ideal_volume(temperature, pressure)
+        volume = sol.value
         # jax.debug.print("volume = {out}", out=volume)
 
         return volume
