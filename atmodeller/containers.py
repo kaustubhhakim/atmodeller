@@ -1051,8 +1051,8 @@ class SolverParameters(NamedTuple):
             species: A collection of species
             solver_class: Solver class. Defaults to optimistix Newton.
             linear_solver: Linear solver. Defaults to QR.
-            rtol: Relative tolerance. Defaults to 1.0e-3.
-            atol: Absolute tolerance. Defaults to 1.0e-3.
+            rtol: Relative tolerance. Defaults to 1.0e-6.
+            atol: Absolute tolerance. Defaults to 1.0e-6.
             throw. How to report any failures. Defaults to False.
             max_steps: The maximum number of steps the solver can take. Defaults to 256.
             norm: The norm. Defaults to optimistix RMS norm.
