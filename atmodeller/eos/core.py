@@ -531,6 +531,8 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Solves the RK equation numerically to compute the volume.
 
+        FIXME: This can throw solver errors and break the code. To debug.
+
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
