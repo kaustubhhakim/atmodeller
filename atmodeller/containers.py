@@ -1010,7 +1010,7 @@ class SolverParameters(NamedTuple):
         upper: Upper bound on the hypercube which contains the root. Defaults to empty.
         jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
             Can be either fwd or bwd. Defaults to fwd.
-        multistart: Number of multistarts. Defaults to 1.
+        multistart: Number of multistarts. Defaults to 10.
         multistart_perturbation: Perturbation for multistart. Defaults to 30.
     """
 
@@ -1026,7 +1026,7 @@ class SolverParameters(NamedTuple):
     """Upper bound on the hypercube which contains the root"""
     jac: str = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
-    multistart: int = 20
+    multistart: int = 10
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
@@ -1042,7 +1042,7 @@ class SolverParameters(NamedTuple):
         throw: bool = False,
         max_steps: int = 256,
         norm: Callable = optx.rms_norm,
-        multistart: int = 20,
+        multistart: int = 10,
         multistart_perturbation: float = 30.0,
     ) -> Self:
         """Creates an instance
@@ -1056,7 +1056,7 @@ class SolverParameters(NamedTuple):
             throw. How to report any failures. Defaults to False.
             max_steps: The maximum number of steps the solver can take. Defaults to 256.
             norm: The norm. Defaults to optimistix RMS norm.
-            multistart: Number of multistarts. Defaults to 1.
+            multistart: Number of multistarts. Defaults to 10.
             mutlistart_perturbation: Perturbation for multistart. Defaults to 30.
 
         Returns:

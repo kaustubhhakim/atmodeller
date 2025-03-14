@@ -90,7 +90,7 @@ def solve(
 
 
 @jit
-def select_valid_solutions(sol: Array, solver_status: Array) -> Array:
+def select_valid_solutions(sol: Array, solver_status: Array) -> tuple[Array, Array]:
     """Selects a single valid solution for each simulation from sol, using solver_status.
 
     Args:
@@ -130,7 +130,7 @@ def select_valid_solutions(sol: Array, solver_status: Array) -> Array:
 
     # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
 
-    return selected_solutions
+    return selected_solutions, first_valid_index
 
 
 @jit

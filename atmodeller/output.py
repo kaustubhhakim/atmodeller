@@ -71,6 +71,7 @@ class Output:
 
     Args:
         solution: Array output from solve
+        first_valid_index: First valid index
         interior_atmosphere: Interior atmosphere
         initial_solution: Initial solution
         traced_parameters: Traced parameters
@@ -82,6 +83,7 @@ class Output:
     def __init__(
         self,
         solution: Array,
+        first_valid_index: Array,
         solution_args: SolutionArguments,
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
@@ -90,6 +92,7 @@ class Output:
         # Input is 2-D to allow the same (sometimes vmapped) functions to be used for single and
         # batch output.
         self._solution: Array = solution
+        self._first_valid_index: Array = first_valid_index
         self._solution_args: SolutionArguments = solution_args
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._species: SpeciesCollection = self._solution_args.species
@@ -236,6 +239,8 @@ class Output:
             log10_shift_at_P: Array = log10_fugacity - buffer_at_P
             logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
+
+        out["solver"] = {"multisolve_id": self._first_valid_index}
 
         # Convert all arrays in the dictionary to numpy arrays. Using the same functions that the
         # engine uses makes sense to avoid duplication and ensure consistency, but for the output

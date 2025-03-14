@@ -144,10 +144,11 @@ class InteriorAtmosphere:
         solution.block_until_ready()
         solver_status.block_until_ready()
 
-        valid_solutions: Array = select_valid_solutions(solution, solver_status)
+        valid_solutions, first_valid_index = select_valid_solutions(solution, solver_status)
 
         self._output: Output = Output(
             valid_solutions,
+            first_valid_index,
             solution_args,
             fixed_parameters,
             traced_parameters,
@@ -202,10 +203,11 @@ class InteriorAtmosphere:
         solution.block_until_ready()
         solver_status.block_until_ready()
 
-        valid_solutions: Array = select_valid_solutions(solution, solver_status)
+        valid_solutions, first_valid_index = select_valid_solutions(solution, solver_status)
 
         self._output: Output = Output(
             valid_solutions,
+            first_valid_index,
             solution_args,
             fixed_parameters,
             traced_parameters,
