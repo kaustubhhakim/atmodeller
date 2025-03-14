@@ -74,6 +74,8 @@ class Output:
         interior_atmosphere: Interior atmosphere
         initial_solution: Initial solution
         traced_parameters: Traced parameters
+
+        # FIXME: Add multistart success ID
         solver_result: An integer array representing whether the solve was successful or no
     """
 
@@ -100,6 +102,9 @@ class Output:
         self._log_number_density: Array = log_number_density
         # Number of entries in log_stability could be between 0 and the total number of species
         self._log_stability: Array = log_stability
+        # Caching output to avoid recomputation
+        self._cached_dict: dict[str, dict[str, Array]] | None = None
+        self._cached_dataframes: dict[str, pd.DataFrame] | None = None
 
     @property
     def condensed_species_indices(self) -> Array:
@@ -173,14 +178,18 @@ class Output:
         return jnp.exp(self.log_activity_without_stability())
 
     def asdict(self) -> dict[str, dict[str, Array]]:
-        """All output in a dictionary
+        """All output in a dictionary, with caching.
 
-        Note that this also includes failed cases.
+        TODO: This function is slow and is an obvious candidate for speeding up.
 
         Returns:
             Dictionary of all output
         """
-        logger.info("Writing output to dictionary")
+        if self._cached_dict is not None:
+            logger.info("Returning cached asdict output")
+            return self._cached_dict  # Return cached result
+
+        logger.info("Computing asdict output")
         fugacity_matrix: Array = jnp.array(self._fixed_parameters.fugacity_matrix)
         formula_matrix_constraints: Array = jnp.array(
             self._fixed_parameters.formula_matrix_constraints
@@ -232,7 +241,8 @@ class Output:
         # engine uses makes sense to avoid duplication and ensure consistency, but for the output
         # we can convert all arrays to numpy. Then the output will only consistent of dictionaries
         # and numpy arrays, which might simplify the pickling/unpickling process for end-users who
-        # only care about the results. To this point the arrays are of type
+        # only care about the results and do not necessary want to use JAX types to process
+        # the output. To this point the arrays are of type
         # <class 'jaxlib.xla_extension.ArrayImpl'>.
         def convert_to_numpy(d) -> None:
             for key, value in d.items():
@@ -245,6 +255,8 @@ class Output:
 
         logger.debug("Convert all arrays to numpy")
         convert_to_numpy(out)
+
+        self._cached_dict = out  # Cache result
 
         return out
 
@@ -804,22 +816,22 @@ class Output:
         """
         return jnp.exp(self.log_stability)
 
-    def to_dataframes(self, success: bool = True) -> dict[str, pd.DataFrame]:
+    def to_dataframes(self) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
-
-        Args:
-            success: Only output successful (converged) models. Otherwise all models are output
-                which can be useful for seeing where the solver failed. Defaults to True.
 
         Returns:
             Output in a dictionary of dataframes
         """
-        logger.info("Writing output to dataframes")
-        out: dict[str, pd.DataFrame] = nested_dict_to_dataframes(self.asdict())
+        if self._cached_dataframes is not None:
+            logger.debug("Returning cached to_dataframes output")
+            return self._cached_dataframes  # Return cached result
 
-        logger.debug("to_dataframes = %s", out)
+        logger.info("Computing to_dataframes output")
+        self._cached_dataframes = nested_dict_to_dataframes(self.asdict())
 
-        return out
+        logger.debug("to_dataframes = %s", self._cached_dataframes)
+
+        return self._cached_dataframes
 
     def to_excel(self, file_prefix: Path | str = "new_atmodeller_out") -> None:
         """Writes the output to an Excel file.
