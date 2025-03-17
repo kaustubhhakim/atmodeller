@@ -18,7 +18,6 @@
 
 import logging
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 from jax.typing import ArrayLike
@@ -319,7 +318,7 @@ def test_CHO_low_temperature(helper) -> None:
 
     interior_atmosphere.solve(
         planet=planet,
-        initial_log_number_density=jnp.array(initial_log_number_density),
+        initial_log_number_density=initial_log_number_density,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.output
@@ -446,8 +445,8 @@ def test_water_condensed(helper) -> None:
 
     interior_atmosphere.solve(
         planet=planet,
-        initial_log_number_density=jnp.array(initial_log_number_density),
-        initial_log_stability=jnp.array(initial_log_stability),
+        initial_log_number_density=initial_log_number_density,
+        initial_log_stability=initial_log_stability,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.output
