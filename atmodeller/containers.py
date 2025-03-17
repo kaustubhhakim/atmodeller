@@ -901,7 +901,6 @@ class FixedParameters(NamedTuple):
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
         tau: Tau factor for species stability
-        mass_logarithmic_error: Mass logarithmic error
     """
 
     species: SpeciesCollection
@@ -930,8 +929,6 @@ class FixedParameters(NamedTuple):
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""
-    mass_logarithmic_error: int
-    """Mass logarithmic error"""
 
 
 class Species(NamedTuple):

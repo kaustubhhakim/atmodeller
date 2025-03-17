@@ -156,56 +156,6 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
 
 @jit
-def compute_mass_residual(
-    mass_logarithmic_error: Array,
-    element_density: Array,
-    element_melt_density: Array,
-    mass_constraints: MassConstraints,
-    log_volume: Array,
-) -> Array:
-    """Computes the mass residual
-
-    Some scaling must be applied to the mass residual so that all components of the final residual
-    are of similar magnitude.
-
-    Args:
-        mass_logarithmic_error: Use logarithmic error metric
-        element_density: Element density
-        element_melt_density: Element melt density
-        mass_constraints: Mass constraints
-        log_volume: Log volume of the atmosphere
-
-    Returns:
-        Mass residual
-    """
-
-    def log_error_case(_) -> Array:
-        """Log error
-
-        Used for testing but can be removed in the future.
-        """
-        log_element_density: Array = jnp.log(element_density + element_melt_density)
-        return log_element_density - mass_constraints.log_number_density(log_volume)
-
-    def relative_error_case(_) -> Array:
-        """Relative error
-
-        Computed in log-space for numerical stability.
-        """
-        element_density_total: Array = element_density + element_melt_density
-        log_element_density_total: Array = jnp.log(element_density_total)
-        log_target_density: Array = mass_constraints.log_number_density(log_volume)
-        return safe_exp(log_element_density_total - log_target_density) - 1
-
-    # Use lax.cond to switch based on mass_logarithmic_error
-    mass_residual: Array = lax.cond(
-        mass_logarithmic_error, log_error_case, relative_error_case, None
-    )
-
-    return jnp.asarray(mass_residual)
-
-
-@jit
 def get_min_log_elemental_abundance_per_species(
     formula_matrix: Array, mass_constraints: MassConstraints
 ) -> Array:
@@ -265,9 +215,6 @@ def compute_residual(solution: Array, kwargs: dict) -> Array:
     """
     traced_parameters: TracedParameters = kwargs["traced_parameters"]
     fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
-    mass_logarithmic_error: Array = jnp.asarray(
-        fixed_parameters.mass_logarithmic_error, dtype=bool
-    )
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.temperature
     fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
@@ -384,13 +331,11 @@ def compute_residual(solution: Array, kwargs: dict) -> Array:
         )
         # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
 
-        mass_residual = compute_mass_residual(
-            mass_logarithmic_error,
-            element_density,
-            element_melt_density,
-            mass_constraints,
-            log_volume,
-        )
+        # Relative mass error, computed in log-space for numerical stability
+        element_density_total: Array = element_density + element_melt_density
+        log_element_density_total: Array = jnp.log(element_density_total)
+        log_target_density: Array = mass_constraints.log_number_density(log_volume)
+        mass_residual: Array = safe_exp(log_element_density_total - log_target_density) - 1
         # jax.debug.print("element_density = {out}", out=mass_residual)
 
         residual = jnp.concatenate([residual, mass_residual])
