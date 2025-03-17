@@ -1317,7 +1317,7 @@ _critical_data_N2_g: CriticalData = CriticalData(126.2, 33.9)
 _critical_data_Ar_g: CriticalData = CriticalData(151, 48.6)
 """Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
 _critical_data_He_g: CriticalData = CriticalData(5.2, 2.274)
-"""Critical parameters for He :cite:p:`ADM77"""
+"""Critical parameters for He :cite:p:`ADM77`"""
 _critical_data_Ne_g: CriticalData = CriticalData(44.49, 26.8)
 """Critical paramters for Ne :cite:p:`KJS86{Table 4}`"""
 _critical_data_Kr_g: CriticalData = CriticalData(209.46, 55.2019)
