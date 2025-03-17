@@ -103,8 +103,8 @@ class SolutionArguments:
         cls,
         species: SpeciesCollection,
         planet: Planet | None = None,
-        initial_log_number_density: Array | None = None,
-        initial_log_stability: Array | None = None,
+        initial_log_number_density: ArrayLike | None = None,
+        initial_log_stability: ArrayLike | None = None,
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
         mass_constraints: Mapping[str, ArrayLike] | None = None,
         solver_parameters: SolverParameters | None = None,
@@ -148,9 +148,6 @@ class SolutionArguments:
             )
         else:
             base_log_stability = initial_log_stability
-
-        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
-        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
 
         # base_log_number_density and base_log_stability could be 1-D arrays if the default values
         # are taken or a 1-D array specified by the user, otherwise they could be 2-D arrays if the
