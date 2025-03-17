@@ -23,7 +23,6 @@ from typing import Any, Callable
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optimistix as optx
 from jax import Array, jit, lax
 from jax.scipy.special import logsumexp
@@ -52,6 +51,7 @@ def solve(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
+    options: dict[str, Any],
 ) -> tuple[Array, Array, Array]:
     """Solves the system of non-linear equations
 
@@ -60,19 +60,14 @@ def solve(
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
         solver_parameters: Solver parameters
+        options: Options for root find
 
     Returns:
         The solution array, the status of the solver
     """
-    options: dict[str, Any] = {
-        "lower": np.asarray(solver_parameters.lower),
-        "upper": np.asarray(solver_parameters.upper),
-        "jac": solver_parameters.jac,
-    }
-
     sol: optx.Solution = optx.root_find(
         objective_function,
-        solver_parameters.solver,
+        solver_parameters.solver_instance,
         solution_array,
         args={
             "traced_parameters": traced_parameters,

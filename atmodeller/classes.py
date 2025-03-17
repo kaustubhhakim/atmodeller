@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import pprint
 from collections.abc import Mapping
-from typing import Callable
+from typing import Any, Callable
 
 import equinox as eqx
 import jax
@@ -104,6 +104,13 @@ class InteriorAtmosphere:
             solver_parameters,
         )
 
+        # Assemble options dictionary for solve
+        options: dict[str, Any] = {
+            "lower": self.species.get_lower_bound(),
+            "upper": self.species.get_upper_bound(),
+            "jac": solution_args.solver_parameters.jac,
+        }
+
         if solution_args.is_batch:
             initial_solution_axes = solution_args.get_initial_solution_vmap()
             traced_parameters_axes = solution_args.get_traced_parameters_vmap()
@@ -111,14 +118,14 @@ class InteriorAtmosphere:
             # Create an inner vmap callable for batch processing
             inner_solver: Callable = jax.vmap(
                 solve,
-                in_axes=(initial_solution_axes, traced_parameters_axes, None, None),
+                in_axes=(initial_solution_axes, traced_parameters_axes, None, None, None),
             )
         else:
             inner_solver = solve  # No batching, use the raw solver
 
         # Apply an outer vmap over the multistart dimension
         self._solver: Callable = eqx.filter_jit(
-            jax.vmap(inner_solver, in_axes=(0, None, None, None))
+            jax.vmap(inner_solver, in_axes=(0, None, None, None, None))
         )
 
         fixed_parameters: FixedParameters = self.get_fixed_parameters(
@@ -132,6 +139,7 @@ class InteriorAtmosphere:
             traced_parameters,
             fixed_parameters,
             solution_args.solver_parameters,
+            options,
         )
 
         # Ensure computation is complete before proceeding
@@ -190,11 +198,19 @@ class InteriorAtmosphere:
         initial_solution_array: Array = solution_args.solution
         traced_parameters: TracedParameters = solution_args.get_traced_parameters()
 
+        # Assemble options dictionary for solve
+        options: dict[str, Any] = {
+            "lower": self.species.get_lower_bound(),
+            "upper": self.species.get_upper_bound(),
+            "jac": solution_args.solver_parameters.jac,
+        }
+
         solution, solver_status, solver_steps = self._solver(
             initial_solution_array,
             traced_parameters,
             fixed_parameters,
             solution_args.solver_parameters,
+            options,
         )
 
         # Ensure computation is complete before proceeding

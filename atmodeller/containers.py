@@ -30,8 +30,9 @@ import logging
 import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Callable, NamedTuple, Type
+from typing import Any, Callable, Literal, NamedTuple, Type
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -124,7 +125,7 @@ class SolutionArguments:
             An instance
         """
         if solver_parameters is None:
-            solver_parameters_: SolverParameters = SolverParameters.create(species)
+            solver_parameters_: SolverParameters = SolverParameters()
         else:
             solver_parameters_ = solver_parameters
 
@@ -377,6 +378,14 @@ class SpeciesCollection(tuple):
 
         return tuple(indices)
 
+    def get_lower_bound(self: SpeciesCollection) -> ArrayLike:
+        """Gets the lower bound for truncating the solution during the solve"""
+        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
+
+    def get_upper_bound(self: SpeciesCollection) -> ArrayLike:
+        """Gets the upper bound for truncating the solution during the solve"""
+        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
+
     def get_molar_masses(self: tuple[Species, ...]) -> tuple[float, ...]:
         """Gets the molar masses of all species.
 
@@ -445,6 +454,29 @@ class SpeciesCollection(tuple):
     def number_of_stability(self: SpeciesCollection) -> int:
         """Number of stability solutions"""
         return len(self.get_stability_species_indices())
+
+    def _get_hypercube_bound(
+        self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
+    ) -> ArrayLike:
+        """Gets the bound on the hypercube
+
+        Args:
+            log_number_density_bound: Bound on the log number density
+            stability_bound: Bound on the stability
+
+        Returns:
+            Bound on the hypercube which contains the root
+        """
+        log_number_density: ArrayLike = log_number_density_bound * np.ones(self.number)
+
+        bound: ArrayLike = np.concatenate(
+            (
+                log_number_density,
+                stability_bound * np.ones(self.number_of_stability()),
+            )
+        )
+
+        return bound
 
     def tree_flatten(self) -> tuple[tuple, None]:
         return (self, None)
@@ -993,122 +1025,53 @@ class Species(NamedTuple):
         return cls(species_data, activity, solubility, solve_for_stability)
 
 
-class SolverParameters(NamedTuple):
+class SolverParameters(eqx.Module):
     """Solver parameters
 
     Args:
-        solver: Solver
+        solver: Solver. Defaults to optx.Newton
+        atol: Absolute tolerance. Defaults to 1.0e-6.
+        rtol: Relative tolerance. Defaults to 1.0e-6.
+        linear_solver: Linear solver. Defaults to lineax.QR.
+        norm: Norm. Defaults to optx.rms_norm.
         throw: How to report any failures. Defaults to False.
         max_steps: The maximum number of steps the solver can take. Defaults to 256
-        lower: Lower bound on the hypercube which contains the root. Defaults to empty.
-        upper: Upper bound on the hypercube which contains the root. Defaults to empty.
         jac: Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian.
             Can be either fwd or bwd. Defaults to fwd.
         multistart: Number of multistarts. Defaults to 10.
         multistart_perturbation: Perturbation for multistart. Defaults to 30.
     """
 
-    solver: OptxSolver
+    solver: Type[OptxSolver] = optx.Newton
     """Solver"""
+    atol: float = 1.0e-6
+    """Absolute tolerance"""
+    rtol: float = 1.0e-6
+    """Relative tolerance"""
+    linear_solver: Type[AbstractLinearSolver] = QR
+    """Linear solver"""
+    norm: Callable = optx.rms_norm
+    """Norm""" ""
     throw: bool = False
     """How to report any failures"""
     max_steps: int = 256
     """Maximum number of steps the solver can take"""
-    lower: tuple[float, ...] = ()
-    """Lower bound on the hypercube which contains the root"""
-    upper: tuple[float, ...] = ()
-    """Upper bound on the hypercube which contains the root"""
-    jac: str = "fwd"
+    jac: Literal["fwd", "bwd"] = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
     multistart: int = 10
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
+    solver_instance: OptxSolver = eqx.field(init=False)
+    """Solver instance"""
 
-    @classmethod
-    def create(
-        cls,
-        species: SpeciesCollection,
-        solver_class: Type[OptxSolver] = optx.Newton,
-        linear_solver: Type[AbstractLinearSolver] = QR,
-        rtol: float = 1.0e-6,
-        atol: float = 1.0e-6,
-        throw: bool = False,
-        max_steps: int = 256,
-        norm: Callable = optx.rms_norm,
-        multistart: int = 10,
-        multistart_perturbation: float = 30.0,
-    ) -> Self:
-        """Creates an instance
-
-        Args:
-            species: A collection of species
-            solver_class: Solver class. Defaults to optimistix Newton.
-            linear_solver: Linear solver. Defaults to QR.
-            rtol: Relative tolerance. Defaults to 1.0e-6.
-            atol: Absolute tolerance. Defaults to 1.0e-6.
-            throw. How to report any failures. Defaults to False.
-            max_steps: The maximum number of steps the solver can take. Defaults to 256.
-            norm: The norm. Defaults to optimistix RMS norm.
-            multistart: Number of multistarts. Defaults to 10.
-            mutlistart_perturbation: Perturbation for multistart. Defaults to 30.
-
-        Returns:
-            An instance
-        """
-        solver: OptxSolver = solver_class(
-            rtol=rtol,
-            atol=atol,
-            norm=norm,
-            linear_solver=linear_solver(),  # type: ignore
+    def __post_init__(self):
+        self.solver_instance = self.solver(
+            rtol=self.rtol,
+            atol=self.atol,
+            norm=self.norm,
+            linear_solver=self.linear_solver(),  # type: ignore because there is a parameter
         )
-        lower: tuple[float, ...] = cls._get_hypercube_bound(
-            species, LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER
-        )
-        upper: tuple[float, ...] = cls._get_hypercube_bound(
-            species, LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER
-        )
-
-        return cls(
-            solver,
-            throw=throw,
-            max_steps=max_steps,
-            lower=lower,
-            upper=upper,
-            jac="fwd",
-            multistart=multistart,
-            multistart_perturbation=multistart_perturbation,
-        )
-
-    @classmethod
-    def _get_hypercube_bound(
-        cls,
-        species: SpeciesCollection,
-        log_number_density_bound: float,
-        stability_bound: float,
-    ) -> tuple[float, ...]:
-        """Gets the bound on the hypercube
-
-        Args:
-            species: Collection of species
-            log_number_density_bound: Bound on the log number density
-            stability_bound: Bound on the stability
-
-        Returns:
-            Bound on the hypercube which contains the root
-        """
-        log_number_density: ArrayLike = log_number_density_bound * np.ones(species.number)
-
-        bound: tuple[float, ...] = tuple(
-            np.concatenate(
-                (
-                    log_number_density,
-                    stability_bound * np.ones(species.number_of_stability()),
-                )
-            ).tolist()
-        )
-
-        return bound
 
 
 # endregion
