@@ -895,7 +895,7 @@ def collapse_single_entry_values(
     return out
 
 
-def expand_dict(some_dict: dict[str, Array], expand_to_size: int) -> dict[str, Array]:
+def expand_dict(some_dict: dict[str, ArrayLike], expand_to_size: int) -> dict[str, Array]:
     """Gets a dictionary of the values with scalars expanded
 
     Args:

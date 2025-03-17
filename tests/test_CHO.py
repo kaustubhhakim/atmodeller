@@ -126,8 +126,8 @@ def test_H_fO2_fH2(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": IronWustiteBuffer(np.array([-1, 0, 1])),
-        "H2_g": ConstantFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6])),
+        "O2_g": IronWustiteBuffer(np.array([-1, 0, 1], dtype=np.float_)),
+        "H2_g": ConstantFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6], dtype=np.float_)),
     }
 
     interior_atmosphere.solve(

@@ -38,8 +38,8 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax, tree_flatten
-from jax.tree_util import register_pytree_node_class
+from jax import Array, jit, lax
+from jax.tree_util import register_pytree_node_class, tree_flatten, tree_map
 from jax.typing import ArrayLike
 from lineax import QR, AbstractLinearSolver
 from molmass import Formula
@@ -490,11 +490,11 @@ class SpeciesCollection(tuple):
 # region: Containers for traced parameters
 
 
-class TracedParameters(NamedTuple):
+class TracedParameters(eqx.Module):
     """Traced parameters
 
     As the name says, these are parameters that should be traced, inasmuch as they may be
-    updated by the suer a
+    updated by the user for rapid repeat calculations.
 
     Args:
         planet: Planet
@@ -510,7 +510,7 @@ class TracedParameters(NamedTuple):
     """Mass constraints"""
 
 
-class Planet(NamedTuple):
+class Planet(eqx.Module):
     """Planet properties
 
     Default values are for a fully molten Earth.
@@ -580,25 +580,20 @@ class Planet(NamedTuple):
         """Temperature"""
         return self.surface_temperature
 
-    def asdict(self) -> dict[str, Array]:
+    def asdict(self) -> dict[str, ArrayLike]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
-        base_dict: dict[str, ArrayLike] = self._asdict()
+        base_dict: dict[str, ArrayLike] = asdict(self)
         base_dict["mantle_mass"] = self.mass
         base_dict["mantle_melt_mass"] = self.melt_mass
         base_dict["mantle_solid_mass"] = self.solid_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.surface_gravity
 
-        # Always return JAX arrays which are required for subsequent output operations
-        converted_dict: dict[str, Array] = {
-            key: jnp.asarray(value) for key, value in base_dict.items()
-        }
-
-        return converted_dict
+        return base_dict
 
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
@@ -606,19 +601,10 @@ class Planet(NamedTuple):
         Returns:
             vmap axes
         """
-        vmap_axes: list[int | None] = []
-        for field in self._fields:
-            value: ArrayLike = getattr(self, field)
-            if jnp.isscalar(value):
-                vmap_axis: int | None = None
-            else:
-                vmap_axis = 0
-            vmap_axes.append(vmap_axis)
-
-        return Planet(*vmap_axes)  # type: ignore - container types are for data not axes
+        return tree_map(lambda x: 0 if not jnp.isscalar(x) else None, self)
 
 
-class NormalisedMass(NamedTuple):
+class NormalisedMass(eqx.Module):
     """Normalised mass for conventional outgassing
 
     This is not currently used, but it is a placeholder for future development.
@@ -649,6 +635,7 @@ class NormalisedMass(NamedTuple):
         return self.mass * (1 - self.melt_fraction)
 
 
+# TODO: Converting this to eqx.module break the tests.
 class ConstantFugacityConstraint(NamedTuple):
     """A constant fugacity constraint
 
@@ -846,13 +833,13 @@ class MassConstraints(NamedTuple):
 
         return cls(init_map)
 
-    def asdict(self) -> dict[str, Array]:
+    def asdict(self) -> dict[str, ArrayLike]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
-        out: dict[str, Array] = {
+        out: dict[str, ArrayLike] = {
             f"{key}_number": jnp.exp(jnp.asarray(value))
             for key, value in self.log_abundance.items()
         }
@@ -1058,7 +1045,7 @@ class SolverParameters(eqx.Module):
     """Maximum number of steps the solver can take"""
     jac: Literal["fwd", "bwd"] = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
-    multistart: int = 10
+    multistart: int = 1
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
