@@ -899,7 +899,7 @@ class MassConstraints(NamedTuple):
 
 
 # region: Containers for fixed parameters
-class FixedParameters(NamedTuple):
+class FixedParameters(eqx.Module):
     """Parameters that are always fixed for a calculation
 
     This container and all objects within it must be hashable.
@@ -913,6 +913,7 @@ class FixedParameters(NamedTuple):
         stability_species_indices: Indices of species to solve for stability
         fugacity_matrix: Fugacity constraint matrix
         gas_species_indices: Indices of gas species
+        condensed_specie_indices: Indices of condensed species
         fugacity_species_indices: Indices of species to constrain the fugacity
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
@@ -947,7 +948,7 @@ class FixedParameters(NamedTuple):
     """Tau factor for species"""
 
 
-class Species(NamedTuple):
+class Species(eqx.Module):
     """Species
 
     Args:
