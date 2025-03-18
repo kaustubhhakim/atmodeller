@@ -49,10 +49,6 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
         evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
             the total pressure will be used, but this can give rise to multiple solutions and
             should be used with caution.
-
-    Attributes:
-        log10_shift: Log10 shift relative to the buffer
-        evaluation_pressure: Pressure to evaluate the buffer at
     """
 
     def __init__(
@@ -61,7 +57,9 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
         evaluation_pressure: ArrayLike | None = 1.0,
     ):
         self.log10_shift: ArrayLike = log10_shift
+        """ Log10 shift relative to the buffer"""
         self.evaluation_pressure: ArrayLike | None = evaluation_pressure
+        """Pressure to evaluate the buffer at"""
 
     @property
     def calibration(self) -> ExperimentalCalibration:
@@ -139,10 +137,6 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
         evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
             the total pressure will be used, but this can give rise to multiple solutions and
             should be used with caution.
-
-    Attributes:
-        log10_shift: Log10 shift relative to the buffer
-        evaluation_pressure: Pressure to evaluate the buffer at
     """
 
     @override
@@ -193,10 +187,6 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
             the total pressure will be used, but this can give rise to multiple solutions and
             should be used with caution.
-
-    Attributes:
-        log10_shift: Log10 shift relative to the buffer
-        evaluation_pressure: Pressure to evaluate the buffer at
     """
 
     @override
@@ -352,10 +342,6 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
             the total pressure will be used, but this can give rise to multiple solutions and
             should be used with caution.
-
-    Attributes:
-        log10_shift: Log10 shift relative to the buffer
-        evaluation_pressure: Pressure to evaluate the buffer at
     """
 
     @override

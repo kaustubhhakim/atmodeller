@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-__version__: str = "0.2.2"
+__version__: str = "0.4.0"
 
 import logging
 
@@ -54,29 +54,29 @@ Empirically determined. Preliminary testing seems to reveal that starting from a
 value improves the performance of the solver. This asserts that all species are stable.
 """
 
-# Maximum x for which exp(x) is finite in 64-bit precision
+# Maximum x for which exp(x) is finite in 64-bit precision (to prevent overflow)
 max_exp_input = np.log(np.finfo(np.float64).max)
 # Minimum x for which exp(x) is non-zero in 64-bit precision
 min_exp_input = np.log(jnp.finfo(np.float64).tiny)
 
 # Lower and upper bounds on the hypercube which contains the root
-LOG_NUMBER_DENSITY_LOWER: float = -120
+LOG_NUMBER_DENSITY_LOWER: float = -170.0
 """Lower log number density for a species
 
 At 3000 K this corresponds to 3.17E-77 bar and at 298 K this corresponds to 3.16E-78 bar.
 """
-LOG_NUMBER_DENSITY_UPPER: float = 70
+LOG_NUMBER_DENSITY_UPPER: float = 80.0
 """Upper log number density for a species
 
 At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this corresponds to 103494 bar
 (10.3 GPa).
 """
-LOG_STABILITY_LOWER: float = -700  # basically the same as min_exp_input
+LOG_STABILITY_LOWER: float = -700.0  # basically the same as min_exp_input
 """Lower stability for a species
 
 Derived to ensure that the exponential function exp(x) does not underflow to zero
 """
-LOG_STABILITY_UPPER: float = 35
+LOG_STABILITY_UPPER: float = 35.0
 """Upper stability for a species
 
 Empirically determined.
@@ -166,7 +166,12 @@ def debug_file_logger() -> logging.Logger:
 
 
 from atmodeller.classes import InteriorAtmosphere  # noqa: E402, F401
-from atmodeller.containers import Planet, SolverParameters, Species  # noqa: E402, F401
+from atmodeller.containers import (  # noqa: E402, F401
+    Planet,
+    SolverParameters,
+    Species,
+    SpeciesCollection,
+)
 from atmodeller.utilities import (  # noqa: E402, F401
     bulk_silicate_earth_abundances,
     earth_oceans_to_hydrogen_mass,

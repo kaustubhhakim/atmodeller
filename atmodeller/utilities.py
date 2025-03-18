@@ -28,6 +28,7 @@ from jax import Array, jit, lax
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
+from atmodeller import max_exp_input
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 if sys.version_info < (3, 11):
@@ -62,8 +63,7 @@ def get_log_number_density_from_log_pressure(
 
 @jit
 def safe_exp(x: ArrayLike) -> Array:
-    max_val: float = 709.78  # Maximum value to prevent overflow in 64-bit
-    return jnp.exp(jnp.clip(x, a_max=max_val))
+    return jnp.exp(jnp.clip(x, a_max=max_exp_input))
 
 
 @jit

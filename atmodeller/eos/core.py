@@ -538,16 +538,13 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
         initial_volume: ArrayLike = self.initial_volume(temperature, pressure)
+        kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         # atol reduced since typical volumes are around 1e-5 to 1e-6
         solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
         sol = optx.root_find(
-            self._objective_function,
-            solver,
-            initial_volume,
-            args=kwargs,
+            self._objective_function, solver, initial_volume, args=kwargs, throw=False
         )
         volume: ArrayLike = sol.value
         # jax.debug.print("volume = {out}", out=volume)
