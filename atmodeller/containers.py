@@ -138,14 +138,14 @@ class SolutionArguments:
 
         if initial_log_number_density is None:
             base_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-                len(species), dtype=jnp.float_
+                len(species), dtype=np.float_
             )
         else:
             base_log_number_density = initial_log_number_density
 
         if initial_log_stability is None:
             base_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
-                species.number_of_stability(), dtype=jnp.float_
+                species.number_of_stability(), dtype=np.float_
             )
         else:
             base_log_stability = initial_log_stability
