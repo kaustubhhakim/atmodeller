@@ -18,6 +18,7 @@ Current development team:
 
 - Dan J. Bower (lead developer, ETH Zurich)
 - Maggie A. Thompson (ETH Zurich/Carnegie)
+- Kaustubh Hakim (KU Leuven)
 - Meng Tian (LMU Munich)
 - Paolo A. Sossi (ETH Zurich)
 
@@ -25,7 +26,7 @@ Current development team:
 
 If you use Atmodeller please cite (prior to manuscript submission, check back to see if this reference has been updated):
 
-- Bower, D.J, Thompson, M. A., Tian, M., and Sossi P.A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, non-ideality and condensation, The Astrophysical Journal, to be submitted.
+- Bower, D.J, Thompson, M. A., Hakim, K., Tian, M., and Sossi P.A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, non-ideality and condensation, The Astrophysical Journal, to be submitted.
 
 ## Basic usage
 
