@@ -512,11 +512,14 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         pressure: ArrayLike = kwargs["pressure"]
         a: ArrayLike = self.a(temperature, pressure)
 
-        # Coefficients for the polynomial in terms of volume
-        rtp: float = GAS_CONSTANT_BAR * temperature / pressure
-        coeff2: float = -rtp
-        coeff1: float = a / (jnp.sqrt(temperature) * pressure) - self.b() * (rtp + self.b())
-        coeff0: float = -a * self.b() / (jnp.sqrt(temperature) * pressure)
+        # Coefficients for the polynomial in terms of volume. Unity coefficients are to satisfy
+        # type checking.
+        rtp: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
+        coeff2: ArrayLike = -1.0 * rtp
+        coeff1: ArrayLike = a / (jnp.sqrt(temperature) * pressure) - 1.0 * self.b() * (
+            rtp + self.b()
+        )
+        coeff0: ArrayLike = -1.0 * a * self.b() / (jnp.sqrt(temperature) * pressure)
 
         residual: Array = (
             jnp.power(volume, 3) + coeff2 * jnp.square(volume) + coeff1 * volume + coeff0
