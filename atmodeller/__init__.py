@@ -65,7 +65,7 @@ LOG_NUMBER_DENSITY_LOWER: float = -170.0
 
 At 3000 K this corresponds to 3.17E-77 bar and at 298 K this corresponds to 3.16E-78 bar.
 """
-LOG_NUMBER_DENSITY_UPPER: float = 80.0
+LOG_NUMBER_DENSITY_UPPER: float = 70.0
 """Upper log number density for a species
 
 At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this corresponds to 103494 bar
