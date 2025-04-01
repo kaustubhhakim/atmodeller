@@ -389,7 +389,7 @@ class Output:
         out: dict[str, Array] = self._get_number_density_output(
             number_density_condensed, molar_mass_condensed, "total_"
         )
-        out["molar_mass"] = molar_mass
+        out["molar_mass"] = molar_mass_condensed
         out["activity"] = activity_condensed
 
         split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
