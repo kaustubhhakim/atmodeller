@@ -1038,7 +1038,7 @@ class SolverParameters(eqx.Module):
     """Relative tolerance"""
     linear_solver: Type[AbstractLinearSolver] = QR
     """Linear solver"""
-    norm: Callable = optx.rms_norm
+    norm: Callable = optx.max_norm
     """Norm""" ""
     throw: bool = False
     """How to report any failures"""
