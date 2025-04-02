@@ -174,7 +174,7 @@ class InteriorAtmosphere:
                 "Try increasing 'multistart', for example:\n"
                 "    solver_parameters = SolverParameters(multistart=5)\n"
                 "and then pass solver_parameters to the solve method.\n"
-                "Optionally, you can also adjust 'multistart_perturbation', for example:\n"
+                "You can also adjust 'multistart_perturbation', for example:\n"
                 "    solver_parameters = SolverParameters(multistart=5, "
                 "multistart_perturbation=20.0)"
             )
