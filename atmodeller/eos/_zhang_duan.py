@@ -22,16 +22,17 @@ import sys
 
 import jax.numpy as jnp
 import numpy as np
+import optimistix as optx
 from jax import Array, jit
 from jax.typing import ArrayLike
 
+from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import RealGas
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
 else:
     from typing import override
-
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -98,37 +99,81 @@ class ZhangDuan(RealGas):
 
         return scaled_temperature
 
-    @override
     @jit
-    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Compressibility factor :cite:p:`ZD09{Equation 8}`
+    def _get_parameter(
+        self, temperature: ArrayLike, coefficients: tuple[float, float, float]
+    ) -> ArrayLike:
+        Tm: ArrayLike = self.Tm(temperature)
 
-        This overrides the base class because the compressibility factor is used to determine the
-        volume, whereas in the base class the volume is used to determine the compressibility
-        factor.
+        return coefficients[0] + coefficients[1] / Tm + coefficients[2] / jnp.power(Tm, 3)
+
+    # @override
+    # @jit
+    # def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    #     r"""Volume :cite:p:`SS92{Equation 1}`
+
+    #     Args:
+    #         temperature: Temperature in K
+    #         pressure: Pressure in bar
+
+    #     Returns:
+    #         Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
+    #     """
+    #     Z: Array = self.compressibility_factor(temperature, pressure)
+    #     volume: Array = Z * self.ideal_volume(temperature, pressure)
+
+    #     return volume
+
+    @jit
+    def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
+        r"""Objective function to solve for the volume
 
         Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
+            volume: Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
+            kwargs: Dictionary with other required parameters
 
         Returns:
-            The compressibility factor, which is dimensionless
+            Residual of the objective function
         """
-        Tr: ArrayLike = self.scaled_temperature(temperature)
-        Pr: ArrayLike = self.scaled_pressure(pressure)
-        Z: Array = (
-            self._a(Tr)
-            + self._b(Tr) * Pr
-            + self._c(Tr) * jnp.square(Pr)
-            + self._d(Tr) * jnp.power(Pr, 3)
+        temperature: ArrayLike = kwargs["temperature"]
+        pressure: ArrayLike = kwargs["pressure"]
+
+        # TODO: Note solve for Vm and then convert back?
+        # TODO: Check dealt with all factors of Vm
+
+        # Coefficients for the polynomial in terms of volume. Unity coefficients are to satisfy
+        # type checking.
+        ptr: ArrayLike = pressure / (GAS_CONSTANT_BAR * temperature)
+        Tm: ArrayLike = self.Tm(temperature)
+
+        a: ArrayLike = self._get_parameter(self._coefficients[0:3])
+        b: ArrayLike = self._get_parameter(self._coefficients[3:6])
+        c: ArrayLike = self._get_parameter(self._coefficients[6:9])
+        d: ArrayLike = self._get_parameter(self._coefficients[9:12])
+
+        term1: Array = (
+            1 / volume
+            + a / jnp.square(volume)
+            + b / jnp.power(volume, 3)
+            + c / jnp.power(volume, 5)
+            + d / jnp.power(volume, 6)
         )
 
-        return Z
+        a13: float = self._coefficients[12]
+        a14: float = self._coefficients[13]
+        a15: float = self._coefficients[14]
+        term2: Array = a13 / (jnp.power(Tm, 3) * jnp.power(volume, 3))
+        term2 = term2 * (a14 + a15 / jnp.square(volume))
+        term2 = term2 * jnp.exp(-a15 / jnp.square(volume))
+
+        residual: Array = term1 + term2 - ptr
+
+        return residual
 
     @override
     @jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Volume :cite:p:`SS92{Equation 1}`
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        r"""Solves the RK equation numerically to compute the volume.
 
         Args:
             temperature: Temperature in K
@@ -137,8 +182,17 @@ class ZhangDuan(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        Z: Array = self.compressibility_factor(temperature, pressure)
-        volume: Array = Z * self.ideal_volume(temperature, pressure)
+        # FIXME: Solve for Vm then convert back
+        initial_volume: ArrayLike = self.initial_volume(temperature, pressure)
+        kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
+
+        # atol reduced since typical volumes are around 1e-5 to 1e-6
+        solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
+        sol = optx.root_find(
+            self._objective_function, solver, initial_volume, args=kwargs, throw=False
+        )
+        volume: ArrayLike = sol.value
+        # jax.debug.print("volume = {out}", out=volume)
 
         return volume
 
