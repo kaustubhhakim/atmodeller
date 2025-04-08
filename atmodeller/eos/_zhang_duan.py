@@ -24,10 +24,12 @@ import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
 from jax import Array, jit
+from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import RealGas
+from atmodeller.interfaces import RealGasProtocol
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -40,8 +42,11 @@ else:
     from typing import Self
 
 
+@register_pytree_node_class
 class ZhangDuan(RealGas):
     """Real gas EOS from :cite:t:`ZD09`
+
+    TODO: LaTeX math
 
     Args:
         epsilon: Lenard-Jones parameter (epsilon/kB) in K
@@ -100,6 +105,21 @@ class ZhangDuan(RealGas):
         return scaled_temperature
 
     @jit
+    def Vm(self, volume: ArrayLike) -> ArrayLike:
+        """Scaled volume
+
+        Args:
+            volume: Volume
+
+        Returns:
+            The scaled volume
+        """
+        sigma_term: ArrayLike = jnp.power(self._sigma / 3.691, 3)
+        scaled_volume: ArrayLike = volume / (1000 * sigma_term)
+
+        return scaled_volume
+
+    @jit
     def _get_parameter(
         self, temperature: ArrayLike, coefficients: tuple[float, float, float]
     ) -> ArrayLike:
@@ -138,33 +158,29 @@ class ZhangDuan(RealGas):
         temperature: ArrayLike = kwargs["temperature"]
         pressure: ArrayLike = kwargs["pressure"]
 
-        # TODO: Note solve for Vm and then convert back?
-        # TODO: Check dealt with all factors of Vm
-
-        # Coefficients for the polynomial in terms of volume. Unity coefficients are to satisfy
-        # type checking.
         ptr: ArrayLike = pressure / (GAS_CONSTANT_BAR * temperature)
         Tm: ArrayLike = self.Tm(temperature)
+        Vm: ArrayLike = self.Vm(volume)
 
-        a: ArrayLike = self._get_parameter(self._coefficients[0:3])
-        b: ArrayLike = self._get_parameter(self._coefficients[3:6])
-        c: ArrayLike = self._get_parameter(self._coefficients[6:9])
-        d: ArrayLike = self._get_parameter(self._coefficients[9:12])
+        a: ArrayLike = self._get_parameter(temperature, self._coefficients[0:3])
+        b: ArrayLike = self._get_parameter(temperature, self._coefficients[3:6])
+        c: ArrayLike = self._get_parameter(temperature, self._coefficients[6:9])
+        d: ArrayLike = self._get_parameter(temperature, self._coefficients[9:12])
 
         term1: Array = (
-            1 / volume
-            + a / jnp.square(volume)
-            + b / jnp.power(volume, 3)
-            + c / jnp.power(volume, 5)
-            + d / jnp.power(volume, 6)
+            1 / jnp.asarray(volume)
+            + a / jnp.square(Vm)
+            + b / jnp.power(Vm, 3)
+            + c / jnp.power(Vm, 5)
+            + d / jnp.power(Vm, 6)
         )
 
         a13: float = self._coefficients[12]
         a14: float = self._coefficients[13]
         a15: float = self._coefficients[14]
-        term2: Array = a13 / (jnp.power(Tm, 3) * jnp.power(volume, 3))
-        term2 = term2 * (a14 + a15 / jnp.square(volume))
-        term2 = term2 * jnp.exp(-a15 / jnp.square(volume))
+        term2: Array = a13 / (jnp.power(Tm, 3) * jnp.power(Vm, 3))
+        term2 = term2 * (a14 + a15 / jnp.square(Vm))
+        term2 = term2 * jnp.exp(-a15 / jnp.square(Vm))
 
         residual: Array = term1 + term2 - ptr
 
@@ -183,7 +199,7 @@ class ZhangDuan(RealGas):
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         # FIXME: Solve for Vm then convert back
-        initial_volume: ArrayLike = self.initial_volume(temperature, pressure)
+        initial_volume: ArrayLike = 1e-5  # self.initial_volume(temperature, pressure)
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         # atol reduced since typical volumes are around 1e-5 to 1e-6
@@ -195,6 +211,38 @@ class ZhangDuan(RealGas):
         # jax.debug.print("volume = {out}", out=volume)
 
         return volume
+
+    @jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Volume integral :cite:p:`HP91{Appendix A}`
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
+        """
+        # FIXME
+        return jnp.asarray(1)
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Log fugacity :cite:p:`HP91{Equation 8}`
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity
+        """
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
+        )
+
+        return log_fugacity
 
     def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
         children: tuple = ()
@@ -304,3 +352,37 @@ def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
 
     # If it doesn't converge, return None
     return None, None
+
+
+CH4_zhang09: RealGasProtocol = ZhangDuan(154.0, 3.691)
+H2O_zhang09: RealGasProtocol = ZhangDuan(510.0, 2.88)
+CO2_zhang09: RealGasProtocol = ZhangDuan(235.0, 3.79)
+H2_zhang09: RealGasProtocol = ZhangDuan(31.2, 2.93)
+CO_zhang09: RealGasProtocol = ZhangDuan(105.6, 3.66)
+O2_zhang09: RealGasProtocol = ZhangDuan(124.5, 3.66)
+C2H6_zhang09: RealGasProtocol = ZhangDuan(246.1, 4.35)
+
+
+def get_zhang_eos_models() -> dict[str, RealGasProtocol]:
+    """Gets a dictionary of Zhang and Duan EOS models that are bounded
+
+    TODO: Make bounded?
+
+    The naming convention is as follows:
+        [species]_[eos model]_[citation]
+
+    'cs' refers to corresponding states.
+
+    Returns:
+        Dictionary of EOS models
+    """
+    eos_models: dict[str, RealGasProtocol] = {}
+    eos_models["CH4_zhang09"] = CH4_zhang09
+    eos_models["H2O_zhang09"] = H2O_zhang09
+    eos_models["CO2_zhang09"] = CO2_zhang09
+    eos_models["H2_zhang09"] = H2_zhang09
+    eos_models["CO_zhang09"] = CO_zhang09
+    eos_models["O2_zhang09"] = O2_zhang09
+    eos_models["C2H6_zhang09"] = C2H6_zhang09
+
+    return eos_models

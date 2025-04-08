@@ -32,6 +32,7 @@ from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos._holland_powell import get_holland_eos_models
 from atmodeller.eos._holley import get_holley_eos_models
 from atmodeller.eos._saxena import get_saxena_eos_models
+from atmodeller.eos._zhang_duan import get_zhang_eos_models
 from atmodeller.eos.classes import Chabrier
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration
@@ -95,5 +96,7 @@ def get_eos_models() -> dict[str, RealGasProtocol]:
     eos_models |= get_holland_eos_models()
     # Merge Saxena models
     eos_models |= get_saxena_eos_models()
+    # Merge Zhang models
+    eos_models |= get_zhang_eos_models()
 
     return eos_models
