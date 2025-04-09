@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # Copyright 2024 Dan J. Bower
 #
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import sys
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
@@ -115,7 +117,7 @@ class ZhangDuan(RealGas):
             The scaled volume
         """
         sigma_term: ArrayLike = jnp.power(self._sigma / 3.691, 3)
-        scaled_volume: ArrayLike = volume / (1000 * sigma_term)
+        scaled_volume: ArrayLike = volume / 1000.0 / sigma_term
 
         return scaled_volume
 
@@ -125,7 +127,9 @@ class ZhangDuan(RealGas):
     ) -> ArrayLike:
         Tm: ArrayLike = self.Tm(temperature)
 
-        return coefficients[0] + coefficients[1] / Tm + coefficients[2] / jnp.power(Tm, 3)
+        return (
+            coefficients[0] + coefficients[1] / jnp.square(Tm) + coefficients[2] / jnp.power(Tm, 3)
+        )
 
     # @override
     # @jit
@@ -158,9 +162,14 @@ class ZhangDuan(RealGas):
         temperature: ArrayLike = kwargs["temperature"]
         pressure: ArrayLike = kwargs["pressure"]
 
-        ptr: ArrayLike = pressure / (GAS_CONSTANT_BAR * temperature)
+        pressure = pressure / 10  # to MPa
+
+        Pm: ArrayLike = self.Pm(pressure)
         Tm: ArrayLike = self.Tm(temperature)
         Vm: ArrayLike = self.Vm(volume)
+
+        # ptr: ArrayLike = Pm / (GAS_CONSTANT_BAR * Tm)
+        ptr: ArrayLike = Pm / (8.314472 * Tm)
 
         a: ArrayLike = self._get_parameter(temperature, self._coefficients[0:3])
         b: ArrayLike = self._get_parameter(temperature, self._coefficients[3:6])
@@ -168,7 +177,7 @@ class ZhangDuan(RealGas):
         d: ArrayLike = self._get_parameter(temperature, self._coefficients[9:12])
 
         term1: Array = (
-            1 / jnp.asarray(volume)
+            1 / jnp.asarray(Vm)
             + a / jnp.square(Vm)
             + b / jnp.power(Vm, 3)
             + c / jnp.power(Vm, 5)
@@ -178,7 +187,7 @@ class ZhangDuan(RealGas):
         a13: float = self._coefficients[12]
         a14: float = self._coefficients[13]
         a15: float = self._coefficients[14]
-        term2: Array = a13 / (jnp.power(Tm, 3) * jnp.power(Vm, 3))
+        term2: Array = a13 / jnp.power(Tm, 3) / jnp.power(Vm, 3)
         term2 = term2 * (a14 + a15 / jnp.square(Vm))
         term2 = term2 * jnp.exp(-a15 / jnp.square(Vm))
 
@@ -199,16 +208,22 @@ class ZhangDuan(RealGas):
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
         # FIXME: Solve for Vm then convert back
-        initial_volume: ArrayLike = 1e-5  # self.initial_volume(temperature, pressure)
+        initial_volume: ArrayLike = 22  # e-5  # self.initial_volume(temperature, pressure)
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         # atol reduced since typical volumes are around 1e-5 to 1e-6
         solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
         sol = optx.root_find(
-            self._objective_function, solver, initial_volume, args=kwargs, throw=False
+            self._objective_function,
+            solver,
+            initial_volume,
+            args=kwargs,
+            throw=True,  # TODO: Update throw to False when working
         )
         volume: ArrayLike = sol.value
         # jax.debug.print("volume = {out}", out=volume)
+
+        jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
 
         return volume
 
@@ -224,7 +239,7 @@ class ZhangDuan(RealGas):
             Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
         # FIXME
-        return jnp.asarray(1)
+        raise NotImplementedError()
 
     @override
     @jit
@@ -359,7 +374,7 @@ H2O_zhang09: RealGasProtocol = ZhangDuan(510.0, 2.88)
 CO2_zhang09: RealGasProtocol = ZhangDuan(235.0, 3.79)
 H2_zhang09: RealGasProtocol = ZhangDuan(31.2, 2.93)
 CO_zhang09: RealGasProtocol = ZhangDuan(105.6, 3.66)
-O2_zhang09: RealGasProtocol = ZhangDuan(124.5, 3.66)
+O2_zhang09: RealGasProtocol = ZhangDuan(124.5, 3.36)
 C2H6_zhang09: RealGasProtocol = ZhangDuan(246.1, 4.35)
 
 
@@ -386,3 +401,28 @@ def get_zhang_eos_models() -> dict[str, RealGasProtocol]:
     eos_models["C2H6_zhang09"] = C2H6_zhang09
 
     return eos_models
+
+
+def test():
+    # Table 6 comparisons
+    temperature_low: float = 1203.15
+    pressure_low: float = 9500
+    temperature_high: float = 1873.15
+    pressure_high: float = 25000
+
+    volume_low_ZD = H2O_zhang09.volume(temperature_low, pressure_low)
+    print("volume_low (Zhang and Duan) = ", volume_low_ZD, ", target = 2.22e-05")
+    volume_high_ZD = H2O_zhang09.volume(temperature_high, pressure_high)
+    print("volume_high (Zhang and Duan) = ", volume_high_ZD, ", target = 1.941e-05")
+
+    from atmodeller.eos._holland_powell import H2O_cork_holland98 as H2O_cork_holland
+
+    # Agrees with the data in Table 6.
+    volume_low_HP = H2O_cork_holland.volume(temperature_low, pressure_low)
+    print("volume_low (Holland and Powell) = ", volume_low_HP)
+    volume_high_HP = H2O_cork_holland.volume(temperature_high, pressure_high)
+    print("volume_high (Holland and Powell) = ", volume_high_HP)
+
+
+if __name__ == "__main__":
+    test()
