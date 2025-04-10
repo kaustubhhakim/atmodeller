@@ -116,6 +116,7 @@ class ZhangDuan(RealGas):
         Returns:
             The scaled volume
         """
+        # TODO: Check units
         sigma_term: ArrayLike = jnp.power(self._sigma / 3.691, 3)
         scaled_volume: ArrayLike = volume / 1000.0 / sigma_term
 
@@ -417,11 +418,12 @@ def test():
 
     from atmodeller.eos._holland_powell import H2O_cork_holland98 as H2O_cork_holland
 
+    print("")
     # Agrees with the data in Table 6.
     volume_low_HP = H2O_cork_holland.volume(temperature_low, pressure_low)
-    print("volume_low (Holland and Powell) = ", volume_low_HP)
+    print("volume_low (Holland and Powell) = ", volume_low_HP, ", target = 2.160e-05")
     volume_high_HP = H2O_cork_holland.volume(temperature_high, pressure_high)
-    print("volume_high (Holland and Powell) = ", volume_high_HP)
+    print("volume_high (Holland and Powell) = ", volume_high_HP, ", target = 1.837e-05")
 
 
 if __name__ == "__main__":
