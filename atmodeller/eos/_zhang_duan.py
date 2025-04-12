@@ -32,6 +32,7 @@ from jax.typing import ArrayLike
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import RealGas
 from atmodeller.interfaces import RealGasProtocol
+from atmodeller.utilities import unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -46,13 +47,11 @@ else:
 
 @register_pytree_node_class
 class ZhangDuan(RealGas):
-    """Real gas EOS from :cite:t:`ZD09`
-
-    TODO: LaTeX math
+    """Real gas EOS :cite:p:`ZD09`
 
     Args:
         epsilon: Lenard-Jones parameter (epsilon/kB) in K
-        sigma: Lenard-Jones parameter (10^-10) m
+        sigma: Lenard-Jones parameter ($10^{-10}$ m)
     """
 
     def __init__(self, epsilon: float, sigma: float):
@@ -77,17 +76,17 @@ class ZhangDuan(RealGas):
         )
 
     @jit
-    def Pm(self, pressure: ArrayLike) -> ArrayLike:
+    def Pm(self, pressure: ArrayLike) -> Array:
         """Scaled pressure
 
         Args:
             pressure: Pressure in bar
 
         Returns:
-            The scaled pressure
+            Scaled pressure
         """
-        # TODO: Check units
-        scaled_pressure: ArrayLike = 3.0636 * jnp.power(self._sigma, 3) * pressure / self._epsilon
+        pressure_MPa: ArrayLike = pressure * unit_conversion.bar_to_MPa
+        scaled_pressure: Array = 3.0636 * jnp.power(self._sigma, 3) * pressure_MPa / self._epsilon
 
         return scaled_pressure
 
@@ -99,55 +98,42 @@ class ZhangDuan(RealGas):
             temperature: Temperature in K
 
         Returns:
-            The scaled temperature
+            Scaled temperature
         """
-        # TODO: Check units
         scaled_temperature: ArrayLike = 154.0 * temperature / self._epsilon
 
         return scaled_temperature
 
     @jit
-    def Vm(self, volume: ArrayLike) -> ArrayLike:
-        """Scaled volume
+    def Vm(self, volume: ArrayLike) -> Array:
+        r"""Scaled volume
 
         Args:
-            volume: Volume
+            volume: Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
 
         Returns:
-            The scaled volume
+            Scaled volume
         """
-        # TODO: Check units
-        sigma_term: ArrayLike = jnp.power(self._sigma / 3.691, 3)
-        scaled_volume: ArrayLike = volume / 1000.0 / sigma_term
+        volume_cm3: ArrayLike = volume * unit_conversion.m3_to_cm3
+        sigma_term: Array = jnp.power(self._sigma / 3.691, 3)
+        scaled_volume: Array = volume_cm3 / 1000.0 / sigma_term  # type:ignore
 
         return scaled_volume
 
     @jit
-    def _get_parameter(
-        self, temperature: ArrayLike, coefficients: tuple[float, float, float]
-    ) -> ArrayLike:
-        Tm: ArrayLike = self.Tm(temperature)
+    def _get_parameter(self, Tm: ArrayLike, coefficients: tuple[float, float, float]) -> Array:
+        """Gets the parameter (coefficient) for polynomials involving Tm terms
 
+        Args:
+            Tm: Scaled temperature
+            coefficients: Coefficients for this term
+
+        Returns:
+            Parameter (coefficient)
+        """
         return (
             coefficients[0] + coefficients[1] / jnp.square(Tm) + coefficients[2] / jnp.power(Tm, 3)
         )
-
-    # @override
-    # @jit
-    # def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-    #     r"""Volume :cite:p:`SS92{Equation 1}`
-
-    #     Args:
-    #         temperature: Temperature in K
-    #         pressure: Pressure in bar
-
-    #     Returns:
-    #         Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
-    #     """
-    #     Z: Array = self.compressibility_factor(temperature, pressure)
-    #     volume: Array = Z * self.ideal_volume(temperature, pressure)
-
-    #     return volume
 
     @jit
     def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
@@ -163,43 +149,50 @@ class ZhangDuan(RealGas):
         temperature: ArrayLike = kwargs["temperature"]
         pressure: ArrayLike = kwargs["pressure"]
 
-        pressure = pressure / 10  # to MPa
-
-        Pm: ArrayLike = self.Pm(pressure)
         Tm: ArrayLike = self.Tm(temperature)
+        # jax.debug.print("Tm = {Tm}", Tm=Tm)
         Vm: ArrayLike = self.Vm(volume)
+        # jax.debug.print("Vm = {Vm}", Vm=Vm)
+        ptr: ArrayLike = pressure * volume / (GAS_CONSTANT_BAR * temperature)
+        # jax.debug.print("ptr = {ptr}", ptr=ptr)
 
-        # ptr: ArrayLike = Pm / (GAS_CONSTANT_BAR * Tm)
-        ptr: ArrayLike = Pm / (8.314472 * Tm)
-
-        a: ArrayLike = self._get_parameter(temperature, self._coefficients[0:3])
-        b: ArrayLike = self._get_parameter(temperature, self._coefficients[3:6])
-        c: ArrayLike = self._get_parameter(temperature, self._coefficients[6:9])
-        d: ArrayLike = self._get_parameter(temperature, self._coefficients[9:12])
+        b: ArrayLike = self._get_parameter(Tm, self._coefficients[0:3])
+        # jax.debug.print("b = {b}", b=b)
+        c: ArrayLike = self._get_parameter(Tm, self._coefficients[3:6])
+        # jax.debug.print("c = {c}", c=c)
+        d: ArrayLike = self._get_parameter(Tm, self._coefficients[6:9])
+        # jax.debug.print("d = {d}", d=d)
+        e: ArrayLike = self._get_parameter(Tm, self._coefficients[9:12])
+        # jax.debug.print("e = {e}", e=e)
 
         term1: Array = (
-            1 / jnp.asarray(Vm)
-            + a / jnp.square(Vm)
-            + b / jnp.power(Vm, 3)
-            + c / jnp.power(Vm, 5)
-            + d / jnp.power(Vm, 6)
+            jnp.asarray(1)
+            + b / jnp.asarray(Vm)
+            + c / jnp.power(Vm, 2)
+            + d / jnp.power(Vm, 4)
+            + e / jnp.power(Vm, 5)
         )
 
         a13: float = self._coefficients[12]
         a14: float = self._coefficients[13]
         a15: float = self._coefficients[14]
-        term2: Array = a13 / jnp.power(Tm, 3) / jnp.power(Vm, 3)
-        term2 = term2 * (a14 + a15 / jnp.square(Vm))
-        term2 = term2 * jnp.exp(-a15 / jnp.square(Vm))
+        term2: Array = (
+            a13
+            / jnp.power(Tm, 3)
+            / jnp.power(Vm, 2)
+            * (a14 + a15 / jnp.square(Vm))
+            * jnp.exp(-a15 / jnp.square(Vm))
+        )
 
         residual: Array = term1 + term2 - ptr
+        # jax.debug.print("residual = {residual}", residual=residual)
 
         return residual
 
     @override
     @jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Solves the RK equation numerically to compute the volume.
+        r"""Computes the volume numerically.
 
         Args:
             temperature: Temperature in K
@@ -208,11 +201,10 @@ class ZhangDuan(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        # FIXME: Solve for Vm then convert back
-        initial_volume: ArrayLike = 22  # e-5  # self.initial_volume(temperature, pressure)
+        # TODO: Find a good way of specifying an initial guess
+        initial_volume: ArrayLike = 22e-6  # self.initial_volume(temperature, pressure)
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
-        # atol reduced since typical volumes are around 1e-5 to 1e-6
         solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
         sol = optx.root_find(
             self._objective_function,
@@ -228,6 +220,7 @@ class ZhangDuan(RealGas):
 
         return volume
 
+    @override
     @jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral :cite:p:`HP91{Appendix A}`
@@ -254,6 +247,7 @@ class ZhangDuan(RealGas):
         Returns:
             Log fugacity
         """
+        # TODO: Maybe update?
         log_fugacity: Array = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT_BAR * temperature
         )
@@ -294,26 +288,19 @@ def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
     """
 
     # Species-specific constants from the Fortran data blocks
-    eps = np.zeros(17)
-    sig3 = np.zeros(17)
-    eps[[1, 2, 3, 4, 5, 7, 16]] = [510, 235, 105.6, 154, 31.2, 0, 124.5]
-    sig3[[1, 2, 3, 4, 5, 7, 16]] = [
-        23.887872,
-        54.439939,
-        49.027896,
-        50.28426837,
-        25.153757,
-        0,
-        37.933056,
-    ]
+    eps = np.array([510, 235, 105.6, 154, 31.2, 124.5, 246.1])
+    sig = np.array([2.88, 3.79, 3.66, 3.691, 2.93, 3.36, 4.35])
 
-    if i not in [1, 2, 3, 4, 5, 7, 16]:
-        raise ValueError("Unsupported species index")
+    sig3 = sig**3
 
     # Initial guess for volume (in cm³/mol)
     vol = 50.0
 
+    # P is in bar, divide by ten converts to MPa
+    # r is 8.314, t is in K
+    # Note that these appear to be the actual P and T, not scaled variables.
     prt = p / (10.0 * r * t)
+
     gamm = 6.123507682 * sig3[i] ** 2
     et = eps[i] / t
     et2 = et**2
@@ -326,6 +313,7 @@ def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
     ge = 16.60301885 * et2 * et * sig3[i] ** 4
 
     for it in range(max_iter):
+        # vi is inverse of the actual volume, not scaled
         vi = 1.0 / vol
         expg = np.exp(-gamm * vi * vi)
 
@@ -363,6 +351,8 @@ def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
                 )
                 / vol
             )
+            # TODO: Perple_X has this term, but the value seems to be a factor of ten larger
+            # than the volume in cm^3. Unsure why.
             vol *= 10.0  # Convert from J/bar to cm³/mol
             return vol, lnfug
 
@@ -386,8 +376,6 @@ def get_zhang_eos_models() -> dict[str, RealGasProtocol]:
 
     The naming convention is as follows:
         [species]_[eos model]_[citation]
-
-    'cs' refers to corresponding states.
 
     Returns:
         Dictionary of EOS models
@@ -426,5 +414,26 @@ def test():
     print("volume_high (Holland and Powell) = ", volume_high_HP, ", target = 1.837e-05")
 
 
+def perple_X():
+    """The volume agrees with the data in Table 6 if the volume is divided by 10."""
+
+    temperature_low: float = 1203.15
+    pressure_low: float = 9500
+    temperature_high: float = 1873.15
+    pressure_high: float = 25000
+
+    volume_low_ZD, lnfug_low_ZD = zd09_pure_species(0, pressure_low, temperature_low, 8.314, 1)
+    print("volume_low (Zhang and Duan) = ", volume_low_ZD, ", target = 2.22e-05")
+    print("lnfug_low_ZD = ", lnfug_low_ZD)
+
+    volume_high_ZD, lnfug_high = zd09_pure_species(0, pressure_high, temperature_high, 8.314, 1)
+    print("volume_high (Zhang and Duan) = ", volume_high_ZD, ", target = 1.941e-05")
+    print("lnfug_high_ZD = ", lnfug_high)
+
+
 if __name__ == "__main__":
+    print("test below")
     test()
+    print()
+    print("perple_X below")
+    perple_X()
