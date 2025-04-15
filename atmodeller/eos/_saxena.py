@@ -587,7 +587,7 @@ also adopted.
 
 
 def get_saxena_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of Saxena and colleagues EOS models that are bounded
+    """Gets a dictionary of Saxena and colleagues EOS models
 
     'cs' refers to corresponding states.
 

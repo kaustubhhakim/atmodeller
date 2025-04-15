@@ -34,6 +34,7 @@ from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData
 from atmodeller.utilities import (
+    OptxSolver,
     PyTreeNoData,
     safe_exp,
 )
@@ -543,7 +544,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         # atol reduced since typical volumes are around 1e-5 to 1e-6
-        solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
+        solver: OptxSolver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
         sol = optx.root_find(
             self._objective_function, solver, initial_volume, args=kwargs, throw=False
         )

@@ -145,7 +145,7 @@ He_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
 
 
 def get_holley_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of Holley EOS models that are bounded
+    """Gets a dictionary of Holley EOS models
 
     The naming convention is as follows:
         [species]_[eos model]_[citation]
