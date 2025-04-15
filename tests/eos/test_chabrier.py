@@ -26,8 +26,8 @@ MODEL_SUFFIX: str = "chabrier21"
 """Suffix of the :cite:t:`CD21` models"""
 
 
-def test_Chabrier_H2_volume_100kbar(check_values) -> None:
-    """Tests Chabrier volume at 100 kbar"""
+def test_H2_volume_100kbar(check_values) -> None:
+    """Tests volume at 100 kbar"""
     expected: float = 9.005066169376918
     expected *= unit_conversion.cm3_to_m3
     check_values.volume(
@@ -40,8 +40,8 @@ def test_Chabrier_H2_volume_100kbar(check_values) -> None:
     )
 
 
-def test_Chabrier_H2_fugacity_coefficient_100kbar(check_values) -> None:
-    """Tests Chabrier fugacity coefficient at 100 kbar"""
+def test_H2_fugacity_coefficient_100kbar(check_values) -> None:
+    """Tests fugacity coefficient at 100 kbar"""
     # Assumes 1000 integration steps
     expected: float = 32.84516697626837
     check_values.fugacity_coefficient(
@@ -54,8 +54,8 @@ def test_Chabrier_H2_fugacity_coefficient_100kbar(check_values) -> None:
     )
 
 
-def test_Chabrier_H2_volume_1000kbar(check_values) -> None:
-    """Tests Chabrier volume at 1000 kbar"""
+def test_H2_volume_1000kbar(check_values) -> None:
+    """Tests volume at 1000 kbar"""
     expected: float = 3.0100820540769166
     expected *= unit_conversion.cm3_to_m3
     check_values.volume(
@@ -68,8 +68,8 @@ def test_Chabrier_H2_volume_1000kbar(check_values) -> None:
     )
 
 
-def test_Chabrier_H2_fugacity_coefficient_1000kbar(check_values) -> None:
-    """Tests Chabrier fugacity coefficient at 1000 kbar"""
+def test_H2_fugacity_coefficient_1000kbar(check_values) -> None:
+    """Tests fugacity coefficient at 1000 kbar"""
     # Assumes 1000 integration steps
     expected: float = 451196.92186256585
     check_values.fugacity_coefficient(
