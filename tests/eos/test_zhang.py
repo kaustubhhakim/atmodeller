@@ -52,3 +52,17 @@ def test_H2O_volume_high_TP(check_values) -> None:
         rtol=RTOL,
         atol=ATOL,
     )
+
+
+def test_H2O_volume_high_TP2(check_values) -> None:
+    """Tests volume at 1373.15 K and 3500 MPa :cite:t:`ZD09{Table 6}`"""
+    expected: float = 16.02290245403692
+    expected *= unit_conversion.cm3_to_m3
+    check_values.volume(
+        1373.15,
+        35000,  # 3500 MPa
+        check_values.get_eos_model("H2O", MODEL_SUFFIX),
+        expected,
+        rtol=RTOL,
+        atol=ATOL,
+    )

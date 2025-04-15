@@ -32,7 +32,7 @@ from jax.typing import ArrayLike
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import RealGas
 from atmodeller.interfaces import RealGasProtocol
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import OptxSolver, unit_conversion
 
 if sys.version_info < (3, 12):
     from typing_extensions import override
@@ -137,7 +137,10 @@ class ZhangDuan(RealGas):
 
     @jit
     def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
-        r"""Objective function to solve for the volume
+        r"""Objective function to solve for the volume :cite:p:`ZD09{Equation 8}`.
+
+        Note that the left-hand side of :cite:t:`ZD09{Equation 8}` is the compressibility factor
+        so should be expressed in terms of P, V, R, and T, and not the scaled equivalents.
 
         Args:
             volume: Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
@@ -153,6 +156,9 @@ class ZhangDuan(RealGas):
         # jax.debug.print("Tm = {Tm}", Tm=Tm)
         Vm: ArrayLike = self.Vm(volume)
         # jax.debug.print("Vm = {Vm}", Vm=Vm)
+        # Zhang and Duan (2009) use scaled quantities, according to the paper, but this is
+        # presumably a typo and in fact the actual P and T should be used. This agrees with the
+        # Perple_X implementation and the reported volumes in Table 6.
         ptr: ArrayLike = pressure * volume / (GAS_CONSTANT_BAR * temperature)
         # jax.debug.print("ptr = {ptr}", ptr=ptr)
 
@@ -201,11 +207,12 @@ class ZhangDuan(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        # TODO: Find a good way of specifying an initial guess
-        initial_volume: ArrayLike = 22e-6  # self.initial_volume(temperature, pressure)
+        # The initial guess is at the upper end of values in Table 6 for generally high temperature
+        # and pressure conditions.
+        initial_volume: ArrayLike = 25 * unit_conversion.cm3_to_m3
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
-        solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
+        solver: OptxSolver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
         sol = optx.root_find(
             self._objective_function,
             solver,
@@ -223,7 +230,7 @@ class ZhangDuan(RealGas):
     @override
     @jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Volume integral :cite:p:`HP91{Appendix A}`
+        r"""Volume integral
 
         Args:
             temperature: Temperature in K
@@ -238,7 +245,7 @@ class ZhangDuan(RealGas):
     @override
     @jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Log fugacity :cite:p:`HP91{Equation 8}`
+        r"""Log fugacity
 
         Args:
             temperature: Temperature in K
@@ -247,7 +254,6 @@ class ZhangDuan(RealGas):
         Returns:
             Log fugacity
         """
-        # TODO: Maybe update?
         log_fugacity: Array = self.volume_integral(temperature, pressure) / (
             GAS_CONSTANT_BAR * temperature
         )
@@ -370,12 +376,7 @@ C2H6_zhang09: RealGasProtocol = ZhangDuan(246.1, 4.35)
 
 
 def get_zhang_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of Zhang and Duan EOS models that are bounded
-
-    TODO: Make bounded?
-
-    The naming convention is as follows:
-        [species]_[eos model]_[citation]
+    """Gets a dictionary of Zhang and Duan EOS models
 
     Returns:
         Dictionary of EOS models
