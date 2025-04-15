@@ -178,14 +178,14 @@ class RealGas(ABC):
 
     @jit
     def log_fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log of the fugacity coefficient
+        """Log fugacity coefficient
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Log of the fugacity coefficient, which is dimensionless
+            Log fugacity coefficient, which is dimensionless
         """
         return self.log_fugacity(temperature, pressure) - self.ideal_log_fugacity(
             temperature, pressure

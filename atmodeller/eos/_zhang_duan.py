@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import sys
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
@@ -76,7 +75,7 @@ class ZhangDuan(RealGas):
         )
 
     @jit
-    def Pm(self, pressure: ArrayLike) -> Array:
+    def _Pm(self, pressure: ArrayLike) -> Array:
         """Scaled pressure
 
         Args:
@@ -91,7 +90,7 @@ class ZhangDuan(RealGas):
         return scaled_pressure
 
     @jit
-    def Tm(self, temperature: ArrayLike) -> ArrayLike:
+    def _Tm(self, temperature: ArrayLike) -> ArrayLike:
         """Scaled temperature
 
         Args:
@@ -105,7 +104,7 @@ class ZhangDuan(RealGas):
         return scaled_temperature
 
     @jit
-    def Vm(self, volume: ArrayLike) -> Array:
+    def _Vm(self, volume: ArrayLike) -> Array:
         r"""Scaled volume
 
         Args:
@@ -136,6 +135,39 @@ class ZhangDuan(RealGas):
         )
 
     @jit
+    def _S1(self, Tm: ArrayLike, Vm: ArrayLike) -> Array:
+        """S1 term :cite:p:`ZD09{Equation 15}`
+
+        Args:
+            Tm: Scaled temperature
+            Vm: Scaled volume
+
+        Returns:
+            S1 term
+        """
+        b: Array = self._get_parameter(Tm, self._coefficients[0:3])
+        c: Array = self._get_parameter(Tm, self._coefficients[3:6])
+        d: Array = self._get_parameter(Tm, self._coefficients[6:9])
+        e: Array = self._get_parameter(Tm, self._coefficients[9:12])
+        a13: float = self._coefficients[12]
+        a14: float = self._coefficients[13]
+        a15: float = self._coefficients[14]
+
+        S1: Array = (
+            b / Vm
+            + c / (2 * jnp.square(Vm))
+            + d / (4 * jnp.power(Vm, 4))
+            + e / (5 * jnp.power(Vm, 5))
+        )
+        S1 = S1 + (
+            a13
+            / (2 * a15 * jnp.power(Tm, 3))
+            * (a14 + 1 - (a14 + 1 + a15 / jnp.square(Vm)) * jnp.exp(-a15 / jnp.square(Vm)))
+        )
+
+        return S1
+
+    @jit
     def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
         r"""Objective function to solve for the volume :cite:p:`ZD09{Equation 8}`.
 
@@ -152,9 +184,9 @@ class ZhangDuan(RealGas):
         temperature: ArrayLike = kwargs["temperature"]
         pressure: ArrayLike = kwargs["pressure"]
 
-        Tm: ArrayLike = self.Tm(temperature)
+        Tm: ArrayLike = self._Tm(temperature)
         # jax.debug.print("Tm = {Tm}", Tm=Tm)
-        Vm: ArrayLike = self.Vm(volume)
+        Vm: ArrayLike = self._Vm(volume)
         # jax.debug.print("Vm = {Vm}", Vm=Vm)
         # Zhang and Duan (2009) use scaled quantities, according to the paper, but this is
         # presumably a typo and in fact the actual P and T should be used. This agrees with the
@@ -218,14 +250,38 @@ class ZhangDuan(RealGas):
             solver,
             initial_volume,
             args=kwargs,
-            throw=True,  # TODO: Update throw to False when working
+            throw=False,
         )
         volume: ArrayLike = sol.value
         # jax.debug.print("volume = {out}", out=volume)
-
-        jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+        # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
 
         return volume
+
+    @override
+    @jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log fugacity :cite:p:`ZD09{Equation 14}`
+
+        This is for a pure species and does not include the terms to enable end member mixing.
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity in bar
+        """
+        volume: Array = self.volume(temperature, pressure)
+        Vm: Array = self._Vm(volume)
+        Tm: Array = self._Tm(temperature)
+        # Compute the compressibility factor directly to avoid another solve for volume
+        Z: ArrayLike = pressure * volume / (GAS_CONSTANT_BAR * temperature)
+        log_fugacity_coefficient: Array = Z - 1 - jnp.log(Z) + self._S1(Tm, Vm)
+        log_fugacity: Array = log_fugacity_coefficient + jnp.log(pressure)
+        # jax.debug.print("log_fugacity_coefficient = {out}", out=log_fugacity_coefficient)
+
+        return log_fugacity
 
     @override
     @jit
@@ -239,26 +295,10 @@ class ZhangDuan(RealGas):
         Returns:
             Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
-        # FIXME
-        raise NotImplementedError()
+        log_fugacity: Array = self.log_fugacity(temperature, pressure)
+        volume_integral: Array = log_fugacity * GAS_CONSTANT_BAR * temperature
 
-    @override
-    @jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Log fugacity
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity
-        """
-        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
-            GAS_CONSTANT_BAR * temperature
-        )
-
-        return log_fugacity
+        return volume_integral
 
     def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
         children: tuple = ()
@@ -423,18 +463,46 @@ def perple_X():
     temperature_high: float = 1873.15
     pressure_high: float = 25000
 
-    volume_low_ZD, lnfug_low_ZD = zd09_pure_species(0, pressure_low, temperature_low, 8.314, 1)
-    print("volume_low (Zhang and Duan) = ", volume_low_ZD, ", target = 2.22e-05")
-    print("lnfug_low_ZD = ", lnfug_low_ZD)
+    GAS_CONSTANT = GAS_CONSTANT_BAR * 1e5
 
-    volume_high_ZD, lnfug_high = zd09_pure_species(0, pressure_high, temperature_high, 8.314, 1)
-    print("volume_high (Zhang and Duan) = ", volume_high_ZD, ", target = 1.941e-05")
-    print("lnfug_high_ZD = ", lnfug_high)
+    volume_low_perplex, lnfug_low_perplex = zd09_pure_species(
+        0, pressure_low, temperature_low, GAS_CONSTANT, 1
+    )
+    print("volume_low_perplex = ", volume_low_perplex, ", target = 2.22e-05")
+    print("lnfug_low_perplex = ", lnfug_low_perplex)
+    print("fug_low_perplex = ", np.exp(lnfug_low_perplex))
+
+    volume_low_ZD = H2O_zhang09.volume(temperature_low, pressure_low)
+    print("volume_low = ", volume_low_ZD, ", target = 2.22e-05")
+    log_fugacity_coefficient_ZD = H2O_zhang09.log_fugacity_coefficient(
+        temperature_low, pressure_low
+    )
+    print("log_fugacity_coefficient_ZD = ", log_fugacity_coefficient_ZD)
+    fugacity_ZD = np.exp(log_fugacity_coefficient_ZD) * pressure_low
+    print("fugacity_ZD = ", fugacity_ZD)
+
+    print()
+
+    volume_high_perplex, lnfug_high_perplex = zd09_pure_species(
+        0, pressure_high, temperature_high, GAS_CONSTANT, 1
+    )
+    print("volume_high_perplex = ", volume_high_perplex, ", target = 1.941e-05")
+    print("lnfug_high_perplex = ", lnfug_high_perplex)
+    print("fug_high_perplex = ", np.exp(lnfug_high_perplex))
+
+    volume_high_ZD = H2O_zhang09.volume(temperature_high, pressure_high)
+    print("volume_high = ", volume_high_ZD, ", target = 1.941e-05")
+    log_fugacity_coefficient_ZD = H2O_zhang09.log_fugacity_coefficient(
+        temperature_high, pressure_high
+    )
+    print("log_fugacity_coefficient_ZD = ", log_fugacity_coefficient_ZD)
+    fugacity_ZD = np.exp(log_fugacity_coefficient_ZD) * pressure_high
+    print("fugacity_ZD = ", fugacity_ZD)
 
 
 if __name__ == "__main__":
-    print("test below")
-    test()
-    print()
+    # print("test below")
+    # test()
+    # print()
     print("perple_X below")
     perple_X()
