@@ -59,18 +59,6 @@ class RealGas(eqx.Module):
     """
 
     @abstractmethod
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log fugacity
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity in bar
-        """
-
-    @abstractmethod
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Volume
 
@@ -93,6 +81,23 @@ class RealGas(eqx.Module):
         Returns:
             Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
+
+    @eqx.filter_jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log fugacity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity in bar
+        """
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
+        )
+
+        return log_fugacity
 
     @eqx.filter_jit
     def volume_integral_J(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
@@ -150,7 +155,7 @@ class RealGas(eqx.Module):
             Compressibility factor, which is dimensionless
         """
         volume: ArrayLike = self.volume(temperature, pressure)
-        volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
+        volume_ideal: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
         compressibility_factor: ArrayLike = volume / volume_ideal
 
         return compressibility_factor
@@ -181,9 +186,7 @@ class RealGas(eqx.Module):
         Returns:
             Log fugacity coefficient, which is dimensionless
         """
-        return self.log_fugacity(temperature, pressure) - self.ideal_log_fugacity(
-            temperature, pressure
-        )
+        return self.log_fugacity(temperature, pressure) - jnp.log(pressure)
 
     @eqx.filter_jit
     def fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
@@ -197,39 +200,6 @@ class RealGas(eqx.Module):
             fugacity coefficient, which is dimensionless
         """
         return safe_exp(self.log_fugacity_coefficient(temperature, pressure))
-
-    @eqx.filter_jit
-    def ideal_log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Log fugacity of an ideal gas
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity of an ideal gas
-        """
-        del temperature
-        ideal_log_fugacity: ArrayLike = jnp.log(pressure)
-
-        return ideal_log_fugacity
-
-    @eqx.filter_jit
-    def ideal_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Volume of an ideal gas
-
-        This is required to compute the compressibility factor.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Ideal volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
-        """
-        ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
-
-        return ideal_volume
 
 
 class IdealGas(RealGas):
@@ -245,18 +215,13 @@ class IdealGas(RealGas):
 
     @override
     @eqx.filter_jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        return self.ideal_log_fugacity(temperature, pressure)
-
-    @override
-    @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        return self.ideal_volume(temperature, pressure)
+        return GAS_CONSTANT_BAR * temperature / pressure
 
     @override
     @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        return self.log_fugacity(temperature, pressure) * GAS_CONSTANT_BAR * temperature
+        return jnp.log(pressure) * GAS_CONSTANT_BAR * temperature
 
 
 class RedlichKwongABC(RealGas):
@@ -321,24 +286,6 @@ class RedlichKwongABC(RealGas):
         )
 
         return volume_integral
-
-    @override
-    @eqx.filter_jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Log fugacity :cite:p:`HP91{Equation 8}`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity
-        """
-        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
-            GAS_CONSTANT_BAR * temperature
-        )
-
-        return log_fugacity
 
     @override
     @eqx.filter_jit
@@ -761,25 +708,7 @@ class CORK(RealGas):
 
     @override
     @eqx.filter_jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log fugacity :cite:p:`HP91{Equation 8}`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity
-        """
-        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
-            GAS_CONSTANT_BAR * temperature
-        )
-
-        return log_fugacity
-
-    @override
-    @eqx.filter_jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Volume :cite:p:`HP91{Equation 7a}`
 
         Args:
@@ -789,7 +718,7 @@ class CORK(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        volume: Array = self.mrk.volume(temperature, pressure) + self.virial.volume(
+        volume: ArrayLike = self.mrk.volume(temperature, pressure) + self.virial.volume(
             temperature, pressure, self.critical_data
         )
 

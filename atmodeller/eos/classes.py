@@ -161,7 +161,7 @@ class BeattieBridgeman(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        initial_volume: ArrayLike = self.ideal_volume(temperature, pressure)
+        initial_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)

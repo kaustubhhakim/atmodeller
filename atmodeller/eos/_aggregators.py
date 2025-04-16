@@ -41,8 +41,11 @@ except ImportError:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class CombinedRealGasABC(RealGas):
-    """Base class for combining real gas EOS
+class CombinedRealGas(RealGas):
+    """Combined real gas EOS with separate volume integrations for each EOS
+
+    This class computes the contribution to the volume integral separately for each EOS based on
+    the range covered by its P-T calibration, and then combines them.
 
     Args:
         real_gases: Real gases to combine
@@ -57,175 +60,6 @@ class CombinedRealGasABC(RealGas):
 
     def __post_init__(self):
         self._upper_pressure_bounds: Array = self._get_upper_pressure_bounds()
-
-    @property
-    def volume_functions(self) -> list[Callable]:
-        """Volume functions"""
-        return [eos.volume for eos in self.real_gases]
-
-    @property
-    def volume_integral_functions(self) -> list[Callable]:
-        """Volume integral functions"""
-        return [eos.volume_integral for eos in self.real_gases]
-
-    # Jitting might cause problem with initialization?
-    def _get_upper_pressure_bounds(self) -> Array:
-        """Gets the upper pressure bounds based on each experimental calibration.
-
-        # TODO: Obvious candidate for improvement if this is a bottleneck.
-
-        Returns:
-            Upper pressure bounds
-        """
-        upper_pressure_bounds: list[float] = []
-
-        for ii, calibration in enumerate(self.calibrations):
-            try:
-                assert calibration.pressure_max is not None
-            except AssertionError:
-                if ii == len(self.calibrations) - 1:
-                    continue
-                else:
-                    msg: str = "Maximum pressure cannot be None"
-                    raise ValueError(msg)
-
-            pressure_bound = calibration.pressure_max
-            upper_pressure_bounds.append(pressure_bound)
-
-        return jnp.array(upper_pressure_bounds)
-
-    @eqx.filter_jit
-    def _get_index(self, pressure: ArrayLike) -> Array:
-        """Gets the index of the appropriate EOS model based on `pressure`.
-
-        Args:
-            pressure: Pressure in bar
-
-        Returns:
-            Index of the relevant EOS model
-        """
-        index: Array = jnp.searchsorted(self._upper_pressure_bounds, pressure, side="right")
-        # jax.debug.print("pressure = {pressure}, index = {index}", pressure=pressure, index=index)
-
-        return index
-
-    @override
-    @eqx.filter_jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        index: Array = self._get_index(pressure)
-        volume: Array = lax.switch(index, self.volume_functions, temperature, pressure)
-
-        return volume
-
-    @override
-    @eqx.filter_jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
-            GAS_CONSTANT_BAR * temperature
-        )
-
-        return log_fugacity
-
-
-class UpperBoundRealGas(RealGas):
-    """An upper bound for an EOS
-
-    This is used to extrapolate an EOS assuming that the compressibility factor is a linear
-    function of pressure. Importantly, this class is not intended to be used directly, but rather
-    as a component of `CombinedRealGas`.
-
-    Args:
-        real_gas: Real gas to evaluate the compressibility factor at `p_eval`.
-        p_eval: Evaluation pressure in bar. This is usually the maximum calibration pressure
-            of `real_gas`. Defaults to 1 bar.
-        dzdp: Gradient of the compressibility factor. Defaults to 0.
-    """
-
-    real_gas: RealGasProtocol
-    """Real gas to evaluate the compressibility factor at `p_eval`"""
-    p_eval: float = 1
-    """Evaluation pressure in bar"""
-    dzdp: float = 0
-    """Gradient of the compressibility factor"""
-
-    @eqx.filter_jit
-    def _z0(self, temperature: ArrayLike) -> ArrayLike:
-        """Compressibility factor of the previous EOS to blend smoothly with.
-
-        Args:
-            temperature: Temperature in K
-        """
-        return self.real_gas.compressibility_factor(temperature, self.p_eval)
-
-    @override
-    @eqx.filter_jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log fugacity cannot be computed.
-
-        This method should not be used because the volume integral is only defined above `p_eval`,
-        meaning that the log fugacity cannot be calculated.
-        """
-        del temperature
-        del pressure
-
-        raise NotImplementedError("This method should not be used")
-
-    @override
-    @eqx.filter_jit
-    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        compressibility_factor: ArrayLike = self._z0(temperature) + self.dzdp * (
-            pressure - self.p_eval
-        )
-
-        return compressibility_factor
-
-    @override
-    @jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        return self.compressibility_factor(temperature, pressure) * self.ideal_volume(
-            temperature, pressure
-        )
-
-    @override
-    @eqx.filter_jit
-    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        volume_integral: Array = (
-            (
-                jnp.log(pressure / self.p_eval) * (self._z0(temperature) - self.dzdp * self.p_eval)
-                + self.dzdp * (pressure - self.p_eval)
-            )
-            * GAS_CONSTANT_BAR
-            * temperature
-        )
-
-        return volume_integral
-
-
-class CombinedRealGasSwitch(CombinedRealGasABC):
-    """Combined real gas EOS
-
-    This class selects the EOS to use based on an index. This is only meaningful if subsequent EOS
-    contain the contribution of previous EOS, otherwise there will be a mismatch across the joining
-    boundary and the resulting EOS will not be continuous.
-    """
-
-    @override
-    @eqx.filter_jit
-    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        index: Array = self._get_index(pressure)
-        volume_integral: Array = lax.switch(
-            index, self.volume_integral_functions, temperature, pressure
-        )
-
-        return volume_integral
-
-
-class CombinedRealGas(CombinedRealGasABC):
-    """Combined real gas EOS with separate volume integrations for each EOS
-
-    This class computes the contribution to the volume integral separately for each EOS based on
-    the range covered by its P-T calibration, and then combines them.
-    """
 
     @classmethod
     def create(
@@ -299,6 +133,66 @@ class CombinedRealGas(CombinedRealGasABC):
         real_gases.append(real_gas)
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=pressure_min)
         calibrations.append(calibration)
+
+    @property
+    def volume_functions(self) -> list[Callable]:
+        """Volume functions"""
+        return [eos.volume for eos in self.real_gases]
+
+    @property
+    def volume_integral_functions(self) -> list[Callable]:
+        """Volume integral functions"""
+        return [eos.volume_integral for eos in self.real_gases]
+
+    # Jitting might cause problem with initialization?
+    def _get_upper_pressure_bounds(self) -> Array:
+        """Gets the upper pressure bounds based on each experimental calibration.
+
+        # TODO: Obvious candidate for improvement if this is a bottleneck.
+
+        Returns:
+            Upper pressure bounds
+        """
+        upper_pressure_bounds: list[float] = []
+
+        for ii, calibration in enumerate(self.calibrations):
+            try:
+                assert calibration.pressure_max is not None
+            except AssertionError:
+                if ii == len(self.calibrations) - 1:
+                    continue
+                else:
+                    msg: str = "Maximum pressure cannot be None"
+                    raise ValueError(msg)
+
+            pressure_bound = calibration.pressure_max
+            upper_pressure_bounds.append(pressure_bound)
+
+        return jnp.array(upper_pressure_bounds)
+
+    @eqx.filter_jit
+    def _get_index(self, pressure: ArrayLike) -> Array:
+        """Gets the index of the appropriate EOS model based on `pressure`.
+
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            Index of the relevant EOS model
+        """
+        index: Array = jnp.searchsorted(self._upper_pressure_bounds, pressure, side="right")
+        # jax.debug.print("pressure = {pressure}, index = {index}", pressure=pressure, index=index)
+
+        return index
+
+    @override
+    @eqx.filter_jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        # FIXME: lax.switch incompatible with index as an array
+        index: Array = self._get_index(pressure)
+        volume: Array = lax.switch(index, self.volume_functions, temperature, pressure)
+
+        return volume
 
     @override
     @eqx.filter_jit
@@ -403,3 +297,77 @@ class CombinedRealGas(CombinedRealGasABC):
         total_integral, _ = lax.scan(scan_fn, total_integral, loop_indices)
 
         return total_integral
+
+
+class UpperBoundRealGas(RealGas):
+    """An upper bound for an EOS
+
+    This is used to extrapolate an EOS assuming that the compressibility factor is a linear
+    function of pressure. Importantly, this class is not intended to be used directly, but rather
+    as a component of `CombinedRealGas`.
+
+    Args:
+        real_gas: Real gas to evaluate the compressibility factor at `p_eval`.
+        p_eval: Evaluation pressure in bar. This is usually the maximum calibration pressure
+            of `real_gas`. Defaults to 1 bar.
+        dzdp: Gradient of the compressibility factor. Defaults to 0.
+    """
+
+    real_gas: RealGasProtocol
+    """Real gas to evaluate the compressibility factor at `p_eval`"""
+    p_eval: float = 1
+    """Evaluation pressure in bar"""
+    dzdp: float = 0
+    """Gradient of the compressibility factor"""
+
+    @eqx.filter_jit
+    def _z0(self, temperature: ArrayLike) -> ArrayLike:
+        """Compressibility factor of the previous EOS to blend smoothly with.
+
+        Args:
+            temperature: Temperature in K
+        """
+        return self.real_gas.compressibility_factor(temperature, self.p_eval)
+
+    @override
+    @eqx.filter_jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log fugacity cannot be computed.
+
+        This method should not be used because the volume integral is only defined above `p_eval`,
+        meaning that the log fugacity cannot be calculated.
+        """
+        del temperature
+        del pressure
+
+        raise NotImplementedError("This method should not be used")
+
+    @override
+    @eqx.filter_jit
+    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        compressibility_factor: ArrayLike = self._z0(temperature) + self.dzdp * (
+            pressure - self.p_eval
+        )
+
+        return compressibility_factor
+
+    @override
+    @jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        return self.compressibility_factor(temperature, pressure) * self.ideal_volume(
+            temperature, pressure
+        )
+
+    @override
+    @eqx.filter_jit
+    def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        volume_integral: Array = (
+            (
+                jnp.log(pressure / self.p_eval) * (self._z0(temperature) - self.dzdp * self.p_eval)
+                + self.dzdp * (pressure - self.p_eval)
+            )
+            * GAS_CONSTANT_BAR
+            * temperature
+        )
+
+        return volume_integral
