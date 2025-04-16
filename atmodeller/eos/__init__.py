@@ -21,6 +21,13 @@ from importlib.abc import Traversable
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory, which is the same as the package directory"""
+# ABSOLUTE_TOLERANCE is less than RELATIVE_TOLERANCE because typical volumes are around 1e-6
+ABSOLUTE_TOLERANCE: float = 1.0e-12
+r"""Absolute tolerance when solving for the volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
+RELATIVE_TOLERANCE: float = 1.0e-6
+r"""Relative tolerance when solving for the volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
+THROW: bool = True
+"""Whether to throw errors. Change to True for debugging purposes."""
 
 # Expose the public API
 from atmodeller.eos._aggregators import (  # noqa: E402, F401

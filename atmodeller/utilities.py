@@ -294,6 +294,7 @@ class UnitConversion(NamedTuple):
     bar_to_MPa: float = 1.0e-1
     bar_to_GPa: float = 1.0e-4
     Pa_to_bar: float = 1.0e-5
+    MPa_to_bar: float = 1.0e1
     GPa_to_bar: float = 1.0e4
     fraction_to_ppm: float = mega
     g_to_kg: float = 1 / kilo

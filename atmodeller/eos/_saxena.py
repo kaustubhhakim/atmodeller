@@ -26,9 +26,9 @@ import logging
 import sys
 from abc import abstractmethod
 
+import equinox as eqx
 import jax.numpy as jnp
 from jax import Array, jit
-from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
 from atmodeller import PRESSURE_REFERENCE
@@ -45,9 +45,9 @@ else:
     from typing import override
 
 if sys.version_info < (3, 11):
-    from typing_extensions import Self
+    pass
 else:
-    from typing import Self
+    pass
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -269,24 +269,23 @@ class SaxenaABC(RealGas):
 
         return volume_integral
 
-    def tree_flatten(self) -> tuple[tuple, dict[str, tuple[float, ...]]]:
-        children: tuple = ()
-        aux_data = {
-            "a_coefficients": self._a_coefficients,
-            "b_coefficients": self._b_coefficients,
-            "c_coefficients": self._c_coefficients,
-            "d_coefficients": self._d_coefficients,
-            "critical_data": self._critical_data,
-        }
-        return (children, aux_data)
+    # def tree_flatten(self) -> tuple[tuple, dict[str, tuple[float, ...]]]:
+    #     children: tuple = ()
+    #     aux_data = {
+    #         "a_coefficients": self._a_coefficients,
+    #         "b_coefficients": self._b_coefficients,
+    #         "c_coefficients": self._c_coefficients,
+    #         "d_coefficients": self._d_coefficients,
+    #         "critical_data": self._critical_data,
+    #     }
+    #     return (children, aux_data)
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
+    # @classmethod
+    # def tree_unflatten(cls, aux_data, children) -> Self:
+    #     del children
+    #     return cls(**aux_data)
 
 
-@register_pytree_node_class
 class SaxenaFiveCoefficients(SaxenaABC):
     """Real gas EOS with five coefficients, which is generally used for low pressures"""
 
@@ -316,8 +315,7 @@ class SaxenaFiveCoefficients(SaxenaABC):
         return coefficient
 
 
-@register_pytree_node_class
-class SaxenaEightCoefficients(SaxenaABC):
+class SaxenaEightCoefficients(SaxenaABC, eqx.Module):
     """Real gas EOS with eight coefficients, which is generally used for high pressures"""
 
     @override

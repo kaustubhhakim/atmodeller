@@ -1037,7 +1037,7 @@ H2O_cork_gas_fluid_holland98_bounded: RealGasProtocol = CombinedRealGas(
 
 
 def get_holland_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of Holland and Powell EOS models
+    """Gets a dictionary of EOS models
 
     The naming convention is as follows:
         [species]_[eos model]_[citation]
