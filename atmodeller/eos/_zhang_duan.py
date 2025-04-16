@@ -410,7 +410,18 @@ def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
 # The choice of the initial volume guess is really important and the value should ideally allow the
 # model to converge to the correct physical route across the entire range of pressures and
 # temperatures, at least up to the maximum calibration pressure of 10 GPa.
-CH4_zhang09: RealGasProtocol = ZhangDuan(154.0, 3.691)
+CH4_zhang09: RealGasProtocol = ZhangDuan(154.0, 3.691, 25 * unit_conversion.cm3_to_m3)
+CH4_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
+    temperature_min=273,
+    temperature_max=2573,
+    pressure_min=0.1 * unit_conversion.MPa_to_bar,
+    pressure_max=10000 * unit_conversion.MPa_to_bar,
+)
+r"""Experimental calibration for CH4 :cite:p:`ZD09{Table 5}`"""
+CH4_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
+    [CH4_zhang09], [CH4_experimental_calibration]
+)
+"""CH4 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
 H2O_zhang09: RealGasProtocol = ZhangDuan(510.0, 2.88)
 
@@ -429,7 +440,7 @@ r"""Experimental calibration for H2 :cite:p:`ZD09{Table 5}`"""
 H2_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2_zhang09], [H2_experimental_calibration]
 )
-"""H2 bounded to experimental data :cite:p:`ZD09{Table 5}`"""
+"""H2 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
 CO_zhang09: RealGasProtocol = ZhangDuan(105.6, 3.66)
 O2_zhang09: RealGasProtocol = ZhangDuan(124.5, 3.36)
@@ -444,9 +455,11 @@ def get_zhang_eos_models() -> dict[str, RealGasProtocol]:
     """
     eos_models: dict[str, RealGasProtocol] = {}
     eos_models["CH4_zhang09"] = CH4_zhang09
+    eos_models["CH4_zhang09_bounded"] = CH4_zhang09_bounded
     eos_models["H2O_zhang09"] = H2O_zhang09
     eos_models["CO2_zhang09"] = CO2_zhang09
-    eos_models["H2_zhang09"] = H2_zhang09  # _bounded
+    eos_models["H2_zhang09"] = H2_zhang09
+    eos_models["H2_zhang09_bounded"] = H2_zhang09_bounded
     eos_models["CO_zhang09"] = CO_zhang09
     eos_models["O2_zhang09"] = O2_zhang09
     eos_models["C2H6_zhang09"] = C2H6_zhang09

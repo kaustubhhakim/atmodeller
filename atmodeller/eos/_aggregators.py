@@ -24,7 +24,6 @@ from dataclasses import field
 from typing import Callable
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jax import Array, jit, lax
 from jax.typing import ArrayLike
@@ -72,6 +71,8 @@ class CombinedRealGasABC(RealGas):
     # Jitting might cause problem with initialization?
     def _get_upper_pressure_bounds(self) -> Array:
         """Gets the upper pressure bounds based on each experimental calibration.
+
+        # TODO: Obvious candidate for improvement if this is a bottleneck.
 
         Returns:
             Upper pressure bounds
@@ -303,116 +304,102 @@ class CombinedRealGas(CombinedRealGasABC):
     @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         index: Array = self._get_index(pressure)
-        jax.debug.print("index = {index}", index=index)
-        # temperature, pressure, index = jnp.broadcast_arrays(temperature, pressure, index)
-        temperature, pressure = jnp.broadcast_arrays(temperature, pressure)
-        jax.debug.print("temperature.shape = {temperature}", temperature=temperature.shape)
-        jax.debug.print("pressure.shape = {pressure}", pressure=pressure.shape)
-        jax.debug.print("index.shape = {index}", index=index.shape)
+        # Broadcasting might no longer be necessary but is kept for safety
+        # temperature, pressure = jnp.broadcast_arrays(temperature, pressure)
 
-        def compute_integral(
-            ii: Array, pressure_high: ArrayLike, pressure_low: ArrayLike
-        ) -> Array:
+        def compute_integral(i: Array, pressure_high: ArrayLike, pressure_low: ArrayLike) -> Array:
+            """Computes the volume integral for the given pressure range.
+
+            Args:
+                i: Index of the EOS model
+                pressure_high: Upper pressure bound
+                pressure_low: Lower pressure bound
+
+            Returns:
+                Volume integral"""
             volume_integral_high: Array = lax.switch(
-                ii, self.volume_integral_functions, temperature, pressure_high
+                i, self.volume_integral_functions, temperature, pressure_high
             )
-            # jax.debug.print("compute_integral: index = {ii}", ii=ii)
             # jax.debug.print(
             #    "compute_integral: volume_integral_high = {out}", out=volume_integral_high
             # )
             volume_integral_low: Array = lax.switch(
-                ii, self.volume_integral_functions, temperature, pressure_low
+                i, self.volume_integral_functions, temperature, pressure_low
             )
             # jax.debug.print(
             #    "compute_integral: volume_integral_low = {out}", out=volume_integral_low
             # )
-            integral_contribution = volume_integral_high - volume_integral_low
+            integral: Array = volume_integral_high - volume_integral_low
 
-            return integral_contribution
+            return integral
 
-        def scan_fn(carry: Array, i: Array):
-            jax.debug.print("scan_fn: i = {out}", out=i)
-            # Scalar pressures from EOS bounds (broadcast later)
-            pressure_high = lax.dynamic_index_in_dim(
-                self._upper_pressure_bounds, i, keepdims=False
-            )
+        def scan_fn(carry: Array, i: Array) -> tuple:
+            """Scan function for accumulating the volume integral
+
+            Args:
+                carry: Accumulated volume integral
+                i: Index of the EOS model
+
+            Returns:
+                Updated carry and None (unused)
+            """
+            # jax.debug.print("scan_fn: i = {out}", out=i)
             pressure_low = lax.dynamic_index_in_dim(
                 self._upper_pressure_bounds, i - 1, keepdims=False
             )
+            # jax.debug.print("pressure_low = {out}", out=pressure_low)
 
-            # Let compute_integral handle broadcasting
-            contrib = compute_integral(i, pressure_high, pressure_low)  # shape: broadcasted
-            jax.debug.print("contrib = {out}", out=contrib)
+            # Middle integrals
+            mask_middle: Array = i < index
+            # jax.debug.print("mask_middle = {out}", out=mask_middle)
+            pressure_high = lax.dynamic_index_in_dim(
+                self._upper_pressure_bounds, i, keepdims=False
+            )
+            # jax.debug.print("pressure_high = {out}", out=pressure_high)
+            contrib_middle: Array = compute_integral(i, pressure_high, pressure_low)
+            carry = carry + jnp.where(mask_middle, contrib_middle, 0.0)
 
-            # Mask by whether current i < index (broadcasts across everything)
-            jax.debug.print("index = {out}", out=index)
-            mask = i < index  # shape: broadcasted with contrib
-            jax.debug.print("mask = {out}", out=mask)
+            # Final integral
+            mask_final: Array = i == index
+            # jax.debug.print("mask_final = {out}", out=mask_final)
+            contrib_final: Array = compute_integral(i, pressure, pressure_low)
+            carry = carry + jnp.where(mask_final, contrib_final, 0.0)
+            # jax.debug.print("carry = {out}", out=carry)
 
-            carry = carry + jnp.where(mask, contrib, 0.0)
-            jax.debug.print("carry = {out}", out=carry)
             return carry, None
+
+        def add_first_integral(total_integral: Array) -> Array:
+            """Adds the contribution of the first integral to the total integral.
+
+            This is necessary because the first integral is not included in the loop over the
+            EOS models.
+
+            Args:
+                total_integral: Total integral so far
+
+            Returns:
+                Total integral with the first integral contribution added
+            """
+            # If the index is 0, then the first integral is the only one that is added.
+            integral: Array = lax.switch(0, self.volume_integral_functions, temperature, pressure)
+            # Otherwise, the first integral is added to the total integral.
+            pressure_max: Array = lax.dynamic_index_in_dim(
+                self._upper_pressure_bounds, 0, keepdims=False
+            )
+            integral2: Array = lax.switch(
+                0, self.volume_integral_functions, temperature, pressure_max
+            )
+
+            # jax.debug.print("add_only_first_integral: integral = {out}", out=integral)
+            return jnp.where(index == 0, total_integral + integral, total_integral + integral2)
 
         # Initialize. Must be 0.0 to ensure float array.
         total_integral: Array = jnp.array(0.0)
+        total_integral = add_first_integral(total_integral)
 
-        def add_only_first_integral(total_integral: Array) -> Array:
-            integral: Array = lax.switch(0, self.volume_integral_functions, temperature, pressure)
-            # jax.debug.print("add_only_first_integral: integral = {out}", out=integral)
-            return jnp.where(index == 0, total_integral + integral, total_integral)
-
-        total_integral = add_only_first_integral(total_integral)
-        jax.debug.print("total_integral after jnp.where = {out}", out=total_integral)
-
-        # FIXME: Need to make below broadcast compatible
-        # # TODO: Use lax scan for reverse differentiation compatibility
-        # # Loop over and accumulate the vdP integrations over the EOS. This will only do something
-        # # if index >= 2, so will effectively be ignored for index = 1, as desired
-        # total_integral: Array = lax.fori_loop(1, index, body_fun, total_integral)
-        # jax.debug.print("total_integral after lax.fori_loop = {out}", out=total_integral)
-
-        # Make sure this is the shape that supports broadcasting across inputs
-        # broadcast_shape = jnp.broadcast_shapes(
-        #    jnp.shape(temperature), jnp.shape(pressure), jnp.shape(index)
-        # )
-        # total_integral = jnp.zeros(broadcast_shape, dtype=jnp.result_type(temperature, pressure))
-
-        loop_indices = jnp.arange(1, self._upper_pressure_bounds.shape[0])  # shape (N-1,)
-        jax.debug.print("loop_indices = {out}", out=loop_indices)
+        # Scan over the indices of the EOS models.
+        loop_indices: Array = jnp.arange(1, self._upper_pressure_bounds.shape[0] + 1)
+        # jax.debug.print("loop_indices = {out}", out=loop_indices)
         total_integral, _ = lax.scan(scan_fn, total_integral, loop_indices)
-
-        def add_final_integral(total_integral):
-            # pressure_low = lax.dynamic_index_in_dim(
-            #    self._upper_pressure_bounds, index - 1, keepdims=False
-            # )
-            pressure_low = jnp.take(self._upper_pressure_bounds, index - 1)
-            jax.debug.print("pressure_low = {out}", out=pressure_low)
-            # final_integral = compute_integral(index, pressure, pressure_low)
-            # return jnp.where(index > 0, total_integral + final_integral, total_integral)
-
-        # def add_final_integral(total_integral: Array) -> Array:
-        #     # Account for the first integral, which thus far has not been included for index > 0.
-        #     pressure_high = lax.dynamic_index_in_dim(
-        #         self._upper_pressure_bounds, 0, keepdims=False
-        #     )
-        #     # Do not evaluate a difference because log(0) is not defined.
-        #     # TODO: Check. This evaluation for P<1 will be negative for an ideal gas.
-        #     first_integral: Array = lax.switch(
-        #         0, self.volume_integral_functions, temperature, pressure_high
-        #     )
-        #     # jax.debug.print("first_integral = {out}", out=first_integral)
-
-        #     pressure_low: Array = lax.dynamic_index_in_dim(
-        #         self._upper_pressure_bounds, index - 1, keepdims=False
-        #     )
-        #     final_integral: Array = compute_integral(index, pressure, pressure_low)
-
-        #     return first_integral + final_integral + total_integral
-
-        # total_integral = lax.cond(index > 0, add_final_integral, lambda x: x, total_integral)
-        # # jax.debug.print("total_integral = {out}", out=total_integral)
-
-        # total_integral = add_final_integral(total_integral)
-        add_final_integral(total_integral)
 
         return total_integral
