@@ -25,7 +25,7 @@ from typing import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit, lax
+from jax import Array, lax
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
@@ -352,11 +352,16 @@ class UpperBoundRealGas(RealGas):
         return compressibility_factor
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        return self.compressibility_factor(temperature, pressure) * self.ideal_volume(
-            temperature, pressure
+        volume: ArrayLike = (
+            self.compressibility_factor(temperature, pressure)
+            * GAS_CONSTANT_BAR
+            * temperature
+            / pressure
         )
+
+        return volume
 
     @override
     @eqx.filter_jit

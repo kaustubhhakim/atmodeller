@@ -16,9 +16,10 @@
 #
 """Concrete classes for real gas equations of state"""
 
+import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array, jit
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
@@ -59,7 +60,7 @@ class BeattieBridgeman(RealGas):
     c: float
     """c empirical constant"""
 
-    @jit
+    @eqx.filter_jit
     def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
         r"""Objective function to solve for the volume :cite:p:`HWZ58{Equation 2}`
 
@@ -106,7 +107,7 @@ class BeattieBridgeman(RealGas):
         return residual
 
     @override
-    @jit
+    @eqx.filter_jit
     def log_fugacity(
         self,
         temperature: ArrayLike,
@@ -146,7 +147,7 @@ class BeattieBridgeman(RealGas):
         return log_fugacity
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Solves the BB equation numerically to compute the volume.
 
@@ -174,6 +175,6 @@ class BeattieBridgeman(RealGas):
         return volume
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        return GAS_CONSTANT_BAR * temperature * self.log_fugacity(temperature, pressure)
+        return self.log_fugacity(temperature, pressure) * GAS_CONSTANT_BAR * temperature
