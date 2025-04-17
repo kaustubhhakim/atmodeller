@@ -25,7 +25,7 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
-from jax import Array, lax
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
@@ -47,11 +47,6 @@ class ZhangDuan(RealGas):
     Args:
         epsilon: Lenard-Jones parameter (epsilon/kB) in K
         sigma: Lenard-Jones parameter in :math:`10^{-10}` m
-        initial_volume: Initial volume guess in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`. The choice
-            of the initial volume is very important to avoid a jump to a different solution branch
-            that is not the correct physical one. Ideally we want an initial volume that will
-            converge across the entire range of calibrated pressures and temperatures. The initial
-            volume may need to be different for each species to avoid branch jumps.
     """
 
     coefficients: ClassVar[tuple[float, ...]] = (
@@ -77,8 +72,6 @@ class ZhangDuan(RealGas):
     """Lenard-Jones parameter (epsilon/kB) in K"""
     sigma: float
     r"""Lenard-Jones parameter in :math:`10^{-10}` m"""
-    initial_volume: float = 1.0e-5
-    r"""Initial volume guess in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
 
     @eqx.filter_jit
     def _Pm(self, pressure: ArrayLike) -> Array:
@@ -240,6 +233,46 @@ class ZhangDuan(RealGas):
 
         return residual
 
+    @eqx.filter_jit
+    def initial_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        r"""Initial guess volume to ensure convergence to the correct root
+
+        .. math::
+            V = \frac{RT}{P} \left(1 + \frac{b}{V_m}\right)
+
+        This is the ideal gas law with a correction for the b term based on truncating the full
+        equation and substituting in the ideal gas volume. The 1/Vm**2 is not included because
+        convergence did not improve with it, in fact, it got worse. Also, the initial volume is
+        required to be positive, so the initial compressibility parameter is limited to a minimum
+        of 0.1, which is guided by the behaviour of water to some extent.
+
+        This initial guess will eventually fail for large pressures, leaving room for an improved
+        approach.
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Initial volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
+        """
+        minimum_compressibility_factor: float = 0.1
+        ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
+        Tm: ArrayLike = self._Tm(temperature)
+        Vm: Array = self._Vm(ideal_volume)
+
+        b: Array = self._get_parameter(Tm, self.coefficients[0:3])
+        compressibility_factor: Array = 1 + b / Vm
+        compressibility_factor = jnp.where(
+            compressibility_factor < minimum_compressibility_factor,
+            minimum_compressibility_factor,
+            compressibility_factor,
+        )
+        initial_volume: Array = compressibility_factor * ideal_volume
+        # jax.debug.print("initial_volume = {out}", out=initial_volume)
+
+        return initial_volume
+
     @override
     @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
@@ -252,14 +285,7 @@ class ZhangDuan(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        # Find the broadcasted shape of temperature and pressure
-        temperature = jnp.asarray(temperature)
-        pressure = jnp.asarray(pressure)
-        out_shape: tuple[int, ...] = lax.broadcast_shapes(temperature.shape, pressure.shape)
-
-        # Broadcast the initial volume to match
-        initial: Array = jnp.broadcast_to(self.initial_volume, out_shape)
-
+        initial: Array = self.initial_volume(temperature, pressure)
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)
@@ -267,6 +293,12 @@ class ZhangDuan(RealGas):
         volume: ArrayLike = sol.value
         # jax.debug.print("volume = {out}", out=volume)
         # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
+
+        # For comparing the initial and final volumes to refine the choice of the initial volume
+        # jax.debug.print("initial_volume = {out}", out=initial)
+        # jax.debug.print("final_volume = {out}", out=volume)
+        # relative_volume_error: Array = (initial - volume) / volume
+        # jax.debug.print("Relative volume error = {out}", out=relative_volume_error)
 
         return volume
 
@@ -404,10 +436,7 @@ def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
     return None, None
 
 
-# The choice of the initial volume guess is really important and the value should ideally allow the
-# model to converge to the correct physical route across the entire range of pressures and
-# temperatures, at least up to the maximum calibration pressure of 10 GPa.
-CH4_zhang09: RealGasProtocol = ZhangDuan(154.0, 3.691, 15 * unit_conversion.cm3_to_m3)
+CH4_zhang09: RealGasProtocol = ZhangDuan(154.0, 3.691)
 """CH4 unbounded :cite:p:`ZD09`"""
 CH4_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=273,
@@ -421,7 +450,7 @@ CH4_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
 )
 """CH4 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-H2O_zhang09: RealGasProtocol = ZhangDuan(510.0, 2.88, 25 * unit_conversion.cm3_to_m3)
+H2O_zhang09: RealGasProtocol = ZhangDuan(510.0, 2.88)
 """H2O unbounded :cite:p:`ZD09`"""
 H2O_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=673,
@@ -435,7 +464,7 @@ H2O_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
 )
 """H2O bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-CO2_zhang09: RealGasProtocol = ZhangDuan(235.0, 3.79, 20 * unit_conversion.cm3_to_m3)
+CO2_zhang09: RealGasProtocol = ZhangDuan(235.0, 3.79)
 """CO2 unbounded :cite:p:`ZD09`"""
 CO2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=473,
@@ -449,7 +478,7 @@ CO2_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
 )
 
 # Tested boundedness (not the same as physical correctness) for 500<T<10000 K and 0<P<10 GPa
-H2_zhang09: RealGasProtocol = ZhangDuan(31.2, 2.93, 10 * unit_conversion.cm3_to_m3)
+H2_zhang09: RealGasProtocol = ZhangDuan(31.2, 2.93)
 """H2 unbounded :cite:p:`ZD09`"""
 H2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=250,
@@ -463,7 +492,7 @@ H2_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
 )
 """H2 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-CO_zhang09: RealGasProtocol = ZhangDuan(105.6, 3.66, 15 * unit_conversion.cm3_to_m3)
+CO_zhang09: RealGasProtocol = ZhangDuan(105.6, 3.66)
 """CO unbounded :cite:p:`ZD09`"""
 CO_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=300,
@@ -477,7 +506,7 @@ CO_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
 )
 """CO bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-O2_zhang09: RealGasProtocol = ZhangDuan(124.5, 3.36, 10 * unit_conversion.cm3_to_m3)
+O2_zhang09: RealGasProtocol = ZhangDuan(124.5, 3.36)
 """O2 unbounded :cite:p:`ZD09`"""
 O2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=300,
@@ -491,7 +520,7 @@ O2_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
 )
 """O2 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-C2H6_zhang09: RealGasProtocol = ZhangDuan(246.1, 4.35, 20 * unit_conversion.cm3_to_m3)
+C2H6_zhang09: RealGasProtocol = ZhangDuan(246.1, 4.35)
 """C2H6 unbounded :cite:p:`ZD09`"""
 C2H6_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=373,
