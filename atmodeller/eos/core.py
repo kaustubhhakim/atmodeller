@@ -26,17 +26,14 @@ from typing import Callable
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array, grad
+from jax import Array, jacfwd
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
 from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData
-from atmodeller.utilities import (
-    OptxSolver,
-    safe_exp,
-)
+from atmodeller.utilities import OptxSolver, safe_exp
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -113,7 +110,22 @@ class RealGas(eqx.Module):
         return 1e5 * self.volume_integral(temperature, pressure)
 
     @eqx.filter_jit
-    def dvolume_dpressure(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    def dzdp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Derivative of the compressibility factor with respect to pressure
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Derivative of the compressibility factor with respect to pressure
+        """
+        dzdp_fn: Callable = jacfwd(self.compressibility_factor, argnums=1)
+
+        return dzdp_fn(temperature, pressure)
+
+    @eqx.filter_jit
+    def dvdp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Derivative of volume with respect to pressure
 
         Args:
@@ -123,9 +135,9 @@ class RealGas(eqx.Module):
         Returns:
             Derivative of volume with respect to pressure
         """
-        dvolume_dpressure_fn: Callable = grad(self.volume, argnums=1)
+        dvdp_fn: Callable = jacfwd(self.volume, argnums=1)
 
-        return dvolume_dpressure_fn(temperature, pressure)
+        return dvdp_fn(temperature, pressure)
 
     @eqx.filter_jit
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:

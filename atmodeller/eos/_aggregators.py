@@ -66,7 +66,6 @@ class CombinedRealGas(RealGas):
         cls,
         real_gases: list[RealGasProtocol],
         calibrations: list[ExperimentalCalibration],
-        dzdp: float = 0,
         extrapolate: bool = True,
     ) -> RealGas:
         """Create an instance with the given real gases and calibrations
@@ -84,8 +83,6 @@ class CombinedRealGas(RealGas):
         Args:
             real_gases: Real gases to combine
             calibrations: Experimental calibrations that correspond to `real_gases`
-            dzdp: Constant compressibility (pressure) gradient for the upper bound extrapolation
-                (if relevant). Defaults to 0.
             extrapolate: Extrapolate the EOS to have reasonable behaviour below the minimum and
                 above the maximum calibration pressure if required. Defaults to True.
         """
@@ -93,7 +90,7 @@ class CombinedRealGas(RealGas):
             if calibrations[0].pressure_min is not None:
                 cls._append_lower_bound(real_gases, calibrations)
             if calibrations[-1].pressure_max is not None:
-                cls._append_upper_bound(real_gases, calibrations, dzdp)
+                cls._append_upper_bound(real_gases, calibrations)
 
         return cls(real_gases, calibrations)
 
@@ -119,17 +116,15 @@ class CombinedRealGas(RealGas):
         cls,
         real_gases: list[RealGasProtocol],
         calibrations: list[ExperimentalCalibration],
-        dzdp: float,
     ) -> None:
         """Appends the upper bound
 
         Args:
             real_gases: Real gases to combine
             calibrations: Experimental calibrations that correspond to `real_gases`
-            dzdp: Constant compressibility (pressure) gradient
         """
         pressure_min: float = calibrations[-1].pressure_max  # type: ignore check done before
-        real_gas: RealGasProtocol = UpperBoundRealGas(real_gases[-1], pressure_min, dzdp)
+        real_gas: RealGasProtocol = UpperBoundRealGas(real_gases[-1], pressure_min)
         real_gases.append(real_gas)
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=pressure_min)
         calibrations.append(calibration)
@@ -332,15 +327,12 @@ class UpperBoundRealGas(RealGas):
         real_gas: Real gas to evaluate the compressibility factor at `p_eval`.
         p_eval: Evaluation pressure in bar. This is usually the maximum calibration pressure
             of `real_gas`. Defaults to 1 bar.
-        dzdp: Gradient of the compressibility factor. Defaults to 0.
     """
 
     real_gas: RealGasProtocol
     """Real gas to evaluate the compressibility factor at `p_eval`"""
     p_eval: float = 1
     """Evaluation pressure in bar"""
-    dzdp: float = 0
-    """Gradient of the compressibility factor"""
 
     @eqx.filter_jit
     def _z0(self, temperature: ArrayLike) -> ArrayLike:
@@ -350,6 +342,15 @@ class UpperBoundRealGas(RealGas):
             temperature: Temperature in K
         """
         return self.real_gas.compressibility_factor(temperature, self.p_eval)
+
+    @eqx.filter_jit
+    def _dzdp0(self, temperature: ArrayLike) -> ArrayLike:
+        """Gradient of the compressibility factor of the previous EOS to blend smoothly with.
+
+        Args:
+            temperature: Temperature in K
+        """
+        return self.real_gas.dzdp(temperature, self.p_eval)
 
     @override
     @eqx.filter_jit
@@ -367,8 +368,8 @@ class UpperBoundRealGas(RealGas):
     @override
     @eqx.filter_jit
     def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        compressibility_factor: ArrayLike = self._z0(temperature) + self.dzdp * (
-            pressure - self.p_eval
+        compressibility_factor: ArrayLike = self._z0(temperature) + self._dzdp0(temperature) * (
+            pressure - self.p_eval  # type: ignore
         )
 
         return compressibility_factor
@@ -390,8 +391,9 @@ class UpperBoundRealGas(RealGas):
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         volume_integral: Array = (
             (
-                jnp.log(pressure / self.p_eval) * (self._z0(temperature) - self.dzdp * self.p_eval)
-                + self.dzdp * (pressure - self.p_eval)
+                jnp.log(pressure / self.p_eval)
+                * (self._z0(temperature) - self._dzdp0(temperature) * self.p_eval)
+                + self._dzdp0(temperature) * (pressure - self.p_eval)
             )
             * GAS_CONSTANT_BAR
             * temperature
