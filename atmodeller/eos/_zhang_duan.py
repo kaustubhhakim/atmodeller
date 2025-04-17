@@ -167,8 +167,7 @@ class ZhangDuan(RealGas):
             + c / (2 * jnp.square(Vm))
             + d / (4 * jnp.power(Vm, 4))
             + e / (5 * jnp.power(Vm, 5))
-        )
-        S1 = S1 + (
+        ) + (
             a13
             / (2 * a15 * jnp.power(Tm, 3))
             * (a14 + 1 - (a14 + 1 + a15 / jnp.square(Vm)) * safe_exp(-a15 / jnp.square(Vm)))
@@ -288,7 +287,6 @@ class ZhangDuan(RealGas):
         volume: ArrayLike = self.volume(temperature, pressure)
         Vm: Array = self._Vm(volume)
         Tm: ArrayLike = self._Tm(temperature)
-        # Compute the compressibility factor directly to avoid another solve for volume
         Z: ArrayLike = pressure * volume / (GAS_CONSTANT_BAR * temperature)
         log_fugacity_coefficient: Array = -jnp.log(Z) + self._S1(Tm, Vm) + Z - 1
         log_fugacity: Array = log_fugacity_coefficient + jnp.log(pressure)

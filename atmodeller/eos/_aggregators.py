@@ -188,9 +188,31 @@ class CombinedRealGas(RealGas):
     @override
     @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        # FIXME: lax.switch incompatible with index as an array
         index: Array = self._get_index(pressure)
-        volume: Array = lax.switch(index, self.volume_functions, temperature, pressure)
+
+        def scan_fn(carry: Array, i: Array) -> tuple:
+            """Scan function to get the volume
+
+            Args:
+                carry: Volume
+                i: Index of the EOS model
+
+            Returns:
+                Volume and None (unused)
+            """
+            volume: Array = lax.switch(i, self.volume_functions, temperature, pressure)
+            mask: Array = i == index
+            carry = carry + jnp.where(mask, volume, 0.0)
+
+            return carry, None
+
+        # Get output shape by evaluating one of the volume functions (e.g., index 0)
+        first_volume: ArrayLike = self.volume_functions[0](temperature, pressure)
+        volume: Array = jnp.where(index == 0, first_volume, 0.0)
+
+        # Scan over the indices of the EOS models.
+        loop_indices: Array = jnp.arange(1, self._upper_pressure_bounds.shape[0] + 1)
+        volume, _ = lax.scan(scan_fn, volume, loop_indices)
 
         return volume
 
