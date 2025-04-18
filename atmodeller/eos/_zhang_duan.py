@@ -260,8 +260,8 @@ class ZhangDuan(RealGas):
         ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
         Tm: ArrayLike = self._Tm(temperature)
         Vm: Array = self._Vm(ideal_volume)
-
         b: Array = self._get_parameter(Tm, self.coefficients[0:3])
+
         compressibility_factor: Array = 1 + b / Vm
         compressibility_factor = jnp.where(
             compressibility_factor < minimum_compressibility_factor,
