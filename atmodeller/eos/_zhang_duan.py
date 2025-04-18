@@ -275,7 +275,7 @@ class ZhangDuan(RealGas):
 
     @override
     @eqx.filter_jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Computes the volume numerically.
 
         Args:
