@@ -56,7 +56,7 @@ H2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     c=volume_conversion(0.0504e4),
 )
 """H2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-H2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
+H2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2_beattie_holley58],
     [ExperimentalCalibration(30, 1000, pressure_min, atm2bar(1000))],
 )
@@ -70,7 +70,7 @@ N2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     c=volume_conversion(4.2e4),
 )
 """N2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-N2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
+N2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas.create(
     [N2_beattie_holley58], [ExperimentalCalibration(70, 1000, pressure_min, atm2bar(1000))]
 )
 """N2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
@@ -83,7 +83,7 @@ O2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     c=volume_conversion(4.8e4),
 )
 """O2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-O2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
+O2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas.create(
     [O2_beattie_holley58], [ExperimentalCalibration(100, 1000, pressure_min, atm2bar(1000))]
 )
 """O2 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
@@ -96,7 +96,7 @@ CO2_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     c=volume_conversion(66e4),
 )
 """CO2 Beattie-Bridgeman :cite:p:`HWZ58`"""
-CO2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
+CO2_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas.create(
     [CO2_beattie_holley58],
     [ExperimentalCalibration(200, 1000, pressure_min, atm2bar(1000))],
 )
@@ -110,7 +110,7 @@ NH3_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     c=volume_conversion(476.87e4),
 )
 """NH3 Beattie-Bridgeman :cite:p:`HWZ58`"""
-NH3_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
+NH3_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas.create(
     [NH3_beattie_holley58], [ExperimentalCalibration(300, 1000, pressure_min, atm2bar(500))]
 )
 """NH3 Beattie-Bridgeman bounded :cite:p:`HWZ58`"""
@@ -123,7 +123,7 @@ CH4_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     c=volume_conversion(12.83e4),
 )
 """CH4 Beattie-Bridgeman :cite:p:`HWZ58`"""
-CH4_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
+CH4_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas.create(
     [CH4_beattie_holley58],
     [ExperimentalCalibration(100, 1000, pressure_min, atm2bar(1000))],
 )
@@ -137,7 +137,7 @@ He_beattie_holley58: RealGasProtocol = BeattieBridgeman(
     c=volume_conversion(0.004e4),
 )
 """He Beattie-Bridgeman :cite:p:`HWZ58`"""
-He_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas(
+He_beattie_holley58_bounded: RealGasProtocol = CombinedRealGas.create(
     [He_beattie_holley58],
     [ExperimentalCalibration(10, 1000, pressure_min, atm2bar(1000))],
 )

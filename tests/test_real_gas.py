@@ -30,7 +30,7 @@ from atmodeller.containers import (
     Species,
     SpeciesCollection,
 )
-from atmodeller.eos.library import H2_chabrier21, get_eos_models
+from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     RealGasProtocol,
@@ -93,7 +93,7 @@ def test_fO2_holley(helper) -> None:
 def test_chabrier_earth(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=H2_chabrier21)
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")

@@ -120,6 +120,8 @@ class RealGas(eqx.Module):
         Returns:
             Derivative of the compressibility factor with respect to pressure
         """
+        temperature = jnp.asarray(temperature, dtype=jnp.float_)
+        pressure = jnp.asarray(pressure, dtype=jnp.float_)
         dzdp_fn: Callable = jacfwd(self.compressibility_factor, argnums=1)
 
         return dzdp_fn(temperature, pressure)
@@ -135,6 +137,8 @@ class RealGas(eqx.Module):
         Returns:
             Derivative of volume with respect to pressure
         """
+        temperature = jnp.asarray(temperature, dtype=jnp.float_)
+        pressure = jnp.asarray(pressure, dtype=jnp.float_)
         dvdp_fn: Callable = jacfwd(self.volume, argnums=1)
 
         return dvdp_fn(temperature, pressure)

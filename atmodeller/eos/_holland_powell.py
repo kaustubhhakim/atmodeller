@@ -371,6 +371,7 @@ class MRKImplicitHP91ABCMixin(eqx.Module):
 
         return a
 
+    @eqx.filter_jit
     def b(self) -> ArrayLike:
         return self._b
 
@@ -403,6 +404,7 @@ class MRKImplicitLiquidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFl
     """MRK for liquid phase :cite:p`HP91{Equation 6}`"""
 
     @override
+    @eqx.filter_jit
     def delta_temperature_for_a(self, temperature: ArrayLike) -> ArrayLike:
         return self._Ta - temperature
 
@@ -420,6 +422,7 @@ class MRKImplicitFluidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFlu
     """MRK for supercritical fluid :cite:p:`HP91{Equation 6}`"""
 
     @override
+    @eqx.filter_jit
     def delta_temperature_for_a(self, temperature: ArrayLike) -> ArrayLike:
         return temperature - self._Ta
 
@@ -864,7 +867,7 @@ CH4_cork_cs_holland91: RealGasProtocol = CORK(
     CH4_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CH4_g")
 )
 """CH4 CORK corresponding states :cite:p:`HP91`"""
-CH4_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CH4_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [CH4_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CH4 CORK corresponding states bounded :cite:p:`HP91`"""
@@ -872,7 +875,7 @@ CO_cork_cs_holland91: RealGasProtocol = CORK(
     CO_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO_g")
 )
 """CO CORK corresponding states :cite:p:`HP91`"""
-CO_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CO_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [CO_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CO CORK corresponding states bounded :cite:p:`HP91`"""
@@ -880,7 +883,7 @@ CO2_cork_cs_holland91: RealGasProtocol = CORK(
     CO2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO2_g")
 )
 """CO2 CORK corresponding states :cite:p:`HP91`"""
-CO2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CO2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [CO2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CO2 CORK corresponding states bounded :cite:p:`HP91`"""
@@ -890,7 +893,7 @@ H2_cork_cs_holland91: RealGasProtocol = CORK(
     select_critical_data("H2_g_Holland"),
 )
 """H2 CORK corresponding states :cite:p:`HP91`"""
-H2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+H2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """H2 CORK corresponding states bounded :cite:p:`HP91`"""
@@ -898,7 +901,7 @@ H2S_cork_cs_holland11: RealGasProtocol = CORK(
     H2S_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("H2S_g")
 )
 """H2S CORK corresponding states :cite:p:`HP91`"""
-H2S_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas(
+H2S_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2S_cork_cs_holland11], [experimental_calibration_holland91]
 )
 """H2S CORK corresponding states bounded :cite:p:`HP91`"""
@@ -906,7 +909,7 @@ N2_cork_cs_holland91: RealGasProtocol = CORK(
     N2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("N2_g")
 )
 """N2 CORK corresponding states :cite:p:`HP91`"""
-N2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+N2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [N2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """N2 CORK corresponding states bounded :cite:p:`HP91`"""
@@ -914,7 +917,7 @@ S2_cork_cs_holland11: RealGasProtocol = CORK(
     S2_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("S2_g")
 )
 """S2 CORK corresponding states :cite:p:`HP91`"""
-S2_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas(
+S2_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas.create(
     [S2_cork_cs_holland11], [experimental_calibration_holland91]
 )
 """S2 CORK corresponding states bounded :cite:p:`HP91`"""
@@ -937,7 +940,7 @@ CO2_cork_holland91: RealGasProtocol = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland91, dummy_critical_data
 )
 """CO2 cork :cite:p:`HP91`"""
-CO2_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CO2_cork_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [CO2_cork_holland91], [experimental_calibration_holland91]
 )
 """CO2 cork bounded :cite:p:`HP91`"""
@@ -953,7 +956,7 @@ H2O_cork_holland91: RealGasProtocol = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland91, dummy_critical_data
 )
 """H2O cork :cite:p:`HP91`"""
-H2O_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2O_cork_holland91], [experimental_calibration_holland91]
 )
 """H2O cork bounded :cite:p:`HP91`"""
@@ -961,7 +964,7 @@ H2O_cork_gas_fluid_holland91: RealGasProtocol = CORK(
     H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland91, dummy_critical_data
 )
 """H2O cork for the gas and supercritical fluid :cite:p:`HP91`"""
-H2O_cork_gas_fluid_holland91_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_gas_fluid_holland91_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2O_cork_gas_fluid_holland91], [experimental_calibration_holland91]
 )
 """H2O cork for the gas and supercritical fluid bounded :cite:p:`HP91`"""
@@ -977,7 +980,7 @@ CO2_cork_holland98: RealGasProtocol = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland98, dummy_critical_data
 )
 """CO2 cork :cite:p:`HP98`"""
-CO2_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
+CO2_cork_holland98_bounded: RealGasProtocol = CombinedRealGas.create(
     [CO2_cork_holland98], [experimental_calibration_holland98]
 )
 """CO2 cork bounded :cite:p:`HP98`"""
@@ -993,7 +996,7 @@ H2O_cork_holland98: RealGasProtocol = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
 """H2O cork :cite:p:`HP98`"""
-H2O_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_holland98_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2O_cork_holland98], [experimental_calibration_holland98]
 )
 """H2O cork bounded :cite:p:`HP98`"""
@@ -1001,7 +1004,7 @@ H2O_cork_gas_fluid_holland98: RealGasProtocol = CORK(
     H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
 """H2O cork for the gas and supercritical fluid :cite:p:`HP98`"""
-H2O_cork_gas_fluid_holland98_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_gas_fluid_holland98_bounded: RealGasProtocol = CombinedRealGas.create(
     [H2O_cork_gas_fluid_holland98], [experimental_calibration_holland98]
 )
 """H2O cork for the gas and supercritical fluid bounded :cite:p:`HP98`"""
