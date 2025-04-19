@@ -26,7 +26,7 @@ ABSOLUTE_TOLERANCE: float = 1.0e-12
 r"""Absolute tolerance when solving for the volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
 RELATIVE_TOLERANCE: float = 1.0e-6
 r"""Relative tolerance when solving for the volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
-THROW: bool = True
+THROW: bool = False
 """Whether to throw errors. Change to True for debugging purposes."""
 
 # Expose the public API

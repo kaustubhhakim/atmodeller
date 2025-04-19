@@ -24,6 +24,8 @@ from typing import Callable, Sequence
 
 import equinox as eqx
 import jax.numpy as jnp
+import numpy as np
+import numpy.typing as npt
 from jax import Array, lax
 from jax.typing import ArrayLike
 
@@ -55,7 +57,7 @@ class CombinedRealGas(RealGas):
     """Real gases to combine"""
     calibrations: tuple[ExperimentalCalibration, ...]
     """Experimental calibrations"""
-    _upper_pressure_bounds: Array = eqx.field(init=False)
+    _upper_pressure_bounds: npt.NDArray = eqx.field(init=False, static=True)
 
     def __post_init__(self):
         self._upper_pressure_bounds = self._get_upper_pressure_bounds()
@@ -142,10 +144,8 @@ class CombinedRealGas(RealGas):
         return tuple(eos.volume_integral for eos in self.real_gases)
 
     # Jitting might cause problem with initialization?
-    def _get_upper_pressure_bounds(self) -> Array:
+    def _get_upper_pressure_bounds(self) -> npt.NDArray:
         """Gets the upper pressure bounds based on each experimental calibration.
-
-        # TODO: Obvious candidate for improvement if this is a bottleneck.
 
         Returns:
             Upper pressure bounds
@@ -165,7 +165,7 @@ class CombinedRealGas(RealGas):
             pressure_bound = calibration.pressure_max
             upper_pressure_bounds.append(pressure_bound)
 
-        return jnp.array(upper_pressure_bounds)
+        return np.array(upper_pressure_bounds)
 
     @eqx.filter_jit
     def _get_index(self, pressure: ArrayLike) -> Array:
