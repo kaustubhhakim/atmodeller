@@ -169,7 +169,7 @@ class InteriorAtmosphere:
 
         if num_failed_models > 0:
             logger.warning(
-                f"Solve complete: {num_successful_models} successful models but "
+                f"Solve complete: {num_successful_models} successful models and "
                 f"{num_failed_models} models failed.\n"
                 "Try increasing 'multistart', for example:\n"
                 "    solver_parameters = SolverParameters(multistart=5)\n"
