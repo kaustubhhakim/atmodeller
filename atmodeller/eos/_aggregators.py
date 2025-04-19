@@ -20,8 +20,7 @@ Units for temperature and pressure are K and bar, respectively.
 """
 
 import logging
-from dataclasses import field
-from typing import Callable
+from typing import Callable, Sequence
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -52,20 +51,20 @@ class CombinedRealGas(RealGas):
         calibrations: Experimental calibrations that correspond to `real_gases`
     """
 
-    real_gases: list[RealGasProtocol]
+    real_gases: tuple[RealGasProtocol, ...]
     """Real gases to combine"""
-    calibrations: list[ExperimentalCalibration]
+    calibrations: tuple[ExperimentalCalibration, ...]
     """Experimental calibrations"""
-    _upper_pressure_bounds: Array = field(init=False)
+    _upper_pressure_bounds: Array = eqx.field(init=False)
 
     def __post_init__(self):
-        self._upper_pressure_bounds: Array = self._get_upper_pressure_bounds()
+        self._upper_pressure_bounds = self._get_upper_pressure_bounds()
 
     @classmethod
     def create(
         cls,
-        real_gases: list[RealGasProtocol],
-        calibrations: list[ExperimentalCalibration],
+        real_gases: Sequence[RealGasProtocol],
+        calibrations: Sequence[ExperimentalCalibration],
         extrapolate: bool = True,
     ) -> RealGas:
         """Create an instance with the given real gases and calibrations
@@ -86,13 +85,16 @@ class CombinedRealGas(RealGas):
             extrapolate: Extrapolate the EOS to have reasonable behaviour below the minimum and
                 above the maximum calibration pressure if required. Defaults to True.
         """
-        if extrapolate:
-            if calibrations[0].pressure_min is not None:
-                cls._append_lower_bound(real_gases, calibrations)
-            if calibrations[-1].pressure_max is not None:
-                cls._append_upper_bound(real_gases, calibrations)
+        real_gases_list: list[RealGasProtocol] = list(real_gases)
+        calibrations_list: list[ExperimentalCalibration] = list(calibrations)
 
-        return cls(real_gases, calibrations)
+        if extrapolate:
+            if calibrations_list[0].pressure_min is not None:
+                cls._append_lower_bound(real_gases_list, calibrations_list)
+            if calibrations_list[-1].pressure_max is not None:
+                cls._append_upper_bound(real_gases_list, calibrations_list)
+
+        return cls(tuple(real_gases_list), tuple(calibrations_list))
 
     @classmethod
     def _append_lower_bound(
@@ -130,14 +132,14 @@ class CombinedRealGas(RealGas):
         calibrations.append(calibration)
 
     @property
-    def volume_functions(self) -> list[Callable]:
+    def volume_functions(self) -> tuple[Callable, ...]:
         """Volume functions"""
-        return [eos.volume for eos in self.real_gases]
+        return tuple(eos.volume for eos in self.real_gases)
 
     @property
-    def volume_integral_functions(self) -> list[Callable]:
+    def volume_integral_functions(self) -> tuple[Callable, ...]:
         """Volume integral functions"""
-        return [eos.volume_integral for eos in self.real_gases]
+        return tuple(eos.volume_integral for eos in self.real_gases)
 
     # Jitting might cause problem with initialization?
     def _get_upper_pressure_bounds(self) -> Array:
@@ -352,7 +354,7 @@ class UpperBoundRealGas(RealGas):
         """
         # FIXME: Just to recover previous tests. Then swap in dzdp approach.
         return 0
-        return self.real_gas.dzdp(temperature, self.p_eval)
+        # return self.real_gas.dzdp(temperature, self.p_eval)
 
     @override
     @eqx.filter_jit

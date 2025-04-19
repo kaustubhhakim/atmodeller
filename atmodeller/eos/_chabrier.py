@@ -75,8 +75,8 @@ class Chabrier(RealGas):
     
     Dictionary keys should correspond to the name of the Chabrier file.
     """
-
-    log10_density_func: RegularGridInterpolator
+    # Must be declared static otherise a TypeError is raised
+    log10_density_func: RegularGridInterpolator = eqx.field(static=True)
     """Spline lookup for density from :cite:t:`CD21` T-P-rho tables"""
     He_fraction: float
     """He fraction"""
