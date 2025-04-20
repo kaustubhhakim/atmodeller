@@ -200,3 +200,15 @@ def test_volume_integral_index2(check_values) -> None:
     pressure: float = 20000
     expected: float = 1.365159989447105
     check_values.volume_integral(temperature, pressure, model, expected)
+
+
+def test_volume_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGasProtocol = eos_models["CO2_cs_shi92"]
+    check_values.check_broadcasting("volume", model)
+
+
+def test_fugacity_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGasProtocol = eos_models["CO2_cs_shi92"]
+    check_values.check_broadcasting("fugacity", model)
