@@ -168,3 +168,15 @@ def test_H2O_below_Tc_above_P0(check_values) -> None:
     model: RealGasProtocol = H2O_cork_holland98_bounded
     expected: float = 0.39156756638038
     check_values.fugacity_coefficient(600, 10e3, model, expected, rtol=RTOL, atol=ATOL)
+
+
+def test_volume_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGasProtocol = eos_models["CO2_cork_holland98"]
+    check_values.check_broadcasting("volume", model)
+
+
+def test_fugacity_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGasProtocol = eos_models["CO2_cork_holland98"]
+    check_values.check_broadcasting("fugacity", model)
