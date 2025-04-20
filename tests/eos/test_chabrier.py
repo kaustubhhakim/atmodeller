@@ -16,6 +16,7 @@
 #
 """Tests for the EOS models from :cite:t:`CD21`"""
 
+from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8
@@ -80,3 +81,16 @@ def test_H2_fugacity_coefficient_1000kbar(check_values) -> None:
         rtol=RTOL,
         atol=ATOL,
     )
+
+
+def test_volume_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGasProtocol = check_values.get_eos_model("H2", MODEL_SUFFIX)
+    check_values.check_broadcasting("volume", model)
+
+
+# This fails. Currently debugging fugacity.
+def test_fugacity_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGasProtocol = check_values.get_eos_model("H2", MODEL_SUFFIX)
+    check_values.check_broadcasting("fugacity", model)
