@@ -534,7 +534,7 @@ class Planet(eqx.Module):
     """Mass fraction of the core relative to the planetary mass in kg/kg"""
     mantle_melt_fraction: ArrayLike = 1.0
     """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: ArrayLike = 6371000.0
+    surface_radius: ArrayLike = 6371000
     """Radius of the surface in m"""
     surface_temperature: ArrayLike = 2000
     """Temperature of the surface in K"""
