@@ -21,7 +21,7 @@ typing-extensions = "^4.12.2"
 optax = "^0.2.4"
 xmmutablemap = "^0.1"
 optimistix = { git = "https://github.com/ExPlanetology/optimistix.git", branch = "gauss-newton-clip" }
-jax = "0.5.2"
+jax = "0.5.3"
 equinox = "0.11.12"
 
 [tool.poetry.group.dev.dependencies]
