@@ -23,7 +23,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE
+from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import OptxSolver
 
@@ -163,7 +163,7 @@ class BeattieBridgeman(RealGas):
 
         solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)
         sol = optx.root_find(
-            self._objective_function, solver, initial_volume, args=kwargs, throw=False
+            self._objective_function, solver, initial_volume, args=kwargs, throw=THROW
         )
         volume = sol.value
         # jax.debug.print("volume = {out}", out=volume)

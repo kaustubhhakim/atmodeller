@@ -536,7 +536,7 @@ class Planet(eqx.Module):
     """Mass fraction of the molten mantle in kg/kg"""
     surface_radius: ArrayLike = 6371000.0
     """Radius of the surface in m"""
-    surface_temperature: ArrayLike = 2000.0
+    surface_temperature: ArrayLike = 2000
     """Temperature of the surface in K"""
 
     @property
@@ -745,6 +745,9 @@ class FugacityConstraints(NamedTuple):
             constraint.log_fugacity for constraint in self.constraints.values()
         ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
+
+        # Temperature must be a float array to ensure branches have have identical types
+        temperature = jnp.asarray(temperature, dtype=jnp.float_)
 
         def apply_fugacity_function(
             index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike

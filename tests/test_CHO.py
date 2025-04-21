@@ -159,9 +159,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Number of surface temperatures is different to number of species to test array shapes work.
-    surface_temperatures: npt.NDArray[np.float_] = np.array(
-        [1500, 2000, 2500, 3000], dtype=np.float_
-    )
+    surface_temperatures: npt.NDArray[np.float_] = np.array([1500, 2000, 2500, 3000])
     planet: Planet = Planet(surface_temperature=surface_temperatures)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}

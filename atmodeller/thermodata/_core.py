@@ -236,6 +236,8 @@ class ThermoCoefficients:
         # output if the temperature is outside the ranges
         T_min_array: Array = jnp.asarray(self._T_min)
         T_max_array: Array = jnp.asarray(self._T_max)
+        # Temperature must be a float array since JAX cannot raise integers to negative powers.
+        temperature = jnp.asarray(temperature, dtype=jnp.float_)
         bool_mask: Array = (T_min_array <= temperature) & (temperature <= T_max_array)
         index: Array = jnp.argmax(bool_mask)
         # jax.debug.print("index = {out}", out=index)

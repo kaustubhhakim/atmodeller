@@ -63,7 +63,7 @@ def test_fO2_holley(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g))
     # Temperature is within the range of the Holley model
-    planet: Planet = Planet(surface_temperature=1000.0)
+    planet: Planet = Planet(surface_temperature=1000)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
@@ -102,7 +102,7 @@ def test_chabrier_earth(helper) -> None:
     SiO2_l: Species = Species.create_condensed("SiO2_l")
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
-    planet: Planet = Planet(surface_temperature=3400.0)
+    planet: Planet = Planet(surface_temperature=3400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     h_kg: ArrayLike = 0.01 * planet.planet_mass
@@ -150,7 +150,7 @@ def test_chabrier_subNeptune(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
 
-    surface_temperature = 3400.0  # K
+    surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
     planet: Planet = Planet(
@@ -214,7 +214,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
 
-    surface_temperature = 3400.0  # K
+    surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
     planet: Planet = Planet(
@@ -318,11 +318,11 @@ def test_H_and_C_real_gas(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "H2_g": ConstantFugacityConstraint(958.0),
+        "H2_g": ConstantFugacityConstraint(958),
         "O2_g": ConstantFugacityConstraint(1.0132255325169718e-07),
     }
 
-    oceans: ArrayLike = 10.0
+    oceans: ArrayLike = 10
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg}

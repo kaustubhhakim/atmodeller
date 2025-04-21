@@ -82,7 +82,7 @@ def test_CHO_reduced(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
     )
-    planet: Planet = Planet(surface_temperature=1400.0)
+    planet: Planet = Planet(surface_temperature=1400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(-2)}
@@ -124,7 +124,7 @@ def test_CHO_IW(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
     )
-    planet: Planet = Planet(surface_temperature=1400.0)
+    planet: Planet = Planet(surface_temperature=1400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
@@ -177,7 +177,7 @@ def test_CHO_oxidised(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
     )
-    planet: Planet = Planet(surface_temperature=1400.0)
+    planet: Planet = Planet(surface_temperature=1400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(2)}
@@ -220,7 +220,7 @@ def test_CHO_highly_oxidised(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
     )
-    planet: Planet = Planet(surface_temperature=1400.0)
+    planet: Planet = Planet(surface_temperature=1400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(4)}
@@ -258,7 +258,7 @@ def test_CHO_middle_temperature(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
     )
-    planet: Planet = Planet(surface_temperature=873.0)
+    planet: Planet = Planet(surface_temperature=873)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
@@ -297,7 +297,7 @@ def test_CHO_low_temperature(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2_g", "H2O_g", "CO_g", "CO2_g", "CH4_g", "O2_g")
     )
-    planet: Planet = Planet(surface_temperature=450.0)
+    planet: Planet = Planet(surface_temperature=450)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: ArrayLike = 1
@@ -342,7 +342,7 @@ def test_graphite_condensed(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("O2_g", "H2_g", "CO_g", "H2O_g", "CO2_g", "CH4_g", "C_cr")
     )
-    planet: Planet = Planet(surface_temperature=873.0)
+    planet: Planet = Planet(surface_temperature=873)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     oceans: ArrayLike = 1
@@ -385,7 +385,7 @@ def test_graphite_unstable(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("O2_g", "H2_g", "CO_g", "H2O_g", "CO2_g", "CH4_g", "C_cr")
     )
-    planet: Planet = Planet(surface_temperature=1400.0)
+    planet: Planet = Planet(surface_temperature=1400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer(0.5)}
@@ -469,7 +469,7 @@ def test_graphite_water_condensed(helper) -> None:
     species: SpeciesCollection = SpeciesCollection.create(
         ("H2O_g", "H2_g", "O2_g", "CO_g", "CO2_g", "CH4_g", "H2O_l", "C_cr")
     )
-    planet: Planet = Planet(surface_temperature=430.0)
+    planet: Planet = Planet(surface_temperature=430)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     h_kg: float = 3.10e20
