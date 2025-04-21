@@ -108,11 +108,7 @@ class BeattieBridgeman(RealGas):
 
     @override
     @eqx.filter_jit
-    def log_fugacity(
-        self,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-    ) -> Array:
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity :cite:p:`HWZ58{Equation 11}`.
 
         Args:

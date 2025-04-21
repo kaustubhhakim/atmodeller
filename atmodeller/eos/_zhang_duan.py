@@ -32,7 +32,6 @@ from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration, OptxSolver, safe_exp, unit_conversion
 
 try:
@@ -436,7 +435,7 @@ def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
     return None, None
 
 
-CH4_zhang09: RealGasProtocol = ZhangDuan(154.0, 3.691)
+CH4_zhang09: RealGas = ZhangDuan(154.0, 3.691)
 """CH4 unbounded :cite:p:`ZD09`"""
 CH4_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=273,
@@ -445,12 +444,12 @@ CH4_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     pressure_max=10000 * unit_conversion.MPa_to_bar,
 )
 """Experimental calibration for CH4 :cite:p:`ZD09{Table 5}`"""
-CH4_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
+CH4_zhang09_bounded: RealGas = CombinedRealGas.create(
     [CH4_zhang09], [CH4_experimental_calibration]
 )
 """CH4 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-H2O_zhang09: RealGasProtocol = ZhangDuan(510.0, 2.88)
+H2O_zhang09: RealGas = ZhangDuan(510.0, 2.88)
 """H2O unbounded :cite:p:`ZD09`"""
 H2O_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=673,
@@ -459,12 +458,12 @@ H2O_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     pressure_max=10000 * unit_conversion.MPa_to_bar,
 )
 """Experimental calibration for H2O :cite:p:`ZD09{Table 5}`"""
-H2O_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
+H2O_zhang09_bounded: RealGas = CombinedRealGas.create(
     [H2O_zhang09], [H2O_experimental_calibration]
 )
 """H2O bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-CO2_zhang09: RealGasProtocol = ZhangDuan(235.0, 3.79)
+CO2_zhang09: RealGas = ZhangDuan(235.0, 3.79)
 """CO2 unbounded :cite:p:`ZD09`"""
 CO2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=473,
@@ -473,12 +472,12 @@ CO2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     pressure_max=10000 * unit_conversion.MPa_to_bar,
 )
 """Experimental calibration for CO2 :cite:p:`ZD09{Table 5}`"""
-CO2_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
+CO2_zhang09_bounded: RealGas = CombinedRealGas.create(
     [CO2_zhang09], [CO2_experimental_calibration]
 )
 
 # Tested boundedness (not the same as physical correctness) for 500<T<10000 K and 0<P<10 GPa
-H2_zhang09: RealGasProtocol = ZhangDuan(31.2, 2.93)
+H2_zhang09: RealGas = ZhangDuan(31.2, 2.93)
 """H2 unbounded :cite:p:`ZD09`"""
 H2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=250,
@@ -487,12 +486,10 @@ H2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     pressure_max=700 * unit_conversion.MPa_to_bar,
 )
 """Experimental calibration for H2 :cite:p:`ZD09{Table 5}`"""
-H2_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
-    [H2_zhang09], [H2_experimental_calibration]
-)
+H2_zhang09_bounded: RealGas = CombinedRealGas.create([H2_zhang09], [H2_experimental_calibration])
 """H2 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-CO_zhang09: RealGasProtocol = ZhangDuan(105.6, 3.66)
+CO_zhang09: RealGas = ZhangDuan(105.6, 3.66)
 """CO unbounded :cite:p:`ZD09`"""
 CO_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=300,
@@ -501,12 +498,10 @@ CO_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     pressure_max=1020.6 * unit_conversion.MPa_to_bar,
 )
 """Experimental calibration for CO :cite:p:`ZD09{Table 5}`"""
-CO_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
-    [CO_zhang09], [CO_experimental_calibration]
-)
+CO_zhang09_bounded: RealGas = CombinedRealGas.create([CO_zhang09], [CO_experimental_calibration])
 """CO bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-O2_zhang09: RealGasProtocol = ZhangDuan(124.5, 3.36)
+O2_zhang09: RealGas = ZhangDuan(124.5, 3.36)
 """O2 unbounded :cite:p:`ZD09`"""
 O2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=300,
@@ -515,12 +510,10 @@ O2_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     pressure_max=1013.2 * unit_conversion.MPa_to_bar,
 )
 """Experimental calibration for O2 :cite:p:`ZD09{Table 5}`"""
-O2_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
-    [O2_zhang09], [O2_experimental_calibration]
-)
+O2_zhang09_bounded: RealGas = CombinedRealGas.create([O2_zhang09], [O2_experimental_calibration])
 """O2 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
-C2H6_zhang09: RealGasProtocol = ZhangDuan(246.1, 4.35)
+C2H6_zhang09: RealGas = ZhangDuan(246.1, 4.35)
 """C2H6 unbounded :cite:p:`ZD09`"""
 C2H6_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=373,
@@ -529,19 +522,19 @@ C2H6_experimental_calibration: ExperimentalCalibration = ExperimentalCalibration
     pressure_max=900 * unit_conversion.MPa_to_bar,
 )
 """Experimental calibration for C2H6 :cite:p:`ZD09{Table 5}`"""
-C2H6_zhang09_bounded: RealGasProtocol = CombinedRealGas.create(
+C2H6_zhang09_bounded: RealGas = CombinedRealGas.create(
     [C2H6_zhang09], [C2H6_experimental_calibration]
 )
 """C2H6 bounded to data range :cite:p:`ZD09{Table 5}`"""
 
 
-def get_zhang_eos_models() -> dict[str, RealGasProtocol]:
+def get_zhang_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of Zhang and Duan EOS models
 
     Returns:
         Dictionary of EOS models
     """
-    eos_models: dict[str, RealGasProtocol] = {}
+    eos_models: dict[str, RealGas] = {}
     eos_models["CH4_zhang09"] = CH4_zhang09_bounded
     # eos_models["CH4_zhang09_unbounded"] = CH4_zhang09
     eos_models["H2O_zhang09"] = H2O_zhang09_bounded

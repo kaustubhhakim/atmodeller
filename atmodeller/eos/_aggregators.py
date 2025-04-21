@@ -31,7 +31,6 @@ from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import IdealGas, RealGas
-from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration
 
 try:
@@ -53,7 +52,7 @@ class CombinedRealGas(RealGas):
         calibrations: Experimental calibrations that correspond to `real_gases`
     """
 
-    real_gases: tuple[RealGasProtocol, ...]
+    real_gases: tuple[RealGas, ...]
     """Real gases to combine"""
     calibrations: tuple[ExperimentalCalibration, ...]
     """Experimental calibrations"""
@@ -65,7 +64,7 @@ class CombinedRealGas(RealGas):
     @classmethod
     def create(
         cls,
-        real_gases: Sequence[RealGasProtocol],
+        real_gases: Sequence[RealGas],
         calibrations: Sequence[ExperimentalCalibration],
         extrapolate: bool = True,
     ) -> RealGas:
@@ -87,7 +86,7 @@ class CombinedRealGas(RealGas):
             extrapolate: Extrapolate the EOS to have reasonable behaviour below the minimum and
                 above the maximum calibration pressure if required. Defaults to True.
         """
-        real_gases_list: list[RealGasProtocol] = list(real_gases)
+        real_gases_list: list[RealGas] = list(real_gases)
         calibrations_list: list[ExperimentalCalibration] = list(calibrations)
 
         if extrapolate:
@@ -101,7 +100,7 @@ class CombinedRealGas(RealGas):
     @classmethod
     def _append_lower_bound(
         cls,
-        real_gases: list[RealGasProtocol],
+        real_gases: list[RealGas],
         calibrations: list[ExperimentalCalibration],
     ) -> None:
         """Appends the lower bound, which gives ideal gas behaviour
@@ -118,7 +117,7 @@ class CombinedRealGas(RealGas):
     @classmethod
     def _append_upper_bound(
         cls,
-        real_gases: list[RealGasProtocol],
+        real_gases: list[RealGas],
         calibrations: list[ExperimentalCalibration],
     ) -> None:
         """Appends the upper bound
@@ -128,7 +127,7 @@ class CombinedRealGas(RealGas):
             calibrations: Experimental calibrations that correspond to `real_gases`
         """
         pressure_min: float = calibrations[-1].pressure_max  # type: ignore check done before
-        real_gas: RealGasProtocol = UpperBoundRealGas(real_gases[-1], pressure_min)
+        real_gas: RealGas = UpperBoundRealGas(real_gases[-1], pressure_min)
         real_gases.append(real_gas)
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=pressure_min)
         calibrations.append(calibration)
@@ -217,8 +216,6 @@ class CombinedRealGas(RealGas):
     @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         index: Array = self._get_index(pressure)
-        # Broadcasting might no longer be necessary but is kept for safety
-        # temperature, pressure = jnp.broadcast_arrays(temperature, pressure)
 
         def compute_integral(i: Array, pressure_high: ArrayLike, pressure_low: ArrayLike) -> Array:
             """Computes the volume integral for the given pressure range.
@@ -331,7 +328,7 @@ class UpperBoundRealGas(RealGas):
             of `real_gas`. Defaults to 1 bar.
     """
 
-    real_gas: RealGasProtocol
+    real_gas: RealGas
     """Real gas to evaluate the compressibility factor at `p_eval`"""
     p_eval: float = 1
     """Evaluation pressure in bar"""

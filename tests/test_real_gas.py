@@ -17,13 +17,13 @@
 """Tests for systems with real gases"""
 
 import logging
+from typing import Mapping
 
 import numpy as np
-import pytest
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.classes import InteriorAtmosphere
+from atmodeller.classes import InteriorAtmosphere, SolverParameters
 from atmodeller.containers import (
     ConstantFugacityConstraint,
     Planet,
@@ -32,8 +32,8 @@ from atmodeller.containers import (
 )
 from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import (
+    ActivityProtocol,
     FugacityConstraintProtocol,
-    RealGasProtocol,
     SolubilityProtocol,
 )
 from atmodeller.output import Output
@@ -50,7 +50,7 @@ ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
-eos_models: dict[str, RealGasProtocol] = get_eos_models()
+eos_models: Mapping[str, ActivityProtocol] = get_eos_models()
 
 
 def test_fO2_holley(helper) -> None:
@@ -297,7 +297,7 @@ def test_pH2_fO2_real_gas(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="Takes a bit longer to compile and run than other models")
+# @pytest.mark.skip(reason="Takes a bit longer to compile and run than other models")
 def test_H_and_C_real_gas(helper) -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 
@@ -334,10 +334,13 @@ def test_H_and_C_real_gas(helper) -> None:
     c_kg: ArrayLike = h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg}
 
+    solver_parameters = SolverParameters(multistart=5)
+
     interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
+        solver_parameters=solver_parameters,
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()

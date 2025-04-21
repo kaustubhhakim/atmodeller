@@ -35,7 +35,6 @@ from atmodeller import PRESSURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData, select_critical_data
 from atmodeller.utilities import ExperimentalCalibration
 
@@ -325,7 +324,7 @@ class SaxenaEightCoefficients(SaxenaABC):
         return coefficient
 
 
-_H2_low_pressure_SS92: RealGasProtocol = SaxenaFiveCoefficients(
+_H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
     a_coefficients=(1, 0, 0, 0, 0),
     b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
@@ -341,7 +340,7 @@ because they originate from :cite:t:`SF87a{Equation 23}`.
 In :cite:t:`SF87a{Equation 23}` the final `c` coefficient is 0.1472e-1, not 0.1427e-1 as given in
 :cite:t:`SS92{Table 1b}`. The earlier work is assumed to be correct.
 """
-_H2_high_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
+_H2_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
     a_coefficients=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1),
     b_coefficients=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5),
     c_coefficients=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10),
@@ -354,7 +353,7 @@ plotted, so presumably it requires the actual temperature and pressure (hence cr
 provided as arguments). Visually, the fit compares well to :obj:`_H2_high_pressure_SS92_refit`.
 """
 
-_H2_high_pressure_SS92_refit: RealGasProtocol = SaxenaEightCoefficients(
+_H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
     a_coefficients=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
     b_coefficients=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
     c_coefficients=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
@@ -370,7 +369,7 @@ are set to zero :cite:p:`SS92{Table 1b}`. The refitting is performed using reduc
 pressure.
 """
 
-H2_SS92: RealGasProtocol = CombinedRealGas.create(
+H2_SS92: RealGas = CombinedRealGas.create(
     [_H2_low_pressure_SS92, _H2_high_pressure_SS92],
     [
         ExperimentalCalibration(pressure_min=1, pressure_max=1000),
@@ -379,7 +378,7 @@ H2_SS92: RealGasProtocol = CombinedRealGas.create(
 )
 """H2 EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1b}`"""
 
-_H2_high_pressure_SF88: RealGasProtocol = SaxenaEightCoefficients(
+_H2_high_pressure_SF88: RealGas = SaxenaEightCoefficients(
     a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
     b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
     c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
@@ -394,7 +393,7 @@ and pressure inputs are the actual or reduced values.
 Further investigations are warranted before this model should be used.
 """
 
-SO2_SS92: RealGasProtocol = SaxenaEightCoefficients(
+SO2_SS92: RealGas = SaxenaEightCoefficients(
     a_coefficients=(0.92854, 0.43269e-1, -0.24671, 0, 0.24999, 0, -0.53182, -0.16461e-1),
     b_coefficients=(
         0.84866e-3,
@@ -420,12 +419,12 @@ SO2_SS92: RealGasProtocol = SaxenaEightCoefficients(
     critical_data=select_critical_data("SO2_g"),
 )
 """SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar"""
-SO2_SS92_bounded: RealGasProtocol = CombinedRealGas.create(
+SO2_SS92_bounded: RealGas = CombinedRealGas.create(
     [SO2_SS92], [ExperimentalCalibration(pressure_min=1, pressure_max=10000)]
 )
 """SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar"""
 
-_H2S_low_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
+_H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
     a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
     b_coefficients=(0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515),
     c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
@@ -434,7 +433,7 @@ _H2S_low_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
 )
 """H2S low pressure (1-500 bar) :cite:p:`SS92{Table 1d}`"""
 
-_H2S_high_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
+_H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
     a_coefficients=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
     b_coefficients=(
         0.22545e-1,
@@ -461,7 +460,7 @@ _H2S_high_pressure_SS92: RealGasProtocol = SaxenaEightCoefficients(
 )
 """H2S high pressure (500-10000 bar) :cite:p:`SS92{Table 1d}`"""
 
-H2S_SS92: RealGasProtocol = CombinedRealGas.create(
+H2S_SS92: RealGas = CombinedRealGas.create(
     [_H2S_low_pressure_SS92, _H2S_high_pressure_SS92],
     [
         ExperimentalCalibration(pressure_min=1.0, pressure_max=500),
@@ -471,7 +470,7 @@ H2S_SS92: RealGasProtocol = CombinedRealGas.create(
 """H2S EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1d}`"""
 
 
-def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
+def get_corresponding_states_SS92(species: str) -> RealGas:
     """Corresponding states :cite:p:`SS92{Table 1a}`
 
     Coefficients for the low and medium pressure regimes are from
@@ -489,7 +488,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
     critical_data: CriticalData = select_critical_data(species)
 
     # Table 1a, <1000 bar
-    low_pressure: RealGasProtocol = SaxenaFiveCoefficients(
+    low_pressure: RealGas = SaxenaFiveCoefficients(
         a_coefficients=(1, 0, 0, 0, 0),
         b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
         # Saxena and Fei (1987) CMP, Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
@@ -499,7 +498,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
     )
 
     # Table 1a, 1000-5000 bar
-    medium_pressure: RealGasProtocol = SaxenaEightCoefficients(
+    medium_pressure: RealGas = SaxenaEightCoefficients(
         a_coefficients=(1, 0, 0, 0, -5.917e-1, 0, 0, 0),
         b_coefficients=(0, 0, 9.122e-2, 0, 0, 0, 0, 0),
         # Saxena and Fei (1987) CMP, Eq. 21, C first coefficient = 1.4164e-4 (not negative)
@@ -510,7 +509,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
 
     # Table 1a, >5000 bar
     # High precision coefficients taken from Saxena and Fei (1987), GCA, and agree with Table 1(a)
-    high_pressure: RealGasProtocol = SaxenaEightCoefficients(
+    high_pressure: RealGas = SaxenaEightCoefficients(
         a_coefficients=(2.0614, 0, 0, 0, -2.2351, 0, 0, -3.9411e-1),
         b_coefficients=(0, 0, 5.5125e-2, 0, 3.9344e-2, 0, 0, 0),
         c_coefficients=(0, 0, -1.8935e-6, 0, -1.1092e-5, 0, -2.1892e-5, 0),
@@ -518,7 +517,7 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
         critical_data=critical_data,
     )
 
-    combined_model: RealGasProtocol = CombinedRealGas.create(
+    combined_model: RealGas = CombinedRealGas.create(
         [low_pressure, medium_pressure, high_pressure],
         [
             ExperimentalCalibration(pressure_min=1, pressure_max=1000),
@@ -530,31 +529,31 @@ def get_corresponding_states_SS92(species: str) -> RealGasProtocol:
     return combined_model
 
 
-CH4_SS92: RealGasProtocol = get_corresponding_states_SS92("CH4_g")
+CH4_SS92: RealGas = get_corresponding_states_SS92("CH4_g")
 """CH4 corresponding states :cite:p:`SS92`"""
-CO_SS92: RealGasProtocol = get_corresponding_states_SS92("CO_g")
+CO_SS92: RealGas = get_corresponding_states_SS92("CO_g")
 """CO corresponding states :cite:p:`SS92`"""
-CO2_SS92: RealGasProtocol = get_corresponding_states_SS92("CO2_g")
+CO2_SS92: RealGas = get_corresponding_states_SS92("CO2_g")
 """CO2 corresponding states :cite:p:`SS92`"""
-COS_SS92: RealGasProtocol = get_corresponding_states_SS92("COS_g")
+COS_SS92: RealGas = get_corresponding_states_SS92("COS_g")
 """COS corresponding states :cite:p:`SS92`"""
-O2_SS92: RealGasProtocol = get_corresponding_states_SS92("O2_g")
+O2_SS92: RealGas = get_corresponding_states_SS92("O2_g")
 """O2 corresponding states :cite:p:`SS92`"""
-S2_SS92: RealGasProtocol = get_corresponding_states_SS92("S2_g")
+S2_SS92: RealGas = get_corresponding_states_SS92("S2_g")
 """S2 corresponding states :cite:p:`SS92`"""
-Ar_SF87: RealGasProtocol = get_corresponding_states_SS92("Ar_g")
+Ar_SF87: RealGas = get_corresponding_states_SS92("Ar_g")
 """Ar corresponding states :cite:p:`SF87{Equation 11}`
 
 The low pressure extension given by the corresponding states model of :cite:t:`SS92{Table 1a}` is
 also adopted.
 """
-H2_SF87: RealGasProtocol = get_corresponding_states_SS92("H2_g")
+H2_SF87: RealGas = get_corresponding_states_SS92("H2_g")
 """H2 corresponding states :cite:p:`SF87{Equation 11}`
 
 The low pressure extension given by the corresponding states model of :cite:t:`SS92{Table 1a}` is
 also adopted.
 """
-N2_SF87: RealGasProtocol = get_corresponding_states_SS92("N2_g")
+N2_SF87: RealGas = get_corresponding_states_SS92("N2_g")
 """N2 corresponding states :cite:p:`SF87{Equation 11}`
 
 The low pressure extension given by the corresponding states model of :cite:t:`SS92{Table 1a}` is
@@ -562,7 +561,7 @@ also adopted.
 """
 
 
-def get_saxena_eos_models() -> dict[str, RealGasProtocol]:
+def get_saxena_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of Saxena and colleagues EOS models
 
     'cs' refers to corresponding states.
@@ -570,7 +569,7 @@ def get_saxena_eos_models() -> dict[str, RealGasProtocol]:
     Returns:
         Dictionary of EOS models
     """
-    eos_models: dict[str, RealGasProtocol] = {}
+    eos_models: dict[str, RealGas] = {}
     eos_models["Ar_cs_saxena87"] = Ar_SF87
     eos_models["CH4_cs_shi92"] = CH4_SS92
     eos_models["CO_cs_shi92"] = CO_SS92

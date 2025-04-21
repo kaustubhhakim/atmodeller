@@ -16,7 +16,7 @@
 #
 """Tests for the EOS models from :cite:t:`ZD09`"""
 
-from atmodeller.interfaces import RealGasProtocol
+from atmodeller.eos.core import RealGas
 from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8
@@ -71,11 +71,11 @@ def test_H2O_volume_high_TP2(check_values) -> None:
 
 def test_volume_with_broadcasting(check_values) -> None:
     """Tests volume with broadcasting"""
-    model: RealGasProtocol = check_values.get_eos_model("H2O", MODEL_SUFFIX)
+    model: RealGas = check_values.get_eos_model("H2O", MODEL_SUFFIX)
     check_values.check_broadcasting("volume", model)
 
 
 def test_fugacity_with_broadcasting(check_values) -> None:
     """Tests volume with broadcasting"""
-    model: RealGasProtocol = check_values.get_eos_model("H2O", MODEL_SUFFIX)
+    model: RealGas = check_values.get_eos_model("H2O", MODEL_SUFFIX)
     check_values.check_broadcasting("fugacity", model)

@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import pandas as pd
 from jax import Array
@@ -36,7 +37,6 @@ from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.interfaces import RealGasProtocol
 from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
 try:
@@ -88,7 +88,7 @@ class Chabrier(RealGas):
     """Number of integration steps"""
 
     @classmethod
-    def create(cls, filename: Path, integration_steps: int = 1000) -> RealGasProtocol:
+    def create(cls, filename: Path, integration_steps: int = 1000) -> RealGas:
         """Creates a Chabrier instance
 
         Args:
@@ -178,21 +178,76 @@ class Chabrier(RealGas):
     @override
     @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        # jax.debug.print("temperature_in = {out}", out=temperature)
-        # jax.debug.print("pressure_in = {out}", out=pressure)
-        # Pressure range to integrate over
-        pressures: Array = jnp.logspace(
-            jnp.log10(PRESSURE_REFERENCE), jnp.log10(pressure), num=self.integration_steps
-        )
-        # jax.debug.print("pressures = {out}", out=pressures)
-        volumes: Array = self.volume(temperature, pressures)
-        # jax.debug.print("volumes = {out}", out=volumes)
+        """This works for a single temperature and a pressure array.
 
-        # Optimized trapezoidal rule (avoids jax.scipy.integrate.trapezoid overhead)
-        dP: Array = jnp.diff(pressures)
+        TODO: Broadcasting needs generalising for multiple temperatures and pressures.
+
+        Next steps:
+            1. Add support for a temperature array the same length as the pressure array
+            2. Add support for multiple temperatures and a single pressure
+            3. Add support for manual broadcasting temperature[:.None] and pressure[None,:]
+        """
+        jax.debug.print("log_fugacity called")
+        jax.debug.print("temperature_in = {out}", out=temperature)
+        jax.debug.print("pressure_in = {out}", out=pressure)
+
+        temperature = jnp.asarray(temperature)
+        pressure = jnp.asarray(pressure)
+        # Broadcast temperature and pressure to a common shape. This ensures that method works
+        # with both singular temperature and singular pressure.
+        temperature, pressure = jnp.broadcast_arrays(temperature, pressure)
+        jax.debug.print("broadcasted temperature.shape = {s}", s=temperature.shape)
+        # Broadcasting1: (number of temperatuer points, number of pressure points)
+        # Broadcasting2: (number of pressure points, number of temperature points)
+        jax.debug.print("broadcasted pressure.shape = {s}", s=pressure.shape)
+        # Broadcasting1: (number of temperature points, number of pressure points)
+        # Broadcasting2: (number of pressure points, number of temperature points)
+
+        # Pressure range to integrate over
+        log10_pressures: Array = jnp.log10(pressure)
+
+        pressures: Array = jnp.logspace(
+            jnp.log10(PRESSURE_REFERENCE), log10_pressures, num=self.integration_steps
+        )
+        # Single temperature: (number of integration steps,)
+        # Single pressure: (number of integration steps, number of temperature points)
+        # Equal length: (number of integration steps, number of points)
+        # Broadcasting 1: (number of integration steps, number of temperature points, number of pressure points)
+        # Broadcasting 2: (number of integration steps, number of pressure points, number of temperature points)
+        jax.debug.print("pressures.shape = {out}", out=pressures.shape)
+
+        volumes: Array = self.volume(temperature, pressures)
+        # Single temperature: (number of integration steps,)
+        # Single pressure: (number of integration steps, number of temperature points)
+        # Equal length: (number of integration steps, number of points)
+        # Broadcasting 1: (number of integration steps, number of temperature points, number of pressure points)
+        # Broadcasting 2: (number of integration steps, number of pressure points, number of temperature points)
+        jax.debug.print("volumes.shape = {out}", out=volumes.shape)
+
+        dP: Array = jnp.diff(pressures, axis=0)
+        # Single temperature: (number of integration steps - 1,)
+        # Single pressure: (number of integration steps - 1, number of temperature points)
+        # Equal length: (number of integration steps - 1, number of points)
+        # Broadcasting1: (number of integration steps - 1, number of temperature points, number of pressure points)
+        # Broadcasting2: (number of integration steps - 1, number of pressure points, number of temperature points)
+        jax.debug.print("dP.shape = {out}", out=dP.shape)
+
         avg_volumes: Array = (volumes[:-1] + volumes[1:]) * 0.5
-        volume_integral: Array = jnp.sum(avg_volumes * dP)  # Equivalent to trapezoid integration
-        # jax.debug.print("volume_integral = {out}", out=volume_integral)
+        # Single temperature: (number of integration steps - 1,)
+        # Single pressure: (number of integration steps - 1, number of temperature points)
+        # Equal length: (number of integration steps - 1, number of points)
+        # Broadcasting 1: (number of integration steps - 1, number of temperature points, number of pressure points)
+        # Broadcasting 2: (number of integration steps - 1, number of pressure points, number of temperature points)
+        jax.debug.print("avg_volumes.shape = {out}", out=avg_volumes.shape)
+
+        # Trapezoid integration
+        volume_integral: Array = jnp.sum(avg_volumes * dP, axis=0)
+        jax.debug.print("volume_integral.shape = {out}", out=volume_integral.shape)
+        # Single temperature: () (scalar)
+        # Single pressure: (number of temperature points,)
+        # Equal length: (number of points,)
+        # Broadcasting1: (number of temperature points, 1)
+
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
         return log_fugacity
@@ -223,46 +278,44 @@ calibration_chabrier21: ExperimentalCalibration = ExperimentalCalibration(
     temperature_min=100, temperature_max=1.0e8, pressure_min=None, pressure_max=1.0e17
 )
 """Calibration for :cite:t:`CD21`"""
-H2_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLE_H_TP_v1"))
+H2_chabrier21: RealGas = Chabrier.create(Path("TABLE_H_TP_v1"))
 """H2 :cite:p:`CD21`"""
-H2_chabrier21_bounded: RealGasProtocol = CombinedRealGas.create(
+H2_chabrier21_bounded: RealGas = CombinedRealGas.create(
     [H2_chabrier21],
     [calibration_chabrier21],
 )
 """H2 bounded :cite:p:`CD21`"""
-He_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLE_HE_TP_v1"))
+He_chabrier21: RealGas = Chabrier.create(Path("TABLE_HE_TP_v1"))
 """He :cite:p:`CD21`"""
-He_chabrier21_bounded: RealGasProtocol = CombinedRealGas.create(
-    [He_chabrier21], [calibration_chabrier21]
-)
+He_chabrier21_bounded: RealGas = CombinedRealGas.create([He_chabrier21], [calibration_chabrier21])
 """He bounded :cite:p:`CD21`"""
-H2_He_Y0275_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLEEOS_2021_TP_Y0275_v1"))
+H2_He_Y0275_chabrier21: RealGas = Chabrier.create(Path("TABLEEOS_2021_TP_Y0275_v1"))
 """H2HeY0275 :cite:p:`CD21`"""
-H2_He_Y0275_chabrier21_bounded: RealGasProtocol = CombinedRealGas.create(
+H2_He_Y0275_chabrier21_bounded: RealGas = CombinedRealGas.create(
     [H2_He_Y0275_chabrier21], [calibration_chabrier21]
 )
 """H2HeY0275 bounded :cite:p:`CD21`"""
-H2_He_Y0292_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLEEOS_2021_TP_Y0292_v1"))
+H2_He_Y0292_chabrier21: RealGas = Chabrier.create(Path("TABLEEOS_2021_TP_Y0292_v1"))
 """H2HeY0292 :cite:p:`CD21`"""
-H2_He_Y0292_chabrier21_bounded: RealGasProtocol = CombinedRealGas.create(
+H2_He_Y0292_chabrier21_bounded: RealGas = CombinedRealGas.create(
     [H2_He_Y0292_chabrier21], [calibration_chabrier21]
 )
 """H2HeY0292 bounded :cite:p:`CD21`"""
-H2_He_Y0297_chabrier21: RealGasProtocol = Chabrier.create(Path("TABLEEOS_2021_TP_Y0297_v1"))
+H2_He_Y0297_chabrier21: RealGas = Chabrier.create(Path("TABLEEOS_2021_TP_Y0297_v1"))
 """H2HeY0297 :cite:p:`CD21`"""
-H2_He_Y0297_chabrier21_bounded: RealGasProtocol = CombinedRealGas.create(
+H2_He_Y0297_chabrier21_bounded: RealGas = CombinedRealGas.create(
     [H2_He_Y0297_chabrier21], [calibration_chabrier21]
 )
 """H2HeY0297 bounded :cite:p:`CD21`"""
 
 
-def get_chabrier_eos_models() -> dict[str, RealGasProtocol]:
+def get_chabrier_eos_models() -> dict[str, RealGas]:
     """Gets a dictionary of EOS models
 
     Returns:
         Dictionary of EOS models
     """
-    eos_models: dict[str, RealGasProtocol] = {}
+    eos_models: dict[str, RealGas] = {}
     eos_models["H2_chabrier21"] = H2_chabrier21_bounded
     eos_models["H2_He_Y0275_chabrier21"] = H2_He_Y0275_chabrier21_bounded
     eos_models["H2_He_Y0292_chabrier21"] = H2_He_Y0292_chabrier21_bounded

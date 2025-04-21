@@ -31,7 +31,6 @@ from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
-from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData
 from atmodeller.utilities import OptxSolver, safe_exp
 
@@ -715,7 +714,7 @@ class CORK(RealGas):
         critical_data: Critical data
     """
 
-    mrk: RealGasProtocol
+    mrk: RealGas
     """MRK model"""
     virial: VirialCompensation
     """Virial compensation term"""
