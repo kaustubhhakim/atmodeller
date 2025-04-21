@@ -239,7 +239,6 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
     """
 
     critical_data: CriticalData
-    # TODO: Use converter= instead of post_init
     _a_coefficients: tuple[float, ...] = eqx.field(init=False)
     _b: float = eqx.field(init=False)
 
