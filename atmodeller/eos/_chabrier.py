@@ -23,7 +23,6 @@ from pathlib import Path
 from typing import ClassVar
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import pandas as pd
 from jax import Array
@@ -57,7 +56,7 @@ class Chabrier(RealGas):
         He_fraction: He fraction
         H2_molar_mass_g_mol: Molar mass of H2
         He_molar_mass_g_mol: Molar mass of He
-        integration_steps: Number of integration steps. Defaults to 1000.
+        integration_steps: Number of integration steps
     """
 
     CHABRIER_DIRECTORY: ClassVar[Path] = Path("chabrier")
@@ -75,7 +74,8 @@ class Chabrier(RealGas):
     
     Dictionary keys should correspond to the name of the Chabrier file.
     """
-    # Must be declared static otherise a TypeError is raised
+    # Must be declared static because we don't want to trace through the arrays of the
+    # interpolator.
     log10_density_func: RegularGridInterpolator = eqx.field(static=True)
     """Spline lookup for density from :cite:t:`CD21` T-P-rho tables"""
     He_fraction: float
@@ -88,12 +88,16 @@ class Chabrier(RealGas):
     """Number of integration steps"""
 
     @classmethod
-    def create(cls, filename: Path, integration_steps: int = 1000) -> RealGas:
+    def create(cls, filename: Path, integration_steps: int = 100) -> RealGas:
         """Creates a Chabrier instance
 
         Args:
             filename: Filename of the density-T-P data
-            integration_steps: Number of integration steps. Defaults to 1000.
+            integration_steps: Number of integration steps. Defaults to 100, which computes the
+                fugacity of H2 to within 4% (relative to 1000 steps, for T from 1000 to 5000 K and
+                pressure to 10 GPa), and to within 10% (relative to 1000 steps, for T from 1000 to
+                5000 K and pressure to 100 GPa). Increasing the integration steps will increase the
+                run time but provide better accuracy.
 
         Returns:
             Instance
@@ -178,75 +182,39 @@ class Chabrier(RealGas):
     @override
     @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """This works for a single temperature and a pressure array.
+        """Log fugacity
 
-        TODO: Broadcasting needs generalising for multiple temperatures and pressures.
+        This performs a numerical integration to compute the fugacity, although an obvious
+        speedup to implement is to precompute the fugacity (integral), either by calculating it
+        during initialisation or by storing it in a lookup table that is read in.
 
-        Next steps:
-            1. Add support for a temperature array the same length as the pressure array
-            2. Add support for multiple temperatures and a single pressure
-            3. Add support for manual broadcasting temperature[:.None] and pressure[None,:]
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity in bar
         """
-        jax.debug.print("log_fugacity called")
-        jax.debug.print("temperature_in = {out}", out=temperature)
-        jax.debug.print("pressure_in = {out}", out=pressure)
-
         temperature = jnp.asarray(temperature)
-        pressure = jnp.asarray(pressure)
-        # Broadcast temperature and pressure to a common shape. This ensures that method works
-        # with both singular temperature and singular pressure.
-        temperature, pressure = jnp.broadcast_arrays(temperature, pressure)
-        jax.debug.print("broadcasted temperature.shape = {s}", s=temperature.shape)
-        # Broadcasting1: (number of temperatuer points, number of pressure points)
-        # Broadcasting2: (number of pressure points, number of temperature points)
-        jax.debug.print("broadcasted pressure.shape = {s}", s=pressure.shape)
-        # Broadcasting1: (number of temperature points, number of pressure points)
-        # Broadcasting2: (number of pressure points, number of temperature points)
+        log10_pressure: Array = jnp.log10(pressure)
+        temperature, log10_pressure = jnp.broadcast_arrays(temperature, log10_pressure)
 
         # Pressure range to integrate over
-        log10_pressures: Array = jnp.log10(pressure)
-
         pressures: Array = jnp.logspace(
-            jnp.log10(PRESSURE_REFERENCE), log10_pressures, num=self.integration_steps
+            jnp.log10(PRESSURE_REFERENCE), log10_pressure, num=self.integration_steps
         )
-        # Single temperature: (number of integration steps,)
-        # Single pressure: (number of integration steps, number of temperature points)
-        # Equal length: (number of integration steps, number of points)
-        # Broadcasting 1: (number of integration steps, number of temperature points, number of pressure points)
-        # Broadcasting 2: (number of integration steps, number of pressure points, number of temperature points)
-        jax.debug.print("pressures.shape = {out}", out=pressures.shape)
+        # jax.debug.print("pressures.shape = {out}", out=pressures.shape)
+        dP: Array = jnp.diff(pressures, axis=0)
+        # jax.debug.print("dP.shape = {out}", out=dP.shape)
 
         volumes: Array = self.volume(temperature, pressures)
-        # Single temperature: (number of integration steps,)
-        # Single pressure: (number of integration steps, number of temperature points)
-        # Equal length: (number of integration steps, number of points)
-        # Broadcasting 1: (number of integration steps, number of temperature points, number of pressure points)
-        # Broadcasting 2: (number of integration steps, number of pressure points, number of temperature points)
-        jax.debug.print("volumes.shape = {out}", out=volumes.shape)
-
-        dP: Array = jnp.diff(pressures, axis=0)
-        # Single temperature: (number of integration steps - 1,)
-        # Single pressure: (number of integration steps - 1, number of temperature points)
-        # Equal length: (number of integration steps - 1, number of points)
-        # Broadcasting1: (number of integration steps - 1, number of temperature points, number of pressure points)
-        # Broadcasting2: (number of integration steps - 1, number of pressure points, number of temperature points)
-        jax.debug.print("dP.shape = {out}", out=dP.shape)
-
+        # jax.debug.print("volumes.shape = {out}", out=volumes.shape)
         avg_volumes: Array = (volumes[:-1] + volumes[1:]) * 0.5
-        # Single temperature: (number of integration steps - 1,)
-        # Single pressure: (number of integration steps - 1, number of temperature points)
-        # Equal length: (number of integration steps - 1, number of points)
-        # Broadcasting 1: (number of integration steps - 1, number of temperature points, number of pressure points)
-        # Broadcasting 2: (number of integration steps - 1, number of pressure points, number of temperature points)
-        jax.debug.print("avg_volumes.shape = {out}", out=avg_volumes.shape)
+        # jax.debug.print("avg_volumes.shape = {out}", out=avg_volumes.shape)
 
         # Trapezoid integration
         volume_integral: Array = jnp.sum(avg_volumes * dP, axis=0)
-        jax.debug.print("volume_integral.shape = {out}", out=volume_integral.shape)
-        # Single temperature: () (scalar)
-        # Single pressure: (number of temperature points,)
-        # Equal length: (number of points,)
-        # Broadcasting1: (number of temperature points, 1)
+        # jax.debug.print("volume_integral.shape = {out}", out=volume_integral.shape)
 
         log_fugacity: Array = volume_integral / (GAS_CONSTANT_BAR * temperature)
 
