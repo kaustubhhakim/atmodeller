@@ -34,11 +34,8 @@ else:
     from typing import Self
 
 
-phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2, "s": 5}
-"""Mapping from the JANAF phase string to an integer code.
-
-s is used for amorphous SiO
-"""
+phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
+"""Mapping from the JANAF phase string to an integer code"""
 inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
 """Inverse mapping from the integer code to a JANAF phase string"""
 
@@ -239,6 +236,8 @@ class ThermoCoefficients:
         # output if the temperature is outside the ranges
         T_min_array: Array = jnp.asarray(self._T_min)
         T_max_array: Array = jnp.asarray(self._T_max)
+        # Temperature must be a float array since JAX cannot raise integers to negative powers.
+        temperature = jnp.asarray(temperature, dtype=jnp.float_)
         bool_mask: Array = (T_min_array <= temperature) & (temperature <= T_max_array)
         index: Array = jnp.argmax(bool_mask)
         # jax.debug.print("index = {out}", out=index)

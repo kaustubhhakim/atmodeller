@@ -20,38 +20,29 @@ Units for temperature and pressure are K and bar, respectively.
 """
 
 import logging
-import sys
-from abc import ABC, abstractmethod
-from typing import Any, Callable
+from abc import abstractmethod
+from typing import Callable
 
+import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array, grad, jit
-from jax.tree_util import register_pytree_node_class
+from jax import Array, jacfwd
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.interfaces import RealGasProtocol
+from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
 from atmodeller.thermodata import CriticalData
-from atmodeller.utilities import (
-    PyTreeNoData,
-    safe_exp,
-)
+from atmodeller.utilities import OptxSolver, safe_exp
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
-
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
+try:
+    from typing import override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override  # Python 3.11 and earlier
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class RealGas(ABC):
+class RealGas(eqx.Module):
     r"""A real gas equation of state (EOS)
 
     Fugacity is computed using the standard relation:
@@ -64,19 +55,7 @@ class RealGas(ABC):
     """
 
     @abstractmethod
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log fugacity
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity in bar
-        """
-
-    @abstractmethod
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Volume
 
         Args:
@@ -99,7 +78,24 @@ class RealGas(ABC):
             Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
 
-    @jit
+    @eqx.filter_jit
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Log fugacity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log fugacity in bar
+        """
+        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
+            GAS_CONSTANT_BAR * temperature
+        )
+
+        return log_fugacity
+
+    @eqx.filter_jit
     def volume_integral_J(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral in J
 
@@ -112,8 +108,25 @@ class RealGas(ABC):
         """
         return 1e5 * self.volume_integral(temperature, pressure)
 
-    @jit
-    def dvolume_dpressure(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    @eqx.filter_jit
+    def dzdp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+        """Derivative of the compressibility factor with respect to pressure
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Derivative of the compressibility factor with respect to pressure
+        """
+        temperature = jnp.asarray(temperature, dtype=jnp.float_)
+        pressure = jnp.asarray(pressure, dtype=jnp.float_)
+        dzdp_fn: Callable = jacfwd(self.compressibility_factor, argnums=1)
+
+        return dzdp_fn(temperature, pressure)
+
+    @eqx.filter_jit
+    def dvdp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Derivative of volume with respect to pressure
 
         Args:
@@ -123,11 +136,13 @@ class RealGas(ABC):
         Returns:
             Derivative of volume with respect to pressure
         """
-        dvolume_dpressure_fn: Callable = grad(self.volume, argnums=1)
+        temperature = jnp.asarray(temperature, dtype=jnp.float_)
+        pressure = jnp.asarray(pressure, dtype=jnp.float_)
+        dvdp_fn: Callable = jacfwd(self.volume, argnums=1)
 
-        return dvolume_dpressure_fn(temperature, pressure)
+        return dvdp_fn(temperature, pressure)
 
-    @jit
+    @eqx.filter_jit
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Log activity
 
@@ -143,7 +158,7 @@ class RealGas(ABC):
 
         return self.log_fugacity(temperature, pressure)
 
-    @jit
+    @eqx.filter_jit
     def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Compressibility factor
 
@@ -155,12 +170,12 @@ class RealGas(ABC):
             Compressibility factor, which is dimensionless
         """
         volume: ArrayLike = self.volume(temperature, pressure)
-        volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
+        volume_ideal: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
         compressibility_factor: ArrayLike = volume / volume_ideal
 
         return compressibility_factor
 
-    @jit
+    @eqx.filter_jit
     def fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Fugacity
 
@@ -175,22 +190,20 @@ class RealGas(ABC):
 
         return fugacity
 
-    @jit
+    @eqx.filter_jit
     def log_fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log of the fugacity coefficient
+        """Log fugacity coefficient
 
         Args:
             temperature: Temperature in K
             pressure: Pressure in bar
 
         Returns:
-            Log of the fugacity coefficient, which is dimensionless
+            Log fugacity coefficient, which is dimensionless
         """
-        return self.log_fugacity(temperature, pressure) - self.ideal_log_fugacity(
-            temperature, pressure
-        )
+        return self.log_fugacity(temperature, pressure) - jnp.log(pressure)
 
-    @jit
+    @eqx.filter_jit
     def fugacity_coefficient(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Fugacity coefficient
 
@@ -203,42 +216,8 @@ class RealGas(ABC):
         """
         return safe_exp(self.log_fugacity_coefficient(temperature, pressure))
 
-    @jit
-    def ideal_log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Log fugacity of an ideal gas
 
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity of an ideal gas
-        """
-        del temperature
-        ideal_log_fugacity: ArrayLike = jnp.log(pressure)
-
-        return ideal_log_fugacity
-
-    @jit
-    def ideal_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        r"""Volume of an ideal gas
-
-        This is required to compute the compressibility factor.
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Ideal volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
-        """
-        ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
-
-        return ideal_volume
-
-
-@register_pytree_node_class
-class IdealGas(PyTreeNoData, RealGas):
+class IdealGas(RealGas):
     r"""Ideal gas equation of state:
 
     .. math::
@@ -250,19 +229,14 @@ class IdealGas(PyTreeNoData, RealGas):
     """
 
     @override
-    @jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        return self.ideal_log_fugacity(temperature, pressure)
-
-    @override
-    @jit
+    @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        return self.ideal_volume(temperature, pressure)
+        return GAS_CONSTANT_BAR * temperature / pressure
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        return GAS_CONSTANT_BAR * temperature * self.log_fugacity(temperature, pressure)
+        return jnp.log(pressure) * GAS_CONSTANT_BAR * temperature
 
 
 class RedlichKwongABC(RealGas):
@@ -301,7 +275,7 @@ class RedlichKwongABC(RealGas):
         """
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral
 
@@ -329,25 +303,7 @@ class RedlichKwongABC(RealGas):
         return volume_integral
 
     @override
-    @jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        r"""Log fugacity :cite:p:`HP91{Equation 8}`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity
-        """
-        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
-            GAS_CONSTANT_BAR * temperature
-        )
-
-        return log_fugacity
-
-    @override
-    @jit
+    @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume-explicit equation :cite:p:`HP91{Equation 7}`
 
@@ -409,7 +365,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         """
         ...
 
-    @jit
+    @eqx.filter_jit
     def A_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """`A` factor :cite:p:`HP91{Appendix A}`
 
@@ -426,7 +382,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
 
         return A_factor
 
-    @jit
+    @eqx.filter_jit
     def B_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """`B` factor :cite:p:`HP91{Appendix A}`
 
@@ -442,25 +398,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         return B_factor
 
     @override
-    @jit
-    def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        """Compressibility factor
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            The compressibility factor, which is dimensionless
-        """
-        volume: ArrayLike = self.volume(temperature, pressure)
-        volume_ideal: ArrayLike = self.ideal_volume(temperature, pressure)
-        compressibility_factor: ArrayLike = volume / volume_ideal
-
-        return compressibility_factor
-
-    @override
-    @jit
+    @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral :cite:p:`HP91{Equation A.2}`
 
@@ -477,7 +415,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         return volume_integral
 
     @override
-    @jit
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Log fugacity
 
@@ -497,7 +435,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
 
         return log_fugacity
 
-    @jit
+    @eqx.filter_jit
     def _objective_function(self, volume: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
         r"""Objective function to solve for the volume
 
@@ -528,7 +466,7 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         return residual
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Solves the RK equation numerically to compute the volume.
 
@@ -542,10 +480,9 @@ class RedlichKwongImplicitABC(RedlichKwongABC):
         initial_volume: ArrayLike = self.initial_volume(temperature, pressure)
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
-        # atol reduced since typical volumes are around 1e-5 to 1e-6
-        solver = optx.Newton(rtol=1.0e-6, atol=1.0e-12)
+        solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)
         sol = optx.root_find(
-            self._objective_function, solver, initial_volume, args=kwargs, throw=False
+            self._objective_function, solver, initial_volume, args=kwargs, throw=THROW
         )
         volume: ArrayLike = sol.value
         # jax.debug.print("volume = {out}", out=volume)
@@ -598,8 +535,7 @@ class RedlichKwongImplicitGasABC(RedlichKwongImplicitABC):
         return initial_volume
 
 
-@register_pytree_node_class
-class VirialCompensation:
+class VirialCompensation(eqx.Module):
     r"""A virial compensation term for the increasing deviation of the MRK volumes with pressure
 
     General form of the equation :cite:t:`HP98` and also see :cite:t:`HP91{Equations 4 and 9}`:
@@ -621,28 +557,18 @@ class VirialCompensation:
         c_coefficients: As above for the c coefficients
         P0: Pressure at which the MRK equation begins to overestimate the molar volume
             significantly and may be determined from experimental data.
-
-    Attributes:
-        a_coefficients: Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`.
-        b_coefficients: As above for the b coefficients
-        c_coefficients: As above for the c coefficients
-        P0: Pressure at which the MRK equation begins to overestimate the molar volume
-            significantly and may be determined from experimental data.
     """
 
-    def __init__(
-        self,
-        a_coefficients: tuple[float, ...],
-        b_coefficients: tuple[float, ...],
-        c_coefficients: tuple[float, ...],
-        P0: float,
-    ):
-        self.a_coefficients: tuple[float, ...] = a_coefficients
-        self.b_coefficients: tuple[float, ...] = b_coefficients
-        self.c_coefficients: tuple[float, ...] = c_coefficients
-        self.P0: float = P0
+    a_coefficients: tuple[float, ...]
+    """Coefficients for a polynomial of the form :math:`a=a_0+a_1 T`"""
+    b_coefficients: tuple[float, ...]
+    """As above for the b coefficients"""
+    c_coefficients: tuple[float, ...]
+    """As above for the c coefficients"""
+    P0: float
+    """Pressure at which the MRK equation begins to overestimate the molar volume significantly"""
 
-    @jit
+    @eqx.filter_jit
     def _a(self, temperature: ArrayLike, critical_data: CriticalData) -> Array:
         r"""`a` parameter :cite:p:`HP98`
 
@@ -663,7 +589,7 @@ class VirialCompensation:
 
         return a
 
-    @jit
+    @eqx.filter_jit
     def _b(self, temperature: ArrayLike, critical_data: CriticalData) -> Array:
         r"""`b` parameter :cite:p:`HP98`
 
@@ -684,7 +610,7 @@ class VirialCompensation:
 
         return b
 
-    @jit
+    @eqx.filter_jit
     def _c(self, temperature: ArrayLike, critical_data: CriticalData) -> Array:
         r"""`c` parameter :cite:p:`HP98`
 
@@ -703,7 +629,7 @@ class VirialCompensation:
 
         return c
 
-    @jit
+    @eqx.filter_jit
     def _delta_pressure(self, pressure: ArrayLike) -> Array:
         """Pressure difference
 
@@ -726,7 +652,7 @@ class VirialCompensation:
 
         return delta_pressure
 
-    @jit
+    @eqx.filter_jit
     def volume(
         self, temperature: ArrayLike, pressure: ArrayLike, critical_data: CriticalData
     ) -> Array:
@@ -749,7 +675,7 @@ class VirialCompensation:
 
         return volume
 
-    @jit
+    @eqx.filter_jit
     def volume_integral(
         self, temperature: ArrayLike, pressure: ArrayLike, critical_data: CriticalData
     ) -> Array:
@@ -778,23 +704,7 @@ class VirialCompensation:
 
         return volume_integral
 
-    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
-        children: tuple = ()
-        aux_data = {
-            "a_coefficients": self.a_coefficients,
-            "b_coefficients": self.b_coefficients,
-            "c_coefficients": self.c_coefficients,
-            "P0": self.P0,
-        }
-        return (children, aux_data)
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
-
-
-@register_pytree_node_class
 class CORK(RealGas):
     """A Compensated-Redlich-Kwong (CORK) EOS :cite:p:`HP91`
 
@@ -804,34 +714,16 @@ class CORK(RealGas):
         critical_data: Critical data
     """
 
-    def __init__(
-        self, mrk: RealGasProtocol, virial: VirialCompensation, critical_data: CriticalData
-    ):
-        self._mrk: RealGasProtocol = mrk
-        self._virial: VirialCompensation = virial
-        self._critical_data: CriticalData = critical_data
+    mrk: RealGas
+    """MRK model"""
+    virial: VirialCompensation
+    """Virial compensation term"""
+    critical_data: CriticalData
+    """Critical data"""
 
     @override
-    @jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
-        """Log fugacity :cite:p:`HP91{Equation 8}`
-
-        Args:
-            temperature: Temperature in K
-            pressure: Pressure in bar
-
-        Returns:
-            Log fugacity
-        """
-        log_fugacity: Array = self.volume_integral(temperature, pressure) / (
-            GAS_CONSTANT_BAR * temperature
-        )
-
-        return log_fugacity
-
-    @override
-    @jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    @eqx.filter_jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Volume :cite:p:`HP91{Equation 7a}`
 
         Args:
@@ -841,14 +733,14 @@ class CORK(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        volume: Array = self._mrk.volume(temperature, pressure) + self._virial.volume(
-            temperature, pressure, self._critical_data
+        volume: ArrayLike = self.mrk.volume(temperature, pressure) + self.virial.volume(
+            temperature, pressure, self.critical_data
         )
 
         return volume
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral :cite:p:`HP91{Equation 8}`
 
@@ -859,18 +751,8 @@ class CORK(RealGas):
         Returns:
             Volume integral in :math:`\mathrm{m}^3\ \mathrm{bar}\ \mathrm{mol}^{-1}`
         """
-        volume_integral: Array = self._mrk.volume_integral(
+        volume_integral: Array = self.mrk.volume_integral(
             temperature, pressure
-        ) + self._virial.volume_integral(temperature, pressure, self._critical_data)
+        ) + self.virial.volume_integral(temperature, pressure, self.critical_data)
 
         return volume_integral
-
-    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
-        children: tuple = ()
-        aux_data = {"mrk": self._mrk, "virial": self._virial, "critical_data": self._critical_data}
-        return (children, aux_data)
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)

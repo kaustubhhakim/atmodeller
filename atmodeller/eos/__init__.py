@@ -21,14 +21,16 @@ from importlib.abc import Traversable
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory, which is the same as the package directory"""
+# ABSOLUTE_TOLERANCE is less than RELATIVE_TOLERANCE because typical volumes are around 1e-6
+ABSOLUTE_TOLERANCE: float = 1.0e-12
+r"""Absolute tolerance when solving for the volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
+RELATIVE_TOLERANCE: float = 1.0e-6
+r"""Relative tolerance when solving for the volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`"""
+THROW: bool = False
+"""Whether to throw errors. Change to True for debugging purposes."""
 
-# Expose the public API
-from atmodeller.eos._aggregators import (  # noqa: E402, F401
-    CombinedRealGas,
-)
-from atmodeller.eos.classes import (  # noqa: E402, F401
-    BeattieBridgeman,
-    Chabrier,
-)
+# Expose the public API, including base classes for EOS models
+from atmodeller.eos._aggregators import CombinedRealGas  # noqa: E402, F401
+from atmodeller.eos.classes import RealGas  # noqa: E402, F401
 from atmodeller.eos.core import IdealGas  # noqa: E402, F401
 from atmodeller.eos.library import get_eos_models  # noqa: E402, F401

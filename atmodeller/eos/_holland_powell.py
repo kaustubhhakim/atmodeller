@@ -16,14 +16,15 @@
 #
 """Real gas EOS from :cite:t:`HP91,HP98,HP11`"""
 
-import logging
-import sys
-from abc import abstractmethod
-from typing import Any, Callable
+from __future__ import annotations
 
+import logging
+from abc import abstractmethod
+from typing import Callable
+
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit, lax
-from jax.tree_util import register_pytree_node_class
+from jax import Array, lax
 from jax.typing import ArrayLike
 from scipy.constants import kilo
 
@@ -37,19 +38,14 @@ from atmodeller.eos.core import (
     RedlichKwongImplicitGasABC,
     VirialCompensation,
 )
-from atmodeller.interfaces import RealGasProtocol
 from atmodeller.thermodata import CriticalData, select_critical_data
-from atmodeller.utilities import ExperimentalCalibration, PyTreeNoData
+from atmodeller.utilities import ExperimentalCalibration
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
+try:
+    from typing import override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override  # Python 3.11 and earlier
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -233,7 +229,6 @@ class FullUnitConverter:
         )
 
 
-@register_pytree_node_class
 class MRKCorrespondingStatesHP91(RedlichKwongABC):
     """MRK corresponding states :cite:p:`HP91`
 
@@ -243,25 +238,28 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         critical_data: Critical data
     """
 
-    def __init__(self, critical_data: CriticalData):
-        self._critical_data: CriticalData = critical_data
-        self._a_coefficients: tuple[float, ...] = (
-            CorrespondingStatesUnitConverter.convert_a_coefficients((5.45963e-5, -8.63920e-6, 0))
+    critical_data: CriticalData
+    _a_coefficients: tuple[float, ...] = eqx.field(init=False)
+    _b: float = eqx.field(init=False)
+
+    def __post_init__(self):
+        self._a_coefficients = CorrespondingStatesUnitConverter.convert_a_coefficients(
+            (5.45963e-5, -8.63920e-6, 0)
         )
-        self._b: float = CorrespondingStatesUnitConverter.convert_b_coefficient(9.18301e-4)
+        self._b = CorrespondingStatesUnitConverter.convert_b_coefficient(9.18301e-4)
 
     @property
     def critical_pressure(self) -> float:
         """Critical pressure in bar"""
-        return self._critical_data.pressure
+        return self.critical_data.pressure
 
     @property
     def critical_temperature(self) -> float:
         """Critical temperature in K"""
-        return self._critical_data.temperature
+        return self.critical_data.temperature
 
     @classmethod
-    def get_species(cls, species: str) -> Self:
+    def get_species(cls, species: str) -> MRKCorrespondingStatesHP91:
         """Gets an MRK corresponding states model for a given species.
 
         Args:
@@ -275,7 +273,7 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         return cls(critical_data)
 
     @override
-    @jit
+    @eqx.filter_jit
     def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""MRK `a` parameter :cite:p:`HP91{Equation 9}`
 
@@ -303,7 +301,7 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         return a
 
     @override
-    @jit
+    @eqx.filter_jit
     def b(self) -> ArrayLike:
         r"""MRK `b` parameter computed from :attr:`b0` :cite:p:`HP91{Equation 9}`.
 
@@ -318,18 +316,8 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
 
         return b
 
-    def tree_flatten(self) -> tuple[tuple, tuple]:
-        children: tuple = ()
-        aux_data = (self._critical_data,)
-        return (children, aux_data)
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(*aux_data)
-
-
-class MRKImplicitHP91ABCMixin:
+class MRKImplicitHP91ABCMixin(eqx.Module):
     """MRK implicit :cite:p:`HP91`
 
     Universal constants from :cite:t:`HP91{Table 1}`.
@@ -341,11 +329,10 @@ class MRKImplicitHP91ABCMixin:
         Tc: Critical temperature in K
     """
 
-    def __init__(self, a_coefficients: tuple[float, ...], b: float, Ta: float, Tc: float):
-        self._a_coefficients: tuple[float, ...] = a_coefficients
-        self._b: float = b
-        self._Ta: float = Ta
-        self._Tc: float = Tc
+    _a_coefficients: tuple[float, ...]
+    _b: float
+    _Ta: float
+    _Tc: float
 
     @abstractmethod
     def delta_temperature_for_a(self, temperature: ArrayLike) -> ArrayLike:
@@ -359,7 +346,7 @@ class MRKImplicitHP91ABCMixin:
         """
         ...
 
-    @jit
+    @eqx.filter_jit
     def a(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""MRK `a` parameter :cite:p:`HP91{Equation 6}`
 
@@ -382,26 +369,11 @@ class MRKImplicitHP91ABCMixin:
 
         return a
 
+    @eqx.filter_jit
     def b(self) -> ArrayLike:
         return self._b
 
-    def tree_flatten(self) -> tuple[tuple, dict[str, Any]]:
-        children: tuple = ()
-        aux_data = {
-            "a_coefficients": self._a_coefficients,
-            "b": self._b,
-            "Ta": self._Ta,
-            "Tc": self._Tc,
-        }
-        return (children, aux_data)
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
-
-
-@register_pytree_node_class
 class MRKImplicitGasHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitGasABC):
     """MRK for gaseous phase :cite:p:`HP91{Equation 6a}`"""
 
@@ -426,11 +398,11 @@ H2OMrkGasHolland91: MRKImplicitGasHP91 = MRKImplicitGasHP91(
 """H2O MRK for gas phase :cite:p:`HP91`"""
 
 
-@register_pytree_node_class
 class MRKImplicitLiquidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFluidABC):
     """MRK for liquid phase :cite:p`HP91{Equation 6}`"""
 
     @override
+    @eqx.filter_jit
     def delta_temperature_for_a(self, temperature: ArrayLike) -> ArrayLike:
         return self._Ta - temperature
 
@@ -444,16 +416,16 @@ H2OMrkLiquidHolland91: MRKImplicitLiquidHP91 = MRKImplicitLiquidHP91(
 """H2O MRK for liquid phase :cite:p`HP91`"""
 
 
-@register_pytree_node_class
 class MRKImplicitFluidHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitDenseFluidABC):
     """MRK for supercritical fluid :cite:p:`HP91{Equation 6}`"""
 
     @override
+    @eqx.filter_jit
     def delta_temperature_for_a(self, temperature: ArrayLike) -> ArrayLike:
         return temperature - self._Ta
 
     @override
-    @jit
+    @eqx.filter_jit
     def initial_volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Initial guess volume to ensure convergence to the correct root
 
@@ -515,8 +487,7 @@ formulation for H2O, the CO2 critical temperature is set.
 """
 
 
-@register_pytree_node_class
-class H2OMrkGasFluid91(PyTreeNoData, RealGas):
+class H2OMrkGasFluid91(RealGas):
     """A MRK model for H2O for the gas and supercritical fluid
 
     Args:
@@ -535,7 +506,7 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
     Tc: float = Tc_H2O
     """Critical temperature in K"""
 
-    @jit
+    @eqx.filter_jit
     def _select_condition(self, temperature: ArrayLike) -> Array:
         """Selects the condition
 
@@ -564,7 +535,8 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
 
         return condition
 
-    @jit
+    @override
+    @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral :cite:p:`HP91{Appendix A}`
 
@@ -598,7 +570,7 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
         return volume_integral
 
     @override
-    @jit
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Log fugacity :cite:p:`HP91{Equation 8}`
 
@@ -616,7 +588,7 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
         return log_fugacity
 
     @override
-    @jit
+    @eqx.filter_jit
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume
 
@@ -629,13 +601,13 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
         """
         condition: Array = self._select_condition(temperature)
 
-        def volume0() -> Array:
+        def volume0() -> ArrayLike:
             return self.mrk_fluid.volume(temperature, pressure)
 
-        def volume1() -> Array:
+        def volume1() -> ArrayLike:
             return self.mrk_gas.volume(temperature, pressure)
 
-        def volume2() -> Array:
+        def volume2() -> ArrayLike:
             return self.mrk_fluid.volume(temperature, pressure)
 
         volume_funcs: list[Callable] = [volume0, volume1, volume2]
@@ -646,8 +618,7 @@ class H2OMrkGasFluid91(PyTreeNoData, RealGas):
         return volume
 
 
-@register_pytree_node_class
-class H2OMrkHP91(PyTreeNoData, RealGas):
+class H2OMrkHP91(RealGas):
     """A MRK model for H2O that accommodates critical behaviour
 
     Args:
@@ -669,7 +640,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
     Tc: float = Tc_H2O
     """Critical temperature in K"""
 
-    @jit
+    @eqx.filter_jit
     def Psat(self, temperature: ArrayLike) -> Array:
         """Saturation curve
 
@@ -690,7 +661,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
         return Psat
 
-    @jit
+    @eqx.filter_jit
     def _select_condition(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Selects the condition
 
@@ -731,7 +702,8 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
 
         return condition
 
-    @jit
+    @override
+    @eqx.filter_jit
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Volume integral :cite:p:`HP91{Appendix A}`
 
@@ -778,7 +750,7 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         return volume_integral
 
     @override
-    @jit
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Log fugacity :cite:p:`HP91{Equation 8}`
 
@@ -796,8 +768,8 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         return log_fugacity
 
     @override
-    @jit
-    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
+    @eqx.filter_jit
+    def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         r"""Volume
 
         Args:
@@ -809,19 +781,19 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         """
         condition: Array = self._select_condition(temperature, pressure)
 
-        def volume0() -> Array:
+        def volume0() -> ArrayLike:
             return self.mrk_fluid.volume(temperature, pressure)
 
-        def volume1() -> Array:
+        def volume1() -> ArrayLike:
             return self.mrk_gas.volume(temperature, pressure)
 
-        def volume2() -> Array:
+        def volume2() -> ArrayLike:
             return self.mrk_fluid.volume(temperature, pressure)
 
-        def volume3() -> Array:
+        def volume3() -> ArrayLike:
             return self.mrk_liquid.volume(temperature, pressure)
 
-        def volume4() -> Array:
+        def volume4() -> ArrayLike:
             return self.mrk_fluid.volume(temperature, pressure)
 
         volume_funcs: list[Callable] = [volume0, volume1, volume2, volume3, volume4]
@@ -832,29 +804,29 @@ class H2OMrkHP91(PyTreeNoData, RealGas):
         return volume
 
 
-H2OMrkHolland91: RealGasProtocol = H2OMrkHP91()
+H2OMrkHolland91: RealGas = H2OMrkHP91()
 """H2O MRK that includes critical behaviour (also the liquid phase)"""
-CO2_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CO2_g")
+CO2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO2_g")
 """CO2 MRK corresponding states :cite:p:`HP91`"""
-CH4_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CH4_g")
+CH4_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CH4_g")
 """CH4 MRK corresponding states :cite:p:`HP91`"""
-H2_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("H2_g_Holland")
+H2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("H2_g_Holland")
 """H2 MRK corresponding states :cite:p:`HP91`"""
-CO_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("CO_g")
+CO_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("CO_g")
 """CO MRK corresponding states :cite:p:`HP91`"""
-N2_mrk_cs_holland91: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("N2_g")
+N2_mrk_cs_holland91: RealGas = MRKCorrespondingStatesHP91.get_species("N2_g")
 """N2 MRK corresponding states :cite:p:`HP91`"""
-S2_mrk_cs_holland11: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("S2_g")
+S2_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("S2_g")
 """S2 MRK corresponding states :cite:p:`HP11`"""
-H2S_mrk_cs_holland11: RealGasProtocol = MRKCorrespondingStatesHP91.get_species("H2S_g")
+H2S_mrk_cs_holland11: RealGas = MRKCorrespondingStatesHP91.get_species("H2S_g")
 """H2S MRK corresponding states :cite:p:`HP11`"""
-H2O_mrk_fluid_holland91: RealGasProtocol = H2OMrkFluidHolland91
+H2O_mrk_fluid_holland91: RealGas = H2OMrkFluidHolland91
 """H2O MRK supercritical fluid :cite:p:`HP91`"""
-H2O_mrk_gas_holland91: RealGasProtocol = H2OMrkGasHolland91
+H2O_mrk_gas_holland91: RealGas = H2OMrkGasHolland91
 """H2O MRK gas :cite:p:`HP91`"""
-H2O_mrk_liquid_holland91: RealGasProtocol = H2OMrkLiquidHolland91
+H2O_mrk_liquid_holland91: RealGas = H2OMrkLiquidHolland91
 """H2O MRK liquid :cite:p:`HP91`"""
-H2O_mrk_gas_fluid_holland91: RealGasProtocol = H2OMrkGasFluid91()
+H2O_mrk_gas_fluid_holland91: RealGas = H2OMrkGasFluid91()
 """H2O MRK for the gas and supercritical fluid :cite:p:`HP91`"""
 
 coefficients_P: tuple[float, ...] = CorrespondingStatesUnitConverter.convert_virial_coefficients(
@@ -889,61 +861,61 @@ experimental_calibration_holland98: ExperimentalCalibration = ExperimentalCalibr
 )
 """Experimental calibration for :cite:`HP98` models"""
 
-CH4_cork_cs_holland91: RealGasProtocol = CORK(
+CH4_cork_cs_holland91: RealGas = CORK(
     CH4_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CH4_g")
 )
 """CH4 CORK corresponding states :cite:p:`HP91`"""
-CH4_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CH4_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
     [CH4_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CH4 CORK corresponding states bounded :cite:p:`HP91`"""
-CO_cork_cs_holland91: RealGasProtocol = CORK(
+CO_cork_cs_holland91: RealGas = CORK(
     CO_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO_g")
 )
 """CO CORK corresponding states :cite:p:`HP91`"""
-CO_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CO_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
     [CO_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CO CORK corresponding states bounded :cite:p:`HP91`"""
-CO2_cork_cs_holland91: RealGasProtocol = CORK(
+CO2_cork_cs_holland91: RealGas = CORK(
     CO2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("CO2_g")
 )
 """CO2 CORK corresponding states :cite:p:`HP91`"""
-CO2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CO2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
     [CO2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """CO2 CORK corresponding states bounded :cite:p:`HP91`"""
-H2_cork_cs_holland91: RealGasProtocol = CORK(
+H2_cork_cs_holland91: RealGas = CORK(
     H2_mrk_cs_holland91,
     virial_compensation_corresponding_states,
     select_critical_data("H2_g_Holland"),
 )
 """H2 CORK corresponding states :cite:p:`HP91`"""
-H2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+H2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
     [H2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """H2 CORK corresponding states bounded :cite:p:`HP91`"""
-H2S_cork_cs_holland11: RealGasProtocol = CORK(
+H2S_cork_cs_holland11: RealGas = CORK(
     H2S_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("H2S_g")
 )
 """H2S CORK corresponding states :cite:p:`HP91`"""
-H2S_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas(
+H2S_cork_cs_holland11_bounded: RealGas = CombinedRealGas.create(
     [H2S_cork_cs_holland11], [experimental_calibration_holland91]
 )
 """H2S CORK corresponding states bounded :cite:p:`HP91`"""
-N2_cork_cs_holland91: RealGasProtocol = CORK(
+N2_cork_cs_holland91: RealGas = CORK(
     N2_mrk_cs_holland91, virial_compensation_corresponding_states, select_critical_data("N2_g")
 )
 """N2 CORK corresponding states :cite:p:`HP91`"""
-N2_cork_cs_holland91_bounded: RealGasProtocol = CombinedRealGas(
+N2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
     [N2_cork_cs_holland91], [experimental_calibration_holland91]
 )
 """N2 CORK corresponding states bounded :cite:p:`HP91`"""
-S2_cork_cs_holland11: RealGasProtocol = CORK(
+S2_cork_cs_holland11: RealGas = CORK(
     S2_mrk_cs_holland11, virial_compensation_corresponding_states, select_critical_data("S2_g")
 )
 """S2 CORK corresponding states :cite:p:`HP91`"""
-S2_cork_cs_holland11_bounded: RealGasProtocol = CombinedRealGas(
+S2_cork_cs_holland11_bounded: RealGas = CombinedRealGas.create(
     [S2_cork_cs_holland11], [experimental_calibration_holland91]
 )
 """S2 CORK corresponding states bounded :cite:p:`HP91`"""
@@ -962,11 +934,11 @@ CO2_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     5000,
 )
 """CO2 virial compensation :cite:p:`HP91`"""
-CO2_cork_holland91: RealGasProtocol = CORK(
+CO2_cork_holland91: RealGas = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland91, dummy_critical_data
 )
 """CO2 cork :cite:p:`HP91`"""
-CO2_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
+CO2_cork_holland91_bounded: RealGas = CombinedRealGas.create(
     [CO2_cork_holland91], [experimental_calibration_holland91]
 )
 """CO2 cork bounded :cite:p:`HP91`"""
@@ -978,19 +950,19 @@ H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     2000,
 )
 """H2O virial compensation :cite:p:`HP91`"""
-H2O_cork_holland91: RealGasProtocol = CORK(
+H2O_cork_holland91: RealGas = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland91, dummy_critical_data
 )
 """H2O cork :cite:p:`HP91`"""
-H2O_cork_holland91_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_holland91_bounded: RealGas = CombinedRealGas.create(
     [H2O_cork_holland91], [experimental_calibration_holland91]
 )
 """H2O cork bounded :cite:p:`HP91`"""
-H2O_cork_gas_fluid_holland91: RealGasProtocol = CORK(
+H2O_cork_gas_fluid_holland91: RealGas = CORK(
     H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland91, dummy_critical_data
 )
 """H2O cork for the gas and supercritical fluid :cite:p:`HP91`"""
-H2O_cork_gas_fluid_holland91_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_gas_fluid_holland91_bounded: RealGas = CombinedRealGas.create(
     [H2O_cork_gas_fluid_holland91], [experimental_calibration_holland91]
 )
 """H2O cork for the gas and supercritical fluid bounded :cite:p:`HP91`"""
@@ -1002,11 +974,11 @@ CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     5000,
 )
 """CO2 virial compensation :cite:p:`HP98`"""
-CO2_cork_holland98: RealGasProtocol = CORK(
+CO2_cork_holland98: RealGas = CORK(
     CO2MrkHolland91, CO2_virial_compensation_holland98, dummy_critical_data
 )
 """CO2 cork :cite:p:`HP98`"""
-CO2_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
+CO2_cork_holland98_bounded: RealGas = CombinedRealGas.create(
     [CO2_cork_holland98], [experimental_calibration_holland98]
 )
 """CO2 cork bounded :cite:p:`HP98`"""
@@ -1018,26 +990,26 @@ H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     2000,
 )
 """H2O virial compensation :cite:p:`HP98`"""
-H2O_cork_holland98: RealGasProtocol = CORK(
+H2O_cork_holland98: RealGas = CORK(
     H2OMrkHolland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
 """H2O cork :cite:p:`HP98`"""
-H2O_cork_holland98_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_holland98_bounded: RealGas = CombinedRealGas.create(
     [H2O_cork_holland98], [experimental_calibration_holland98]
 )
 """H2O cork bounded :cite:p:`HP98`"""
-H2O_cork_gas_fluid_holland98: RealGasProtocol = CORK(
+H2O_cork_gas_fluid_holland98: RealGas = CORK(
     H2O_mrk_gas_fluid_holland91, H2O_virial_compensation_holland98, dummy_critical_data
 )
 """H2O cork for the gas and supercritical fluid :cite:p:`HP98`"""
-H2O_cork_gas_fluid_holland98_bounded: RealGasProtocol = CombinedRealGas(
+H2O_cork_gas_fluid_holland98_bounded: RealGas = CombinedRealGas.create(
     [H2O_cork_gas_fluid_holland98], [experimental_calibration_holland98]
 )
 """H2O cork for the gas and supercritical fluid bounded :cite:p:`HP98`"""
 
 
-def get_holland_eos_models() -> dict[str, RealGasProtocol]:
-    """Gets a dictionary of Holland and Powell EOS models that are bounded
+def get_holland_eos_models() -> dict[str, RealGas]:
+    """Gets a dictionary of EOS models
 
     The naming convention is as follows:
         [species]_[eos model]_[citation]
@@ -1047,7 +1019,7 @@ def get_holland_eos_models() -> dict[str, RealGasProtocol]:
     Returns:
         Dictionary of EOS models
     """
-    eos_models: dict[str, RealGasProtocol] = {}
+    eos_models: dict[str, RealGas] = {}
     eos_models["CH4_cork_cs_holland91"] = CH4_cork_cs_holland91_bounded
     eos_models["CO_cork_cs_holland91"] = CO_cork_cs_holland91_bounded
     eos_models["CO2_cork_holland91"] = CO2_cork_holland91_bounded

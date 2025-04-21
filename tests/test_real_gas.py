@@ -17,23 +17,24 @@
 """Tests for systems with real gases"""
 
 import logging
+from typing import Mapping
 
 import numpy as np
 import pytest
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.classes import InteriorAtmosphere
+from atmodeller.classes import InteriorAtmosphere, SolverParameters
 from atmodeller.containers import (
     ConstantFugacityConstraint,
     Planet,
     Species,
     SpeciesCollection,
 )
-from atmodeller.eos.library import H2_chabrier21, get_eos_models
+from atmodeller.eos.library import get_eos_models
 from atmodeller.interfaces import (
+    ActivityProtocol,
     FugacityConstraintProtocol,
-    RealGasProtocol,
     SolubilityProtocol,
 )
 from atmodeller.output import Output
@@ -50,7 +51,7 @@ ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
 solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
-eos_models: dict[str, RealGasProtocol] = get_eos_models()
+eos_models: Mapping[str, ActivityProtocol] = get_eos_models()
 
 
 def test_fO2_holley(helper) -> None:
@@ -62,7 +63,7 @@ def test_fO2_holley(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g))
     # Temperature is within the range of the Holley model
-    planet: Planet = Planet(surface_temperature=1000.0)
+    planet: Planet = Planet(surface_temperature=1000)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
@@ -93,7 +94,7 @@ def test_fO2_holley(helper) -> None:
 def test_chabrier_earth(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=H2_chabrier21)
+    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
     SiO_g: Species = Species.create_gas("SiO_g")
@@ -101,7 +102,7 @@ def test_chabrier_earth(helper) -> None:
     SiO2_l: Species = Species.create_condensed("SiO2_l")
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
-    planet: Planet = Planet(surface_temperature=3400.0)
+    planet: Planet = Planet(surface_temperature=3400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     h_kg: ArrayLike = 0.01 * planet.planet_mass
@@ -114,18 +115,18 @@ def test_chabrier_earth(helper) -> None:
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
-        "H2O_g": 7113.08023480496,
-        "H2O_g_activity": 7113.08023480496,
-        "H2_g": 11852.575254137557,
-        "H2_g_activity": 249033.31883030405,
-        "H4Si_g": 67369.04263803319,
-        "H4Si_g_activity": 67369.04263803319,
-        "O2Si_l": 92956.79519434669,
+        "H2O_g": 7.253556287801738e03,
+        "H2O_g_activity": 7.253556287801635e03,
+        "H2_g": 1.162520652380062e04,
+        "H2_g_activity": 2.516876841308367e05,
+        "H4Si_g": 6.759146395057408e04,
+        "H4Si_g_activity": 6.759146395057408e04,
+        "O2Si_l": 9.311489514762553e04,
         "O2Si_l_activity": 1.0,
-        "O2_g": 1.7600128617497757e-05,
-        "O2_g_activity": 1.760012861749763e-05,
-        "OSi_g": 635.9088815105993,
-        "OSi_g_activity": 635.9088815105947,
+        "O2_g": 1.791815879185495e-05,
+        "O2_g_activity": 1.791815879185482e-05,
+        "OSi_g": 6.302402285027329e02,
+        "OSi_g_activity": 6.302402285027240e02,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -133,15 +134,6 @@ def test_chabrier_earth(helper) -> None:
 
 def test_chabrier_subNeptune(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune
-
-    It is recommended to impose mass constraints for all species and not to impose a buffered
-    oxygen fugacity. This is because a redox buffer depends on total pressure, which is dictated by
-    the atmospheric speciation and size. Hence for a given buffer choice, particularly for large
-    pressure ranges, there can be multiple atmospheric structures that satisfy the fO2 constraint
-    imposed by the redox buffer, with each structure possessing a different total reservoir of
-    oxygen. If instead the oxygen mass is constrained then there is only one physical solution and
-    root, which is preferred for robust numerical solution. Remember that the oxygen fugacity shift
-    relative to the iron-wustite buffer is back-calculated for the output.
 
     This case effectively saturates the maximum allowable log number density at a value of 70
     based on the default hypercube that brackets the solution (see LOG_NUMBER_DENSITY_UPPER).
@@ -158,7 +150,7 @@ def test_chabrier_subNeptune(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
 
-    surface_temperature = 3400.0  # K
+    surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
     planet: Planet = Planet(
@@ -186,18 +178,18 @@ def test_chabrier_subNeptune(helper) -> None:
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
-        "H2O_g": 429506.99705368624,
-        "H2O_g_activity": 429506.99705368624,
-        "H2_g": 3.0474730096539067,
-        "H2_g_activity": 19509.066519228905,
-        "H4Si_g": 0.0006959073713891908,
-        "H4Si_g_activity": 0.0006959073713891908,
-        "O2Si_l": 449791.006799111,
+        "H2O_g": 4.295071823974879e05,
+        "H2O_g_activity": 4.295071823974879e05,
+        "H2_g": 2.926773356736283e00,
+        "H2_g_activity": 1.956449985411128e04,
+        "H4Si_g": 7.038499826508187e-04,
+        "H4Si_g_activity": 7.038499826508187e-04,
+        "O2Si_l": 4.497910721606553e05,
         "O2Si_l_activity": 1.0,
-        "O2_g": 10.456415851163248,
-        "O2_g_activity": 10.456415851163175,
-        "OSi_g": 0.8250141324194714,
-        "OSi_g_activity": 0.8250141324194655,
+        "O2_g": 1.039725511931324e01,
+        "O2_g_activity": 1.039725511931332e01,
+        "OSi_g": 8.273579821046055e-01,
+        "OSi_g_activity": 8.273579821046055e-01,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -222,7 +214,7 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
 
-    surface_temperature = 3400.0  # K
+    surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
     planet: Planet = Planet(
@@ -247,12 +239,13 @@ def test_chabrier_subNeptune_batch(helper) -> None:
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
-    # Some pertinent output here for testing, no need to specify all the species
     target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([34153.77081489505, 34647.1332440629, 34773.46404439051]),
-        "H2_g": np.array([2.003779275941042, 0.170286592324685, 0.027748065223053]),
-        "H2_g_activity": np.array([26.950066680928565, 14.769840704588862, 11.271846186087407]),
-        "O2_g": np.array([34647.585150424486, 118713.03010968788, 205315.219950596]),
+        "H2O_g": np.array([3.415377850792279e04, 3.464713381927368e04, 3.477346411670301e04]),
+        "H2_g": np.array([1.953887558935978e00, 1.649313472441684e-01, 2.675210310320718e-02]),
+        "H2_g_activity": np.array(
+            [2.695007407667841e01, 1.476984016623652e01, 1.127184619297398e01]
+        ),
+        "O2_g": np.array([3.464758174266921e04, 1.187130259426918e05, 2.053152202141989e05]),
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -297,7 +290,7 @@ def test_pH2_fO2_real_gas(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="Takes a bit longer to compile and run than other models")
+@pytest.mark.skip(reason="Can fail if multistart is not large enough")
 def test_H_and_C_real_gas(helper) -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 
@@ -325,30 +318,33 @@ def test_H_and_C_real_gas(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "H2_g": ConstantFugacityConstraint(958.0),
+        "H2_g": ConstantFugacityConstraint(958),
         "O2_g": ConstantFugacityConstraint(1.0132255325169718e-07),
     }
 
-    oceans: ArrayLike = 10.0
+    oceans: ArrayLike = 10
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = h_kg
     mass_constraints: dict[str, ArrayLike] = {"C": c_kg}
+
+    solver_parameters = SolverParameters(multistart=5)
 
     interior_atmosphere.solve(
         planet=planet,
         fugacity_constraints=fugacity_constraints,
         mass_constraints=mass_constraints,
+        solver_parameters=solver_parameters,
     )
     output: Output = interior_atmosphere.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
-        "CH4_g": 11.612216513852113,
-        "CO2_g": 67.19430723726805,
-        "CO_g": 276.8796027243849,
-        "H2O_g": 955.2659883622448,
-        "H2_g": 694.2030982090682,
-        "O2_g": 1.0132255325169676e-07,
+        "CH4_g": 1.161221651357397e01,
+        "CO2_g": 6.719430723567530e01,
+        "CO_g": 2.768796027177136e02,
+        "H2O_g": 9.552659883631408e02,
+        "H2_g": 6.942030982137493e02,
+        "O2_g": 1.013225532516968e-07,
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)

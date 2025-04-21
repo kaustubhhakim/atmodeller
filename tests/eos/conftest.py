@@ -18,12 +18,14 @@
 
 from typing import Callable
 
+import numpy as np
 import numpy.testing as nptest
 import pytest
+from jax import Array
 from jax.typing import ArrayLike
 
+from atmodeller.eos.core import RealGas
 from atmodeller.eos.library import get_eos_models
-from atmodeller.interfaces import RealGasProtocol
 
 # Tolerances to compare the test results with target output.
 RTOL: float = 1.0e-8
@@ -31,7 +33,7 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
-eos_models: dict[str, RealGasProtocol] = get_eos_models()
+eos_models: dict[str, RealGas] = get_eos_models()
 
 
 class CheckValues:
@@ -43,7 +45,7 @@ class CheckValues:
         property_name: str,
         temperature: ArrayLike,
         pressure: ArrayLike,
-        eos: RealGasProtocol,
+        eos: RealGas,
         expected: ArrayLike,
         *,
         rtol=RTOL,
@@ -52,9 +54,10 @@ class CheckValues:
         """Generalized method to check a property (e.g., compressibility, fugacity, etc.)
 
         Args:
+            property_name: Name of the property to check
             temperature: Temperature in K
             pressure: Pressure in bar
-            fugacity_model: Fugacity model
+            eos: EOS model
             expected: The expected value
             rtol: Relative tolerance. Defaults to RTOL.
             atol: Absolute tolerance. Defaults to ATOL.
@@ -68,7 +71,7 @@ class CheckValues:
         nptest.assert_allclose(result, expected, rtol, atol)
 
     @staticmethod
-    def get_eos_model(species_name: str, suffix: str) -> RealGasProtocol:
+    def get_eos_model(species_name: str, suffix: str) -> RealGas:
         """Gets a model for a species
 
         Args:
@@ -104,6 +107,47 @@ class CheckValues:
     def volume_integral(cls, *args, **kwargs) -> None:
         """Checks the volume integral"""
         cls._check_property("volume_integral", *args, **kwargs)
+
+    @classmethod
+    def check_broadcasting(cls, property_name: str, eos: RealGas) -> None:
+        """Checks that the EOS model handles broadcasting correctly.
+
+        Args:
+            property_name: Name of the property to check
+            eos: EOS model
+        """
+        # Dynamically get the method from the eos model based on property_name
+        method: Callable = getattr(eos, property_name)
+
+        # Tests pressure broadcasting
+        temperature = 2000
+        pressure = np.array([1, 10, 100])
+        result: Array = method(temperature, pressure)
+        assert result.shape == (3,)
+
+        # Tests temperature broadcasting
+        temperature = np.array([1500, 2000])
+        pressure = 100
+        result = method(temperature, pressure)
+        assert result.shape == (2,)
+
+        # Tests both temperature and pressure broadcasting with equal length arrays
+        temperature = np.array([1500, 2000])
+        pressure = np.array([0.5, 100])
+        results = method(temperature, pressure)
+        assert results.shape == (2,)
+
+        # Tests both temperature and pressure broadcasting
+        temperature = np.array([1500, 2000])[:, None]
+        pressure = np.array([1, 10, 100])[None, :]
+        result = method(temperature, pressure)
+        assert result.shape == (2, 3)
+
+        # Tests both temperature and pressure broadcasting with switched order
+        temperature = np.array([1500, 2000])[None, :]
+        pressure = np.array([1, 10, 100])[:, None]
+        result = method(temperature, pressure)
+        assert result.shape == (3, 2)
 
 
 @pytest.fixture(scope="module")

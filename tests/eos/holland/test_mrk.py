@@ -29,7 +29,7 @@ from atmodeller.eos._holland_powell import (
     H2O_mrk_gas_holland91,
     H2OMrkHolland91,
 )
-from atmodeller.interfaces import RealGasProtocol
+from atmodeller.eos.core import RealGas
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
@@ -41,21 +41,21 @@ logger: logging.Logger = debug_logger()
 
 def test_CO2_corresponding_states(check_values) -> None:
     """CO2 corresponding states"""
-    model: RealGasProtocol = CO2_mrk_cs_holland91
+    model: RealGas = CO2_mrk_cs_holland91
     expected: float = 1.5831992703027848
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_CO2(check_values) -> None:
     """CO2"""
-    model: RealGasProtocol = CO2MrkHolland91
+    model: RealGas = CO2MrkHolland91
     expected: float = 1.575457075165528
     check_values.fugacity_coefficient(2000, 2e3, model, expected, rtol=RTOL, atol=ATOL)
 
 
 def test_H2O_above_Tc(check_values) -> None:
     """H2O above Tc"""
-    model: RealGasProtocol = H2O_mrk_fluid_holland91
+    model: RealGas = H2O_mrk_fluid_holland91
     expected: float = 1.048278616058322
     check_values.fugacity_coefficient(2000, 1e3, model, expected, rtol=RTOL, atol=ATOL)
 
@@ -63,7 +63,7 @@ def test_H2O_above_Tc(check_values) -> None:
 def test_H2O_below_Tc_below_Psat(check_values) -> None:
     """H2O below Tc and below Psat"""
     # Psat = 0.118224 kbar at T = 600 K
-    model: RealGasProtocol = H2O_mrk_gas_holland91
+    model: RealGas = H2O_mrk_gas_holland91
     expected: float = 0.7910907770688191
     check_values.fugacity_coefficient(600, 0.1e3, model, expected, rtol=RTOL, atol=ATOL)
 
@@ -73,3 +73,15 @@ def test_H2O_below_Tc_above_Psat(check_values) -> None:
     # Psat = 0.118224 kbar at T = 600 K
     expected: float = 0.13704706029361396
     check_values.fugacity_coefficient(600, 1e3, H2OMrkHolland91, expected, rtol=RTOL, atol=ATOL)
+
+
+def test_volume_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGas = CO2MrkHolland91
+    check_values.check_broadcasting("volume", model)
+
+
+def test_fugacity_with_broadcasting(check_values) -> None:
+    """Tests volume with broadcasting"""
+    model: RealGas = CO2MrkHolland91
+    check_values.check_broadcasting("fugacity", model)
