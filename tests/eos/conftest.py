@@ -120,33 +120,33 @@ class CheckValues:
         method: Callable = getattr(eos, property_name)
 
         # Tests pressure broadcasting
-        # temperature = 2000
-        # pressure = np.array([1, 10, 100])
-        # result: Array = method(temperature, pressure)
-        # assert result.shape == (3,)
+        temperature = 2000
+        pressure = np.array([1, 10, 100])
+        result: Array = method(temperature, pressure)
+        assert result.shape == (3,)
 
-        # # Tests temperature broadcasting
-        # temperature = np.array([1500, 2000])
-        # pressure = 100
-        # result: Array = method(temperature, pressure)
-        # assert result.shape == (2,)
+        # Tests temperature broadcasting
+        temperature = np.array([1500, 2000])
+        pressure = 100
+        result = method(temperature, pressure)
+        assert result.shape == (2,)
 
-        # # Tests both temperature and pressure broadcasting with equal length arrays
-        # temperature = np.array([1500, 2000])
-        # pressure = np.array([0.5, 100])
-        # results: Array = method(temperature, pressure)
-        # assert results.shape == (2,)
+        # Tests both temperature and pressure broadcasting with equal length arrays
+        temperature = np.array([1500, 2000])
+        pressure = np.array([0.5, 100])
+        results = method(temperature, pressure)
+        assert results.shape == (2,)
 
-        # # Tests both temperature and pressure broadcasting
-        # temperature = np.array([1500, 2000])[:, None]
-        # pressure = np.array([1, 10, 100])[None, :]
-        # result: Array = method(temperature, pressure)
-        # assert result.shape == (2, 3)
+        # Tests both temperature and pressure broadcasting
+        temperature = np.array([1500, 2000])[:, None]
+        pressure = np.array([1, 10, 100])[None, :]
+        result = method(temperature, pressure)
+        assert result.shape == (2, 3)
 
         # Tests both temperature and pressure broadcasting with switched order
         temperature = np.array([1500, 2000])[None, :]
         pressure = np.array([1, 10, 100])[:, None]
-        result: Array = method(temperature, pressure)
+        result = method(temperature, pressure)
         assert result.shape == (3, 2)
 
 
