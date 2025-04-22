@@ -31,6 +31,8 @@ THROW: bool = False
 
 # Expose the public API, including base classes for EOS models
 from atmodeller.eos._aggregators import CombinedRealGas  # noqa: E402, F401
-from atmodeller.eos.classes import RealGas  # noqa: E402, F401
-from atmodeller.eos.core import IdealGas  # noqa: E402, F401
+from atmodeller.eos.core import (
+    IdealGas,  # noqa: E402, F401
+    RealGas,  # noqa: E402, F401
+)
 from atmodeller.eos.library import get_eos_models  # noqa: E402, F401
