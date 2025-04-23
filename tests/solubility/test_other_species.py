@@ -23,8 +23,9 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.interfaces import RedoxBufferProtocol, SolubilityProtocol
+from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.solubility import get_solubility_models
+from atmodeller.solubility.core import Solubility
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion
 
@@ -55,14 +56,14 @@ logger.info("TEST_PRESSURE_GPA = %e bar", TEST_PRESSURE_GPA)
 logger.info("TEST_FO2 = %e bar", TEST_FO2)
 logger.info("TEST_FO2_GPA = %e bar", TEST_FO2_GPA)
 
-solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
+solubility_models: dict[str, Solubility] = get_solubility_models()
 
 
 def test_Cl2_ano_dio_for_thomas(check_values) -> None:
     """Tests Cl in silicate melts :cite:p:`TW21`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["Cl2_ano_dio_for_thomas21"]
+    solubility_model: Solubility = solubility_models["Cl2_ano_dio_for_thomas21"]
     # target_concentration: ArrayLike = 1987252.8978466734
     target_concentration: ArrayLike = 1800
     test_fugacity_Cl2_ano_dio: ArrayLike = 1.66e-6
@@ -81,7 +82,7 @@ def test_Cl2_basalt_thomas(check_values) -> None:
     """Tests Cl in silicate melts :cite:p:`TW21`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["Cl2_basalt_thomas21"]
+    solubility_model: Solubility = solubility_models["Cl2_basalt_thomas21"]
     # target_concentration: ArrayLike = 1111006.1746003036
     target_concentration: ArrayLike = 16000
     test_fugacity_Cl2_basalt: ArrayLike = 4.24e-4
@@ -100,7 +101,7 @@ def test_He_basalt(check_values) -> None:
     """He in tholeittic basalt melt :cite:p:`JWB86`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["He_basalt_jambon86"]
+    solubility_model: Solubility = solubility_models["He_basalt_jambon86"]
     # target_concentration: ArrayLike = 0.20013
     target_concentration: ArrayLike = 0.1
     test_fugacity_He_basalt: ArrayLike = 1
@@ -119,7 +120,7 @@ def test_N2_basalt_bernadou(check_values) -> None:
     """Tests N2 in basaltic silicate melt :cite:p:`BGF21`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["N2_basalt_bernadou21"]
+    solubility_model: Solubility = solubility_models["N2_basalt_bernadou21"]
     # target_concentration: ArrayLike = 1.8621737654355521
     target_concentration: ArrayLike = 20.86
     test_fugacity_N2_basalt_bernadou: ArrayLike = 741
@@ -141,7 +142,7 @@ def test_N2_basalt_dasgupta(check_values) -> None:
     """Tests N2 in silicate melts :cite:p:`DFP22`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["N2_basalt_dasgupta22"]
+    solubility_model: Solubility = solubility_models["N2_basalt_dasgupta22"]
     # target_concentration: ArrayLike = 2.280293304957063
     target_concentration: ArrayLike = 1000
     test_fugacity_N2_basalt_dasgupta: ArrayLike = 1550
@@ -163,7 +164,7 @@ def test_N2_basalt_libourel(check_values) -> None:
     """Tests N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["N2_basalt_libourel03"]
+    solubility_model: Solubility = solubility_models["N2_basalt_libourel03"]
     # target_concentration: ArrayLike = 0.12236470428806222
     target_concentration: ArrayLike = 446.7
     test_fugacity_N2_basalt_libourel: ArrayLike = 0.20

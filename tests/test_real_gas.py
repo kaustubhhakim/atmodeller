@@ -50,7 +50,7 @@ RTOL: float = 1.0e-6
 ATOL: float = 1.0e-6
 """Absolute tolerance"""
 
-solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
+solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 eos_models: Mapping[str, ActivityProtocol] = get_eos_models()
 
 

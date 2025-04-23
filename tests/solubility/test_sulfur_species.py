@@ -23,8 +23,9 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.interfaces import RedoxBufferProtocol, SolubilityProtocol
+from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.solubility import get_solubility_models
+from atmodeller.solubility.core import Solubility
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion
 
@@ -55,14 +56,14 @@ logger.info("TEST_PRESSURE_GPA = %e bar", TEST_PRESSURE_GPA)
 logger.info("TEST_FO2 = %e bar", TEST_FO2)
 logger.info("TEST_FO2_GPA = %e bar", TEST_FO2_GPA)
 
-solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
+solubility_models: dict[str, Solubility] = get_solubility_models()
 
 
 def test_S2_sulfate_andesite_boulliung(check_values) -> None:
     """Tests S as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_andesite_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_sulfate_andesite_boulliung23"]
     # target_concentration: ArrayLike = 0.0002601378182149385
     target_concentration: ArrayLike = 95
     test_fugacity_S2_sulfate_boulliung_andesite: ArrayLike = 4.16869e-16
@@ -83,7 +84,7 @@ def test_S2_sulfide_andesite_boulliung(check_values) -> None:
     """Tests S as sulfide (S^2-) in andesite :cite:p:`BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_andesite_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_sulfide_andesite_boulliung23"]
     # target_concentration: ArrayLike = 2765.534194086474
     target_concentration: ArrayLike = 376
     test_fugacity_S2_sulfide_boulliung_andesite: ArrayLike = 0.089125094
@@ -104,7 +105,7 @@ def test_S2_andesite_boulliung(check_values) -> None:
     """Tests S in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_andesite_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_andesite_boulliung23"]
     target_concentration: ArrayLike = 2765.5344542242924
 
     check_values.concentration(
@@ -122,7 +123,7 @@ def test_S2_sulfate_basalt_boulliung(check_values) -> None:
     """Tests S in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_basalt_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_sulfate_basalt_boulliung23"]
     # target_concentration: ArrayLike = 0.00020528360011091678
     target_concentration: ArrayLike = 210
     test_fugacity_S2_sulfate_boulliung_basalt: ArrayLike = 1.38038e-14
@@ -143,7 +144,7 @@ def test_S2_sulfide_basalt_boulliung(check_values) -> None:
     """Tests S in basalt as sulfide (S^2-) :cite:p:`BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_basalt_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_sulfide_basalt_boulliung23"]
     # target_concentration: ArrayLike = 7576.212242182479
     target_concentration: ArrayLike = 760
     test_fugacity_S2_sulfide_boulliung_basalt: ArrayLike = 0.089125094
@@ -164,7 +165,7 @@ def test_S2_basalt_boulliung(check_values) -> None:
     """Tests S in basalt due to sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_basalt_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_basalt_boulliung23"]
     target_concentration: ArrayLike = 7576.212447466079
 
     check_values.concentration(
@@ -182,7 +183,7 @@ def test_S2_sulfate_trachybasalt_boulliung(check_values) -> None:
     """Tests S as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_sulfate_trachybasalt_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_sulfate_trachybasalt_boulliung23"]
     # target_concentration: ArrayLike = 0.0007002721319248917
     target_concentration: ArrayLike = 230
     test_fugacity_S2_sulfate_boulliung_trachybasalt: ArrayLike = 2.51189e-15
@@ -203,7 +204,7 @@ def test_S2_sulfide_trachybasalt_boulliung(check_values) -> None:
     """Tests S as sulfide (S^2-) in trachybasalt :cite:p:`BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_sulfide_trachybasalt_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_sulfide_trachybasalt_boulliung23"]
     # target_concentration: ArrayLike = 9573.602305681254
     target_concentration: ArrayLike = 1157
     test_fugacity_S2_sulfide_boulliung_trachybasalt: ArrayLike = 0.089125094
@@ -224,7 +225,7 @@ def test_S2_trachybasalt_boulliung(check_values) -> None:
     """Tests S in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["S2_trachybasalt_boulliung23"]
+    solubility_model: Solubility = solubility_models["S2_trachybasalt_boulliung23"]
     target_concentration: ArrayLike = 9573.603005953386
 
     check_values.concentration(

@@ -29,10 +29,7 @@ r"""Relative tolerance when solving for the volume in :math:`\mathrm{m}^3\ \math
 THROW: bool = False
 """Whether to throw errors. Change to True for debugging purposes."""
 
-# Expose the public API, including base classes for EOS models
+# Expose the public API
 from atmodeller.eos._aggregators import CombinedRealGas  # noqa: E402, F401
-from atmodeller.eos.core import (
-    IdealGas,  # noqa: E402, F401
-    RealGas,  # noqa: E402, F401
-)
+from atmodeller.eos.core import IdealGas, RealGas  # noqa: E402, F401
 from atmodeller.eos.library import get_eos_models  # noqa: E402, F401

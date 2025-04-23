@@ -20,27 +20,24 @@ For every law there should be a test in the test suite.
 """
 
 import logging
-import sys
 
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit
-from jax.tree_util import register_pytree_node_class
+from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.classes import Solubility
-from atmodeller.utilities import PyTreeNoData, unit_conversion
+from atmodeller.solubility.core import Solubility
+from atmodeller.utilities import unit_conversion
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
+try:
+    from typing import override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override  # Python 3.11 and earlier
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@register_pytree_node_class
-class _S2_sulfate_andesite_boulliung23(PyTreeNoData, Solubility):
+class _S2_sulfate_andesite_boulliung23(Solubility):
     """Sulfur as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -50,7 +47,7 @@ class _S2_sulfate_andesite_boulliung23(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -64,7 +61,7 @@ class _S2_sulfate_andesite_boulliung23(PyTreeNoData, Solubility):
         return ppmw
 
 
-S2_sulfate_andesite_boulliung23: SolubilityProtocol = _S2_sulfate_andesite_boulliung23()
+S2_sulfate_andesite_boulliung23: Solubility = _S2_sulfate_andesite_boulliung23()
 """Sulfur as sulfate SO4^2-/S^6+ in andesite :cite:p:`BW22,BW23corr`
 
 Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -74,8 +71,7 @@ equilibrated with Air/SO2 mixtures.
 """
 
 
-@register_pytree_node_class
-class _S2_sulfide_andesite_boulliung23(PyTreeNoData, Solubility):
+class _S2_sulfide_andesite_boulliung23(Solubility):
     """Sulfur as sulfide (S^2-) in andesite :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -84,7 +80,7 @@ class _S2_sulfide_andesite_boulliung23(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -97,7 +93,7 @@ class _S2_sulfide_andesite_boulliung23(PyTreeNoData, Solubility):
         return ppmw
 
 
-S2_sulfide_andesite_boulliung23: SolubilityProtocol = _S2_sulfide_andesite_boulliung23()
+S2_sulfide_andesite_boulliung23: Solubility = _S2_sulfide_andesite_boulliung23()
 """Sulfur as sulfide (S^2-) in andesite :cite:p:`BW23`
 
 Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -106,16 +102,18 @@ controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit bel
 """
 
 
-@register_pytree_node_class
-class _S2_andesite_boulliung23(PyTreeNoData, Solubility):
+class _S2_andesite_boulliung23(Solubility):
     """S2 in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
-    def __init__(self):
-        self._sulfide: SolubilityProtocol = S2_sulfide_andesite_boulliung23
-        self._sulfate: SolubilityProtocol = S2_sulfate_andesite_boulliung23
+    _sulfide: Solubility = eqx.field(init=False)
+    _sulfate: Solubility = eqx.field(init=False)
+
+    def __post_init__(self):
+        self._sulfide = S2_sulfide_andesite_boulliung23
+        self._sulfate = S2_sulfate_andesite_boulliung23
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -129,12 +127,11 @@ class _S2_andesite_boulliung23(PyTreeNoData, Solubility):
         return concentration
 
 
-S2_andesite_boulliung23: SolubilityProtocol = _S2_andesite_boulliung23()
+S2_andesite_boulliung23: Solubility = _S2_andesite_boulliung23()
 """S2 in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
 
-@register_pytree_node_class
-class _S2_sulfate_basalt_boulliung23(PyTreeNoData, Solubility):
+class _S2_sulfate_basalt_boulliung23(Solubility):
     """Sulfur in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract and the corrected expression for sulfate capacity
@@ -144,7 +141,7 @@ class _S2_sulfate_basalt_boulliung23(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -158,7 +155,7 @@ class _S2_sulfate_basalt_boulliung23(PyTreeNoData, Solubility):
         return ppmw
 
 
-S2_sulfate_basalt_boulliung23: SolubilityProtocol = _S2_sulfate_basalt_boulliung23()
+S2_sulfate_basalt_boulliung23: Solubility = _S2_sulfate_basalt_boulliung23()
 """Sulfur in basalt as sulfate, SO4^2-/S^6+ :cite:p:`BW22,BW23corr`
 
 Using the first equation in the abstract and the corrected expression for sulfate capacity
@@ -168,8 +165,7 @@ Air/SO2 mixtures.
 """
 
 
-@register_pytree_node_class
-class _S2_sulfide_basalt_boulliung23(PyTreeNoData, Solubility):
+class _S2_sulfide_basalt_boulliung23(Solubility):
     """Sulfur in basalt as sulfide (S^2-) :cite:p:`BW23`
 
     Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for
@@ -179,7 +175,7 @@ class _S2_sulfide_basalt_boulliung23(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -192,7 +188,7 @@ class _S2_sulfide_basalt_boulliung23(PyTreeNoData, Solubility):
         return ppmw
 
 
-S2_sulfide_basalt_boulliung23: SolubilityProtocol = _S2_sulfide_basalt_boulliung23()
+S2_sulfide_basalt_boulliung23: Solubility = _S2_sulfide_basalt_boulliung23()
 """Sulfur in basalt as sulfide (S^2-) :cite:p:`BW23`
 
 Using expressions in the abstract for S wt% and sulfide capacity (C_S2-). Composition for
@@ -202,16 +198,18 @@ unit below FMQ.
 """
 
 
-@register_pytree_node_class
-class _S2_basalt_boulliung23(PyTreeNoData, Solubility):
+class _S2_basalt_boulliung23(Solubility):
     """Sulfur in basalt due to sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
-    def __init__(self):
-        self._sulfide: SolubilityProtocol = S2_sulfide_basalt_boulliung23
-        self._sulfate: SolubilityProtocol = S2_sulfate_basalt_boulliung23
+    _sulfide: Solubility = eqx.field(init=False)
+    _sulfate: Solubility = eqx.field(init=False)
+
+    def __post_init__(self):
+        self._sulfide = S2_sulfide_basalt_boulliung23
+        self._sulfate = S2_sulfate_basalt_boulliung23
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -225,12 +223,11 @@ class _S2_basalt_boulliung23(PyTreeNoData, Solubility):
         return concentration
 
 
-S2_basalt_boulliung23: SolubilityProtocol = _S2_basalt_boulliung23()
+S2_basalt_boulliung23: Solubility = _S2_basalt_boulliung23()
 """Sulfur in basalt due to sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
 
-@register_pytree_node_class
-class _S2_sulfate_trachybasalt_boulliung23(PyTreeNoData, Solubility):
+class _S2_sulfate_trachybasalt_boulliung23(Solubility):
     """Sulfur as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`
 
     Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -240,7 +237,7 @@ class _S2_sulfate_trachybasalt_boulliung23(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -254,7 +251,7 @@ class _S2_sulfate_trachybasalt_boulliung23(PyTreeNoData, Solubility):
         return ppmw
 
 
-S2_sulfate_trachybasalt_boulliung23: SolubilityProtocol = _S2_sulfate_trachybasalt_boulliung23()
+S2_sulfate_trachybasalt_boulliung23: Solubility = _S2_sulfate_trachybasalt_boulliung23()
 """Sulfur as sulfate SO4^2-/S^6+ in trachybasalt :cite:p:`BW22,BW23corr`
 
 Using the first equation in the abstract of :cite:t:`BW22` and the corrected expression for
@@ -264,8 +261,7 @@ equilibrated with Air/SO2 mixtures.
 """
 
 
-@register_pytree_node_class
-class _S2_sulfide_trachybasalt_boulliung23(PyTreeNoData, Solubility):
+class _S2_sulfide_trachybasalt_boulliung23(Solubility):
     """Sulfur as sulfide (S^2-) in trachybasalt :cite:p:`BW23`
 
     Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -274,7 +270,7 @@ class _S2_sulfide_trachybasalt_boulliung23(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -287,7 +283,7 @@ class _S2_sulfide_trachybasalt_boulliung23(PyTreeNoData, Solubility):
         return ppmw
 
 
-S2_sulfide_trachybasalt_boulliung23: SolubilityProtocol = _S2_sulfide_trachybasalt_boulliung23()
+S2_sulfide_trachybasalt_boulliung23: Solubility = _S2_sulfide_trachybasalt_boulliung23()
 """Sulfur as sulfide (S^2-) in trachybasalt :cite:p:`BW23`
 
 Using expressions in the abstract for S wt.% and sulfide capacity (C_S2-). Composition
@@ -296,16 +292,18 @@ controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit bel
 """
 
 
-@register_pytree_node_class
-class _S2_trachybasalt_boulliung23(PyTreeNoData, Solubility):
+class _S2_trachybasalt_boulliung23(Solubility):
     """Sulfur in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
-    def __init__(self):
-        self._sulfide: SolubilityProtocol = S2_sulfide_trachybasalt_boulliung23
-        self._sulfate: SolubilityProtocol = S2_sulfate_trachybasalt_boulliung23
+    _sulfide: Solubility = eqx.field(init=False)
+    _sulfate: Solubility = eqx.field(init=False)
+
+    def __post_init__(self):
+        self._sulfide = S2_sulfide_trachybasalt_boulliung23
+        self._sulfate = S2_sulfate_trachybasalt_boulliung23
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> ArrayLike:
@@ -319,5 +317,5 @@ class _S2_trachybasalt_boulliung23(PyTreeNoData, Solubility):
         return concentration
 
 
-S2_trachybasalt_boulliung23: SolubilityProtocol = _S2_trachybasalt_boulliung23()
+S2_trachybasalt_boulliung23: Solubility = _S2_trachybasalt_boulliung23()
 """Sulfur in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""

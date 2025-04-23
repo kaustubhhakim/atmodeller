@@ -12,51 +12,6 @@ Subpackages
 Submodules
 ----------
 
-atmodeller.eos.\_aggregators module
------------------------------------
-
-.. automodule:: atmodeller.eos._aggregators
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :private-members:
-
-atmodeller.eos.\_holland\_powell module
----------------------------------------
-
-.. automodule:: atmodeller.eos._holland_powell
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :private-members:
-
-atmodeller.eos.\_holley module
-------------------------------
-
-.. automodule:: atmodeller.eos._holley
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :private-members:
-
-atmodeller.eos.\_saxena module
-------------------------------
-
-.. automodule:: atmodeller.eos._saxena
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :private-members:
-
-atmodeller.eos.classes module
------------------------------
-
-.. automodule:: atmodeller.eos.classes
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :private-members:
-
 atmodeller.eos.core module
 --------------------------
 
@@ -64,7 +19,6 @@ atmodeller.eos.core module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 atmodeller.eos.library module
 -----------------------------
@@ -73,7 +27,6 @@ atmodeller.eos.library module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 Module contents
 ---------------
@@ -82,4 +35,3 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:

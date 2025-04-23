@@ -19,31 +19,29 @@
 For every law there should be a test in the test suite.
 """
 
-import sys
-
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit
-from jax.tree_util import register_pytree_node_class
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.interfaces import RedoxBufferProtocol, SolubilityProtocol
-from atmodeller.solubility.classes import Solubility, SolubilityPowerLaw, power_law
-from atmodeller.solubility.core import fO2_temperature_correction
+from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.solubility.core import (
+    Solubility,
+    SolubilityPowerLaw,
+    fO2_temperature_correction,
+    power_law,
+)
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.utilities import PyTreeNoData, safe_exp, unit_conversion
+from atmodeller.utilities import safe_exp, unit_conversion
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
+try:
+    from typing import override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override  # Python 3.11 and earlier
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
 
-Cl2_ano_dio_for_thomas21: SolubilityProtocol = SolubilityPowerLaw(
+Cl2_ano_dio_for_thomas21: Solubility = SolubilityPowerLaw(
     140.52 * unit_conversion.percent_to_ppm, 0.5
 )
 """Cl in silicate melts :cite:p:`TW21`
@@ -53,9 +51,7 @@ and Cl fugacity for CMAS composition (An50Di28Fo22 (anorthite-diopside-forsterit
 low-degree mantle melt) at 1400 C and 1.5 GPa. Experiments from 0.5-2 GPa and 1200-1500 C.
 """
 
-Cl2_basalt_thomas21: SolubilityProtocol = SolubilityPowerLaw(
-    78.56 * unit_conversion.percent_to_ppm, 0.5
-)
+Cl2_basalt_thomas21: Solubility = SolubilityPowerLaw(78.56 * unit_conversion.percent_to_ppm, 0.5)
 """Cl in silicate melts :cite:p:`TW21`
 
 Solubility law from :cite:t:`TW21{Figure 4}` showing relation between dissolved Cl concentration
@@ -69,7 +65,7 @@ _He_henry_sol_constant_jambon86: float = 56e-5  # cm3*STP/g*bar
 _He_henry_sol_constant_jambon86 = (
     (_He_henry_sol_constant_jambon86 / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
 )
-He_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_He_henry_sol_constant_jambon86, 1)
+He_basalt_jambon86: Solubility = SolubilityPowerLaw(_He_henry_sol_constant_jambon86, 1)
 """Solubility of He in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -83,7 +79,7 @@ _Ar_henry_sol_constant_jambon86: float = 5.9e-5  # cm3*STP/g*bar
 _Ar_henry_sol_constant_jambon86 = (
     (_Ar_henry_sol_constant_jambon86 / 2.24e4) * 39.948 * unit_conversion.fraction_to_ppm
 )
-Ar_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Ar_henry_sol_constant_jambon86, 1)
+Ar_basalt_jambon86: Solubility = SolubilityPowerLaw(_Ar_henry_sol_constant_jambon86, 1)
 """Solubility of Ar in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -97,7 +93,7 @@ _Ne_henry_sol_constant_jambon86: float = 25e-5  # cm3*STP/g*bar
 _Ne_henry_sol_constant_jambon86 = (
     (_Ne_henry_sol_constant_jambon86 / 2.24e4) * 20.1797 * unit_conversion.fraction_to_ppm
 )
-Ne_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Ne_henry_sol_constant_jambon86, 1)
+Ne_basalt_jambon86: Solubility = SolubilityPowerLaw(_Ne_henry_sol_constant_jambon86, 1)
 """Solubility of Ne in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -111,7 +107,7 @@ _Kr_henry_sol_constant_jambon86: float = 3.0e-5  # cm3*STP/g*bar
 _Kr_henry_sol_constant_jambon86 = (
     (_Kr_henry_sol_constant_jambon86 / 2.24e4) * 83.798 * unit_conversion.fraction_to_ppm
 )
-Kr_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Kr_henry_sol_constant_jambon86, 1)
+Kr_basalt_jambon86: Solubility = SolubilityPowerLaw(_Kr_henry_sol_constant_jambon86, 1)
 """Solubility of Kr in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -125,7 +121,7 @@ _Xe_henry_sol_constant_jambon86: float = 1.7e-5  # cm3*STP/g*bar
 _Xe_henry_sol_constant_jambon86 = (
     (_Xe_henry_sol_constant_jambon86 / 2.24e4) * 131.293 * unit_conversion.fraction_to_ppm
 )
-Xe_basalt_jambon86: SolubilityProtocol = SolubilityPowerLaw(_Xe_henry_sol_constant_jambon86, 1)
+Xe_basalt_jambon86: Solubility = SolubilityPowerLaw(_Xe_henry_sol_constant_jambon86, 1)
 """Solubility of Xe in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -134,8 +130,7 @@ units to mol/g*bar.
 """
 
 
-@register_pytree_node_class
-class _N2_basalt_bernadou21(PyTreeNoData, Solubility):
+class _N2_basalt_bernadou21(Solubility):
     """N2 in basaltic silicate melt :cite:p:`BGF21`
 
     :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -146,7 +141,7 @@ class _N2_basalt_bernadou21(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -169,10 +164,9 @@ class _N2_basalt_bernadou21(PyTreeNoData, Solubility):
         return ppmw
 
 
-N2_basalt_bernadou21: SolubilityProtocol = _N2_basalt_bernadou21()
+N2_basalt_bernadou21: Solubility = _N2_basalt_bernadou21()
 
 
-@register_pytree_node_class
 class _N2_basalt_dasgupta22(Solubility):
     """N2 in silicate melts :cite:p:`DFP22`
 
@@ -194,15 +188,17 @@ class _N2_basalt_dasgupta22(Solubility):
         xtio2: Mole fraction of TiO2
     """
 
-    def __init__(self, xsio2: float = 0.56, xal2o3: float = 0.11, xtio2: float = 0.01):
-        self.xsio2: float = xsio2
-        self.xal2o3: float = xal2o3
-        self.xtio2: float = xtio2
-        # The buffer is evaluated at the pressure of interest, not the default of 1 bar
-        self._buffer: RedoxBufferProtocol = IronWustiteBuffer(evaluation_pressure=None)
+    xsio2: float = 0.56
+    xal2o3: float = 0.11
+    xtio2: float = 0.01
+    # The buffer is evaluated at the pressure of interest, not the default of 1 bar
+    _buffer: RedoxBufferProtocol = eqx.field(init=False)
+
+    def __post_init__(self):
+        self._buffer = IronWustiteBuffer(evaluation_pressure=None)
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -226,18 +222,8 @@ class _N2_basalt_dasgupta22(Solubility):
 
         return ppmw
 
-    def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
-        children: tuple = ()
-        aux_data = {"xsio2": self.xsio2, "xal2o3": self.xal2o3, "xtio2": self.xtio2}
-        return (children, aux_data)
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
-
-
-N2_basalt_dasgupta22: SolubilityProtocol = _N2_basalt_dasgupta22()
+N2_basalt_dasgupta22: Solubility = _N2_basalt_dasgupta22()
 """N2 in basaltic silicate melt :cite:p:`BGF21`
 
 :cite:t:`BGF21{Equation 18}` and using :cite:t:`BGF21{Equations 19-20}` and the values for the
@@ -248,8 +234,7 @@ concentrations at fluid saturation from 1 bar to 10 kbar, calibrated their solub
 """
 
 
-@register_pytree_node_class
-class _N2_basalt_libourel03(PyTreeNoData, Solubility):
+class _N2_basalt_libourel03(Solubility):
     """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
     :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1
@@ -258,7 +243,7 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -285,7 +270,7 @@ class _N2_basalt_libourel03(PyTreeNoData, Solubility):
         return ppmw
 
 
-N2_basalt_libourel03: SolubilityProtocol = _N2_basalt_libourel03()
+N2_basalt_libourel03: Solubility = _N2_basalt_libourel03()
 """N2 in basalt (tholeiitic) magmas :cite:p:`LMH03`
 
 :cite:t:`LMH03{Equation 23}`, includes dependencies on fN2 and fO2. Experiments conducted at 1

@@ -25,7 +25,6 @@ Usage:
     print(concentration)
 """
 
-from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility._carbon_species import (
     CH4_basalt_ardia13,
     CO2_basalt_dixon95,
@@ -36,6 +35,8 @@ from atmodeller.solubility._carbon_species import (
 from atmodeller.solubility._hydrogen_species import (
     H2_andesite_hirschmann12,
     H2_basalt_hirschmann12,
+    H2_chachan18,
+    H2_kite19,
     H2_silicic_melts_gaillard03,
     H2O_ano_dio_newcombe17,
     H2O_basalt_dixon95,
@@ -66,16 +67,16 @@ from atmodeller.solubility._sulfur_species import (
     S2_sulfide_trachybasalt_boulliung23,
     S2_trachybasalt_boulliung23,
 )
-from atmodeller.solubility.classes import NoSolubility
+from atmodeller.solubility.core import NoSolubility, Solubility
 
 
-def get_solubility_models() -> dict[str, SolubilityProtocol]:
+def get_solubility_models() -> dict[str, Solubility]:
     """Gets a dictionary of solubility models
 
     Returns:
         Dictionary of solubility models
     """
-    models: dict[str, SolubilityProtocol] = {}
+    models: dict[str, Solubility] = {}
 
     # Carbon species
     models["CH4_basalt_ardia13"] = CH4_basalt_ardia13
@@ -88,6 +89,8 @@ def get_solubility_models() -> dict[str, SolubilityProtocol]:
     models["H2_andesite_hirschmann12"] = H2_andesite_hirschmann12
     models["H2_basalt_hirschmann12"] = H2_basalt_hirschmann12
     models["H2_silicic_melts_gaillard03"] = H2_silicic_melts_gaillard03
+    models["H2_chachan18"] = H2_chachan18
+    models["H2_kite19"] = H2_kite19
     models["H2O_ano_dio_newcombe17"] = H2O_ano_dio_newcombe17
     models["H2O_basalt_dixon95"] = H2O_basalt_dixon95
     models["H2O_basalt_mitchell17"] = H2O_basalt_mitchell17
