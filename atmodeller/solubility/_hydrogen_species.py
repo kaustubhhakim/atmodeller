@@ -19,8 +19,28 @@
 For every law there should be a test in the test suite.
 """
 
+import sys
+
+import jax.numpy as jnp
+from jax import jit
+from jax.tree_util import register_pytree_node_class
+from jax.typing import ArrayLike
+
+from atmodeller.eos._chabrier import H2_chabrier21_bounded
+from atmodeller.eos._zhang_duan import H2_zhang09_bounded
 from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.classes import SolubilityPowerLaw, SolubilityPowerLawLog10
+from atmodeller.solubility.classes import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10
+from atmodeller.utilities import unit_conversion
+
+if sys.version_info < (3, 12):
+    from typing_extensions import override
+else:
+    from typing import override
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 H2_andesite_hirschmann12: SolubilityProtocol = SolubilityPowerLawLog10(1.01058631, 0.60128868)
 """H2 in synthetic andesite :cite:p:`HWA12`
@@ -81,3 +101,81 @@ H2O_peridotite_sossi23: SolubilityProtocol = SolubilityPowerLaw(647, 0.5)
 Power law parameters in the abstract for peridotitic glasses. Experiments conducted at 2173 K
 and 1 bar and range of fO2 from IW-1.9 to IW+6.0.
 """
+
+
+@register_pytree_node_class
+class _H2_chachan18(Solubility):
+    """H2 solubility :cite:p:`CS18`
+
+    Args:
+        f_calibration: Calibration fugacity
+        T_calibration: Calibration temperature
+        X_calibration: Mass fraction at calibration conditions
+        T0: Arrhenius temperature factor in K, which expresses the repulsive interaction of the
+            molecule with magma. Defaults to 4000 K, which is the middle of the range the authors
+            explore (from 3000 K to 5000 K).
+
+    Attributes:
+        T0: Arrhenius temperature factor
+    """
+
+    def __init__(
+        self,
+        f_calibration: ArrayLike,
+        T_calibration: ArrayLike,
+        X_calibration: ArrayLike,
+        T0: float = 4000,
+    ):
+        self.f_calibration: ArrayLike = f_calibration
+        self.T_calibration: ArrayLike = T_calibration
+        self.X_calibration: ArrayLike = X_calibration
+        self.T0: float = T0
+        self.A: ArrayLike = jnp.exp(
+            (self.T0 / self.T_calibration) + jnp.log(self.X_calibration / self.f_calibration)
+        )
+        # jax.debug.print("A = ", self.A)
+
+    @override
+    @jit
+    def concentration(self, fugacity: ArrayLike, *, temperature: ArrayLike, **kwargs) -> ArrayLike:
+        del kwargs
+        mass_fraction: ArrayLike = self.A * fugacity * jnp.exp(-self.T0 / temperature)
+        ppmw: ArrayLike = mass_fraction * unit_conversion.fraction_to_ppm
+
+        return ppmw
+
+    def tree_flatten(self) -> tuple[tuple, dict[str, float]]:
+        children: tuple = ()
+        aux_data = {
+            "f_calibration": self.f_calibration,
+            "T_calibration": self.T_calibration,
+            "X_calibration": self.X_calibration,
+            "T0": self.T0,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children) -> Self:
+        del children
+        return cls(**aux_data)
+
+
+H2_chachan18: SolubilityProtocol = _H2_chachan18(
+    f_calibration=1500, T_calibration=1673, X_calibration=0.001
+)
+"""H2 by combining theory and experiment :cite:p:`CS18`"""
+
+# At 1 GPa in the presence of pure H2, the molecular H2 concentration is 0.19 wt.%"
+# Need to convert pressure to H2 fugacity
+T_calibration: float = 1673
+P_calibration: float = 1 * unit_conversion.GPa_to_bar
+f_calibration: ArrayLike = H2_chabrier21_bounded.fugacity(T_calibration, P_calibration)
+print("f_calibration = ", f_calibration)
+f_calibration2: ArrayLike = H2_zhang09_bounded.fugacity(T_calibration, P_calibration)
+print("f_calibration2 = ", f_calibration2)
+X_calibration: float = 0.0019
+
+H2_kite19: SolubilityProtocol = _H2_chachan18(
+    f_calibration=f_calibration, T_calibration=T_calibration, X_calibration=X_calibration
+)
+"""H2 by combining theory and experiment :cite:p:`KFS19`."""
