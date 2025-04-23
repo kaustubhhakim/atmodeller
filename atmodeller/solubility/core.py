@@ -19,14 +19,138 @@
 Units for temperature and pressure are K and bar, respectively.
 """
 
+from abc import abstractmethod
+
+import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
+from atmodeller.utilities import power_law
+
+try:
+    from typing import override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override  # Python 3.11 and earlier
 
 iron_wustite_buffer: RedoxBufferProtocol = IronWustiteBuffer()
+
+
+class Solubility(eqx.Module):
+    """Solubility interface
+
+    :meth:`~Solubility.jax_concentration` is defined in order to allow arguments to be passed by
+    position to lax.switch.
+    """
+
+    @abstractmethod
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: ArrayLike | None = None,
+        pressure: ArrayLike | None = None,
+        fO2: ArrayLike | None = None,
+    ) -> ArrayLike:
+        """Concentration in ppmw
+
+        Args:
+            fugacity: Fugacity in bar
+            temperature: Temperature in K. Defaults to None for not used.
+            pressure: Pressure in bar. Defaults to None for not used.
+            fO2: fO2 in bar. Defaults to None for not used.
+
+        Returns:
+            Concentration in ppmw
+        """
+
+    @eqx.filter_jit
+    def jax_concentration(
+        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
+    ) -> ArrayLike:
+        """Wrapper to pass concentration arguments by position to use with JAX lax.switch
+
+        Args:
+            fugacity: Fugacity in bar
+            temperature: Temperature in K
+            pressure: Pressure in bar
+            fO2: fO2 in bar
+
+        Returns:
+            Concentration in ppmw
+        """
+        return self.concentration(fugacity, temperature=temperature, pressure=pressure, fO2=fO2)
+
+
+class NoSolubility(Solubility):
+    """No solubility"""
+
+    @override
+    @eqx.filter_jit
+    def concentration(
+        self,
+        fugacity: ArrayLike,
+        *,
+        temperature: ArrayLike | None = None,
+        pressure: ArrayLike | None = None,
+        fO2: ArrayLike | None = None,
+    ) -> ArrayLike:
+        del fugacity
+        del temperature
+        del pressure
+        del fO2
+
+        # Must be 0.0 (float) for JAX array type compliance
+        return 0.0
+
+
+class SolubilityPowerLaw(Solubility):
+    """A solubility power law
+
+    Args:
+        constant: Constant
+        exponent: Exponent
+
+    Attributes:
+        constant: Constant
+        exponent: Exponent
+    """
+
+    constant: float
+    exponent: float
+
+    @override
+    @eqx.filter_jit
+    def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> ArrayLike:
+        del args
+        del kwargs
+
+        return power_law(fugacity, self.constant, self.exponent)
+
+
+class SolubilityPowerLawLog10(Solubility):
+    """A solubility power law with log10 coefficients
+
+    Args:
+        log10_constant: Log10 constant
+        log10_exponent: Log10 exponent
+
+    Attributes:
+        log10_constant: Log10 constant
+        log10_exponent: Log10 exponent
+    """
+
+    log10_constant: float
+    log10_exponent: float
+
+    @override
+    @eqx.filter_jit
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
+        del kwargs
+
+        return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
 
 
 def fO2_temperature_correction(

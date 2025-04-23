@@ -21,7 +21,6 @@ atmodeller.classes module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 atmodeller.constants module
 ---------------------------
@@ -30,7 +29,6 @@ atmodeller.constants module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 atmodeller.containers module
 ----------------------------
@@ -39,7 +37,6 @@ atmodeller.containers module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 atmodeller.engine module
 ------------------------
@@ -48,7 +45,6 @@ atmodeller.engine module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 atmodeller.interfaces module
 ----------------------------
@@ -57,7 +53,6 @@ atmodeller.interfaces module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 atmodeller.output module
 ------------------------
@@ -66,7 +61,6 @@ atmodeller.output module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 atmodeller.utilities module
 ---------------------------
@@ -75,7 +69,6 @@ atmodeller.utilities module
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
 
 Module contents
 ---------------
@@ -84,4 +77,3 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:

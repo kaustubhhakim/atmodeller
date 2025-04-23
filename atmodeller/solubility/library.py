@@ -25,7 +25,6 @@ Usage:
     print(concentration)
 """
 
-from atmodeller.interfaces import SolubilityProtocol
 from atmodeller.solubility._carbon_species import (
     CH4_basalt_ardia13,
     CO2_basalt_dixon95,
@@ -68,16 +67,16 @@ from atmodeller.solubility._sulfur_species import (
     S2_sulfide_trachybasalt_boulliung23,
     S2_trachybasalt_boulliung23,
 )
-from atmodeller.solubility.classes import NoSolubility
+from atmodeller.solubility.core import NoSolubility, Solubility
 
 
-def get_solubility_models() -> dict[str, SolubilityProtocol]:
+def get_solubility_models() -> dict[str, Solubility]:
     """Gets a dictionary of solubility models
 
     Returns:
         Dictionary of solubility models
     """
-    models: dict[str, SolubilityProtocol] = {}
+    models: dict[str, Solubility] = {}
 
     # Carbon species
     models["CH4_basalt_ardia13"] = CH4_basalt_ardia13

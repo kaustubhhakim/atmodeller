@@ -19,25 +19,21 @@
 For every law there should be a test in the test suite.
 """
 
-import sys
-
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit
-from jax.tree_util import register_pytree_node_class
+from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.interfaces import SolubilityProtocol
-from atmodeller.solubility.classes import Solubility
-from atmodeller.utilities import PyTreeNoData, safe_exp, unit_conversion
+from atmodeller.solubility.core import Solubility
+from atmodeller.utilities import safe_exp, unit_conversion
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
+try:
+    from typing import override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override  # Python 3.11 and earlier
 
 
-@register_pytree_node_class
-class _CH4_basalt_ardia13(PyTreeNoData, Solubility):
+class _CH4_basalt_ardia13(Solubility):
     """CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`
 
     Experiments conducted at 0.7-3 GPa and 1400-1450 C. :cite:t:`AHW13{Equations 7a, 8}`, values
@@ -45,7 +41,7 @@ class _CH4_basalt_ardia13(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> ArrayLike:
         del kwargs
         pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
@@ -56,7 +52,7 @@ class _CH4_basalt_ardia13(PyTreeNoData, Solubility):
         return ppmw
 
 
-CH4_basalt_ardia13: SolubilityProtocol = _CH4_basalt_ardia13()
+CH4_basalt_ardia13: Solubility = _CH4_basalt_ardia13()
 """CH4 in haplobasalt (Fe-free) silicate melt :cite:p:`AHW13`
 
 Experiments conducted at 0.7-3 GPa and 1400-1450 C. :cite:t:`AHW13{Equations 7a, 8}`, values
@@ -64,8 +60,7 @@ for lnK0 and deltaV from the text.
 """
 
 
-@register_pytree_node_class
-class _CO_basalt_armstrong15(PyTreeNoData, Solubility):
+class _CO_basalt_armstrong15(Solubility):
     """Volatiles in mafic melts under reduced conditions :cite:p:`AHS15`
 
     Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
@@ -75,7 +70,7 @@ class _CO_basalt_armstrong15(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
         logco_ppm: Array = -0.738 + (0.876 * jnp.log10(fugacity)) - (5.44e-5 * pressure)
@@ -84,7 +79,7 @@ class _CO_basalt_armstrong15(PyTreeNoData, Solubility):
         return ppmw
 
 
-CO_basalt_armstrong15: SolubilityProtocol = _CO_basalt_armstrong15()
+CO_basalt_armstrong15: Solubility = _CO_basalt_armstrong15()
 """Volatiles in mafic melts under reduced conditions :cite:p:`AHS15`
 
 Experiments on Martian and terrestrial basalts at 1.2 GPa and 1400 C with variable fO2 from
@@ -94,8 +89,7 @@ dependence on total pressure. The fitting coefficients also use data from :cite:
 """
 
 
-@register_pytree_node_class
-class _CO_basalt_yoshioka19(PyTreeNoData, Solubility):
+class _CO_basalt_yoshioka19(Solubility):
     """Carbon in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -104,7 +98,7 @@ class _CO_basalt_yoshioka19(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         co_wtp: Array = jnp.power(10, (-5.20 + (0.8 * jnp.log10(fugacity))))
@@ -113,7 +107,7 @@ class _CO_basalt_yoshioka19(PyTreeNoData, Solubility):
         return ppmw
 
 
-CO_basalt_yoshioka19: SolubilityProtocol = _CO_basalt_yoshioka19()
+CO_basalt_yoshioka19: Solubility = _CO_basalt_yoshioka19()
 """Carbon in silicate melts :cite:p:`YNN19`
 
 Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -122,8 +116,7 @@ MORB in the abstract.
 """
 
 
-@register_pytree_node_class
-class _CO_rhyolite_yoshioka19(PyTreeNoData, Solubility):
+class _CO_rhyolite_yoshioka19(Solubility):
     """Carbon in silicate melts :cite:p:`YNN19`
 
     Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -132,7 +125,7 @@ class _CO_rhyolite_yoshioka19(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         co_wtp: Array = jnp.power(10, (-4.08 + (0.52 * jnp.log10(fugacity))))
@@ -141,7 +134,7 @@ class _CO_rhyolite_yoshioka19(PyTreeNoData, Solubility):
         return ppmw
 
 
-CO_rhyolite_yoshioka19: SolubilityProtocol = _CO_rhyolite_yoshioka19()
+CO_rhyolite_yoshioka19: Solubility = _CO_rhyolite_yoshioka19()
 """Carbon in silicate melts :cite:p:`YNN19`
 
 Experiments on carbon solubility in silicate melts (Fe-free) coexisting with graphite and
@@ -150,8 +143,7 @@ rhyolite in the abstract.
 """
 
 
-@register_pytree_node_class
-class _CO2_basalt_dixon95(PyTreeNoData, Solubility):
+class _CO2_basalt_dixon95(Solubility):
     """CO2 in MORB liquids :cite:p:`DSH95`
 
     :cite:t:`DSH95{Equation 6}` for mole fraction of dissolved carbonate (CO3^2-) and then
@@ -160,7 +152,7 @@ class _CO2_basalt_dixon95(PyTreeNoData, Solubility):
     """
 
     @override
-    @jit
+    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, pressure: ArrayLike, **kwargs
     ) -> Array:
@@ -171,7 +163,7 @@ class _CO2_basalt_dixon95(PyTreeNoData, Solubility):
         return ppmw
 
 
-CO2_basalt_dixon95: SolubilityProtocol = _CO2_basalt_dixon95()
+CO2_basalt_dixon95: Solubility = _CO2_basalt_dixon95()
 """CO2 in MORB liquids :cite:p:`DSH95`
 
 :cite:t:`DSH95{Equation 6}` for mole fraction of dissolved carbonate (CO3^2-) and then

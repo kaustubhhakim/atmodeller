@@ -23,8 +23,9 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.interfaces import RedoxBufferProtocol, SolubilityProtocol
+from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.solubility import get_solubility_models
+from atmodeller.solubility.core import Solubility
 from atmodeller.thermodata import IronWustiteBuffer
 
 logger: logging.Logger = debug_logger()
@@ -51,7 +52,7 @@ logger.info("TEST_TEMPERATURE = %e K", TEST_TEMPERATURE)
 logger.info("TEST_PRESSURE = %e bar", TEST_PRESSURE)
 logger.info("TEST_FO2 = %e bar", TEST_FO2)
 
-solubility_models: dict[str, SolubilityProtocol] = get_solubility_models()
+solubility_models: dict[str, Solubility] = get_solubility_models()
 
 
 def test_H2_andesite_hirschmann(check_values) -> None:
@@ -61,7 +62,7 @@ def test_H2_andesite_hirschmann(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2_andesite_hirschmann12"]
+    solubility_model: Solubility = solubility_models["H2_andesite_hirschmann12"]
     target_concentration: ArrayLike = 9000
     test_fugacity_H2_hirschmann_andesite: ArrayLike = 72269
     check_values.concentration(
@@ -83,7 +84,7 @@ def test_H2_basalt_hirschmann(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2_basalt_hirschmann12"]
+    solubility_model: Solubility = solubility_models["H2_basalt_hirschmann12"]
     target_concentration: ArrayLike = 2200
     test_fugacity_H2_hirschmann_basalt: ArrayLike = 19058
     check_values.concentration(
@@ -104,7 +105,7 @@ def test_H2_silicic_melts_gaillard(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2_silicic_melts_gaillard03"]
+    solubility_model: Solubility = solubility_models["H2_silicic_melts_gaillard03"]
     target_concentration: ArrayLike = 2.1
     test_fugacity_H2_gaillard: ArrayLike = 8
     check_values.concentration(
@@ -125,7 +126,7 @@ def test_H2O_ano_dio_newcombe(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2O_ano_dio_newcombe17"]
+    solubility_model: Solubility = solubility_models["H2O_ano_dio_newcombe17"]
     target_concentration: ArrayLike = 229
     test_fugacity_H2O_newcombe_andio: ArrayLike = 0.1
     check_values.concentration(
@@ -146,7 +147,7 @@ def test_H2O_basalt_dixon(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2O_basalt_dixon95"]
+    solubility_model: Solubility = solubility_models["H2O_basalt_dixon95"]
     target_concentration: ArrayLike = 5200
     test_fugacity_H2O_dixon_basalt: ArrayLike = 25
     check_values.concentration(
@@ -167,7 +168,7 @@ def test_H2O_basalt_mitchell(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2O_basalt_mitchell17"]
+    solubility_model: Solubility = solubility_models["H2O_basalt_mitchell17"]
     target_concentration: ArrayLike = 202247
     test_fugacity_H2O_mitchell_basalt: ArrayLike = 20600.63
     check_values.concentration(
@@ -188,7 +189,7 @@ def test_H2O_lunar_glass_newcombe(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2O_lunar_glass_newcombe17"]
+    solubility_model: Solubility = solubility_models["H2O_lunar_glass_newcombe17"]
     target_concentration: ArrayLike = 353.5
     test_fugacity_H2O_newcombe_lunarglass: ArrayLike = 0.27
     check_values.concentration(
@@ -209,7 +210,7 @@ def test_H2O_peridotite_sossi(check_values) -> None:
     """
 
     function_name: str = inspect.currentframe().f_code.co_name  # type: ignore
-    solubility_model: SolubilityProtocol = solubility_models["H2O_peridotite_sossi23"]
+    solubility_model: Solubility = solubility_models["H2O_peridotite_sossi23"]
     target_concentration: ArrayLike = 42.9
     test_fugacity_H2O_sossi_peridotite: ArrayLike = 0.0038
     check_values.concentration(
