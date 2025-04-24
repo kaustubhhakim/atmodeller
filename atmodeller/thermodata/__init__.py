@@ -16,13 +16,6 @@
 #
 """Thermodata package level variables"""
 
-# Below may be reinstated if we acquire thermochemical data in a table format.
-# import importlib.resources
-# from importlib.abc import Traversable
-
-# DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}")
-# """Data directory, which is the same as the package directory"""
-
 # Expose public API
 from atmodeller.thermodata._core import (  # noqa: F401
     CondensateActivity,

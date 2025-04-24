@@ -17,10 +17,10 @@
 """Solubility package"""
 
 # Expose the public API
-from atmodeller.solubility.core import (
-    NoSolubility,  # noqa: E402, F401
-    Solubility,  # noqa: E402, F401
-    SolubilityPowerLaw,  # noqa: E402, F401
-    SolubilityPowerLawLog10,  # noqa: E402, F401
+from atmodeller.solubility.core import (  # noqa: E402, F401
+    NoSolubility,
+    Solubility,
+    SolubilityPowerLaw,
+    SolubilityPowerLawLog10,
 )
-from atmodeller.solubility.library import get_solubility_models as get_solubility_models
+from atmodeller.solubility.library import get_solubility_models  # noqa: E402, F401
