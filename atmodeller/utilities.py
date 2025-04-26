@@ -17,31 +17,26 @@
 """Utilities"""
 
 import logging
-import sys
 from typing import NamedTuple
 
+import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax
+from jax import Array, lax
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
 
 
-@jit
+@eqx.filter_jit
 def get_log_number_density_from_log_pressure(
     log_pressure: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -61,12 +56,12 @@ def get_log_number_density_from_log_pressure(
     return log_number_density
 
 
-@jit
+@eqx.filter_jit
 def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, a_max=max_exp_input))
 
 
-@jit
+@eqx.filter_jit
 def partial_rref_jax(matrix: Array) -> Array:
     """Computes the partial reduced row echelon form to determine linear components.
 
@@ -366,23 +361,8 @@ class ExperimentalCalibration(NamedTuple):
     log10_fO2_max: float | None = None
 
 
-class PyTreeNoData:
-    """A PyTree with no data"""
-
-    def tree_flatten(self) -> tuple[tuple, None]:
-        children = ()
-        aux_data = None
-        return children, aux_data
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        del children
-        return cls()
-
-
-@jit
-def power_law(values: ArrayLike, constant: float, exponent: float) -> Array:
+@eqx.filter_jit
+def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
     """Power law
 
     Args:
@@ -393,4 +373,4 @@ def power_law(values: ArrayLike, constant: float, exponent: float) -> Array:
     Returns:
         Evaluated power law
     """
-    return constant * jnp.power(values, exponent)
+    return jnp.power(values, exponent) * constant
