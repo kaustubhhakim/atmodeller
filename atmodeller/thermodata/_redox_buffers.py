@@ -65,6 +65,18 @@ class RedoxBuffer(eqx.Module):
             Pressure in units appropriate for the calculation
         """
 
+    @abstractmethod
+    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        """Gets the log10 fugacity at the buffer
+
+        Args:
+            temperature: Temperature
+            pressure: Pressure
+
+        Returns:
+            Log10 fugacity at the buffer
+        """
+
     @eqx.filter_jit
     def get_scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
         """Gets the scaled pressure.
@@ -79,18 +91,6 @@ class RedoxBuffer(eqx.Module):
             return self.convert_pressure_units(self.evaluation_pressure)
         else:
             return self.convert_pressure_units(pressure)
-
-    @abstractmethod
-    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        """Gets the log10 fugacity at the buffer
-
-        Args:
-            temperature: Temperature
-            pressure: Pressure
-
-        Returns:
-            Log10 fugacity at the buffer
-        """
 
     @override
     @eqx.filter_jit
@@ -350,6 +350,14 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
             self.log10_shift, self.evaluation_pressure
         )
 
+    # @property
+    # def low_temperature_buffer(self) -> RedoxBuffer:
+    #     return IronWustiteBufferHirschmann08(self.log10_shift, self.evaluation_pressure)
+
+    # @property
+    # def high_temperature_buffer(self) -> RedoxBuffer:
+    #     return IronWustiteBufferHirschmann21(self.log10_shift, self.evaluation_pressure)
+
     # Not used for a composite redox buffer but required by the interface
     @override
     @eqx.filter_jit
@@ -382,11 +390,16 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
             Log10 fugacity at the buffer
         """
 
+        # low_temperature = eqx.Partial(self.low_temperature_buffer.log10_fugacity_buffer)
+        # high_temperature = eqx.Partial(self.high_temperature_buffer.log10_fugacity_buffer)
+
         def low_temperature_case() -> ArrayLike:
             return self.low_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
+            # return low_temperature(temperature, pressure)
 
         def high_temperature_case() -> ArrayLike:
             return self.high_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
+            # return high_temperature(temperature, pressure)
 
         buffer_value: Array = jnp.where(
             self._use_low_temperature(temperature),
