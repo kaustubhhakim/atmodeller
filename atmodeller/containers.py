@@ -38,7 +38,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax
+from jax import Array, lax
 from jax.tree_util import Partial, register_pytree_node_class, tree_flatten, tree_map
 from jax.typing import ArrayLike
 from lineax import QR, AbstractLinearSolver
@@ -767,7 +767,7 @@ class FugacityConstraints(NamedTuple):
 
         return log_fugacity
 
-    @jit
+    @eqx.filter_jit
     def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log number density
 
@@ -858,7 +858,7 @@ class MassConstraints(NamedTuple):
 
         return out
 
-    @jit
+    @eqx.filter_jit
     def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Array:
         """Log number density
 
@@ -873,7 +873,7 @@ class MassConstraints(NamedTuple):
 
         return log_number_density
 
-    @jit
+    @eqx.filter_jit
     def log_maximum_number(self) -> Array:
         """Log of the maximum abundance
 
