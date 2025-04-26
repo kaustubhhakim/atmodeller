@@ -19,8 +19,9 @@
 import sys
 from typing import NamedTuple
 
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit
+from jax import Array
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 from molmass import Formula
@@ -108,7 +109,7 @@ class ThermoCoefficients:
         self._T_min = T_min
         self._T_max = T_max
 
-    @jit
+    @eqx.filter_jit
     def _cp_over_R(self, cp_coefficients: ArrayLike, temperature: ArrayLike) -> Array:
         """Heat capacity relative to the gas constant (R)
 
@@ -136,7 +137,7 @@ class ThermoCoefficients:
 
         return heat_capacity
 
-    @jit
+    @eqx.filter_jit
     def _S_over_R(
         self, cp_coefficients: ArrayLike, b2: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -167,7 +168,7 @@ class ThermoCoefficients:
 
         return entropy
 
-    @jit
+    @eqx.filter_jit
     def _H_over_RT(
         self, cp_coefficients: ArrayLike, b1: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -198,7 +199,7 @@ class ThermoCoefficients:
 
         return enthalpy
 
-    @jit
+    @eqx.filter_jit
     def _G_over_RT(
         self, cp_coefficients: ArrayLike, b1: ArrayLike, b2: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -220,7 +221,7 @@ class ThermoCoefficients:
 
         return gibbs
 
-    @jit
+    @eqx.filter_jit
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
 

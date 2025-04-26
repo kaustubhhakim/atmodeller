@@ -20,8 +20,9 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Type
 
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit
+from jax import Array
 from jax.tree_util import register_pytree_node_class
 from jax.typing import ArrayLike
 
@@ -88,7 +89,7 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
         """
 
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity
 
@@ -102,7 +103,7 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
         return self.log10_fugacity_buffer(temperature, pressure) + self.log10_shift
 
     @override
-    @jit
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log fugacity
 
@@ -152,7 +153,7 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
         return pressure
 
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity
 
@@ -209,7 +210,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """Units are GPa"""
         return pressure * unit_conversion.bar_to_GPa
 
-    @jit
+    @eqx.filter_jit
     def _evaluate_m(self, pressure: ArrayLike, coefficients: tuple[float, ...]) -> Array:
         """Evaluates an m parameter
 
@@ -230,7 +231,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return m
 
-    @jit
+    @eqx.filter_jit
     def _evaluate_fO2(
         self,
         temperature: ArrayLike,
@@ -256,7 +257,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return log10fO2
 
-    @jit
+    @eqx.filter_jit
     def _fcc_bcc_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """log10fO2 for fcc and bcc iron
 
@@ -273,7 +274,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return log10fO2
 
-    @jit
+    @eqx.filter_jit
     def _hcp_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """log10fO2 for hcp iron
 
@@ -290,7 +291,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return log10fO2
 
-    @jit
+    @eqx.filter_jit
     def _use_hcp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Check to use hcp iron formulation for fO2
 
@@ -307,7 +308,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         return jnp.array(pressure) > threshold
 
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity
 
@@ -367,7 +368,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         """Units are bar"""
         return pressure
 
-    @jit
+    @eqx.filter_jit
     def _use_low_temperature(self, temperature: ArrayLike) -> Array:
         """Check to use the low temperature buffer for fO2
 
@@ -380,7 +381,7 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         return jnp.asarray(temperature) < self._high_temperature_buffer.calibration.temperature_min
 
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity at the buffer
 
