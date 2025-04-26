@@ -33,7 +33,6 @@ from dataclasses import asdict, dataclass, fields
 from typing import Any, Callable, Literal, NamedTuple, Type
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
@@ -758,7 +757,9 @@ class FugacityConstraints(NamedTuple):
                 pressure,
             )
 
-        vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
+        vmap_apply_function: Callable = eqx.filter_vmap(
+            apply_fugacity_function, in_axes=(0, None, None)
+        )
         indices: Array = jnp.arange(len(self.constraints))
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)

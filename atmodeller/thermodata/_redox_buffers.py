@@ -339,24 +339,24 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
     calibration: ExperimentalCalibration = ExperimentalCalibration(
         pressure_max=100 * unit_conversion.GPa_to_bar
     )
-    low_temperature_buffer: RedoxBuffer = eqx.field(init=False)
-    high_temperature_buffer: RedoxBuffer = eqx.field(init=False)
+    # low_temperature_buffer: RedoxBuffer = eqx.field(init=False)
+    # high_temperature_buffer: RedoxBuffer = eqx.field(init=False)
 
-    def __post_init__(self):
-        self.low_temperature_buffer = IronWustiteBufferHirschmann08(
-            self.log10_shift, self.evaluation_pressure
-        )
-        self.high_temperature_buffer = IronWustiteBufferHirschmann21(
-            self.log10_shift, self.evaluation_pressure
-        )
+    # def __post_init__(self):
+    #     self.low_temperature_buffer = IronWustiteBufferHirschmann08(
+    #         self.log10_shift, self.evaluation_pressure
+    #     )
+    #     self.high_temperature_buffer = IronWustiteBufferHirschmann21(
+    #         self.log10_shift, self.evaluation_pressure
+    #     )
 
-    # @property
-    # def low_temperature_buffer(self) -> RedoxBuffer:
-    #     return IronWustiteBufferHirschmann08(self.log10_shift, self.evaluation_pressure)
+    @property
+    def low_temperature_buffer(self) -> RedoxBuffer:
+        return IronWustiteBufferHirschmann08(self.log10_shift, self.evaluation_pressure)
 
-    # @property
-    # def high_temperature_buffer(self) -> RedoxBuffer:
-    #     return IronWustiteBufferHirschmann21(self.log10_shift, self.evaluation_pressure)
+    @property
+    def high_temperature_buffer(self) -> RedoxBuffer:
+        return IronWustiteBufferHirschmann21(self.log10_shift, self.evaluation_pressure)
 
     # Not used for a composite redox buffer but required by the interface
     @override
@@ -411,4 +411,4 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
 
 
 # FIXME: This should be just Hirschmann
-IronWustiteBuffer: Type[RedoxBuffer] = IronWustiteBufferHirschmann21
+IronWustiteBuffer: Type[RedoxBuffer] = IronWustiteBufferHirschmann
