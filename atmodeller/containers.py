@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Iterable, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from typing import Any, Callable, Literal, NamedTuple, Type
 
 import equinox as eqx
@@ -654,14 +654,12 @@ class ConstantFugacityConstraint(eqx.Module):
     """
 
     fugacity: ArrayLike
-    # TODO: This is a temporary hack so this class has the same number of arguments as for the
-    # redox protocol and hence the vmapping works
-    dummy_does_nothing: ArrayLike | None = None
 
     @property
     def value(self) -> ArrayLike:
         return self.fugacity
 
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         del temperature
         del pressure
@@ -741,9 +739,9 @@ class FugacityConstraints(NamedTuple):
         Returns:
             Log fugacity
         """
-        fugacity_funcs = tuple(
-            [Partial(constraint.log_fugacity) for constraint in self.constraints.values()]
-        )
+        fugacity_funcs = [
+            Partial(constraint.log_fugacity) for constraint in self.constraints.values()
+        ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
         # Temperature must be a float array to ensure branches have have identical types
@@ -793,12 +791,17 @@ class FugacityConstraints(NamedTuple):
         """
         constraints_vmap: dict[str, FugacityConstraintProtocol] = {}
 
+        def count_init_fields(cls):
+            return sum(f.init for f in fields(cls))
+
         for key, constraint in self.constraints.items():
             if jnp.isscalar(constraint.value):
                 vmap_axis: int | None = None
             else:
                 vmap_axis = 0
-            constraints_vmap[key] = type(constraint)(vmap_axis, None)  # type: ignore - container
+            number_init_fields: int = count_init_fields(constraint)
+            init_values: tuple = (vmap_axis,) + (None,) * (number_init_fields - 1)
+            constraints_vmap[key] = constraint.__class__(*init_values)  # type: ignore
 
         return FugacityConstraints(ImmutableMap(constraints_vmap))  # type: ignore - container
 

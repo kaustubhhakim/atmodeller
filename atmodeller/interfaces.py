@@ -39,28 +39,13 @@ class FugacityConstraintProtocol(Protocol):
 
 
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
-    """Redox buffer protocol"""
-
     log10_shift: ArrayLike
     evaluation_pressure: ArrayLike | None
-    _calibration: ExperimentalCalibration
-
-    def __init__(
-        self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0
-    ): ...
-
-    @property
-    def calibration(self) -> ExperimentalCalibration: ...
-
-    @property
-    def value(self) -> ArrayLike:
-        return self.log10_shift
+    calibration: ExperimentalCalibration
 
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
-
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
 class SolubilityProtocol(Protocol):
