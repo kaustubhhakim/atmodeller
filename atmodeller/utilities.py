@@ -17,7 +17,6 @@
 """Utilities"""
 
 import logging
-from typing import NamedTuple
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -281,7 +280,7 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     return component_matrix
 
 
-class UnitConversion(NamedTuple):
+class UnitConversion(eqx.Module):
     """Unit conversions"""
 
     atmosphere_to_bar: float = ATMOSPHERE
@@ -338,10 +337,11 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> Arra
     """
     h_grams: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: ArrayLike = h_grams * unit_conversion.g_to_kg
+
     return h_kg
 
 
-class ExperimentalCalibration(NamedTuple):
+class ExperimentalCalibration(eqx.Module):
     """Experimental calibration
 
     Args:

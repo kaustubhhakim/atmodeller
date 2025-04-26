@@ -17,7 +17,6 @@
 """Core classes and functions for thermochemical data"""
 
 import sys
-from typing import NamedTuple
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -41,28 +40,12 @@ inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapp
 """Inverse mapping from the integer code to a JANAF phase string"""
 
 
-# TODO: First get buffer working, then can reimplement this if required.
-# class ConstantBuffer(NamedTuple):
-#     """Constant buffer
-
-#     Args:
-#         log10_fugacity: Log10 fugacity
-#     """
-
-#     log10_fugacity: ArrayLike
-
-#     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-#         del temperature
-#         del pressure
-
-#         return self.log10_fugacity * jnp.log(10)
-
-
-class CondensateActivity(NamedTuple):
+class CondensateActivity(eqx.Module):
     """Activity of a stable condensate"""
 
     activity: ArrayLike = 1.0
 
+    @eqx.filter_jit
     def log_activity(
         self,
         temperature: ArrayLike,
@@ -271,7 +254,7 @@ class ThermoCoefficients:
         return cls(**aux_data)
 
 
-class SpeciesData(NamedTuple):
+class SpeciesData(eqx.Module):
     """Species data
 
     Args:
@@ -361,7 +344,7 @@ class SpeciesData(NamedTuple):
         return inverse_phase_mapping[self.phase_code]
 
 
-class CriticalData(NamedTuple):
+class CriticalData(eqx.Module):
     """Critical temperature and pressure of a gas species
 
     Args:

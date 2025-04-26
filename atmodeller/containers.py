@@ -30,7 +30,7 @@ import logging
 import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, fields
-from typing import Any, Callable, Literal, NamedTuple, Type
+from typing import Any, Callable, Literal, Type
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -609,6 +609,8 @@ class Planet(eqx.Module):
         Returns:
             vmap axes
         """
+        # TODO: This should already naturally extend to filter_vmap since it's just a standard
+        # test of is something an array or not
         return tree_map(lambda x: 0 if not jnp.isscalar(x) else None, self)
 
 
@@ -667,7 +669,7 @@ class ConstantFugacityConstraint(eqx.Module):
         return log_fugacity_value
 
 
-class FugacityConstraints(NamedTuple):
+class FugacityConstraints(eqx.Module):
     """Fugacity constraints
 
     These are applied as constraints on the gas activity.
@@ -784,6 +786,8 @@ class FugacityConstraints(NamedTuple):
 
         return log_number_density
 
+    # TODO: This should already naturally extend to filter_vmap since it's just a standard test of
+    # is something an array or not, with Nones padded for most entries after the first.
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
 
@@ -810,7 +814,7 @@ class FugacityConstraints(NamedTuple):
         return bool(self.constraints)
 
 
-class MassConstraints(NamedTuple):
+class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
     Args:
@@ -888,6 +892,8 @@ class MassConstraints(NamedTuple):
 
         return jnp.max(log_abundance)
 
+    # TODO: This should already naturally extend to filter_vmap since it's just a standard test of
+    # is something an array or not, with Nones padded for most entries after the first.
     def vmap_axes(self) -> Self:
         """Gets vmap axes.
 
