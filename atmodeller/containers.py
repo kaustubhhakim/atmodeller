@@ -39,7 +39,7 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, jit, lax
-from jax.tree_util import register_pytree_node_class, tree_flatten, tree_map
+from jax.tree_util import Partial, register_pytree_node_class, tree_flatten, tree_map
 from jax.typing import ArrayLike
 from lineax import QR, AbstractLinearSolver
 from molmass import Formula
@@ -644,8 +644,7 @@ class NormalisedMass(eqx.Module):
         return self.mass * (1 - self.melt_fraction)
 
 
-# TODO: Converting this to eqx.module break the tests.
-class ConstantFugacityConstraint(NamedTuple):
+class ConstantFugacityConstraint(eqx.Module):
     """A constant fugacity constraint
 
     This must adhere to FugacityConstraintProtocol
@@ -664,10 +663,11 @@ class ConstantFugacityConstraint(NamedTuple):
         return self.fugacity
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        del temperature
         del pressure
         log_fugacity_value: ArrayLike = jnp.log(self.fugacity)
 
-        return jnp.full_like(temperature, log_fugacity_value)
+        return log_fugacity_value
 
 
 class FugacityConstraints(NamedTuple):
@@ -730,7 +730,7 @@ class FugacityConstraints(NamedTuple):
 
         return out
 
-    @jit
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity
 
@@ -741,9 +741,9 @@ class FugacityConstraints(NamedTuple):
         Returns:
             Log fugacity
         """
-        fugacity_funcs: list[Callable] = [
-            constraint.log_fugacity for constraint in self.constraints.values()
-        ]
+        fugacity_funcs = tuple(
+            [Partial(constraint.log_fugacity) for constraint in self.constraints.values()]
+        )
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
         # Temperature must be a float array to ensure branches have have identical types
