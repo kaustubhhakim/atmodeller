@@ -20,7 +20,7 @@ import importlib.resources
 import logging
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import ClassVar
+from typing import Callable, ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -74,9 +74,7 @@ class Chabrier(RealGas):
     
     Dictionary keys should correspond to the name of the Chabrier file.
     """
-    # Must be declared static because we don't want to trace through the arrays of the
-    # interpolator.
-    log10_density_func: RegularGridInterpolator = eqx.field(static=True)
+    log10_density_func: Callable
     """Spline lookup for density from :cite:t:`CD21` T-P-rho tables"""
     He_fraction: float
     """He fraction"""
@@ -102,7 +100,7 @@ class Chabrier(RealGas):
         Returns:
             Instance
         """
-        log10_density_func: RegularGridInterpolator = cls._get_interpolator(filename)
+        log10_density_func: Callable = cls._get_interpolator(filename)
         He_fraction: float = cls.He_fraction_map[filename.name]
         H2_molar_mass_g_mol: float = Formula("H2").mass
         He_molar_mass_g_mol: float = Formula("He").mass
@@ -137,7 +135,7 @@ class Chabrier(RealGas):
         return molar_density
 
     @classmethod
-    def _get_interpolator(cls, filename: Path) -> RegularGridInterpolator:
+    def _get_interpolator(cls, filename: Path) -> Callable:
         """Gets spline lookup for density from :cite:t:`CD21` T-P-rho tables.
 
         The data tables have a slightly different organisation of the header line. But in all cases
@@ -177,7 +175,11 @@ class Chabrier(RealGas):
             (log_T, log_P), log_rho, method="linear"
         )
 
-        return interpolator
+        def interpolator_hashable_function_wrapper(x) -> Array:
+            """Converts interpolator to a hashable function"""
+            return interpolator(x)
+
+        return interpolator_hashable_function_wrapper
 
     @override
     @eqx.filter_jit
