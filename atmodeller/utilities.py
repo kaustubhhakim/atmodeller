@@ -16,9 +16,12 @@
 #
 """Utilities"""
 
+import dataclasses
 import logging
+from typing import Any
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
@@ -374,3 +377,68 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
         Evaluated power law
     """
     return jnp.power(values, exponent) * constant
+
+
+# Copied from the Equinox source code
+# A numpy scalar is always triggered as an array by Equinox, but Atmodeller wants to exclude
+# scalars which cannot be vmapped (otherwise an axis error is reported)
+# https://numpy.org/doc/stable/reference/arrays.scalars.html
+
+
+def is_array(element: Any) -> bool:
+    """Returns `True` if `element` is a JAX array or NumPy array.
+
+    Removed np.generic compared to the Equinox source code.
+    """
+    return isinstance(element, (np.ndarray, jax.Array))
+
+
+@dataclasses.dataclass(frozen=True)  # not a pytree
+class if_array:
+    """Returns a callable that returns the specified integer if evaluated on an array.
+    Otherwise, it returns `None`.
+
+    !!! Example
+
+        ```python
+        fn = if_array(1)
+        # Evaluate on an array, return the integer.
+        fn(jax.numpy.array([0, 1, 2]))  # 1
+        # Evaluate on not-an-array, return None.
+        fn(True)  # None
+        ```
+    """
+
+    axis: int
+
+    def __call__(self, x: Any) -> int | None:
+        return self.axis if is_array(x) else None
+
+
+# For debuging, might move elsewhere eventually
+
+
+def pytree_debug(pytree: Any, name: str) -> None:
+    """Prints the pytree structure for debugging vmap.
+
+    Args:
+        pytree: Pytree to print
+    """
+    arrays, static = eqx.partition(pytree, is_array)
+    arrays_tree = jax.tree_map(
+        lambda x: (
+            type(x),
+            "True" if is_array(x) else ("False" if x is not None else "None"),
+        ),
+        arrays,
+    )
+    jax.debug.print("{name} arrays_tree = {out}", name=name, out=arrays_tree)
+
+    static_tree = jax.tree_map(
+        lambda x: (
+            type(x),
+            "True" if is_array(x) else ("False" if x is not None else "None"),
+        ),
+        static,
+    )
+    jax.debug.print("{name} static_tree = {out}", name=name, out=static_tree)
