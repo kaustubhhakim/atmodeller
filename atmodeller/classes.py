@@ -24,10 +24,10 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+from equinox import Partial
 from jax import Array
 from jax.typing import ArrayLike
 
@@ -45,7 +45,7 @@ from atmodeller.containers import (
 from atmodeller.engine import select_valid_solutions, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
-from atmodeller.utilities import partial_rref
+from atmodeller.utilities import if_array, partial_rref, pytree_debug
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -110,37 +110,68 @@ class InteriorAtmosphere:
             "upper": self.species.get_upper_bound(),
             "jac": solution_args.solver_parameters.jac,
         }
-
-        if solution_args.is_batch:
-            initial_solution_axes = solution_args.get_initial_solution_vmap()
-            traced_parameters_axes = solution_args.get_traced_parameters_vmap()
-
-            # Create an inner vmap callable for batch processing
-            inner_solver: Callable = jax.vmap(
-                solve,
-                in_axes=(initial_solution_axes, traced_parameters_axes, None, None, None),
-            )
-        else:
-            inner_solver = solve  # No batching, use the raw solver
-
-        # Apply an outer vmap over the multistart dimension
-        self._solver: Callable = eqx.filter_jit(
-            jax.vmap(inner_solver, in_axes=(0, None, None, None, None))
-        )
+        pytree_debug(options, "options")
 
         fixed_parameters: FixedParameters = self.get_fixed_parameters(
             solution_args.fugacity_constraints, solution_args.mass_constraints
         )
-        initial_solution_array: Array = solution_args.solution
-        traced_parameters: TracedParameters = solution_args.get_traced_parameters()
+        # pytree_debug(fixed_parameters, "fixed_parameters")
 
-        solution, solver_status, solver_steps = self._solver(
-            initial_solution_array,
-            traced_parameters,
-            fixed_parameters,
-            solution_args.solver_parameters,
-            options,
+        # TODO: This is coming through as a 2-D array, which I don't think I want anymore for the
+        # new vmapping
+        initial_solution_array: Array = solution_args.solution
+        # TODO: Hack, just revert back to 1-D for testing (this now works without multistart)
+        initial_solution_array = jnp.squeeze(initial_solution_array, axis=0)
+        print(type(initial_solution_array), initial_solution_array.shape)
+
+        traced_parameters: TracedParameters = solution_args.get_traced_parameters()
+        pytree_debug(traced_parameters, "traced_parameters")
+
+        # Pre-bind constant options into the solver to avoid tracing through them
+        solve_with_bindings = Partial(
+            solve,
+            fixed_parameters=fixed_parameters,
+            solver_parameters=solution_args.solver_parameters,
+            options=options,
         )
+
+        # FIXME: Need to sort out how to deal with initial_solution_array and whether to batch or
+        # not
+        if solution_args.is_batch:
+            inner_solver: Callable = eqx.filter_vmap(
+                solve_with_bindings, in_axes=(None, if_array(axis=0))
+            )
+            solution, solver_status, solver_steps = inner_solver(
+                initial_solution_array,
+                traced_parameters,
+            )
+        else:
+            inner_solver = solve_with_bindings
+            solution, solver_status, solver_steps = inner_solver(
+                initial_solution_array,
+                traced_parameters,
+            )
+
+        print("Got to here")
+
+        # FIXME: Need to cleanly reinstate a multistart dimension
+        # Apply an outer vmap over the multistart dimension
+        # self._solver: Callable = eqx.filter_jit(
+        #   jax.vmap(inner_solver, in_axes=(0, None, None, None, None))
+        # )
+
+        # solution, solver_status, solver_steps = self._solver(
+        #     initial_solution_array,
+        #     traced_parameters,
+        #     fixed_parameters,
+        #     solution_args.solver_parameters,
+        #     options,
+        # )
+
+        print("Finished solve")
+        print(solution)
+        print(solver_status)
+        print(solver_steps)
 
         # Ensure computation is complete before proceeding
         solution.block_until_ready()
@@ -328,14 +359,16 @@ class InteriorAtmosphere:
         fugacity_matrix: npt.NDArray[np.float_] = np.identity(number_fugacity_constraints)
 
         # For fixed parameters all objects must be hashable because it is a static argument
+        # tolist is important to convert numpy dtypes to standard Python, thus ensuring they are
+        # not triggered as arrays by eqx.as_array
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
-            formula_matrix=tuple(map(tuple, formula_matrix)),
-            formula_matrix_constraints=tuple(map(tuple, formula_matrix_constraints)),
-            reaction_matrix=tuple(map(tuple, reaction_matrix)),
-            reaction_stability_matrix=tuple(map(tuple, reaction_stability_matrix)),
+            formula_matrix=tuple(map(tuple, formula_matrix.tolist())),
+            formula_matrix_constraints=tuple(map(tuple, formula_matrix_constraints.tolist())),
+            reaction_matrix=tuple(map(tuple, reaction_matrix.tolist())),
+            reaction_stability_matrix=tuple(map(tuple, reaction_stability_matrix.tolist())),
             stability_species_indices=stability_species_indices,
-            fugacity_matrix=tuple(map(tuple, fugacity_matrix)),
+            fugacity_matrix=tuple(map(tuple, fugacity_matrix.tolist())),
             gas_species_indices=gas_species_indices,
             condensed_species_indices=condensed_species_indices,
             fugacity_species_indices=tuple(fugacity_species_indices),

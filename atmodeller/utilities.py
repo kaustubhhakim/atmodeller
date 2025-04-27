@@ -381,7 +381,7 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
 
 # Copied from the Equinox source code
 # A numpy scalar is always triggered as an array by Equinox, but Atmodeller wants to exclude
-# scalars which cannot be vmapped (otherwise an axis error is reported)
+# scalars since they cannot be vmapped (otherwise an axis error is reported)
 # https://numpy.org/doc/stable/reference/arrays.scalars.html
 
 
@@ -415,14 +415,12 @@ class if_array:
         return self.axis if is_array(x) else None
 
 
-# For debuging, might move elsewhere eventually
-
-
 def pytree_debug(pytree: Any, name: str) -> None:
     """Prints the pytree structure for debugging vmap.
 
     Args:
         pytree: Pytree to print
+        name: Name for the debug print
     """
     arrays, static = eqx.partition(pytree, is_array)
     arrays_tree = jax.tree_map(

@@ -29,16 +29,17 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Iterable, Mapping
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass
 from typing import Any, Callable, Literal, Type
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, lax
-from jax.tree_util import Partial, register_pytree_node_class, tree_flatten, tree_map
+from jax.tree_util import Partial, register_pytree_node_class
 from jax.typing import ArrayLike
 from lineax import QR, AbstractLinearSolver
 from molmass import Formula
@@ -64,6 +65,7 @@ from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermo
 from atmodeller.utilities import (
     OptxSolver,
     get_log_number_density_from_log_pressure,
+    is_array,
     unit_conversion,
 )
 
@@ -212,30 +214,28 @@ class SolutionArguments:
         )
 
     @property
-    def is_batch(self) -> bool:
-        """Returns if any parameters are batched, thereby necessitating a vmap solve
+    def is_batch(self):
+        """Check if x is batched along axis=0, only considering array-like leaves."""
+        x = self.get_traced_parameters()
 
-        This deals with potential vectorisation over planet properties, fugacity constraints, and
-        mass constraints.
-        """
-        leaves1, _ = tree_flatten(self.get_traced_parameters_vmap())
-        leaves2, _ = tree_flatten(self.get_initial_solution_vmap())
-        leaves: list = leaves1 + leaves2
-        # Check if any of the axes should be vmapped, which is defined by an entry of zero
-        contains_zero: bool = any(np.array(leaves) == 0)
+        for leaf in jax.tree_util.tree_leaves(x):
+            if is_array(leaf) and leaf.shape[0] > 1:
+                return True
 
-        return contains_zero
+        return False
 
-    def get_initial_solution_vmap(self) -> int | None:
-        """Gets the vmapping axes for the initial solution estimate.
+    # TODO: Remove once vmapping redone. This is legacy but could be useful as the code is swapped
+    # over to eqx.filter_vmap
+    # def get_initial_solution_vmap(self) -> int | None:
+    #     """Gets the vmapping axes for the initial solution estimate.
 
-        Returns:
-            Vmapping for the initial solution estimate
-        """
-        if np.ndim(self.solution) == 3:
-            return 0
-        else:
-            return None
+    #     Returns:
+    #         Vmapping for the initial solution estimate
+    #     """
+    #     if np.ndim(self.solution) == 3:
+    #         return 0
+    #     else:
+    #         return None
 
     def get_traced_parameters(self) -> TracedParameters:
         """Gets traced parameters
@@ -244,20 +244,6 @@ class SolutionArguments:
             Traced parameters
         """
         return TracedParameters(self.planet, self.fugacity_constraints, self.mass_constraints)
-
-    def get_traced_parameters_vmap(self) -> TracedParameters:
-        """Gets the vmapping axes for tracer parameters.
-
-        Returns:
-            Vmapping for tracer parameters
-        """
-        traced_parameters_vmap: TracedParameters = TracedParameters(
-            planet=self.planet.vmap_axes(),
-            fugacity_constraints=self.fugacity_constraints.vmap_axes(),
-            mass_constraints=self.mass_constraints.vmap_axes(),
-        )
-
-        return traced_parameters_vmap
 
     def override(
         self,
@@ -381,11 +367,11 @@ class SpeciesCollection(tuple):
 
         return tuple(indices)
 
-    def get_lower_bound(self: SpeciesCollection) -> ArrayLike:
+    def get_lower_bound(self: SpeciesCollection) -> npt.NDArray[np.float_]:
         """Gets the lower bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
 
-    def get_upper_bound(self: SpeciesCollection) -> ArrayLike:
+    def get_upper_bound(self: SpeciesCollection) -> npt.NDArray[np.float_]:
         """Gets the upper bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
@@ -460,7 +446,7 @@ class SpeciesCollection(tuple):
 
     def _get_hypercube_bound(
         self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
-    ) -> ArrayLike:
+    ) -> npt.NDArray[np.float_]:
         """Gets the bound on the hypercube
 
         Args:
@@ -602,16 +588,6 @@ class Planet(eqx.Module):
         base_dict["surface_gravity"] = self.surface_gravity
 
         return base_dict
-
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        # TODO: This should already naturally extend to filter_vmap since it's just a standard
-        # test of is something an array or not
-        return tree_map(lambda x: 0 if not jnp.isscalar(x) else None, self)
 
 
 class NormalisedMass(eqx.Module):
@@ -786,30 +762,6 @@ class FugacityConstraints(eqx.Module):
 
         return log_number_density
 
-    # TODO: This should already naturally extend to filter_vmap since it's just a standard test of
-    # is something an array or not, with Nones padded for most entries after the first.
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        constraints_vmap: dict[str, FugacityConstraintProtocol] = {}
-
-        def count_init_fields(cls):
-            return sum(f.init for f in fields(cls))
-
-        for key, constraint in self.constraints.items():
-            if jnp.isscalar(constraint.value):
-                vmap_axis: int | None = None
-            else:
-                vmap_axis = 0
-            number_init_fields: int = count_init_fields(constraint)
-            init_values: tuple = (vmap_axis,) + (None,) * (number_init_fields - 1)
-            constraints_vmap[key] = constraint.__class__(*init_values)  # type: ignore
-
-        return FugacityConstraints(ImmutableMap(constraints_vmap))  # type: ignore - container
-
     def __bool__(self) -> bool:
         return bool(self.constraints)
 
@@ -844,8 +796,8 @@ class MassConstraints(eqx.Module):
 
         for element, mass_constraint in sorted_mass.items():
             molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log_abundance_: Array = (
-                jnp.log(mass_constraint) + jnp.log(AVOGADRO) - jnp.log(molar_mass)
+            log_abundance_: ArrayLike = (
+                np.log(mass_constraint) + np.log(AVOGADRO) - np.log(molar_mass)
             )
             log_abundance[element] = log_abundance_
 
@@ -891,27 +843,6 @@ class MassConstraints(eqx.Module):
         log_abundance: Array = jnp.array(list(self.log_abundance.values()))
 
         return jnp.max(log_abundance)
-
-    # TODO: This should already naturally extend to filter_vmap since it's just a standard test of
-    # is something an array or not, with Nones padded for most entries after the first.
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        log_abundance_vmap: dict[str, int | None] = {}
-
-        for key, log_abundance in self.log_abundance.items():
-            if jnp.isscalar(log_abundance):
-                vmap_axis: int | None = None
-            else:
-                vmap_axis = 0
-            log_abundance_vmap[key] = vmap_axis
-
-        logger.debug("log_abundance_vmap = %s", log_abundance_vmap)
-
-        return MassConstraints(ImmutableMap(log_abundance_vmap))  # type: ignore - container
 
     def __bool__(self) -> bool:
         return bool(self.log_abundance)
