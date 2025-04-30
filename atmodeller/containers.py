@@ -875,27 +875,27 @@ class FixedParameters(eqx.Module):
 
     species: SpeciesCollection
     """Collection of species"""
-    formula_matrix: tuple[tuple[float, ...], ...]
+    formula_matrix: npt.NDArray[np.int_]
     """Formula matrix"""
-    formula_matrix_constraints: tuple[tuple[float, ...], ...]
+    formula_matrix_constraints: npt.NDArray[np.int_]
     """Formula matrix for applying mass constraints"""
-    reaction_matrix: tuple[tuple[float, ...], ...]
+    reaction_matrix: npt.NDArray[np.float_]
     """Reaction matrix"""
-    reaction_stability_matrix: tuple[tuple[float, ...], ...]
+    reaction_stability_matrix: npt.NDArray[np.float_]
     """Reaction stability matrix"""
-    stability_species_indices: tuple[int, ...]
+    stability_species_indices: npt.NDArray[np.int_]
     """Indices of species to solve for stability"""
-    fugacity_matrix: tuple[tuple[float, ...], ...]
+    fugacity_matrix: npt.NDArray[np.float_]
     """Fugacity constraint matrix"""
-    gas_species_indices: tuple[int, ...]
+    gas_species_indices: npt.NDArray[np.int_]
     """Indices of gas species"""
-    condensed_species_indices: tuple[int, ...]
+    condensed_species_indices: npt.NDArray[np.int_]
     """Indices of condensed species"""
-    fugacity_species_indices: tuple[int, ...]
+    fugacity_species_indices: npt.NDArray[np.int_]
     """Indices of species to constrain the fugacity"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
-    molar_masses: tuple[float, ...]
+    molar_masses: npt.NDArray[np.float_]
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""

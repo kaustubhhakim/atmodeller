@@ -287,7 +287,7 @@ class InteriorAtmosphere:
 
         logger.info("Fast solve complete")
 
-    def get_condensed_species_indices(self) -> tuple[int, ...]:
+    def get_condensed_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of condensed species
 
         Returns:
@@ -298,7 +298,7 @@ class InteriorAtmosphere:
             if species_.data.phase != "g":
                 indices.append(nn)
 
-        return tuple(indices)
+        return np.array(indices)
 
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
@@ -330,10 +330,10 @@ class InteriorAtmosphere:
         """
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
         reaction_stability_matrix: npt.NDArray[np.float_] = self.get_reaction_stability_matrix()
-        gas_species_indices: tuple[int, ...] = self.get_gas_species_indices()
-        condensed_species_indices: tuple[int, ...] = self.get_condensed_species_indices()
-        stability_species_indices: tuple[int, ...] = self.get_stability_species_indices()
-        molar_masses: tuple[float, ...] = self.get_molar_masses()
+        gas_species_indices: npt.NDArray[np.int_] = self.get_gas_species_indices()
+        condensed_species_indices: npt.NDArray[np.int_] = self.get_condensed_species_indices()
+        stability_species_indices: npt.NDArray[np.int_] = self.get_stability_species_indices()
+        molar_masses: npt.NDArray[np.float_] = self.get_molar_masses()
         diatomic_oxygen_index: int = self.get_diatomic_oxygen_index()
 
         # The complete formula matrix is not required for the calculation but it is used for
@@ -351,11 +351,12 @@ class InteriorAtmosphere:
 
         # Fugacity constraint matrix and indices
         number_fugacity_constraints: int = len(fugacity_constraints.constraints)
-        fugacity_species_indices: list[int] = []
+        fugacity_species_indices_list: list[int] = []
         species_names: tuple[str, ...] = self.get_species_names()
         for species_name in fugacity_constraints.constraints.keys():
             index: int = species_names.index(species_name)
-            fugacity_species_indices.append(index)
+            fugacity_species_indices_list.append(index)
+        fugacity_species_indices: npt.NDArray[np.int_] = np.array(fugacity_species_indices_list)
         fugacity_matrix: npt.NDArray[np.float_] = np.identity(number_fugacity_constraints)
 
         # For fixed parameters all objects must be hashable because it is a static argument
@@ -363,15 +364,15 @@ class InteriorAtmosphere:
         # not triggered as arrays by eqx.as_array
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
-            formula_matrix=tuple(map(tuple, formula_matrix.tolist())),
-            formula_matrix_constraints=tuple(map(tuple, formula_matrix_constraints.tolist())),
-            reaction_matrix=tuple(map(tuple, reaction_matrix.tolist())),
-            reaction_stability_matrix=tuple(map(tuple, reaction_stability_matrix.tolist())),
+            formula_matrix=formula_matrix,
+            formula_matrix_constraints=formula_matrix_constraints,
+            reaction_matrix=reaction_matrix,
+            reaction_stability_matrix=reaction_stability_matrix,
             stability_species_indices=stability_species_indices,
-            fugacity_matrix=tuple(map(tuple, fugacity_matrix.tolist())),
+            fugacity_matrix=fugacity_matrix,
             gas_species_indices=gas_species_indices,
             condensed_species_indices=condensed_species_indices,
-            fugacity_species_indices=tuple(fugacity_species_indices),
+            fugacity_species_indices=fugacity_species_indices,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
             tau=self.tau,
@@ -406,7 +407,7 @@ class InteriorAtmosphere:
 
         return formula_matrix
 
-    def get_gas_species_indices(self) -> tuple[int, ...]:
+    def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of gas species
 
         Returns:
@@ -417,7 +418,7 @@ class InteriorAtmosphere:
             if species_.data.phase == "g":
                 indices.append(nn)
 
-        return tuple(indices)
+        return np.array(indices)
 
     def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements.
@@ -438,13 +439,13 @@ class InteriorAtmosphere:
 
         return tuple(sorted_elements)
 
-    def get_molar_masses(self) -> tuple[float, ...]:
+    def get_molar_masses(self) -> npt.NDArray[np.float_]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: tuple[float, ...] = tuple(
+        molar_masses: npt.NDArray[np.float_] = np.array(
             [species_.data.molar_mass for species_ in self.species]
         )
 
@@ -525,7 +526,7 @@ class InteriorAtmosphere:
         """
         return tuple([species_.name for species_ in self.species])
 
-    def get_stability_species_indices(self) -> tuple[int, ...]:
+    def get_stability_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of species to solve for stability
 
         Returns:
@@ -536,7 +537,7 @@ class InteriorAtmosphere:
             if species_.solve_for_stability:
                 indices.append(nn)
 
-        return tuple(indices)
+        return np.array(indices)
 
     def get_stability_species_mask(self) -> npt.NDArray[np.bool_]:
         """Gets the stability species mask
