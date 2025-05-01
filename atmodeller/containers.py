@@ -216,6 +216,10 @@ class SolutionArguments:
     @property
     def is_batch(self):
         """Check if x is batched along axis=0, only considering array-like leaves."""
+        y = self.get_initial_solution_vmap()
+        if y == 0:
+            return True
+
         x = self.get_traced_parameters()
 
         for leaf in jax.tree_util.tree_leaves(x):
@@ -224,18 +228,16 @@ class SolutionArguments:
 
         return False
 
-    # TODO: Remove once vmapping redone. This is legacy but could be useful as the code is swapped
-    # over to eqx.filter_vmap
-    # def get_initial_solution_vmap(self) -> int | None:
-    #     """Gets the vmapping axes for the initial solution estimate.
+    def get_initial_solution_vmap(self) -> int | None:
+        """Gets the vmapping axes for the initial solution estimate.
 
-    #     Returns:
-    #         Vmapping for the initial solution estimate
-    #     """
-    #     if np.ndim(self.solution) == 3:
-    #         return 0
-    #     else:
-    #         return None
+        Returns:
+            Vmapping for the initial solution estimate
+        """
+        if np.ndim(self.solution) == 3:
+            return 0
+        else:
+            return None
 
     def get_traced_parameters(self) -> TracedParameters:
         """Gets traced parameters

@@ -110,15 +110,13 @@ class InteriorAtmosphere:
             "upper": self.species.get_upper_bound(),
             "jac": solution_args.solver_parameters.jac,
         }
-        pytree_debug(options, "options")
+        # pytree_debug(options, "options")
 
         fixed_parameters: FixedParameters = self.get_fixed_parameters(
             solution_args.fugacity_constraints, solution_args.mass_constraints
         )
         # pytree_debug(fixed_parameters, "fixed_parameters")
 
-        # TODO: This is coming through as a 2-D array, which I don't think I want anymore for the
-        # new vmapping
         initial_solution_array: Array = solution_args.solution
         # TODO: Hack, just revert back to 1-D for testing (this now works without multistart)
         initial_solution_array = jnp.squeeze(initial_solution_array, axis=0)
@@ -138,8 +136,11 @@ class InteriorAtmosphere:
         # FIXME: Need to sort out how to deal with initial_solution_array and whether to batch or
         # not
         if solution_args.is_batch:
+            print("Yes is batch")
+            initial_solution_axes = solution_args.get_initial_solution_vmap()
+            print("initial_solution_axes = ", initial_solution_axes)
             inner_solver: Callable = eqx.filter_vmap(
-                solve_with_bindings, in_axes=(None, if_array(axis=0))
+                solve_with_bindings, in_axes=(initial_solution_axes, if_array(axis=0))
             )
             solution, solver_status, solver_steps = inner_solver(
                 initial_solution_array,
@@ -152,31 +153,39 @@ class InteriorAtmosphere:
                 traced_parameters,
             )
 
+        print(solution)
+        print(solver_status)
+        print(solver_steps)
+
         print("Got to here")
 
         # FIXME: Need to cleanly reinstate a multistart dimension
         # Apply an outer vmap over the multistart dimension
         # self._solver: Callable = eqx.filter_jit(
-        #   jax.vmap(inner_solver, in_axes=(0, None, None, None, None))
+        #    eqx.filter_vmap(inner_solver, in_axes=(0, None))
+        # )  # , None, None, None))
         # )
 
-        # solution, solver_status, solver_steps = self._solver(
-        #     initial_solution_array,
-        #     traced_parameters,
-        #     fixed_parameters,
-        #     solution_args.solver_parameters,
-        #     options,
-        # )
+        print("Initial solution array shape: ", initial_solution_array.shape)
 
-        print("Finished solve")
-        print(solution)
-        print(solver_status)
-        print(solver_steps)
+        solution, solver_status, solver_steps = self._solver(
+            initial_solution_array,
+            traced_parameters,
+            # fixed_parameters,
+            # solution_args.solver_parameters,
+            # options,
+        )
 
         # Ensure computation is complete before proceeding
         solution.block_until_ready()
         solver_status.block_until_ready()
         solver_steps.block_until_ready()
+
+        print(solution)
+        print(solver_status)
+        print(solver_steps)
+
+        print("Finished solve")
 
         valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
             solution, solver_status, solver_steps
