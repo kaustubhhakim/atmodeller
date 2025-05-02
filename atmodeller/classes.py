@@ -24,20 +24,18 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from equinox import Partial
-from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller import TAU
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
     MassConstraints,
     Planet,
-    SolutionArguments,
     SolverParameters,
     SpeciesCollection,
     TracedParameters,
@@ -45,7 +43,12 @@ from atmodeller.containers import (
 from atmodeller.engine import select_valid_solutions, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
-from atmodeller.utilities import if_array, partial_rref, pytree_debug
+from atmodeller.utilities import (
+    broadcast_initial_solution,
+    get_batch_size,
+    partial_rref,
+    vmap_axes_spec,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -54,7 +57,7 @@ class InteriorAtmosphere:
     """Interior atmosphere
 
     This is the main class that the user interacts with to build interior-atmosphere systems,
-    solve them, and retreive the results.
+    solve them, and retrieve the results.
 
     Args:
         species: Collection of species
@@ -94,86 +97,73 @@ class InteriorAtmosphere:
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
         """
-        solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
-            self.species,
-            planet,
-            initial_log_number_density,
-            initial_log_stability,
-            fugacity_constraints,
-            mass_constraints,
-            solver_parameters,
+        if planet is None:
+            planet_: Planet = Planet()
+        else:
+            planet_ = planet
+
+        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
+            fugacity_constraints
+        )
+        mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
+
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters(
+            fugacity_constraints_, mass_constraints_
         )
 
-        # Assemble options dictionary for solve
+        traced_parameters_: TracedParameters = TracedParameters(
+            planet_, fugacity_constraints_, mass_constraints_
+        )
+
+        if solver_parameters is None:
+            solver_parameters_: SolverParameters = SolverParameters()
+        else:
+            solver_parameters_ = solver_parameters
+
         options: dict[str, Any] = {
             "lower": self.species.get_lower_bound(),
             "upper": self.species.get_upper_bound(),
-            "jac": solution_args.solver_parameters.jac,
+            "jac": solver_parameters_.jac,
         }
-        # pytree_debug(options, "options")
 
-        fixed_parameters: FixedParameters = self.get_fixed_parameters(
-            solution_args.fugacity_constraints, solution_args.mass_constraints
-        )
-        # pytree_debug(fixed_parameters, "fixed_parameters")
-
-        initial_solution_array: Array = solution_args.solution
-        # TODO: Hack, just revert back to 1-D for testing (this now works without multistart)
-        initial_solution_array = jnp.squeeze(initial_solution_array, axis=0)
-        print(type(initial_solution_array), initial_solution_array.shape)
-
-        traced_parameters: TracedParameters = solution_args.get_traced_parameters()
-        pytree_debug(traced_parameters, "traced_parameters")
-
-        # Pre-bind constant options into the solver to avoid tracing through them
-        solve_with_bindings = Partial(
+        # Pre-bind fixed configuration to avoid retracing and improve JIT efficiency
+        solve_with_bindings: Callable = eqx.Partial(
             solve,
-            fixed_parameters=fixed_parameters,
-            solver_parameters=solution_args.solver_parameters,
+            fixed_parameters=fixed_parameters_,
+            solver_parameters=solver_parameters_,
             options=options,
         )
 
-        # FIXME: Need to sort out how to deal with initial_solution_array and whether to batch or
-        # not
-        if solution_args.is_batch:
-            print("Yes is batch")
-            initial_solution_axes = solution_args.get_initial_solution_vmap()
-            print("initial_solution_axes = ", initial_solution_axes)
-            inner_solver: Callable = eqx.filter_vmap(
-                solve_with_bindings, in_axes=(initial_solution_axes, if_array(axis=0))
-            )
-            solution, solver_status, solver_steps = inner_solver(
-                initial_solution_array,
-                traced_parameters,
+        # Always batch over the initial solution, meaning the initial solution must be broadcast
+        # appropriately.
+        in_axes: Any = vmap_axes_spec(traced_parameters_)
+        self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
+
+        if initial_log_number_density is None:
+            log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+                len(self.species), dtype=np.float_
             )
         else:
-            inner_solver = solve_with_bindings
-            solution, solver_status, solver_steps = inner_solver(
-                initial_solution_array,
-                traced_parameters,
+            log_number_density = initial_log_number_density
+
+        if initial_log_stability is None:
+            log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
+                self.species.number_of_stability(), dtype=np.float_
             )
+        else:
+            log_stability = initial_log_stability
 
-        print(solution)
-        print(solver_status)
-        print(solver_steps)
-
-        print("Got to here")
-
-        # FIXME: Need to cleanly reinstate a multistart dimension
-        # Apply an outer vmap over the multistart dimension
-        # self._solver: Callable = eqx.filter_jit(
-        #    eqx.filter_vmap(inner_solver, in_axes=(0, None))
-        # )  # , None, None, None))
-        # )
-
-        print("Initial solution array shape: ", initial_solution_array.shape)
+        initial_solution = jnp.concatenate((log_number_density, log_stability), axis=-1)
+        # jax.debug.print("initial_solution = {out}", out=initial_solution)
+        batch_size: int = get_batch_size(traced_parameters_)
+        # jax.debug.print("batch_size = {out}", out=batch_size)
+        initial_solution = broadcast_initial_solution(initial_solution, max(1, batch_size))
+        jax.debug.print("initial_solution = {out}", out=initial_solution)
+        jax.debug.print("initial_solution.shape = {out}", out=initial_solution.shape)
 
         solution, solver_status, solver_steps = self._solver(
-            initial_solution_array,
-            traced_parameters,
-            # fixed_parameters,
-            # solution_args.solver_parameters,
-            # options,
+            initial_solution,
+            traced_parameters_,
         )
 
         # Ensure computation is complete before proceeding
@@ -186,6 +176,17 @@ class InteriorAtmosphere:
         print(solver_steps)
 
         print("Finished solve")
+
+        # Solve again for fun with the compiled code
+        solution2, solver_status2, solver_steps2 = self._solver(solution, traced_parameters_)
+
+        print(solution2)
+        print(solver_status2)
+        print(solver_steps2)
+
+        print("Finished solve2")
+
+        sys.exit(0)
 
         valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
             solution, solver_status, solver_steps
@@ -226,75 +227,76 @@ class InteriorAtmosphere:
                 "which can depend on the choice of the random seed"
             )
 
-    def solve_fast(
-        self,
-        *,
-        planet: Planet | None = None,
-        initial_log_number_density: Array | None = None,
-        initial_log_stability: Array | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-    ) -> None:
-        """Solves the system and initialises an Output instance for processing the result
+    # TODO: To reinstate at some point if relevant
+    # def solve_fast(
+    #     self,
+    #     *,
+    #     planet: Planet | None = None,
+    #     initial_log_number_density: Array | None = None,
+    #     initial_log_stability: Array | None = None,
+    #     fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+    #     mass_constraints: Mapping[str, ArrayLike] | None = None,
+    # ) -> None:
+    #     """Solves the system and initialises an Output instance for processing the result
 
-        The idea is that this method is faster than the solve method because it does not recompile
-        the solver function each time it is called.
+    #     The idea is that this method is faster than the solve method because it does not recompile
+    #     the solver function each time it is called.
 
-        Args:
-            planet: Planet. Defaults to None.
-            initial_log_number_density: Initial log number density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-        """
-        solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
-            self.species,
-            planet,
-            initial_log_number_density,
-            initial_log_stability,
-            fugacity_constraints,
-            mass_constraints,
-        )
-        fixed_parameters: FixedParameters = self.get_fixed_parameters(
-            solution_args.fugacity_constraints, solution_args.mass_constraints
-        )
-        initial_solution_array: Array = solution_args.solution
-        traced_parameters: TracedParameters = solution_args.get_traced_parameters()
+    #     Args:
+    #         planet: Planet. Defaults to None.
+    #         initial_log_number_density: Initial log number density. Defaults to None.
+    #         initial_log_stability: Initial log stability. Defaults to None.
+    #         fugacity_constraints: Fugacity constraints. Defaults to None.
+    #         mass_constraints: Mass constraints. Defaults to None.
+    #     """
+    #     solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
+    #         self.species,
+    #         planet,
+    #         initial_log_number_density,
+    #         initial_log_stability,
+    #         fugacity_constraints,
+    #         mass_constraints,
+    #     )
+    #     fixed_parameters: FixedParameters = self.get_fixed_parameters(
+    #         solution_args.fugacity_constraints, solution_args.mass_constraints
+    #     )
+    #     initial_solution_array: Array = solution_args.solution
+    #     traced_parameters: TracedParameters = solution_args.get_traced_parameters()
 
-        # Assemble options dictionary for solve
-        options: dict[str, Any] = {
-            "lower": self.species.get_lower_bound(),
-            "upper": self.species.get_upper_bound(),
-            "jac": solution_args.solver_parameters.jac,
-        }
+    #     # Assemble options dictionary for solve
+    #     options: dict[str, Any] = {
+    #         "lower": self.species.get_lower_bound(),
+    #         "upper": self.species.get_upper_bound(),
+    #         "jac": solution_args.solver_parameters.jac,
+    #     }
 
-        solution, solver_status, solver_steps = self._solver(
-            initial_solution_array,
-            traced_parameters,
-            fixed_parameters,
-            solution_args.solver_parameters,
-            options,
-        )
+    #     solution, solver_status, solver_steps = self._solver(
+    #         initial_solution_array,
+    #         traced_parameters,
+    #         fixed_parameters,
+    #         solution_args.solver_parameters,
+    #         options,
+    #     )
 
-        # Ensure computation is complete before proceeding
-        solution.block_until_ready()
-        solver_status.block_until_ready()
-        solver_steps.block_until_ready()
+    #     # Ensure computation is complete before proceeding
+    #     solution.block_until_ready()
+    #     solver_status.block_until_ready()
+    #     solver_steps.block_until_ready()
 
-        valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
-            solution, solver_status, solver_steps
-        )
+    #     valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
+    #         solution, solver_status, solver_steps
+    #     )
 
-        self._output: Output = Output(
-            valid_solutions,
-            first_valid_index,
-            solver_steps,
-            solution_args,
-            fixed_parameters,
-            traced_parameters,
-        )
+    #     self._output: Output = Output(
+    #         valid_solutions,
+    #         first_valid_index,
+    #         solver_steps,
+    #         solution_args,
+    #         fixed_parameters,
+    #         traced_parameters,
+    #     )
 
-        logger.info("Fast solve complete")
+    #     logger.info("Fast solve complete")
 
     def get_condensed_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of condensed species

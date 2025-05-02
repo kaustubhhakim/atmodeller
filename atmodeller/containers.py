@@ -30,10 +30,9 @@ import logging
 import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Callable, Literal, Type
+from typing import Callable, Literal, Type
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
@@ -46,8 +45,6 @@ from molmass import Formula
 from xmmutablemap import ImmutableMap
 
 from atmodeller import (
-    INITIAL_LOG_NUMBER_DENSITY,
-    INITIAL_LOG_STABILITY,
     LOG_NUMBER_DENSITY_LOWER,
     LOG_NUMBER_DENSITY_UPPER,
     LOG_STABILITY_LOWER,
@@ -65,7 +62,7 @@ from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermo
 from atmodeller.utilities import (
     OptxSolver,
     get_log_number_density_from_log_pressure,
-    is_array,
+    # is_array,
     unit_conversion,
 )
 
@@ -93,197 +90,212 @@ class SolutionArguments:
         solver_parameters: Solver parameters
     """
 
-    species: SpeciesCollection
-    planet: Planet
-    solution: Array
-    fugacity_constraints: FugacityConstraints
-    mass_constraints: MassConstraints
-    solver_parameters: SolverParameters
 
-    @classmethod
-    def create_with_defaults(
-        cls,
-        species: SpeciesCollection,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-        solver_parameters: SolverParameters | None = None,
-    ) -> Self:
-        """Creates an instance with defaults applied if arguments are not specified.
+#     species: SpeciesCollection
+#     planet: Planet
+#     solution: Array
+#     fugacity_constraints: FugacityConstraints
+#     mass_constraints: MassConstraints
+#     solver_parameters: SolverParameters
 
-        Args:
-            species: Collection of species
-            planet: Planet. Defaults to None.
-            initial_log_number_density: Initial log number density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-            solver_parameters: Solver parameters. Defaults to None.
+#     @classmethod
+#     def create_with_defaults(
+#         cls,
+#         species: SpeciesCollection,
+#         planet: Planet | None = None,
+#         initial_log_number_density: ArrayLike | None = None,
+#         initial_log_stability: ArrayLike | None = None,
+#         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+#         mass_constraints: Mapping[str, ArrayLike] | None = None,
+#         solver_parameters: SolverParameters | None = None,
+#     ) -> Self:
+#         """Creates an instance with defaults applied if arguments are not specified.
 
-        Returns:
-            An instance
-        """
-        if solver_parameters is None:
-            solver_parameters_: SolverParameters = SolverParameters()
-        else:
-            solver_parameters_ = solver_parameters
+#         Args:
+#             species: Collection of species
+#             planet: Planet. Defaults to None.
+#             initial_log_number_density: Initial log number density. Defaults to None.
+#             initial_log_stability: Initial log stability. Defaults to None.
+#             fugacity_constraints: Fugacity constraints. Defaults to None.
+#             mass_constraints: Mass constraints. Defaults to None.
+#             solver_parameters: Solver parameters. Defaults to None.
 
-        multistart: int = solver_parameters_.multistart
+#         Returns:
+#             An instance
+#         """
+#         if solver_parameters is None:
+#             solver_parameters_: SolverParameters = SolverParameters()
+#         else:
+#             solver_parameters_ = solver_parameters
 
-        if planet is None:
-            planet_: Planet = Planet()
-        else:
-            planet_ = planet
+#         # TODO: Move multistart elsewhere
+#         # multistart: int = solver_parameters_.multistart
 
-        if initial_log_number_density is None:
-            base_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-                len(species), dtype=np.float_
-            )
-        else:
-            base_log_number_density = initial_log_number_density
+#         if planet is None:
+#             planet_: Planet = Planet()
+#         else:
+#             planet_ = planet
 
-        if initial_log_stability is None:
-            base_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
-                species.number_of_stability(), dtype=np.float_
-            )
-        else:
-            base_log_stability = initial_log_stability
+#         if initial_log_number_density is None:
+#             base_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+#                 len(species), dtype=np.float_
+#             )
+#         else:
+#             base_log_number_density = initial_log_number_density
 
-        # base_log_number_density and base_log_stability could be 1-D arrays if the default values
-        # are taken or a 1-D array specified by the user, otherwise they could be 2-D arrays if the
-        # user has provided a batch of initial solutions. We append another dimension to the axes
-        # to account for the multistart dimension. Hence the shape becomes (1, ?)
-        base_log_number_density = np.expand_dims(base_log_number_density, axis=0)
-        base_log_stability = np.expand_dims(base_log_stability, axis=0)
-        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
-        logger.debug("base_log_number_density = %s", base_log_number_density)
-        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
-        logger.debug("base_log_stability = %s", base_log_stability)
+#         if initial_log_stability is None:
+#             base_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
+#                 species.number_of_stability(), dtype=np.float_
+#             )
+#         else:
+#             base_log_stability = initial_log_stability
 
-        # Multistart runs each simulation multiple times with different initial conditions.
-        base_log_number_density = np.repeat(base_log_number_density, multistart, axis=0)
-        base_log_stability = np.repeat(base_log_stability, multistart, axis=0)
-        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
-        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
+#         # TODO: Move multistart elsewhere
+#         # base_log_number_density and base_log_stability could be 1-D arrays if the default values
+#         # are taken or a 1-D array specified by the user, otherwise they could be 2-D arrays if the
+#         # user has provided a batch of initial solutions. We append another dimension to the axes
+#         # to account for the multistart dimension. Hence the shape becomes (1, ?)
+#         # base_log_number_density = np.expand_dims(base_log_number_density, axis=0)
+#         # base_log_stability = np.expand_dims(base_log_stability, axis=0)
+#         # logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
+#         # logger.debug("base_log_number_density = %s", base_log_number_density)
+#         # logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
+#         # logger.debug("base_log_stability = %s", base_log_stability)
 
-        if multistart > 1:
-            multistart_perturbation: float = solver_parameters_.multistart_perturbation
-            log_number_perturbation: ArrayLike = multistart_perturbation * (
-                2 * np.random.uniform(size=base_log_number_density.shape) - 1
-            )
-            log_stability_perturbation: ArrayLike = multistart_perturbation * (
-                2 * np.random.uniform(size=base_log_stability.shape) - 1
-            )
+#         # # Multistart runs each simulation multiple times with different initial conditions.
+#         # base_log_number_density = np.repeat(base_log_number_density, multistart, axis=0)
+#         # base_log_stability = np.repeat(base_log_stability, multistart, axis=0)
+#         # logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
+#         # logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
 
-            # Ensure first multistart retains base values
-            log_number_perturbation[0] = 0
-            log_stability_perturbation[0] = 0
+#         # if multistart > 1:
+#         #     multistart_perturbation: float = solver_parameters_.multistart_perturbation
+#         #     log_number_perturbation: ArrayLike = multistart_perturbation * (
+#         #         2 * np.random.uniform(size=base_log_number_density.shape) - 1
+#         #     )
+#         #     log_stability_perturbation: ArrayLike = multistart_perturbation * (
+#         #         2 * np.random.uniform(size=base_log_stability.shape) - 1
+#         #     )
 
-            log_number_density: ArrayLike = base_log_number_density + log_number_perturbation
-            log_stability: ArrayLike = base_log_stability + log_stability_perturbation
-        else:
-            log_number_density = base_log_number_density
-            log_stability = base_log_stability
+#         #     # Ensure first multistart retains base values
+#         #     log_number_perturbation[0] = 0
+#         #     log_stability_perturbation[0] = 0
 
-        logger.debug("log_number_density.shape = %s", log_number_density.shape)
-        logger.debug("log_number_density = %s", log_number_density)
-        logger.debug("log_stability.shape = %s", log_stability.shape)
-        logger.debug("log_stability = %s", log_stability)
+#         #     log_number_density: ArrayLike = base_log_number_density + log_number_perturbation
+#         #     log_stability: ArrayLike = base_log_stability + log_stability_perturbation
+#         # else:
+#         #     log_number_density = base_log_number_density
+#         #     log_stability = base_log_stability
 
-        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            fugacity_constraints
-        )
-        mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
+#         # logger.debug("log_number_density.shape = %s", log_number_density.shape)
+#         # logger.debug("log_number_density = %s", log_number_density)
+#         # logger.debug("log_stability.shape = %s", log_stability.shape)
+#         # logger.debug("log_stability = %s", log_stability)
 
-        # Ensure both arrays have the same shape before concatenation
-        if log_number_density.ndim != log_stability.ndim:
-            raise ValueError(
-                f"Shape mismatch: log_number_density {log_number_density.shape} != log_stability {log_stability.shape}"
-            )
-        solution: Array = jnp.concatenate((log_number_density, log_stability), axis=-1)
+#         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
+#             fugacity_constraints
+#         )
+#         mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
 
-        return cls(
-            species,
-            planet_,
-            solution,
-            fugacity_constraints_,
-            mass_constraints_,
-            solver_parameters_,
-        )
+#         # Ensure both arrays have the same shape before concatenation
+#         # if base_log_number_density.ndim != base_log_stability.ndim:
+#         #    raise ValueError(
+#         #        f"Shape mismatch: log_number_density {base_log_number_density.shape} != log_stability {base_log_stability.shape}"
+#         #    )
+#         solution: Array = jnp.concatenate((base_log_number_density, base_log_stability), axis=-1)
 
-    @property
-    def is_batch(self):
-        """Check if x is batched along axis=0, only considering array-like leaves."""
-        y = self.get_initial_solution_vmap()
-        if y == 0:
-            return True
+#         return cls(
+#             species,
+#             planet_,
+#             solution,
+#             fugacity_constraints_,
+#             mass_constraints_,
+#             solver_parameters_,
+#         )
 
-        x = self.get_traced_parameters()
+# @property
+# def is_batch(self):
+#     """Check if x is batched along axis=0, only considering array-like leaves."""
 
-        for leaf in jax.tree_util.tree_leaves(x):
-            if is_array(leaf) and leaf.shape[0] > 1:
-                return True
+#     x = self.get_traced_parameters()
 
-        return False
+#     for leaf in jax.tree_util.tree_leaves(x):
+#         if is_array(leaf) and leaf.shape[0] > 1:
+#             return True
 
-    def get_initial_solution_vmap(self) -> int | None:
-        """Gets the vmapping axes for the initial solution estimate.
+#     return False
 
-        Returns:
-            Vmapping for the initial solution estimate
-        """
-        if np.ndim(self.solution) == 3:
-            return 0
-        else:
-            return None
+# def get_initial_solution_vmap(self) -> int | None:
+#     """Gets the vmapping axes for the initial solution estimate.
 
-    def get_traced_parameters(self) -> TracedParameters:
-        """Gets traced parameters
+#     Returns:
+#         Vmapping for the initial solution estimate
+#     """
+#     try:
+#         dim: int = np.ndim(self.solution)
+#         if dim == 1:
+#             return None
+#         elif dim == 2:
+#             return 1
+#     except AttributeError:
+#         return None
 
-        Returns:
-            Traced parameters
-        """
-        return TracedParameters(self.planet, self.fugacity_constraints, self.mass_constraints)
+# if np.ndim(self.solution) == 1
+# if np.ndim(self.solution) == 2:
+#     return 1
 
-    def override(
-        self,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-    ) -> SolutionArguments:
-        """Overrides values
+# previous
+# if np.ndim(self.solution) == 3:
+#    return 0
+# else:
+#    return None
 
-        Args:
-            planet: Planet. Defaults to None.
-            initial_log_number_density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
+# def get_traced_parameters(self) -> TracedParameters:
+#     """Gets traced parameters
 
-        Returns:
-            An instance
-        """
-        self_asdict: dict[str, Any] = asdict(self)
-        to_merge: dict[str, Any] = {}
+#     Returns:
+#         Traced parameters
+#     """
+#     return TracedParameters(self.planet, self.fugacity_constraints, self.mass_constraints)
 
-        if planet is not None:
-            to_merge["planet"] = planet
-        if initial_log_number_density is not None:
-            to_merge["initial_log_number_density"] = initial_log_number_density
-        if initial_log_stability is not None:
-            to_merge["initial_log_stability"] = initial_log_stability
-        if fugacity_constraints:
-            to_merge["fugacity_constraints"] = FugacityConstraints.create(fugacity_constraints)
-        if mass_constraints:
-            to_merge["mass_constraints"] = MassConstraints.create(mass_constraints)
+# TODO: I think can remove. Clunky and not used
+# def override(
+#     self,
+#     planet: Planet | None = None,
+#     initial_log_number_density: ArrayLike | None = None,
+#     initial_log_stability: ArrayLike | None = None,
+#     fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
+#     mass_constraints: Mapping[str, ArrayLike] | None = None,
+# ) -> SolutionArguments:
+#     """Overrides values
 
-        merged_dict: dict[str, Any] = self_asdict | to_merge
+#     Args:
+#         planet: Planet. Defaults to None.
+#         initial_log_number_density. Defaults to None.
+#         initial_log_stability: Initial log stability. Defaults to None.
+#         fugacity_constraints: Fugacity constraints. Defaults to None.
+#         mass_constraints: Mass constraints. Defaults to None.
 
-        return SolutionArguments(**merged_dict)
+#     Returns:
+#         An instance
+#     """
+#     self_asdict: dict[str, Any] = asdict(self)
+#     to_merge: dict[str, Any] = {}
+
+#     if planet is not None:
+#         to_merge["planet"] = planet
+#     if initial_log_number_density is not None:
+#         to_merge["initial_log_number_density"] = initial_log_number_density
+#     if initial_log_stability is not None:
+#         to_merge["initial_log_stability"] = initial_log_stability
+#     if fugacity_constraints:
+#         to_merge["fugacity_constraints"] = FugacityConstraints.create(fugacity_constraints)
+#     if mass_constraints:
+#         to_merge["mass_constraints"] = MassConstraints.create(mass_constraints)
+
+#     merged_dict: dict[str, Any] = self_asdict | to_merge
+
+#     return SolutionArguments(**merged_dict)
 
 
 @register_pytree_node_class
@@ -484,8 +496,8 @@ class SpeciesCollection(tuple):
 class TracedParameters(eqx.Module):
     """Traced parameters
 
-    As the name says, these are parameters that should be traced, inasmuch as they may be
-    updated by the user for rapid repeat calculations.
+    These are parameters that should be traced, inasmuch as they may be updated by the user for
+    repeat calculations.
 
     Args:
         planet: Planet

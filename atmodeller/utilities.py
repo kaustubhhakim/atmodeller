@@ -16,9 +16,8 @@
 #
 """Utilities"""
 
-import dataclasses
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import equinox as eqx
 import jax
@@ -379,40 +378,45 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
     return jnp.power(values, exponent) * constant
 
 
-# Copied from the Equinox source code
-# A numpy scalar is always triggered as an array by Equinox, but Atmodeller wants to exclude
-# scalars since they cannot be vmapped (otherwise an axis error is reported)
-# https://numpy.org/doc/stable/reference/arrays.scalars.html
+def is_arraylike_batched(x: ArrayLike) -> Literal[0, None]:
+    """Checks if x is batched.
 
+    Args:
+        x: Something arraylike
 
-def is_array(element: Any) -> bool:
-    """Returns `True` if `element` is a JAX array or NumPy array.
-
-    Removed np.generic compared to the Equinox source code.
+    Returns:
+        0 (axis) if batched, else None (not batched)
     """
-    return isinstance(element, (np.ndarray, jax.Array))
+    return 0 if eqx.is_array(x) and x.ndim > 0 else None  # type: ignore
 
 
-@dataclasses.dataclass(frozen=True)  # not a pytree
-class if_array:
-    """Returns a callable that returns the specified integer if evaluated on an array.
-    Otherwise, it returns `None`.
+def vmap_axes_spec(x: Any) -> Any:
+    """Recursively generate in_axes for vmap by checking if each leaf is batched (axis 0).
 
-    !!! Example
+    Args:
+        x: Pytree of nested containers possibly containing arrays or scalars
 
-        ```python
-        fn = if_array(1)
-        # Evaluate on an array, return the integer.
-        fn(jax.numpy.array([0, 1, 2]))  # 1
-        # Evaluate on not-an-array, return None.
-        fn(True)  # None
-        ```
+    Returns:
+        Pytree matching the structure of x
     """
+    return jax.tree_map(is_arraylike_batched, x)
 
-    axis: int
 
-    def __call__(self, x: Any) -> int | None:
-        return self.axis if is_array(x) else None
+def get_batch_size(x: Any) -> int:
+    """Determines the maximum batch size (i.e., length along axis 0) among all array-like leaves.
+
+    Args:
+        x: Pytree of nested containers possibly containing arrays or scalars
+
+    Returns:
+        The maximum size along axis 0 among all array-like leaves, or 0 if all leaves are scalars.
+    """
+    max_size: int = 0
+    for leaf in jax.tree_util.tree_leaves(x):
+        if eqx.is_array(leaf) and leaf.ndim > 0:
+            max_size = max(max_size, leaf.shape[0])
+
+    return max_size
 
 
 def pytree_debug(pytree: Any, name: str) -> None:
@@ -422,11 +426,11 @@ def pytree_debug(pytree: Any, name: str) -> None:
         pytree: Pytree to print
         name: Name for the debug print
     """
-    arrays, static = eqx.partition(pytree, is_array)
+    arrays, static = eqx.partition(pytree, eqx.is_array)
     arrays_tree = jax.tree_map(
         lambda x: (
             type(x),
-            "True" if is_array(x) else ("False" if x is not None else "None"),
+            "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
         ),
         arrays,
     )
@@ -435,8 +439,42 @@ def pytree_debug(pytree: Any, name: str) -> None:
     static_tree = jax.tree_map(
         lambda x: (
             type(x),
-            "True" if is_array(x) else ("False" if x is not None else "None"),
+            "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
         ),
         static,
     )
     jax.debug.print("{name} static_tree = {out}", name=name, out=static_tree)
+
+
+def broadcast_initial_solution(initial_solution: ArrayLike, batch_size: int) -> Array:
+    """Broadcasts initial_solution to shape (batch_size, D) if needed.
+
+    Args:
+        initial_solution: Initial solution
+        batch_size: Batch size
+
+    Returns:
+        Broadcasted initial solution
+    """
+    initial_solution = jnp.asarray(initial_solution)
+
+    if initial_solution.ndim == 0:
+        # Scalar input, promote to (batch_size, 1)
+        return jnp.full((batch_size, 1), initial_solution)
+
+    elif initial_solution.ndim == 1:
+        # Shape (D,) -> (batch_size, D)
+        return jnp.broadcast_to(initial_solution[None, :], (batch_size, initial_solution.shape[0]))
+
+    elif initial_solution.ndim == 2:
+        if initial_solution.shape[0] != batch_size:
+            raise ValueError(
+                f"initial_solution has batch size {initial_solution.shape[0]}, "
+                f"but traced_parameters expects {batch_size}"
+            )
+        return initial_solution
+
+    else:
+        raise ValueError(
+            f"initial_solution must be 0D, 1D or 2D, got shape {initial_solution.shape}"
+        )
