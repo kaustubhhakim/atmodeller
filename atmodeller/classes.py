@@ -191,13 +191,7 @@ class InteriorAtmosphere:
         solver_status.block_until_ready()
         solver_steps.block_until_ready()
 
-        # sys.exit(0)
-
-        # valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
-        #    solution, solver_status, solver_steps
-        # )
-
-        # TODO: To reinstate at some point
+        # FIXME: To reinstate at some point
         # self._output: Output = Output(
         #     valid_solutions,
         #     first_valid_index,
@@ -208,8 +202,6 @@ class InteriorAtmosphere:
         # )
 
         num_total_models: int = solver_status.size
-
-        # Update these below
         num_successful_models: int = jnp.count_nonzero(solver_status).item()
         num_failed_models: int = jnp.count_nonzero(~solver_status).item()
 
@@ -290,7 +282,7 @@ class InteriorAtmosphere:
 
         return final_i, final_solution, final_status, final_steps
 
-    # TODO: To reinstate at some point if relevant
+    # FIXME: To reinstate at some point if relevant
     # def solve_fast(
     #     self,
     #     *,
