@@ -28,6 +28,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+from jax import Array, lax
 from jax.typing import ArrayLike
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
@@ -40,7 +41,7 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import select_valid_solutions, solve
+from atmodeller.engine import solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.utilities import (
@@ -140,30 +141,49 @@ class InteriorAtmosphere:
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
         if initial_log_number_density is None:
-            log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+            base_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
                 len(self.species), dtype=np.float_
             )
         else:
-            log_number_density = initial_log_number_density
+            base_log_number_density = initial_log_number_density
 
         if initial_log_stability is None:
-            log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
+            base_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
                 self.species.number_of_stability(), dtype=np.float_
             )
         else:
-            log_stability = initial_log_stability
+            base_log_stability = initial_log_stability
 
-        initial_solution = jnp.concatenate((log_number_density, log_stability), axis=-1)
+        base_initial_solution = jnp.concatenate(
+            (base_log_number_density, base_log_stability), axis=-1
+        )
         # jax.debug.print("initial_solution = {out}", out=initial_solution)
         batch_size: int = get_batch_size(traced_parameters_)
         # jax.debug.print("batch_size = {out}", out=batch_size)
-        initial_solution = broadcast_initial_solution(initial_solution, max(1, batch_size))
-        jax.debug.print("initial_solution = {out}", out=initial_solution)
-        jax.debug.print("initial_solution.shape = {out}", out=initial_solution.shape)
+        base_initial_solution = broadcast_initial_solution(
+            base_initial_solution, max(1, batch_size)
+        )
+        # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
+        # jax.debug.print("base_initial_solution.shape = {out}", out=base_initial_solution.shape)
 
+        # First solution attempt
         solution, solver_status, solver_steps = self._solver(
-            initial_solution,
+            base_initial_solution,
             traced_parameters_,
+        )
+
+        # Use repeat solver if any cases failed
+        key: Array = jax.random.PRNGKey(0)
+        final_i, solution, solver_status, solver_steps = self.repeat_solver(
+            self._solver,
+            base_initial_solution,
+            solution,
+            solver_status,
+            solver_steps,
+            traced_parameters_,
+            multistart_perturbation=solver_parameters_.multistart_perturbation,
+            max_attempts=solver_parameters_.multistart,
+            key=key,
         )
 
         # Ensure computation is complete before proceeding
@@ -171,47 +191,34 @@ class InteriorAtmosphere:
         solver_status.block_until_ready()
         solver_steps.block_until_ready()
 
-        print(solution)
-        print(solver_status)
-        print(solver_steps)
+        # sys.exit(0)
 
-        print("Finished solve")
+        # valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
+        #    solution, solver_status, solver_steps
+        # )
 
-        # Solve again for fun with the compiled code
-        solution2, solver_status2, solver_steps2 = self._solver(solution, traced_parameters_)
+        # TODO: To reinstate at some point
+        # self._output: Output = Output(
+        #     valid_solutions,
+        #     first_valid_index,
+        #     solver_steps,
+        #     solution_args,
+        #     fixed_parameters,
+        #     traced_parameters,
+        # )
 
-        print(solution2)
-        print(solver_status2)
-        print(solver_steps2)
+        num_total_models: int = solver_status.size
 
-        print("Finished solve2")
+        # Update these below
+        num_successful_models: int = jnp.count_nonzero(solver_status).item()
+        num_failed_models: int = jnp.count_nonzero(~solver_status).item()
 
-        sys.exit(0)
-
-        valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
-            solution, solver_status, solver_steps
-        )
-
-        self._output: Output = Output(
-            valid_solutions,
-            first_valid_index,
-            solver_steps,
-            solution_args,
-            fixed_parameters,
-            traced_parameters,
-        )
-
-        num_total_models: int = len(first_valid_index)
-        num_successful_models: int = jnp.count_nonzero(first_valid_index != -1).item()
-        num_failed_models: int = jnp.count_nonzero(first_valid_index == -1).item()
-        max_valid_index: int = jnp.max(first_valid_index).item()
-
-        logger.info(f"Attempted to solve {num_total_models} models")
+        logger.info(f"Attempted to solve {num_total_models} model(s)")
 
         if num_failed_models > 0:
             logger.warning(
-                f"Solve complete: {num_successful_models} successful models and "
-                f"{num_failed_models} models failed.\n"
+                f"Solve complete: {num_successful_models} successful model(s) and "
+                f"{num_failed_models} model(s) failed.\n"
                 "Try increasing 'multistart', for example:\n"
                 "    solver_parameters = SolverParameters(multistart=5)\n"
                 "and then pass solver_parameters to the solve method.\n"
@@ -220,12 +227,68 @@ class InteriorAtmosphere:
                 "multistart_perturbation=40.0)"
             )
         else:
-            required_multistarts: int = max(max_valid_index + 1, 1)  # Ensure it's at least 1
+            required_multistarts: int = max(final_i + 1, 1)  # Ensure it's at least 1
             logger.info(
-                f"Solve complete: {num_successful_models} successful models\n"
+                f"Solve complete: {num_successful_models} successful model(s)\n"
                 f"The number of multistarts required was {required_multistarts}, "
                 "which can depend on the choice of the random seed"
             )
+            logger.info("solution = %s", solution)
+
+    @eqx.filter_jit
+    def repeat_solver(
+        self,
+        solver_fn: Callable,
+        base_initial_solution: Array,
+        initial_solution: Array,
+        initial_status: Array,
+        initial_steps: Array,
+        traced_parameters_: TracedParameters,
+        multistart_perturbation: float,
+        max_attempts: int,
+        key: Array,
+    ):
+        def body_fn(state):
+            i, key, solution, status, _, base_initial_solution = state
+
+            failed_mask: Array = ~status
+            key, subkey = jax.random.split(key)
+            perturb_shape: tuple[Array, ...] = (solution.shape[0], solution.shape[1])
+            raw_perturb: Array = jax.random.uniform(
+                subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
+            )
+            perturbations: Array = jnp.where(
+                failed_mask[:, None],
+                multistart_perturbation * raw_perturb,
+                jnp.zeros_like(solution),
+            )
+            new_initial_solution = jnp.where(
+                failed_mask[:, None], base_initial_solution + perturbations, solution
+            )
+
+            new_solution, new_status, new_steps = solver_fn(
+                new_initial_solution, traced_parameters_
+            )
+
+            return (i + 1, key, new_solution, new_status, new_steps, base_initial_solution)
+
+        def cond_fn(state) -> Array:
+            i, _, _, status, _, _ = state
+            return jnp.logical_and(i < max_attempts, jnp.any(~status))
+
+        initial_state: tuple = (
+            0,
+            key,
+            initial_solution,
+            initial_status,
+            initial_steps,
+            base_initial_solution,
+        )
+        final_i, _, final_solution, final_status, final_steps, _ = lax.while_loop(
+            cond_fn, body_fn, initial_state
+        )
+
+        return final_i, final_solution, final_status, final_steps
 
     # TODO: To reinstate at some point if relevant
     # def solve_fast(

@@ -85,65 +85,65 @@ def solve(
     return sol.value, solver_status, solver_steps
 
 
-@eqx.filter_jit
-def select_valid_solutions(
-    sol: Array, solver_status: Array, solver_steps: Array
-) -> tuple[Array, Array, Array]:
-    """Selects a single valid solution for each simulation from sol, using solver_status.
+# @eqx.filter_jit
+# def select_valid_solutions(
+#     sol: Array, solver_status: Array, solver_steps: Array
+# ) -> tuple[Array, Array, Array]:
+#     """Selects a single valid solution for each simulation from sol, using solver_status.
 
-    Args:
-        sol: Solution array of shape (multistarts, simulations, solution) or
-            (multistarts, solution)
-        solver_status: Status array of shape (multistarts, simulations) or (multistarts,)
+#     Args:
+#         sol: Solution array of shape (multistarts, simulations, solution) or
+#             (multistarts, solution)
+#         solver_status: Status array of shape (multistarts, simulations) or (multistarts,)
 
-    Returns:
-        Reduced array of shape (simulations, solution)
-        First valid index for each simulation
-        Number of steps for each simulation
-    """
-    # jax.debug.print("sol = {out}", out=sol)
-    # jax.debug.print("solver_status = {out}", out=solver_status)
-    # jax.debug.print("solver_steps = {out}", out=solver_steps)
-    # Check if input is 3D (multistarts, simulations, solution) or 2D (multistarts, solution)
-    is_3d: int = sol.ndim == 3
+#     Returns:
+#         Reduced array of shape (simulations, solution)
+#         First valid index for each simulation
+#         Number of steps for each simulation
+#     """
+#     # jax.debug.print("sol = {out}", out=sol)
+#     # jax.debug.print("solver_status = {out}", out=solver_status)
+#     # jax.debug.print("solver_steps = {out}", out=solver_steps)
+#     # Check if input is 3D (multistarts, simulations, solution) or 2D (multistarts, solution)
+#     is_3d: int = sol.ndim == 3
 
-    if is_3d:
-        _, simulations, _ = sol.shape  # Get shape
-    else:
-        _, _ = sol.shape
-        simulations: int = 1  # Treat as single simulation for uniform indexing
+#     if is_3d:
+#         _, simulations, _ = sol.shape  # Get shape
+#     else:
+#         _, _ = sol.shape
+#         simulations: int = 1  # Treat as single simulation for uniform indexing
 
-        # Expand dims for uniform processing
-        sol = sol[:, None, :]  # (multistarts, 1, solution)
-        solver_status = solver_status[:, None]  # (multistarts, 1)
-        solver_steps = solver_steps[:, None]  # (multistarts, 1)
+#         # Expand dims for uniform processing
+#         sol = sol[:, None, :]  # (multistarts, 1, solution)
+#         solver_status = solver_status[:, None]  # (multistarts, 1)
+#         solver_steps = solver_steps[:, None]  # (multistarts, 1)
 
-    # Find the first valid index per simulation using jnp.argmax
-    # If all multistarts failed for a given case, this will return the first index
-    first_valid_index: Array = jnp.argmax(solver_status, axis=0)  # (simulations,)
-    # jax.debug.print("first_valid_index = {out}", out=first_valid_index)
+#     # Find the first valid index per simulation using jnp.argmax
+#     # If all multistarts failed for a given case, this will return the first index
+#     first_valid_index: Array = jnp.argmax(solver_status, axis=0)  # (simulations,)
+#     # jax.debug.print("first_valid_index = {out}", out=first_valid_index)
 
-    # Gather the selected solutions (simulations, solution_dim)
-    selected_solutions: Array = sol[first_valid_index, jnp.arange(simulations)]
-    selected_steps: Array = solver_steps[first_valid_index, jnp.arange(simulations)]
-    # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
-    # jax.debug.print("selected_steps = {out}", out=selected_steps)
+#     # Gather the selected solutions (simulations, solution_dim)
+#     selected_solutions: Array = sol[first_valid_index, jnp.arange(simulations)]
+#     selected_steps: Array = solver_steps[first_valid_index, jnp.arange(simulations)]
+#     # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
+#     # jax.debug.print("selected_steps = {out}", out=selected_steps)
 
-    # Find if there is any valid solution. This allows us to maintain the same array size
-    # (important for computing the output) whilst at the same time keeping tracking of failed cases
-    # with a -1 index. These failed cases can then later be filtered out during output, if the user
-    # desires.
-    has_valid_solution: Array = jnp.any(solver_status, axis=0)  # (simulations,)
-    first_valid_index = jnp.where(has_valid_solution, first_valid_index, -1)
-    selected_steps = jnp.where(has_valid_solution, selected_steps, 0)
+#     # Find if there is any valid solution. This allows us to maintain the same array size
+#     # (important for computing the output) whilst at the same time keeping tracking of failed cases
+#     # with a -1 index. These failed cases can then later be filtered out during output, if the user
+#     # desires.
+#     has_valid_solution: Array = jnp.any(solver_status, axis=0)  # (simulations,)
+#     first_valid_index = jnp.where(has_valid_solution, first_valid_index, -1)
+#     selected_steps = jnp.where(has_valid_solution, selected_steps, 0)
 
-    # Keep the same dimensions for all output, so below line is commented out
-    # if not is_3d:
-    #    selected_solutions = selected_solutions.squeeze(0)  # Remove extra dimension for 2D case
+#     # Keep the same dimensions for all output, so below line is commented out
+#     # if not is_3d:
+#     #    selected_solutions = selected_solutions.squeeze(0)  # Remove extra dimension for 2D case
 
-    # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
+#     # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
 
-    return selected_solutions, first_valid_index, selected_steps
+#     return selected_solutions, first_valid_index, selected_steps
 
 
 @eqx.filter_jit
