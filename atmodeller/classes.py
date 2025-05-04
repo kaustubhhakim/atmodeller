@@ -191,15 +191,14 @@ class InteriorAtmosphere:
         solver_status.block_until_ready()
         solver_steps.block_until_ready()
 
-        # FIXME: To reinstate at some point
-        # self._output: Output = Output(
-        #     valid_solutions,
-        #     first_valid_index,
-        #     solver_steps,
-        #     solution_args,
-        #     fixed_parameters,
-        #     traced_parameters,
-        # )
+        self._output: Output = Output(
+            self.species,
+            solution,
+            solver_status,
+            solver_steps,
+            fixed_parameters_,
+            traced_parameters_,
+        )
 
         num_total_models: int = solver_status.size
         num_successful_models: int = jnp.count_nonzero(solver_status).item()

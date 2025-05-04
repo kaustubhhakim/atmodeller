@@ -43,7 +43,6 @@ from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
     Planet,
-    # SolutionArguments,
     Species,
     SpeciesCollection,
     TracedParameters,
@@ -63,7 +62,7 @@ from atmodeller.engine import (
 )
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import unit_conversion, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -72,33 +71,29 @@ class Output:
     """Output
 
     Args:
+        species: Species
         solution: Array output from solve
-        first_valid_index: First valid index
+        solver_status: Solver status
         solver_steps: Number of solver steps
-        interior_atmosphere: Interior atmosphere
-        initial_solution: Initial solution
+        fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
-        solver_result: An integer array representing whether the solve was successful or no
     """
 
     def __init__(
         self,
+        species: SpeciesCollection,
         solution: Array,
-        first_valid_index: Array,
+        solver_status: Array,
         solver_steps: Array,
-        solution_args: SolutionArguments,
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
     ):
         logger.debug("Creating Output")
-        # Input is 2-D to allow the same (sometimes vmapped) functions to be used for single and
-        # batch output.
+        self._species: SpeciesCollection = species
         self._solution: Array = solution
-        self._first_valid_index: Array = first_valid_index
+        self._solver_status: Array = solver_status
         self._solver_steps: Array = solver_steps
-        self._solution_args: SolutionArguments = solution_args
         self._fixed_parameters: FixedParameters = fixed_parameters
-        self._species: SpeciesCollection = self._solution_args.species
         self._traced_parameters: TracedParameters = traced_parameters
 
         # Calculate the index at which to split the array
@@ -116,11 +111,6 @@ class Output:
     def condensed_species_indices(self) -> Array:
         """Condensed species indices"""
         return jnp.array(self._species.get_condensed_species_indices(), dtype=int)
-
-    @property
-    def successful_solves(self) -> npt.NDArray[np.bool_]:
-        """Cases that solved successfully"""
-        return np.array(self._first_valid_index != -1, dtype=np.bool_)
 
     @property
     def gas_species_indices(self) -> Array:
@@ -165,12 +155,16 @@ class Output:
     @property
     def temperature_vmap(self) -> int | None:
         """Axis for temperature vmap"""
-        return self.traced_parameters_vmap.planet.temperature  # type: ignore
+        # return self.traced_parameters_vmap.planet.temperature  # type: ignore
+        # TODO: New to test
+        return vmap_axes_spec(self._traced_parameters.planet).temperature
 
     @property
     def traced_parameters_vmap(self) -> TracedParameters:
         """Axis for traced parameters vmap"""
-        return self._solution_args.get_traced_parameters_vmap()
+        # return self._solution_args.get_traced_parameters_vmap()
+        # TODO: New to test
+        return vmap_axes_spec(self._traced_parameters)
 
     def activity(self) -> Array:
         """Gets the activity of all species
@@ -248,7 +242,7 @@ class Output:
             logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
-        out["solver"] = {"multisolve_id": self._first_valid_index, "steps": self._solver_steps}
+        out["solver"] = {"status": self._solver_status, "steps": self._solver_steps}
 
         # Convert all arrays in the dictionary to numpy arrays. Using the same functions that the
         # engine uses makes sense to avoid duplication and ensure consistency, but for the output
@@ -257,6 +251,7 @@ class Output:
         # only care about the results and do not necessary want to use JAX types to process
         # the output. To this point the arrays are of type
         # <class 'jaxlib.xla_extension.ArrayImpl'>.
+        # TODO: could maybe use numpy method?
         def convert_to_numpy(d) -> None:
             for key, value in d.items():
                 if isinstance(value, dict):
@@ -342,7 +337,7 @@ class Output:
             in_axes=(
                 None,
                 0,
-                self._solution_args.planet.vmap_axes(),
+                vmap_axes_spec(self._traced_parameters.planet),
             ),
         )
         atmosphere_log_volume: Array = atmosphere_log_volume_func(
@@ -676,7 +671,7 @@ class Output:
         """
         log_activity_func: Callable = jax.vmap(
             get_log_activity,
-            in_axes=(self._solution_args.get_traced_parameters_vmap(), None, 0),
+            in_axes=(vmap_axes_spec(self._traced_parameters), None, 0),
         )
         log_activity: Array = log_activity_func(
             self._traced_parameters, self._fixed_parameters, self.log_number_density
@@ -840,7 +835,7 @@ class Output:
         Returns:
             Dictionary of dataframes without unsuccessful models
         """
-        return {key: df.loc[self.successful_solves] for key, df in dataframes.items()}
+        return {key: df.loc[np.array(self._solver_status)] for key, df in dataframes.items()}
 
     def to_dataframes(self, drop_unsuccessful: bool = False) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
@@ -885,7 +880,9 @@ class Output:
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         # Get the indices where the successful_solves mask is False
-        unsuccessful_indices: npt.NDArray[np.int_] = np.where(self.successful_solves == False)[0]  # noqa: E712
+        unsuccessful_indices: npt.NDArray[np.int_] = np.where(
+            np.array(self._solver_status) == False  # noqa: E712
+        )[0]
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             for df_name, df in out.items():
