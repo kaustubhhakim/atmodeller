@@ -26,6 +26,7 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, lax
+from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
@@ -399,7 +400,7 @@ def vmap_axes_spec(x: Any) -> Any:
     Returns:
         Pytree matching the structure of x
     """
-    return jax.tree_map(is_arraylike_batched, x)
+    return tree_map(is_arraylike_batched, x)
 
 
 def get_batch_size(x: Any) -> int:
@@ -427,7 +428,7 @@ def pytree_debug(pytree: Any, name: str) -> None:
         name: Name for the debug print
     """
     arrays, static = eqx.partition(pytree, eqx.is_array)
-    arrays_tree = jax.tree_map(
+    arrays_tree = tree_map(
         lambda x: (
             type(x),
             "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
@@ -436,7 +437,7 @@ def pytree_debug(pytree: Any, name: str) -> None:
     )
     jax.debug.print("{name} arrays_tree = {out}", name=name, out=arrays_tree)
 
-    static_tree = jax.tree_map(
+    static_tree = tree_map(
         lambda x: (
             type(x),
             "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
