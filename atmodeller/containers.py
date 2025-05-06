@@ -115,7 +115,7 @@ class SpeciesCollection(tuple):
         """Number of species"""
         return len(self)
 
-    def get_condensed_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_condensed_species_indices(self: tuple[Species, ...]) -> npt.NDArray[np.int_]:
         """Gets the indices of condensed species
 
         Returns:
@@ -126,7 +126,7 @@ class SpeciesCollection(tuple):
             if species_.data.phase != "g":
                 indices.append(nn)
 
-        return tuple(indices)
+        return np.array(indices, dtype=np.int_)
 
     def get_diatomic_oxygen_index(self: tuple[Species, ...]) -> int:
         """Gets the species index corresponding to diatomic oxygen.
@@ -146,7 +146,7 @@ class SpeciesCollection(tuple):
         # and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_gas_species_indices(self: tuple[Species, ...]) -> npt.NDArray[np.int_]:
         """Gets the indices of gas species
 
         Returns:
@@ -157,7 +157,7 @@ class SpeciesCollection(tuple):
             if species_.data.phase == "g":
                 indices.append(nn)
 
-        return tuple(indices)
+        return np.array(indices, dtype=np.int_)
 
     def get_lower_bound(self: SpeciesCollection) -> npt.NDArray[np.float_]:
         """Gets the lower bound for truncating the solution during the solve"""
@@ -167,13 +167,15 @@ class SpeciesCollection(tuple):
         """Gets the upper bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
-    def get_molar_masses(self: tuple[Species, ...]) -> tuple[float, ...]:
+    def get_molar_masses(self: tuple[Species, ...]) -> npt.NDArray[np.float_]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: tuple[float, ...] = tuple([species_.data.molar_mass for species_ in self])
+        molar_masses: npt.NDArray[np.float_] = np.array(
+            [species_.data.molar_mass for species_ in self]
+        )
 
         logger.debug("molar_masses = %s", molar_masses)
 
@@ -187,7 +189,7 @@ class SpeciesCollection(tuple):
         """
         return tuple([species_.name for species_ in self])
 
-    def get_stability_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_stability_species_indices(self: tuple[Species, ...]) -> npt.NDArray[np.int_]:
         """Gets the indices of species to solve for stability
 
         Returns:
@@ -198,7 +200,7 @@ class SpeciesCollection(tuple):
             if species_.solve_for_stability:
                 indices.append(nn)
 
-        return tuple(indices)
+        return np.array(indices, dtype=np.int_)
 
     def get_stability_species_mask(self: tuple[Species, ...]) -> npt.NDArray[np.bool_]:
         """Gets the stability species mask

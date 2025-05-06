@@ -110,12 +110,12 @@ class Output:
     @property
     def condensed_species_indices(self) -> Array:
         """Condensed species indices"""
-        return jnp.array(self._species.get_condensed_species_indices(), dtype=int)
+        return jnp.array(self._species.get_condensed_species_indices())
 
     @property
     def gas_species_indices(self) -> Array:
         """Gas species indices"""
-        return jnp.array(self._fixed_parameters.gas_species_indices, dtype=int)
+        return jnp.array(self._fixed_parameters.gas_species_indices)
 
     @property
     def log_number_density(self) -> Array:
