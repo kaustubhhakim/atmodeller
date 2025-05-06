@@ -14,15 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Pytree containers that can be use by JAX
-
-The leaves of pytrees must be JAX-compliant types, which excludes strings. So the preferred
-approach is to encode the data as JAX-compatible types and provide properties and methods that can
-reconstruct other desired quantities, notably strings and other objects. This ensures that similar
-functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
-
-This could be improved using equinox dataclasses instead.
-"""
+"""Pytree containers that can be use by JAX"""
 
 from __future__ import annotations
 
@@ -30,7 +22,7 @@ import logging
 import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict
-from typing import Callable, Literal, Type
+from typing import Callable, Iterator, Literal, Type
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -38,7 +30,7 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, lax
-from jax.tree_util import Partial, register_pytree_node_class
+from jax.tree_util import Partial
 from jax.typing import ArrayLike
 from lineax import QR, AbstractLinearSolver
 from molmass import Formula
@@ -76,18 +68,14 @@ logger: logging.Logger = logging.getLogger(__name__)
 np.random.seed(0)
 
 
-@register_pytree_node_class
-class SpeciesCollection(tuple):
+class SpeciesCollection(eqx.Module):
     """A collection of species
-
-    TODO: Tidy up this class. Bit clunky subclassing a tuple, but it works for now.
 
     Args:
         species: Species
     """
 
-    def __new__(cls, species: Iterable[Species]):
-        return super().__new__(cls, tuple(species))
+    data: tuple[Species, ...] = eqx.field(converter=tuple)
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> Self:
@@ -111,30 +99,30 @@ class SpeciesCollection(tuple):
         return cls(species_list)
 
     @property
-    def number(self: tuple[Species, ...]) -> int:
+    def number(self) -> int:
         """Number of species"""
-        return len(self)
+        return len(self.data)
 
-    def get_condensed_species_indices(self: tuple[Species, ...]) -> npt.NDArray[np.int_]:
+    def get_condensed_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of condensed species
 
         Returns:
             Indices of the condensed species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.phase != "g":
                 indices.append(nn)
 
         return np.array(indices, dtype=np.int_)
 
-    def get_diatomic_oxygen_index(self: tuple[Species, ...]) -> int:
+    def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
         Returns:
             Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
         """
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.hill_formula == "O2":
                 logger.debug("Found O2 at index = %d", nn)
                 return nn
@@ -146,14 +134,14 @@ class SpeciesCollection(tuple):
         # and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_indices(self: tuple[Species, ...]) -> npt.NDArray[np.int_]:
+    def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of gas species
 
         Returns:
             Indices of the gas species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.phase == "g":
                 indices.append(nn)
 
@@ -167,55 +155,54 @@ class SpeciesCollection(tuple):
         """Gets the upper bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
-    def get_molar_masses(self: tuple[Species, ...]) -> npt.NDArray[np.float_]:
+    def get_molar_masses(self) -> npt.NDArray[np.float_]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
         molar_masses: npt.NDArray[np.float_] = np.array(
-            [species_.data.molar_mass for species_ in self]
+            [species_.data.molar_mass for species_ in self.data]
         )
 
         logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
 
-    def get_species_names(self: tuple[Species, ...]) -> tuple[str, ...]:
+    def get_species_names(self) -> tuple[str, ...]:
         """Gets the names of all species.
 
         Returns:
             Species names
         """
-        return tuple([species_.name for species_ in self])
+        return tuple([species_.name for species_ in self.data])
 
-    def get_stability_species_indices(self: tuple[Species, ...]) -> npt.NDArray[np.int_]:
+    def get_stability_species_indices(self) -> npt.NDArray[np.int_]:
         """Gets the indices of species to solve for stability
 
         Returns:
             Indices of the species to solve for stability
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.solve_for_stability:
                 indices.append(nn)
 
         return np.array(indices, dtype=np.int_)
 
-    def get_stability_species_mask(self: tuple[Species, ...]) -> npt.NDArray[np.bool_]:
+    def get_stability_species_mask(self) -> npt.NDArray[np.bool_]:
         """Gets the stability species mask
 
         Returns:
             Mask for the species to solve for the stability
         """
-        # Find the species to solve for stability
         stability_bool: npt.NDArray[np.bool_] = np.array(
-            [species.solve_for_stability for species in self], dtype=np.bool_
+            [species.solve_for_stability for species in self.data], dtype=np.bool_
         )
 
         return stability_bool
 
-    def get_unique_elements_in_species(self: tuple[Species, ...]) -> tuple[str, ...]:
+    def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements.
 
         Args:
@@ -225,7 +212,7 @@ class SpeciesCollection(tuple):
             Unique elements in the species ordered alphabetically
         """
         elements: list[str] = []
-        for species_ in self:
+        for species_ in self.data:
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         sorted_elements: list[str] = sorted(unique_elements)
@@ -261,16 +248,14 @@ class SpeciesCollection(tuple):
 
         return bound
 
-    def tree_flatten(self) -> tuple[tuple, None]:
-        return (self, None)
+    def __getitem__(self, index: int) -> Species:
+        return self.data[index]
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        return cls(children)
+    def __iter__(self) -> Iterator[Species]:
+        return iter(self.data)
 
-
-# region: Containers for traced parameters
+    def __len__(self) -> int:
+        return len(self.data)
 
 
 class TracedParameters(eqx.Module):
@@ -642,10 +627,6 @@ class MassConstraints(eqx.Module):
         return bool(self.log_abundance)
 
 
-# endregion
-
-
-# region: Containers for fixed parameters
 class FixedParameters(eqx.Module):
     """Parameters that are always fixed for a calculation
 
@@ -807,6 +788,3 @@ class SolverParameters(eqx.Module):
             norm=self.norm,
             linear_solver=self.linear_solver(),  # type: ignore because there is a parameter
         )
-
-
-# endregion
