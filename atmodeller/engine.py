@@ -247,12 +247,12 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     temperature: ArrayLike = planet.temperature
     fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
     mass_constraints: MassConstraints = traced_parameters.mass_constraints
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
+    gas_species_indices: Array = fixed_parameters.gas_species_indices
 
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     reaction_stability_matrix: Array = jnp.array(fixed_parameters.reaction_stability_matrix)
-    stability_species_indices: Array = jnp.array(fixed_parameters.stability_species_indices)
-    fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
+    stability_species_indices: Array = fixed_parameters.stability_species_indices
+    fugacity_matrix: Array = fixed_parameters.fugacity_matrix
     # We only need the formula matrix for elements with mass constraints
     formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
     # jax.debug.print("Starting new residual evaluation")

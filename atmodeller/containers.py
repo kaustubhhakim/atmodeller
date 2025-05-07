@@ -103,7 +103,7 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    def get_condensed_species_indices(self) -> npt.NDArray[np.int_]:
+    def get_condensed_species_indices(self) -> Array:
         """Gets the indices of condensed species
 
         Returns:
@@ -114,7 +114,7 @@ class SpeciesCollection(eqx.Module):
             if species_.data.phase != "g":
                 indices.append(nn)
 
-        return np.array(indices, dtype=np.int_)
+        return jnp.array(indices, dtype=jnp.int_)
 
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
@@ -134,7 +134,7 @@ class SpeciesCollection(eqx.Module):
         # and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_indices(self) -> npt.NDArray[np.int_]:
+    def get_gas_species_indices(self) -> Array:
         """Gets the indices of gas species
 
         Returns:
@@ -145,27 +145,24 @@ class SpeciesCollection(eqx.Module):
             if species_.data.phase == "g":
                 indices.append(nn)
 
-        return np.array(indices, dtype=np.int_)
+        return jnp.array(indices, dtype=jnp.int_)
 
-    def get_lower_bound(self: SpeciesCollection) -> npt.NDArray[np.float_]:
+    def get_lower_bound(self: SpeciesCollection) -> Array:
         """Gets the lower bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
 
-    def get_upper_bound(self: SpeciesCollection) -> npt.NDArray[np.float_]:
+    def get_upper_bound(self: SpeciesCollection) -> Array:
         """Gets the upper bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
-    def get_molar_masses(self) -> npt.NDArray[np.float_]:
+    def get_molar_masses(self) -> Array:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: npt.NDArray[np.float_] = np.array(
-            [species_.data.molar_mass for species_ in self.data]
-        )
-
-        logger.debug("molar_masses = %s", molar_masses)
+        molar_masses: Array = jnp.array([species_.data.molar_mass for species_ in self.data])
+        # logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
 
@@ -177,7 +174,7 @@ class SpeciesCollection(eqx.Module):
         """
         return tuple([species_.name for species_ in self.data])
 
-    def get_stability_species_indices(self) -> npt.NDArray[np.int_]:
+    def get_stability_species_indices(self) -> Array:
         """Gets the indices of species to solve for stability
 
         Returns:
@@ -188,16 +185,16 @@ class SpeciesCollection(eqx.Module):
             if species_.solve_for_stability:
                 indices.append(nn)
 
-        return np.array(indices, dtype=np.int_)
+        return jnp.array(indices, dtype=jnp.int_)
 
-    def get_stability_species_mask(self) -> npt.NDArray[np.bool_]:
+    def get_stability_species_mask(self) -> Array:
         """Gets the stability species mask
 
         Returns:
             Mask for the species to solve for the stability
         """
-        stability_bool: npt.NDArray[np.bool_] = np.array(
-            [species.solve_for_stability for species in self.data], dtype=np.bool_
+        stability_bool: Array = jnp.array(
+            [species.solve_for_stability for species in self.data], dtype=jnp.bool_
         )
 
         return stability_bool
@@ -227,7 +224,7 @@ class SpeciesCollection(eqx.Module):
 
     def _get_hypercube_bound(
         self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
-    ) -> npt.NDArray[np.float_]:
+    ) -> Array:
         """Gets the bound on the hypercube
 
         Args:
@@ -246,7 +243,7 @@ class SpeciesCollection(eqx.Module):
             )
         )
 
-        return bound
+        return jnp.array(bound)
 
     def __getitem__(self, index: int) -> Species:
         return self.data[index]
@@ -658,19 +655,19 @@ class FixedParameters(eqx.Module):
     """Reaction matrix"""
     reaction_stability_matrix: npt.NDArray[np.float_]
     """Reaction stability matrix"""
-    stability_species_indices: npt.NDArray[np.int_]
+    stability_species_indices: Array
     """Indices of species to solve for stability"""
-    fugacity_matrix: npt.NDArray[np.float_]
+    fugacity_matrix: Array
     """Fugacity constraint matrix"""
-    gas_species_indices: npt.NDArray[np.int_]
+    gas_species_indices: Array
     """Indices of gas species"""
-    condensed_species_indices: npt.NDArray[np.int_]
+    condensed_species_indices: Array
     """Indices of condensed species"""
-    fugacity_species_indices: npt.NDArray[np.int_]
+    fugacity_species_indices: Array
     """Indices of species to constrain the fugacity"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
-    molar_masses: npt.NDArray[np.float_]
+    molar_masses: Array
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""

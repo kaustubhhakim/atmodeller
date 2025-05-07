@@ -190,9 +190,9 @@ class InteriorAtmosphere:
         )
 
         # Ensure computation is complete before proceeding
-        solution.block_until_ready()
-        solver_status.block_until_ready()
-        solver_steps.block_until_ready()
+        # solution.block_until_ready()
+        # solver_status.block_until_ready()
+        # solver_steps.block_until_ready()
 
         self._output = Output(
             self.species,
@@ -314,14 +314,10 @@ class InteriorAtmosphere:
         """
         reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
         reaction_stability_matrix: npt.NDArray[np.float_] = self.get_reaction_stability_matrix()
-        gas_species_indices: npt.NDArray[np.int_] = self.species.get_gas_species_indices()
-        condensed_species_indices: npt.NDArray[np.int_] = (
-            self.species.get_condensed_species_indices()
-        )
-        stability_species_indices: npt.NDArray[np.int_] = (
-            self.species.get_stability_species_indices()
-        )
-        molar_masses: npt.NDArray[np.float_] = self.species.get_molar_masses()
+        gas_species_indices: Array = self.species.get_gas_species_indices()
+        condensed_species_indices: Array = self.species.get_condensed_species_indices()
+        stability_species_indices: Array = self.species.get_stability_species_indices()
+        molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
 
         # The complete formula matrix is not required for the calculation but it is used for
@@ -344,10 +340,8 @@ class InteriorAtmosphere:
         for species_name in fugacity_constraints.constraints.keys():
             index: int = species_names.index(species_name)
             fugacity_species_indices_list.append(index)
-        fugacity_species_indices: npt.NDArray[np.int_] = np.array(
-            fugacity_species_indices_list, dtype=np.int_
-        )
-        fugacity_matrix: npt.NDArray[np.float_] = np.identity(number_fugacity_constraints)
+        fugacity_species_indices: Array = jnp.array(fugacity_species_indices_list, dtype=jnp.int_)
+        fugacity_matrix: Array = jnp.identity(number_fugacity_constraints)
 
         # For fixed parameters all objects must be hashable because it is a static argument
         # tolist is important to convert numpy dtypes to standard Python, thus ensuring they are
@@ -444,7 +438,7 @@ class InteriorAtmosphere:
 
         if reaction_matrix.size > 0:
             # Find the species to solve for stability
-            stability_bool: npt.NDArray[np.bool_] = self.species.get_stability_species_mask()
+            stability_bool: Array = self.species.get_stability_species_mask()
             mask[:, stability_bool] = True
             reaction_stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
         else:
