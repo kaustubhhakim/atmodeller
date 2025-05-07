@@ -23,7 +23,6 @@ from typing import ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
 import optimistix as optx
 from jax import Array
 from jax.typing import ArrayLike
@@ -341,98 +340,6 @@ class ZhangDuan(RealGas):
         volume_integral: Array = log_fugacity * GAS_CONSTANT_BAR * temperature
 
         return volume_integral
-
-
-# Converted from Perple_X
-def zd09_pure_species(i, p, t, r, pr, nopt_51=1e-6, max_iter=100):
-    """
-    Python implementation of the Zhang & Duan (2009) EoS for pure species.
-
-    Parameters:
-    - i: species index (1=H2O, 2=CO2, 3=CO, 4=CH4, 5=H2, 7=O2, 16=C2H6)
-    - p: pressure in MPa
-    - t: temperature in K
-    - r: gas constant in J/mol/K
-    - pr: reference pressure in MPa
-    - nopt_51: convergence threshold
-    - max_iter: max iteration for Newton-Raphson
-
-    Returns:
-    - vol: molar volume in cm^3/mol
-    - lnfug: log fugacity
-    """
-
-    # Species-specific constants from the Fortran data blocks
-    eps = np.array([510, 235, 105.6, 154, 31.2, 124.5, 246.1])
-    sig = np.array([2.88, 3.79, 3.66, 3.691, 2.93, 3.36, 4.35])
-
-    sig3 = sig**3
-
-    # Initial guess for volume (in cm³/mol)
-    vol = 50.0
-
-    # P is in bar, divide by ten converts to MPa
-    # r is 8.314, t is in K
-    # Note that these appear to be the actual P and T, not scaled variables.
-    prt = p / (10.0 * r * t)
-
-    gamm = 6.123507682 * sig3[i] ** 2
-    et = eps[i] / t
-    et2 = et**2
-
-    b = (0.5870171892 + (-5.314333643 - 1.498847241 * et) * et2) * sig3[i]
-    c = (0.5106889412 + (-2.431331151 + 8.294070444 * et) * et2) * sig3[i] ** 2
-    d = (0.4045789083 + (3.437865241 - 5.988792021 * et) * et2) * sig3[i] ** 4
-    e = (-0.07351354702 + (0.7017349038 - 0.2308963611 * et) * et2) * sig3[i] ** 5
-    f = 1.985438372 * et2 * et * sig3[i] ** 2
-    ge = 16.60301885 * et2 * et * sig3[i] ** 4
-
-    for it in range(max_iter):
-        # vi is inverse of the actual volume, not scaled
-        vi = 1.0 / vol
-        expg = np.exp(-gamm * vi * vi)
-
-        veq = -vi - b * vi**2 + (-f * expg - c) * vi**3 + (-ge * expg - d) * vi**5 - e * vi**6
-
-        dveq = (
-            -veq * vi
-            + b * vi**3
-            + 2.0 * (f * expg + c) * vi**4
-            + (-2.0 * f * expg * gamm + 4.0 * ge * expg + 4.0 * d) * vi**6
-            + 5.0 * e * vi**7
-            - 2.0 * ge * expg * gamm * vi**8
-        )
-
-        dv = -(prt + veq) / dveq
-
-        if dv < 0.0 and (vol + dv < 0.0):
-            vol *= 0.8
-        else:
-            vol += dv
-
-        if abs(dv / vol) < nopt_51:
-            expg = np.exp(gamm / (vol * vol))
-            lnfug = (
-                np.log(r * t / vol / pr * 1e1)
-                + 0.5 * (f + ge / gamm) * (1.0 - 1.0 / expg) / gamm
-                + (
-                    2.0 * b
-                    + (
-                        1.5 * c
-                        + (f - 0.5 * ge / gamm) / expg
-                        + (1.25 * d + ge / expg + 1.2 * e / vol) / vol**2
-                    )
-                    / vol
-                )
-                / vol
-            )
-            # TODO: Perple_X has this term, but the value seems to be a factor of ten larger
-            # than the volume in cm^3. Unsure why.
-            vol *= 10.0  # Convert from J/bar to cm³/mol
-            return vol, lnfug
-
-    # If it doesn't converge, return None
-    return None, None
 
 
 CH4_zhang09: RealGas = ZhangDuan(154.0, 3.691)
