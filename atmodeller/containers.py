@@ -19,7 +19,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict
 from typing import Callable, Iterator, Literal, Type
@@ -57,10 +56,10 @@ from atmodeller.utilities import (
     unit_conversion,
 )
 
-if sys.version_info < (3, 11):
+try:
+    from typing import Self  # type: ignore
+except ImportError:
     from typing_extensions import Self
-else:
-    from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
