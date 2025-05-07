@@ -111,7 +111,7 @@ def repeat_solver(
         key: Random key
     """
 
-    def body_fn(state):
+    def body_fn(state: tuple) -> tuple[int, Array, Array, Array, Array, Array]:
         i, key, solution, status, _, base_initial_solution = state
 
         failed_mask: Array = ~status
@@ -133,7 +133,7 @@ def repeat_solver(
 
         return (i + 1, key, new_solution, new_status, new_steps, base_initial_solution)
 
-    def cond_fn(state) -> Array:
+    def cond_fn(state: tuple) -> Array:
         i, _, _, status, _, _ = state
 
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
