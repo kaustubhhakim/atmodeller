@@ -189,11 +189,6 @@ class InteriorAtmosphere:
             key=key,
         )
 
-        # Ensure computation is complete before proceeding
-        # solution.block_until_ready()
-        # solver_status.block_until_ready()
-        # solver_steps.block_until_ready()
-
         self._output = Output(
             self.species,
             solution,
@@ -228,77 +223,6 @@ class InteriorAtmosphere:
                 "which can depend on the choice of the random seed"
             )
             logger.info("solution = %s", solution)
-
-    # FIXME: To reinstate at some point if relevant
-    # def solve_fast(
-    #     self,
-    #     *,
-    #     planet: Planet | None = None,
-    #     initial_log_number_density: Array | None = None,
-    #     initial_log_stability: Array | None = None,
-    #     fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-    #     mass_constraints: Mapping[str, ArrayLike] | None = None,
-    # ) -> None:
-    #     """Solves the system and initialises an Output instance for processing the result
-
-    #     The idea is that this method is faster than the solve method because it does not recompile
-    #     the solver function each time it is called.
-
-    #     Args:
-    #         planet: Planet. Defaults to None.
-    #         initial_log_number_density: Initial log number density. Defaults to None.
-    #         initial_log_stability: Initial log stability. Defaults to None.
-    #         fugacity_constraints: Fugacity constraints. Defaults to None.
-    #         mass_constraints: Mass constraints. Defaults to None.
-    #     """
-    #     solution_args: SolutionArguments = SolutionArguments.create_with_defaults(
-    #         self.species,
-    #         planet,
-    #         initial_log_number_density,
-    #         initial_log_stability,
-    #         fugacity_constraints,
-    #         mass_constraints,
-    #     )
-    #     fixed_parameters: FixedParameters = self.get_fixed_parameters(
-    #         solution_args.fugacity_constraints, solution_args.mass_constraints
-    #     )
-    #     initial_solution_array: Array = solution_args.solution
-    #     traced_parameters: TracedParameters = solution_args.get_traced_parameters()
-
-    #     # Assemble options dictionary for solve
-    #     options: dict[str, Any] = {
-    #         "lower": self.species.get_lower_bound(),
-    #         "upper": self.species.get_upper_bound(),
-    #         "jac": solution_args.solver_parameters.jac,
-    #     }
-
-    #     solution, solver_status, solver_steps = self._solver(
-    #         initial_solution_array,
-    #         traced_parameters,
-    #         fixed_parameters,
-    #         solution_args.solver_parameters,
-    #         options,
-    #     )
-
-    #     # Ensure computation is complete before proceeding
-    #     solution.block_until_ready()
-    #     solver_status.block_until_ready()
-    #     solver_steps.block_until_ready()
-
-    #     valid_solutions, first_valid_index, solver_steps = select_valid_solutions(
-    #         solution, solver_status, solver_steps
-    #     )
-
-    #     self._output: Output = Output(
-    #         valid_solutions,
-    #         first_valid_index,
-    #         solver_steps,
-    #         solution_args,
-    #         fixed_parameters,
-    #         traced_parameters,
-    #     )
-
-    #     logger.info("Fast solve complete")
 
     def get_fixed_parameters(
         self, fugacity_constraints: FugacityConstraints, mass_constraints: MassConstraints
