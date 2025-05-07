@@ -65,8 +65,8 @@ class InteriorAtmosphere:
         tau: Tau factor for species stability. Defaults to TAU.
     """
 
-    # Save the jit compiled solver for repeat calculations
-    _solver: Callable
+    _solver: Callable | None = None
+    _output: Output | None = None
 
     def __init__(self, species: SpeciesCollection, tau: float = TAU):
         self.species: SpeciesCollection = species
@@ -76,6 +76,9 @@ class InteriorAtmosphere:
 
     @property
     def output(self) -> Output:
+        if self._output is None:
+            raise AttributeError("Output has not been set.")
+
         return self._output
 
     def solve(
@@ -160,7 +163,7 @@ class InteriorAtmosphere:
         # jax.debug.print("initial_solution = {out}", out=initial_solution)
         batch_size: int = get_batch_size(traced_parameters_)
         # jax.debug.print("batch_size = {out}", out=batch_size)
-        base_initial_solution = broadcast_initial_solution(
+        base_initial_solution: Array = broadcast_initial_solution(
             base_initial_solution, max(1, batch_size)
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
@@ -191,7 +194,7 @@ class InteriorAtmosphere:
         solver_status.block_until_ready()
         solver_steps.block_until_ready()
 
-        self._output: Output = Output(
+        self._output = Output(
             self.species,
             solution,
             solver_status,
