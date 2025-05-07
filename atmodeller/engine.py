@@ -112,6 +112,21 @@ def repeat_solver(
     """
 
     def body_fn(state: tuple) -> tuple[int, Array, Array, Array, Array, Array]:
+        """Perform one iteration of the solver retry loop
+
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                key: PRNG key for random number generation
+                solution: Current solution array
+                status: Boolean array indicating successful solutions
+                steps: Step count or similar solver output
+                base_initial_solution: Unperturbed base initial solution
+
+        Returns:
+            Updated state tuple with incremented attempt index, potentially perturbed
+            solutions, updated status, updated steps, and unmodified base initial solution
+        """
         i, key, solution, status, _, base_initial_solution = state
 
         failed_mask: Array = ~status
@@ -134,6 +149,21 @@ def repeat_solver(
         return (i + 1, key, new_solution, new_status, new_steps, base_initial_solution)
 
     def cond_fn(state: tuple) -> Array:
+        """Check if the solver should continue retrying
+
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                _: Unused (PRNG key)
+                _: Unused (solution)
+                status: Boolean array indicating success of each solution
+                _: Unused (steps)
+                _: Unused (base initial solution)
+
+        Returns:
+            A boolean array indicating whether retries should continue (True if
+            any solution failed and attempts are still available)
+        """
         i, _, _, status, _, _ = state
 
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
