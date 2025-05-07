@@ -562,7 +562,7 @@ def get_log_activity(
             total_pressure,
         )
 
-    vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0,))
+    vmap_apply_function: Callable = eqx.filter_vmap(apply_activity_function, in_axes=(0,))
     indices: Array = jnp.arange(len(species))
     log_activity_pure_species: Array = vmap_apply_function(indices)
     # jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
@@ -775,7 +775,7 @@ def get_species_ppmw_in_melt(
             diatomic_oxygen_fugacity,
         )
 
-    vmap_apply_function: Callable = jax.vmap(apply_solubility_function, in_axes=(0, 0))
+    vmap_apply_function: Callable = eqx.filter_vmap(apply_solubility_function, in_axes=(0, 0))
     indices: ArrayLike = jnp.arange(len(species))
     species_ppmw: Array = vmap_apply_function(indices, fugacity)
     # jax.debug.print("ppmw = {out}", out=ppmw)
