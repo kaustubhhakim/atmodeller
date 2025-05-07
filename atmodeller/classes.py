@@ -28,7 +28,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array, lax
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
@@ -41,7 +41,7 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import solve
+from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.utilities import (
@@ -172,9 +172,9 @@ class InteriorAtmosphere:
             traced_parameters_,
         )
 
-        # Use repeat solver if any cases failed
+        # Use repeat solver to ensure all cases solve
         key: Array = jax.random.PRNGKey(0)
-        final_i, solution, solver_status, solver_steps = self.repeat_solver(
+        final_i, solution, solver_status, solver_steps = repeat_solver(
             self._solver,
             base_initial_solution,
             solution,
@@ -225,61 +225,6 @@ class InteriorAtmosphere:
                 "which can depend on the choice of the random seed"
             )
             logger.info("solution = %s", solution)
-
-    @eqx.filter_jit
-    def repeat_solver(
-        self,
-        solver_fn: Callable,
-        base_initial_solution: Array,
-        initial_solution: Array,
-        initial_status: Array,
-        initial_steps: Array,
-        traced_parameters_: TracedParameters,
-        multistart_perturbation: float,
-        max_attempts: int,
-        key: Array,
-    ):
-        def body_fn(state):
-            i, key, solution, status, _, base_initial_solution = state
-
-            failed_mask: Array = ~status
-            key, subkey = jax.random.split(key)
-            perturb_shape: tuple[Array, ...] = (solution.shape[0], solution.shape[1])
-            raw_perturb: Array = jax.random.uniform(
-                subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
-            )
-            perturbations: Array = jnp.where(
-                failed_mask[:, None],
-                multistart_perturbation * raw_perturb,
-                jnp.zeros_like(solution),
-            )
-            new_initial_solution = jnp.where(
-                failed_mask[:, None], base_initial_solution + perturbations, solution
-            )
-
-            new_solution, new_status, new_steps = solver_fn(
-                new_initial_solution, traced_parameters_
-            )
-
-            return (i + 1, key, new_solution, new_status, new_steps, base_initial_solution)
-
-        def cond_fn(state) -> Array:
-            i, _, _, status, _, _ = state
-            return jnp.logical_and(i < max_attempts, jnp.any(~status))
-
-        initial_state: tuple = (
-            0,
-            key,
-            initial_solution,
-            initial_status,
-            initial_steps,
-            base_initial_solution,
-        )
-        final_i, _, final_solution, final_status, final_steps, _ = lax.while_loop(
-            cond_fn, body_fn, initial_state
-        )
-
-        return final_i, final_solution, final_status, final_steps
 
     # FIXME: To reinstate at some point if relevant
     # def solve_fast(

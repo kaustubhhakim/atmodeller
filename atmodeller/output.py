@@ -48,7 +48,6 @@ from atmodeller.containers import (
     TracedParameters,
 )
 from atmodeller.engine import (
-    compute_residual,
     get_atmosphere_log_molar_mass,
     get_atmosphere_log_volume,
     get_element_density,
@@ -59,6 +58,7 @@ from atmodeller.engine import (
     get_species_density_in_melt,
     get_species_ppmw_in_melt,
     get_total_pressure,
+    objective_function,
 )
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata import IronWustiteBuffer
@@ -755,7 +755,7 @@ class Output:
             Dictionary of the residual
         """
         residual_func: Callable = jax.vmap(
-            compute_residual,
+            objective_function,
             in_axes=(
                 0,
                 {
