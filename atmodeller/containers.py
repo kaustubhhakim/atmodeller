@@ -123,7 +123,7 @@ class SpeciesCollection(eqx.Module):
         """
         for nn, species_ in enumerate(self.data):
             if species_.data.hill_formula == "O2":
-                logger.debug("Found O2 at index = %d", nn)
+                # logger.debug("Found O2 at index = %d", nn)
                 return nn
 
         # TODO: Bad practice to return the first index because it could be wrong and therefore give
@@ -213,7 +213,7 @@ class SpeciesCollection(eqx.Module):
         unique_elements: list[str] = list(set(elements))
         sorted_elements: list[str] = sorted(unique_elements)
 
-        logger.debug("unique_elements_in_species = %s", sorted_elements)
+        # logger.debug("unique_elements_in_species = %s", sorted_elements)
 
         return tuple(sorted_elements)
 

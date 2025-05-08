@@ -112,7 +112,7 @@ H2O_l: SpeciesData = SpeciesData(
 )
 "Species data for H2O_l"
 
-_H2SO4_l_coeffs: ThermoCoefficients = ThermoCoefficients(
+_H2O4S_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-1.068997367e5,),
     (-1.353966639e1,),
     (
@@ -129,14 +129,14 @@ _H2SO4_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (283.456,),
     (1000,),
 )
-H2SO4_l: SpeciesData = SpeciesData(
-    "H2SO4",
+H2O4S_l: SpeciesData = SpeciesData(
+    "H2O4S",
     "l",
-    _H2SO4_l_coeffs,
+    _H2O4S_l_coeffs,
 )
-"Species data for H2SO4_l"
+"Species data for H2O4S_l"
 
-_NH4Cl_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
+_ClH4N_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-3.792881500e4, -8.787975900e5, 2.063363145e7),
     (2.933013040e1, 3.897936900e3, -3.765976360e4),
     (
@@ -163,12 +163,12 @@ _NH4Cl_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (298.15, 457.7, 1000.0),
     (457.7, 1000.0, 1500.0),
 )
-NH4Cl_cr: SpeciesData = SpeciesData(
-    "NH4Cl",
+ClH4N_cr: SpeciesData = SpeciesData(
+    "ClH4N",
     "cr",
-    _NH4Cl_cr_coeffs,
+    _ClH4N_cr_coeffs,
 )
-"Species data for NH4Cl_cr"
+"Species data for ClH4N_cr"
 
 _S_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.516389580e2, -6.852714730e2),
@@ -237,16 +237,16 @@ Si_l: SpeciesData = SpeciesData(
 )
 "Species data for Si_l"
 
-_SiO2_l_coeffs: ThermoCoefficients = ThermoCoefficients(
+_O2Si_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-1.140002976e5,),
     (-5.554279592e1,),
     ((0, 0, 1.004268442e1, 0, 0, 0, 0),),
     (1996,),
     (6000,),
 )
-SiO2_l: SpeciesData = SpeciesData(
-    "SiO2",
+O2Si_l: SpeciesData = SpeciesData(
+    "O2Si",
     "l",
-    _SiO2_l_coeffs,
+    _O2Si_l_coeffs,
 )
-"Species data for SiO2_l"
+"Species data for O2Si_l"

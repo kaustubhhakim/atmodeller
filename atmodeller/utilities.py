@@ -246,7 +246,7 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     nrows, ncols = matrix.shape
 
     augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
-    logger.debug("augmented_matrix = \n%s", augmented_matrix)
+    # debug("augmented_matrix = \n%s", augmented_matrix)
     # Permutation matrix
     # P: npt.NDArray = np.eye(nrows)
 
@@ -261,7 +261,7 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
         for j in range(i + 1, nrows):
             ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
             augmented_matrix[j] -= ratio * augmented_matrix[i]
-    logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
+    # logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
     # Backward substitution
     for i in range(ncols - 1, -1, -1):
@@ -272,12 +272,12 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
             if augmented_matrix[j, i] != 0:
                 ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
-    logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
+    # logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
-    reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
+    # reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
     component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
-    logger.debug("reduced_matrix = \n%s", reduced_matrix)
-    logger.debug("component_matrix = \n%s", component_matrix)
+    # logger.debug("reduced_matrix = \n%s", reduced_matrix)
+    # logger.debug("component_matrix = \n%s", component_matrix)
     # logger.debug("permutation_matrix = \n%s", P)
 
     return component_matrix

@@ -282,7 +282,7 @@ class InteriorAtmosphere:
         """
         unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
         formula_matrix: npt.NDArray[np.int_] = np.zeros(
-            (len(unique_elements), len(self.species)), dtype=jnp.int_
+            (len(unique_elements), self.species.number), dtype=jnp.int_
         )
 
         for element_index, element in enumerate(unique_elements):
@@ -323,7 +323,7 @@ class InteriorAtmosphere:
         Returns:
             A matrix of linearly independent reactions or an empty array if no reactions
         """
-        if len(self.species) == 1:
+        if self.species.number == 1:
             logger.debug("Only one species therefore no reactions")
             return np.array([])
 
