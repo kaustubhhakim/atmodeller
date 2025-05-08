@@ -445,37 +445,3 @@ def pytree_debug(pytree: Any, name: str) -> None:
         static,
     )
     jax.debug.print("{name} static_tree = {out}", name=name, out=static_tree)
-
-
-def broadcast_initial_solution(initial_solution: ArrayLike, batch_size: int) -> Array:
-    """Broadcasts initial_solution to shape (batch_size, D) if needed.
-
-    Args:
-        initial_solution: Initial solution
-        batch_size: Batch size
-
-    Returns:
-        Broadcasted initial solution
-    """
-    initial_solution = jnp.asarray(initial_solution)
-
-    if initial_solution.ndim == 0:
-        # Scalar input, promote to (batch_size, 1)
-        return jnp.full((batch_size, 1), initial_solution)
-
-    elif initial_solution.ndim == 1:
-        # Shape (D,) -> (batch_size, D)
-        return jnp.broadcast_to(initial_solution[None, :], (batch_size, initial_solution.shape[0]))
-
-    elif initial_solution.ndim == 2:
-        if initial_solution.shape[0] != batch_size:
-            raise ValueError(
-                f"initial_solution has batch size {initial_solution.shape[0]}, "
-                f"but traced_parameters expects {batch_size}"
-            )
-        return initial_solution
-
-    else:
-        raise ValueError(
-            f"initial_solution must be 0D, 1D or 2D, got shape {initial_solution.shape}"
-        )

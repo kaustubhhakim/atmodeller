@@ -45,7 +45,6 @@ from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
 from atmodeller.utilities import (
-    broadcast_initial_solution,
     get_batch_size,
     partial_rref,
     vmap_axes_spec,
@@ -143,31 +142,15 @@ class InteriorAtmosphere:
         in_axes: Any = vmap_axes_spec(traced_parameters_)
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
-        if initial_log_number_density is None:
-            base_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-                len(self.species), dtype=np.float_
-            )
-        else:
-            base_log_number_density = initial_log_number_density
-
-        if initial_log_stability is None:
-            base_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
-                self.species.number_of_stability(), dtype=np.float_
-            )
-        else:
-            base_log_stability = initial_log_stability
-
-        base_initial_solution = jnp.concatenate(
-            (base_log_number_density, base_log_stability), axis=-1
-        )
-        # jax.debug.print("initial_solution = {out}", out=initial_solution)
         batch_size: int = get_batch_size(traced_parameters_)
-        # jax.debug.print("batch_size = {out}", out=batch_size)
         base_initial_solution: Array = broadcast_initial_solution(
-            base_initial_solution, max(1, batch_size)
+            initial_log_number_density,
+            initial_log_stability,
+            self.species.number,
+            self.species.number_of_stability(),
+            max(1, batch_size),
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
-        # jax.debug.print("base_initial_solution.shape = {out}", out=base_initial_solution.shape)
 
         # First solution attempt
         solution, solver_status, solver_steps = self._solver(
@@ -398,3 +381,92 @@ class InteriorAtmosphere:
                 reactions[reaction_index] = reaction
 
         return reactions
+
+
+def _broadcast_component(
+    component: ArrayLike | None, default_value: float, dim: int, batch_size: int, name: str
+) -> Array:
+    """Broadcasts a scalar, 1D, or 2D input array to shape (batch_size, dim).
+
+    This function standardizes inputs that may be:
+        - None (in which case a default value is used),
+        - a scalar (promoted to a 1D array of length `dim`),
+        - a 1D array of shape (`dim`,) (broadcast across the batch),
+        - or a 2D array of shape (`batch_size`, `dim`) (used as-is).
+
+    Args:
+        component: The input data (or None), representing either a scalar, 1D array, or 2D array
+        default_value: The default scalar value to use if `component` is None
+        dim: The number of features or dimensions per batch item
+        batch_size: The number of batch items
+        name: Name of the component (used for error messages)
+
+    Returns:
+        A JAX array of shape (batch_size, dim), with values broadcast as needed
+
+    Raises:
+        ValueError: If the input array has an unexpected shape or inconsistent dimensions
+    """
+    if component is None:
+        base: Array = jnp.full((dim,), default_value, dtype=jnp.float_)
+    else:
+        component = jnp.asarray(component, dtype=jnp.float_)
+        if component.ndim == 0:
+            base = jnp.full((dim,), component.item(), dtype=jnp.float_)
+        elif component.ndim == 1:
+            if component.shape[0] != dim:
+                raise ValueError(f"{name} should have shape ({dim},), got {component.shape}")
+            base = component
+        elif component.ndim == 2:
+            if component.shape[0] != batch_size or component.shape[1] != dim:
+                raise ValueError(
+                    f"{name} should have shape ({batch_size}, {dim}), got {component.shape}"
+                )
+            # NOTE: 2-D already so return
+            return component
+        else:
+            raise ValueError(
+                f"{name} must be a scalar, 1D, or 2D array, got shape {component.shape}"
+            )
+
+    # Promote 1D base to (batch_size, dim)
+    return jnp.broadcast_to(base[None, :], (batch_size, dim))
+
+
+def broadcast_initial_solution(
+    initial_log_number_density: ArrayLike | None,
+    initial_log_stability: ArrayLike | None,
+    number_of_species: int,
+    number_of_stability: int,
+    batch_size: int,
+) -> Array:
+    """Creates and broadcasts the initial solution to shape (batch_size, D)
+
+    D = number_of_species + number_of_stability, i.e. the total number of solution quantities
+
+    Args:
+        initial_log_number_density: Initial log number density
+        initial_log_stability: Initial log stability
+        number_of_species: Number of species
+        number_of_stability: Number of species stability
+        batch_size: Batch size
+
+    Returns:
+        Initial solution with shape (batch_size, D)
+    """
+    number_density: Array = _broadcast_component(
+        initial_log_number_density,
+        INITIAL_LOG_NUMBER_DENSITY,
+        number_of_species,
+        batch_size,
+        name="initial_log_number_density",
+    )
+    stability: Array = _broadcast_component(
+        initial_log_stability,
+        INITIAL_LOG_STABILITY,
+        number_of_stability,
+        batch_size,
+        name="initial_log_stability",
+    )
+
+    return jnp.concatenate((number_density, stability), axis=-1)
