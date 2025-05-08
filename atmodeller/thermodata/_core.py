@@ -16,8 +16,6 @@
 #
 """Core classes and functions for thermochemical data"""
 
-import sys
-
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
@@ -26,17 +24,6 @@ from molmass import Formula
 from xmmutablemap import ImmutableMap
 
 from atmodeller.utilities import unit_conversion
-
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
-
-
-phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
-"""Mapping from the JANAF phase string to an integer code"""
-inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
-"""Inverse mapping from the integer code to a JANAF phase string"""
 
 
 class CondensateActivity(eqx.Module):
@@ -232,62 +219,39 @@ class SpeciesData(eqx.Module):
     """Species data
 
     Args:
-        composition: Composition
-        phase_code: Phase code
-        molar_mass: Molar mass
+        formula: Formula
+        phase: Phase
         thermodata: Thermodynamic data
     """
 
-    composition: ImmutableMap[str, tuple[int, float, float]]
-    """Composition"""
-    phase_code: int
-    """Phase code"""
-    molar_mass: float
-    """Molar mass"""
+    formula: str
+    """Formula"""
+    phase: str
+    """Phase"""
     thermodata: ThermoCoefficients
     """Thermodynamic data"""
+    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    """Composition"""
+    hill_formula: str = eqx.field(init=False)
+    """Hill formula"""
+    molar_mass: float = eqx.field(init=False)
+    """Molar mass"""
 
-    @classmethod
-    def create(
-        cls,
-        formula: str,
-        phase: str,
-        thermodata: ThermoCoefficients,
-    ) -> Self:
-        """Creates an instance
-
-        Args:
-            formula: Formula
-            phase: Phase
-            thermodata: Thermodynamic data
-
-        Returns:
-            An instance
-        """
-        mformula: Formula = Formula(formula)
-        composition: ImmutableMap[str, tuple[int, float, float]] = ImmutableMap(
-            mformula.composition().asdict()
-        )
-        molar_mass: float = mformula.mass * unit_conversion.g_to_kg
-        phase_code: int = phase_mapping[phase]
-
-        return cls(composition, phase_code, molar_mass, thermodata)
+    def __post_init__(self):
+        mformula: Formula = Formula(self.formula)
+        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.hill_formula = mformula.formula
+        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
 
     @property
     def elements(self) -> tuple[str, ...]:
         """Elements"""
         return tuple(self.composition.keys())
 
-    def formula(self) -> Formula:
-        """Formula object"""
-        formula: str = ""
-        for element, values in self.composition.items():
-            count: int = values[0]
-            formula += element
-            if count > 1:
-                formula += str(count)
-
-        return Formula(formula)
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and phase"""
+        return f"{self.hill_formula}_{self.phase}"
 
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
@@ -301,21 +265,6 @@ class SpeciesData(eqx.Module):
             Gibbs energy over RT
         """
         return self.thermodata.get_gibbs_over_RT(temperature)
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return f"{self.hill_formula}_{self.phase}"
-
-    @property
-    def hill_formula(self) -> str:
-        """Hill formula"""
-        return self.formula().formula
-
-    @property
-    def phase(self) -> str:
-        """JANAF phase"""
-        return inverse_phase_mapping[self.phase_code]
 
 
 class CriticalData(eqx.Module):

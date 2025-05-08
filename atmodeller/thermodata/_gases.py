@@ -56,7 +56,7 @@ _C_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-C_g: SpeciesData = SpeciesData.create(
+C_g: SpeciesData = SpeciesData(
     "C",
     "g",
     _C_g_coeffs,
@@ -89,7 +89,7 @@ _CH4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-CH4_g: SpeciesData = SpeciesData.create(
+CH4_g: SpeciesData = SpeciesData(
     "CH4",
     "g",
     _CH4_g_coeffs,
@@ -122,7 +122,7 @@ _Cl2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-Cl2_g: SpeciesData = SpeciesData.create("Cl2", "g", _Cl2_g_coeffs)
+Cl2_g: SpeciesData = SpeciesData("Cl2", "g", _Cl2_g_coeffs)
 "Species data for Cl2_g"
 
 _CO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -164,7 +164,7 @@ _CO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-CO_g: SpeciesData = SpeciesData.create(
+CO_g: SpeciesData = SpeciesData(
     "CO",
     "g",
     _CO_g_coeffs,
@@ -206,7 +206,7 @@ _CO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-CO2_g: SpeciesData = SpeciesData.create(
+CO2_g: SpeciesData = SpeciesData(
     "CO2",
     "g",
     _CO2_g_coeffs,
@@ -248,7 +248,7 @@ _H2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-H2_g: SpeciesData = SpeciesData.create("H2", "g", _H2_g_coeffs)
+H2_g: SpeciesData = SpeciesData("H2", "g", _H2_g_coeffs)
 "Species data for H2_g"
 
 _H2O_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -277,7 +277,7 @@ _H2O_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-H2O_g: SpeciesData = SpeciesData.create(
+H2O_g: SpeciesData = SpeciesData(
     "H2O",
     "g",
     _H2O_g_coeffs,
@@ -310,7 +310,7 @@ _H2S_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-H2S_g: SpeciesData = SpeciesData.create(
+H2S_g: SpeciesData = SpeciesData(
     "H2S",
     "g",
     _H2S_g_coeffs,
@@ -343,7 +343,7 @@ _HCl_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-HCl_g: SpeciesData = SpeciesData.create(
+HCl_g: SpeciesData = SpeciesData(
     "HCl",
     "g",
     _HCl_g_coeffs,
@@ -369,7 +369,7 @@ _He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-He_g: SpeciesData = SpeciesData.create(
+He_g: SpeciesData = SpeciesData(
     "He",
     "g",
     _He_g_coeffs,
@@ -411,7 +411,7 @@ _N2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-N2_g: SpeciesData = SpeciesData.create("N2", "g", _N2_g_coeffs)
+N2_g: SpeciesData = SpeciesData("N2", "g", _N2_g_coeffs)
 "Species data for N2_g"
 
 _NH3_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -440,7 +440,7 @@ _NH3_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-NH3_g: SpeciesData = SpeciesData.create(
+NH3_g: SpeciesData = SpeciesData(
     "NH3",
     "g",
     _NH3_g_coeffs,
@@ -482,7 +482,7 @@ _O2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000, 6000),
     (1000, 6000, 20000),
 )
-O2_g: SpeciesData = SpeciesData.create("O2", "g", _O2_g_coeffs)
+O2_g: SpeciesData = SpeciesData("O2", "g", _O2_g_coeffs)
 "Species data for O2_g"
 
 _S2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -511,7 +511,7 @@ _S2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-S2_g: SpeciesData = SpeciesData.create("S2", "g", _S2_g_coeffs)
+S2_g: SpeciesData = SpeciesData("S2", "g", _S2_g_coeffs)
 "Species data for S2_g"
 
 _SO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -540,7 +540,7 @@ _SO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-SO_g: SpeciesData = SpeciesData.create("SO", "g", _SO_g_coeffs)
+SO_g: SpeciesData = SpeciesData("SO", "g", _SO_g_coeffs)
 "Species data for SO_g"
 
 _SO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -569,7 +569,7 @@ _SO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-SO2_g: SpeciesData = SpeciesData.create("SO2", "g", _SO2_g_coeffs)
+SO2_g: SpeciesData = SpeciesData("SO2", "g", _SO2_g_coeffs)
 "Species data for SO2_g"
 
 _SiH4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -598,7 +598,7 @@ _SiH4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-SiH4_g: SpeciesData = SpeciesData.create("SiH4", "g", _SiH4_g_coeffs)
+SiH4_g: SpeciesData = SpeciesData("SiH4", "g", _SiH4_g_coeffs)
 "Species data for SiH4_g"
 
 _SiO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -627,7 +627,7 @@ _SiO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-SiO_g: SpeciesData = SpeciesData.create("SiO", "g", _SiO_g_coeffs)
+SiO_g: SpeciesData = SpeciesData("SiO", "g", _SiO_g_coeffs)
 "Species data for SiO_g"
 
 _Si_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -665,7 +665,7 @@ _Si_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-Si_g: SpeciesData = SpeciesData.create("Si", "g", _Si_g_coeffs)
+Si_g: SpeciesData = SpeciesData("Si", "g", _Si_g_coeffs)
 "Species data for Si_g"
 
 _SiO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -694,7 +694,7 @@ _SiO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 1000),
     (1000, 6000),
 )
-SiO2_g: SpeciesData = SpeciesData.create("SiO2", "g", _SiO2_g_coeffs)
+SiO2_g: SpeciesData = SpeciesData("SiO2", "g", _SiO2_g_coeffs)
 "Species data for SiO2_g"
 
 _OH_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -732,7 +732,7 @@ _OH_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-OH_g: SpeciesData = SpeciesData.create("OH", "g", _OH_g_coeffs)
+OH_g: SpeciesData = SpeciesData("OH", "g", _OH_g_coeffs)
 "Species data for OH_g"
 
 _MgO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -770,7 +770,7 @@ _MgO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-MgO_g: SpeciesData = SpeciesData.create("MgO", "g", _MgO_g_coeffs)
+MgO_g: SpeciesData = SpeciesData("MgO", "g", _MgO_g_coeffs)
 "Species data for MgO_g"
 
 _Mg_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -800,7 +800,7 @@ _Mg_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-Mg_g: SpeciesData = SpeciesData.create("Mg", "g", _Mg_g_coeffs)
+Mg_g: SpeciesData = SpeciesData("Mg", "g", _Mg_g_coeffs)
 "Species data for Mg_g"
 
 _SH_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -829,7 +829,7 @@ _SH_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-SH_g: SpeciesData = SpeciesData.create("SH", "g", _SH_g_coeffs)
+SH_g: SpeciesData = SpeciesData("SH", "g", _SH_g_coeffs)
 "Species data for SH_g"
 
 _C2H2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -858,7 +858,7 @@ _C2H2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-C2H2_g: SpeciesData = SpeciesData.create("C2H2", "g", _C2H2_g_coeffs)
+C2H2_g: SpeciesData = SpeciesData("C2H2", "g", _C2H2_g_coeffs)
 "Species data for C2H2_g"
 
 _HCN_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -887,7 +887,7 @@ _HCN_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-HCN_g: SpeciesData = SpeciesData.create("HCN", "g", _HCN_g_coeffs)
+HCN_g: SpeciesData = SpeciesData("HCN", "g", _HCN_g_coeffs)
 "Species data for HCN_g"
 
 _SO3_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -916,7 +916,7 @@ _SO3_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-SO3_g: SpeciesData = SpeciesData.create("SO3", "g", _SO3_g_coeffs)
+SO3_g: SpeciesData = SpeciesData("SO3", "g", _SO3_g_coeffs)
 "Species data for SO3_g"
 
 _H2SO4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -945,7 +945,7 @@ _H2SO4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-H2SO4_g: SpeciesData = SpeciesData.create("H2SO4", "g", _H2SO4_g_coeffs)
+H2SO4_g: SpeciesData = SpeciesData("H2SO4", "g", _H2SO4_g_coeffs)
 "Species data for H2SO4_g"
 
 _FeO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -974,7 +974,7 @@ _FeO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-FeO_g: SpeciesData = SpeciesData.create("FeO", "g", _FeO_g_coeffs)
+FeO_g: SpeciesData = SpeciesData("FeO", "g", _FeO_g_coeffs)
 "Species data for FeO_g"
 
 _Fe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1012,7 +1012,7 @@ _Fe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-Fe_g: SpeciesData = SpeciesData.create("Fe", "g", _Fe_g_coeffs)
+Fe_g: SpeciesData = SpeciesData("Fe", "g", _Fe_g_coeffs)
 "Species data for Fe_g"
 
 _NO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1050,7 +1050,7 @@ _NO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-NO_g: SpeciesData = SpeciesData.create("NO", "g", _NO_g_coeffs)
+NO_g: SpeciesData = SpeciesData("NO", "g", _NO_g_coeffs)
 "Species data for NO_g"
 
 _COS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1079,7 +1079,7 @@ _COS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000),
     T_max=(1000, 6000),
 )
-COS_g: SpeciesData = SpeciesData.create("COS", "g", _COS_g_coeffs)
+COS_g: SpeciesData = SpeciesData("COS", "g", _COS_g_coeffs)
 "Species data for COS_g"
 
 _Ar_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1117,7 +1117,7 @@ _Ar_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-Ar_g: SpeciesData = SpeciesData.create("Ar", "g", _Ar_g_coeffs)
+Ar_g: SpeciesData = SpeciesData("Ar", "g", _Ar_g_coeffs)
 "Species data for Ar_g"
 
 _He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1155,7 +1155,7 @@ _He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-He_g: SpeciesData = SpeciesData.create("He", "g", _He_g_coeffs)
+He_g: SpeciesData = SpeciesData("He", "g", _He_g_coeffs)
 "Species data for He_g"
 
 _Ne_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1193,7 +1193,7 @@ _Ne_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-Ne_g: SpeciesData = SpeciesData.create("Ne", "g", _Ne_g_coeffs)
+Ne_g: SpeciesData = SpeciesData("Ne", "g", _Ne_g_coeffs)
 "Species data for Ne_g"
 
 _Kr_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1231,7 +1231,7 @@ _Kr_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-Kr_g: SpeciesData = SpeciesData.create("Kr", "g", _Kr_g_coeffs)
+Kr_g: SpeciesData = SpeciesData("Kr", "g", _Kr_g_coeffs)
 "Species data for Kr_g"
 
 _Xe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -1269,7 +1269,7 @@ _Xe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     T_min=(200, 1000, 6000),
     T_max=(1000, 6000, 20000),
 )
-Xe_g: SpeciesData = SpeciesData.create("Xe", "g", _Xe_g_coeffs)
+Xe_g: SpeciesData = SpeciesData("Xe", "g", _Xe_g_coeffs)
 "Species data for Xe_g"
 
 _critical_data_H2O_g: CriticalData = CriticalData(647.25, 221.1925)

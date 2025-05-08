@@ -56,7 +56,7 @@ _C_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 600, 2000),
     (600, 2000, 6000),
 )
-C_cr: SpeciesData = SpeciesData.create("C", "cr", _C_cr_coeffs)
+C_cr: SpeciesData = SpeciesData("C", "cr", _C_cr_coeffs)
 "Species data for C_cr"
 
 _H2O_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -76,7 +76,7 @@ _H2O_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200,),
     (273.1507,),
 )
-H2O_cr: SpeciesData = SpeciesData.create("H2O", "cr", _H2O_cr_coeffs)
+H2O_cr: SpeciesData = SpeciesData("H2O", "cr", _H2O_cr_coeffs)
 "Species data for H2O_cr"
 
 _H2O_l_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -105,7 +105,7 @@ _H2O_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (273.150, 373.150),
     (373.150, 600),
 )
-H2O_l: SpeciesData = SpeciesData.create(
+H2O_l: SpeciesData = SpeciesData(
     "H2O",
     "l",
     _H2O_l_coeffs,
@@ -129,7 +129,7 @@ _H2SO4_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (283.456,),
     (1000,),
 )
-H2SO4_l: SpeciesData = SpeciesData.create(
+H2SO4_l: SpeciesData = SpeciesData(
     "H2SO4",
     "l",
     _H2SO4_l_coeffs,
@@ -163,7 +163,7 @@ _NH4Cl_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (298.15, 457.7, 1000.0),
     (457.7, 1000.0, 1500.0),
 )
-NH4Cl_cr: SpeciesData = SpeciesData.create(
+NH4Cl_cr: SpeciesData = SpeciesData(
     "NH4Cl",
     "cr",
     _NH4Cl_cr_coeffs,
@@ -183,7 +183,7 @@ _S_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 368.3),
     (368.3, 388.36),
 )
-S_cr: SpeciesData = SpeciesData.create("S", "cr", _S_cr_coeffs)
+S_cr: SpeciesData = SpeciesData("S", "cr", _S_cr_coeffs)
 "Species data for S_alpha and S_beta"
 
 _S_l_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -199,7 +199,7 @@ _S_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (388.36, 428.15, 432.25, 453.15, 717),
     (428.15, 432.25, 453.15, 717, 6000),
 )
-S_l: SpeciesData = SpeciesData.create(
+S_l: SpeciesData = SpeciesData(
     "S",
     "l",
     _S_l_coeffs,
@@ -216,7 +216,7 @@ _Si_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
     (200, 298.15),
     (298.15, 1690),
 )
-Si_cr: SpeciesData = SpeciesData.create(
+Si_cr: SpeciesData = SpeciesData(
     "Si",
     "cr",
     _Si_cr_coeffs,
@@ -230,7 +230,7 @@ _Si_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (1690,),
     (6000,),
 )
-Si_l: SpeciesData = SpeciesData.create(
+Si_l: SpeciesData = SpeciesData(
     "Si",
     "l",
     _Si_l_coeffs,
@@ -244,7 +244,7 @@ _SiO2_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (1996,),
     (6000,),
 )
-SiO2_l: SpeciesData = SpeciesData.create(
+SiO2_l: SpeciesData = SpeciesData(
     "SiO2",
     "l",
     _SiO2_l_coeffs,

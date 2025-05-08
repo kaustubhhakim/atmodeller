@@ -142,13 +142,13 @@ class InteriorAtmosphere:
         in_axes: Any = vmap_axes_spec(traced_parameters_)
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
-        batch_size: int = get_batch_size(traced_parameters_)
+        batch_size: int = max(get_batch_size(traced_parameters_), 1)
         base_initial_solution: Array = broadcast_initial_solution(
             initial_log_number_density,
             initial_log_stability,
             self.species.number,
             self.species.number_of_stability(),
-            max(1, batch_size),
+            batch_size,
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
@@ -199,7 +199,7 @@ class InteriorAtmosphere:
                 "multistart_perturbation=40.0)"
             )
         else:
-            required_multistarts: int = max(final_i, 1)  # Ensure it's at least 1
+            required_multistarts: int = max(final_i, 1)
             logger.info(
                 f"Solve complete: {num_successful_models} successful model(s)\n"
                 f"The number of multistarts required was {required_multistarts}, "
