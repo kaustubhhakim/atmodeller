@@ -111,14 +111,12 @@ class SolubilityPowerLaw(Solubility):
     Args:
         constant: Constant
         exponent: Exponent
-
-    Attributes:
-        constant: Constant
-        exponent: Exponent
     """
 
     constant: float
+    """Constant"""
     exponent: float
+    """Exponent"""
 
     @override
     @eqx.filter_jit
@@ -136,13 +134,12 @@ class SolubilityPowerLawLog10(Solubility):
         log10_constant: Log10 constant
         log10_exponent: Log10 exponent
 
-    Attributes:
-        log10_constant: Log10 constant
-        log10_exponent: Log10 exponent
     """
 
     log10_constant: float
+    """Log10 constant"""
     log10_exponent: float
+    """Log10 exponent"""
 
     @override
     @eqx.filter_jit
