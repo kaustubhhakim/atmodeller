@@ -21,6 +21,7 @@ For every law there should be a test in the test suite.
 
 import equinox as eqx
 import jax.numpy as jnp
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
@@ -127,10 +128,10 @@ class _H2_chachan18(Solubility):
 
     @override
     @eqx.filter_jit
-    def concentration(self, fugacity: ArrayLike, *, temperature: ArrayLike, **kwargs) -> ArrayLike:
+    def concentration(self, fugacity: ArrayLike, *, temperature: ArrayLike, **kwargs) -> Array:
         del kwargs
-        mass_fraction: ArrayLike = self.A * fugacity * jnp.exp(-self.T0 / temperature)
-        ppmw: ArrayLike = mass_fraction * unit_conversion.fraction_to_ppm
+        mass_fraction: Array = jnp.exp(-self.T0 / temperature) * self.A * fugacity
+        ppmw: Array = mass_fraction * unit_conversion.fraction_to_ppm
 
         return ppmw
 

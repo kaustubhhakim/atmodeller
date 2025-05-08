@@ -53,7 +53,7 @@ class Solubility(eqx.Module):
         temperature: ArrayLike | None = None,
         pressure: ArrayLike | None = None,
         fO2: ArrayLike | None = None,
-    ) -> ArrayLike:
+    ) -> Array:
         """Concentration in ppmw
 
         Args:
@@ -69,7 +69,7 @@ class Solubility(eqx.Module):
     @eqx.filter_jit
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ) -> ArrayLike:
+    ) -> Array:
         """Wrapper to pass concentration arguments by position to use with JAX lax.switch
 
         Args:
@@ -102,8 +102,7 @@ class NoSolubility(Solubility):
         del pressure
         del fO2
 
-        # Must be 0.0 (float) for JAX array type compliance
-        return 0.0
+        return jnp.array(0.0)  # For JAX compatibility
 
 
 class SolubilityPowerLaw(Solubility):
@@ -153,6 +152,7 @@ class SolubilityPowerLawLog10(Solubility):
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
 
 
+# FIXME: jit?
 def fO2_temperature_correction(
     fO2: ArrayLike,
     *,

@@ -50,7 +50,7 @@ class _S2_sulfate_andesite_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         del kwargs
         logcs: Array = -12.948 + (31586.2393 / jnp.asarray(temperature))
         logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
@@ -83,7 +83,7 @@ class _S2_sulfide_andesite_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         del kwargs
         logcs: Array = 0.225 - (8921.0927 / jnp.asarray(temperature))
         logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
@@ -116,7 +116,7 @@ class _S2_andesite_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         concentration: ArrayLike = self._sulfide.concentration(
             fugacity, temperature=temperature, fO2=fO2, **kwargs
         )
@@ -144,7 +144,7 @@ class _S2_sulfate_basalt_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         del kwargs
         logcs: Array = -12.948 + (32333.5635 / jnp.asarray(temperature))
         logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
@@ -178,7 +178,7 @@ class _S2_sulfide_basalt_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         del kwargs
         logcs: Array = 0.225 - (8045.7465 / jnp.asarray(temperature))
         logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
@@ -212,7 +212,7 @@ class _S2_basalt_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         concentration: ArrayLike = self._sulfide.concentration(
             fugacity, temperature=temperature, fO2=fO2, **kwargs
         )
@@ -240,7 +240,7 @@ class _S2_sulfate_trachybasalt_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         del kwargs
         logcs: Array = -12.948 + (32446.366 / jnp.asarray(temperature))
         logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
@@ -273,7 +273,7 @@ class _S2_sulfide_trachybasalt_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         del kwargs
         logcs: Array = 0.225 - (7842.5 / jnp.asarray(temperature))
         logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
@@ -306,7 +306,7 @@ class _S2_trachybasalt_boulliung23(Solubility):
     @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
-    ) -> ArrayLike:
+    ) -> Array:
         concentration: ArrayLike = self._sulfide.concentration(
             fugacity, temperature=temperature, fO2=fO2, **kwargs
         )
