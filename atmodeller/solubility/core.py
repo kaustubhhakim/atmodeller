@@ -35,8 +35,6 @@ try:
 except ImportError:
     from typing_extensions import override  # Python 3.11 and earlier
 
-iron_wustite_buffer: RedoxBufferProtocol = IronWustiteBuffer()
-
 
 class Solubility(eqx.Module):
     """Solubility interface
@@ -149,7 +147,7 @@ class SolubilityPowerLawLog10(Solubility):
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
 
 
-# FIXME: jit?
+@eqx.filter_jit
 def fO2_temperature_correction(
     fO2: ArrayLike,
     *,
@@ -164,7 +162,7 @@ def fO2_temperature_correction(
     fO2 shift at arbitrary temperature.
 
     Args:
-        fO2: Absolute oxygen fugacity at `temperature`, in bar
+        fO2: Absolute oxygen fugacity at `temperature` in bar
         temperature: Temperature in K
         pressure: Absolute pressure in bar
         reference_temperature: Reference temperature, which is usually the temperature at which the
@@ -173,6 +171,7 @@ def fO2_temperature_correction(
     Returns:
         Adjusted fO2
     """
+    iron_wustite_buffer: RedoxBufferProtocol = IronWustiteBuffer()
     logiw_fugacity_at_current_temp: ArrayLike = iron_wustite_buffer.log10_fugacity(
         temperature, pressure
     )
