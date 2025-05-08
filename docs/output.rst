@@ -110,16 +110,16 @@ Species output have a dictionary key associated with the species name and its st
      - Molar mass
    * - total_mass
      - kg
-     - Mass in all reservoirs
+     - Mass
    * - total_moles
      - moles
-     - Number of moles in all reservoirs
+     - Number of moles
    * - total_number
      - molecules
-     - Number of molecules in all reservoirs
+     - Number of molecules
    * - total_number_density
      - molecules m\ :math:`^{-3}`
-     - Number density in all reservoirs
+     - Number density
 
 Elements
 --------
@@ -249,9 +249,6 @@ The atmosphere output has a dictionary key of `atmosphere`.
    * - Name
      - Units
      - Description
-   * - species_mass
-     - kg
-     - Mass of species
    * - species_moles
      - moles
      - Number of moles of species
@@ -261,6 +258,9 @@ The atmosphere output has a dictionary key of `atmosphere`.
    * - species_number_density
      - molecules m\ :math:`^{-3}`
      - Number density of species
+   * - mass
+     - kg
+     - Mass
    * - molar_mass
      - kg mole\ :math:`^{-1}`
      - Molar mass
@@ -279,6 +279,14 @@ The atmosphere output has a dictionary key of `atmosphere`.
    * - element_number_density
      - atoms m\ :math:`^{-3}`
      - Number density of elements
-   * - Temperature
+   * - temperature
      - K
      - Temperature of the atmosphere
+  
+Other output
+------------
+
+- constraints: Applied elemental mass and/or species fugacity constraints
+- raw_solution: Raw solution from the solver, i.e. number densities and stabilities
+- residual: Residuals of the reaction network and mass balance
+- solver: Solver quantities
