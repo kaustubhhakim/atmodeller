@@ -216,7 +216,7 @@ class InteriorAtmosphere:
                 "multistart_perturbation=40.0)"
             )
         else:
-            required_multistarts: int = max(final_i + 1, 1)  # Ensure it's at least 1
+            required_multistarts: int = max(final_i, 1)  # Ensure it's at least 1
             logger.info(
                 f"Solve complete: {num_successful_models} successful model(s)\n"
                 f"The number of multistarts required was {required_multistarts}, "

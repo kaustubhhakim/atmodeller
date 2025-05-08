@@ -131,6 +131,10 @@ def repeat_solver(
 
         failed_mask: Array = ~status
         key, subkey = jax.random.split(key)
+
+        # Implements a simple perturbation of the base initial solution, but something more
+        # sophisticated could be implemented, such as training a network or using a regressor
+        # to inform the next guess of the models that failed from the ones that succeeded.
         perturb_shape: tuple[Array, ...] = (solution.shape[0], solution.shape[1])
         raw_perturb: Array = jax.random.uniform(
             subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
@@ -169,7 +173,7 @@ def repeat_solver(
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
 
     initial_state: tuple = (
-        0,
+        1,  # A first solve has already been attempted before repeat_solver is called
         key,
         initial_solution,
         initial_status,
