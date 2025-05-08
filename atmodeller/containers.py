@@ -491,7 +491,8 @@ class FugacityConstraints(eqx.Module):
         Returns:
             Log fugacity
         """
-        fugacity_funcs = [
+        # Partial to avoid the late-binding closure issue
+        fugacity_funcs: list[Callable] = [
             Partial(constraint.log_fugacity) for constraint in self.constraints.values()
         ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
