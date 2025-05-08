@@ -18,6 +18,7 @@
 
 from typing import Protocol
 
+from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.utilities import ExperimentalCalibration
@@ -70,4 +71,4 @@ class SolubilityProtocol(Protocol):
         temperature: ArrayLike,
         pressure: ArrayLike,
         fO2: ArrayLike,
-    ) -> ArrayLike: ...
+    ) -> Array: ...
