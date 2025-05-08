@@ -771,7 +771,7 @@ class SolverParameters(eqx.Module):
     """Maximum number of steps the solver can take"""
     jac: Literal["fwd", "bwd"] = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
-    multistart: int = 1
+    multistart: int = 10
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
