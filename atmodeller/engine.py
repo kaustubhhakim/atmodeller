@@ -765,6 +765,7 @@ def get_species_ppmw_in_melt(
     total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
     diatomic_oxygen_fugacity: Array = jnp.take(fugacity, diatomic_oxygen_index)
 
+    # NOTE: All solubility formulations must return a JAX array to allow vmapping
     solubility_funcs: list[Callable] = [
         species_.solubility.jax_concentration for species_ in species
     ]
