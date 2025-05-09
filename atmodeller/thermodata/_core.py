@@ -16,52 +16,22 @@
 #
 """Core classes and functions for thermochemical data"""
 
-import sys
-from typing import NamedTuple
-
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit
-from jax.tree_util import register_pytree_node_class
+from jax import Array
 from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
 from atmodeller.utilities import unit_conversion
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
 
-
-phase_mapping: dict[str, int] = {"g": 0, "l": 1, "cr": 2}
-"""Mapping from the JANAF phase string to an integer code"""
-inverse_phase_mapping: dict[int, str] = {value: key for key, value in phase_mapping.items()}
-"""Inverse mapping from the integer code to a JANAF phase string"""
-
-
-# TODO: First get buffer working, then can reimplement this if required.
-# class ConstantBuffer(NamedTuple):
-#     """Constant buffer
-
-#     Args:
-#         log10_fugacity: Log10 fugacity
-#     """
-
-#     log10_fugacity: ArrayLike
-
-#     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-#         del temperature
-#         del pressure
-
-#         return self.log10_fugacity * jnp.log(10)
-
-
-class CondensateActivity(NamedTuple):
+class CondensateActivity(eqx.Module):
     """Activity of a stable condensate"""
 
     activity: ArrayLike = 1.0
 
+    @eqx.filter_jit
     def log_activity(
         self,
         temperature: ArrayLike,
@@ -73,8 +43,7 @@ class CondensateActivity(NamedTuple):
         return jnp.log(self.activity)
 
 
-@register_pytree_node_class
-class ThermoCoefficients:
+class ThermoCoefficients(eqx.Module):
     """Coefficients for thermochemical data
 
     Coefficients are available at https://ntrs.nasa.gov/citations/20020085330
@@ -94,21 +63,13 @@ class ThermoCoefficients:
         T_max: Maximum temperature(s) in the range
     """
 
-    def __init__(
-        self,
-        b1: tuple[float, ...],
-        b2: tuple[float, ...],
-        cp_coeffs: tuple[tuple[float, float, float, float, float, float, float], ...],
-        T_min: tuple[float, ...],
-        T_max: tuple[float, ...],
-    ):
-        self._b1 = b1
-        self._b2 = b2
-        self._cp_coeffs = cp_coeffs
-        self._T_min = T_min
-        self._T_max = T_max
+    b1: tuple[float, ...]
+    b2: tuple[float, ...]
+    cp_coeffs: tuple[tuple[float, float, float, float, float, float, float], ...]
+    T_min: tuple[float, ...]
+    T_max: tuple[float, ...]
 
-    @jit
+    @eqx.filter_jit
     def _cp_over_R(self, cp_coefficients: ArrayLike, temperature: ArrayLike) -> Array:
         """Heat capacity relative to the gas constant (R)
 
@@ -136,7 +97,7 @@ class ThermoCoefficients:
 
         return heat_capacity
 
-    @jit
+    @eqx.filter_jit
     def _S_over_R(
         self, cp_coefficients: ArrayLike, b2: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -167,7 +128,7 @@ class ThermoCoefficients:
 
         return entropy
 
-    @jit
+    @eqx.filter_jit
     def _H_over_RT(
         self, cp_coefficients: ArrayLike, b1: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -198,7 +159,7 @@ class ThermoCoefficients:
 
         return enthalpy
 
-    @jit
+    @eqx.filter_jit
     def _G_over_RT(
         self, cp_coefficients: ArrayLike, b1: ArrayLike, b2: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -220,7 +181,7 @@ class ThermoCoefficients:
 
         return gibbs
 
-    @jit
+    @eqx.filter_jit
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
 
@@ -234,18 +195,18 @@ class ThermoCoefficients:
         """
         # This assumes the temperature is within one of the ranges and will produce unexpected
         # output if the temperature is outside the ranges
-        T_min_array: Array = jnp.asarray(self._T_min)
-        T_max_array: Array = jnp.asarray(self._T_max)
+        T_min_array: Array = jnp.asarray(self.T_min)
+        T_max_array: Array = jnp.asarray(self.T_max)
         # Temperature must be a float array since JAX cannot raise integers to negative powers.
         temperature = jnp.asarray(temperature, dtype=jnp.float_)
         bool_mask: Array = (T_min_array <= temperature) & (temperature <= T_max_array)
         index: Array = jnp.argmax(bool_mask)
         # jax.debug.print("index = {out}", out=index)
-        cp_coeffs_for_index: Array = jnp.take(jnp.array(self._cp_coeffs), index, axis=0)
+        cp_coeffs_for_index: Array = jnp.take(jnp.array(self.cp_coeffs), index, axis=0)
         # jax.debug.print("cp_coeffs_for_index = {out}", out=cp_coeffs_for_index)
-        b1_for_index: Array = jnp.take(jnp.array(self._b1), index)
+        b1_for_index: Array = jnp.take(jnp.array(self.b1), index)
         # jax.debug.print("b1_for_index = {out}", out=b1_for_index)
-        b2_for_index: Array = jnp.take(jnp.array(self._b2), index)
+        b2_for_index: Array = jnp.take(jnp.array(self.b2), index)
         # jax.debug.print("b2_for_index = {out}", out=b2_for_index)
         gibbs_for_index: Array = self._G_over_RT(
             cp_coeffs_for_index, b1_for_index, b2_for_index, temperature
@@ -253,83 +214,44 @@ class ThermoCoefficients:
 
         return gibbs_for_index
 
-    def tree_flatten(self) -> tuple[tuple, dict[str, tuple]]:
-        children: tuple = ()
-        aux_data = {
-            "b1": self._b1,
-            "b2": self._b2,
-            "cp_coeffs": self._cp_coeffs,
-            "T_min": self._T_min,
-            "T_max": self._T_max,
-        }
-        return (children, aux_data)
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del children
-        return cls(**aux_data)
-
-
-class SpeciesData(NamedTuple):
+class SpeciesData(eqx.Module):
     """Species data
 
     Args:
-        composition: Composition
-        phase_code: Phase code
-        molar_mass: Molar mass
+        formula: Formula
+        phase: Phase
         thermodata: Thermodynamic data
     """
 
-    composition: ImmutableMap[str, tuple[int, float, float]]
-    """Composition"""
-    phase_code: int
-    """Phase code"""
-    molar_mass: float
-    """Molar mass"""
+    formula: str
+    """Formula"""
+    phase: str
+    """Phase"""
     thermodata: ThermoCoefficients
     """Thermodynamic data"""
+    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    """Composition"""
+    hill_formula: str = eqx.field(init=False)
+    """Hill formula"""
+    molar_mass: float = eqx.field(init=False)
+    """Molar mass"""
 
-    @classmethod
-    def create(
-        cls,
-        formula: str,
-        phase: str,
-        thermodata: ThermoCoefficients,
-    ) -> Self:
-        """Creates an instance
-
-        Args:
-            formula: Formula
-            phase: Phase
-            thermodata: Thermodynamic data
-
-        Returns:
-            An instance
-        """
-        mformula: Formula = Formula(formula)
-        composition: ImmutableMap[str, tuple[int, float, float]] = ImmutableMap(
-            mformula.composition().asdict()
-        )
-        molar_mass: float = mformula.mass * unit_conversion.g_to_kg
-        phase_code: int = phase_mapping[phase]
-
-        return cls(composition, phase_code, molar_mass, thermodata)
+    def __post_init__(self):
+        mformula: Formula = Formula(self.formula)
+        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.hill_formula = mformula.formula
+        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
 
     @property
     def elements(self) -> tuple[str, ...]:
         """Elements"""
         return tuple(self.composition.keys())
 
-    def formula(self) -> Formula:
-        """Formula object"""
-        formula: str = ""
-        for element, values in self.composition.items():
-            count: int = values[0]
-            formula += element
-            if count > 1:
-                formula += str(count)
-
-        return Formula(formula)
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and phase"""
+        return f"{self.hill_formula}_{self.phase}"
 
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
@@ -344,23 +266,8 @@ class SpeciesData(NamedTuple):
         """
         return self.thermodata.get_gibbs_over_RT(temperature)
 
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return f"{self.hill_formula}_{self.phase}"
 
-    @property
-    def hill_formula(self) -> str:
-        """Hill formula"""
-        return self.formula().formula
-
-    @property
-    def phase(self) -> str:
-        """JANAF phase"""
-        return inverse_phase_mapping[self.phase_code]
-
-
-class CriticalData(NamedTuple):
+class CriticalData(eqx.Module):
     """Critical temperature and pressure of a gas species
 
     Args:

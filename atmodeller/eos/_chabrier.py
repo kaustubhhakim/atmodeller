@@ -113,27 +113,6 @@ class Chabrier(RealGas):
             integration_steps,
         )
 
-    @eqx.filter_jit
-    def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
-        r"""Converts density to molar density
-
-        Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
-
-        Args:
-            log10_density_gcc: Log10 density in g/cc
-
-        Returns:
-            Molar density in :math:`\mathrm{mol}\mathrm{m}^{-3}`
-        """
-        molar_density: Array = jnp.power(10, log10_density_gcc) / unit_conversion.cm3_to_m3
-        composition_factor: float = (
-            self.He_molar_mass_g_mol * self.He_fraction
-            + self.H2_molar_mass_g_mol * (1 - self.He_fraction)
-        )
-        molar_density = molar_density / composition_factor
-
-        return molar_density
-
     @classmethod
     def _get_interpolator(cls, filename: Path) -> Callable:
         """Gets spline lookup for density from :cite:t:`CD21` T-P-rho tables.
@@ -180,6 +159,27 @@ class Chabrier(RealGas):
             return interpolator(x)
 
         return interpolator_hashable_function_wrapper
+
+    @eqx.filter_jit
+    def _convert_to_molar_density(self, log10_density_gcc: ArrayLike) -> Array:
+        r"""Converts density to molar density
+
+        Convert units: g/cm3 to mol/cm3 to mol/m3 for H2 (1e6 cm3 = 1 m3; 1 mol H2 = 2.016 g H2)
+
+        Args:
+            log10_density_gcc: Log10 density in g/cc
+
+        Returns:
+            Molar density in :math:`\mathrm{mol}\mathrm{m}^{-3}`
+        """
+        molar_density: Array = jnp.power(10, log10_density_gcc) / unit_conversion.cm3_to_m3
+        composition_factor: float = (
+            self.He_molar_mass_g_mol * self.He_fraction
+            + self.H2_molar_mass_g_mol * (1 - self.He_fraction)
+        )
+        molar_density = molar_density / composition_factor
+
+        return molar_density
 
     @override
     @eqx.filter_jit

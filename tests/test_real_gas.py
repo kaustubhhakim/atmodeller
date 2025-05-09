@@ -97,11 +97,11 @@ def test_chabrier_earth(helper) -> None:
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
-    SiO_g: Species = Species.create_gas("SiO_g")
-    SiH4_g: Species = Species.create_gas("SiH4_g")
-    SiO2_l: Species = Species.create_condensed("SiO2_l")
+    SiO_g: Species = Species.create_gas("OSi_g")
+    H4Si_g: Species = Species.create_gas("H4Si_g")
+    O2Si_l: Species = Species.create_condensed("O2Si_l")
 
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
+    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
     planet: Planet = Planet(surface_temperature=3400)
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -144,11 +144,11 @@ def test_chabrier_subNeptune(helper) -> None:
     H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
     H2O_g: Species = Species.create_gas("H2O_g")
     O2_g: Species = Species.create_gas("O2_g")
-    SiO_g: Species = Species.create_gas("SiO_g")
-    SiH4_g: Species = Species.create_gas("SiH4_g")
-    SiO2_l: Species = Species.create_condensed("SiO2_l")
+    OSi_g: Species = Species.create_gas("OSi_g")
+    H4Si_g: Species = Species.create_gas("H4Si_g")
+    O2Si_l: Species = Species.create_condensed("O2Si_l")
 
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
+    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, OSi_g, O2Si_l))
 
     surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
@@ -208,11 +208,11 @@ def test_chabrier_subNeptune_batch(helper) -> None:
         "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
     )
     O2_g: Species = Species.create_gas("O2_g")
-    SiO_g: Species = Species.create_gas("SiO_g")
-    SiH4_g: Species = Species.create_gas("SiH4_g")
-    SiO2_l: Species = Species.create_condensed("SiO2_l")
+    OSi_g: Species = Species.create_gas("OSi_g")
+    H4Si_g: Species = Species.create_gas("H4Si_g")
+    O2Si_l: Species = Species.create_condensed("O2Si_l")
 
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, SiH4_g, SiO_g, SiO2_l))
+    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, OSi_g, O2Si_l))
 
     surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg

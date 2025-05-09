@@ -17,31 +17,28 @@
 """Utilities"""
 
 import logging
-import sys
-from typing import NamedTuple
+from typing import Any, Literal
 
+import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax
+from jax import Array, lax
+from jax.tree_util import tree_map
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
 
 
-@jit
+@eqx.filter_jit
 def get_log_number_density_from_log_pressure(
     log_pressure: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -61,12 +58,12 @@ def get_log_number_density_from_log_pressure(
     return log_number_density
 
 
-@jit
+@eqx.filter_jit
 def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, a_max=max_exp_input))
 
 
-@jit
+@eqx.filter_jit
 def partial_rref_jax(matrix: Array) -> Array:
     """Computes the partial reduced row echelon form to determine linear components.
 
@@ -249,7 +246,7 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     nrows, ncols = matrix.shape
 
     augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
-    logger.debug("augmented_matrix = \n%s", augmented_matrix)
+    # debug("augmented_matrix = \n%s", augmented_matrix)
     # Permutation matrix
     # P: npt.NDArray = np.eye(nrows)
 
@@ -264,7 +261,7 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
         for j in range(i + 1, nrows):
             ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
             augmented_matrix[j] -= ratio * augmented_matrix[i]
-    logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
+    # logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
     # Backward substitution
     for i in range(ncols - 1, -1, -1):
@@ -275,18 +272,18 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
             if augmented_matrix[j, i] != 0:
                 ratio = augmented_matrix[j, i] / augmented_matrix[i, i]
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
-    logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
+    # logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
-    reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
+    # reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
     component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
-    logger.debug("reduced_matrix = \n%s", reduced_matrix)
-    logger.debug("component_matrix = \n%s", component_matrix)
+    # logger.debug("reduced_matrix = \n%s", reduced_matrix)
+    # logger.debug("component_matrix = \n%s", component_matrix)
     # logger.debug("permutation_matrix = \n%s", P)
 
     return component_matrix
 
 
-class UnitConversion(NamedTuple):
+class UnitConversion(eqx.Module):
     """Unit conversions"""
 
     atmosphere_to_bar: float = ATMOSPHERE
@@ -343,10 +340,11 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> Arra
     """
     h_grams: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
     h_kg: ArrayLike = h_grams * unit_conversion.g_to_kg
+
     return h_kg
 
 
-class ExperimentalCalibration(NamedTuple):
+class ExperimentalCalibration(eqx.Module):
     """Experimental calibration
 
     Args:
@@ -366,23 +364,8 @@ class ExperimentalCalibration(NamedTuple):
     log10_fO2_max: float | None = None
 
 
-class PyTreeNoData:
-    """A PyTree with no data"""
-
-    def tree_flatten(self) -> tuple[tuple, None]:
-        children = ()
-        aux_data = None
-        return children, aux_data
-
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        del children
-        return cls()
-
-
-@jit
-def power_law(values: ArrayLike, constant: float, exponent: float) -> Array:
+@eqx.filter_jit
+def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
     """Power law
 
     Args:
@@ -393,4 +376,72 @@ def power_law(values: ArrayLike, constant: float, exponent: float) -> Array:
     Returns:
         Evaluated power law
     """
-    return constant * jnp.power(values, exponent)
+    return jnp.power(values, exponent) * constant
+
+
+def is_arraylike_batched(x: ArrayLike) -> Literal[0, None]:
+    """Checks if x is batched.
+
+    Args:
+        x: Something arraylike
+
+    Returns:
+        0 (axis) if batched, else None (not batched)
+    """
+    return 0 if eqx.is_array(x) and x.ndim > 0 else None  # type: ignore
+
+
+def vmap_axes_spec(x: Any) -> Any:
+    """Recursively generate in_axes for vmap by checking if each leaf is batched (axis 0).
+
+    Args:
+        x: Pytree of nested containers possibly containing arrays or scalars
+
+    Returns:
+        Pytree matching the structure of x
+    """
+    return tree_map(is_arraylike_batched, x)
+
+
+def get_batch_size(x: Any) -> int:
+    """Determines the maximum batch size (i.e., length along axis 0) among all array-like leaves.
+
+    Args:
+        x: Pytree of nested containers possibly containing arrays or scalars
+
+    Returns:
+        The maximum size along axis 0 among all array-like leaves, or 0 if all leaves are scalars.
+    """
+    max_size: int = 0
+    for leaf in jax.tree_util.tree_leaves(x):
+        if eqx.is_array(leaf) and leaf.ndim > 0:
+            max_size = max(max_size, leaf.shape[0])
+
+    return max_size
+
+
+def pytree_debug(pytree: Any, name: str) -> None:
+    """Prints the pytree structure for debugging vmap.
+
+    Args:
+        pytree: Pytree to print
+        name: Name for the debug print
+    """
+    arrays, static = eqx.partition(pytree, eqx.is_array)
+    arrays_tree = tree_map(
+        lambda x: (
+            type(x),
+            "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
+        ),
+        arrays,
+    )
+    jax.debug.print("{name} arrays_tree = {out}", name=name, out=arrays_tree)
+
+    static_tree = tree_map(
+        lambda x: (
+            type(x),
+            "True" if eqx.is_array(x) else ("False" if x is not None else "None"),
+        ),
+        static,
+    )
+    jax.debug.print("{name} static_tree = {out}", name=name, out=static_tree)

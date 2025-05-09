@@ -42,7 +42,7 @@ class _CH4_basalt_ardia13(Solubility):
 
     @override
     @eqx.filter_jit
-    def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> ArrayLike:
+    def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
         pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
         one_bar_in_gpa: ArrayLike = unit_conversion.bar_to_GPa

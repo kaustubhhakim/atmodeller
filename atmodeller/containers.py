@@ -14,40 +14,28 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Pytree containers that can be use by JAX
-
-The leaves of pytrees must be JAX-compliant types, which excludes strings. So the preferred
-approach is to encode the data as JAX-compatible types and provide properties and methods that can
-reconstruct other desired quantities, notably strings and other objects. This ensures that similar
-functionality can remain together whilst accommodating the requirements of JAX-compliant pytrees.
-
-This could be improved using equinox dataclasses instead.
-"""
+"""Pytree containers that can be use by JAX"""
 
 from __future__ import annotations
 
 import logging
-import sys
 from collections.abc import Iterable, Mapping
-from dataclasses import asdict, dataclass
-from typing import Any, Callable, Literal, NamedTuple, Type
+from dataclasses import asdict
+from typing import Callable, Iterator, Literal, Type
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, jit, lax
-from jax.tree_util import register_pytree_node_class, tree_flatten, tree_map
+from jax import Array, lax
+from jax.tree_util import Partial
 from jax.typing import ArrayLike
 from lineax import QR, AbstractLinearSolver
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
 from atmodeller import (
-    INITIAL_LOG_NUMBER_DENSITY,
-    INITIAL_LOG_STABILITY,
     LOG_NUMBER_DENSITY_LOWER,
     LOG_NUMBER_DENSITY_UPPER,
     LOG_STABILITY_LOWER,
@@ -68,10 +56,10 @@ from atmodeller.utilities import (
     unit_conversion,
 )
 
-if sys.version_info < (3, 11):
+try:
+    from typing import Self  # type: ignore
+except ImportError:
     from typing_extensions import Self
-else:
-    from typing import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -79,238 +67,14 @@ logger: logging.Logger = logging.getLogger(__name__)
 np.random.seed(0)
 
 
-@dataclass
-class SolutionArguments:
-    """Container for the solution arguments
-
-    Args:
-        species: Collection of species
-        planet: Planet
-        solution: Solution array
-        fugacity_constraints: Fugacity constraints
-        mass_constraints: Mass constraints
-        solver_parameters: Solver parameters
-    """
-
-    species: SpeciesCollection
-    planet: Planet
-    solution: Array
-    fugacity_constraints: FugacityConstraints
-    mass_constraints: MassConstraints
-    solver_parameters: SolverParameters
-
-    @classmethod
-    def create_with_defaults(
-        cls,
-        species: SpeciesCollection,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-        solver_parameters: SolverParameters | None = None,
-    ) -> Self:
-        """Creates an instance with defaults applied if arguments are not specified.
-
-        Args:
-            species: Collection of species
-            planet: Planet. Defaults to None.
-            initial_log_number_density: Initial log number density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-            solver_parameters: Solver parameters. Defaults to None.
-
-        Returns:
-            An instance
-        """
-        if solver_parameters is None:
-            solver_parameters_: SolverParameters = SolverParameters()
-        else:
-            solver_parameters_ = solver_parameters
-
-        multistart: int = solver_parameters_.multistart
-
-        if planet is None:
-            planet_: Planet = Planet()
-        else:
-            planet_ = planet
-
-        if initial_log_number_density is None:
-            base_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-                len(species), dtype=np.float_
-            )
-        else:
-            base_log_number_density = initial_log_number_density
-
-        if initial_log_stability is None:
-            base_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(
-                species.number_of_stability(), dtype=np.float_
-            )
-        else:
-            base_log_stability = initial_log_stability
-
-        # base_log_number_density and base_log_stability could be 1-D arrays if the default values
-        # are taken or a 1-D array specified by the user, otherwise they could be 2-D arrays if the
-        # user has provided a batch of initial solutions. We append another dimension to the axes
-        # to account for the multistart dimension. Hence the shape becomes (1, ?)
-        base_log_number_density = np.expand_dims(base_log_number_density, axis=0)
-        base_log_stability = np.expand_dims(base_log_stability, axis=0)
-        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
-        logger.debug("base_log_number_density = %s", base_log_number_density)
-        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
-        logger.debug("base_log_stability = %s", base_log_stability)
-
-        # Multistart runs each simulation multiple times with different initial conditions.
-        base_log_number_density = np.repeat(base_log_number_density, multistart, axis=0)
-        base_log_stability = np.repeat(base_log_stability, multistart, axis=0)
-        logger.debug("base_log_number_density.shape = %s", base_log_number_density.shape)
-        logger.debug("base_log_stability.shape = %s", base_log_stability.shape)
-
-        if multistart > 1:
-            multistart_perturbation: float = solver_parameters_.multistart_perturbation
-            log_number_perturbation: ArrayLike = multistart_perturbation * (
-                2 * np.random.uniform(size=base_log_number_density.shape) - 1
-            )
-            log_stability_perturbation: ArrayLike = multistart_perturbation * (
-                2 * np.random.uniform(size=base_log_stability.shape) - 1
-            )
-
-            # Ensure first multistart retains base values
-            log_number_perturbation[0] = 0
-            log_stability_perturbation[0] = 0
-
-            log_number_density: ArrayLike = base_log_number_density + log_number_perturbation
-            log_stability: ArrayLike = base_log_stability + log_stability_perturbation
-        else:
-            log_number_density = base_log_number_density
-            log_stability = base_log_stability
-
-        logger.debug("log_number_density.shape = %s", log_number_density.shape)
-        logger.debug("log_number_density = %s", log_number_density)
-        logger.debug("log_stability.shape = %s", log_stability.shape)
-        logger.debug("log_stability = %s", log_stability)
-
-        fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            fugacity_constraints
-        )
-        mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
-
-        # Ensure both arrays have the same shape before concatenation
-        if log_number_density.ndim != log_stability.ndim:
-            raise ValueError(
-                f"Shape mismatch: log_number_density {log_number_density.shape} != log_stability {log_stability.shape}"
-            )
-        solution: Array = jnp.concatenate((log_number_density, log_stability), axis=-1)
-
-        return cls(
-            species,
-            planet_,
-            solution,
-            fugacity_constraints_,
-            mass_constraints_,
-            solver_parameters_,
-        )
-
-    @property
-    def is_batch(self) -> bool:
-        """Returns if any parameters are batched, thereby necessitating a vmap solve
-
-        This deals with potential vectorisation over planet properties, fugacity constraints, and
-        mass constraints.
-        """
-        leaves1, _ = tree_flatten(self.get_traced_parameters_vmap())
-        leaves2, _ = tree_flatten(self.get_initial_solution_vmap())
-        leaves: list = leaves1 + leaves2
-        # Check if any of the axes should be vmapped, which is defined by an entry of zero
-        contains_zero: bool = any(np.array(leaves) == 0)
-
-        return contains_zero
-
-    def get_initial_solution_vmap(self) -> int | None:
-        """Gets the vmapping axes for the initial solution estimate.
-
-        Returns:
-            Vmapping for the initial solution estimate
-        """
-        if np.ndim(self.solution) == 3:
-            return 0
-        else:
-            return None
-
-    def get_traced_parameters(self) -> TracedParameters:
-        """Gets traced parameters
-
-        Returns:
-            Traced parameters
-        """
-        return TracedParameters(self.planet, self.fugacity_constraints, self.mass_constraints)
-
-    def get_traced_parameters_vmap(self) -> TracedParameters:
-        """Gets the vmapping axes for tracer parameters.
-
-        Returns:
-            Vmapping for tracer parameters
-        """
-        traced_parameters_vmap: TracedParameters = TracedParameters(
-            planet=self.planet.vmap_axes(),
-            fugacity_constraints=self.fugacity_constraints.vmap_axes(),
-            mass_constraints=self.mass_constraints.vmap_axes(),
-        )
-
-        return traced_parameters_vmap
-
-    def override(
-        self,
-        planet: Planet | None = None,
-        initial_log_number_density: ArrayLike | None = None,
-        initial_log_stability: ArrayLike | None = None,
-        fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-        mass_constraints: Mapping[str, ArrayLike] | None = None,
-    ) -> SolutionArguments:
-        """Overrides values
-
-        Args:
-            planet: Planet. Defaults to None.
-            initial_log_number_density. Defaults to None.
-            initial_log_stability: Initial log stability. Defaults to None.
-            fugacity_constraints: Fugacity constraints. Defaults to None.
-            mass_constraints: Mass constraints. Defaults to None.
-
-        Returns:
-            An instance
-        """
-        self_asdict: dict[str, Any] = asdict(self)
-        to_merge: dict[str, Any] = {}
-
-        if planet is not None:
-            to_merge["planet"] = planet
-        if initial_log_number_density is not None:
-            to_merge["initial_log_number_density"] = initial_log_number_density
-        if initial_log_stability is not None:
-            to_merge["initial_log_stability"] = initial_log_stability
-        if fugacity_constraints:
-            to_merge["fugacity_constraints"] = FugacityConstraints.create(fugacity_constraints)
-        if mass_constraints:
-            to_merge["mass_constraints"] = MassConstraints.create(mass_constraints)
-
-        merged_dict: dict[str, Any] = self_asdict | to_merge
-
-        return SolutionArguments(**merged_dict)
-
-
-@register_pytree_node_class
-class SpeciesCollection(tuple):
+class SpeciesCollection(eqx.Module):
     """A collection of species
-
-    TODO: Tidy up this class. Bit clunky subclassing a tuple, but it works for now.
 
     Args:
         species: Species
     """
 
-    def __new__(cls, species: Iterable[Species]):
-        return super().__new__(cls, tuple(species))
+    data: tuple[Species, ...] = eqx.field(converter=tuple)
 
     @classmethod
     def create(cls, species_names: Iterable[str]) -> Self:
@@ -334,32 +98,32 @@ class SpeciesCollection(tuple):
         return cls(species_list)
 
     @property
-    def number(self: tuple[Species, ...]) -> int:
+    def number(self) -> int:
         """Number of species"""
-        return len(self)
+        return len(self.data)
 
-    def get_condensed_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_condensed_species_indices(self) -> Array:
         """Gets the indices of condensed species
 
         Returns:
             Indices of the condensed species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.phase != "g":
                 indices.append(nn)
 
-        return tuple(indices)
+        return jnp.array(indices, dtype=jnp.int_)
 
-    def get_diatomic_oxygen_index(self: tuple[Species, ...]) -> int:
+    def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
         Returns:
             Index of diatomic oxygen, or the first index if diatomic oxygen is not in the species
         """
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.hill_formula == "O2":
-                logger.debug("Found O2 at index = %d", nn)
+                # logger.debug("Found O2 at index = %d", nn)
                 return nn
 
         # TODO: Bad practice to return the first index because it could be wrong and therefore give
@@ -369,74 +133,72 @@ class SpeciesCollection(tuple):
         # and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_gas_species_indices(self) -> Array:
         """Gets the indices of gas species
 
         Returns:
             Indices of the gas species
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.data.phase == "g":
                 indices.append(nn)
 
-        return tuple(indices)
+        return jnp.array(indices, dtype=jnp.int_)
 
-    def get_lower_bound(self: SpeciesCollection) -> ArrayLike:
+    def get_lower_bound(self: SpeciesCollection) -> Array:
         """Gets the lower bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
 
-    def get_upper_bound(self: SpeciesCollection) -> ArrayLike:
+    def get_upper_bound(self: SpeciesCollection) -> Array:
         """Gets the upper bound for truncating the solution during the solve"""
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
-    def get_molar_masses(self: tuple[Species, ...]) -> tuple[float, ...]:
+    def get_molar_masses(self) -> Array:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: tuple[float, ...] = tuple([species_.data.molar_mass for species_ in self])
-
-        logger.debug("molar_masses = %s", molar_masses)
+        molar_masses: Array = jnp.array([species_.data.molar_mass for species_ in self.data])
+        # logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
 
-    def get_species_names(self: tuple[Species, ...]) -> tuple[str, ...]:
+    def get_species_names(self) -> tuple[str, ...]:
         """Gets the names of all species.
 
         Returns:
             Species names
         """
-        return tuple([species_.name for species_ in self])
+        return tuple([species_.name for species_ in self.data])
 
-    def get_stability_species_indices(self: tuple[Species, ...]) -> tuple[int, ...]:
+    def get_stability_species_indices(self) -> Array:
         """Gets the indices of species to solve for stability
 
         Returns:
             Indices of the species to solve for stability
         """
         indices: list[int] = []
-        for nn, species_ in enumerate(self):
+        for nn, species_ in enumerate(self.data):
             if species_.solve_for_stability:
                 indices.append(nn)
 
-        return tuple(indices)
+        return jnp.array(indices, dtype=jnp.int_)
 
-    def get_stability_species_mask(self: tuple[Species, ...]) -> npt.NDArray[np.bool_]:
+    def get_stability_species_mask(self) -> Array:
         """Gets the stability species mask
 
         Returns:
             Mask for the species to solve for the stability
         """
-        # Find the species to solve for stability
-        stability_bool: npt.NDArray[np.bool_] = np.array(
-            [species.solve_for_stability for species in self], dtype=np.bool_
+        stability_bool: Array = jnp.array(
+            [species.solve_for_stability for species in self.data], dtype=jnp.bool_
         )
 
         return stability_bool
 
-    def get_unique_elements_in_species(self: tuple[Species, ...]) -> tuple[str, ...]:
+    def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements.
 
         Args:
@@ -446,12 +208,12 @@ class SpeciesCollection(tuple):
             Unique elements in the species ordered alphabetically
         """
         elements: list[str] = []
-        for species_ in self:
+        for species_ in self.data:
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         sorted_elements: list[str] = sorted(unique_elements)
 
-        logger.debug("unique_elements_in_species = %s", sorted_elements)
+        # logger.debug("unique_elements_in_species = %s", sorted_elements)
 
         return tuple(sorted_elements)
 
@@ -461,7 +223,7 @@ class SpeciesCollection(tuple):
 
     def _get_hypercube_bound(
         self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
-    ) -> ArrayLike:
+    ) -> Array:
         """Gets the bound on the hypercube
 
         Args:
@@ -480,25 +242,23 @@ class SpeciesCollection(tuple):
             )
         )
 
-        return bound
+        return jnp.array(bound)
 
-    def tree_flatten(self) -> tuple[tuple, None]:
-        return (self, None)
+    def __getitem__(self, index: int) -> Species:
+        return self.data[index]
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        return cls(children)
+    def __iter__(self) -> Iterator[Species]:
+        return iter(self.data)
 
-
-# region: Containers for traced parameters
+    def __len__(self) -> int:
+        return len(self.data)
 
 
 class TracedParameters(eqx.Module):
     """Traced parameters
 
-    As the name says, these are parameters that should be traced, inasmuch as they may be
-    updated by the user for rapid repeat calculations.
+    These are parameters that should be traced, inasmuch as they may be updated by the user for
+    repeat calculations.
 
     Args:
         planet: Planet
@@ -604,14 +364,6 @@ class Planet(eqx.Module):
 
         return base_dict
 
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        return tree_map(lambda x: 0 if not jnp.isscalar(x) else None, self)
-
 
 class NormalisedMass(eqx.Module):
     """Normalised mass for conventional outgassing
@@ -644,8 +396,7 @@ class NormalisedMass(eqx.Module):
         return self.mass * (1 - self.melt_fraction)
 
 
-# TODO: Converting this to eqx.module break the tests.
-class ConstantFugacityConstraint(NamedTuple):
+class ConstantFugacityConstraint(eqx.Module):
     """A constant fugacity constraint
 
     This must adhere to FugacityConstraintProtocol
@@ -655,22 +406,21 @@ class ConstantFugacityConstraint(NamedTuple):
     """
 
     fugacity: ArrayLike
-    # TODO: This is a temporary hack so this class has the same number of arguments as for the
-    # redox protocol and hence the vmapping works
-    dummy_does_nothing: ArrayLike | None = None
 
     @property
     def value(self) -> ArrayLike:
         return self.fugacity
 
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+        del temperature
         del pressure
         log_fugacity_value: ArrayLike = jnp.log(self.fugacity)
 
-        return jnp.full_like(temperature, log_fugacity_value)
+        return log_fugacity_value
 
 
-class FugacityConstraints(NamedTuple):
+class FugacityConstraints(eqx.Module):
     """Fugacity constraints
 
     These are applied as constraints on the gas activity.
@@ -730,7 +480,7 @@ class FugacityConstraints(NamedTuple):
 
         return out
 
-    @jit
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity
 
@@ -741,8 +491,9 @@ class FugacityConstraints(NamedTuple):
         Returns:
             Log fugacity
         """
+        # Partial to avoid the late-binding closure issue
         fugacity_funcs: list[Callable] = [
-            constraint.log_fugacity for constraint in self.constraints.values()
+            Partial(constraint.log_fugacity) for constraint in self.constraints.values()
         ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
@@ -760,14 +511,16 @@ class FugacityConstraints(NamedTuple):
                 pressure,
             )
 
-        vmap_apply_function: Callable = jax.vmap(apply_fugacity_function, in_axes=(0, None, None))
+        vmap_apply_function: Callable = eqx.filter_vmap(
+            apply_fugacity_function, in_axes=(0, None, None)
+        )
         indices: Array = jnp.arange(len(self.constraints))
         log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity
 
-    @jit
+    @eqx.filter_jit
     def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log number density
 
@@ -785,28 +538,11 @@ class FugacityConstraints(NamedTuple):
 
         return log_number_density
 
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        constraints_vmap: dict[str, FugacityConstraintProtocol] = {}
-
-        for key, constraint in self.constraints.items():
-            if jnp.isscalar(constraint.value):
-                vmap_axis: int | None = None
-            else:
-                vmap_axis = 0
-            constraints_vmap[key] = type(constraint)(vmap_axis, None)  # type: ignore - container
-
-        return FugacityConstraints(ImmutableMap(constraints_vmap))  # type: ignore - container
-
     def __bool__(self) -> bool:
         return bool(self.constraints)
 
 
-class MassConstraints(NamedTuple):
+class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
     Args:
@@ -836,8 +572,8 @@ class MassConstraints(NamedTuple):
 
         for element, mass_constraint in sorted_mass.items():
             molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log_abundance_: Array = (
-                jnp.log(mass_constraint) + jnp.log(AVOGADRO) - jnp.log(molar_mass)
+            log_abundance_: ArrayLike = (
+                np.log(mass_constraint) + np.log(AVOGADRO) - np.log(molar_mass)
             )
             log_abundance[element] = log_abundance_
 
@@ -858,7 +594,7 @@ class MassConstraints(NamedTuple):
 
         return out
 
-    @jit
+    @eqx.filter_jit
     def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Array:
         """Log number density
 
@@ -873,7 +609,7 @@ class MassConstraints(NamedTuple):
 
         return log_number_density
 
-    @jit
+    @eqx.filter_jit
     def log_maximum_number(self) -> Array:
         """Log of the maximum abundance
 
@@ -884,33 +620,10 @@ class MassConstraints(NamedTuple):
 
         return jnp.max(log_abundance)
 
-    def vmap_axes(self) -> Self:
-        """Gets vmap axes.
-
-        Returns:
-            vmap axes
-        """
-        log_abundance_vmap: dict[str, int | None] = {}
-
-        for key, log_abundance in self.log_abundance.items():
-            if jnp.isscalar(log_abundance):
-                vmap_axis: int | None = None
-            else:
-                vmap_axis = 0
-            log_abundance_vmap[key] = vmap_axis
-
-        logger.debug("log_abundance_vmap = %s", log_abundance_vmap)
-
-        return MassConstraints(ImmutableMap(log_abundance_vmap))  # type: ignore - container
-
     def __bool__(self) -> bool:
         return bool(self.log_abundance)
 
 
-# endregion
-
-
-# region: Containers for fixed parameters
 class FixedParameters(eqx.Module):
     """Parameters that are always fixed for a calculation
 
@@ -934,27 +647,27 @@ class FixedParameters(eqx.Module):
 
     species: SpeciesCollection
     """Collection of species"""
-    formula_matrix: tuple[tuple[float, ...], ...]
+    formula_matrix: npt.NDArray[np.int_]
     """Formula matrix"""
-    formula_matrix_constraints: tuple[tuple[float, ...], ...]
+    formula_matrix_constraints: npt.NDArray[np.int_]
     """Formula matrix for applying mass constraints"""
-    reaction_matrix: tuple[tuple[float, ...], ...]
+    reaction_matrix: npt.NDArray[np.float_]
     """Reaction matrix"""
-    reaction_stability_matrix: tuple[tuple[float, ...], ...]
+    reaction_stability_matrix: npt.NDArray[np.float_]
     """Reaction stability matrix"""
-    stability_species_indices: tuple[int, ...]
+    stability_species_indices: Array
     """Indices of species to solve for stability"""
-    fugacity_matrix: tuple[tuple[float, ...], ...]
+    fugacity_matrix: Array
     """Fugacity constraint matrix"""
-    gas_species_indices: tuple[int, ...]
+    gas_species_indices: Array
     """Indices of gas species"""
-    condensed_species_indices: tuple[int, ...]
+    condensed_species_indices: Array
     """Indices of condensed species"""
-    fugacity_species_indices: tuple[int, ...]
+    fugacity_species_indices: Array
     """Indices of species to constrain the fugacity"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
-    molar_masses: tuple[float, ...]
+    molar_masses: Array
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""
@@ -1058,7 +771,7 @@ class SolverParameters(eqx.Module):
     """Maximum number of steps the solver can take"""
     jac: Literal["fwd", "bwd"] = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
-    multistart: int = 1
+    multistart: int = 10
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
@@ -1072,6 +785,3 @@ class SolverParameters(eqx.Module):
             norm=self.norm,
             linear_solver=self.linear_solver(),  # type: ignore because there is a parameter
         )
-
-
-# endregion

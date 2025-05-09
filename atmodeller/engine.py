@@ -86,77 +86,105 @@ def solve(
 
 
 @eqx.filter_jit
-def select_valid_solutions(
-    sol: Array, solver_status: Array, solver_steps: Array
-) -> tuple[Array, Array, Array]:
-    """Selects a single valid solution for each simulation from sol, using solver_status.
+def repeat_solver(
+    solver_fn: Callable,
+    base_initial_solution: Array,
+    initial_solution: Array,
+    initial_status: Array,
+    initial_steps: Array,
+    traced_parameters: TracedParameters,
+    multistart_perturbation: float,
+    max_attempts: int,
+    key: Array,
+) -> tuple[int, Array, Array, Array]:
+    """Repeat solver until a solution is found
 
     Args:
-        sol: Solution array of shape (multistarts, simulations, solution) or
-            (multistarts, solution)
-        solver_status: Status array of shape (multistarts, simulations) or (multistarts,)
-
-    Returns:
-        Reduced array of shape (simulations, solution)
-        First valid index for each simulation
-        Number of steps for each simulation
+        solver_fn: Solver function with pre-bound fixed configuration
+        base_initial_solution: Base initial solution to perturb if necessary
+        initial_solution: Initial solution after first solve
+        initial_status: Initial status after first solve
+        initial_steps: Initial steps after first solve
+        traced_parameters: Traced parameters
+        multistart_perturbation: Multistart perturbation
+        max_attempts: Maximum attempts
+        key: Random key
     """
-    # jax.debug.print("sol = {out}", out=sol)
-    # jax.debug.print("solver_status = {out}", out=solver_status)
-    # jax.debug.print("solver_steps = {out}", out=solver_steps)
-    # Check if input is 3D (multistarts, simulations, solution) or 2D (multistarts, solution)
-    is_3d: int = sol.ndim == 3
 
-    if is_3d:
-        _, simulations, _ = sol.shape  # Get shape
-    else:
-        _, _ = sol.shape
-        simulations: int = 1  # Treat as single simulation for uniform indexing
+    def body_fn(state: tuple) -> tuple[int, Array, Array, Array, Array, Array]:
+        """Perform one iteration of the solver retry loop
 
-        # Expand dims for uniform processing
-        sol = sol[:, None, :]  # (multistarts, 1, solution)
-        solver_status = solver_status[:, None]  # (multistarts, 1)
-        solver_steps = solver_steps[:, None]  # (multistarts, 1)
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                key: PRNG key for random number generation
+                solution: Current solution array
+                status: Boolean array indicating successful solutions
+                steps: Step count or similar solver output
+                base_initial_solution: Unperturbed base initial solution
 
-    # Find the first valid index per simulation using jnp.argmax
-    # If all multistarts failed for a given case, this will return the first index
-    first_valid_index: Array = jnp.argmax(solver_status, axis=0)  # (simulations,)
-    # jax.debug.print("first_valid_index = {out}", out=first_valid_index)
+        Returns:
+            Updated state tuple with incremented attempt index, potentially perturbed
+            solutions, updated status, updated steps, and unmodified base initial solution
+        """
+        i, key, solution, status, _, base_initial_solution = state
 
-    # Gather the selected solutions (simulations, solution_dim)
-    selected_solutions: Array = sol[first_valid_index, jnp.arange(simulations)]
-    selected_steps: Array = solver_steps[first_valid_index, jnp.arange(simulations)]
-    # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
-    # jax.debug.print("selected_steps = {out}", out=selected_steps)
+        failed_mask: Array = ~status
+        key, subkey = jax.random.split(key)
 
-    # Find if there is any valid solution. This allows us to maintain the same array size
-    # (important for computing the output) whilst at the same time keeping tracking of failed cases
-    # with a -1 index. These failed cases can then later be filtered out during output, if the user
-    # desires.
-    has_valid_solution: Array = jnp.any(solver_status, axis=0)  # (simulations,)
-    first_valid_index = jnp.where(has_valid_solution, first_valid_index, -1)
-    selected_steps = jnp.where(has_valid_solution, selected_steps, 0)
+        # Implements a simple perturbation of the base initial solution, but something more
+        # sophisticated could be implemented, such as training a network or using a regressor
+        # to inform the next guess of the models that failed from the ones that succeeded.
+        perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
+        raw_perturb: Array = jax.random.uniform(
+            subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
+        )
+        perturbations: Array = jnp.where(
+            failed_mask[:, None],
+            multistart_perturbation * raw_perturb,
+            jnp.zeros_like(solution),
+        )
+        new_initial_solution = jnp.where(
+            failed_mask[:, None], base_initial_solution + perturbations, solution
+        )
 
-    # Keep the same dimensions for all output, so below line is commented out
-    # if not is_3d:
-    #    selected_solutions = selected_solutions.squeeze(0)  # Remove extra dimension for 2D case
+        new_solution, new_status, new_steps = solver_fn(new_initial_solution, traced_parameters)
 
-    # jax.debug.print("selected_solutions = {out}", out=selected_solutions)
+        return (i + 1, key, new_solution, new_status, new_steps, base_initial_solution)
 
-    return selected_solutions, first_valid_index, selected_steps
+    def cond_fn(state: tuple) -> Array:
+        """Check if the solver should continue retrying
 
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                _: Unused (PRNG key)
+                _: Unused (solution)
+                status: Boolean array indicating success of each solution
+                _: Unused (steps)
+                _: Unused (base initial solution)
 
-@eqx.filter_jit
-def objective_function(solution: Array, kwargs: dict) -> Array:
-    """Residual of the reaction network and mass balance
+        Returns:
+            A boolean array indicating whether retries should continue (True if
+            any solution failed and attempts are still available)
+        """
+        i, _, _, status, _, _ = state
 
-    Args:
-        kwargs: Dictionary of pytrees required to compute the residual
+        return jnp.logical_and(i < max_attempts, jnp.any(~status))
 
-    Returns:
-        Residual
-    """
-    return compute_residual(solution, kwargs)
+    initial_state: tuple = (
+        1,  # A first solve has already been attempted before repeat_solver is called
+        key,
+        initial_solution,
+        initial_status,
+        initial_steps,
+        base_initial_solution,
+    )
+    final_i, _, final_solution, final_status, final_steps, _ = lax.while_loop(
+        cond_fn, body_fn, initial_state
+    )
+
+    return final_i, final_solution, final_status, final_steps
 
 
 @eqx.filter_jit
@@ -207,7 +235,7 @@ def get_min_log_elemental_abundance_per_species(
 
 
 @eqx.filter_jit
-def compute_residual(solution: Array, kwargs: dict) -> Array:
+def objective_function(solution: Array, kwargs: dict) -> Array:
     """Residual of the reaction network and mass balance
 
     Args:
@@ -223,12 +251,12 @@ def compute_residual(solution: Array, kwargs: dict) -> Array:
     temperature: ArrayLike = planet.temperature
     fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
     mass_constraints: MassConstraints = traced_parameters.mass_constraints
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
+    gas_species_indices: Array = fixed_parameters.gas_species_indices
 
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     reaction_stability_matrix: Array = jnp.array(fixed_parameters.reaction_stability_matrix)
-    stability_species_indices: Array = jnp.array(fixed_parameters.stability_species_indices)
-    fugacity_matrix: Array = jnp.array(fixed_parameters.fugacity_matrix)
+    stability_species_indices: Array = fixed_parameters.stability_species_indices
+    fugacity_matrix: Array = fixed_parameters.fugacity_matrix
     # We only need the formula matrix for elements with mass constraints
     formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
     # jax.debug.print("Starting new residual evaluation")
@@ -538,7 +566,7 @@ def get_log_activity(
             total_pressure,
         )
 
-    vmap_apply_function: Callable = jax.vmap(apply_activity_function, in_axes=(0,))
+    vmap_apply_function: Callable = eqx.filter_vmap(apply_activity_function, in_axes=(0,))
     indices: Array = jnp.arange(len(species))
     log_activity_pure_species: Array = vmap_apply_function(indices)
     # jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
@@ -737,6 +765,7 @@ def get_species_ppmw_in_melt(
     total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
     diatomic_oxygen_fugacity: Array = jnp.take(fugacity, diatomic_oxygen_index)
 
+    # NOTE: All solubility formulations must return a JAX array to allow vmapping
     solubility_funcs: list[Callable] = [
         species_.solubility.jax_concentration for species_ in species
     ]
@@ -751,7 +780,7 @@ def get_species_ppmw_in_melt(
             diatomic_oxygen_fugacity,
         )
 
-    vmap_apply_function: Callable = jax.vmap(apply_solubility_function, in_axes=(0, 0))
+    vmap_apply_function: Callable = eqx.filter_vmap(apply_solubility_function, in_axes=(0, 0))
     indices: ArrayLike = jnp.arange(len(species))
     species_ppmw: Array = vmap_apply_function(indices, fugacity)
     # jax.debug.print("ppmw = {out}", out=ppmw)

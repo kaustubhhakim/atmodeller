@@ -34,6 +34,7 @@ print("Atmodeller initialized with double precision (float64)")
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_infs", False)
 # jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_log_compiles", True)
 
 # Thermodynamic standard state
 ENTHALPY_REFERENCE: float = 298.15

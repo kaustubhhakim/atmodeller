@@ -35,8 +35,6 @@ try:
 except ImportError:
     from typing_extensions import override  # Python 3.11 and earlier
 
-iron_wustite_buffer: RedoxBufferProtocol = IronWustiteBuffer()
-
 
 class Solubility(eqx.Module):
     """Solubility interface
@@ -53,7 +51,7 @@ class Solubility(eqx.Module):
         temperature: ArrayLike | None = None,
         pressure: ArrayLike | None = None,
         fO2: ArrayLike | None = None,
-    ) -> ArrayLike:
+    ) -> Array:
         """Concentration in ppmw
 
         Args:
@@ -69,7 +67,7 @@ class Solubility(eqx.Module):
     @eqx.filter_jit
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
-    ) -> ArrayLike:
+    ) -> Array:
         """Wrapper to pass concentration arguments by position to use with JAX lax.switch
 
         Args:
@@ -102,8 +100,7 @@ class NoSolubility(Solubility):
         del pressure
         del fO2
 
-        # Must be 0.0 (float) for JAX array type compliance
-        return 0.0
+        return jnp.array(0.0)  # For JAX compatibility
 
 
 class SolubilityPowerLaw(Solubility):
@@ -112,14 +109,12 @@ class SolubilityPowerLaw(Solubility):
     Args:
         constant: Constant
         exponent: Exponent
-
-    Attributes:
-        constant: Constant
-        exponent: Exponent
     """
 
     constant: float
+    """Constant"""
     exponent: float
+    """Exponent"""
 
     @override
     @eqx.filter_jit
@@ -137,13 +132,12 @@ class SolubilityPowerLawLog10(Solubility):
         log10_constant: Log10 constant
         log10_exponent: Log10 exponent
 
-    Attributes:
-        log10_constant: Log10 constant
-        log10_exponent: Log10 exponent
     """
 
     log10_constant: float
+    """Log10 constant"""
     log10_exponent: float
+    """Log10 exponent"""
 
     @override
     @eqx.filter_jit
@@ -153,6 +147,7 @@ class SolubilityPowerLawLog10(Solubility):
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
 
 
+@eqx.filter_jit
 def fO2_temperature_correction(
     fO2: ArrayLike,
     *,
@@ -167,7 +162,7 @@ def fO2_temperature_correction(
     fO2 shift at arbitrary temperature.
 
     Args:
-        fO2: Absolute oxygen fugacity at `temperature`, in bar
+        fO2: Absolute oxygen fugacity at `temperature` in bar
         temperature: Temperature in K
         pressure: Absolute pressure in bar
         reference_temperature: Reference temperature, which is usually the temperature at which the
@@ -176,6 +171,7 @@ def fO2_temperature_correction(
     Returns:
         Adjusted fO2
     """
+    iron_wustite_buffer: RedoxBufferProtocol = IronWustiteBuffer()
     logiw_fugacity_at_current_temp: ArrayLike = iron_wustite_buffer.log10_fugacity(
         temperature, pressure
     )

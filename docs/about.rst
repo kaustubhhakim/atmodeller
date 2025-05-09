@@ -9,5 +9,6 @@ Authors:
 
 * Dan J. Bower (lead developer, ETH Zurich)
 * Maggie A. Thompson (ETHZ Zurich/Carnegie)
+* Kaustubh Hakim (KU Leuven/Royal Observatory of Belgium)
 * Meng Tian (LMU Munich)
 * Paolo A. Sossi (ETH Zurich)

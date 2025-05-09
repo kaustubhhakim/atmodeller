@@ -26,7 +26,7 @@ from atmodeller.thermodata._redox_buffers import (
     IronWustiteBufferHirschmann,
     IronWustiteBufferHirschmann08,
     IronWustiteBufferHirschmann21,
-    RedoxBufferProtocol,
+    RedoxBuffer,
 )
 from atmodeller.utilities import unit_conversion
 
@@ -55,7 +55,7 @@ TEST_ABOVE_SWITCH_TEMPERATURE: ArrayLike = 1100
 
 def test_IW_Hirschmann08() -> None:
     """Tests the low temperature iron-wustite buffer :cite:p:`OP93,HGD08`"""
-    buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann08(LOG10_SHIFT, None)
+    buffer: RedoxBuffer = IronWustiteBufferHirschmann08(LOG10_SHIFT, None)
 
     log10_fugacity: ArrayLike = buffer.log10_fugacity(
         TEST_BELOW_SWITCH_TEMPERATURE, TEST_LOW_PRESSURE
@@ -71,7 +71,7 @@ def test_IW_Hirschmann21() -> None:
     The values below agree with the calculator provided in Table S7 of the Excel spreadsheet
     provided in the supplementary materials of the online publication.
     """
-    buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann21(LOG10_SHIFT, None)
+    buffer: RedoxBuffer = IronWustiteBufferHirschmann21(LOG10_SHIFT, None)
 
     log10_fugacity: ArrayLike = buffer.log10_fugacity(TEST_LOW_TEMPERATURE, TEST_LOW_PRESSURE)
     logger.info("log10_fugacity (Low T, low P) = %s", log10_fugacity)
@@ -124,9 +124,9 @@ def test_IW_Hirschmann21() -> None:
 def test_IW_Hirschmann() -> None:
     """Tests the switch between the high and low temperature iron-wustite buffer."""
 
-    low_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann08(LOG10_SHIFT, None)
-    high_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann21(LOG10_SHIFT, None)
-    composite_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann(LOG10_SHIFT, None)
+    low_temperature_buffer: RedoxBuffer = IronWustiteBufferHirschmann08(LOG10_SHIFT, None)
+    high_temperature_buffer: RedoxBuffer = IronWustiteBufferHirschmann21(LOG10_SHIFT, None)
+    composite_buffer: RedoxBuffer = IronWustiteBufferHirschmann(LOG10_SHIFT, None)
 
     # Evaluate the buffers either side of the switch temperature.
     log10_fugacity_low_temperature: ArrayLike = low_temperature_buffer.log10_fugacity(
@@ -155,7 +155,7 @@ def test_IW_Hirschmann08_fixed_P() -> None:
     of the fugacity.
     """
     # Define an evaluation pressure at 1 bar
-    buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann08(LOG10_SHIFT, 1)
+    buffer: RedoxBuffer = IronWustiteBufferHirschmann08(LOG10_SHIFT, 1)
 
     log10_fugacity_low_pressure: ArrayLike = buffer.log10_fugacity(
         TEST_BELOW_SWITCH_TEMPERATURE, TEST_LOW_PRESSURE

@@ -24,8 +24,6 @@ from typing import Callable, Sequence
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
-import numpy.typing as npt
 from jax import Array, lax
 from jax.typing import ArrayLike
 
@@ -56,7 +54,7 @@ class CombinedRealGas(RealGas):
     """Real gases to combine"""
     calibrations: tuple[ExperimentalCalibration, ...]
     """Experimental calibrations"""
-    _upper_pressure_bounds: npt.NDArray = eqx.field(init=False, static=True)
+    _upper_pressure_bounds: tuple[float, ...] = eqx.field(init=False)
 
     def __post_init__(self):
         self._upper_pressure_bounds = self._get_upper_pressure_bounds()
@@ -138,12 +136,15 @@ class CombinedRealGas(RealGas):
         return tuple(eos.volume for eos in self.real_gases)
 
     @property
+    def upper_pressure_bounds(self) -> Array:
+        return jnp.array(self._upper_pressure_bounds)
+
+    @property
     def volume_integral_functions(self) -> tuple[Callable, ...]:
         """Volume integral functions"""
         return tuple(eos.volume_integral for eos in self.real_gases)
 
-    # Jitting might cause problem with initialization?
-    def _get_upper_pressure_bounds(self) -> npt.NDArray:
+    def _get_upper_pressure_bounds(self) -> tuple[float, ...]:
         """Gets the upper pressure bounds based on each experimental calibration.
 
         Returns:
@@ -164,7 +165,7 @@ class CombinedRealGas(RealGas):
             pressure_bound = calibration.pressure_max
             upper_pressure_bounds.append(pressure_bound)
 
-        return np.array(upper_pressure_bounds)
+        return tuple(upper_pressure_bounds)
 
     @eqx.filter_jit
     def _get_index(self, pressure: ArrayLike) -> Array:
@@ -176,7 +177,7 @@ class CombinedRealGas(RealGas):
         Returns:
             Index of the relevant EOS model
         """
-        index: Array = jnp.searchsorted(self._upper_pressure_bounds, pressure, side="right")
+        index: Array = jnp.searchsorted(self.upper_pressure_bounds, pressure, side="right")
         # jax.debug.print("pressure = {pressure}, index = {index}", pressure=pressure, index=index)
 
         return index
@@ -207,7 +208,7 @@ class CombinedRealGas(RealGas):
         volume: Array = jnp.where(index == 0, first_volume, 0.0)
 
         # Scan over the indices of the EOS models.
-        loop_indices: Array = jnp.arange(1, self._upper_pressure_bounds.shape[0] + 1)
+        loop_indices: Array = jnp.arange(1, self.upper_pressure_bounds.shape[0] + 1)
         volume, _ = lax.scan(scan_fn, volume, loop_indices)
 
         return volume
@@ -255,16 +256,14 @@ class CombinedRealGas(RealGas):
             """
             # jax.debug.print("scan_fn: i = {out}", out=i)
             pressure_low = lax.dynamic_index_in_dim(
-                self._upper_pressure_bounds, i - 1, keepdims=False
+                self.upper_pressure_bounds, i - 1, keepdims=False
             )
             # jax.debug.print("pressure_low = {out}", out=pressure_low)
 
             # Middle integrals
             mask_middle: Array = i < index
             # jax.debug.print("mask_middle = {out}", out=mask_middle)
-            pressure_high = lax.dynamic_index_in_dim(
-                self._upper_pressure_bounds, i, keepdims=False
-            )
+            pressure_high = lax.dynamic_index_in_dim(self.upper_pressure_bounds, i, keepdims=False)
             # jax.debug.print("pressure_high = {out}", out=pressure_high)
             contrib_middle: Array = compute_integral(i, pressure_high, pressure_low)
             carry = carry + jnp.where(mask_middle, contrib_middle, 0.0)
@@ -294,7 +293,7 @@ class CombinedRealGas(RealGas):
             integral: Array = lax.switch(0, self.volume_integral_functions, temperature, pressure)
             # Otherwise, the first integral is added to the total integral.
             pressure_max: Array = lax.dynamic_index_in_dim(
-                self._upper_pressure_bounds, 0, keepdims=False
+                self.upper_pressure_bounds, 0, keepdims=False
             )
             integral2: Array = lax.switch(
                 0, self.volume_integral_functions, temperature, pressure_max
@@ -308,7 +307,7 @@ class CombinedRealGas(RealGas):
         total_integral = add_first_integral(total_integral)
 
         # Scan over the indices of the EOS models.
-        loop_indices: Array = jnp.arange(1, self._upper_pressure_bounds.shape[0] + 1)
+        loop_indices: Array = jnp.arange(1, self.upper_pressure_bounds.shape[0] + 1)
         # jax.debug.print("loop_indices = {out}", out=loop_indices)
         total_integral, _ = lax.scan(scan_fn, total_integral, loop_indices)
 
@@ -349,9 +348,7 @@ class UpperBoundRealGas(RealGas):
         Args:
             temperature: Temperature in K
         """
-        # FIXME: Just to recover previous tests. Then swap in dzdp approach.
-        return 0
-        # return self.real_gas.dzdp(temperature, self.p_eval)
+        return self.real_gas.dzdp(temperature, self.p_eval)
 
     @override
     @eqx.filter_jit

@@ -16,33 +16,28 @@
 #
 """Redox buffers"""
 
-import sys
-from abc import ABC, abstractmethod
+from __future__ import annotations
+
+from abc import abstractmethod
 from typing import Type
 
+import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, jit
-from jax.tree_util import register_pytree_node_class
+from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
-
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
+try:
+    from typing import override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override  # Python 3.11 and earlier
 
 
-class RedoxBuffer(ABC, RedoxBufferProtocol):
+class RedoxBuffer(eqx.Module):
     """Redox buffer
 
-    Child classes must set self._calibration
+    This must adhere to FugacityConstraintProtocol
 
     Args:
         log10_shift: Log10 shift relative to the buffer. Defaults to 0.
@@ -51,29 +46,24 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
             should be used with caution.
     """
 
-    def __init__(
-        self,
-        log10_shift: ArrayLike = 0,
-        evaluation_pressure: ArrayLike | None = 1.0,
-    ):
-        self.log10_shift: ArrayLike = log10_shift
-        """ Log10 shift relative to the buffer"""
-        self.evaluation_pressure: ArrayLike | None = evaluation_pressure
-        """Pressure to evaluate the buffer at"""
+    log10_shift: ArrayLike = 0
+    evaluation_pressure: ArrayLike | None = 1.0
+    calibration: eqx.AbstractVar[ExperimentalCalibration] = eqx.field(init=False)
 
     @property
-    def calibration(self) -> ExperimentalCalibration:
-        """Experimental calibration"""
-        return self._calibration
+    def value(self) -> ArrayLike:
+        return self.log10_shift
 
     @abstractmethod
-    def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike: ...
+    def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
+        """Converts the pressure units
 
-    def get_scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
-        if self.evaluation_pressure is not None:
-            return self.convert_pressure_units(self.evaluation_pressure)
-        else:
-            return self.convert_pressure_units(pressure)
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            Pressure in units appropriate for the calculation
+        """
 
     @abstractmethod
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
@@ -87,8 +77,23 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
             Log10 fugacity at the buffer
         """
 
+    @eqx.filter_jit
+    def get_scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
+        """Gets the scaled pressure.
+
+        Args:
+            pressure: Pressure in bar
+
+        Returns:
+            Pressure in units appropriate for the calculation
+        """
+        if self.evaluation_pressure is not None:
+            return self.convert_pressure_units(self.evaluation_pressure)
+        else:
+            return self.convert_pressure_units(pressure)
+
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity
 
@@ -102,7 +107,7 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
         return self.log10_fugacity_buffer(temperature, pressure) + self.log10_shift
 
     @override
-    @jit
+    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log fugacity
 
@@ -115,18 +120,7 @@ class RedoxBuffer(ABC, RedoxBufferProtocol):
         """
         return self.log10_fugacity(temperature, pressure) * jnp.log(10)
 
-    def tree_flatten(self) -> tuple[tuple[ArrayLike, ArrayLike | None], None]:
-        children = (self.log10_shift, self.evaluation_pressure)
-        aux_data = None
-        return children, aux_data
 
-    @classmethod
-    def tree_unflatten(cls, aux_data, children) -> Self:
-        del aux_data
-        return cls(*children)
-
-
-@register_pytree_node_class
 class IronWustiteBufferHirschmann08(RedoxBuffer):
     """Iron-wustite buffer :cite:p:`OP93,HGD08`
 
@@ -137,22 +131,21 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
         evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
             the total pressure will be used, but this can give rise to multiple solutions and
             should be used with caution.
+        calibration: Experimental calibration
     """
 
-    @override
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0):
-        self._calibration: ExperimentalCalibration = ExperimentalCalibration(
-            pressure_max=27.5 * unit_conversion.GPa_to_bar
-        )
-        super().__init__(log10_shift, evaluation_pressure)
+    calibration: ExperimentalCalibration = ExperimentalCalibration(
+        pressure_max=27.5 * unit_conversion.GPa_to_bar
+    )
 
     @override
+    @eqx.filter_jit
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
         """Units are bar"""
         return pressure
 
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity
 
@@ -174,7 +167,6 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
         return log10_fugacity_buffer
 
 
-@register_pytree_node_class
 class IronWustiteBufferHirschmann21(RedoxBuffer):
     """Iron-wustite buffer :cite:p:`H21`
 
@@ -187,29 +179,29 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
             the total pressure will be used, but this can give rise to multiple solutions and
             should be used with caution.
+        calibration: Experimental calibration
+        a-h: Coefficients
     """
 
-    @override
-    def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1.0):
-        super().__init__(log10_shift, evaluation_pressure)
-        self._calibration: ExperimentalCalibration = ExperimentalCalibration(
-            temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
-        )
-        self._a: tuple[float, ...] = (6.844864, 1.175691e-1, 1.143873e-3, 0, 0)
-        self._b: tuple[float, ...] = (5.791364e-4, -2.891434e-4, -2.737171e-7, 0.0, 0.0)
-        self._c: tuple[float, ...] = (-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7)
-        self._d: tuple[float, ...] = (-2.769002e4, 5.285977e2, -2.919275, 0, 0)
-        self._e: tuple[float, ...] = (8.463095, -3.000307e-3, 7.213445e-5, 0, 0)
-        self._f: tuple[float, ...] = (1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0)
-        self._g: tuple[float, ...] = (-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4)
-        self._h: tuple[float, ...] = (-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0)
+    calibration: ExperimentalCalibration = ExperimentalCalibration(
+        temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
+    )
+    a: tuple[float, ...] = (6.844864, 1.175691e-1, 1.143873e-3, 0, 0)
+    b: tuple[float, ...] = (5.791364e-4, -2.891434e-4, -2.737171e-7, 0.0, 0.0)
+    c: tuple[float, ...] = (-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7)
+    d: tuple[float, ...] = (-2.769002e4, 5.285977e2, -2.919275, 0, 0)
+    e: tuple[float, ...] = (8.463095, -3.000307e-3, 7.213445e-5, 0, 0)
+    f: tuple[float, ...] = (1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0)
+    g: tuple[float, ...] = (-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4)
+    h: tuple[float, ...] = (-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0)
 
     @override
+    @eqx.filter_jit
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
         """Units are GPa"""
         return pressure * unit_conversion.bar_to_GPa
 
-    @jit
+    @eqx.filter_jit
     def _evaluate_m(self, pressure: ArrayLike, coefficients: tuple[float, ...]) -> Array:
         """Evaluates an m parameter
 
@@ -230,7 +222,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return m
 
-    @jit
+    @eqx.filter_jit
     def _evaluate_fO2(
         self,
         temperature: ArrayLike,
@@ -256,7 +248,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return log10fO2
 
-    @jit
+    @eqx.filter_jit
     def _fcc_bcc_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """log10fO2 for fcc and bcc iron
 
@@ -268,12 +260,12 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
             log10fO2 for fcc and bcc iron
         """
         log10fO2: Array = self._evaluate_fO2(
-            temperature, pressure, (self._a, self._b, self._c, self._d)
+            temperature, pressure, (self.a, self.b, self.c, self.d)
         )
 
         return log10fO2
 
-    @jit
+    @eqx.filter_jit
     def _hcp_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """log10fO2 for hcp iron
 
@@ -285,12 +277,12 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
             log10fO2 for hcp iron
         """
         log10fO2: Array = self._evaluate_fO2(
-            temperature, pressure, (self._e, self._f, self._g, self._h)
+            temperature, pressure, (self.e, self.f, self.g, self.h)
         )
 
         return log10fO2
 
-    @jit
+    @eqx.filter_jit
     def _use_hcp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Check to use hcp iron formulation for fO2
 
@@ -307,7 +299,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         return jnp.array(pressure) > threshold
 
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity
 
@@ -333,7 +325,6 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         return buffer_value
 
 
-@register_pytree_node_class
 class IronWustiteBufferHirschmann(RedoxBuffer):
     """Composite iron-wustite buffer using :cite:t:`OP93,HGD08` and :cite:t:`H21`
 
@@ -342,32 +333,31 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         evaluation_pressure: Pressure to evaluate the buffer at. Defaults to 1 bar. If None, then
             the total pressure will be used, but this can give rise to multiple solutions and
             should be used with caution.
+        calibration: Experimental calibration
     """
 
-    @override
-    def __init__(
-        self,
-        log10_shift: ArrayLike = 0,
-        evaluation_pressure: ArrayLike | None = 1.0,
-    ):
-        super().__init__(log10_shift, evaluation_pressure)
-        self._low_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann08(
-            log10_shift, evaluation_pressure
+    calibration: ExperimentalCalibration = ExperimentalCalibration(
+        pressure_max=100 * unit_conversion.GPa_to_bar
+    )
+    low_temperature_buffer: RedoxBuffer = eqx.field(init=False)
+    high_temperature_buffer: RedoxBuffer = eqx.field(init=False)
+
+    def __post_init__(self):
+        self.low_temperature_buffer = IronWustiteBufferHirschmann08(
+            self.log10_shift, self.evaluation_pressure
         )
-        self._high_temperature_buffer: RedoxBufferProtocol = IronWustiteBufferHirschmann21(
-            log10_shift, evaluation_pressure
-        )
-        self._calibration: ExperimentalCalibration = ExperimentalCalibration(
-            pressure_max=100 * unit_conversion.GPa_to_bar
+        self.high_temperature_buffer = IronWustiteBufferHirschmann21(
+            self.log10_shift, self.evaluation_pressure
         )
 
     # Not used for a composite redox buffer but required by the interface
     @override
+    @eqx.filter_jit
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
         """Units are bar"""
         return pressure
 
-    @jit
+    @eqx.filter_jit
     def _use_low_temperature(self, temperature: ArrayLike) -> Array:
         """Check to use the low temperature buffer for fO2
 
@@ -377,10 +367,10 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         Returns:
             True/False whether to use the low temperature formulation
         """
-        return jnp.asarray(temperature) < self._high_temperature_buffer.calibration.temperature_min
+        return jnp.asarray(temperature) < self.high_temperature_buffer.calibration.temperature_min
 
     @override
-    @jit
+    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         """Gets the log10 fugacity at the buffer
 
@@ -393,10 +383,10 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         """
 
         def low_temperature_case() -> ArrayLike:
-            return self._low_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
+            return self.low_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
 
         def high_temperature_case() -> ArrayLike:
-            return self._high_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
+            return self.high_temperature_buffer.log10_fugacity_buffer(temperature, pressure)
 
         buffer_value: Array = jnp.where(
             self._use_low_temperature(temperature),
@@ -407,4 +397,4 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         return buffer_value
 
 
-IronWustiteBuffer: Type[RedoxBufferProtocol] = IronWustiteBufferHirschmann
+IronWustiteBuffer: Type[RedoxBuffer] = IronWustiteBufferHirschmann
