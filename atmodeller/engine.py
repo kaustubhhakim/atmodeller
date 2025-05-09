@@ -135,7 +135,7 @@ def repeat_solver(
         # Implements a simple perturbation of the base initial solution, but something more
         # sophisticated could be implemented, such as training a network or using a regressor
         # to inform the next guess of the models that failed from the ones that succeeded.
-        perturb_shape: tuple[Array, ...] = (solution.shape[0], solution.shape[1])
+        perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
         raw_perturb: Array = jax.random.uniform(
             subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
         )
