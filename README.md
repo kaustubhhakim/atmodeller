@@ -14,6 +14,10 @@ Atmodeller is a Python package that uses [JAX](https://jax.readthedocs.io/en/lat
 
 ## Documentation
 
+The documentation is available online, with options to download it in EPUB or PDF format:
+
+[https://atmodeller.readthedocs.io/en/latest/](https://atmodeller.readthedocs.io/en/latest/)
+
 ## Quick install
 
 Atmodeller is a Python package that can be installed on a variety of platforms (e.g. Mac, Windows, Linux). It is recommended to install Atmodeller in a dedicated Python environment. Before installation, create and activate the environment, then run:
