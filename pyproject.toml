@@ -20,7 +20,7 @@ seaborn = "^0.13.2"
 typing-extensions = "^4.12.2"
 optax = "^0.2.4"
 xmmutablemap = "^0.1"
-optimistix = { git = "https://github.com/ExPlanetology/optimistix.git", branch = "gauss-newton-clip" }
+optimistix = "0.0.10"
 jax = "0.5.3"
 equinox = "0.12.1"
 
