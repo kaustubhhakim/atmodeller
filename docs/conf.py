@@ -30,7 +30,7 @@ copyright = "2024, Dan J. Bower"
 author = "Dan J. Bower"
 
 # The full version, including alpha/beta/rc tags
-release = "0.3.1"
+release = "0.5.0"
 
 
 # -- General configuration ---------------------------------------------------

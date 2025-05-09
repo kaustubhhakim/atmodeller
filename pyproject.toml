@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "atmodeller"
-version = "0.4.0"
+version = "0.5.0"
 description = "Volatile partitioning between a rocky interior and atmosphere"
 authors = ["Dan J Bower <djbower@users.noreply.github.com>"]
 license = "GPL-3.0-or-later"

@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-__version__: str = "0.4.0"
+__version__: str = "0.5.0"
 
 import logging
 

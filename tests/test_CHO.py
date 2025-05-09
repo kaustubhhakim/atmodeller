@@ -45,7 +45,7 @@ solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
 def test_version():
     """Test version."""
-    assert __version__ == "0.4.0"
+    assert __version__ == "0.5.0"
 
 
 def test_H2O(helper) -> None:
