@@ -10,17 +10,17 @@
 [![Python package](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml/badge.svg)](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml)
 
 ## About
-Atmodeller is a Python package that leverages [JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under [The GNU General Public License v3.0 or later](https://www.gnu.org/licenses/gpl-3.0.en.html).
+Atmodeller is a Python package that uses [JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under [The GNU General Public License v3.0 or later](https://www.gnu.org/licenses/gpl-3.0.en.html).
 
-Documentation will eventually be available on readthedocs, but for the time being you can access the latest manual [here](https://www.dropbox.com/scl/fi/pmlldk2kcd8n0be7rvcw7/atmodeller.pdf?rlkey=rdsa6o7s3l83kbnpqqtj7u61n&dl=0)
+## Documentation
 
-Current development team:
+## Quick install
 
-- Dan J. Bower (lead developer, ETH Zurich)
-- Maggie A. Thompson (ETH Zurich/Carnegie)
-- Kaustubh Hakim (KU Leuven/Royal Observatory of Belgium)
-- Meng Tian (LMU Munich)
-- Paolo A. Sossi (ETH Zurich)
+Atmodeller is a Python package that can be installed on a variety of platforms (e.g. Mac, Windows, Linux). It is recommended to install Atmodeller in a dedicated Python environment. Before installation, create and activate the environment, then run:
+
+```pip install atmodeller```
+
+Downloading the source code is also recommended if you'd like access to the example notebooks in `notebooks/`.
 
 ## Citation
 
@@ -30,7 +30,7 @@ If you use Atmodeller please cite (prior to manuscript submission, check back to
 
 ## Basic usage
 
-There are Jupyter notebooks in `notebooks/` that provide code snippets for how to perform single and batch calculations, as well as include Atmodeller into a time integration.
+Jupyter notebooks in the `notebooks/` directory demonstrate how to perform single and batch calculations, and how to integrate Atmodeller into time-dependent simulations. A simple example of how to use Atmodeller is provided below:
 
 ```
 from atmodeller import (
@@ -83,58 +83,3 @@ print("solution_asdict =", solution_asdict)
 # Write the complete solution to Excel
 output.to_excel("example_single")
 ```
-
-## Installation
-
-Atmodeller is a Python package that can be installed on a variety of platforms (e.g. Mac, Windows, Linux).
-
-### Quick install
-
-If you want to use a GUI to install the code, particularly if you are a Windows or Spyder user, see [here](https://gist.github.com/djbower/c82b4a70a3c3c74ad26dc572edefdd34). Otherwise, follow the instructions below to install the code using the terminal on a Mac or Linux system.
-
-### 1. Obtain the source code
-
-Navigate to a location on your computer and obtain the source code. To clone using ssh, where you must use a password-protected SSH key:
-
-    git clone git@github.com:ExPlanetology/atmodeller.git
-    cd atmodeller
-
-Instructions for connecting to GitHub with SSH are available [here](https://docs.github.com/en/authentication/connecting-to-github-with-ssh).
-
-If you do not have SSH keys set up, instead you can clone using HTTPS:
-
-    git clone https://github.com/ExPlanetology/atmodeller.git
-    cd atmodeller
-
-### 2. Create a Python environment
-
-The basic procedure is to install Atmodeller into a Python environment. For example, if you are using a Conda distribution to create Python environments (e.g. [Anaconda](https://www.anaconda.com/download)), create a new environment to install Atmodeller. Atmodeller requires Python >= 3.10:
-
-    conda create -n atmodeller python
-    conda activate atmodeller
-
-### 3. Install into the environment
-
-Install Atmodeller into the environment using either (a) [Poetry](https://python-poetry.org) or (b) [pip](https://pip.pypa.io/en/stable/getting-started/). If you are a developer you will probably prefer to use Poetry and if you are an end-user you will probably prefer to use pip. This [Gist](https://gist.github.com/djbower/e9538e7eb5ed3deaf3c4de9dea41ebcd) provides further information.
-
-#### 3a. Option 1: Poetry
-
-This requires that you have you have [Poetry](https://python-poetry.org) installed:
-
-    poetry install
-
-#### 3b. Option 2: pip
-
-Alternatively, use `pip`, where you can include the `-e` option if you want an [editable install ](https://setuptools.pypa.io/en/latest/userguide/development_mode.html).
-
-    pip install .
-
-If desired, you will need to manually install the dependencies for testing and documentation (these are automatically installed by Poetry but not when using `pip`). See the additional dependencies to install in `pyproject.toml`.
-
-### Developer install
-
-See this [developer setup guide](https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3) to set up your system to develop Atmodeller using [VS Code](https://code.visualstudio.com) and [Poetry](https://python-poetry.org).
-
-## Examples
-
-Several examples are provided in `notebooks/`.
