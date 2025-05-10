@@ -205,7 +205,8 @@ class InteriorAtmosphere:
                 f"The number of multistarts required was {required_multistarts}, "
                 "which can depend on the choice of the random seed"
             )
-            logger.info("solution = %s", solution)
+
+        logger.debug("solution = %s", solution)
 
     def get_fixed_parameters(
         self, fugacity_constraints: FugacityConstraints, mass_constraints: MassConstraints
