@@ -64,11 +64,19 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 #
 # html_theme = "alabaster"
 html_theme = "sphinx_rtd_theme"
+html_logo = "logo200x200.png"
+html_context = {
+    "display_github": True,
+    "github_user": "ExPlanetology",
+    "github_repo": "atmodeller",
+    "github_version": "main",
+    "conf_py_path": "/docs/",
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+# html_static_path = ["_static"]
 
 numfig = True
 
@@ -86,6 +94,7 @@ autodoc_default_options = {
     "undoc-members": False,
 }
 
+latex_logo = "logo.png"
 # Disable the automatic inclusion of the Python module index in the LaTeX PDF output
 latex_domain_indices = False
 

@@ -9,41 +9,50 @@ Community development of the code is strongly encouraged so please contact the l
 Installation
 ------------
 
-For instructions on developer installation, see :ref:`developer_install`. Note that you may need to install the group dependencies for dev and docs manually if you are using `pip` to install. For example, you may need to install `pytest` manually into your development environment.
+See :ref:`developer_install` for how to install *Atmodeller* and the extra dependencies required for the developer tools and documentation.
  
 Pre-commit
 ----------
 
-Before issuing a pull request to the main repository, run pre-commit
-
-.. code-block:: shell
+Run pre-commit before issuing a pull request to the main repository::
 
     pre-commit run --all-files
 
 Documentation
 -------------
 
-Documentation will eventually be available on Read the Docs, but for the time being, you can compile (and contribute, if you wish) to the documentation in the `docs/` directory. If you are using Poetry you need to use the `--with docs` option when you run `poetry install`. See `here <https://python-poetry.org/docs/managing-dependencies/>`_ for further information.
+.. note::
+    Documentation should be consistent with the source code, so any changes to the source code should be reflected in changes to the documentation, if required.
 
-Once the necessary dependencies are installed to compile the documentation, you can navigate into the `docs/` directory and run:
+When the doc dependencies have been installed the documentation can be compiled::
 
-.. code-block:: shell
+    cd docs
+    sphinx-apidoc -f -o source ../atmodeller
+
+To generate HTML documentation::
 
     make html
 
-And/or to compile the documentation as a PDF where `latexpdf` must be available on your system:
-
-.. code-block:: shell
+To generate PDF documentation, noting that ``latexpdf`` must be available on your system::
 
     make latexpdf
 
-This will build the documentation in the appropriately named subdirectory in `_build`.
+Documentation is built the appropriately named subdirectory in ``_build``.
 
 Tests
 -----
 
-You can confirm that all tests pass by running::
+.. note::
+    Tests should be consistent with the source code, so any changes to the source code should be reflected in changes to the test suite, if required.
+
+You can confirm that all tests pass by navigating to the root directory of *Atmodeller* and running::
     
     pytest
     
-in the root directory of *Atmodeller*. Please add a corresponding unit test for new features that you develop.
+Similarly, to test coverage::
+
+    pytest --cov
+
+The percentage test coverage is reported in ``README.md`` but requires manual update.
+
+Add a corresponding test for new features that are developed.

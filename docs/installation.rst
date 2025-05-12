@@ -3,61 +3,102 @@ Installation
 
 *Atmodeller* is a Python package that can be installed on a variety of platforms (e.g. Mac, Windows, Linux).
 
-Quick install
--------------
+Python environment
+------------------
+It is recommended to install *Atmodeller* into a virtual environment, see for example: https://docs.python.org/3/library/venv.html.
 
-With a Python environment active::
+1. Quick install
+----------------
+
+Use pip::
 
     pip install atmodeller
 
+Downloading the source code is also recommended if you'd like access to the example notebooks in ``notebooks/``.
+
 .. _developer_install:
 
-Developer install
------------------
+2. Developer install
+--------------------
 
-First steps
-^^^^^^^^^^^
+2a. Fork and clone the repository
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The instructions below clone the main repository. However, if you prefer to fork the repository first, you should update the repository address accordingly before cloning.
+If you plan to contribute to *Atmodeller* or want to work independently, it's recommended to first fork the repository to your own GitHub account. This gives you full control over your changes without affecting the original repository.
 
-- Navigate to a location on your computer and obtain the source code. To clone using ssh, where you must use a password-protected SSH key::
+Follow these steps:
 
-    git clone git@github.com:ExPlanetology/atmodeller.git
+- Visit the main repository on GitHub: https://github.com/ExPlanetology/atmodeller
+- Click the **Fork** button (usually in the top-right corner).
+- Choose whether to fork to your personal account or an organization you belong to.
+
+Once you have forked the repository, you can then proceed to clone **your forked copy** instead of the original.
+
+When cloning your fork:
+
+- If using SSH::
+
+    git clone git@github.com:<your-username>/atmodeller.git
     cd atmodeller
 
-Instructions for connecting to GitHub with SSH are available `here <https://docs.github.com/en/authentication/connecting-to-github-with-ssh>`_.
+- If using HTTPS::
 
-- If you do not have SSH keys set up, instead you can clone using HTTPS::
-
-    git clone https://github.com/ExPlanetology/atmodeller.git
+    git clone https://github.com/<your-username>/atmodeller.git
     cd atmodeller
 
-- Set up a Python environment to install *Atmodeller*. This can be achieved via a GUI or command line tools.
+Replace ``<your-username>`` with your actual GitHub username. You can now work on your fork independently, create branches, and later submit a pull request to the main repository if desired.
 
-- Install *Atmodeller* into the environment using either (a) `Poetry <https://python-poetry.org>`_ or (b) `pip <https://pip.pypa.io/en/stable/getting-started/>`_.
+.. note::
+
+    It is also possible to simply clone the main repository directly, without forking, if you do not intend to make contributions or want to keep things simple.
+
+2b. Install *Atmodeller*
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Use either Option 1: `Poetry <https://python-poetry.org>`_ or Option 2: `pip <https://pip.pypa.io/en/stable/getting-started/>`_.
 
 Option 1: Poetry
 ^^^^^^^^^^^^^^^^
 
 This requires that you have `Poetry <https://python-poetry.org>`_ installed:
 
-.. code-block:: shell
+To install the core *Atmodeller* package::
 
     poetry install
+
+To include developer tools (e.g. testing and linting)::
+
+    poetry install --extras "dev"
+
+To also include documentation build dependencies::
+
+    poetry install --extras "dev docs"
 
 Option 2: pip
 ^^^^^^^^^^^^^
 
-Alternatively, use `pip`, where you can include the `-e` option if you want an `editable install <https://setuptools.pypa.io/en/latest/userguide/development_mode.html>`_.
+Alternatively, use pip. You may use the ``-e`` option for an `editable install <https://setuptools.pypa.io/en/latest/userguide/development_mode.html>`_::
 
-.. code-block:: shell
+    pip install -e .
 
-    pip install .
+To install additional dependencies:
 
-If desired, you will need to manually install the dependencies for testing and documentation because these are automatically installed by Poetry but not by `pip`. See the additional group dependencies to install in `pyproject.toml`.
+- For development tools::
 
-Additional information
-^^^^^^^^^^^^^^^^^^^^^^
+      pip install -e .[dev]
 
-- See this `developer setup guide <https://gist.github.com/djbower/c66474000029730ac9f8b73b96071db3>`_ to set up your system to develop *Atmodeller* using `VS Code <https://code.visualstudio.com>`_ and `Poetry <https://python-poetry.org>`_.
-- This `Gist <https://gist.github.com/djbower/e9538e7eb5ed3deaf3c4de9dea41ebcd>`_ provides further information about the interoperability of Poetry and pip.
+- For documentation tools::
+
+      pip install -e .[docs]
+
+- For both::
+
+      pip install -e .[dev,docs]
+
+.. note::
+
+    Zsh treats square brackets (`[ ]`) as globbing characters. You must quote or escape them when using `pip`. Use either of the following::
+
+        pip install -e '.[dev]'
+        # or
+        pip install -e .\[dev\]
