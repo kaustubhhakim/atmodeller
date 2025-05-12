@@ -127,8 +127,8 @@ def test_H_fO2_fH2(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
-        "O2_g": IronWustiteBuffer(np.array([-1, 0, 1], dtype=np.float_)),
-        "H2_g": ConstantFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6], dtype=np.float_)),
+        "O2_g": IronWustiteBuffer(np.array([-1, 0, 1], dtype=np.float64)),
+        "H2_g": ConstantFugacityConstraint(np.array([1.0e-8, 1.0e-7, 1.0e-6], dtype=np.float64)),
     }
 
     interior_atmosphere.solve(
@@ -160,8 +160,8 @@ def test_H_fO2_batch_temperature(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Number of surface temperatures is different to number of species to test array shapes work.
-    surface_temperatures: npt.NDArray[np.float_] = np.array(
-        [1500, 2000, 2500, 3000], dtype=np.float_
+    surface_temperatures: npt.NDArray[np.float64] = np.array(
+        [1500, 2000, 2500, 3000], dtype=np.float64
     )
     planet: Planet = Planet(surface_temperature=surface_temperatures)
 
@@ -224,7 +224,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
 
     # Set up a range of fO2 shifts
     num: int = 4
-    fO2_shifts: npt.NDArray[np.float_] = np.linspace(-10, 10, num, dtype=np.float_)
+    fO2_shifts: npt.NDArray[np.float64] = np.linspace(-10, 10, num, dtype=np.float64)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(fO2_shifts)
     }

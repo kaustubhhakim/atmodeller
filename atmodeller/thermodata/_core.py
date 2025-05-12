@@ -198,7 +198,7 @@ class ThermoCoefficients(eqx.Module):
         T_min_array: Array = jnp.asarray(self.T_min)
         T_max_array: Array = jnp.asarray(self.T_max)
         # Temperature must be a float array since JAX cannot raise integers to negative powers.
-        temperature = jnp.asarray(temperature, dtype=jnp.float_)
+        temperature = jnp.asarray(temperature, dtype=jnp.float64)
         bool_mask: Array = (T_min_array <= temperature) & (temperature <= T_max_array)
         index: Array = jnp.argmax(bool_mask)
         # jax.debug.print("index = {out}", out=index)

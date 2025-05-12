@@ -220,8 +220,8 @@ class InteriorAtmosphere:
         Returns:
             Fixed parameters
         """
-        reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
-        reaction_stability_matrix: npt.NDArray[np.float_] = self.get_reaction_stability_matrix()
+        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
+        reaction_stability_matrix: npt.NDArray[np.float64] = self.get_reaction_stability_matrix()
         gas_species_indices: Array = self.species.get_gas_species_indices()
         condensed_species_indices: Array = self.species.get_condensed_species_indices()
         stability_species_indices: Array = self.species.get_stability_species_indices()
@@ -318,7 +318,7 @@ class InteriorAtmosphere:
 
         return tuple(sorted_elements)
 
-    def get_reaction_matrix(self) -> npt.NDArray[np.float_]:
+    def get_reaction_matrix(self) -> npt.NDArray[np.float64]:
         """Gets the reaction matrix.
 
         Returns:
@@ -329,26 +329,26 @@ class InteriorAtmosphere:
             return np.array([])
 
         transpose_formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix().T
-        reaction_matrix: npt.NDArray[np.float_] = partial_rref(transpose_formula_matrix)
+        reaction_matrix: npt.NDArray[np.float64] = partial_rref(transpose_formula_matrix)
 
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
 
-    def get_reaction_stability_matrix(self) -> npt.NDArray[np.float_]:
+    def get_reaction_stability_matrix(self) -> npt.NDArray[np.float64]:
         """Gets the reaction stability matrix.
 
         Returns:
             Reaction stability matrix
         """
-        reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
+        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
         mask: npt.NDArray[np.bool_] = np.zeros_like(reaction_matrix, dtype=bool)
 
         if reaction_matrix.size > 0:
             # Find the species to solve for stability
             stability_bool: Array = self.species.get_stability_species_mask()
             mask[:, stability_bool] = True
-            reaction_stability_matrix: npt.NDArray[np.float_] = reaction_matrix * mask
+            reaction_stability_matrix: npt.NDArray[np.float64] = reaction_matrix * mask
         else:
             reaction_stability_matrix = reaction_matrix
 
@@ -362,7 +362,7 @@ class InteriorAtmosphere:
         Returns:
             Reactions as a dictionary
         """
-        reaction_matrix: npt.NDArray[np.float_] = self.get_reaction_matrix()
+        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
         reactions: dict[int, str] = {}
         if reaction_matrix.size != 0:
             for reaction_index in range(reaction_matrix.shape[0]):
@@ -409,11 +409,11 @@ def _broadcast_component(
         ValueError: If the input array has an unexpected shape or inconsistent dimensions
     """
     if component is None:
-        base: Array = jnp.full((dim,), default_value, dtype=jnp.float_)
+        base: Array = jnp.full((dim,), default_value, dtype=jnp.float64)
     else:
-        component = jnp.asarray(component, dtype=jnp.float_)
+        component = jnp.asarray(component, dtype=jnp.float64)
         if component.ndim == 0:
-            base = jnp.full((dim,), component.item(), dtype=jnp.float_)
+            base = jnp.full((dim,), component.item(), dtype=jnp.float64)
         elif component.ndim == 1:
             if component.shape[0] != dim:
                 raise ValueError(f"{name} should have shape ({dim},), got {component.shape}")

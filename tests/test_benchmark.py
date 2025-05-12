@@ -19,6 +19,7 @@
 import logging
 
 import numpy as np
+import numpy.typing as npt
 import pytest
 from jax.typing import ArrayLike
 
@@ -436,8 +437,8 @@ def test_water_condensed(helper) -> None:
     }
 
     # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: ArrayLike = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float_
+    initial_log_number_density: npt.NDArray[np.float64] = INITIAL_LOG_NUMBER_DENSITY * np.ones(
+        len(species), dtype=np.float64
     )
     # For this case, reducing the fO2 is required for the solver to latch onto the solution
     initial_log_number_density[2] = -INITIAL_LOG_NUMBER_DENSITY

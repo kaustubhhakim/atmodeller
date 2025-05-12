@@ -498,7 +498,7 @@ class FugacityConstraints(eqx.Module):
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
         # Temperature must be a float array to ensure branches have have identical types
-        temperature = jnp.asarray(temperature, dtype=jnp.float_)
+        temperature = jnp.asarray(temperature, dtype=jnp.float64)
 
         def apply_fugacity_function(
             index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
@@ -651,9 +651,9 @@ class FixedParameters(eqx.Module):
     """Formula matrix"""
     formula_matrix_constraints: npt.NDArray[np.int_]
     """Formula matrix for applying mass constraints"""
-    reaction_matrix: npt.NDArray[np.float_]
+    reaction_matrix: npt.NDArray[np.float64]
     """Reaction matrix"""
-    reaction_stability_matrix: npt.NDArray[np.float_]
+    reaction_stability_matrix: npt.NDArray[np.float64]
     """Reaction stability matrix"""
     stability_species_indices: Array
     """Indices of species to solve for stability"""
