@@ -25,13 +25,14 @@ from typing import Callable, Iterator, Literal, Type
 
 import equinox as eqx
 import jax.numpy as jnp
+import lineax as lx
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, lax
 from jax.tree_util import Partial
 from jax.typing import ArrayLike
-from lineax import QR, AbstractLinearSolver
+from lineax import AbstractLinearSolver
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
@@ -761,7 +762,7 @@ class SolverParameters(eqx.Module):
     """Absolute tolerance"""
     rtol: float = 1.0e-6
     """Relative tolerance"""
-    linear_solver: Type[AbstractLinearSolver] = QR
+    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
     """Linear solver"""
     norm: Callable = optx.max_norm
     """Norm""" ""
@@ -783,5 +784,7 @@ class SolverParameters(eqx.Module):
             rtol=self.rtol,
             atol=self.atol,
             norm=self.norm,
-            linear_solver=self.linear_solver(),  # type: ignore because there is a parameter
+            linear_solver=self.linear_solver,  # type: ignore because there is a parameter
+            # For debugging LM solver. Not valid for all solvers (e.g. Newton)
+            # verbose=frozenset({"step_size", "y", "loss", "accepted"}),
         )
