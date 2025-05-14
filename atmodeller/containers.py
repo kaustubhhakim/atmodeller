@@ -147,13 +147,31 @@ class SpeciesCollection(eqx.Module):
 
         return jnp.array(indices, dtype=jnp.int_)
 
-    def get_lower_bound(self: SpeciesCollection) -> Array:
-        """Gets the lower bound for truncating the solution during the solve"""
-        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
+    def get_lower_bound(self: SpeciesCollection, number_fugacity_constraints: int) -> Array:
+        """Gets the lower bound for truncating the solution during the solve
 
-    def get_upper_bound(self: SpeciesCollection) -> Array:
-        """Gets the upper bound for truncating the solution during the solve"""
-        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
+        Args:
+            number_fugacity_constraints: Number of fugacity constraints
+
+        Returns:
+            Lower bound for truncating the solution during the solve
+        """
+        return self._get_hypercube_bound(
+            LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER, number_fugacity_constraints
+        )
+
+    def get_upper_bound(self: SpeciesCollection, number_fugacity_constraints: int) -> Array:
+        """Gets the upper bound for truncating the solution during the solve
+
+        Args:
+            number_fugacity_constraints: Number of fugacity constraints
+
+        Returns:
+            Upper bound for truncating the solution during the solve
+        """
+        return self._get_hypercube_bound(
+            LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER, number_fugacity_constraints
+        )
 
     def get_molar_masses(self) -> Array:
         """Gets the molar masses of all species.
@@ -223,18 +241,24 @@ class SpeciesCollection(eqx.Module):
         return len(self.get_stability_species_indices())
 
     def _get_hypercube_bound(
-        self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
+        self: SpeciesCollection,
+        log_number_density_bound: float,
+        stability_bound: float,
+        number_fugacity_constraints: int,
     ) -> Array:
         """Gets the bound on the hypercube
 
         Args:
             log_number_density_bound: Bound on the log number density
             stability_bound: Bound on the stability
+            number_fugacity_constraints: Number of fugacity constraints
 
         Returns:
             Bound on the hypercube which contains the root
         """
-        log_number_density: ArrayLike = log_number_density_bound * np.ones(self.number)
+        log_number_density: ArrayLike = log_number_density_bound * np.ones(
+            self.number - number_fugacity_constraints
+        )
 
         bound: ArrayLike = np.concatenate(
             (
@@ -542,6 +566,9 @@ class FugacityConstraints(eqx.Module):
     def __bool__(self) -> bool:
         return bool(self.constraints)
 
+    def __len__(self) -> int:
+        return len(self.constraints)
+
 
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
@@ -623,6 +650,9 @@ class MassConstraints(eqx.Module):
 
     def __bool__(self) -> bool:
         return bool(self.log_abundance)
+
+    def __len__(self) -> int:
+        return len(self.log_abundance)
 
 
 class FixedParameters(eqx.Module):
@@ -756,7 +786,7 @@ class SolverParameters(eqx.Module):
         multistart_perturbation: Perturbation for multistart. Defaults to 30.
     """
 
-    solver: Type[OptxSolver] = optx.LevenbergMarquardt
+    solver: Type[OptxSolver] = optx.Newton
     """Solver"""
     atol: float = 1.0e-6
     """Absolute tolerance"""

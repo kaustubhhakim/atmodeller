@@ -44,6 +44,7 @@ from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
     Planet,
+    SolverParameters,
     Species,
     SpeciesCollection,
     TracedParameters,
@@ -78,6 +79,7 @@ class Output:
         solver_steps: Number of solver steps
         fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
+        solver_parameters: Solver parameters
     """
 
     def __init__(
@@ -88,6 +90,7 @@ class Output:
         solver_steps: Array,
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
+        solver_parameters: SolverParameters,
     ):
         logger.debug("Creating Output")
         self._species: SpeciesCollection = species
@@ -96,6 +99,7 @@ class Output:
         self._solver_steps: Array = solver_steps
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
+        self._solver_parameters: SolverParameters = solver_parameters
 
         # Calculate the index at which to split the array
         split_index: int = self._solution.shape[1] - self._species.number_of_stability()
@@ -758,6 +762,7 @@ class Output:
                 {
                     "traced_parameters": self.traced_parameters_vmap,
                     "fixed_parameters": None,
+                    "solver_parameters": None,
                 },
             ),
         )
@@ -766,6 +771,7 @@ class Output:
             {
                 "traced_parameters": self._traced_parameters,
                 "fixed_parameters": self._fixed_parameters,
+                "solver_parameters": self._solver_parameters,
             },
         )
 
