@@ -74,6 +74,7 @@ def solve(
         args={
             "traced_parameters": traced_parameters,
             "fixed_parameters": fixed_parameters,
+            "solver_parameters": solver_parameters,
         },
         throw=solver_parameters.throw,
         max_steps=solver_parameters.max_steps,
@@ -250,6 +251,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # jax.debug.print("Starting new objective_function evaluation")
     traced_parameters: TracedParameters = kwargs["traced_parameters"]
     fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
+    solver_parameters: SolverParameters = kwargs["solver_parameters"]
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.temperature
 
@@ -328,24 +330,27 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
         return log_activity_number_density - fugacity_constraints_log_number_density
 
-    # Solve the root finding problem
+    # Solve the root finding problem. Parameters are the same as the outer solver but might not
+    # need to be.
     # Initial guess for partial pressures are the same as the applied fugacities
     initial_guess: Array = fugacity_constraints_log_number_density
-    solution = optx.root_find(
+    constraint_solution = optx.root_find(
         fugacity_residual,
-        optx.Newton(atol=1.0e-6, rtol=1.0e-6),
+        solver_parameters.solver_instance,
         initial_guess,
         args={
             "traced_parameters": traced_parameters,
             "fixed_parameters": fixed_parameters,
         },
-        throw=False,
-        max_steps=256,
+        throw=solver_parameters.throw,
+        max_steps=solver_parameters.max_steps,
     ).value
+
+    # TODO: Add some fall back if the solver fails?
 
     # jax.debug.print("solution = {out}", out=solution)
     # Merge the solution into log_number_density
-    log_number_density = log_number_density.at[fugacity_species_indices].set(solution)
+    log_number_density = log_number_density.at[fugacity_species_indices].set(constraint_solution)
     # jax.debug.print("log_number_density after merging = {out}", out=log_number_density)
 
     # Stability
