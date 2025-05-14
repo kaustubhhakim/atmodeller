@@ -268,6 +268,8 @@ def test_pH2_fO2_real_gas(helper) -> None:
     planet: Planet = Planet()
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
+    # FIXME: Probably breaking because the order of the fugacity constraints is not
+    # consistent with the order of the species in the collection
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": ConstantFugacityConstraint(1.0453574209588085e-07),
         # Gives a H2 partial pressure of around 1000 bar

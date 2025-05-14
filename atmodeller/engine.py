@@ -271,85 +271,88 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     else:
         log_number_density = solution
 
-    # FIXME: This works for simply appending one fugacity constraint (test_H_fH2) but will surely
-    # break for multiple fugacity constraints because the order could get scrambled.
+    if fugacity_species_indices.size > 0:
+        # FIXME: This works for simply appending one fugacity constraint (test_H_fH2) but will surely
+        # break for multiple fugacity constraints because the order could get scrambled.
 
-    # Impose fugacity constraints as hard constraints. This involves back-computing the partial
-    # pressure of the species based on the imposed fugacity constraints and the EOS.
-    # All fugacity constraints are evaluated at the temperature of interest and 1 bar.
-    fugacity_constraints_log_number_density: Array = fugacity_constraints.log_number_density(
-        temperature, 1.0
-    )
-    # jax.debug.print(
-    #    "fugacity_constraints_log_number_density = {out}",
-    #    out=fugacity_constraints_log_number_density,
-    # )
-
-    # FIXME: May mess up for multiple species
-    # Initialise the log number density with all species
-    log_number_density = jnp.insert(
-        log_number_density,
-        fugacity_species_indices,
-        0,  # Initialisation value which is subsequently overwritten
-    )
-    # jax.debug.print("log_number_density = {out}", out=log_number_density)
-
-    @eqx.filter_jit
-    def fugacity_residual(guesses: Array, kwargs: dict) -> Array:
-        """Residual function for the fugacity constraints
-
-        Solves for the log number density (i.e. related to partial pressure) of the species with
-        fugacity constraints, adhering to the gas EOS (real or ideal).
-
-        Args:
-            guesses: Log number density guesses for the species with fugacity constraints
-            kwargs: Dictionary of pytrees required to compute the residual
-
-        Returns:
-            Residual
-        """
-        traced_parameters: TracedParameters = kwargs["traced_parameters"]
-        fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
-
-        # Insert guessed log number densities into the solution array
-        log_number_density_ = log_number_density.at[fugacity_species_indices].set(guesses)
-        # jax.debug.print("log_number_density_ = {out}", out=log_number_density_)
-
-        # TODO: Add indices argument to only compute the fugacity for the species with constraints
-        log_activity: Array = get_log_activity(
-            traced_parameters, fixed_parameters, log_number_density_
+        # Impose fugacity constraints as hard constraints. This involves back-computing the partial
+        # pressure of the species based on the imposed fugacity constraints and the EOS.
+        # All fugacity constraints are evaluated at the temperature of interest and 1 bar.
+        fugacity_constraints_log_number_density: Array = fugacity_constraints.log_number_density(
+            temperature, 1.0
         )
-        log_activity = jnp.take(log_activity, fugacity_species_indices)
-        # jax.debug.print("log_activity = {out}", out=log_activity)
+        # jax.debug.print(
+        #    "fugacity_constraints_log_number_density = {out}",
+        #    out=fugacity_constraints_log_number_density,
+        # )
 
-        log_activity_number_density: Array = get_log_number_density_from_log_pressure(
-            log_activity, temperature
+        # FIXME: May mess up for multiple species
+        # Initialise the log number density with all species
+        log_number_density = jnp.insert(
+            log_number_density,
+            fugacity_species_indices,
+            0,  # Initialisation value which is subsequently overwritten
         )
+        # jax.debug.print("log_number_density = {out}", out=log_number_density)
 
-        return log_activity_number_density - fugacity_constraints_log_number_density
+        @eqx.filter_jit
+        def fugacity_residual(guesses: Array, kwargs: dict) -> Array:
+            """Residual function for the fugacity constraints
 
-    # Solve the root finding problem. Parameters are the same as the outer solver but might not
-    # need to be.
-    # Initial guess for partial pressures are the same as the applied fugacities
-    initial_guess: Array = fugacity_constraints_log_number_density
-    constraint_solution = optx.root_find(
-        fugacity_residual,
-        solver_parameters.solver_instance,
-        initial_guess,
-        args={
-            "traced_parameters": traced_parameters,
-            "fixed_parameters": fixed_parameters,
-        },
-        throw=solver_parameters.throw,
-        max_steps=solver_parameters.max_steps,
-    ).value
+            Solves for the log number density (i.e. related to partial pressure) of the species with
+            fugacity constraints, adhering to the gas EOS (real or ideal).
 
-    # TODO: Add some fall back if the solver fails?
+            Args:
+                guesses: Log number density guesses for the species with fugacity constraints
+                kwargs: Dictionary of pytrees required to compute the residual
 
-    # jax.debug.print("solution = {out}", out=solution)
-    # Merge the solution into log_number_density
-    log_number_density = log_number_density.at[fugacity_species_indices].set(constraint_solution)
-    # jax.debug.print("log_number_density after merging = {out}", out=log_number_density)
+            Returns:
+                Residual
+            """
+            traced_parameters: TracedParameters = kwargs["traced_parameters"]
+            fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
+
+            # Insert guessed log number densities into the solution array
+            log_number_density_ = log_number_density.at[fugacity_species_indices].set(guesses)
+            # jax.debug.print("log_number_density_ = {out}", out=log_number_density_)
+
+            # TODO: Add indices argument to only compute the fugacity for the species with constraints
+            log_activity: Array = get_log_activity(
+                traced_parameters, fixed_parameters, log_number_density_
+            )
+            log_activity = jnp.take(log_activity, fugacity_species_indices)
+            # jax.debug.print("log_activity = {out}", out=log_activity)
+
+            log_activity_number_density: Array = get_log_number_density_from_log_pressure(
+                log_activity, temperature
+            )
+
+            return log_activity_number_density - fugacity_constraints_log_number_density
+
+        # Solve the root finding problem. Parameters are the same as the outer solver but might not
+        # need to be.
+        # Initial guess for partial pressures are the same as the applied fugacities
+        initial_guess: Array = fugacity_constraints_log_number_density
+        constraint_solution = optx.root_find(
+            fugacity_residual,
+            solver_parameters.solver_instance,
+            initial_guess,
+            args={
+                "traced_parameters": traced_parameters,
+                "fixed_parameters": fixed_parameters,
+            },
+            throw=solver_parameters.throw,
+            max_steps=solver_parameters.max_steps,
+        ).value
+
+        # TODO: Add some fall back if the solver fails?
+
+        # jax.debug.print("solution = {out}", out=solution)
+        # Merge the solution into log_number_density
+        log_number_density = log_number_density.at[fugacity_species_indices].set(
+            constraint_solution
+        )
+        # jax.debug.print("log_number_density after merging = {out}", out=log_number_density)
 
     # Stability
     # The reaction_stability_matrix has zero entries so its OK to pad with any value for
