@@ -119,9 +119,11 @@ class InteriorAtmosphere:
         else:
             solver_parameters_ = solver_parameters
 
+        # FIXME: Commented out for now since number of solutions is not always equal to the number
+        # of species when fugacity constraints are applied as hard constraints.
         options: dict[str, Any] = {
-            "lower": self.species.get_lower_bound(),
-            "upper": self.species.get_upper_bound(),
+            # "lower": self.species.get_lower_bound(),
+            # "upper": self.species.get_upper_bound(),
             "jac": solver_parameters_.jac,
         }
 
@@ -148,6 +150,11 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
+        # Remove the columns from the base_initial_solution that are not to be solved for
+        base_initial_solution = jnp.delete(
+            base_initial_solution, fixed_parameters_.fugacity_species_indices, axis=1
+        )
+
         # First solution attempt
         solution, solver_status, solver_steps = self._solver(
             base_initial_solution,
@@ -167,6 +174,26 @@ class InteriorAtmosphere:
             max_attempts=solver_parameters_.multistart,
             key=key,
         )
+
+        # Evaluate the log_number_density for the fugacity constraints
+        fugacity_species_indices: Array = fixed_parameters_.fugacity_species_indices
+        if fugacity_species_indices.size > 0:
+            temperature: ArrayLike = traced_parameters_.planet.temperature
+            fugacity_values: Array = fugacity_constraints_.log_number_density(temperature, 1.0)
+            jax.debug.print("fugacity_values = {out}", out=fugacity_values)
+
+            # Ensure fugacity_values are broadcast correctly for batch solutions
+            fugacity_values_broadcasted: Array = jnp.broadcast_to(
+                fugacity_values.T, (solution.shape[0], fugacity_values.shape[0])
+            )
+            jax.debug.print("fugacity_values_broadcasted = {out}", out=fugacity_values_broadcasted)
+
+            # Insert the fugacity values into the solution at the appropriate indices
+            solution = jnp.insert(
+                solution, fugacity_species_indices, fugacity_values_broadcasted, axis=1
+            )
+
+            jax.debug.print("solution after inserting fugacity constraints = {out}", out=solution)
 
         self._output = Output(
             self.species,
@@ -201,6 +228,10 @@ class InteriorAtmosphere:
                 f"The number of multistarts required was {required_multistarts}, "
                 "which can depend on the choice of the random seed"
             )
+
+        jax.debug.print(
+            "Solver steps (multistarts) = {out} ({out2})", out=solver_steps, out2=final_i
+        )
 
         logger.debug("solution = %s", solution)
 

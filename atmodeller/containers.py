@@ -757,7 +757,7 @@ class SolverParameters(eqx.Module):
         multistart_perturbation: Perturbation for multistart. Defaults to 30.
     """
 
-    solver: Type[OptxSolver] = optx.Newton
+    solver: Type[OptxSolver] = optx.LevenbergMarquardt
     """Solver"""
     atol: float = 1.0e-6
     """Absolute tolerance"""
