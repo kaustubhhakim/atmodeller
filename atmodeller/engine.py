@@ -247,23 +247,22 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     Returns:
         Residual
     """
+    # jax.debug.print("Starting new objective_function evaluation")
     traced_parameters: TracedParameters = kwargs["traced_parameters"]
     fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
     planet: Planet = traced_parameters.planet
     temperature: ArrayLike = planet.temperature
+
     fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
+    fugacity_species_indices: Array = fixed_parameters.fugacity_species_indices
     mass_constraints: MassConstraints = traced_parameters.mass_constraints
     gas_species_indices: Array = fixed_parameters.gas_species_indices
 
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     reaction_stability_matrix: Array = jnp.array(fixed_parameters.reaction_stability_matrix)
     stability_species_indices: Array = fixed_parameters.stability_species_indices
-    fugacity_matrix: Array = fixed_parameters.fugacity_matrix
-    # We only need the formula matrix for elements with mass constraints
     formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
-    # jax.debug.print("Starting new residual evaluation")
 
-    # Species
     if stability_species_indices.size > 0:
         split_idx: int = -len(stability_species_indices)
         log_number_density: Array = solution[:split_idx]
@@ -272,7 +271,82 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     else:
         log_number_density = solution
 
+    # FIXME: This works for simply appending one fugacity constraint (test_H_fH2) but will surely
+    # break for multiple fugacity constraints because the order could get scrambled.
+
+    # Impose fugacity constraints as hard constraints. This involves back-computing the partial
+    # pressure of the species based on the imposed fugacity constraints and the EOS.
+    # All fugacity constraints are evaluated at the temperature of interest and 1 bar.
+    fugacity_constraints_log_number_density: Array = fugacity_constraints.log_number_density(
+        temperature, 1.0
+    )
+    # jax.debug.print(
+    #    "fugacity_constraints_log_number_density = {out}",
+    #    out=fugacity_constraints_log_number_density,
+    # )
+
+    # FIXME: May mess up for multiple species
+    # Initialise the log number density with all species
+    log_number_density = jnp.insert(
+        log_number_density,
+        fugacity_species_indices,
+        0,  # Initialisation value which is subsequently overwritten
+    )
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
+
+    @eqx.filter_jit
+    def fugacity_residual(guesses: Array, kwargs: dict) -> Array:
+        """Residual function for the fugacity constraints
+
+        Solves for the log number density (i.e. related to partial pressure) of the species with
+        fugacity constraints, adhering to the gas EOS (real or ideal).
+
+        Args:
+            guesses: Log number density guesses for the species with fugacity constraints
+            kwargs: Dictionary of pytrees required to compute the residual
+
+        Returns:
+            Residual
+        """
+        traced_parameters: TracedParameters = kwargs["traced_parameters"]
+        fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
+
+        # Insert guessed log number densities into the solution array
+        log_number_density_ = log_number_density.at[fugacity_species_indices].set(guesses)
+        # jax.debug.print("log_number_density_ = {out}", out=log_number_density_)
+
+        # TODO: Add indices argument to only compute the fugacity for the species with constraints
+        log_activity: Array = get_log_activity(
+            traced_parameters, fixed_parameters, log_number_density_
+        )
+        log_activity = jnp.take(log_activity, fugacity_species_indices)
+        # jax.debug.print("log_activity = {out}", out=log_activity)
+
+        log_activity_number_density: Array = get_log_number_density_from_log_pressure(
+            log_activity, temperature
+        )
+
+        return log_activity_number_density - fugacity_constraints_log_number_density
+
+    # Solve the root finding problem
+    # Initial guess for partial pressures are the same as the applied fugacities
+    initial_guess: Array = fugacity_constraints_log_number_density
+    solution = optx.root_find(
+        fugacity_residual,
+        optx.Newton(atol=1.0e-6, rtol=1.0e-6),
+        initial_guess,
+        args={
+            "traced_parameters": traced_parameters,
+            "fixed_parameters": fixed_parameters,
+        },
+        throw=False,
+        max_steps=256,
+    ).value
+
+    # jax.debug.print("solution = {out}", out=solution)
+    # Merge the solution into log_number_density
+    log_number_density = log_number_density.at[fugacity_species_indices].set(solution)
+    # jax.debug.print("log_number_density after merging = {out}", out=log_number_density)
 
     # Stability
     # The reaction_stability_matrix has zero entries so its OK to pad with any value for
@@ -322,31 +396,6 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
 
         residual = jnp.concatenate([residual, reaction_residual])
-
-    # Fugacity constraints residual
-    if fugacity_matrix.size > 0:
-        fugacity_species_indices: Array = jnp.array(fixed_parameters.fugacity_species_indices)
-        # jax.debug.print("fugacity_species_indices = {out}", out=fugacity_species_indices)
-        fugacity_log_activity_number_density: Array = jnp.take(
-            log_activity_number_density, fugacity_species_indices
-        )
-        # jax.debug.print(
-        #    "fugacity_log_activity_number_density = {out}",
-        #    out=fugacity_log_activity_number_density,
-        # )
-        # jax.debug.print("fugacity_matrix = {out}", out=fugacity_matrix)
-        # TODO: Check if there is a need to consider the stability of the species for which the
-        # fugacity constraint is being applied.
-        fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity_number_density)
-        # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-        total_pressure: Array = get_total_pressure(
-            fixed_parameters, log_number_density, temperature
-        )
-        fugacity_residual = fugacity_residual - fugacity_constraints.log_number_density(
-            temperature, total_pressure
-        )
-        # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-        residual = jnp.concatenate([residual, fugacity_residual])
 
     # Elemental mass balance residual
     if formula_matrix_constraints.size > 0:
