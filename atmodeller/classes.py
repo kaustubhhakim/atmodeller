@@ -251,9 +251,6 @@ class InteriorAtmosphere:
         fugacity_species_indices: Array = jnp.array(fugacity_species_indices_list, dtype=jnp.int_)
         fugacity_matrix: Array = jnp.identity(number_fugacity_constraints)
 
-        # For fixed parameters all objects must be hashable because it is a static argument
-        # tolist is important to convert numpy dtypes to standard Python, thus ensuring they are
-        # not triggered as arrays by eqx.as_array
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=formula_matrix,
