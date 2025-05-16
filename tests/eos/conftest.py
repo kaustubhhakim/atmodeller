@@ -27,6 +27,7 @@ from jax.typing import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.eos import RealGas, get_eos_models
+from atmodeller.utilities import as_j64
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.INFO)
@@ -70,6 +71,8 @@ class CheckValues:
         # Dynamically get the method from the eos model based on property_name
         method: Callable = getattr(eos, property_name)
         # Call the method with the provided temperature and pressure
+        temperature = as_j64(temperature)
+        pressure = as_j64(pressure)
         result: ArrayLike = method(temperature, pressure)
 
         # Compare the result with the expected value
@@ -110,6 +113,10 @@ class CheckValues:
         """
         # Dynamically get the method from the eos model based on property_name
         method: Callable = getattr(eos, property_name)
+
+        # Since the shapes of the arrays are always changing here there's no point in converting to
+        # jax arrays in order to avoid recompilation because recompilation will occur anyway due to
+        # the changing array shapes.
 
         # Tests pressure broadcasting
         temperature = 2000
