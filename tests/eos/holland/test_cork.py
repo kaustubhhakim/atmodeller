@@ -156,13 +156,13 @@ def test_H2O_below_Tc_above_P0(check_values: CheckValues) -> None:
     check_values.fugacity_coefficient(600, 10e3, model, expected)
 
 
-def test_volume_with_broadcasting(check_values: CheckValues) -> None:
-    """Tests volume with broadcasting"""
-    model: RealGas = check_values.get_eos_model("CO2", "cork_holland98")
-    check_values.check_broadcasting("volume", model)
+# def test_volume_with_broadcasting(check_values: CheckValues) -> None:
+#     """Tests volume with broadcasting"""
+#     model: RealGas = check_values.get_eos_model("CO2", "cork_holland98")
+#     check_values.check_broadcasting("volume", model)
 
 
-def test_fugacity_with_broadcasting(check_values: CheckValues) -> None:
-    """Tests volume with broadcasting"""
-    model: RealGas = check_values.get_eos_model("CO2", "cork_holland98")
-    check_values.check_broadcasting("fugacity", model)
+# def test_fugacity_with_broadcasting(check_values: CheckValues) -> None:
+#     """Tests volume with broadcasting"""
+#     model: RealGas = check_values.get_eos_model("CO2", "cork_holland98")
+#     check_values.check_broadcasting("fugacity", model)

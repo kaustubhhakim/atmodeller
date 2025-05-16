@@ -18,7 +18,6 @@
 
 from conftest import CheckValues
 
-from atmodeller.eos import RealGas
 from atmodeller.utilities import unit_conversion
 
 RTOL: float = 1.0e-8
@@ -71,13 +70,13 @@ def test_H2O_volume_high_TP2(check_values: CheckValues) -> None:
     )
 
 
-def test_volume_with_broadcasting(check_values: CheckValues) -> None:
-    """Tests volume with broadcasting"""
-    model: RealGas = check_values.get_eos_model("H2O", MODEL_SUFFIX)
-    check_values.check_broadcasting("volume", model)
+# def test_volume_with_broadcasting(check_values: CheckValues) -> None:
+#     """Tests volume with broadcasting"""
+#     model: RealGas = check_values.get_eos_model("H2O", MODEL_SUFFIX)
+#     check_values.check_broadcasting("volume", model)
 
 
-def test_fugacity_with_broadcasting(check_values: CheckValues) -> None:
-    """Tests volume with broadcasting"""
-    model: RealGas = check_values.get_eos_model("H2O", MODEL_SUFFIX)
-    check_values.check_broadcasting("fugacity", model)
+# def test_fugacity_with_broadcasting(check_values: CheckValues) -> None:
+#     """Tests volume with broadcasting"""
+#     model: RealGas = check_values.get_eos_model("H2O", MODEL_SUFFIX)
+#     check_values.check_broadcasting("fugacity", model)

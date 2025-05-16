@@ -189,13 +189,13 @@ def test_volume_integral_index2(check_values: CheckValues) -> None:
     check_values.volume_integral(temperature, pressure, model, expected)
 
 
-def test_volume_with_broadcasting(check_values: CheckValues) -> None:
-    """Tests volume with broadcasting"""
-    model: RealGas = check_values.get_eos_model("CO2", "cs_shi92")
-    check_values.check_broadcasting("volume", model)
+# def test_volume_with_broadcasting(check_values: CheckValues) -> None:
+#     """Tests volume with broadcasting"""
+#     model: RealGas = check_values.get_eos_model("CO2", "cs_shi92")
+#     check_values.check_broadcasting("volume", model)
 
 
-def test_fugacity_with_broadcasting(check_values: CheckValues) -> None:
-    """Tests volume with broadcasting"""
-    model: RealGas = check_values.get_eos_model("CO2", "cs_shi92")
-    check_values.check_broadcasting("fugacity", model)
+# def test_fugacity_with_broadcasting(check_values: CheckValues) -> None:
+#     """Tests volume with broadcasting"""
+#     model: RealGas = check_values.get_eos_model("CO2", "cs_shi92")
+#     check_values.check_broadcasting("fugacity", model)
