@@ -63,6 +63,20 @@ def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, max=max_exp_input))
 
 
+def as_j64(x: ArrayLike) -> Array:
+    """Converts input to a JAX array of dtype float64.
+
+    This function is used to minimise the number of times jitted functions need to be compiled.
+
+    Args:
+        x: Input to convert
+
+    Returns:
+        JAX array of dtype float64
+    """
+    return jnp.array(x, dtype=jnp.float64)
+
+
 def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     """Computes the partial reduced row echelon form to determine linear components
 
@@ -182,12 +196,12 @@ class ExperimentalCalibration(eqx.Module):
         log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
     """
 
-    temperature_min: float | None = None
-    temperature_max: float | None = None
-    pressure_min: float | None = None
-    pressure_max: float | None = None
-    log10_fO2_min: float | None = None
-    log10_fO2_max: float | None = None
+    temperature_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    temperature_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    pressure_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    pressure_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    log10_fO2_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    log10_fO2_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
 
 
 @eqx.filter_jit
