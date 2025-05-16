@@ -29,7 +29,7 @@ from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import IdealGas, RealGas
-from atmodeller.utilities import ExperimentalCalibration
+from atmodeller.utilities import ExperimentalCalibration, as_j64
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -54,7 +54,7 @@ class CombinedRealGas(RealGas):
     """Real gases to combine"""
     calibrations: tuple[ExperimentalCalibration, ...]
     """Experimental calibrations"""
-    _upper_pressure_bounds: tuple[float, ...] = eqx.field(init=False)
+    _upper_pressure_bounds: tuple[Array, ...] = eqx.field(init=False)
 
     def __post_init__(self):
         self._upper_pressure_bounds = self._get_upper_pressure_bounds()
@@ -88,9 +88,9 @@ class CombinedRealGas(RealGas):
         calibrations_list: list[ExperimentalCalibration] = list(calibrations)
 
         if extrapolate:
-            if calibrations_list[0].pressure_min is not None:
+            if not jnp.isnan(calibrations_list[0].pressure_min):
                 cls._append_lower_bound(real_gases_list, calibrations_list)
-            if calibrations_list[-1].pressure_max is not None:
+            if not jnp.isnan(calibrations_list[-1].pressure_max):
                 cls._append_upper_bound(real_gases_list, calibrations_list)
 
         return cls(tuple(real_gases_list), tuple(calibrations_list))
@@ -144,17 +144,17 @@ class CombinedRealGas(RealGas):
         """Volume integral functions"""
         return tuple(eos.volume_integral for eos in self.real_gases)
 
-    def _get_upper_pressure_bounds(self) -> tuple[float, ...]:
+    def _get_upper_pressure_bounds(self) -> tuple[Array, ...]:
         """Gets the upper pressure bounds based on each experimental calibration.
 
         Returns:
             Upper pressure bounds
         """
-        upper_pressure_bounds: list[float] = []
+        upper_pressure_bounds: list[Array] = []
 
         for ii, calibration in enumerate(self.calibrations):
             try:
-                assert calibration.pressure_max is not None
+                assert not jnp.isnan(calibration.pressure_max)
             except AssertionError:
                 if ii == len(self.calibrations) - 1:
                     continue
@@ -184,37 +184,32 @@ class CombinedRealGas(RealGas):
 
     @override
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
-        index: Array = self._get_index(pressure)
+        temperature, pressure = jnp.broadcast_arrays(temperature, pressure)
+        original_shape: tuple[int, ...] = temperature.shape
+        # jax.debug.print("temperature = {out}", out=temperature)
+        # jax.debug.print("pressure = {out}", out=pressure)
 
-        def scan_fn(carry: Array, i: Array) -> tuple:
-            """Scan function to get the volume
+        # Flatten for vmapping
+        temperature = temperature.ravel()
+        pressure = pressure.ravel()
 
-            Args:
-                carry: Volume
-                i: Index of the EOS model
+        indices: Array = self._get_index(pressure)
+        # jax.debug.print("indices = {out}", out=indices)
 
-            Returns:
-                Volume and None (unused)
-            """
-            volume: Array = lax.switch(i, self.volume_functions, temperature, pressure)
-            mask: Array = i == index
-            carry = carry + jnp.where(mask, volume, 0.0)
+        def apply_volume_function(index: ArrayLike, temperature, pressure) -> Array:
+            return lax.switch(index, self.volume_functions, temperature, pressure)
 
-            return carry, None
+        vmap_apply_function: Callable = eqx.filter_vmap(apply_volume_function, in_axes=(0, 0, 0))
+        volume: Array = vmap_apply_function(indices, temperature, pressure)
+        # jax.debug.print("volume = {out}", out=volume)
 
-        # Get output shape by evaluating one of the volume functions (e.g., index 0)
-        first_volume: ArrayLike = self.volume_functions[0](temperature, pressure)
-        volume: Array = jnp.where(index == 0, first_volume, 0.0)
-
-        # Scan over the indices of the EOS models.
-        loop_indices: Array = jnp.arange(1, self.upper_pressure_bounds.shape[0] + 1)
-        volume, _ = lax.scan(scan_fn, volume, loop_indices)
-
-        return volume
+        return jnp.reshape(volume, original_shape)
 
     @override
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         index: Array = self._get_index(pressure)
 
@@ -321,6 +316,10 @@ class UpperBoundRealGas(RealGas):
     function of pressure. Importantly, this class is not intended to be used directly, but rather
     as a component of `CombinedRealGas`.
 
+    `p_eval` is used to evaluate the compressibility factor and its gradient, and therefore to
+    avoid recompilation of JAX functions it is converted to a JAX array of dtype float64, which
+    is the expected type for the pressure argument of the EOS functions.
+
     Args:
         real_gas: Real gas to evaluate the compressibility factor at `p_eval`.
         p_eval: Evaluation pressure in bar. This is usually the maximum calibration pressure
@@ -329,10 +328,11 @@ class UpperBoundRealGas(RealGas):
 
     real_gas: RealGas
     """Real gas to evaluate the compressibility factor at `p_eval`"""
-    p_eval: float = 1
-    """Evaluation pressure in bar"""
+    p_eval: Array = eqx.field(converter=as_j64, default=1, static=True)
+    """Evaluation pressure in bar. Defaults to 1 bar."""
 
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def _z0(self, temperature: ArrayLike) -> ArrayLike:
         """Compressibility factor of the previous EOS to blend smoothly with.
 
@@ -342,6 +342,7 @@ class UpperBoundRealGas(RealGas):
         return self.real_gas.compressibility_factor(temperature, self.p_eval)
 
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def _dzdp0(self, temperature: ArrayLike) -> ArrayLike:
         """Gradient of the compressibility factor of the previous EOS to blend smoothly with.
 
@@ -352,6 +353,7 @@ class UpperBoundRealGas(RealGas):
 
     @override
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity cannot be computed.
 
@@ -365,6 +367,7 @@ class UpperBoundRealGas(RealGas):
 
     @override
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         compressibility_factor: ArrayLike = self._z0(temperature) + self._dzdp0(temperature) * (
             pressure - self.p_eval  # type: ignore
@@ -374,6 +377,7 @@ class UpperBoundRealGas(RealGas):
 
     @override
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         volume: ArrayLike = (
             self.compressibility_factor(temperature, pressure)
@@ -386,6 +390,7 @@ class UpperBoundRealGas(RealGas):
 
     @override
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def volume_integral(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         volume_integral: Array = (
             (
