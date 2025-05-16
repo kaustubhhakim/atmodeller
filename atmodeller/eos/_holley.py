@@ -25,7 +25,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.constants import ATMOSPHERE, GAS_CONSTANT_BAR
-from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
+from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import ExperimentalCalibration, OptxSolver, unit_conversion
@@ -181,12 +181,12 @@ class BeattieBridgeman(RealGas):
         Returns:
             Volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        initial_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
+        safe_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure + VOLUME_EPSILON
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)
         sol = optx.root_find(
-            self._objective_function, solver, initial_volume, args=kwargs, throw=THROW
+            self._objective_function, solver, safe_volume, args=kwargs, throw=THROW
         )
         volume = sol.value
         # jax.debug.print("volume = {out}", out=volume)
