@@ -436,7 +436,7 @@ C2H6_zhang09_bounded: RealGas = CombinedRealGas.create(
 
 
 def get_zhang_eos_models() -> dict[str, RealGas]:
-    """Gets a dictionary of Zhang and Duan EOS models
+    """Gets a dictionary of Zhang and Duan EOS models.
 
     Returns:
         Dictionary of EOS models
