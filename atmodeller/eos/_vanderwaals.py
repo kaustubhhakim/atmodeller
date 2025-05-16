@@ -97,7 +97,6 @@ class VanderWaals(RealGas):
         # If the ideal volume is around the b constant value then the denominator becomes zero, so
         # shift the volume and add a small epsilon to avoid this.
         safe_volume: ArrayLike = ideal_volume + self.b + VOLUME_EPSILON
-
         kwargs: dict[str, ArrayLike] = {"temperature": temperature, "pressure": pressure}
 
         solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)
