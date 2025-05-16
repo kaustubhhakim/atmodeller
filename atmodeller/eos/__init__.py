@@ -30,7 +30,7 @@ THROW: bool = False
 """Whether to throw errors. Change to True for debugging purposes."""
 PRESSURE_REFERENCE: float = 1.0
 """Standard state pressure in bar"""
-VOLUME_EPSILON: float = 1.0e-6
+VOLUME_EPSILON: float = 1.0e-12
 r"""Small volume offset in :math:`\mathrm{m}^3\mathrm{mol}^{-1}`"""
 
 # Expose the public API
