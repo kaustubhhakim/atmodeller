@@ -70,7 +70,7 @@ class CheckValues:
         """
         # Dynamically get the method from the eos model based on property_name
         method: Callable = getattr(eos, property_name)
-        # Call the method with the provided temperature and pressure
+        # Call the method with the provided temperature and pressure avoiding recompilation
         temperature = as_j64(temperature)
         pressure = as_j64(pressure)
         result: ArrayLike = method(temperature, pressure)
