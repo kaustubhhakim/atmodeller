@@ -661,7 +661,7 @@ def get_log_activity(
 
     activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
 
-    def apply_activity_function(index: ArrayLike):
+    def apply_activity_function(index: ArrayLike) -> Array:
         return lax.switch(
             index,
             activity_funcs,
