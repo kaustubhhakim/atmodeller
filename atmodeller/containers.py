@@ -809,7 +809,7 @@ class SolverParameters(eqx.Module):
         solver: Solver. Defaults to optx.Newton
         atol: Absolute tolerance. Defaults to 1.0e-6.
         rtol: Relative tolerance. Defaults to 1.0e-6.
-        linear_solver: Linear solver. Defaults to lineax.QR.
+        linear_solver: Linear solver. Defaults to AutoLinearSolver(well_posed=None).
         norm: Norm. Defaults to optx.rms_norm.
         throw: How to report any failures. Defaults to False.
         max_steps: The maximum number of steps the solver can take. Defaults to 256
