@@ -60,7 +60,7 @@ def get_log_number_density_from_log_pressure(
 
 @eqx.filter_jit
 def safe_exp(x: ArrayLike) -> Array:
-    return jnp.exp(jnp.clip(x, a_max=max_exp_input))
+    return jnp.exp(jnp.clip(x, max=max_exp_input))
 
 
 def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
