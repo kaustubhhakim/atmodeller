@@ -770,7 +770,7 @@ def get_species_ppmw_in_melt(
 
     # NOTE: All solubility formulations must return a JAX array to allow vmapping
     solubility_funcs: list[Callable] = [
-        species_.solubility.jax_concentration for species_ in species
+        Partial(species_.solubility.jax_concentration) for species_ in species
     ]
 
     def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike):
