@@ -26,6 +26,7 @@ import jax.numpy as jnp
 import optimistix as optx
 from jax import Array, lax
 from jax.scipy.special import logsumexp
+from jax.tree_util import Partial
 from jax.typing import ArrayLike
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
@@ -659,7 +660,9 @@ def get_log_activity(
     total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
-    activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
+    activity_funcs: list[Callable] = [
+        Partial(species_.activity.log_activity) for species_ in species
+    ]
 
     def apply_activity_function(index: ArrayLike) -> Array:
         return lax.switch(
