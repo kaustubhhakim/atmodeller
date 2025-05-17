@@ -202,7 +202,8 @@ class Output:
         out |= self.gas_species_asdict()
         out |= self.elements_asdict()
 
-        out["planet"] = expand_dict(self.planet.asdict(), self.number_solutions)
+        # FIXME: Address type: ignore below
+        out["planet"] = expand_dict(self.planet.asdict(), self.number_solutions)  # type: ignore
         out["atmosphere"] = self.atmosphere_asdict()
         # temperature and pressure have already been expanded to the number of solutions
         temperature: Array = out["planet"]["surface_temperature"]

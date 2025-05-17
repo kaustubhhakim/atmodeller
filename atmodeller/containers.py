@@ -53,6 +53,7 @@ from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
 from atmodeller.utilities import (
     OptxSolver,
+    as_j64,
     get_log_number_density_from_log_pressure,
     unit_conversion,
 )
@@ -289,74 +290,74 @@ class Planet(eqx.Module):
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
     """
 
-    planet_mass: ArrayLike = 5.972e24
+    planet_mass: Array = eqx.field(converter=as_j64, default=5.972e24)
     """Mass of the planet in kg"""
-    core_mass_fraction: ArrayLike = 0.295334691460966
+    core_mass_fraction: Array = eqx.field(converter=as_j64, default=0.295334691460966)
     """Mass fraction of the core relative to the planetary mass in kg/kg"""
-    mantle_melt_fraction: ArrayLike = 1.0
+    mantle_melt_fraction: Array = eqx.field(converter=as_j64, default=1.0)
     """Mass fraction of the molten mantle in kg/kg"""
-    surface_radius: ArrayLike = 6371000
+    surface_radius: Array = eqx.field(converter=as_j64, default=6371000)
     """Radius of the surface in m"""
-    surface_temperature: ArrayLike = 2000
+    surface_temperature: Array = eqx.field(converter=as_j64, default=2000)
     """Temperature of the surface in K"""
 
     @property
-    def mantle_mass(self) -> ArrayLike:
+    def mantle_mass(self) -> Array:
         """Mantle mass"""
         return self.planet_mass * self.mantle_mass_fraction
 
     @property
-    def mantle_mass_fraction(self) -> ArrayLike:
+    def mantle_mass_fraction(self) -> Array:
         """Mantle mass fraction"""
         return 1 - self.core_mass_fraction
 
     @property
-    def mantle_melt_mass(self) -> ArrayLike:
+    def mantle_melt_mass(self) -> Array:
         """Mass of the molten mantle"""
         return self.mantle_mass * self.mantle_melt_fraction
 
     @property
-    def mantle_solid_mass(self) -> ArrayLike:
+    def mantle_solid_mass(self) -> Array:
         """Mass of the solid mantle"""
         return self.mantle_mass * (1.0 - self.mantle_melt_fraction)
 
     @property
-    def mass(self) -> ArrayLike:
+    def mass(self) -> Array:
         """Mass"""
         return self.mantle_mass
 
     @property
-    def melt_mass(self) -> ArrayLike:
+    def melt_mass(self) -> Array:
         """Mass of the melt"""
         return self.mantle_melt_mass
 
     @property
-    def solid_mass(self) -> ArrayLike:
+    def solid_mass(self) -> Array:
         """Mass of the solid"""
         return self.mantle_solid_mass
 
     @property
-    def surface_area(self) -> ArrayLike:
+    def surface_area(self) -> Array:
         """Surface area"""
         return 4.0 * jnp.pi * self.surface_radius**2
 
     @property
-    def surface_gravity(self) -> ArrayLike:
+    def surface_gravity(self) -> Array:
         """Surface gravity"""
         return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
 
     @property
-    def temperature(self) -> ArrayLike:
+    def temperature(self) -> Array:
         """Temperature"""
         return self.surface_temperature
 
-    def asdict(self) -> dict[str, ArrayLike]:
+    def asdict(self) -> dict[str, Array]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
-        base_dict: dict[str, ArrayLike] = asdict(self)
+        base_dict: dict[str, Array] = asdict(self)
         base_dict["mantle_mass"] = self.mass
         base_dict["mantle_melt_mass"] = self.melt_mass
         base_dict["mantle_solid_mass"] = self.solid_mass
@@ -406,14 +407,14 @@ class ConstantFugacityConstraint(eqx.Module):
         fugacity: Fugacity
     """
 
-    fugacity: ArrayLike
+    fugacity: Array = eqx.field(converter=as_j64)
 
     @property
-    def value(self) -> ArrayLike:
+    def value(self) -> Array:
         return self.fugacity
 
     @eqx.filter_jit
-    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+    def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
         log_fugacity_value: ArrayLike = jnp.log(self.fugacity)
