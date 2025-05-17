@@ -204,7 +204,6 @@ class ExperimentalCalibration(eqx.Module):
     log10_fO2_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
 
 
-@eqx.filter_jit
 def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
     """Power law
 
