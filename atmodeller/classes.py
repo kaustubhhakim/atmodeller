@@ -44,11 +44,7 @@ from atmodeller.containers import (
 from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
-from atmodeller.utilities import (
-    get_batch_size,
-    partial_rref,
-    vmap_axes_spec,
-)
+from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
 
