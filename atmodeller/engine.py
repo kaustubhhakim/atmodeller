@@ -26,7 +26,6 @@ import jax.numpy as jnp
 import optimistix as optx
 from jax import Array, lax
 from jax.scipy.special import logsumexp
-from jax.tree_util import Partial
 from jax.typing import ArrayLike
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
@@ -42,11 +41,13 @@ from atmodeller.containers import (
 from atmodeller.utilities import (
     get_log_number_density_from_log_pressure,
     safe_exp,
+    to_hashable,
     unit_conversion,
 )
 
 
 @eqx.filter_jit
+# @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Array,
     traced_parameters: TracedParameters,
@@ -661,7 +662,7 @@ def get_log_activity(
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     activity_funcs: list[Callable] = [
-        Partial(species_.activity.log_activity) for species_ in species
+        to_hashable(species_.activity.log_activity) for species_ in species
     ]
 
     def apply_activity_function(index: ArrayLike) -> Array:
@@ -873,7 +874,7 @@ def get_species_ppmw_in_melt(
 
     # NOTE: All solubility formulations must return a JAX array to allow vmapping
     solubility_funcs: list[Callable] = [
-        Partial(species_.solubility.jax_concentration) for species_ in species
+        to_hashable(species_.solubility.jax_concentration) for species_ in species
     ]
 
     def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike):

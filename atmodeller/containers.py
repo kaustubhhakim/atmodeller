@@ -30,7 +30,6 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array, lax
-from jax.tree_util import Partial
 from jax.typing import ArrayLike
 from lineax import AbstractLinearSolver
 from molmass import Formula
@@ -55,6 +54,7 @@ from atmodeller.utilities import (
     OptxSolver,
     as_j64,
     get_log_number_density_from_log_pressure,
+    to_hashable,
     unit_conversion,
 )
 
@@ -517,9 +517,9 @@ class FugacityConstraints(eqx.Module):
         Returns:
             Log fugacity
         """
-        # Partial to avoid the late-binding closure issue
+        # NOTE: Must avoid the late-binding closure issue
         fugacity_funcs: list[Callable] = [
-            Partial(constraint.log_fugacity) for constraint in self.constraints.values()
+            to_hashable(constraint.log_fugacity) for constraint in self.constraints.values()
         ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 

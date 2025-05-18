@@ -17,7 +17,7 @@
 """Utilities"""
 
 import logging
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 import equinox as eqx
 import jax
@@ -26,7 +26,7 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import Array
-from jax.tree_util import tree_map
+from jax.tree_util import Partial, tree_map
 from jax.typing import ArrayLike
 from scipy.constants import kilo, mega
 
@@ -61,6 +61,12 @@ def get_log_number_density_from_log_pressure(
 @eqx.filter_jit
 def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, max=max_exp_input))
+
+
+def to_hashable(x: Any) -> Callable:
+    """Converts input to a hashable type"""
+
+    return Partial(x)
 
 
 def as_j64(x: ArrayLike) -> Array:
