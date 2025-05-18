@@ -54,7 +54,7 @@ dependencies = [
     "xmmutablemap>=0.1",
     "optimistix==0.0.10",
     "jax==0.5.3",
-    "equinox==0.12.1",
+    "equinox==0.12.2",
 ]
 
 [project.urls]

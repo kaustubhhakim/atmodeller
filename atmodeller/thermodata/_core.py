@@ -23,20 +23,16 @@ from jax.typing import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import as_j64, unit_conversion
 
 
 class CondensateActivity(eqx.Module):
     """Activity of a stable condensate"""
 
-    activity: ArrayLike = 1.0
+    activity: Array = eqx.field(converter=as_j64, default=1.0)
 
     @eqx.filter_jit
-    def log_activity(
-        self,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-    ) -> ArrayLike:
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
 

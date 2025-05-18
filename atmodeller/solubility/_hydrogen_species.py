@@ -26,7 +26,7 @@ from jax.typing import ArrayLike
 
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import as_j64, unit_conversion
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -105,20 +105,17 @@ class _H2_chachan18(Solubility):
         T0: Arrhenius temperature factor in K, which expresses the repulsive interaction of the
             molecule with magma. Defaults to 4000 K, which is the middle of the range the authors
             explore (from 3000 K to 5000 K).
-
-    Attributes:
-        f_calibration: Calibration fugacity
-        T_calibration: Calibration temperature
-        X_calibration: Mass fraction at calibration conditions
-        T0: Arrhenius temperature factor
-        A: Constant
     """
 
     f_calibration: ArrayLike
+    """Calibration fugacity"""
     T_calibration: ArrayLike
+    """Calibration temperature"""
     X_calibration: ArrayLike
+    """Mass fraction at calibration conditions"""
     T0: float = 4000
-    A: ArrayLike = eqx.field(init=False)
+    """Arrhenius temperature factor in K"""
+    A: Array = eqx.field(init=False)
 
     def __post_init__(self):
         self.A = jnp.exp(
@@ -145,10 +142,10 @@ H2_chachan18: Solubility = _H2_chachan18(
 # Need to convert pressure to H2 fugacity
 # With Chabrier EOS, f_calibration = 23986.034649111516
 # With Zhang and Duan EOS, f_calibration2 = 28421.194323648964
-T_calibration: float = 1673
-P_calibration: float = 1 * unit_conversion.GPa_to_bar
+T_calibration: ArrayLike = as_j64(1673)
+P_calibration: ArrayLike = as_j64(1 * unit_conversion.GPa_to_bar)
 f_calibration: ArrayLike = H2_chabrier21_bounded.fugacity(T_calibration, P_calibration)
-X_calibration: float = 0.0019
+X_calibration: ArrayLike = 0.0019
 
 H2_kite19: Solubility = _H2_chachan18(
     f_calibration=f_calibration, T_calibration=T_calibration, X_calibration=X_calibration

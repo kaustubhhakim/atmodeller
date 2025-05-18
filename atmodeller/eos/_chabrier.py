@@ -245,7 +245,7 @@ class Chabrier(RealGas):
 
 
 calibration_chabrier21: ExperimentalCalibration = ExperimentalCalibration(
-    temperature_min=100, temperature_max=1.0e8, pressure_min=None, pressure_max=1.0e17
+    temperature_min=100, temperature_max=1.0e8, pressure_max=1.0e17
 )
 """Calibration for :cite:t:`CD21`"""
 H2_chabrier21: RealGas = Chabrier.create(Path("TABLE_H_TP_v1"))

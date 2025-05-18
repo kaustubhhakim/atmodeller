@@ -16,6 +16,7 @@
 #
 """Utilities for tests"""
 
+import logging
 from typing import Callable
 
 import numpy as np
@@ -24,8 +25,12 @@ import pytest
 from jax import Array
 from jax.typing import ArrayLike
 
-from atmodeller.eos.core import RealGas
-from atmodeller.eos.library import get_eos_models
+from atmodeller import debug_logger
+from atmodeller.eos import RealGas, get_eos_models
+from atmodeller.utilities import as_j64
+
+logger: logging.Logger = debug_logger()
+logger.setLevel(logging.INFO)
 
 # Tolerances to compare the test results with target output.
 RTOL: float = 1.0e-8
@@ -33,11 +38,12 @@ RTOL: float = 1.0e-8
 ATOL: float = 1.0e-8
 """Absolute tolerance"""
 
-eos_models: dict[str, RealGas] = get_eos_models()
-
 
 class CheckValues:
     """Helper class with methods to check and confirm values"""
+
+    def __init__(self) -> None:
+        self._eos_models: dict[str, RealGas] = get_eos_models()
 
     @classmethod
     def _check_property(
@@ -64,24 +70,13 @@ class CheckValues:
         """
         # Dynamically get the method from the eos model based on property_name
         method: Callable = getattr(eos, property_name)
-        # Call the method with the provided temperature and pressure
+        # Call the method with the provided temperature and pressure avoiding recompilation
+        temperature = as_j64(temperature)
+        pressure = as_j64(pressure)
         result: ArrayLike = method(temperature, pressure)
 
         # Compare the result with the expected value
         nptest.assert_allclose(result, expected, rtol, atol)
-
-    @staticmethod
-    def get_eos_model(species_name: str, suffix: str) -> RealGas:
-        """Gets a model for a species
-
-        Args:
-            species_name: Species name
-            suffix: Model suffix
-
-        Returns:
-            EOS model
-        """
-        return eos_models[f"{species_name}_{suffix}"]
 
     @classmethod
     def compressibility(cls, *args, **kwargs) -> None:
@@ -119,6 +114,10 @@ class CheckValues:
         # Dynamically get the method from the eos model based on property_name
         method: Callable = getattr(eos, property_name)
 
+        # Since the shapes of the arrays are always changing here there's no point in converting to
+        # jax arrays in order to avoid recompilation because recompilation will occur anyway due to
+        # the changing array shapes.
+
         # Tests pressure broadcasting
         temperature = 2000
         pressure = np.array([1, 10, 100])
@@ -148,6 +147,18 @@ class CheckValues:
         pressure = np.array([1, 10, 100])[:, None]
         result = method(temperature, pressure)
         assert result.shape == (3, 2)
+
+    def get_eos_model(self, species_name: str, suffix: str) -> RealGas:
+        """Gets a model for a species
+
+        Args:
+            species_name: Species name
+            suffix: Model suffix
+
+        Returns:
+            EOS model
+        """
+        return self._eos_models[f"{species_name}_{suffix}"]
 
 
 @pytest.fixture(scope="module")

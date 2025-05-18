@@ -28,7 +28,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
-from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
+from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
 from atmodeller.utilities import ExperimentalCalibration, OptxSolver, safe_exp, unit_conversion
@@ -254,13 +254,15 @@ class ZhangDuan(RealGas):
         Returns:
             Initial volume in :math:`\mathrm{m}^3\ \mathrm{mol}^{-1}`
         """
-        minimum_compressibility_factor: float = 0.1
         ideal_volume: ArrayLike = GAS_CONSTANT_BAR * temperature / pressure
+        safe_volume: ArrayLike = ideal_volume + VOLUME_EPSILON
         Tm: ArrayLike = self._Tm(temperature)
-        Vm: Array = self._Vm(ideal_volume)
+        Vm: Array = self._Vm(safe_volume)
         b: Array = self._get_parameter(Tm, self.coefficients[0:3])
 
         compressibility_factor: Array = 1 + b / Vm
+        # TODO: This is ad-hoc, but works for now.
+        minimum_compressibility_factor: float = 0.1
         compressibility_factor = jnp.where(
             compressibility_factor < minimum_compressibility_factor,
             minimum_compressibility_factor,
@@ -273,6 +275,7 @@ class ZhangDuan(RealGas):
 
     @override
     @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
     def volume(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         r"""Computes the volume numerically.
 
@@ -436,7 +439,7 @@ C2H6_zhang09_bounded: RealGas = CombinedRealGas.create(
 
 
 def get_zhang_eos_models() -> dict[str, RealGas]:
-    """Gets a dictionary of Zhang and Duan EOS models
+    """Gets a dictionary of Zhang and Duan EOS models.
 
     Returns:
         Dictionary of EOS models

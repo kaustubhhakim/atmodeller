@@ -41,11 +41,13 @@ from atmodeller.containers import (
 from atmodeller.utilities import (
     get_log_number_density_from_log_pressure,
     safe_exp,
+    to_hashable,
     unit_conversion,
 )
 
 
 @eqx.filter_jit
+# @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Array,
     traced_parameters: TracedParameters,
@@ -556,9 +558,11 @@ def get_log_activity(
     total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
-    activity_funcs: list[Callable] = [species_.activity.log_activity for species_ in species]
+    activity_funcs: list[Callable] = [
+        to_hashable(species_.activity.log_activity) for species_ in species
+    ]
 
-    def apply_activity_function(index: ArrayLike):
+    def apply_activity_function(index: ArrayLike) -> Array:
         return lax.switch(
             index,
             activity_funcs,
@@ -767,7 +771,7 @@ def get_species_ppmw_in_melt(
 
     # NOTE: All solubility formulations must return a JAX array to allow vmapping
     solubility_funcs: list[Callable] = [
-        species_.solubility.jax_concentration for species_ in species
+        to_hashable(species_.solubility.jax_concentration) for species_ in species
     ]
 
     def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike):
