@@ -16,11 +16,11 @@
 #
 """Tests for the EOS models from :cite:t:`SF87,SF87a,SF88,SS92`"""
 
-from conftest import CheckValues
-
 from atmodeller.eos import RealGas
 from atmodeller.eos._saxena import H2_SF87
 from atmodeller.utilities import unit_conversion
+
+from .conftest import CheckValues
 
 
 def test_Ar(check_values: CheckValues) -> None:
