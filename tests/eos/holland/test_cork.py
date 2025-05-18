@@ -16,11 +16,11 @@
 #
 """Tests for the CORK EOS models from :cite:t:`HP91,HP98`"""
 
-from conftest import CheckValues
-
 from atmodeller.eos import RealGas
 from atmodeller.eos._holland_powell import H2O_cork_holland91_bounded, H2O_cork_holland98_bounded
 from atmodeller.utilities import unit_conversion
+
+from ..conftest import CheckValues
 
 
 def test_H2O_volume_1kbar(check_values: CheckValues) -> None:

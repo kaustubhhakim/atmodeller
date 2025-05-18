@@ -16,9 +16,9 @@
 #
 """Tests for the EOS models from :cite:t:`ZD09`"""
 
-from conftest import CheckValues
-
 from atmodeller.utilities import unit_conversion
+
+from ..conftest import CheckValues
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""
