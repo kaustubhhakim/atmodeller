@@ -16,13 +16,9 @@
 #
 """Tests for the EOS models from :cite:t:`HWZ58`"""
 
-from typing import TYPE_CHECKING
-
 from atmodeller.eos import RealGas
 from atmodeller.utilities import unit_conversion
-
-if TYPE_CHECKING:
-    from .conftest import CheckValues
+from tests.eos.conftest import CheckValues
 
 # Probably due to rounding of the model parameters in the paper, some compressibilities in the
 # table in the paper don't quite match exactly with what we compute. Hence relax the tolerance.
