@@ -19,6 +19,8 @@
 These are not intended to be used directly, but rather as a building block of the CORK models they
 serve as convenient tests in the absence of a virial correction term."""
 
+from typing import TYPE_CHECKING
+
 from atmodeller.eos import RealGas
 from atmodeller.eos._holland_powell import (
     CO2_mrk_cs_holland91,
@@ -28,7 +30,8 @@ from atmodeller.eos._holland_powell import (
     H2OMrkHolland91,
 )
 
-from ..conftest import CheckValues
+if TYPE_CHECKING:
+    from ..conftest import CheckValues
 
 
 def test_CO2_corresponding_states(check_values: CheckValues) -> None:
