@@ -16,12 +16,8 @@
 #
 """Tests for the EOS models from :cite:t:`Lide2005`"""
 
-from typing import TYPE_CHECKING
-
 from atmodeller.eos import RealGas
-
-if TYPE_CHECKING:
-    from .conftest import CheckValues
+from tests.eos.conftest import CheckValues
 
 MODEL_SUFFIX: str = "vdw_lide05"
 """Suffix of the :cite:t:`Lide2005` models"""
