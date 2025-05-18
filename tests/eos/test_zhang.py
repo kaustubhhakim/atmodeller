@@ -16,9 +16,12 @@
 #
 """Tests for the EOS models from :cite:t:`ZD09`"""
 
+from typing import TYPE_CHECKING
+
 from atmodeller.utilities import unit_conversion
 
-from .conftest import CheckValues
+if TYPE_CHECKING:
+    from .conftest import CheckValues
 
 RTOL: float = 1.0e-8
 """Relative tolerance"""

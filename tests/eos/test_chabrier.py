@@ -16,10 +16,13 @@
 #
 """Tests for the EOS models from :cite:t:`CD21`"""
 
+from typing import TYPE_CHECKING
+
 from atmodeller.eos import RealGas
 from atmodeller.utilities import unit_conversion
 
-from .conftest import CheckValues
+if TYPE_CHECKING:
+    from .conftest import CheckValues
 
 MODEL_SUFFIX: str = "chabrier21"
 """Suffix of the :cite:t:`CD21` models"""
