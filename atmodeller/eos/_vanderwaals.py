@@ -130,9 +130,7 @@ class VanderWaals(RealGas):
         return volume_integral
 
 
-experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(
-    temperature_min=100, temperature_max=1000, pressure_min=0.1, pressure_max=1000
-)
+experimental_calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=1)
 
 # van der Waals cefficients from David R. Lide, ed., CRC Handbook of Chemistry and Physics,
 # Internet Version 2005, <http://www.hbcpnetbase.com>, CRC Press, Boca Raton, FL, 2005
