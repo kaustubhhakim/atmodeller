@@ -197,6 +197,7 @@ class Output:
 
         logger.info("Computing asdict output")
         fugacity_matrix: Array = jnp.array(self._fixed_parameters.fugacity_matrix)
+        # FIXME: this matrix is no longer used
         formula_matrix_constraints: Array = jnp.array(
             self._fixed_parameters.formula_matrix_constraints
         )
