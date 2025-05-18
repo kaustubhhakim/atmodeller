@@ -574,42 +574,72 @@ class FugacityConstraints(eqx.Module):
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
+    # FIXME: This has to know about the elements in the formula matrix to construct a single
+    # array of log number densities for constrained elements and jnp.nan for unconstrained elements
+    # The the shape of the mass constraints is constant for a given species collection and
+    # shouldn't prompt re-compilation of the JAX function.
+
     Args:
         log_abundance: Log number of atoms of elements
     """
 
-    log_abundance: ImmutableMap[str, ArrayLike]
+    species: SpeciesCollection
+    """Species collection"""
+    log_abundance: Array  # ImmutableMap[str, ArrayLike]
     """Log number of atoms of elements"""
 
     @classmethod
-    def create(cls, mass_constraints: Mapping[str, ArrayLike] | None = None) -> Self:
+    def create(
+        cls, species: SpeciesCollection, mass_constraints: Mapping[str, ArrayLike] | None = None
+    ) -> Self:
         """Creates an instance
 
         Args:
+            species: Species
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
 
         Returns:
             An instance
         """
+        # All unique elements in alphabetical order
+        unique_elements: tuple[str, ...] = species.get_unique_elements_in_species()
+
+        log_abundance: npt.NDArray[np.float64] = np.full(
+            len(unique_elements), np.nan, dtype=np.float64
+        )
+
+        # nans denote no mass constraints
         if mass_constraints is None:
-            init_dict: dict[str, ArrayLike] = {}
-        else:
-            init_dict = dict(mass_constraints)
+            return log_abundance
 
-        sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
-        log_abundance: dict[str, ArrayLike] = {}
+        for nn, element in enumerate(unique_elements):
+            if element in mass_constraints.keys():
+                molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
+                log_abundance_: ArrayLike = (
+                    np.log(mass_constraints[element]) + np.log(AVOGADRO) - np.log(molar_mass)
+                )
+                log_abundance[nn] = log_abundance_
 
-        for element, mass_constraint in sorted_mass.items():
-            molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log_abundance_: ArrayLike = (
-                np.log(mass_constraint) + np.log(AVOGADRO) - np.log(molar_mass)
-            )
-            log_abundance[element] = log_abundance_
+        # if mass_constraints is None:
+        #    init_dict: dict[str, ArrayLike] = {}
+        # else:
+        #    init_dict = dict(mass_constraints)
 
-        init_map: ImmutableMap[str, ArrayLike] = ImmutableMap(log_abundance)
+        # sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
+        # log_abundance: dict[str, ArrayLike] = {}
 
-        return cls(init_map)
+        # for element, mass_constraint in sorted_mass.items():
+        #    molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
+        #    log_abundance_: ArrayLike = (
+        #        np.log(mass_constraint) + np.log(AVOGADRO) - np.log(molar_mass)
+        #    )
+        #    log_abundance[element] = log_abundance_
 
+        # init_map: ImmutableMap[str, ArrayLike] = ImmutableMap(log_abundance)
+
+        return cls(species, jnp.array(log_abundance))
+
+    # FIXME: Needed for output
     def asdict(self) -> dict[str, ArrayLike]:
         """Gets a dictionary of the values
 
@@ -633,8 +663,9 @@ class MassConstraints(eqx.Module):
         Returns:
             Log number density
         """
-        log_abundance: Array = jnp.array(list(self.log_abundance.values()))
-        log_number_density: Array = log_abundance - log_atmosphere_volume
+        # TODO: Remove below old
+        # log_abundance: Array = jnp.array(list(self.log_abundance.values()))
+        log_number_density: Array = self.log_abundance - log_atmosphere_volume
 
         return log_number_density
 
@@ -645,12 +676,13 @@ class MassConstraints(eqx.Module):
         Returns:
             Log of the maximum abundance
         """
-        log_abundance: Array = jnp.array(list(self.log_abundance.values()))
+        # TODO: Remove below old
+        # log_abundance: Array = jnp.array(list(self.log_abundance.values()))
 
-        return jnp.max(log_abundance)
+        return jnp.max(self.log_abundance)
 
-    def __bool__(self) -> bool:
-        return bool(self.log_abundance)
+    # def __bool__(self) -> bool:
+    #     return bool(self.log_abundance)
 
     def __len__(self) -> int:
         return len(self.log_abundance)
@@ -681,8 +713,9 @@ class FixedParameters(eqx.Module):
     """Collection of species"""
     formula_matrix: npt.NDArray[np.int_]
     """Formula matrix"""
-    formula_matrix_constraints: npt.NDArray[np.int_]
-    """Formula matrix for applying mass constraints"""
+    # TODO: Remove
+    # formula_matrix_constraints: npt.NDArray[np.int_]
+    # """Formula matrix for applying mass constraints"""
     reaction_matrix: npt.NDArray[np.float64]
     """Reaction matrix"""
     reaction_stability_matrix: npt.NDArray[np.float64]

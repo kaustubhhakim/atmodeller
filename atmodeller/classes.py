@@ -104,7 +104,11 @@ class InteriorAtmosphere:
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             fugacity_constraints
         )
-        mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
+        # TODO: Need fugacity_constraints_ to produce an array of fixed size so JAX only compiles
+        # once
+        mass_constraints_: MassConstraints = MassConstraints.create(self.species, mass_constraints)
+        # TODO: Similarly for mass_constraints_ to produce an array of fixed size so JAX only
+        # compiles once
 
         fixed_parameters_: FixedParameters = self.get_fixed_parameters(
             fugacity_constraints_, mass_constraints_
@@ -236,6 +240,7 @@ class InteriorAtmosphere:
 
         logger.debug("solution = %s", solution)
 
+    # TODO: Update argument signature remove mass_constraints
     def get_fixed_parameters(
         self, fugacity_constraints: FugacityConstraints, mass_constraints: MassConstraints
     ) -> FixedParameters:
@@ -261,13 +266,20 @@ class InteriorAtmosphere:
         formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
 
         # Formula matrix for elements that are constrained by mass constraints
-        unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
-        indices: list[int] = []
-        for element in mass_constraints.log_abundance.keys():
-            index: int = unique_elements.index(element)
-            indices.append(index)
-        formula_matrix_constraints: npt.NDArray[np.int_] = formula_matrix.copy()
-        formula_matrix_constraints = formula_matrix_constraints[indices, :]
+        # Below returns all elements in the mass constraints in alphabetical order
+        # TODO: Preferred approach would be to keep this structure fixed and use nans or zeros
+        # for the elements that are not in the mass constraints
+        # unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
+
+        # TODO: Here would be preferred to not loop over constraints
+        # Old is below. This just extracts the indices of the elements in the mass constraints
+        # Better would be to pass the whole formula matrix and use a mask
+        # indices: list[int] = []
+        # for element in mass_constraints.log_abundance.keys():
+        #    index: int = unique_elements.index(element)
+        #    indices.append(index)
+        # formula_matrix_constraints: npt.NDArray[np.int_] = formula_matrix.copy()
+        # formula_matrix_constraints = formula_matrix_constraints[indices, :]
 
         # Fugacity constraint matrix and indices
         number_fugacity_constraints: int = len(fugacity_constraints.constraints)
@@ -282,7 +294,7 @@ class InteriorAtmosphere:
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=formula_matrix,
-            formula_matrix_constraints=formula_matrix_constraints,
+            # formula_matrix_constraints=formula_matrix_constraints,
             reaction_matrix=reaction_matrix,
             reaction_stability_matrix=reaction_stability_matrix,
             stability_species_indices=stability_species_indices,

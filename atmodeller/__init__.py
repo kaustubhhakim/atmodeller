@@ -32,9 +32,10 @@ print("Atmodeller initialized with double precision (float64)")
 
 # For debugging
 # jax.config.update("jax_debug_nans", True)
-# jax.config.update("jax_debug_infs", False)
-# jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_debug_infs", True)
+jax.config.update("jax_disable_jit", True)
 # jax.config.update("jax_log_compiles", True)
+# os.environ["EQX_ON_ERROR"] = "breakpoint"
 
 # Thermodynamic standard state
 ENTHALPY_REFERENCE: float = 298.15
@@ -48,11 +49,10 @@ INITIAL_LOG_NUMBER_DENSITY: float = 50.0
 
 Empiricially determined. This value is mid-range for Earth-like planets.
 """
-INITIAL_LOG_STABILITY: float = -140.0
-"""Initial log stability
+INITIAL_LOG_STABILITY: float = -30.0
+"""Initial log stability.
 
-Empirically determined. Preliminary testing seems to reveal that starting from a large negative 
-value improves the performance of the solver. This asserts that all species are stable.
+Empirically determined.
 """
 
 # Maximum x for which exp(x) is finite in 64-bit precision (to prevent overflow)
