@@ -101,14 +101,13 @@ class InteriorAtmosphere:
         else:
             planet_ = planet
 
+        # TODO: Need fugacity_constraints_ to produce an array of fixed size so JAX only compiles
+        # once
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             fugacity_constraints
         )
-        # TODO: Need fugacity_constraints_ to produce an array of fixed size so JAX only compiles
-        # once
+
         mass_constraints_: MassConstraints = MassConstraints.create(self.species, mass_constraints)
-        # TODO: Similarly for mass_constraints_ to produce an array of fixed size so JAX only
-        # compiles once
 
         fixed_parameters_: FixedParameters = self.get_fixed_parameters(
             fugacity_constraints_, mass_constraints_

@@ -216,6 +216,7 @@ def get_min_log_elemental_abundance_per_species(
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
     # jax.debug.print("mask = {out}", out=mask)
 
+    # FIXME: This might be wrong dimensions
     # Convert to column vector to align for element-wise multiplication
     log_abundance: Array = jnp.expand_dims(mass_constraints.log_abundance, axis=1)
     # jax.debug.print("log_abundance = {out}", out=log_abundance)
@@ -363,7 +364,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     Returns:
         Residual
     """
-    jax.debug.print("Starting new objective_function evaluation")
+    # jax.debug.print("Starting new objective_function evaluation")
     traced_parameters: TracedParameters = kwargs["traced_parameters"]
     fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
     planet: Planet = traced_parameters.planet
@@ -375,9 +376,6 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
     reaction_stability_matrix: Array = jnp.array(fixed_parameters.reaction_stability_matrix)
     stability_species_indices: Array = fixed_parameters.stability_species_indices
-    # TODO: Remove
-    # formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
-    # Now use formula matrix that has fixed shaped
     formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
 
     if stability_species_indices.size > 0:
@@ -438,12 +436,6 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         residual = jnp.concatenate([residual, reaction_residual])
 
     # Elemental mass balance residual
-    # TODO: if formula_matrix has a fixed size then this code can always run. Then just select
-    # the relevant residuals using jnp.take
-    # This condition was previously here
-    # if formula_matrix_constraints.size > 0:
-
-    # TODO: Below now computes element density for all elements in the formula matrix
     # Number density of elements in the gas or condensed phase
     element_density: Array = get_element_density(formula_matrix, log_number_density)
     # jax.debug.print("element_density = {out}", out=element_density)
@@ -455,26 +447,19 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_activity,
         log_volume,
     )
-    jax.debug.print("element_melt_density = {out}", out=element_melt_density)
+    # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
 
     # Relative mass error, computed in log-space for numerical stability
     element_density_total: Array = element_density + element_melt_density
     # Now for all elements
     log_element_density_total: Array = jnp.log(element_density_total)
-    # Here, mass_constraints.log_number_density(log_volume) needs to return the same shape as
-    # log_element_density_total. One option is to pass in log_element_density_total when
-    # evaluating the constraints to enforce by construction that mass constraints that have not
-    # been specified are set to zero.
-    # Or, better, set constraints to jnp.nan that are not to be applied and then remove them from
-    # the mass residual by filtering out NaNs
-    jax.debug.print("mass_constraints log_abundance = {out}", out=mass_constraints.log_abundance)
+    # jax.debug.print("log_number_density_total = {out}", out=log_element_density_total)
     log_target_density: Array = mass_constraints.log_number_density(log_volume)
-    jax.debug.print("log_target_density = {out}", out=log_target_density)
+    # jax.debug.print("log_target_density = {out}", out=log_target_density)
     mass_residual: Array = safe_exp(log_element_density_total - log_target_density) - 1
-    jax.debug.print("mass_residual = {out}", out=mass_residual)
-
-    # FIXME: Need to drop Nans from the residual because they are identifying elements that are not
-    # included in the mass constraints
+    # jax.debug.print("mass_residual = {out}", out=mass_residual)
+    # nans are returned for mass constraints that are not specified, and these must be masked.
+    mass_residual = jnp.where(jnp.isnan(mass_residual), 0.0, mass_residual)
 
     residual = jnp.concatenate([residual, mass_residual])
 

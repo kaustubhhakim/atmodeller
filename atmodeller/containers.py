@@ -232,7 +232,6 @@ class SpeciesCollection(eqx.Module):
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         sorted_elements: list[str] = sorted(unique_elements)
-
         # logger.debug("unique_elements_in_species = %s", sorted_elements)
 
         return tuple(sorted_elements)
@@ -363,12 +362,12 @@ class Planet(eqx.Module):
     @property
     def surface_area(self) -> Array:
         """Surface area"""
-        return 4.0 * jnp.pi * self.surface_radius**2
+        return 4.0 * jnp.pi * jnp.square(self.surface_radius)
 
     @property
     def surface_gravity(self) -> Array:
         """Surface gravity"""
-        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
+        return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
 
     @property
     def temperature(self) -> Array:
@@ -574,19 +573,15 @@ class FugacityConstraints(eqx.Module):
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
-    # FIXME: This has to know about the elements in the formula matrix to construct a single
-    # array of log number densities for constrained elements and jnp.nan for unconstrained elements
-    # The the shape of the mass constraints is constant for a given species collection and
-    # shouldn't prompt re-compilation of the JAX function.
-
     Args:
-        log_abundance: Log number of atoms of elements
+        log_abundance: Log number of atoms
+        elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    species: SpeciesCollection
-    """Species collection"""
-    log_abundance: Array  # ImmutableMap[str, ArrayLike]
-    """Log number of atoms of elements"""
+    log_abundance: Array
+    """Log number of atoms"""
+    elements: tuple[str, ...]
+    """Elements corresponding to the columns of log_abundance"""
 
     @classmethod
     def create(
@@ -601,45 +596,42 @@ class MassConstraints(eqx.Module):
         Returns:
             An instance
         """
+        mass_constraints_: Mapping[str, ArrayLike] = (
+            mass_constraints if mass_constraints is not None else {}
+        )
+
         # All unique elements in alphabetical order
         unique_elements: tuple[str, ...] = species.get_unique_elements_in_species()
 
+        # Determine the maximum length of any array in mass_constraints_ values
+        max_len: int = 1
+        for v in mass_constraints_.values():
+            try:
+                vlen: int = v.ndim  # type:ignore
+            except AttributeError:
+                vlen = 1
+            if vlen > max_len:
+                max_len = vlen
+
+        # Initialise to all nans assuming that there are no mass constraints
         log_abundance: npt.NDArray[np.float64] = np.full(
-            len(unique_elements), np.nan, dtype=np.float64
+            (max_len, len(unique_elements)), np.nan, dtype=np.float64
         )
 
-        # nans denote no mass constraints
-        if mass_constraints is None:
-            return log_abundance
-
+        # Now populate mass constraints
         for nn, element in enumerate(unique_elements):
-            if element in mass_constraints.keys():
+            if element in mass_constraints_.keys():
                 molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
                 log_abundance_: ArrayLike = (
-                    np.log(mass_constraints[element]) + np.log(AVOGADRO) - np.log(molar_mass)
+                    np.log(mass_constraints_[element]) + np.log(AVOGADRO) - np.log(molar_mass)
                 )
-                log_abundance[nn] = log_abundance_
+                log_abundance[:, nn] = log_abundance_
 
-        # if mass_constraints is None:
-        #    init_dict: dict[str, ArrayLike] = {}
-        # else:
-        #    init_dict = dict(mass_constraints)
+        # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
-        # sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
-        # log_abundance: dict[str, ArrayLike] = {}
+        return cls(jnp.array(log_abundance), unique_elements)
 
-        # for element, mass_constraint in sorted_mass.items():
-        #    molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-        #    log_abundance_: ArrayLike = (
-        #        np.log(mass_constraint) + np.log(AVOGADRO) - np.log(molar_mass)
-        #    )
-        #    log_abundance[element] = log_abundance_
-
-        # init_map: ImmutableMap[str, ArrayLike] = ImmutableMap(log_abundance)
-
-        return cls(species, jnp.array(log_abundance))
-
-    # FIXME: Needed for output
+    # FIXME: Needed for output and requires use of Species
     def asdict(self) -> dict[str, ArrayLike]:
         """Gets a dictionary of the values
 
@@ -663,29 +655,35 @@ class MassConstraints(eqx.Module):
         Returns:
             Log number density
         """
-        # TODO: Remove below old
-        # log_abundance: Array = jnp.array(list(self.log_abundance.values()))
         log_number_density: Array = self.log_abundance - log_atmosphere_volume
 
         return log_number_density
 
-    @eqx.filter_jit
-    def log_maximum_number(self) -> Array:
-        """Log of the maximum abundance
+    def vmap_axes(self) -> Self:
+        """Vmapping recipe"""
+        if self.log_abundance.shape[0] == 1:
+            # Single row so do not vmap
+            args: tuple = (None, None)
+        else:
+            # Multiple rows so vmaps
+            args = (1, None)
 
-        Returns:
-            Log of the maximum abundance
-        """
-        # TODO: Remove below old
-        # log_abundance: Array = jnp.array(list(self.log_abundance.values()))
+        return type(self)(*args)
 
-        return jnp.max(self.log_abundance)
+    # TODO: I think can remove. Not used.
+    # @eqx.filter_jit
+    # def log_maximum_number(self) -> Array:
+    #     """Log of the maximum abundance
 
-    # def __bool__(self) -> bool:
-    #     return bool(self.log_abundance)
+    #     Returns:
+    #         Log of the maximum abundance
+    #     """
+    #     # TODO: Must be axis=1 for 2-D but should collapse when not vmapped.
+    #     return jnp.max(self.log_abundance, axis=1)
 
-    def __len__(self) -> int:
-        return len(self.log_abundance)
+    # TODO: I think can remove. Not used.
+    # def __len__(self) -> int:
+    #    return len(self.log_abundance)
 
 
 class FixedParameters(eqx.Module):
