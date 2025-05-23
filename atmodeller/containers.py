@@ -56,6 +56,7 @@ from atmodeller.utilities import (
     get_log_number_density_from_log_pressure,
     to_hashable,
     unit_conversion,
+    vmap_axes_spec,
 )
 
 try:
@@ -64,9 +65,6 @@ except ImportError:
     from typing_extensions import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-# Required for multistart and helpful for reproducibility and debugging
-np.random.seed(0)
 
 
 class SpeciesCollection(eqx.Module):
@@ -298,6 +296,18 @@ class TracedParameters(eqx.Module):
     mass_constraints: MassConstraints
     """Mass constraints"""
 
+    def vmap_axes(self) -> Self:
+        """Vmapping recipe
+
+        Returns:
+            Vmap axes
+        """
+        return type(self)(
+            self.planet.vmap_axes(),
+            self.fugacity_constraints.vmap_axes(),
+            self.mass_constraints.vmap_axes(),
+        )
+
 
 class Planet(eqx.Module):
     """Planet properties
@@ -388,6 +398,14 @@ class Planet(eqx.Module):
         base_dict["surface_gravity"] = self.surface_gravity
 
         return base_dict
+
+    def vmap_axes(self) -> Self:
+        """Vmapping recipe
+
+        Returns:
+            Vmap axes
+        """
+        return vmap_axes_spec(self)
 
 
 class NormalisedMass(eqx.Module):
@@ -563,6 +581,14 @@ class FugacityConstraints(eqx.Module):
 
         return log_number_density
 
+    def vmap_axes(self) -> Self:
+        """Vmapping recipe
+
+        Returns:
+            Vmap axes
+        """
+        return vmap_axes_spec(self)
+
     def __bool__(self) -> bool:
         return bool(self.constraints)
 
@@ -631,16 +657,17 @@ class MassConstraints(eqx.Module):
 
         return cls(jnp.array(log_abundance), unique_elements)
 
-    # FIXME: Needed for output and requires use of Species
     def asdict(self) -> dict[str, ArrayLike]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
+        abundance: Array = jnp.exp(self.log_abundance)
         out: dict[str, ArrayLike] = {
-            f"{key}_number": jnp.exp(jnp.asarray(value))
-            for key, value in self.log_abundance.items()
+            f"{element}_number": abundance[:, idx]
+            for idx, element in enumerate(self.elements)
+            if not jnp.all(jnp.isnan(abundance[:, idx]))
         }
 
         return out
@@ -660,30 +687,23 @@ class MassConstraints(eqx.Module):
         return log_number_density
 
     def vmap_axes(self) -> Self:
-        """Vmapping recipe"""
+        """Vmapping recipe
+
+        Returns:
+            Vmap axes
+        """
         if self.log_abundance.shape[0] == 1:
             # Single row so do not vmap
             args: tuple = (None, None)
         else:
-            # Multiple rows so vmaps
-            args = (1, None)
+            # Multiple rows so vmap
+            args = (0, None)
 
         return type(self)(*args)
 
-    # TODO: I think can remove. Not used.
-    # @eqx.filter_jit
-    # def log_maximum_number(self) -> Array:
-    #     """Log of the maximum abundance
-
-    #     Returns:
-    #         Log of the maximum abundance
-    #     """
-    #     # TODO: Must be axis=1 for 2-D but should collapse when not vmapped.
-    #     return jnp.max(self.log_abundance, axis=1)
-
-    # TODO: I think can remove. Not used.
-    # def __len__(self) -> int:
-    #    return len(self.log_abundance)
+    def __bool__(self) -> bool:
+        """Return True if any value in log_abundance is not NaN, else False"""
+        return bool(jnp.any(~jnp.isnan(self.log_abundance)))
 
 
 class FixedParameters(eqx.Module):
@@ -694,7 +714,6 @@ class FixedParameters(eqx.Module):
     Args:
         species: Collection of species
         formula_matrix; Formula matrix
-        formula_matrix_constraints: Formula matrix for applying mass constraints
         reaction_matrix: Reaction matrix
         reaction_stability_matrix: Reaction stability matrix
         stability_species_indices: Indices of species to solve for stability
@@ -711,9 +730,6 @@ class FixedParameters(eqx.Module):
     """Collection of species"""
     formula_matrix: npt.NDArray[np.int_]
     """Formula matrix"""
-    # TODO: Remove
-    # formula_matrix_constraints: npt.NDArray[np.int_]
-    # """Formula matrix for applying mass constraints"""
     reaction_matrix: npt.NDArray[np.float64]
     """Reaction matrix"""
     reaction_stability_matrix: npt.NDArray[np.float64]

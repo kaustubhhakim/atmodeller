@@ -267,7 +267,9 @@ def objective_function_constraint_wrapper(solution: Array, kwargs: dict) -> Arra
 
     if fugacity_species_indices.size > 0:
         # FIXME: This works for simply appending one fugacity constraint (test_H_fH2) but will surely
-        # break for multiple fugacity constraints because the order could get scrambled.
+        # break for multiple fugacity constraints because the order could get scrambled. Need to
+        # implement similar/same approach as for mass constraints where unknown values are padded
+        # with NaNs and then later replaced by zeros.
 
         # Impose fugacity constraints as hard constraints. This involves back-computing the partial
         # pressure of the species based on the imposed fugacity constraints and the EOS.
@@ -454,7 +456,9 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # Now for all elements
     log_element_density_total: Array = jnp.log(element_density_total)
     # jax.debug.print("log_number_density_total = {out}", out=log_element_density_total)
-    log_target_density: Array = mass_constraints.log_number_density(log_volume)
+    # Flattening since if only one set of abundances specified (no vmapping) then the array will
+    # be 2-D with only one row. Otherwise with vmapping the abundances will be a 1-D array.
+    log_target_density: Array = mass_constraints.log_number_density(log_volume).flatten()
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
     mass_residual: Array = safe_exp(log_element_density_total - log_target_density) - 1
     # jax.debug.print("mass_residual = {out}", out=mass_residual)

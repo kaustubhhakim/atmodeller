@@ -44,7 +44,7 @@ from atmodeller.containers import (
 from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.output import Output
-from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
+from atmodeller.utilities import get_batch_size, partial_rref
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -108,10 +108,7 @@ class InteriorAtmosphere:
         )
 
         mass_constraints_: MassConstraints = MassConstraints.create(self.species, mass_constraints)
-
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters(
-            fugacity_constraints_, mass_constraints_
-        )
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters(fugacity_constraints_)
 
         traced_parameters_: TracedParameters = TracedParameters(
             planet_, fugacity_constraints_, mass_constraints_
@@ -138,7 +135,8 @@ class InteriorAtmosphere:
 
         # Always batch over the initial solution, meaning the initial solution must be broadcast
         # appropriately.
-        in_axes: Any = vmap_axes_spec(traced_parameters_)
+        in_axes: Any = traced_parameters_.vmap_axes()
+        # jax.debug.print("in_axes = {out}", out=in_axes)
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
         batch_size: int = max(get_batch_size(traced_parameters_), 1)
@@ -239,15 +237,11 @@ class InteriorAtmosphere:
 
         logger.debug("solution = %s", solution)
 
-    # TODO: Update argument signature remove mass_constraints
-    def get_fixed_parameters(
-        self, fugacity_constraints: FugacityConstraints, mass_constraints: MassConstraints
-    ) -> FixedParameters:
+    def get_fixed_parameters(self, fugacity_constraints: FugacityConstraints) -> FixedParameters:
         """Gets fixed parameters.
 
         Args:
             fugacity_constraints: Fugacity constraints
-            mass_constraints: Mass constraints
 
         Returns:
             Fixed parameters
@@ -259,26 +253,7 @@ class InteriorAtmosphere:
         stability_species_indices: Array = self.species.get_stability_species_indices()
         molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
-
-        # The complete formula matrix is not required for the calculation but it is used for
-        # computing output quantities. So calculate and store it.
         formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
-
-        # Formula matrix for elements that are constrained by mass constraints
-        # Below returns all elements in the mass constraints in alphabetical order
-        # TODO: Preferred approach would be to keep this structure fixed and use nans or zeros
-        # for the elements that are not in the mass constraints
-        # unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
-
-        # TODO: Here would be preferred to not loop over constraints
-        # Old is below. This just extracts the indices of the elements in the mass constraints
-        # Better would be to pass the whole formula matrix and use a mask
-        # indices: list[int] = []
-        # for element in mass_constraints.log_abundance.keys():
-        #    index: int = unique_elements.index(element)
-        #    indices.append(index)
-        # formula_matrix_constraints: npt.NDArray[np.int_] = formula_matrix.copy()
-        # formula_matrix_constraints = formula_matrix_constraints[indices, :]
 
         # Fugacity constraint matrix and indices
         number_fugacity_constraints: int = len(fugacity_constraints.constraints)
@@ -293,7 +268,6 @@ class InteriorAtmosphere:
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
             formula_matrix=formula_matrix,
-            # formula_matrix_constraints=formula_matrix_constraints,
             reaction_matrix=reaction_matrix,
             reaction_stability_matrix=reaction_stability_matrix,
             stability_species_indices=stability_species_indices,

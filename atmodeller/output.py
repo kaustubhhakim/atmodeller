@@ -197,10 +197,6 @@ class Output:
 
         logger.info("Computing asdict output")
         fugacity_matrix: Array = jnp.array(self._fixed_parameters.fugacity_matrix)
-        # FIXME: this matrix is no longer used
-        formula_matrix_constraints: Array = jnp.array(
-            self._fixed_parameters.formula_matrix_constraints
-        )
 
         out: dict[str, dict[str, Array]] = {}
         out |= self.condensed_species_asdict()
@@ -218,10 +214,12 @@ class Output:
         out["raw_solution"] = self.raw_solution_asdict()
 
         out["constraints"] = {}
-        if formula_matrix_constraints.size > 0:
+
+        if self._traced_parameters.mass_constraints:
             out["constraints"] |= expand_dict(
                 self._traced_parameters.mass_constraints.asdict(), self.number_solutions
             )
+
         if fugacity_matrix.size > 0:
             out["constraints"] |= self._traced_parameters.fugacity_constraints.asdict(
                 temperature, pressure
@@ -880,8 +878,7 @@ class Output:
         output_file: Path = Path(f"{file_prefix}.xlsx")
 
         # Convenient to highlight rows where the solver failed to find a solution for follow-up
-        # analysis
-        # Define a fill color for highlighting rows (e.g., yellow)
+        # analysis. Define a fill color for highlighting rows (e.g., yellow)
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         # Get the indices where the successful_solves mask is False
