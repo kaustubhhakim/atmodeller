@@ -52,10 +52,7 @@ def test_H_O(helper) -> None:
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: ArrayLike = 6.25774e20
-    mass_constraints: dict[str, ArrayLike] = {
-        "H": h_kg,
-        "O": o_kg,
-    }
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
         planet=planet,
@@ -91,10 +88,7 @@ def test_CHO_reduced(helper) -> None:
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
-    mass_constraints: dict[str, ArrayLike] = {
-        "H": h_kg,
-        "C": c_kg,
-    }
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     interior_atmosphere.solve(
         planet=planet,
@@ -133,10 +127,7 @@ def test_CHO_IW(helper) -> None:
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
-    mass_constraints: dict[str, ArrayLike] = {
-        "H": h_kg,
-        "C": c_kg,
-    }
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     interior_atmosphere.solve(
         planet=planet,
@@ -186,10 +177,7 @@ def test_CHO_oxidised(helper) -> None:
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 0.1 * h_kg
-    mass_constraints: dict[str, ArrayLike] = {
-        "H": h_kg,
-        "C": c_kg,
-    }
+    mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "C": c_kg}
 
     interior_atmosphere.solve(
         planet=planet,
@@ -267,10 +255,7 @@ def test_CHO_middle_temperature(helper) -> None:
     oceans: ArrayLike = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
-    mass_constraints: dict[str, ArrayLike] = {
-        "C": c_kg,
-        "H": h_kg,
-    }
+    mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg}
 
     interior_atmosphere.solve(
         planet=planet,
@@ -305,11 +290,7 @@ def test_CHO_low_temperature(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
     o_kg: ArrayLike = 1.02999e20
-    mass_constraints: dict[str, ArrayLike] = {
-        "C": c_kg,
-        "H": h_kg,
-        "O": o_kg,
-    }
+    mass_constraints: dict[str, ArrayLike] = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
     initial_log_number_density: ArrayLike = np.ones(len(species)) * INITIAL_LOG_NUMBER_DENSITY
@@ -350,11 +331,7 @@ def test_graphite_condensed(helper) -> None:
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 5 * h_kg
     o_kg: ArrayLike = 2.73159e19
-    mass_constraints = {
-        "C": c_kg,
-        "H": h_kg,
-        "O": o_kg,
-    }
+    mass_constraints = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
         planet=planet,
@@ -394,10 +371,7 @@ def test_graphite_unstable(helper) -> None:
     oceans: ArrayLike = 3
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     c_kg: ArrayLike = 1 * h_kg
-    mass_constraints = {
-        "C": c_kg,
-        "H": h_kg,
-    }
+    mass_constraints = {"C": c_kg, "H": h_kg}
 
     interior_atmosphere.solve(
         planet=planet,
@@ -431,10 +405,7 @@ def test_water_condensed(helper) -> None:
     oceans: float = 1
     h_kg: ArrayLike = earth_oceans_to_hydrogen_mass(oceans)
     o_kg: float = 1.14375e21
-    mass_constraints = {
-        "H": h_kg,
-        "O": o_kg,
-    }
+    mass_constraints = {"H": h_kg, "O": o_kg}
 
     # Initial solution guess number density (molecules/m^3)
     initial_log_number_density: npt.NDArray[np.float64] = INITIAL_LOG_NUMBER_DENSITY * np.ones(
@@ -476,11 +447,7 @@ def test_graphite_water_condensed(helper) -> None:
     h_kg: float = 3.10e20
     c_kg: float = 1.08e20
     o_kg: float = 2.48298883581636e21
-    mass_constraints = {
-        "C": c_kg,
-        "H": h_kg,
-        "O": o_kg,
-    }
+    mass_constraints = {"C": c_kg, "H": h_kg, "O": o_kg}
 
     interior_atmosphere.solve(
         planet=planet,
