@@ -120,8 +120,8 @@ class InteriorAtmosphere:
             solver_parameters_ = solver_parameters
 
         options: dict[str, Any] = {
-            "lower": self.species.get_lower_bound(len(fugacity_constraints_)),
-            "upper": self.species.get_upper_bound(len(fugacity_constraints_)),
+            "lower": self.species.get_lower_bound(),
+            "upper": self.species.get_upper_bound(),
             "jac": solver_parameters_.jac,
         }
 
@@ -144,16 +144,9 @@ class InteriorAtmosphere:
             initial_log_number_density,
             initial_log_stability,
             self.species.number,
-            self.species.number_of_stability(),
             batch_size,
         )
-        # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
-
-        # Remove the species (i.e. columns) from the solution that are not to be solved for.
-        # Instead, these will be imposed as hard constraints.
-        base_initial_solution = jnp.delete(
-            base_initial_solution, fixed_parameters_.fugacity_species_indices, axis=1
-        )
+        jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
         # First solution attempt
         solution, solver_status, solver_steps = self._solver(
@@ -248,9 +241,9 @@ class InteriorAtmosphere:
         """
         reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
         reaction_stability_matrix: npt.NDArray[np.float64] = self.get_reaction_stability_matrix()
-        gas_species_indices: Array = self.species.get_gas_species_indices()
+        gas_species_mask: Array = self.species.get_gas_species_mask()
         condensed_species_indices: Array = self.species.get_condensed_species_indices()
-        stability_species_indices: Array = self.species.get_stability_species_indices()
+        stability_species_mask: Array = self.species.get_stability_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
         formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
@@ -270,9 +263,9 @@ class InteriorAtmosphere:
             formula_matrix=formula_matrix,
             reaction_matrix=reaction_matrix,
             reaction_stability_matrix=reaction_stability_matrix,
-            stability_species_indices=stability_species_indices,
+            stability_species_mask=stability_species_mask,
             fugacity_matrix=fugacity_matrix,
-            gas_species_indices=gas_species_indices,
+            gas_species_mask=gas_species_mask,
             condensed_species_indices=condensed_species_indices,
             fugacity_species_indices=fugacity_species_indices,
             diatomic_oxygen_index=diatomic_oxygen_index,
@@ -448,7 +441,6 @@ def broadcast_initial_solution(
     initial_log_number_density: ArrayLike | None,
     initial_log_stability: ArrayLike | None,
     number_of_species: int,
-    number_of_stability: int,
     batch_size: int,
 ) -> Array:
     """Creates and broadcasts the initial solution to shape (batch_size, D)
@@ -459,7 +451,6 @@ def broadcast_initial_solution(
         initial_log_number_density: Initial log number density
         initial_log_stability: Initial log stability
         number_of_species: Number of species
-        number_of_stability: Number of species stability
         batch_size: Batch size
 
     Returns:
@@ -475,7 +466,7 @@ def broadcast_initial_solution(
     stability: Array = _broadcast_component(
         initial_log_stability,
         INITIAL_LOG_STABILITY,
-        number_of_stability,
+        number_of_species,
         batch_size,
         name="initial_log_stability",
     )

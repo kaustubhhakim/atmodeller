@@ -133,44 +133,33 @@ class SpeciesCollection(eqx.Module):
         # and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_indices(self) -> Array:
-        """Gets the indices of gas species
+    def get_gas_species_mask(self) -> Array:
+        """Gets the gas species mask
 
         Returns:
-            Indices of the gas species
+            Mask for the gas species
         """
-        indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
-            if species_.data.phase == "g":
-                indices.append(nn)
+        gas_species_mask: Array = jnp.array(
+            [species.data.phase == "g" for species in self.data], dtype=jnp.bool_
+        )
 
-        return jnp.array(indices, dtype=jnp.int_)
+        return gas_species_mask
 
-    def get_lower_bound(self: SpeciesCollection, number_fugacity_constraints: int) -> Array:
+    def get_lower_bound(self: SpeciesCollection) -> Array:
         """Gets the lower bound for truncating the solution during the solve
-
-        Args:
-            number_fugacity_constraints: Number of fugacity constraints
 
         Returns:
             Lower bound for truncating the solution during the solve
         """
-        return self._get_hypercube_bound(
-            LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER, number_fugacity_constraints
-        )
+        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
 
-    def get_upper_bound(self: SpeciesCollection, number_fugacity_constraints: int) -> Array:
+    def get_upper_bound(self: SpeciesCollection) -> Array:
         """Gets the upper bound for truncating the solution during the solve
-
-        Args:
-            number_fugacity_constraints: Number of fugacity constraints
 
         Returns:
             Upper bound for truncating the solution during the solve
         """
-        return self._get_hypercube_bound(
-            LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER, number_fugacity_constraints
-        )
+        return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
     def get_molar_masses(self) -> Array:
         """Gets the molar masses of all species.
@@ -190,19 +179,6 @@ class SpeciesCollection(eqx.Module):
             Species names
         """
         return tuple([species_.name for species_ in self.data])
-
-    def get_stability_species_indices(self) -> Array:
-        """Gets the indices of species to solve for stability
-
-        Returns:
-            Indices of the species to solve for stability
-        """
-        indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
-            if species_.solve_for_stability:
-                indices.append(nn)
-
-        return jnp.array(indices, dtype=jnp.int_)
 
     def get_stability_species_mask(self) -> Array:
         """Gets the stability species mask
@@ -234,34 +210,22 @@ class SpeciesCollection(eqx.Module):
 
         return tuple(sorted_elements)
 
-    def number_of_stability(self: SpeciesCollection) -> int:
-        """Number of stability solutions"""
-        return len(self.get_stability_species_indices())
-
     def _get_hypercube_bound(
-        self: SpeciesCollection,
-        log_number_density_bound: float,
-        stability_bound: float,
-        number_fugacity_constraints: int,
+        self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
     ) -> Array:
         """Gets the bound on the hypercube
 
         Args:
             log_number_density_bound: Bound on the log number density
             stability_bound: Bound on the stability
-            number_fugacity_constraints: Number of fugacity constraints
 
         Returns:
             Bound on the hypercube which contains the root
         """
-        log_number_density: ArrayLike = log_number_density_bound * np.ones(
-            self.number - number_fugacity_constraints
-        )
-
         bound: ArrayLike = np.concatenate(
             (
-                log_number_density,
-                stability_bound * np.ones(self.number_of_stability()),
+                log_number_density_bound * np.ones(self.number),
+                stability_bound * np.ones(self.number),
             )
         )
 
@@ -716,9 +680,9 @@ class FixedParameters(eqx.Module):
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
         reaction_stability_matrix: Reaction stability matrix
-        stability_species_indices: Indices of species to solve for stability
+        stability_species_mask: Mask of species to solve for stability
         fugacity_matrix: Fugacity constraint matrix
-        gas_species_indices: Indices of gas species
+        gas_species_mask: Mask of gas species
         condensed_specie_indices: Indices of condensed species
         fugacity_species_indices: Indices of species to constrain the fugacity
         diatomic_oxygen_index: Index of diatomic oxygen
@@ -734,12 +698,12 @@ class FixedParameters(eqx.Module):
     """Reaction matrix"""
     reaction_stability_matrix: npt.NDArray[np.float64]
     """Reaction stability matrix"""
-    stability_species_indices: Array
-    """Indices of species to solve for stability"""
+    stability_species_mask: Array
+    """Mask of species to solve for stability"""
     fugacity_matrix: Array
     """Fugacity constraint matrix"""
-    gas_species_indices: Array
-    """Indices of gas species"""
+    gas_species_mask: Array
+    """Mask of gas species"""
     condensed_species_indices: Array
     """Indices of condensed species"""
     fugacity_species_indices: Array
@@ -824,7 +788,7 @@ class SolverParameters(eqx.Module):
         solver: Solver. Defaults to optx.Newton
         atol: Absolute tolerance. Defaults to 1.0e-6.
         rtol: Relative tolerance. Defaults to 1.0e-6.
-        linear_solver: Linear solver. Defaults to AutoLinearSolver(well_posed=None).
+        linear_solver: Linear solver. Defaults to AutoLinearSolver(well_posed=False).
         norm: Norm. Defaults to optx.rms_norm.
         throw: How to report any failures. Defaults to False.
         max_steps: The maximum number of steps the solver can take. Defaults to 256
@@ -840,11 +804,11 @@ class SolverParameters(eqx.Module):
     """Absolute tolerance"""
     rtol: float = 1.0e-6
     """Relative tolerance"""
-    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
+    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=False)
     """Linear solver"""
     norm: Callable = optx.max_norm
     """Norm""" ""
-    throw: bool = False
+    throw: bool = True
     """How to report any failures"""
     max_steps: int = 256
     """Maximum number of steps the solver can take"""

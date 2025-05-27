@@ -101,12 +101,9 @@ class Output:
         self._traced_parameters: TracedParameters = traced_parameters
         self._solver_parameters: SolverParameters = solver_parameters
 
-        # Calculate the index at which to split the array
-        split_index: int = self._solution.shape[1] - self._species.number_of_stability()
-        log_number_density, log_stability = jnp.split(self._solution, [split_index], axis=1)
-        # Number of entries in log_number_density is always the total number of species
+        log_number_density, log_stability = jnp.split(self._solution, 2, axis=1)
+        # TODO: Might want to mask out quantities that were not solved for
         self._log_number_density: Array = log_number_density
-        # Number of entries in log_stability could be between 0 and the total number of species
         self._log_stability: Array = log_stability
         # Caching output to avoid recomputation
         self._cached_dict: dict[str, dict[str, Array]] | None = None
