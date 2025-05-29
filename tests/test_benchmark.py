@@ -19,11 +19,10 @@
 import logging
 
 import numpy as np
-import numpy.typing as npt
 import pytest
 from jax.typing import ArrayLike
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, debug_logger
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import Planet, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol
@@ -407,18 +406,8 @@ def test_water_condensed(helper) -> None:
     o_kg: float = 1.14375e21
     mass_constraints = {"H": h_kg, "O": o_kg}
 
-    # Initial solution guess number density (molecules/m^3)
-    initial_log_number_density: npt.NDArray[np.float64] = INITIAL_LOG_NUMBER_DENSITY * np.ones(
-        len(species), dtype=np.float64
-    )
-    # For this case, reducing the fO2 is required for the solver to latch onto the solution
-    initial_log_number_density[2] = -INITIAL_LOG_NUMBER_DENSITY
-    initial_log_stability: ArrayLike = INITIAL_LOG_STABILITY * np.ones(1)
-
     interior_atmosphere.solve(
         planet=planet,
-        initial_log_number_density=initial_log_number_density,
-        initial_log_stability=initial_log_stability,
         mass_constraints=mass_constraints,
     )
     output: Output = interior_atmosphere.output
