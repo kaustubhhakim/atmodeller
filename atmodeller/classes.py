@@ -442,8 +442,8 @@ def broadcast_initial_solution(
     D = number_of_species + number_of_stability, i.e. the total number of solution quantities
 
     Args:
-        initial_log_number_density: Initial log number density
-        initial_log_stability: Initial log stability
+        initial_log_number_density: Initial log number density. Defaults to None.
+        initial_log_stability: Initial log stability. Defaults to None.
         number_of_species: Number of species
         batch_size: Batch size
 
