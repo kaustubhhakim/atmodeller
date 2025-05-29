@@ -96,13 +96,7 @@ class InteriorAtmosphere:
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
         """
-        if planet is None:
-            planet_: Planet = Planet()
-        else:
-            planet_ = planet
-
-        # TODO: Need fugacity_constraints_ to produce an array of fixed size so JAX only compiles
-        # once
+        planet_: Planet = Planet() if planet is None else planet
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             fugacity_constraints
         )
