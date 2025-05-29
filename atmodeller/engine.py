@@ -350,7 +350,8 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
     residual = jnp.concatenate([residual, stability_residual])
     # jax.debug.print("residual (with nans) = {out}", out=residual)
-    # nans denote unused conditions
+
+    # nans denote unused conditions that should now be zeroed
     residual = jnp.where(jnp.isnan(residual), 0.0, residual)
     # jax.debug.print("residual = {out}", out=residual)
 
