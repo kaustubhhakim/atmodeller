@@ -46,6 +46,8 @@ class RedoxBuffer(eqx.Module):
             should be used with caution.
     """
 
+    # NOTE: Don't use eqx.converter since this will break vmap, which requires int, None, or
+    # callable.
     log10_shift: ArrayLike = 0
     evaluation_pressure: ArrayLike | None = 1.0
     calibration: eqx.AbstractVar[ExperimentalCalibration] = eqx.field(init=False)

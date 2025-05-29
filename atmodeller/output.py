@@ -109,15 +109,17 @@ class Output:
         self._cached_dict: dict[str, dict[str, Array]] | None = None
         self._cached_dataframes: dict[str, pd.DataFrame] | None = None
 
-    @property
-    def condensed_species_indices(self) -> Array:
-        """Condensed species indices"""
-        return self._species.get_condensed_species_indices()
+    # TODO: Now removed
+    # @property
+    # def condensed_species_indices(self) -> Array:
+    #     """Condensed species indices"""
+    #     return self._species.get_condensed_species_indices()
 
-    @property
-    def gas_species_indices(self) -> Array:
-        """Gas species indices"""
-        return self._fixed_parameters.gas_species_indices
+    # TODO: Now removed
+    # @property
+    # def gas_species_indices(self) -> Array:
+    #     """Gas species indices"""
+    #     return self._fixed_parameters.gas_species_indices
 
     @property
     def log_number_density(self) -> Array:

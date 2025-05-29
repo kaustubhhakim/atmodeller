@@ -98,20 +98,16 @@ class InteriorAtmosphere:
         """
         planet_: Planet = Planet() if planet is None else planet
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            fugacity_constraints
+            self.species, fugacity_constraints
         )
-
         mass_constraints_: MassConstraints = MassConstraints.create(self.species, mass_constraints)
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters(fugacity_constraints_)
-
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
         traced_parameters_: TracedParameters = TracedParameters(
             planet_, fugacity_constraints_, mass_constraints_
         )
-
-        if solver_parameters is None:
-            solver_parameters_: SolverParameters = SolverParameters()
-        else:
-            solver_parameters_ = solver_parameters
+        solver_parameters_: SolverParameters = (
+            SolverParameters() if solver_parameters is None else solver_parameters
+        )
 
         options: dict[str, Any] = {
             "lower": self.species.get_lower_bound(),
@@ -127,8 +123,7 @@ class InteriorAtmosphere:
             options=options,
         )
 
-        # Always batch over the initial solution, meaning the initial solution must be broadcast
-        # appropriately.
+        # Initial solution must be broadcast since it is always batched
         in_axes: Any = traced_parameters_.vmap_axes()
         # jax.debug.print("in_axes = {out}", out=in_axes)
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
@@ -140,7 +135,7 @@ class InteriorAtmosphere:
             self.species.number,
             batch_size,
         )
-        jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
+        # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
         # First solution attempt
         solution, solver_status, solver_steps = self._solver(
@@ -161,27 +156,6 @@ class InteriorAtmosphere:
             max_attempts=solver_parameters_.multistart,
             key=key,
         )
-
-        # FIXME: May break if the ordering of the constraints is not the same as the ordering of the
-        # species in the solution.
-        # Evaluate the log_number_density for the fugacity constraints
-        fugacity_species_indices: Array = fixed_parameters_.fugacity_species_indices
-        if fugacity_species_indices.size > 0:
-            temperature: ArrayLike = traced_parameters_.planet.temperature
-            fugacity_values: Array = fugacity_constraints_.log_number_density(temperature, 1.0)
-            # jax.debug.print("fugacity_values = {out}", out=fugacity_values)
-
-            # Ensure fugacity_values are broadcast correctly for batch solutions
-            fugacity_values_broadcasted: Array = jnp.broadcast_to(
-                fugacity_values.T, (solution.shape[0], fugacity_values.shape[0])
-            )
-            # jax.debug.print("fugacity_values_broadcasted = {out}", out=fugacity_values_broadcasted)
-
-            # Insert the fugacity values into the solution at the appropriate indices
-            solution = jnp.insert(
-                solution, fugacity_species_indices, fugacity_values_broadcasted, axis=1
-            )
-            # jax.debug.print("solution after inserting fugacity constraints = {out}", out=solution)
 
         self._output = Output(
             self.species,
@@ -224,11 +198,8 @@ class InteriorAtmosphere:
 
         logger.debug("solution = %s", solution)
 
-    def get_fixed_parameters(self, fugacity_constraints: FugacityConstraints) -> FixedParameters:
+    def get_fixed_parameters(self) -> FixedParameters:
         """Gets fixed parameters.
-
-        Args:
-            fugacity_constraints: Fugacity constraints
 
         Returns:
             Fixed parameters
@@ -236,21 +207,10 @@ class InteriorAtmosphere:
         reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
         reaction_stability_matrix: npt.NDArray[np.float64] = self.get_reaction_stability_matrix()
         gas_species_mask: Array = self.species.get_gas_species_mask()
-        condensed_species_indices: Array = self.species.get_condensed_species_indices()
         stability_species_mask: Array = self.species.get_stability_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
         formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
-
-        # Fugacity constraint matrix and indices
-        number_fugacity_constraints: int = len(fugacity_constraints.constraints)
-        fugacity_species_indices_list: list[int] = []
-        species_names: tuple[str, ...] = self.species.get_species_names()
-        for species_name in fugacity_constraints.constraints.keys():
-            index: int = species_names.index(species_name)
-            fugacity_species_indices_list.append(index)
-        fugacity_species_indices: Array = jnp.array(fugacity_species_indices_list, dtype=jnp.int_)
-        fugacity_matrix: Array = jnp.identity(number_fugacity_constraints)
 
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
@@ -258,10 +218,7 @@ class InteriorAtmosphere:
             reaction_matrix=reaction_matrix,
             reaction_stability_matrix=reaction_stability_matrix,
             stability_species_mask=stability_species_mask,
-            fugacity_matrix=fugacity_matrix,
             gas_species_mask=gas_species_mask,
-            condensed_species_indices=condensed_species_indices,
-            fugacity_species_indices=fugacity_species_indices,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
             tau=self.tau,

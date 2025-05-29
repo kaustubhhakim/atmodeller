@@ -33,7 +33,6 @@ from jax import Array, lax
 from jax.typing import ArrayLike
 from lineax import AbstractLinearSolver
 from molmass import Formula
-from xmmutablemap import ImmutableMap
 
 from atmodeller import (
     LOG_NUMBER_DENSITY_LOWER,
@@ -102,19 +101,6 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    def get_condensed_species_indices(self) -> Array:
-        """Gets the indices of condensed species
-
-        Returns:
-            Indices of the condensed species
-        """
-        indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
-            if species_.data.phase != "g":
-                indices.append(nn)
-
-        return jnp.array(indices, dtype=jnp.int_)
-
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
@@ -173,7 +159,9 @@ class SpeciesCollection(eqx.Module):
         return molar_masses
 
     def get_species_names(self) -> tuple[str, ...]:
-        """Gets the names of all species.
+        """Gets the unique names of all species.
+
+        Unique names by combining Hill notation and phase
 
         Returns:
             Species names
@@ -261,7 +249,7 @@ class TracedParameters(eqx.Module):
     """Mass constraints"""
 
     def vmap_axes(self) -> Self:
-        """Vmapping recipe
+        """Vmap recipe
 
         Returns:
             Vmap axes
@@ -364,7 +352,7 @@ class Planet(eqx.Module):
         return base_dict
 
     def vmap_axes(self) -> Self:
-        """Vmapping recipe
+        """Vmap recipe
 
         Returns:
             Vmap axes
@@ -412,19 +400,37 @@ class ConstantFugacityConstraint(eqx.Module):
         fugacity: Fugacity
     """
 
-    fugacity: Array = eqx.field(converter=as_j64)
+    # NOTE: Don't use eqx.converter since this will break vmap, which requires int, None, or
+    # callable.
+    fugacity: ArrayLike
+    """Fugacity"""
 
     @property
     def value(self) -> Array:
-        return self.fugacity
+        return jnp.asarray(self.fugacity)
 
     @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
-        log_fugacity_value: ArrayLike = jnp.log(self.fugacity)
+        log_fugacity_value: Array = jnp.log(self.fugacity)
 
         return log_fugacity_value
+
+    def vmap_axes(self) -> Self:
+        return vmap_axes_spec(self)
+
+
+class NoFugacityConstraint(ConstantFugacityConstraint):
+    """No fugacity constraint
+
+    This must adhere to FugacityConstraintProtocol
+
+    Returns nan to indicate the need for subsequent masking
+    """
+
+    def __init__(self):
+        super().__init__(fugacity=jnp.array(jnp.nan))
 
 
 class FugacityConstraints(eqx.Module):
@@ -434,34 +440,48 @@ class FugacityConstraints(eqx.Module):
 
     Args:
         constraints: Fugacity constraints
+        species: Species corresponding to the columns of `constraints`
     """
 
-    constraints: ImmutableMap[str, FugacityConstraintProtocol]
+    constraints: tuple[FugacityConstraintProtocol, ...]
     """Fugacity constraints"""
+    species: tuple[str, ...]
+    """Species corresponding to the entries of constraints"""
 
     @classmethod
     def create(
         cls,
+        species: SpeciesCollection,
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
     ) -> Self:
         """Creates an instance
 
         Args:
+            species: Species
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 None.
 
         Returns:
             An instance
         """
-        if fugacity_constraints is None:
-            init_dict: dict[str, FugacityConstraintProtocol] = {}
-        else:
-            init_dict = dict(fugacity_constraints)
+        fugacity_constraints_: Mapping[str, FugacityConstraintProtocol] = (
+            fugacity_constraints if fugacity_constraints is not None else {}
+        )
 
-        init_map: ImmutableMap[str, FugacityConstraintProtocol] = ImmutableMap(init_dict)
+        # All unique species
+        unique_species: tuple[str, ...] = species.get_species_names()
 
-        return cls(init_map)
+        constraints: list[FugacityConstraintProtocol] = []
 
+        for species_name in unique_species:
+            if species_name in fugacity_constraints_:
+                constraints.append(fugacity_constraints_[species_name])
+            else:
+                constraints.append(NoFugacityConstraint())
+
+        return cls(tuple(constraints), unique_species)
+
+    # FIXME: Refresh for output
     def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
         """Gets a dictionary of the evaluated fugacity constraints.
 
@@ -500,7 +520,7 @@ class FugacityConstraints(eqx.Module):
         """
         # NOTE: Must avoid the late-binding closure issue
         fugacity_funcs: list[Callable] = [
-            to_hashable(constraint.log_fugacity) for constraint in self.constraints.values()
+            to_hashable(constraint.log_fugacity) for constraint in self.constraints
         ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
@@ -546,18 +566,22 @@ class FugacityConstraints(eqx.Module):
         return log_number_density
 
     def vmap_axes(self) -> Self:
-        """Vmapping recipe
+        """Vmap recipe
+
+        TODO: This vmap appears to correctly access the nested arrays associated with the
+        contained fugacity constraints, at least for Constant and No fugacity constraints.
 
         Returns:
             Vmap axes
         """
         return vmap_axes_spec(self)
 
-    def __bool__(self) -> bool:
-        return bool(self.constraints)
+    # TODO: Remove
+    # def __bool__(self) -> bool:
+    #     return bool(self.constraints)
 
-    def __len__(self) -> int:
-        return len(self.constraints)
+    # def __len__(self) -> int:
+    #     return len(self.constraints)
 
 
 class MassConstraints(eqx.Module):
@@ -568,7 +592,9 @@ class MassConstraints(eqx.Module):
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: Array = eqx.field(converter=as_j64)
+    # NOTE: Don't use eqx.converter since this will break vmap, which requires int, None, or
+    # callable.
+    log_abundance: Array
     """Log number of atoms"""
     elements: tuple[str, ...]
     """Elements corresponding to the columns of log_abundance"""
@@ -651,7 +677,7 @@ class MassConstraints(eqx.Module):
         return log_number_density
 
     def vmap_axes(self) -> Self:
-        """Vmapping recipe
+        """Vmap recipe
 
         Returns:
             Vmap axes
@@ -665,9 +691,10 @@ class MassConstraints(eqx.Module):
 
         return type(self)(*args)
 
-    def __bool__(self) -> bool:
-        """Return True if any value in log_abundance is not NaN, else False"""
-        return bool(jnp.any(~jnp.isnan(self.log_abundance)))
+    # TODO: Unsure if still required. Maybe for output?
+    # def __bool__(self) -> bool:
+    #     """Return True if any value in log_abundance is not NaN, else False"""
+    #     return bool(jnp.any(~jnp.isnan(self.log_abundance)))
 
 
 class FixedParameters(eqx.Module):
@@ -681,10 +708,7 @@ class FixedParameters(eqx.Module):
         reaction_matrix: Reaction matrix
         reaction_stability_matrix: Reaction stability matrix
         stability_species_mask: Mask of species to solve for stability
-        fugacity_matrix: Fugacity constraint matrix
         gas_species_mask: Mask of gas species
-        condensed_specie_indices: Indices of condensed species
-        fugacity_species_indices: Indices of species to constrain the fugacity
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
         tau: Tau factor for species stability
@@ -700,14 +724,8 @@ class FixedParameters(eqx.Module):
     """Reaction stability matrix"""
     stability_species_mask: Array
     """Mask of species to solve for stability"""
-    fugacity_matrix: Array
-    """Fugacity constraint matrix"""
     gas_species_mask: Array
     """Mask of gas species"""
-    condensed_species_indices: Array
-    """Indices of condensed species"""
-    fugacity_species_indices: Array
-    """Indices of species to constrain the fugacity"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
     molar_masses: Array

@@ -191,7 +191,7 @@ class CombinedRealGas(RealGas):
         # jax.debug.print("temperature = {out}", out=temperature)
         # jax.debug.print("pressure = {out}", out=pressure)
 
-        # Flatten for vmapping
+        # Flatten for vmap
         temperature = temperature.ravel()
         pressure = pressure.ravel()
 
