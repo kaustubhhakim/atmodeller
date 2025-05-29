@@ -101,6 +101,18 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
+    def get_condensed_species_names(self) -> tuple[str, ...]:
+        """Condensed species names
+
+        Returns:
+            Condensed species names
+        """
+        condensed_names: list[str] = [
+            species.name for species in self.data if species.data.phase != "g"
+        ]
+
+        return tuple(condensed_names)
+
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
 
@@ -130,6 +142,16 @@ class SpeciesCollection(eqx.Module):
         )
 
         return gas_species_mask
+
+    def get_gas_species_names(self) -> tuple[str, ...]:
+        """Gas species names
+
+        Returns:
+            Gas species names
+        """
+        gas_names: list[str] = [species.name for species in self.data if species.data.phase == "g"]
+
+        return tuple(gas_names)
 
     def get_lower_bound(self: SpeciesCollection) -> Array:
         """Gets the lower bound for truncating the solution during the solve
@@ -336,20 +358,23 @@ class Planet(eqx.Module):
         """Temperature"""
         return self.surface_temperature
 
-    def asdict(self) -> dict[str, Array]:
+    def asdict(self) -> dict[str, npt.NDArray]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
-        base_dict: dict[str, Array] = asdict(self)
+        base_dict: dict[str, ArrayLike] = asdict(self)
         base_dict["mantle_mass"] = self.mass
         base_dict["mantle_melt_mass"] = self.melt_mass
         base_dict["mantle_solid_mass"] = self.solid_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.surface_gravity
 
-        return base_dict
+        # Convert all values to NumPy arrays
+        base_dict_np: dict[str, npt.NDArray] = {k: np.asarray(v) for k, v in base_dict.items()}
+
+        return base_dict_np
 
     def vmap_axes(self) -> Self:
         """Vmap recipe
@@ -482,7 +507,7 @@ class FugacityConstraints(eqx.Module):
         return cls(tuple(constraints), unique_species)
 
     # FIXME: Refresh for output
-    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
+    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, npt.NDArray]:
         """Gets a dictionary of the evaluated fugacity constraints.
 
         `temperature` and `pressure` should have a size equal to the number of solutions, which
@@ -496,13 +521,17 @@ class FugacityConstraints(eqx.Module):
         Returns:
             A dictionary of the evaluated fugacity constraints
         """
+
+        # FIXME: I think this actually requires vmap now because entries in log_fugacity could have
+        # different array sizes
+
         # This contains evaluated fugacity constraints in columns
-        log_fugacity: Array = jnp.atleast_2d(self.log_fugacity(temperature, pressure)).T
+        log_fugacity: npt.NDArray = np.atleast_2d(self.log_fugacity(temperature, pressure)).T
 
         # Split the evaluated fugacity constraints by column
-        out: dict[str, Array] = {
-            f"{key}_fugacity": jnp.exp(log_fugacity[:, ii])
-            for ii, key in enumerate(self.constraints)
+        out: dict[str, npt.NDArray] = {
+            f"{key}_fugacity": np.exp(log_fugacity[:, idx])
+            for idx, key in enumerate(self.constraints)
         }
 
         return out
@@ -576,13 +605,6 @@ class FugacityConstraints(eqx.Module):
         """
         return vmap_axes_spec(self)
 
-    # TODO: Remove
-    # def __bool__(self) -> bool:
-    #     return bool(self.constraints)
-
-    # def __len__(self) -> int:
-    #     return len(self.constraints)
-
 
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
@@ -647,17 +669,17 @@ class MassConstraints(eqx.Module):
 
         return cls(jnp.array(log_abundance), unique_elements)
 
-    def asdict(self) -> dict[str, ArrayLike]:
+    def asdict(self) -> dict[str, npt.NDArray]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
-        abundance: Array = jnp.exp(self.log_abundance)
-        out: dict[str, ArrayLike] = {
+        abundance: npt.NDArray = np.exp(self.log_abundance)
+        out: dict[str, npt.NDArray] = {
             f"{element}_number": abundance[:, idx]
             for idx, element in enumerate(self.elements)
-            if not jnp.all(jnp.isnan(abundance[:, idx]))
+            if not np.all(np.isnan(abundance[:, idx]))
         }
 
         return out
@@ -690,11 +712,6 @@ class MassConstraints(eqx.Module):
             args = (0, None)
 
         return type(self)(*args)
-
-    # TODO: Unsure if still required. Maybe for output?
-    # def __bool__(self) -> bool:
-    #     """Return True if any value in log_abundance is not NaN, else False"""
-    #     return bool(jnp.any(~jnp.isnan(self.log_abundance)))
 
 
 class FixedParameters(eqx.Module):
