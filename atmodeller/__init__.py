@@ -64,18 +64,14 @@ min_exp_input = np.log(jnp.finfo(np.float64).tiny)
 LOG_NUMBER_DENSITY_LOWER: float = -170.0
 """Lower log number density for a species
 
-At 3000 K this corresponds to 3.17E-77 bar and at 298 K this corresponds to 3.16E-78 bar.
+For a gas species this corresponds to 3.17E-77 bar and 3.16E-78 bar at 3000 K and 298 K,
+respectively.
 """
 LOG_NUMBER_DENSITY_UPPER: float = 80.0
 """Upper log number density for a species
 
-TODO: The summary values below are for a value of 70.0, but it has been increased to 80 since this
-cut-off also affects condensates, which can extend to large values. The hypercube specification
-can take a pytree structurs, so a more sophisticated approach can be implemented where gas species
-and condensate are treated differently.
-
-At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this corresponds to 103494 bar
-(10.3 GPa).
+For a gas species this corresponds to 2294896 GPa and 227960 GPa at 3000 K and 298 K,
+respectively. However, the choice of this upper limit is actually motivated by condensed species.
 """
 LOG_STABILITY_LOWER: float = -700.0  # basically the same as min_exp_input
 """Lower stability for a species
