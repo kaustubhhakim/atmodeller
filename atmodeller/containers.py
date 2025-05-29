@@ -568,7 +568,7 @@ class MassConstraints(eqx.Module):
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: Array
+    log_abundance: Array = eqx.field(converter=as_j64)
     """Log number of atoms"""
     elements: tuple[str, ...]
     """Elements corresponding to the columns of log_abundance"""
@@ -597,7 +597,7 @@ class MassConstraints(eqx.Module):
         max_len: int = 1
         for v in mass_constraints_.values():
             try:
-                vlen: int = v.ndim  # type:ignore
+                vlen: int = v.size  # type: ignore
             except AttributeError:
                 vlen = 1
             if vlen > max_len:
