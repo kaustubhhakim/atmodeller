@@ -597,9 +597,6 @@ class FugacityConstraints(eqx.Module):
     def vmap_axes(self) -> Self:
         """Vmap recipe
 
-        TODO: This vmap appears to correctly access the nested arrays associated with the
-        contained fugacity constraints, at least for Constant and No fugacity constraints.
-
         Returns:
             Vmap axes
         """
