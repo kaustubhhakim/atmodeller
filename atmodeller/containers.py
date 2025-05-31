@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Any, Literal
+from typing import Literal, no_type_check
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -265,7 +265,7 @@ class TracedParameters(eqx.Module):
     mass_constraints: MassConstraints
     """Mass constraints"""
 
-    def vmap_axes(self) -> Any:  # TracedParameters:
+    def vmap_axes(self) -> TracedParameters:
         """Vmap recipe
 
         Returns:
@@ -371,7 +371,7 @@ class Planet(eqx.Module):
 
         return base_dict_np
 
-    def vmap_axes(self) -> Any:  # Planet:
+    def vmap_axes(self) -> Planet:
         """Vmap recipe
 
         Returns:
@@ -437,7 +437,7 @@ class ConstantFugacityConstraint(eqx.Module):
 
         return log_fugacity_value
 
-    def vmap_axes(self) -> Any:  # ConstantFugacityConstraint:
+    def vmap_axes(self) -> ConstantFugacityConstraint:
         return vmap_axes_spec(self)
 
 
@@ -589,7 +589,7 @@ class FugacityConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> Any:  # FugacityConstraints:
+    def vmap_axes(self) -> FugacityConstraints:
         """Vmap recipe
 
         Returns:
@@ -601,6 +601,9 @@ class FugacityConstraints(eqx.Module):
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
+    A custom __init__ is defined for type checking otherwise beartype will flag that vmap
+    arguments (e.g., None, 0) are not compatible with the specified types.
+
     Args:
         log_abundance: Log number of atoms
         elements: Elements corresponding to the columns of `log_abundance`
@@ -609,9 +612,14 @@ class MassConstraints(eqx.Module):
     # NOTE: Don't use eqx.converter since this will break vmap, which requires int, None, or
     # callable.
     log_abundance: Array
-    """Log number of atoms"""
     elements: tuple[str, ...]
-    """Elements corresponding to the columns of log_abundance"""
+
+    @no_type_check
+    def __init__(self, log_abundance: Array, elements: tuple[str, ...]) -> None:
+        self.log_abundance = log_abundance
+        """Log number of atoms"""
+        self.elements = elements
+        """Elements corresponding to the columns of log_abundance"""
 
     @classmethod
     def create(
@@ -690,7 +698,7 @@ class MassConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> Any:  # MassConstraints:
+    def vmap_axes(self) -> MassConstraints:
         """Vmap recipe
 
         Returns:

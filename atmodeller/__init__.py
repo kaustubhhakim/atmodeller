@@ -26,14 +26,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-# At the very top of your "{your_package}.__init__" submodule:
-# from beartype.claw import beartype_this_package  # <-- boilerplate for victory
-
-# beartype_this_package()  # <-- yay! your team just won
-# from typeguard import install_import_hook
-
-# install_import_hook("atmodeller")
-
+# from beartype.claw import beartype_this_package
+# beartype_this_package()
 
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output

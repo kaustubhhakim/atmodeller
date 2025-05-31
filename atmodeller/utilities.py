@@ -98,12 +98,12 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     for i in range(ncols):
         # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
         if augmented_matrix[i, i] == 0:
-            nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
+            nonzero_row: np.int64 = np.nonzero(augmented_matrix[i:, i])[0][0] + i
             augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
             # P[[i, nonzero_row], :] = P[[nonzero_row, i], :]
         # Perform row operations to eliminate values below the pivot.
         for j in range(i + 1, nrows):
-            ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
+            ratio: np.float64 = augmented_matrix[j, i] / augmented_matrix[i, i]
             augmented_matrix[j] -= ratio * augmented_matrix[i]
     # logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 

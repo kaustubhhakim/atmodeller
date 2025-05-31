@@ -179,7 +179,7 @@ def repeat_solver(
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
 
     initial_state: tuple = (
-        1,  # A first solve has already been attempted before repeat_solver is called
+        jnp.array(1),  # A first solve has already been attempted before repeat_solver is called
         key,
         initial_solution,
         initial_status,
