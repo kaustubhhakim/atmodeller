@@ -20,8 +20,6 @@ This uses existing functions as much as possible to calculate desired output qua
 must be vmapped to compute the output.
 """
 
-from __future__ import annotations
-
 import logging
 import pickle
 from collections.abc import Callable

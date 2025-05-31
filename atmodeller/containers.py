@@ -16,8 +16,6 @@
 #
 """Containers"""
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
@@ -61,6 +59,71 @@ from atmodeller.utilities import (
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+class Species(eqx.Module):
+    """Species
+
+    Args:
+        data: Species data
+        activity: Activity
+        solubility: Solubility
+        solve_for_stability: Solve for stability
+    """
+
+    data: SpeciesData
+    activity: ActivityProtocol
+    solubility: SolubilityProtocol
+    solve_for_stability: bool
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and phase"""
+        return self.data.name
+
+    @classmethod
+    def create_condensed(
+        cls,
+        species_name: str,
+        activity: ActivityProtocol = CondensateActivity(),
+        solve_for_stability: bool = True,
+    ) -> "Species":
+        """Creates a condensate
+
+        Args:
+            species_name: Species name, as it appears in the species dictionary
+            activity: Activity. Defaults to unity activity.
+            solve_for_stability. Solve for stability. Defaults to True.
+
+        Returns:
+            A condensed species
+        """
+        species_data: SpeciesData = select_thermodata(species_name)
+
+        return cls(species_data, activity, NoSolubility(), solve_for_stability)
+
+    @classmethod
+    def create_gas(
+        cls,
+        species_name: str,
+        activity: ActivityProtocol = IdealGas(),
+        solubility: SolubilityProtocol = NoSolubility(),
+        solve_for_stability: bool = False,
+    ) -> "Species":
+        """Creates a gas species
+
+        Args:
+            species_name: Species name, as it appears in the species dictionary
+            activity: Activity. Defaults to an ideal gas.
+            solubility: Solubility. Defaults to no solubility.
+            solve_for_stability. Solve for stability. Defaults to False.
+
+        Returns:
+            A gas species
+        """
+        species_data: SpeciesData = select_thermodata(species_name)
+
+        return cls(species_data, activity, solubility, solve_for_stability)
+
+
 class SpeciesCollection(eqx.Module):
     """A collection of species
 
@@ -71,7 +134,7 @@ class SpeciesCollection(eqx.Module):
     data: tuple[Species, ...] = eqx.field(converter=tuple)
 
     @classmethod
-    def create(cls, species_names: Iterable[str]) -> SpeciesCollection:
+    def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
         """Creates an instance
 
         Args:
@@ -148,7 +211,7 @@ class SpeciesCollection(eqx.Module):
 
         return tuple(gas_names)
 
-    def get_lower_bound(self: SpeciesCollection) -> Array:
+    def get_lower_bound(self) -> Array:
         """Gets the lower bound for truncating the solution during the solve
 
         Returns:
@@ -156,7 +219,7 @@ class SpeciesCollection(eqx.Module):
         """
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
 
-    def get_upper_bound(self: SpeciesCollection) -> Array:
+    def get_upper_bound(self) -> Array:
         """Gets the upper bound for truncating the solution during the solve
 
         Returns:
@@ -216,7 +279,7 @@ class SpeciesCollection(eqx.Module):
         return tuple(sorted_elements)
 
     def _get_hypercube_bound(
-        self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
+        self, log_number_density_bound: float, stability_bound: float
     ) -> Array:
         """Gets the bound on the hypercube
 
@@ -244,38 +307,6 @@ class SpeciesCollection(eqx.Module):
 
     def __len__(self) -> int:
         return len(self.data)
-
-
-class TracedParameters(eqx.Module):
-    """Traced parameters
-
-    These are parameters that should be traced, inasmuch as they may be updated by the user for
-    repeat calculations.
-
-    Args:
-        planet: Planet
-        fugacity_constraints: Fugacity constraints
-        mass_constraints: Mass constraints
-    """
-
-    planet: Planet
-    """Planet"""
-    fugacity_constraints: FugacityConstraints
-    """Fugacity constraints"""
-    mass_constraints: MassConstraints
-    """Mass constraints"""
-
-    def vmap_axes(self) -> TracedParameters:
-        """Vmap recipe
-
-        Returns:
-            Vmap axes
-        """
-        return type(self)(
-            planet=self.planet.vmap_axes(),
-            fugacity_constraints=self.fugacity_constraints.vmap_axes(),
-            mass_constraints=self.mass_constraints.vmap_axes(),
-        )
 
 
 class Planet(eqx.Module):
@@ -371,44 +402,13 @@ class Planet(eqx.Module):
 
         return base_dict_np
 
-    def vmap_axes(self) -> Planet:
+    def vmap_axes(self) -> "Planet":
         """Vmap recipe
 
         Returns:
             Vmap axes
         """
         return vmap_axes_spec(self)
-
-
-class NormalisedMass(eqx.Module):
-    """Normalised mass for conventional outgassing
-
-    This is not currently used, but it is a placeholder for future development.
-
-    Default values are for a unit mass (1 kg) system.
-
-    Args:
-        melt_fraction: Melt fraction. Defaults to 0.3 for 30%.
-        temperature: Temperature. Defaults to 1400 K.
-        mass: Total mass. Defaults to 1 kg for a unit mass system.
-    """
-
-    melt_fraction: ArrayLike = 0.3
-    """Mass fraction of melt in kg/kg"""
-    temperature: ArrayLike = 1400
-    """Temperature in K"""
-    mass: ArrayLike = 1.0
-    """Total mass"""
-
-    @property
-    def melt_mass(self) -> ArrayLike:
-        """Mass of the melt"""
-        return self.mass * self.melt_fraction
-
-    @property
-    def solid_mass(self) -> ArrayLike:
-        """Mass of the solid"""
-        return self.mass * (1 - self.melt_fraction)
 
 
 class ConstantFugacityConstraint(eqx.Module):
@@ -437,7 +437,7 @@ class ConstantFugacityConstraint(eqx.Module):
 
         return log_fugacity_value
 
-    def vmap_axes(self) -> ConstantFugacityConstraint:
+    def vmap_axes(self) -> "ConstantFugacityConstraint":
         return vmap_axes_spec(self)
 
 
@@ -473,7 +473,7 @@ class FugacityConstraints(eqx.Module):
         cls,
         species: SpeciesCollection,
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-    ) -> FugacityConstraints:
+    ) -> "FugacityConstraints":
         """Creates an instance
 
         Args:
@@ -589,13 +589,44 @@ class FugacityConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> FugacityConstraints:
+    def vmap_axes(self) -> "FugacityConstraints":
         """Vmap recipe
 
         Returns:
             Vmap axes
         """
         return vmap_axes_spec(self)
+
+
+class NormalisedMass(eqx.Module):
+    """Normalised mass for conventional outgassing
+
+    This is not currently used, but it is a placeholder for future development.
+
+    Default values are for a unit mass (1 kg) system.
+
+    Args:
+        melt_fraction: Melt fraction. Defaults to 0.3 for 30%.
+        temperature: Temperature. Defaults to 1400 K.
+        mass: Total mass. Defaults to 1 kg for a unit mass system.
+    """
+
+    melt_fraction: ArrayLike = 0.3
+    """Mass fraction of melt in kg/kg"""
+    temperature: ArrayLike = 1400
+    """Temperature in K"""
+    mass: ArrayLike = 1.0
+    """Total mass"""
+
+    @property
+    def melt_mass(self) -> ArrayLike:
+        """Mass of the melt"""
+        return self.mass * self.melt_fraction
+
+    @property
+    def solid_mass(self) -> ArrayLike:
+        """Mass of the solid"""
+        return self.mass * (1 - self.melt_fraction)
 
 
 class MassConstraints(eqx.Module):
@@ -624,7 +655,7 @@ class MassConstraints(eqx.Module):
     @classmethod
     def create(
         cls, species: SpeciesCollection, mass_constraints: Mapping[str, ArrayLike] | None = None
-    ) -> MassConstraints:
+    ) -> "MassConstraints":
         """Creates an instance
 
         Args:
@@ -698,7 +729,7 @@ class MassConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> MassConstraints:
+    def vmap_axes(self) -> "MassConstraints":
         """Vmap recipe
 
         Returns:
@@ -710,6 +741,38 @@ class MassConstraints(eqx.Module):
         else:
             # Vmap multiple rows
             return type(self)(log_abundance=0, elements=None)  # type: ignore since vmap axes
+
+
+class TracedParameters(eqx.Module):
+    """Traced parameters
+
+    These are parameters that should be traced, inasmuch as they may be updated by the user for
+    repeat calculations.
+
+    Args:
+        planet: Planet
+        fugacity_constraints: Fugacity constraints
+        mass_constraints: Mass constraints
+    """
+
+    planet: Planet
+    """Planet"""
+    fugacity_constraints: FugacityConstraints
+    """Fugacity constraints"""
+    mass_constraints: MassConstraints
+    """Mass constraints"""
+
+    def vmap_axes(self) -> "TracedParameters":
+        """Vmap recipe
+
+        Returns:
+            Vmap axes
+        """
+        return type(self)(
+            planet=self.planet.vmap_axes(),
+            fugacity_constraints=self.fugacity_constraints.vmap_axes(),
+            mass_constraints=self.mass_constraints.vmap_axes(),
+        )
 
 
 class FixedParameters(eqx.Module):
@@ -747,71 +810,6 @@ class FixedParameters(eqx.Module):
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""
-
-
-class Species(eqx.Module):
-    """Species
-
-    Args:
-        data: Species data
-        activity: Activity
-        solubility: Solubility
-        solve_for_stability: Solve for stability
-    """
-
-    data: SpeciesData
-    activity: ActivityProtocol
-    solubility: SolubilityProtocol
-    solve_for_stability: bool
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return self.data.name
-
-    @classmethod
-    def create_condensed(
-        cls,
-        species_name: str,
-        activity: ActivityProtocol = CondensateActivity(),
-        solve_for_stability: bool = True,
-    ) -> Species:
-        """Creates a condensate
-
-        Args:
-            species_name: Species name, as it appears in the species dictionary
-            activity: Activity. Defaults to unity activity.
-            solve_for_stability. Solve for stability. Defaults to True.
-
-        Returns:
-            A condensed species
-        """
-        species_data: SpeciesData = select_thermodata(species_name)
-
-        return cls(species_data, activity, NoSolubility(), solve_for_stability)
-
-    @classmethod
-    def create_gas(
-        cls,
-        species_name: str,
-        activity: ActivityProtocol = IdealGas(),
-        solubility: SolubilityProtocol = NoSolubility(),
-        solve_for_stability: bool = False,
-    ) -> Species:
-        """Creates a gas species
-
-        Args:
-            species_name: Species name, as it appears in the species dictionary
-            activity: Activity. Defaults to an ideal gas.
-            solubility: Solubility. Defaults to no solubility.
-            solve_for_stability. Solve for stability. Defaults to False.
-
-        Returns:
-            A gas species
-        """
-        species_data: SpeciesData = select_thermodata(species_name)
-
-        return cls(species_data, activity, solubility, solve_for_stability)
 
 
 class SolverParameters(eqx.Module):

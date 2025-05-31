@@ -20,8 +20,6 @@ The papers state a volume integration from :math:`P_0` to :math:`P`, where :math
 Hence for bounded EOS a minimum pressure of 1 bar is assumed.
 """
 
-from __future__ import annotations
-
 import logging
 import sys
 from abc import abstractmethod

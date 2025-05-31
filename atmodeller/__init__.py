@@ -16,8 +16,6 @@
 #
 """Package level variables and initialises the package logger"""
 
-from __future__ import annotations
-
 __version__: str = "0.5.0"
 
 import logging

@@ -16,8 +16,6 @@
 #
 """Real gas EOS from :cite:t:`HP91,HP98,HP11`"""
 
-from __future__ import annotations
-
 import logging
 from abc import abstractmethod
 from collections.abc import Callable
@@ -261,7 +259,7 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         return self.critical_data.temperature
 
     @classmethod
-    def get_species(cls, species: str) -> MRKCorrespondingStatesHP91:
+    def get_species(cls, species: str) -> "MRKCorrespondingStatesHP91":
         """Gets an MRK corresponding states model for a given species.
 
         Args:

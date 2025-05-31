@@ -16,8 +16,6 @@
 #
 """Classes"""
 
-from __future__ import annotations
-
 import logging
 import pprint
 from collections.abc import Callable, Mapping

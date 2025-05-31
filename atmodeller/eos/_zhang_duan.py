@@ -17,8 +17,6 @@
 #
 """Real gas EOS from :cite:t:`ZD09`"""
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 import equinox as eqx
