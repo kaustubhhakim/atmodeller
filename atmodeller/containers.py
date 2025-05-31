@@ -19,9 +19,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Any, Iterator, Literal, Type
+from typing import Any, Literal
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -823,7 +823,7 @@ class SolverParameters(eqx.Module):
         multistart_perturbation: Perturbation for multistart. Defaults to 30.
     """
 
-    solver: Type[OptxSolver] = optx.Newton
+    solver: type[OptxSolver] = optx.Newton
     """Solver"""
     atol: float = 1.0e-6
     """Absolute tolerance"""

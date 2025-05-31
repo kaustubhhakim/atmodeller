@@ -20,8 +20,7 @@ Units for temperature and pressure are K and bar, respectively.
 """
 
 import logging
-from collections.abc import Callable
-from typing import Sequence
+from collections.abc import Callable, Sequence
 
 import equinox as eqx
 import jax.numpy as jnp
