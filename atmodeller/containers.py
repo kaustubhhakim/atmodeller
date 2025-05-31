@@ -14,14 +14,14 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Pytree containers that can be use by JAX"""
+"""Containers"""
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import asdict
-from typing import Callable, Iterator, Literal, Type
+from typing import Any, Iterator, Literal, Type
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -29,8 +29,8 @@ import lineax as lx
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
-from jax import Array, lax
-from jax.typing import ArrayLike
+from jax import lax
+from jaxtyping import Array, ArrayLike
 from lineax import AbstractLinearSolver
 from molmass import Formula
 
@@ -47,21 +47,16 @@ from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     SolubilityProtocol,
 )
+from atmodeller.mytypes import NumpyArrayFloat, NumpyArrayInt, OptxSolver
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
 from atmodeller.utilities import (
-    OptxSolver,
     as_j64,
     get_log_number_density_from_log_pressure,
     to_hashable,
     unit_conversion,
     vmap_axes_spec,
 )
-
-try:
-    from typing import Self  # type: ignore
-except ImportError:
-    from typing_extensions import Self
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -76,7 +71,7 @@ class SpeciesCollection(eqx.Module):
     data: tuple[Species, ...] = eqx.field(converter=tuple)
 
     @classmethod
-    def create(cls, species_names: Iterable[str]) -> Self:
+    def create(cls, species_names: Iterable[str]) -> SpeciesCollection:
         """Creates an instance
 
         Args:
@@ -270,16 +265,16 @@ class TracedParameters(eqx.Module):
     mass_constraints: MassConstraints
     """Mass constraints"""
 
-    def vmap_axes(self) -> Self:
+    def vmap_axes(self) -> Any:  # TracedParameters:
         """Vmap recipe
 
         Returns:
             Vmap axes
         """
         return type(self)(
-            self.planet.vmap_axes(),
-            self.fugacity_constraints.vmap_axes(),
-            self.mass_constraints.vmap_axes(),
+            planet=self.planet.vmap_axes(),
+            fugacity_constraints=self.fugacity_constraints.vmap_axes(),
+            mass_constraints=self.mass_constraints.vmap_axes(),
         )
 
 
@@ -376,7 +371,7 @@ class Planet(eqx.Module):
 
         return base_dict_np
 
-    def vmap_axes(self) -> Self:
+    def vmap_axes(self) -> Any:  # Planet:
         """Vmap recipe
 
         Returns:
@@ -442,7 +437,7 @@ class ConstantFugacityConstraint(eqx.Module):
 
         return log_fugacity_value
 
-    def vmap_axes(self) -> Self:
+    def vmap_axes(self) -> Any:  # ConstantFugacityConstraint:
         return vmap_axes_spec(self)
 
 
@@ -478,7 +473,7 @@ class FugacityConstraints(eqx.Module):
         cls,
         species: SpeciesCollection,
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-    ) -> Self:
+    ) -> FugacityConstraints:
         """Creates an instance
 
         Args:
@@ -594,7 +589,7 @@ class FugacityConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> Self:
+    def vmap_axes(self) -> Any:  # FugacityConstraints:
         """Vmap recipe
 
         Returns:
@@ -621,7 +616,7 @@ class MassConstraints(eqx.Module):
     @classmethod
     def create(
         cls, species: SpeciesCollection, mass_constraints: Mapping[str, ArrayLike] | None = None
-    ) -> Self:
+    ) -> MassConstraints:
         """Creates an instance
 
         Args:
@@ -649,7 +644,7 @@ class MassConstraints(eqx.Module):
                 max_len = vlen
 
         # Initialise to all nans assuming that there are no mass constraints
-        log_abundance: npt.NDArray[np.float64] = np.full(
+        log_abundance: NumpyArrayFloat = np.full(
             (max_len, len(unique_elements)), np.nan, dtype=np.float64
         )
 
@@ -695,7 +690,7 @@ class MassConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> Self:
+    def vmap_axes(self) -> Any:  # MassConstraints:
         """Vmap recipe
 
         Returns:
@@ -703,12 +698,10 @@ class MassConstraints(eqx.Module):
         """
         if self.log_abundance.shape[0] == 1:
             # Single row so do not vmap
-            args: tuple = (None, None)
+            return type(self)(log_abundance=None, elements=None)  # type: ignore since vmap axes
         else:
-            # Multiple rows so vmap
-            args = (0, None)
-
-        return type(self)(*args)
+            # Vmap multiple rows
+            return type(self)(log_abundance=0, elements=None)  # type: ignore since vmap axes
 
 
 class FixedParameters(eqx.Module):
@@ -730,11 +723,11 @@ class FixedParameters(eqx.Module):
 
     species: SpeciesCollection
     """Collection of species"""
-    formula_matrix: npt.NDArray[np.int_]
+    formula_matrix: NumpyArrayInt
     """Formula matrix"""
-    reaction_matrix: npt.NDArray[np.float64]
+    reaction_matrix: NumpyArrayFloat
     """Reaction matrix"""
-    reaction_stability_matrix: npt.NDArray[np.float64]
+    reaction_stability_matrix: NumpyArrayFloat
     """Reaction stability matrix"""
     stability_species_mask: Array
     """Mask of species to solve for stability"""
@@ -774,7 +767,7 @@ class Species(eqx.Module):
         species_name: str,
         activity: ActivityProtocol = CondensateActivity(),
         solve_for_stability: bool = True,
-    ) -> Self:
+    ) -> Species:
         """Creates a condensate
 
         Args:
@@ -796,7 +789,7 @@ class Species(eqx.Module):
         activity: ActivityProtocol = IdealGas(),
         solubility: SolubilityProtocol = NoSolubility(),
         solve_for_stability: bool = False,
-    ) -> Self:
+    ) -> Species:
         """Creates a gas species
 
         Args:

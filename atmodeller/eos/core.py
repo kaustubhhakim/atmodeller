@@ -21,18 +21,19 @@ Units for temperature and pressure are K and bar, respectively.
 
 import logging
 from abc import abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
 from jax import Array, jacfwd
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
+from atmodeller.mytypes import OptxSolver
 from atmodeller.thermodata import CriticalData
-from atmodeller.utilities import OptxSolver, safe_exp
+from atmodeller.utilities import safe_exp
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+

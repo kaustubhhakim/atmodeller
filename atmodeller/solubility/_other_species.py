@@ -22,7 +22,7 @@ For every law there should be a test in the test suite.
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RedoxBufferProtocol
@@ -65,7 +65,7 @@ _He_henry_sol_constant_jambon86: float = 56e-5  # cm3*STP/g*bar
 _He_henry_sol_constant_jambon86 = (
     (_He_henry_sol_constant_jambon86 / 2.24e4) * 4.0026 * unit_conversion.fraction_to_ppm
 )
-He_basalt_jambon86: Solubility = SolubilityPowerLaw(_He_henry_sol_constant_jambon86, 1)
+He_basalt_jambon86: Solubility = SolubilityPowerLaw(_He_henry_sol_constant_jambon86, 1.0)
 """Solubility of He in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -79,7 +79,7 @@ _Ar_henry_sol_constant_jambon86: float = 5.9e-5  # cm3*STP/g*bar
 _Ar_henry_sol_constant_jambon86 = (
     (_Ar_henry_sol_constant_jambon86 / 2.24e4) * 39.948 * unit_conversion.fraction_to_ppm
 )
-Ar_basalt_jambon86: Solubility = SolubilityPowerLaw(_Ar_henry_sol_constant_jambon86, 1)
+Ar_basalt_jambon86: Solubility = SolubilityPowerLaw(_Ar_henry_sol_constant_jambon86, 1.0)
 """Solubility of Ar in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -93,7 +93,7 @@ _Ne_henry_sol_constant_jambon86: float = 25e-5  # cm3*STP/g*bar
 _Ne_henry_sol_constant_jambon86 = (
     (_Ne_henry_sol_constant_jambon86 / 2.24e4) * 20.1797 * unit_conversion.fraction_to_ppm
 )
-Ne_basalt_jambon86: Solubility = SolubilityPowerLaw(_Ne_henry_sol_constant_jambon86, 1)
+Ne_basalt_jambon86: Solubility = SolubilityPowerLaw(_Ne_henry_sol_constant_jambon86, 1.0)
 """Solubility of Ne in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -107,7 +107,7 @@ _Kr_henry_sol_constant_jambon86: float = 3.0e-5  # cm3*STP/g*bar
 _Kr_henry_sol_constant_jambon86 = (
     (_Kr_henry_sol_constant_jambon86 / 2.24e4) * 83.798 * unit_conversion.fraction_to_ppm
 )
-Kr_basalt_jambon86: Solubility = SolubilityPowerLaw(_Kr_henry_sol_constant_jambon86, 1)
+Kr_basalt_jambon86: Solubility = SolubilityPowerLaw(_Kr_henry_sol_constant_jambon86, 1.0)
 """Solubility of Kr in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and
@@ -121,7 +121,7 @@ _Xe_henry_sol_constant_jambon86: float = 1.7e-5  # cm3*STP/g*bar
 _Xe_henry_sol_constant_jambon86 = (
     (_Xe_henry_sol_constant_jambon86 / 2.24e4) * 131.293 * unit_conversion.fraction_to_ppm
 )
-Xe_basalt_jambon86: Solubility = SolubilityPowerLaw(_Xe_henry_sol_constant_jambon86, 1)
+Xe_basalt_jambon86: Solubility = SolubilityPowerLaw(_Xe_henry_sol_constant_jambon86, 1.0)
 """Solubility of Xe in tholeittic basalt melt :cite:p:`JWB86`
 
 Experiments determined Henry's law solubility constant in tholetiitic basalt melt at 1 bar and

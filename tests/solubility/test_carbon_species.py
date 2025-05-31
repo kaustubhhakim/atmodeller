@@ -20,7 +20,7 @@ import inspect
 import logging
 
 import numpy as np
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.interfaces import RedoxBufferProtocol

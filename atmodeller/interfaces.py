@@ -16,14 +16,15 @@
 #
 """Interfaces"""
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller.utilities import ExperimentalCalibration
 
 
+@runtime_checkable
 class ActivityProtocol(Protocol):
     def log_activity(
         self,
@@ -32,6 +33,7 @@ class ActivityProtocol(Protocol):
     ) -> ArrayLike: ...
 
 
+@runtime_checkable
 class FugacityConstraintProtocol(Protocol):
     @property
     def value(self) -> ArrayLike: ...
@@ -39,6 +41,7 @@ class FugacityConstraintProtocol(Protocol):
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
+@runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
     log10_shift: ArrayLike
     evaluation_pressure: ArrayLike | None
@@ -49,6 +52,7 @@ class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
+@runtime_checkable
 class SolubilityProtocol(Protocol):
     """Solubility protocol
 

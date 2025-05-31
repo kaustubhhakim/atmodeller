@@ -22,7 +22,7 @@ For every law there should be a test in the test suite.
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10
@@ -55,7 +55,7 @@ Power law fit for fH2 vs. H2 (ppm-wt) from :cite:t:`GSM03{Table 4}` data. Experi
 pressures from 0.02-70 bar, temperatures from 300-1000C.
 """
 
-H2O_ano_dio_newcombe17: Solubility = SolubilityPowerLaw(727, 0.5)
+H2O_ano_dio_newcombe17: Solubility = SolubilityPowerLaw(727.0, 0.5)
 """H2O in anorthite-diopside-eutectic compositions :cite:p:`NBB17`
 
 Power law from :cite:t:`NBB17{Figure 5(A)}` for anorthite-diopside glass. Experiments conducted
@@ -63,7 +63,7 @@ at 1 atm and 1350 C. Melts equilibrated in 1 atm furnace with H2/CO2 gas mixture
 fO2 from IW-3 to IW+4.8 and pH2/pH2O from 0.003-24.
 """
 
-H2O_basalt_dixon95: Solubility = SolubilityPowerLaw(965, 0.5)
+H2O_basalt_dixon95: Solubility = SolubilityPowerLaw(965.0, 0.5)
 """H2O in MORB liquids :cite:p:`DSH95`
 
 Refitted data to a power law by Paolo Sossi (fitting :cite:t:`DSH95{Figure 4}`, TODO: CHECK).
@@ -79,7 +79,7 @@ their experiments and prior studies on H2O solubility in basaltic melt at 1200 C
 below 600 MPa.
 """
 
-H2O_lunar_glass_newcombe17: Solubility = SolubilityPowerLaw(683, 0.5)
+H2O_lunar_glass_newcombe17: Solubility = SolubilityPowerLaw(683.0, 0.5)
 """H2O in lunar basalt :cite:p:`NBB17`
 
 Power law from :cite:t:`NBB17{Figure 5(A)}` for Lunar glass. Experiments conducted at 1 atm and
@@ -87,7 +87,7 @@ Power law from :cite:t:`NBB17{Figure 5(A)}` for Lunar glass. Experiments conduct
 to IW+4.8.
 """
 
-H2O_peridotite_sossi23: Solubility = SolubilityPowerLaw(647, 0.5)
+H2O_peridotite_sossi23: Solubility = SolubilityPowerLaw(647.0, 0.5)
 """H2O in peridotite liquids :cite:p:`STB23`
 
 Power law parameters in the abstract for peridotitic glasses. Experiments conducted at 2173 K

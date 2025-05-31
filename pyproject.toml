@@ -75,8 +75,10 @@ docs = [
     "nbsphinx-link>=1.3.1",
 ]
 dev = [
-    "pytest>=8.3.5",
+    "beartype (>=0.21.0,<0.22.0)",
+    "jaxtyping>=0.3.2,<0.4.0",
     "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
     "pytest-cov>=6.1.1",
 ]
 

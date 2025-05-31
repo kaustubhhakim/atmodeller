@@ -21,7 +21,9 @@ import logging
 import numpy as np
 import numpy.typing as npt
 import pytest
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
+
+from atmodeller.mytypes import NumpyArrayFloat
 
 logger: logging.Logger = logging.getLogger("atmodeller.tests")
 
@@ -61,11 +63,11 @@ class Helper:
         solution_compare: dict[str, ArrayLike] = {key: solution[key] for key in intersection_keys}
         target_compare: dict[str, ArrayLike] = {key: target[key] for key in intersection_keys}
 
-        target_values: npt.NDArray[np.float64] = np.array(
+        target_values: NumpyArrayFloat = np.array(
             list(dict(sorted(target_compare.items())).values())
         )
         logger.debug("target_values = %s", target_values)
-        solution_values: npt.NDArray[np.float64] = np.array(
+        solution_values: NumpyArrayFloat = np.array(
             list(dict(sorted(solution_compare.items())).values())
         )
         logger.debug("solution_values = %s", solution_values)

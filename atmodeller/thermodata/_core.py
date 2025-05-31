@@ -19,7 +19,7 @@
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
@@ -271,7 +271,7 @@ class CriticalData(eqx.Module):
         pressure: Critical pressure in bar
     """
 
-    temperature: float = 1
+    temperature: float = 1.0
     """Critical temperature in K"""
-    pressure: float = 1
+    pressure: float = 1.0
     """Critical pressure in bar"""

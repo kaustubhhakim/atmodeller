@@ -24,15 +24,16 @@ from __future__ import annotations
 
 import logging
 import pickle
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import equinox as eqx
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 from molmass import Formula
 from openpyxl.styles import PatternFill
 from scipy.constants import mega
@@ -59,6 +60,7 @@ from atmodeller.engine import (
     objective_function,
 )
 from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.mytypes import NumpyArrayInt
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion, vmap_axes_spec
 
@@ -108,7 +110,7 @@ class Output:
         self._cached_dataframes: dict[str, pd.DataFrame] | None = None
 
     @property
-    def formula_matrix(self) -> npt.NDArray[np.int_]:
+    def formula_matrix(self) -> NumpyArrayInt:
         """Formula matrix"""
         return self._fixed_parameters.formula_matrix
 
@@ -163,7 +165,7 @@ class Output:
         return vmap_axes_spec(self._traced_parameters.planet).temperature
 
     @property
-    def traced_parameters_vmap(self) -> TracedParameters:
+    def traced_parameters_vmap(self) -> Any:  # TracedParameters:
         """Axes for traced parameters vmap"""
         return self._traced_parameters.vmap_axes()
 

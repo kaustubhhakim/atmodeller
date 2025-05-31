@@ -18,15 +18,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array, lax
+from beartype import beartype
+from jax import lax
 from jax.scipy.special import logsumexp
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
@@ -48,13 +50,14 @@ from atmodeller.utilities import (
 
 @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
+@beartype
 def solve(
-    solution_array: Array,
+    solution_array: Float[Array, " sol_dim"],
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
     options: dict[str, Any],
-) -> tuple[Array, Array, Array]:
+) -> tuple[Float[Array, " sol_dim"], Bool[Array, ""], Integer[Array, ""]]:
     """Solves the system of non-linear equations
 
     Args:
@@ -65,7 +68,7 @@ def solve(
         options: Options for root find
 
     Returns:
-        The solution array, the status of the solver
+        The solution array, the status of the solver, number of steps
     """
     sol: optx.Solution = optx.root_find(
         objective_function,
@@ -82,8 +85,8 @@ def solve(
     )
 
     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-    solver_steps: Array = sol.stats["num_steps"]
-    solver_status: Array = sol.result == optx.RESULTS.successful
+    solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
+    solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
 
     return sol.value, solver_status, solver_steps
 
@@ -99,7 +102,7 @@ def repeat_solver(
     multistart_perturbation: float,
     max_attempts: int,
     key: Array,
-) -> tuple[int, Array, Array, Array]:
+) -> tuple[Integer[Array, ""], Array, Array, Array]:
     """Repeat solver until a solution is found
 
     Args:
@@ -114,7 +117,7 @@ def repeat_solver(
         key: Random key
     """
 
-    def body_fn(state: tuple) -> tuple[int, Array, Array, Array, Array, Array]:
+    def body_fn(state: tuple) -> tuple[Integer[Array, ""], Array, Array, Array, Array, Array]:
         """Perform one iteration of the solver retry loop
 
         Args:
@@ -212,27 +215,30 @@ def get_min_log_elemental_abundance_per_species(
     # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
     # (n_elements, n_species)
     mask: Array = (formula_matrix != 0).astype(jnp.int_)
-    # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
-    # jax.debug.print("mask = {out}", out=mask)
+    jax.debug.print("formula_matrix = {out}", out=formula_matrix)
+    jax.debug.print("mask = {out}", out=mask)
 
     # Align for element-wise multiplication: (n_elements, 1)
-    log_abundance: Array = mass_constraints.log_abundance.T
-    # jax.debug.print("log_abundance = {out}", out=log_abundance)
+    # FIXME: Problem here is that log_abundance, when vmapped, is not a 2-D array but a 1-D array
+    # And 1-D arrays when transposed are still 1-D arrays. So must convert to a 2-D array first
+    log_abundance: Array = jnp.atleast_2d(mass_constraints.log_abundance).T
+    jax.debug.print("log_abundance = {out}", out=log_abundance)
 
     # Element-wise multiplication (broadcasted correctly): (n_elements, n_species)
     masked_abundance: Array = mask * log_abundance
-    # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
+    jax.debug.print("masked_abundance = {out}", out=masked_abundance)
     masked_abundance = jnp.where(mask != 0, masked_abundance, jnp.nan)
-    # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
+    jax.debug.print("masked_abundance = {out}", out=masked_abundance)
 
     # Find the minimum log abundance per species
     min_abundance_per_species: Array = jnp.nanmin(masked_abundance, axis=0)
-    # jax.debug.print("min_abundance_per_species = {out}", out=min_abundance_per_species)
+    jax.debug.print("min_abundance_per_species = {out}", out=min_abundance_per_species)
 
     return min_abundance_per_species
 
 
 @eqx.filter_jit
+@beartype
 def objective_function(solution: Array, kwargs: dict) -> Array:
     """Objective function
 
@@ -327,9 +333,10 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # Relative mass error, computed in log-space for numerical stability
     element_density_total: Array = element_density + element_melt_density
     log_element_density_total: Array = jnp.log(element_density_total)
-    # jax.debug.print("log_number_density_total = {out}", out=log_element_density_total)
+    jax.debug.print("log_element_density_total = {out}", out=log_element_density_total)
     # Flattening since if only one set of abundances specified (no vmap) then the array will be
     # 2-D with only one row. Otherwise with vmap the abundances will be a 1-D array.
+    # TODO: Is this flatten correct? Something messes up with mass_constraints when batched
     log_target_density: Array = mass_constraints.log_number_density(log_volume).flatten()
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
     mass_residual: Array = safe_exp(log_element_density_total - log_target_density) - 1
@@ -471,7 +478,11 @@ def get_element_density_in_melt(
         Number density of elements dissolved in melt
     """
     species_melt_density: Array = get_species_density_in_melt(
-        traced_parameters, fixed_parameters, log_number_density, log_activity, log_volume
+        traced_parameters,
+        fixed_parameters,
+        log_number_density,
+        log_activity,
+        log_volume,
     )
     element_melt_density: Array = formula_matrix.dot(species_melt_density)
 
@@ -542,7 +553,9 @@ def get_log_activity(
 
 @eqx.filter_jit
 def get_log_activity_ideal_mixing(
-    fixed_parameters: FixedParameters, log_number_density: Array, log_activity_pure_species: Array
+    fixed_parameters: FixedParameters,
+    log_number_density: Array,
+    log_activity_pure_species: Array,
 ) -> Array:
     """Gets the log activity of species in the atmosphere assuming an ideal mixture
 

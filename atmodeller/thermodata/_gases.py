@@ -53,8 +53,8 @@ _C_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             2.899388702e-16,
         ),
     ),
-    (200, 1000, 6000),
-    (1000, 6000, 20000),
+    (200.0, 1000.0, 6000.0),
+    (1000.0, 6000.0, 20000.0),
 )
 C_g: SpeciesData = SpeciesData(
     "C",
@@ -86,8 +86,8 @@ _CH4_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             1.623737207e-15,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 CH4_g: SpeciesData = SpeciesData(
     "CH4",
@@ -119,8 +119,8 @@ _Cl2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             3.327360290e-14,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 Cl2_g: SpeciesData = SpeciesData("Cl2", "g", _Cl2_g_coeffs)
 "Species data for Cl2_g"
@@ -161,8 +161,8 @@ _CO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             1.998937948e-15,
         ),
     ),
-    (200, 1000, 6000),
-    (1000, 6000, 20000),
+    (200.0, 1000.0, 6000.0),
+    (1000.0, 6000.0, 20000.0),
 )
 CO_g: SpeciesData = SpeciesData(
     "CO",
@@ -203,8 +203,8 @@ _CO2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -8.842351500e-16,
         ),
     ),
-    (200, 1000, 6000),
-    (1000, 6000, 20000),
+    (200.0, 1000.0, 6000.0),
+    (1000.0, 6000.0, 20000.0),
 )
 CO2_g: SpeciesData = SpeciesData(
     "CO2",
@@ -245,8 +245,8 @@ _H2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             1.605461756e-16,
         ),
     ),
-    (200, 1000, 6000),
-    (1000, 6000, 20000),
+    (200.0, 1000.0, 6000.0),
+    (1000.0, 6000.0, 20000.0),
 )
 H2_g: SpeciesData = SpeciesData("H2", "g", _H2_g_coeffs)
 "Species data for H2_g"
@@ -274,8 +274,8 @@ _H2O_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -4.822380530e-15,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 H2O_g: SpeciesData = SpeciesData(
     "H2O",
@@ -307,8 +307,8 @@ _H2S_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             9.318163070e-16,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 H2S_g: SpeciesData = SpeciesData(
     "H2S",
@@ -340,8 +340,8 @@ _ClH_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -6.656104220e-16,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 ClH_g: SpeciesData = SpeciesData(
     "ClH",
@@ -354,8 +354,8 @@ _He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-7.453750000e2, -7.453750000e2, 1.650518960e4),
     (9.287239740e-1, 9.287239740e-1, -4.048814390),
     (
-        (0, 0, 2.5, 0, 0, 0, 0),
-        (0, 0, 2.5, 0, 0, 0, 0),
+        (0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0),
         (
             3.396845420e6,
             -2.194037652e3,
@@ -366,8 +366,8 @@ _He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             4.429960218e-18,
         ),
     ),
-    (200, 1000, 6000),
-    (1000, 6000, 20000),
+    (200.0, 1000.0, 6000.0),
+    (1000.0, 6000.0, 20000.0),
 )
 He_g: SpeciesData = SpeciesData(
     "He",
@@ -408,8 +408,8 @@ _N2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             1.437538881e-15,
         ),
     ),
-    (200, 1000, 6000),
-    (1000, 6000, 20000),
+    (200.0, 1000.0, 6000.0),
+    (1000.0, 6000.0, 20000.0),
 )
 N2_g: SpeciesData = SpeciesData("N2", "g", _N2_g_coeffs)
 "Species data for N2_g"
@@ -437,8 +437,8 @@ _H3N_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -3.322700530e-16,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 H3N_g: SpeciesData = SpeciesData(
     "H3N",
@@ -479,8 +479,8 @@ _O2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             7.278175770e-17,
         ),
     ),
-    (200, 1000, 6000),
-    (1000, 6000, 20000),
+    (200.0, 1000.0, 6000.0),
+    (1000.0, 6000.0, 20000.0),
 )
 O2_g: SpeciesData = SpeciesData("O2", "g", _O2_g_coeffs)
 "Species data for O2_g"
@@ -508,8 +508,8 @@ _S2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -5.596990050e-15,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 S2_g: SpeciesData = SpeciesData("S2", "g", _S2_g_coeffs)
 "Species data for S2_g"
@@ -537,8 +537,8 @@ _OS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -3.560509070e-15,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 OS_g: SpeciesData = SpeciesData("OS", "g", _OS_g_coeffs)
 "Species data for OS_g"
@@ -566,8 +566,8 @@ _O2S_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             2.918294102e-16,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 O2S_g: SpeciesData = SpeciesData("SO2", "g", _O2S_g_coeffs)
 "Species data for SO2_g"
@@ -595,8 +595,8 @@ _H4Si_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             2.072777131e-15,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 H4Si_g: SpeciesData = SpeciesData("H4Si", "g", _H4Si_g_coeffs)
 "Species data for H4Si_g"
@@ -624,8 +624,8 @@ _OSi_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             1.613253297e-15,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 OSi_g: SpeciesData = SpeciesData("OSi", "g", _OSi_g_coeffs)
 "Species data for OSi_g"
@@ -662,8 +662,8 @@ _Si_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -2.474116774e-16,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 Si_g: SpeciesData = SpeciesData("Si", "g", _Si_g_coeffs)
 "Species data for Si_g"
@@ -691,8 +691,8 @@ _O2Si_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             2.178054280e-16,
         ),
     ),
-    (200, 1000),
-    (1000, 6000),
+    (200.0, 1000.0),
+    (1000.0, 6000.0),
 )
 O2Si_g: SpeciesData = SpeciesData("O2Si", "g", _O2Si_g_coeffs)
 "Species data for O2Si_g"
@@ -729,8 +729,8 @@ _HO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             9.567229020e-17,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 HO_g: SpeciesData = SpeciesData("HO", "g", _HO_g_coeffs)
 "Species data for HO_g"
@@ -767,8 +767,8 @@ _MgO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             4.613111760e-17,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 MgO_g: SpeciesData = SpeciesData("MgO", "g", _MgO_g_coeffs)
 "Species data for MgO_g"
@@ -797,8 +797,8 @@ _Mg_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -4.234946112e-16,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 Mg_g: SpeciesData = SpeciesData("Mg", "g", _Mg_g_coeffs)
 "Species data for Mg_g"
@@ -826,8 +826,8 @@ _HS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             3.864741550e-15,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 HS_g: SpeciesData = SpeciesData("HS", "g", _HS_g_coeffs)
 "Species data for HS_g"
@@ -855,8 +855,8 @@ _C2H2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -1.302066204e-15,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 C2H2_g: SpeciesData = SpeciesData("C2H2", "g", _C2H2_g_coeffs)
 "Species data for C2H2_g"
@@ -884,8 +884,8 @@ _CHN_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             3.348247980e-16,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 CHN_g: SpeciesData = SpeciesData("CHN", "g", _CHN_g_coeffs)
 "Species data for CHN_g"
@@ -913,8 +913,8 @@ _O3S_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             4.498397540e-16,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 O3S_g: SpeciesData = SpeciesData("O3S", "g", _O3S_g_coeffs)
 "Species data for O3S_g"
@@ -942,8 +942,8 @@ _H2O4S_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -2.946330375e-16,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 H2O4S_g: SpeciesData = SpeciesData("H2O4S", "g", _H2O4S_g_coeffs)
 "Species data for H2O4S_g"
@@ -971,8 +971,8 @@ _FeO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             3.639292680e-15,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 FeO_g: SpeciesData = SpeciesData("FeO", "g", _FeO_g_coeffs)
 "Species data for FeO_g"
@@ -1009,8 +1009,8 @@ _Fe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -1.480574914e-16,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 Fe_g: SpeciesData = SpeciesData("Fe", "g", _Fe_g_coeffs)
 "Species data for Fe_g"
@@ -1047,8 +1047,8 @@ _NO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -3.295109350e-16,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 NO_g: SpeciesData = SpeciesData("NO", "g", _NO_g_coeffs)
 "Species data for NO_g"
@@ -1076,8 +1076,8 @@ _COS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             5.691053860e-16,
         ),
     ),
-    T_min=(200, 1000),
-    T_max=(1000, 6000),
+    T_min=(200.0, 1000.0),
+    T_max=(1000.0, 6000.0),
 )
 COS_g: SpeciesData = SpeciesData("COS", "g", _COS_g_coeffs)
 "Species data for COS_g"
@@ -1114,8 +1114,8 @@ _Ar_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -9.740147729e-16,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 Ar_g: SpeciesData = SpeciesData("Ar", "g", _Ar_g_coeffs)
 "Species data for Ar_g"
@@ -1152,8 +1152,8 @@ _He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             4.429960218e-18,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 He_g: SpeciesData = SpeciesData("He", "g", _He_g_coeffs)
 "Species data for He_g"
@@ -1190,8 +1190,8 @@ _Ne_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             8.415153652e-18,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 Ne_g: SpeciesData = SpeciesData("Ne", "g", _Ne_g_coeffs)
 "Species data for Ne_g"
@@ -1228,8 +1228,8 @@ _Kr_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -1.521249677e-15,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 Kr_g: SpeciesData = SpeciesData("Kr", "g", _Kr_g_coeffs)
 "Species data for Kr_g"
@@ -1266,8 +1266,8 @@ _Xe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
             -5.943990574e-16,
         ),
     ),
-    T_min=(200, 1000, 6000),
-    T_max=(1000, 6000, 20000),
+    T_min=(200.0, 1000.0, 6000.0),
+    T_max=(1000.0, 6000.0, 20000.0),
 )
 Xe_g: SpeciesData = SpeciesData("Xe", "g", _Xe_g_coeffs)
 "Species data for Xe_g"
@@ -1314,7 +1314,7 @@ Alternative values from :cite:t:`HP91` are 373.4 K and 0.08963 bar
 """
 _critical_data_N2_g: CriticalData = CriticalData(126.2, 33.9)
 """Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
-_critical_data_Ar_g: CriticalData = CriticalData(151, 48.6)
+_critical_data_Ar_g: CriticalData = CriticalData(151.0, 48.6)
 """Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
 _critical_data_He_g: CriticalData = CriticalData(5.2, 2.274)
 """Critical parameters for He :cite:p:`ADM77`"""

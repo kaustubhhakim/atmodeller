@@ -17,25 +17,23 @@
 """Utilities"""
 
 import logging
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-import optimistix as optx
 from jax import Array
 from jax.tree_util import Partial, tree_map
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
 
 
 @eqx.filter_jit
@@ -69,7 +67,7 @@ def to_hashable(x: Any) -> Callable:
     return Partial(x)
 
 
-def as_j64(x: ArrayLike) -> Array:
+def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
     """Converts input to a JAX array of dtype float64.
 
     This function is used to minimise the number of times jitted functions need to be compiled.
@@ -224,11 +222,11 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
     return jnp.power(values, exponent) * constant
 
 
-def is_arraylike_batched(x: ArrayLike) -> Literal[0, None]:
+def is_arraylike_batched(x: Any) -> Literal[0, None]:
     """Checks if x is batched.
 
     Args:
-        x: Something arraylike
+        x: Something to check
 
     Returns:
         0 (axis) if batched, else None (not batched)

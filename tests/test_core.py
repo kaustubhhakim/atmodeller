@@ -22,10 +22,17 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
-from atmodeller.containers import MassConstraints, Species, SpeciesCollection
+from atmodeller.containers import (
+    ConstantFugacityConstraint,
+    FugacityConstraints,
+    MassConstraints,
+    Species,
+    SpeciesCollection,
+)
+from atmodeller.interfaces import FugacityConstraintProtocol
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.WARNING)
@@ -54,6 +61,7 @@ def test_mass_constraints_single() -> None:
     log_abundance: Array = mass_constraints.log_abundance
     target: Array = jnp.array([60.27546626107961, 61.65474558573571, jnp.nan])
 
+    assert mass_constraints.vmap_axes().log_abundance is None
     assert jax.numpy.allclose(log_abundance, target, rtol=RTOL, atol=ATOL, equal_nan=True)
 
 
@@ -75,6 +83,7 @@ def test_mass_constraints_broadcast1() -> None:
         ]
     )
 
+    assert mass_constraints.vmap_axes().log_abundance == 0
     assert jax.numpy.allclose(log_abundance, target, rtol=RTOL, atol=ATOL, equal_nan=True)
 
 
@@ -96,4 +105,41 @@ def test_mass_constraints_broadcast2() -> None:
         ]
     )
 
+    assert mass_constraints.vmap_axes().log_abundance == 0
     assert jax.numpy.allclose(log_abundance, target, rtol=RTOL, atol=ATOL, equal_nan=True)
+
+
+def test_fugacity_constraint_single() -> None:
+    """Fugacity constraints with single entries"""
+
+    fugacity_constraints_map: dict[str, FugacityConstraintProtocol] = {
+        "H2O_g": ConstantFugacityConstraint(1)
+    }
+    fugacity_constraints: FugacityConstraints = FugacityConstraints.create(
+        species, fugacity_constraints_map
+    )
+
+    constraints: tuple[FugacityConstraintProtocol, ...] = fugacity_constraints.constraints
+
+    print(constraints)
+    print(fugacity_constraints.species)
+
+    print(fugacity_constraints.vmap_axes())
+
+
+def test_fugacity_constraint_broadcast1() -> None:
+    """Fugacity constraints with one entry to broadcast"""
+
+    fugacity_constraints_map: dict[str, FugacityConstraintProtocol] = {
+        "H2O_g": ConstantFugacityConstraint(np.array([1, 2]))
+    }
+    fugacity_constraints: FugacityConstraints = FugacityConstraints.create(
+        species, fugacity_constraints_map
+    )
+
+    constraints: tuple[FugacityConstraintProtocol, ...] = fugacity_constraints.constraints
+
+    print(constraints)
+    print(fugacity_constraints.species)
+
+    print(fugacity_constraints.vmap_axes())

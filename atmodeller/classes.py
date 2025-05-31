@@ -20,16 +20,17 @@ from __future__ import annotations
 
 import logging
 import pprint
-from collections.abc import Mapping
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
+from beartype import beartype
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike, Integer
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
 from atmodeller.containers import (
@@ -43,6 +44,7 @@ from atmodeller.containers import (
 )
 from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.mytypes import NumpyArrayFloat, NumpyArrayInt
 from atmodeller.output import Output
 from atmodeller.utilities import get_batch_size, partial_rref
 
@@ -76,6 +78,7 @@ class InteriorAtmosphere:
 
         return self._output
 
+    @beartype
     def solve(
         self,
         *,
@@ -125,7 +128,9 @@ class InteriorAtmosphere:
 
         # Initial solution must be broadcast since it is always batched
         in_axes: Any = traced_parameters_.vmap_axes()
-        # jax.debug.print("in_axes = {out}", out=in_axes)
+        # TODO: Below confirms that log_abundance is a batch quantity
+        jax.debug.print("in_axes = {out}", out=in_axes)
+        jax.debug.print("in_axes = {out}", out=in_axes.mass_constraints.log_abundance)
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
         batch_size: int = max(get_batch_size(traced_parameters_), 1)
@@ -185,7 +190,7 @@ class InteriorAtmosphere:
                 "multistart_perturbation=40.0)"
             )
         else:
-            required_multistarts: int = max(final_i, 1)
+            required_multistarts: Integer[Array, ""] = jnp.maximum(final_i, 1)
             logger.info(
                 f"Solve complete: {num_successful_models} successful model(s)\n"
                 f"The number of multistarts required was {required_multistarts}, "
@@ -204,13 +209,13 @@ class InteriorAtmosphere:
         Returns:
             Fixed parameters
         """
-        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
-        reaction_stability_matrix: npt.NDArray[np.float64] = self.get_reaction_stability_matrix()
+        reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
+        reaction_stability_matrix: NumpyArrayFloat = self.get_reaction_stability_matrix()
         gas_species_mask: Array = self.species.get_gas_species_mask()
         stability_species_mask: Array = self.species.get_stability_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
-        formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
+        formula_matrix: NumpyArrayInt = self.get_formula_matrix()
 
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
@@ -226,7 +231,7 @@ class InteriorAtmosphere:
 
         return fixed_parameters
 
-    def get_formula_matrix(self) -> npt.NDArray[np.int_]:
+    def get_formula_matrix(self) -> NumpyArrayInt:
         """Gets the formula matrix.
 
         Elements are given in rows and species in columns following the convention in
@@ -236,8 +241,8 @@ class InteriorAtmosphere:
             Formula matrix
         """
         unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
-        formula_matrix: npt.NDArray[np.int_] = np.zeros(
-            (len(unique_elements), self.species.number), dtype=jnp.int_
+        formula_matrix: NumpyArrayInt = np.zeros(
+            (len(unique_elements), self.species.number), dtype=np.int_
         )
 
         for element_index, element in enumerate(unique_elements):
@@ -249,7 +254,7 @@ class InteriorAtmosphere:
                     count = 0
                 formula_matrix[element_index, species_index] = count
 
-        logger.debug("formula_matrix = %s", formula_matrix)
+        # logger.debug("formula_matrix = %s", formula_matrix)
 
         return formula_matrix
 
@@ -272,7 +277,7 @@ class InteriorAtmosphere:
 
         return tuple(sorted_elements)
 
-    def get_reaction_matrix(self) -> npt.NDArray[np.float64]:
+    def get_reaction_matrix(self) -> NumpyArrayFloat:
         """Gets the reaction matrix.
 
         Returns:
@@ -282,27 +287,27 @@ class InteriorAtmosphere:
             logger.debug("Only one species therefore no reactions")
             return np.array([])
 
-        transpose_formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix().T
-        reaction_matrix: npt.NDArray[np.float64] = partial_rref(transpose_formula_matrix)
+        transpose_formula_matrix: NumpyArrayInt = self.get_formula_matrix().T
+        reaction_matrix: NumpyArrayFloat = partial_rref(transpose_formula_matrix)
 
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
 
-    def get_reaction_stability_matrix(self) -> npt.NDArray[np.float64]:
+    def get_reaction_stability_matrix(self) -> NumpyArrayFloat:
         """Gets the reaction stability matrix.
 
         Returns:
             Reaction stability matrix
         """
-        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
+        reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
         mask: npt.NDArray[np.bool_] = np.zeros_like(reaction_matrix, dtype=bool)
 
         if reaction_matrix.size > 0:
             # Find the species to solve for stability
             stability_bool: Array = self.species.get_stability_species_mask()
             mask[:, stability_bool] = True
-            reaction_stability_matrix: npt.NDArray[np.float64] = reaction_matrix * mask
+            reaction_stability_matrix: NumpyArrayFloat = reaction_matrix * mask
         else:
             reaction_stability_matrix = reaction_matrix
 
@@ -316,7 +321,7 @@ class InteriorAtmosphere:
         Returns:
             Reactions as a dictionary
         """
-        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
+        reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
         reactions: dict[int, str] = {}
         if reaction_matrix.size != 0:
             for reaction_index in range(reaction_matrix.shape[0]):

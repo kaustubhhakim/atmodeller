@@ -22,7 +22,7 @@ For every law there should be a test in the test suite.
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller.solubility.core import Solubility
 from atmodeller.utilities import safe_exp, unit_conversion

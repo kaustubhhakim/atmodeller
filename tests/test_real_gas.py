@@ -21,7 +21,7 @@ from typing import Mapping
 
 import numpy as np
 import pytest
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.classes import InteriorAtmosphere, SolverParameters

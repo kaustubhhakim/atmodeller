@@ -24,7 +24,7 @@ from typing import Type
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller.utilities import ExperimentalCalibration, unit_conversion
 

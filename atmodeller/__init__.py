@@ -26,6 +26,15 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+# At the very top of your "{your_package}.__init__" submodule:
+# from beartype.claw import beartype_this_package  # <-- boilerplate for victory
+
+# beartype_this_package()  # <-- yay! your team just won
+# from typeguard import install_import_hook
+
+# install_import_hook("atmodeller")
+
+
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
 print("Atmodeller initialized with double precision (float64)")
@@ -33,7 +42,7 @@ print("Atmodeller initialized with double precision (float64)")
 # For debugging
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_infs", True)
-# jax.config.update("jax_disable_jit", True)
+jax.config.update("jax_disable_jit", True)
 # jax.config.update("jax_log_compiles", True)
 # os.environ["EQX_ON_ERROR"] = "breakpoint"
 

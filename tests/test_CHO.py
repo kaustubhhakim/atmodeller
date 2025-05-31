@@ -20,13 +20,13 @@ import logging
 from typing import Mapping
 
 import numpy as np
-import numpy.typing as npt
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, Species, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
+from atmodeller.mytypes import NumpyArrayFloat
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
@@ -160,9 +160,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
 
     # Number of surface temperatures is different to number of species to test array shapes work.
-    surface_temperatures: npt.NDArray[np.float64] = np.array(
-        [1500, 2000, 2500, 3000], dtype=np.float64
-    )
+    surface_temperatures: NumpyArrayFloat = np.array([1500, 2000, 2500, 3000], dtype=np.float64)
     planet: Planet = Planet(surface_temperature=surface_temperatures)
 
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {"O2_g": IronWustiteBuffer()}
@@ -224,7 +222,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
 
     # Set up a range of fO2 shifts
     num: int = 4
-    fO2_shifts: npt.NDArray[np.float64] = np.linspace(-10, 10, num, dtype=np.float64)
+    fO2_shifts: NumpyArrayFloat = np.linspace(-10, 10, num, dtype=np.float64)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(fO2_shifts)
     }

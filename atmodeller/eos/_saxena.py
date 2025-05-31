@@ -29,7 +29,7 @@ from abc import abstractmethod
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller import PRESSURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT_BAR
@@ -325,11 +325,11 @@ class SaxenaEightCoefficients(SaxenaABC):
 
 
 _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
-    a_coefficients=(1, 0, 0, 0, 0),
-    b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
+    a_coefficients=(1.0, 0.0, 0.0, 0.0, 0.0),
+    b_coefficients=(0.0, 0.9827e-1, 0.0, -0.2709, 0.0),
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
-    c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
-    d_coefficients=(0, 0, 0, 0, 0),
+    c_coefficients=(0.0, 0.0, -0.1030e-2, 0.0, 0.1472e-1),
+    d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0),
     critical_data=select_critical_data("H2_g"),
 )
 """H2 low pressure (<1000 bar) :cite:p:`SS92{Table 1b}`
@@ -341,10 +341,10 @@ In :cite:t:`SF87a{Equation 23}` the final `c` coefficient is 0.1472e-1, not 0.14
 :cite:t:`SS92{Table 1b}`. The earlier work is assumed to be correct.
 """
 _H2_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
-    a_coefficients=(2.2615, 0, -6.8712e1, 0, -1.0573e4, 0, 0, -1.6936e-1),
-    b_coefficients=(-2.6707e-4, 0, 2.0173e-1, 0, 4.5759, 0, 0, 3.1452e-5),
-    c_coefficients=(-2.3376e-9, 0, 3.4091e-7, 0, -1.4188e-3, 0, 0, 3.0117e-10),
-    d_coefficients=(-3.2606e-15, 0, 2.4402e-12, 0, -2.4027e-9, 0, 0, 0),
+    a_coefficients=(2.2615, 0.0, -6.8712e1, 0.0, -1.0573e4, 0.0, 0.0, -1.6936e-1),
+    b_coefficients=(-2.6707e-4, 0.0, 2.0173e-1, 0.0, 4.5759, 0.0, 0.0, 3.1452e-5),
+    c_coefficients=(-2.3376e-9, 0.0, 3.4091e-7, 0.0, -1.4188e-3, 0.0, 0.0, 3.0117e-10),
+    d_coefficients=(-3.2606e-15, 0.0, 2.4402e-12, 0.0, -2.4027e-9, 0.0, 0.0, 0.0),
 )
 """H2 high pressure (>1000 bar) :cite:p:`SS92{Table 1b}`
 
@@ -354,10 +354,37 @@ provided as arguments). Visually, the fit compares well to :obj:`_H2_high_pressu
 """
 
 _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
-    a_coefficients=(1.00574428e00, 0, 1.93022092e-03, 0, -3.79261142e-01, 0, 0, -2.44217972e-03),
-    b_coefficients=(1.31517888e-03, 0, 7.22328441e-02, 0, 4.84354163e-02, 0, 0, -4.19624507e-04),
-    c_coefficients=(2.64454401e-06, 0, -5.18445629e-05, 0, -2.05045979e-04, 0, 0, -3.64843213e-07),
-    d_coefficients=(2.28281107e-11, 0, -1.07138603e-08, 0, 3.67720815e-07, 0, 0, 0),
+    a_coefficients=(
+        1.00574428e00,
+        0.0,
+        1.93022092e-03,
+        0.0,
+        -3.79261142e-01,
+        0.0,
+        0.0,
+        -2.44217972e-03,
+    ),
+    b_coefficients=(
+        1.31517888e-03,
+        0.0,
+        7.22328441e-02,
+        0.0,
+        4.84354163e-02,
+        0.0,
+        0.0,
+        -4.19624507e-04,
+    ),
+    c_coefficients=(
+        2.64454401e-06,
+        0.0,
+        -5.18445629e-05,
+        0.0,
+        -2.05045979e-04,
+        0.0,
+        0.0,
+        -3.64843213e-07,
+    ),
+    d_coefficients=(2.28281107e-11, 0.0, -1.07138603e-08, 0.0, 3.67720815e-07, 0.0, 0.0, 0.0),
     critical_data=select_critical_data("H2_g"),
 )
 """H2 high pressure (>1000 bar)
@@ -379,10 +406,10 @@ H2_SS92: RealGas = CombinedRealGas.create(
 """H2 EOS, which combines the low and high pressure EOS :cite:p:`SS92{Table 1b}`"""
 
 _H2_high_pressure_SF88: RealGas = SaxenaEightCoefficients(
-    a_coefficients=(1.6688, 0, -2.0759, 0, -9.6173, 0, 0, -0.1694),
-    b_coefficients=(-2.0410e-3, 0, 7.9230e-2, 0, 5.4295e-2, 0, 0, 4.0887e-4),
-    c_coefficients=(-2.1693e-7, 0, 1.7406e-6, 0, -2.1885e-4, 0, 0, 5.0897e-5),
-    d_coefficients=(-7.1635e-12, 0, 1.6197e-10, 0, -4.8181e-9, 0, 0, 0),
+    a_coefficients=(1.6688, 0.0, -2.0759, 0.0, -9.6173, 0.0, 0.0, -0.1694),
+    b_coefficients=(-2.0410e-3, 0.0, 7.9230e-2, 0.0, 5.4295e-2, 0.0, 0.0, 4.0887e-4),
+    c_coefficients=(-2.1693e-7, 0.0, 1.7406e-6, 0.0, -2.1885e-4, 0.0, 0.0, 5.0897e-5),
+    d_coefficients=(-7.1635e-12, 0.0, 1.6197e-10, 0.0, -4.8181e-9, 0.0, 0.0, 0.0),
     critical_data=select_critical_data("H2_g"),
 )
 """H2 high pressure :cite:p:`SF88{Table on page 1196}`
@@ -394,14 +421,14 @@ Further investigations are warranted before this model should be used.
 """
 
 SO2_SS92: RealGas = SaxenaEightCoefficients(
-    a_coefficients=(0.92854, 0.43269e-1, -0.24671, 0, 0.24999, 0, -0.53182, -0.16461e-1),
+    a_coefficients=(0.92854, 0.43269e-1, -0.24671, 0.0, 0.24999, 0.0, -0.53182, -0.16461e-1),
     b_coefficients=(
         0.84866e-3,
         -0.18379e-2,
         0.66787e-1,
-        0,
+        0.0,
         -0.29427e-1,
-        0,
+        0.0,
         0.29003e-1,
         0.54808e-2,
     ),
@@ -409,13 +436,13 @@ SO2_SS92: RealGas = SaxenaEightCoefficients(
         -0.35456e-3,
         0.23316e-4,
         0.94159e-3,
-        0,
+        0.0,
         -0.81653e-3,
-        0,
+        0.0,
         0.23154e-3,
         0.55542e-4,
     ),
-    d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     critical_data=select_critical_data("SO2_g"),
 )
 """SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar"""
@@ -425,23 +452,23 @@ SO2_SS92_bounded: RealGas = CombinedRealGas.create(
 """SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar"""
 
 _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
-    a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0, -0.10028e2, 0, 0.45484e1, -0.38200e1),
-    b_coefficients=(0.16066, 0.10887, 0.29014, 0, -0.99593, 0, -0.18627, -0.45515),
-    c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0, -0.50533e-1, 0, 0.11760, 0.33972),
-    d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    a_coefficients=(0.14721e1, 0.11177e1, 0.39657e1, 0.0, -0.10028e2, 0.0, 0.45484e1, -0.38200e1),
+    b_coefficients=(0.16066, 0.10887, 0.29014, 0.0, -0.99593, 0.0, -0.18627, -0.45515),
+    c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0.0, -0.50533e-1, 0.0, 0.11760, 0.33972),
+    d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     critical_data=select_critical_data("H2S_g"),
 )
 """H2S low pressure (1-500 bar) :cite:p:`SS92{Table 1d}`"""
 
 _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
-    a_coefficients=(0.59941, -0.15570e-2, 0.45250e-1, 0, 0.36687, 0, -0.79248, 0.26058),
+    a_coefficients=(0.59941, -0.15570e-2, 0.45250e-1, 0.0, 0.36687, 0.0, -0.79248, 0.26058),
     b_coefficients=(
         0.22545e-1,
         0.17473e-2,
         0.48253e-1,
-        0,
+        0.0,
         -0.19890e-1,
-        0,
+        0.0,
         0.32794e-1,
         -0.10985e-1,
     ),
@@ -449,13 +476,13 @@ _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
         0.57375e-3,
         -0.20944e-5,
         -0.11894e-2,
-        0,
+        0.0,
         0.14661e-2,
-        0,
+        0.0,
         -0.75605e-3,
         -0.27985e-3,
     ),
-    d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+    d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     critical_data=select_critical_data("H2S_g"),
 )
 """H2S high pressure (500-10000 bar) :cite:p:`SS92{Table 1d}`"""
@@ -489,31 +516,31 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
 
     # Table 1a, <1000 bar
     low_pressure: RealGas = SaxenaFiveCoefficients(
-        a_coefficients=(1, 0, 0, 0, 0),
-        b_coefficients=(0, 0.9827e-1, 0, -0.2709, 0),
+        a_coefficients=(1.0, 0.0, 0.0, 0.0, 0.0),
+        b_coefficients=(0.0, 0.9827e-1, 0.0, -0.2709, 0.0),
         # Saxena and Fei (1987) CMP, Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
-        c_coefficients=(0, 0, -0.1030e-2, 0, 0.1472e-1),
-        d_coefficients=(0, 0, 0, 0, 0),
+        c_coefficients=(0.0, 0.0, -0.1030e-2, 0.0, 0.1472e-1),
+        d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0),
         critical_data=critical_data,
     )
 
     # Table 1a, 1000-5000 bar
     medium_pressure: RealGas = SaxenaEightCoefficients(
-        a_coefficients=(1, 0, 0, 0, -5.917e-1, 0, 0, 0),
-        b_coefficients=(0, 0, 9.122e-2, 0, 0, 0, 0, 0),
+        a_coefficients=(1.0, 0.0, 0.0, 0.0, -5.917e-1, 0.0, 0.0, 0.0),
+        b_coefficients=(0.0, 0.0, 9.122e-2, 0.0, 0.0, 0.0, 0.0, 0.0),
         # Saxena and Fei (1987) CMP, Eq. 21, C first coefficient = 1.4164e-4 (not negative)
-        c_coefficients=(0, 0, 0, 0, 1.4164e-4, 0, 0, -2.8349e-6),
-        d_coefficients=(0, 0, 0, 0, 0, 0, 0, 0),
+        c_coefficients=(0.0, 0.0, 0.0, 0.0, 1.4164e-4, 0.0, 0.0, -2.8349e-6),
+        d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
         critical_data=critical_data,
     )
 
     # Table 1a, >5000 bar
     # High precision coefficients taken from Saxena and Fei (1987), GCA, and agree with Table 1(a)
     high_pressure: RealGas = SaxenaEightCoefficients(
-        a_coefficients=(2.0614, 0, 0, 0, -2.2351, 0, 0, -3.9411e-1),
-        b_coefficients=(0, 0, 5.5125e-2, 0, 3.9344e-2, 0, 0, 0),
-        c_coefficients=(0, 0, -1.8935e-6, 0, -1.1092e-5, 0, -2.1892e-5, 0),
-        d_coefficients=(0, 0, 5.0527e-11, 0, 0, -6.3033e-21, 0, 0),
+        a_coefficients=(2.0614, 0.0, 0.0, 0.0, -2.2351, 0.0, 0.0, -3.9411e-1),
+        b_coefficients=(0.0, 0.0, 5.5125e-2, 0.0, 3.9344e-2, 0.0, 0.0, 0.0),
+        c_coefficients=(0.0, 0.0, -1.8935e-6, 0.0, -1.1092e-5, 0.0, -2.1892e-5, 0.0),
+        d_coefficients=(0.0, 0.0, 5.0527e-11, 0.0, 0.0, -6.3033e-21, 0.0, 0.0),
         critical_data=critical_data,
     )
 

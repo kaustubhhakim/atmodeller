@@ -20,12 +20,13 @@ Units for temperature and pressure are K and bar, respectively.
 """
 
 import logging
-from typing import Callable, Sequence
+from collections.abc import Callable
+from typing import Sequence
 
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array, lax
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike, Float
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import IdealGas, RealGas
@@ -108,7 +109,7 @@ class CombinedRealGas(RealGas):
             calibrations: Experimental calibrations that correspond to `real_gases`
         """
         real_gases.insert(0, IdealGas())
-        pressure_max: float = calibrations[0].pressure_min  # type: ignore check done before
+        pressure_max: Float[Array, ""] = calibrations[0].pressure_min
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_max=pressure_max)
         calibrations.insert(0, calibration)
 
@@ -124,7 +125,7 @@ class CombinedRealGas(RealGas):
             real_gases: Real gases to combine
             calibrations: Experimental calibrations that correspond to `real_gases`
         """
-        pressure_min: float = calibrations[-1].pressure_max  # type: ignore check done before
+        pressure_min: Float[Array, ""] = calibrations[-1].pressure_max
         real_gas: RealGas = UpperBoundRealGas(real_gases[-1], pressure_min)
         real_gases.append(real_gas)
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=pressure_min)
@@ -328,7 +329,7 @@ class UpperBoundRealGas(RealGas):
 
     real_gas: RealGas
     """Real gas to evaluate the compressibility factor at `p_eval`"""
-    p_eval: Array = eqx.field(converter=as_j64, default=1, static=True)
+    p_eval: Float[Array, ""] = eqx.field(converter=as_j64, default=1.0, static=True)
     """Evaluation pressure in bar. Defaults to 1 bar."""
 
     @eqx.filter_jit
