@@ -18,10 +18,7 @@
 
 from typing import Protocol, runtime_checkable
 
-from jax import Array
-from jaxtyping import ArrayLike
-
-from atmodeller.utilities import ExperimentalCalibration
+from jaxtyping import Array, ArrayLike
 
 
 @runtime_checkable
@@ -45,11 +42,10 @@ class FugacityConstraintProtocol(Protocol):
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
     log10_shift: ArrayLike
     evaluation_pressure: ArrayLike | None
-    calibration: ExperimentalCalibration
 
-    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
-    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
 
 @runtime_checkable

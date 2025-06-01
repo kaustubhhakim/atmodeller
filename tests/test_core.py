@@ -21,8 +21,7 @@ import logging
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax import Array
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.containers import (

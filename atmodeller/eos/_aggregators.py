@@ -24,8 +24,8 @@ from collections.abc import Callable, Sequence
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, lax
-from jaxtyping import ArrayLike, Float
+from jax import lax
+from jaxtyping import Array, ArrayLike, Float
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import IdealGas, RealGas

@@ -30,8 +30,7 @@ import equinox as eqx
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from jax import Array
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 from molmass import Formula
 from openpyxl.styles import PatternFill
 from scipy.constants import mega

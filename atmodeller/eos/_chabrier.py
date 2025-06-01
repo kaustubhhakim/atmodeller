@@ -26,9 +26,8 @@ from typing import ClassVar
 import equinox as eqx
 import jax.numpy as jnp
 import pandas as pd
-from jax import Array
 from jax.scipy.interpolate import RegularGridInterpolator
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 

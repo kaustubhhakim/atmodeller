@@ -21,8 +21,7 @@ For every law there should be a test in the test suite.
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10

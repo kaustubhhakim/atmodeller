@@ -21,8 +21,7 @@ from collections.abc import Callable
 import numpy as np
 import numpy.testing as nptest
 import pytest
-from jax import Array
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.eos import RealGas, get_eos_models
 from atmodeller.utilities import as_j64

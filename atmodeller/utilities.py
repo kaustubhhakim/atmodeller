@@ -25,9 +25,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from jax import Array
 from jax.tree_util import Partial, tree_map
-from jaxtyping import ArrayLike, Float64
+from jaxtyping import Array, ArrayLike, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input

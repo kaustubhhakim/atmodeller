@@ -27,8 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from beartype import beartype
-from jax import Array
-from jaxtyping import ArrayLike, Integer
+from jaxtyping import Array, ArrayLike, Integer
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
 from atmodeller.containers import (

@@ -22,8 +22,8 @@ from collections.abc import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, lax
-from jaxtyping import ArrayLike
+from jax import lax
+from jaxtyping import Array, ArrayLike
 from scipy.constants import kilo
 
 from atmodeller.constants import GAS_CONSTANT_BAR

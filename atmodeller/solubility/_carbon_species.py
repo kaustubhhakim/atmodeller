@@ -21,8 +21,7 @@ For every law there should be a test in the test suite.
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.solubility.core import Solubility
 from atmodeller.utilities import safe_exp, unit_conversion

@@ -19,8 +19,7 @@
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import (

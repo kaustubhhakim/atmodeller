@@ -23,8 +23,7 @@ from abc import abstractmethod
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array
-from jaxtyping import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
