@@ -17,7 +17,6 @@
 """Redox buffers"""
 
 from abc import abstractmethod
-from typing import Type
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -402,4 +401,4 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         return buffer_value
 
 
-IronWustiteBuffer: Type[RedoxBuffer] = IronWustiteBufferHirschmann
+IronWustiteBuffer: type[RedoxBuffer] = IronWustiteBufferHirschmann
