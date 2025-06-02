@@ -32,6 +32,7 @@ from atmodeller.containers import (
     SpeciesCollection,
 )
 from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.utilities import vmap_axes_spec
 
 logger: logging.Logger = debug_logger()
 logger.setLevel(logging.WARNING)
@@ -60,7 +61,7 @@ def test_mass_constraints_single() -> None:
     log_abundance: Array = mass_constraints.log_abundance
     target: Array = jnp.array([60.27546626107961, 61.65474558573571, jnp.nan])
 
-    assert mass_constraints.vmap_axes().log_abundance is None
+    assert vmap_axes_spec(mass_constraints).log_abundance is None
     assert jax.numpy.allclose(log_abundance, target, rtol=RTOL, atol=ATOL, equal_nan=True)
 
 
@@ -82,7 +83,7 @@ def test_mass_constraints_broadcast1() -> None:
         ]
     )
 
-    assert mass_constraints.vmap_axes().log_abundance == 0
+    assert vmap_axes_spec(mass_constraints).log_abundance == 0
     assert jax.numpy.allclose(log_abundance, target, rtol=RTOL, atol=ATOL, equal_nan=True)
 
 
@@ -104,7 +105,7 @@ def test_mass_constraints_broadcast2() -> None:
         ]
     )
 
-    assert mass_constraints.vmap_axes().log_abundance == 0
+    assert vmap_axes_spec(mass_constraints).log_abundance == 0
     assert jax.numpy.allclose(log_abundance, target, rtol=RTOL, atol=ATOL, equal_nan=True)
 
 
@@ -118,12 +119,12 @@ def test_fugacity_constraint_single() -> None:
         species, fugacity_constraints_map
     )
 
-    constraints: tuple[FugacityConstraintProtocol, ...] = fugacity_constraints.constraints
+    # constraints: tuple[FugacityConstraintProtocol, ...] = fugacity_constraints.constraints
 
-    print(constraints)
-    print(fugacity_constraints.species)
+    # print(constraints)
+    # print(fugacity_constraints.species)
 
-    print(fugacity_constraints.vmap_axes())
+    # print(fugacity_constraints.vmap_axes())
 
 
 def test_fugacity_constraint_broadcast1() -> None:
@@ -141,4 +142,4 @@ def test_fugacity_constraint_broadcast1() -> None:
     print(constraints)
     print(fugacity_constraints.species)
 
-    print(fugacity_constraints.vmap_axes())
+    # print(fugacity_constraints.vmap_axes())

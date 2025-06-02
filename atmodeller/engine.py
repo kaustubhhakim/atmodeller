@@ -23,10 +23,9 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
-from beartype import beartype
 from jax import lax
 from jax.scipy.special import logsumexp
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer
+from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
@@ -48,7 +47,6 @@ from atmodeller.utilities import (
 
 @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
-@beartype
 def solve(
     solution_array: Float[Array, " sol_dim"],
     traced_parameters: TracedParameters,
@@ -193,15 +191,9 @@ def repeat_solver(
 
 @eqx.filter_jit
 def get_min_log_elemental_abundance_per_species(
-    formula_matrix: Array, mass_constraints: MassConstraints
-) -> Array:
+    formula_matrix: Integer[Array, "el_dim species_dim"], mass_constraints: MassConstraints
+) -> Float64[Array, " species_dim"]:
     """For each species, find the elemental mass constraint with the lowest abundance.
-
-    If species are present for which there are no elemental mass constraints (for example,
-    oxygen if a fugacity constraint is applied instead) the maximum of all elements will be
-    returned for that particular species. However, the return array from this function is
-    subsequently filtered depending on whether a stability calculation is required for each
-    species.
 
     Args:
         formula_matrix: Formula matrix
@@ -211,32 +203,30 @@ def get_min_log_elemental_abundance_per_species(
         A vector of the minimum log elemental abundance for each species
     """
     # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
-    # (n_elements, n_species)
-    mask: Array = (formula_matrix != 0).astype(jnp.int_)
-    jax.debug.print("formula_matrix = {out}", out=formula_matrix)
-    jax.debug.print("mask = {out}", out=mask)
+    mask: Integer[Array, "el_dim species_dim"] = (formula_matrix != 0).astype(jnp.int_)
+    # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
+    # jax.debug.print("mask = {out}", out=mask)
 
-    # Align for element-wise multiplication: (n_elements, 1)
-    # FIXME: Problem here is that log_abundance, when vmapped, is not a 2-D array but a 1-D array
-    # And 1-D arrays when transposed are still 1-D arrays. So must convert to a 2-D array first
-    log_abundance: Array = jnp.atleast_2d(mass_constraints.log_abundance).T
-    jax.debug.print("log_abundance = {out}", out=log_abundance)
+    # If vmapped, log_abundance is a 1-D array, which cannot be transposed. So make a 2-D array
+    log_abundance: Float64[Array, "el_dim 1"] = jnp.atleast_2d(mass_constraints.log_abundance).T
+    # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
-    # Element-wise multiplication (broadcasted correctly): (n_elements, n_species)
-    masked_abundance: Array = mask * log_abundance
-    jax.debug.print("masked_abundance = {out}", out=masked_abundance)
+    # Element-wise multiplication with broadcasting
+    masked_abundance: Float64[Array, "el_dim species_dim"] = mask * log_abundance
+    # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
     masked_abundance = jnp.where(mask != 0, masked_abundance, jnp.nan)
-    jax.debug.print("masked_abundance = {out}", out=masked_abundance)
+    # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
 
     # Find the minimum log abundance per species
-    min_abundance_per_species: Array = jnp.nanmin(masked_abundance, axis=0)
-    jax.debug.print("min_abundance_per_species = {out}", out=min_abundance_per_species)
+    min_abundance_per_species: Float64[Array, " species_dim"] = jnp.nanmin(
+        masked_abundance, axis=0
+    )
+    # jax.debug.print("min_abundance_per_species = {out}", out=min_abundance_per_species)
 
     return min_abundance_per_species
 
 
 @eqx.filter_jit
-@beartype
 def objective_function(solution: Array, kwargs: dict) -> Array:
     """Objective function
 

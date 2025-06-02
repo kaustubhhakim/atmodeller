@@ -19,7 +19,7 @@
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Literal, no_type_check
+from typing import Literal
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -28,7 +28,7 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import lax
-from jaxtyping import Array, ArrayLike
+from jaxtyping import Array, ArrayLike, Float64
 from lineax import AbstractLinearSolver
 from molmass import Formula
 
@@ -53,7 +53,6 @@ from atmodeller.utilities import (
     get_log_number_density_from_log_pressure,
     to_hashable,
     unit_conversion,
-    vmap_axes_spec,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -315,11 +314,11 @@ class Planet(eqx.Module):
     Default values are for a fully molten Earth.
 
     Args:
-        planet_mass: Mass of the planet in kg. Defaults to Earth.
+        planet_mass: Mass of the planet in kg. Defaults to Earth (5.972e24 kg).
         core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to Earth.
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
-        surface_radius: Radius of the planetary surface in m. Defaults to Earth.
+            to Earth (0.3 kg/kg).
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1 kg/kg.
+        surface_radius: Radius of the planetary surface in m. Defaults to Earth (6371 km).
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
     """
 
@@ -385,7 +384,7 @@ class Planet(eqx.Module):
         return self.surface_temperature
 
     def asdict(self) -> dict[str, npt.NDArray]:
-        """Gets a dictionary of the values
+        """Gets a dictionary of the values as NumPy arrays.
 
         Returns:
             A dictionary of the values
@@ -402,14 +401,6 @@ class Planet(eqx.Module):
 
         return base_dict_np
 
-    def vmap_axes(self) -> "Planet":
-        """Vmap recipe
-
-        Returns:
-            Vmap axes
-        """
-        return vmap_axes_spec(self)
-
 
 class ConstantFugacityConstraint(eqx.Module):
     """A constant fugacity constraint
@@ -420,25 +411,19 @@ class ConstantFugacityConstraint(eqx.Module):
         fugacity: Fugacity
     """
 
-    # NOTE: Don't use eqx.converter since this will break vmap, which requires int, None, or
-    # callable.
-    fugacity: ArrayLike
+    fugacity: Array = eqx.field(converter=as_j64)
     """Fugacity"""
 
     @property
     def value(self) -> Array:
-        return jnp.asarray(self.fugacity)
+        return self.fugacity
 
     @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
-        log_fugacity_value: Array = jnp.log(self.fugacity)
 
-        return log_fugacity_value
-
-    def vmap_axes(self) -> "ConstantFugacityConstraint":
-        return vmap_axes_spec(self)
+        return jnp.log(self.fugacity)
 
 
 class NoFugacityConstraint(ConstantFugacityConstraint):
@@ -450,7 +435,7 @@ class NoFugacityConstraint(ConstantFugacityConstraint):
     """
 
     def __init__(self):
-        super().__init__(fugacity=jnp.array(jnp.nan))
+        super().__init__(fugacity=np.nan)
 
 
 class FugacityConstraints(eqx.Module):
@@ -589,14 +574,6 @@ class FugacityConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> "FugacityConstraints":
-        """Vmap recipe
-
-        Returns:
-            Vmap axes
-        """
-        return vmap_axes_spec(self)
-
 
 class NormalisedMass(eqx.Module):
     """Normalised mass for conventional outgassing
@@ -611,20 +588,20 @@ class NormalisedMass(eqx.Module):
         mass: Total mass. Defaults to 1 kg for a unit mass system.
     """
 
-    melt_fraction: ArrayLike = 0.3
+    melt_fraction: Array = eqx.field(converter=as_j64, default=0.3)
     """Mass fraction of melt in kg/kg"""
-    temperature: ArrayLike = 1400
+    temperature: Array = eqx.field(converter=as_j64, default=1400)
     """Temperature in K"""
-    mass: ArrayLike = 1.0
+    mass: Array = eqx.field(converter=as_j64, default=1.0)
     """Total mass"""
 
     @property
-    def melt_mass(self) -> ArrayLike:
+    def melt_mass(self) -> Array:
         """Mass of the melt"""
         return self.mass * self.melt_fraction
 
     @property
-    def solid_mass(self) -> ArrayLike:
+    def solid_mass(self) -> Array:
         """Mass of the solid"""
         return self.mass * (1 - self.melt_fraction)
 
@@ -632,25 +609,13 @@ class NormalisedMass(eqx.Module):
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
-    A custom __init__ is defined for type checking otherwise beartype will flag that vmap
-    arguments (e.g., None, 0) are not compatible with the specified types.
-
     Args:
         log_abundance: Log number of atoms
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    # NOTE: Don't use eqx.converter since this will break vmap, which requires int, None, or
-    # callable.
-    log_abundance: Array
+    log_abundance: Float64[Array, "mass_dim el_dim"] = eqx.field(converter=as_j64)
     elements: tuple[str, ...]
-
-    @no_type_check
-    def __init__(self, log_abundance: Array, elements: tuple[str, ...]) -> None:
-        self.log_abundance = log_abundance
-        """Log number of atoms"""
-        self.elements = elements
-        """Elements corresponding to the columns of log_abundance"""
 
     @classmethod
     def create(
@@ -687,7 +652,7 @@ class MassConstraints(eqx.Module):
             (max_len, len(unique_elements)), np.nan, dtype=np.float64
         )
 
-        # Now populate mass constraints
+        # Populate mass constraints
         for nn, element in enumerate(unique_elements):
             if element in mass_constraints_.keys():
                 molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
@@ -698,7 +663,7 @@ class MassConstraints(eqx.Module):
 
         # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
-        return cls(jnp.array(log_abundance), unique_elements)
+        return cls(log_abundance, unique_elements)
 
     def asdict(self) -> dict[str, npt.NDArray]:
         """Gets a dictionary of the values
@@ -729,19 +694,6 @@ class MassConstraints(eqx.Module):
 
         return log_number_density
 
-    def vmap_axes(self) -> "MassConstraints":
-        """Vmap recipe
-
-        Returns:
-            Vmap axes
-        """
-        if self.log_abundance.shape[0] == 1:
-            # Single row so do not vmap
-            return type(self)(log_abundance=None, elements=None)  # type: ignore since vmap axes
-        else:
-            # Vmap multiple rows
-            return type(self)(log_abundance=0, elements=None)  # type: ignore since vmap axes
-
 
 class TracedParameters(eqx.Module):
     """Traced parameters
@@ -761,18 +713,6 @@ class TracedParameters(eqx.Module):
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
-
-    def vmap_axes(self) -> "TracedParameters":
-        """Vmap recipe
-
-        Returns:
-            Vmap axes
-        """
-        return type(self)(
-            planet=self.planet.vmap_axes(),
-            fugacity_constraints=self.fugacity_constraints.vmap_axes(),
-            mass_constraints=self.mass_constraints.vmap_axes(),
-        )
 
 
 class FixedParameters(eqx.Module):

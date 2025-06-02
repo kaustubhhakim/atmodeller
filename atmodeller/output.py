@@ -24,7 +24,7 @@ import logging
 import pickle
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import equinox as eqx
 import numpy as np
@@ -156,16 +156,6 @@ class Output:
         """Temperature"""
         return np.asarray(self.planet.temperature)
 
-    @property
-    def temperature_vmap(self) -> int | None:
-        """Axes for temperature vmap"""
-        return vmap_axes_spec(self._traced_parameters.planet).temperature
-
-    @property
-    def traced_parameters_vmap(self) -> Any:  # TracedParameters:
-        """Axes for traced parameters vmap"""
-        return self._traced_parameters.vmap_axes()
-
     def activity(self) -> npt.NDArray:
         """Gets the activity of all species
 
@@ -272,7 +262,7 @@ class Output:
         out: dict[str, npt.NDArray] = {}
 
         log_number_density_from_log_pressure_func: Callable = eqx.filter_vmap(
-            get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap)
+            get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap_axes())
         )
         log_number_density: npt.NDArray = log_number_density_from_log_pressure_func(
             np.log(self.total_pressure()), self.temperature
@@ -358,7 +348,7 @@ class Output:
             Total pressure
         """
         total_pressure_func: Callable = eqx.filter_vmap(
-            get_total_pressure, in_axes=(None, 0, self.temperature_vmap)
+            get_total_pressure, in_axes=(None, 0, self.temperature_vmap_axes())
         )
         total_pressure: Array = total_pressure_func(
             self._fixed_parameters, self.log_number_density, self.temperature
@@ -475,7 +465,7 @@ class Output:
         """
         element_density_dissolved_func: Callable = eqx.filter_vmap(
             get_element_density_in_melt,
-            in_axes=(self.traced_parameters_vmap, None, None, 0, 0, 0),
+            in_axes=(self.traced_parameters_vmap_axes(), None, None, 0, 0, 0),
         )
         element_density_dissolved: Array = element_density_dissolved_func(
             self._traced_parameters,
@@ -630,7 +620,7 @@ class Output:
         """
         log_activity_func: Callable = eqx.filter_vmap(
             get_log_activity,
-            in_axes=(self.traced_parameters_vmap, None, 0),
+            in_axes=(self.traced_parameters_vmap_axes(), None, 0),
         )
         log_activity: Array = log_activity_func(
             self._traced_parameters, self._fixed_parameters, self.log_number_density
@@ -663,7 +653,7 @@ class Output:
             Pressure of species in bar
         """
         pressure_func: Callable = eqx.filter_vmap(
-            get_pressure_from_log_number_density, in_axes=(0, self.temperature_vmap)
+            get_pressure_from_log_number_density, in_axes=(0, self.temperature_vmap_axes())
         )
         pressure: Array = pressure_func(self.log_number_density, self.temperature)
 
@@ -720,7 +710,7 @@ class Output:
             in_axes=(
                 0,
                 {
-                    "traced_parameters": self.traced_parameters_vmap,
+                    "traced_parameters": self.traced_parameters_vmap_axes(),
                     "fixed_parameters": None,
                     "solver_parameters": None,
                 },
@@ -749,7 +739,7 @@ class Output:
         """
         species_density_in_melt_func: Callable = eqx.filter_vmap(
             get_species_density_in_melt,
-            in_axes=(self.traced_parameters_vmap, None, 0, 0, 0),
+            in_axes=(self.traced_parameters_vmap_axes(), None, 0, 0, 0),
         )
         species_density_in_melt: Array = species_density_in_melt_func(
             self._traced_parameters,
@@ -768,7 +758,7 @@ class Output:
             Species ppmw in the melt
         """
         species_ppmw_in_melt_func: Callable = eqx.filter_vmap(
-            get_species_ppmw_in_melt, in_axes=(self.traced_parameters_vmap, None, 0, 0)
+            get_species_ppmw_in_melt, in_axes=(self.traced_parameters_vmap_axes(), None, 0, 0)
         )
         species_ppmw_in_melt: Array = species_ppmw_in_melt_func(
             self._traced_parameters,
@@ -787,6 +777,14 @@ class Output:
         """
         return np.exp(self.log_stability)
 
+    def temperature_vmap_axes(self) -> Literal[0, None]:
+        """Gets vmap axes for temperature"""
+        return vmap_axes_spec(self._traced_parameters.planet.temperature)
+
+    def traced_parameters_vmap_axes(self) -> TracedParameters:
+        """Gets vmap axes for traced parameters"""
+        return vmap_axes_spec(self._traced_parameters)
+
     def _drop_unsuccessful_solves(
         self, dataframes: dict[str, pd.DataFrame]
     ) -> dict[str, pd.DataFrame]:
@@ -798,7 +796,7 @@ class Output:
         Returns:
             Dictionary of dataframes without unsuccessful models
         """
-        return {key: df.loc[np.array(self._solver_status)] for key, df in dataframes.items()}
+        return {key: df.loc[self._solver_status] for key, df in dataframes.items()}
 
     def to_dataframes(self, drop_unsuccessful: bool = False) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.

@@ -35,7 +35,6 @@ from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@eqx.filter_jit
 def get_log_number_density_from_log_pressure(
     log_pressure: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -55,7 +54,6 @@ def get_log_number_density_from_log_pressure(
     return log_number_density
 
 
-@eqx.filter_jit
 def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, max=max_exp_input))
 
@@ -191,12 +189,12 @@ class ExperimentalCalibration(eqx.Module):
     """Experimental calibration
 
     Args:
-        temperature_min: Minimum calibrated temperature. Defaults to None.
-        temperature_max: Maximum calibrated temperature. Defaults to None.
-        pressure_min: Minimum calibrated pressure. Defaults to None.
-        pressure_max: Maximum calibrated pressure. Defaults to None.
-        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to None.
-        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
+        temperature_min: Minimum calibrated temperature. Defaults to nan.
+        temperature_max: Maximum calibrated temperature. Defaults to nan.
+        pressure_min: Minimum calibrated pressure. Defaults to nan.
+        pressure_max: Maximum calibrated pressure. Defaults to nan.
+        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to nan.
+        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to nan.
     """
 
     temperature_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
@@ -224,13 +222,28 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
 def is_arraylike_batched(x: Any) -> Literal[0, None]:
     """Checks if x is batched.
 
+    The logic accommodates batching for scalars, 1-D arrays, and 2-D arrays. Importantly, for
+    2-D arrays batching is only necessary if there is more than one row. This is required for
+    dealing with mass constraints
+
     Args:
         x: Something to check
 
     Returns:
         0 (axis) if batched, else None (not batched)
     """
-    return 0 if eqx.is_array(x) and x.ndim > 0 else None  # type: ignore
+    if eqx.is_array(x):
+        if x.ndim == 0:
+            return None
+        elif x.ndim == 1:
+            return 0
+        elif x.ndim == 2:
+            if x.shape[0] == 1:
+                return None
+            else:
+                return 0
+    else:
+        return None
 
 
 def vmap_axes_spec(x: Any) -> Any:

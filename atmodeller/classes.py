@@ -43,7 +43,7 @@ from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NumpyArrayFloat, NumpyArrayInt
 from atmodeller.output import Output
-from atmodeller.utilities import get_batch_size, partial_rref
+from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -124,10 +124,8 @@ class InteriorAtmosphere:
         )
 
         # Initial solution must be broadcast since it is always batched
-        in_axes: Any = traced_parameters_.vmap_axes()
-        # TODO: Below confirms that log_abundance is a batch quantity
-        jax.debug.print("in_axes = {out}", out=in_axes)
-        jax.debug.print("in_axes = {out}", out=in_axes.mass_constraints.log_abundance)
+        in_axes: Any = vmap_axes_spec(traced_parameters_)
+        # jax.debug.print("in_axes = {out}", out=in_axes)
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
         batch_size: int = max(get_batch_size(traced_parameters_), 1)
