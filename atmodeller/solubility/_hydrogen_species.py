@@ -123,7 +123,6 @@ class _H2_chachan18(Solubility):
         # jax.debug.print("A = ", self.A)
 
     @override
-    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, *, temperature: ArrayLike, **kwargs) -> Array:
         del kwargs
         mass_fraction: Array = jnp.exp(-self.T0 / temperature) * self.A * fugacity

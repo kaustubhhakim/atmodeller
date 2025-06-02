@@ -46,7 +46,6 @@ class _S2_sulfate_andesite_boulliung23(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -79,7 +78,6 @@ class _S2_sulfide_andesite_boulliung23(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -112,7 +110,6 @@ class _S2_andesite_boulliung23(Solubility):
         self._sulfate = S2_sulfate_andesite_boulliung23
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -140,7 +137,6 @@ class _S2_sulfate_basalt_boulliung23(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -174,7 +170,6 @@ class _S2_sulfide_basalt_boulliung23(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -208,7 +203,6 @@ class _S2_basalt_boulliung23(Solubility):
         self._sulfate = S2_sulfate_basalt_boulliung23
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -236,7 +230,6 @@ class _S2_sulfate_trachybasalt_boulliung23(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -269,7 +262,6 @@ class _S2_sulfide_trachybasalt_boulliung23(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
@@ -302,7 +294,6 @@ class _S2_trachybasalt_boulliung23(Solubility):
         self._sulfate = S2_sulfate_trachybasalt_boulliung23
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:

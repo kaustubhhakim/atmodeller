@@ -140,7 +140,6 @@ class _N2_basalt_bernadou21(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -197,7 +196,6 @@ class _N2_basalt_dasgupta22(Solubility):
         self._buffer = IronWustiteBuffer(evaluation_pressure=None)
 
     @override
-    @eqx.filter_jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -242,7 +240,6 @@ class _N2_basalt_libourel03(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self,
         fugacity: ArrayLike,
