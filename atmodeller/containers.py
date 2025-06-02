@@ -50,6 +50,7 @@ from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
 from atmodeller.utilities import (
     as_j64,
+    get_batch_size,
     get_log_number_density_from_log_pressure,
     to_hashable,
     unit_conversion,
@@ -612,18 +613,22 @@ class MassConstraints(eqx.Module):
         elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: Float64[Array, "mass_dim el_dim"] = eqx.field(converter=as_j64)
+    log_abundance: Float64[Array, "batch_dim el_dim"] = eqx.field(converter=as_j64)
     elements: tuple[str, ...]
 
     @classmethod
     def create(
-        cls, species: SpeciesCollection, mass_constraints: Mapping[str, ArrayLike] | None = None
+        cls,
+        species: SpeciesCollection,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+        batch_size: int = 1,
     ) -> "MassConstraints":
         """Creates an instance
 
         Args:
             species: Species
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
+            batch_size: Total batch size, which is required for broadcasting
 
         Returns:
             An instance
@@ -635,15 +640,8 @@ class MassConstraints(eqx.Module):
         # All unique elements in alphabetical order
         unique_elements: tuple[str, ...] = species.get_unique_elements_in_species()
 
-        # Determine the maximum length of any array in mass_constraints_ values
-        max_len: int = 1
-        for v in mass_constraints_.values():
-            try:
-                vlen: int = v.size  # type: ignore
-            except AttributeError:
-                vlen = 1
-            if vlen > max_len:
-                max_len = vlen
+        # Determine the maximum length of any array in mass_constraints_
+        max_len: int = get_batch_size(mass_constraints_)
 
         # Initialise to all nans assuming that there are no mass constraints
         log_abundance: NumpyArrayFloat = np.full(
@@ -659,6 +657,10 @@ class MassConstraints(eqx.Module):
                 )
                 log_abundance[:, nn] = log_abundance_
 
+        # Broadcast, which avoids JAX recompilation if mass constraints change since otherwise the
+        # stored shape (self.log_abundance) can vary between a 1-D and 2-D array, thereby forcing
+        # JAX recompilation
+        log_abundance = np.broadcast_to(log_abundance, (batch_size, len(unique_elements)))
         # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
         return cls(log_abundance, unique_elements)

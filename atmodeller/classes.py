@@ -95,18 +95,25 @@ class InteriorAtmosphere:
             solver_parameters: Solver parameters. Defaults to None.
         """
         planet_: Planet = Planet() if planet is None else planet
+
+        batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
+        # jax.debug.print("batch_size = {out}", out=batch_size)
+
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             self.species, fugacity_constraints
         )
-        mass_constraints_: MassConstraints = MassConstraints.create(self.species, mass_constraints)
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
+        # Mass constraints are always broadcast to avoid JAX recompilation
+        mass_constraints_: MassConstraints = MassConstraints.create(
+            self.species, mass_constraints, batch_size
+        )
         traced_parameters_: TracedParameters = TracedParameters(
             planet_, fugacity_constraints_, mass_constraints_
         )
+
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
-
         options: dict[str, Any] = {
             "lower": self.species.get_lower_bound(),
             "upper": self.species.get_upper_bound(),
@@ -121,12 +128,6 @@ class InteriorAtmosphere:
             options=options,
         )
 
-        # Initial solution must be broadcast since it is always batched
-        in_axes: Any = vmap_axes_spec(traced_parameters_)
-        # jax.debug.print("in_axes = {out}", out=in_axes)
-        self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
-
-        batch_size: int = max(get_batch_size(traced_parameters_), 1)
         base_initial_solution: Array = broadcast_initial_solution(
             initial_log_number_density,
             initial_log_stability,
@@ -134,6 +135,10 @@ class InteriorAtmosphere:
             batch_size,
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
+
+        # Initial solution must be broadcast since it is always batched
+        in_axes: Any = vmap_axes_spec(traced_parameters_)
+        self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
         # First solution attempt
         solution, solver_status, solver_steps = self._solver(

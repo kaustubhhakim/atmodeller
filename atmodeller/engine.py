@@ -45,7 +45,7 @@ from atmodeller.utilities import (
 
 
 @eqx.filter_jit
-# @eqx.debug.assert_max_traces(max_traces=1)
+@eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Float[Array, " sol_dim"],
     traced_parameters: TracedParameters,
@@ -206,7 +206,7 @@ def get_min_log_elemental_abundance_per_species(
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
     # jax.debug.print("mask = {out}", out=mask)
 
-    # If vmapped, log_abundance is a 1-D array, which cannot be transposed. So make a 2-D array
+    # log_abundance is a 1-D array, which cannot be transposed, so make a 2-D array
     log_abundance: Float64[Array, "el_dim 1"] = jnp.atleast_2d(mass_constraints.log_abundance).T
     # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
@@ -313,11 +313,9 @@ def objective_function(
     element_density_total: Float64[Array, " el_dim"] = element_density + element_melt_density
     log_element_density_total: Float64[Array, " el_dim"] = jnp.log(element_density_total)
     # jax.debug.print("log_element_density_total = {out}", out=log_element_density_total)
-    # Flattening since if only one set of abundances specified (no vmap) then the array will be
-    # 2-D with only one row. Otherwise with vmap the abundances will be a 1-D array.
     log_target_density: Float64[Array, " el_dim"] = tp.mass_constraints.log_number_density(
         log_volume
-    ).flatten()
+    )
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
     mass_residual: Float64[Array, " el_dim"] = (
         safe_exp(log_element_density_total - log_target_density) - 1

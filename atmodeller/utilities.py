@@ -222,9 +222,7 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
 def is_arraylike_batched(x: Any) -> Literal[0, None]:
     """Checks if x is batched.
 
-    The logic accommodates batching for scalars, 1-D arrays, and 2-D arrays. Importantly, for
-    2-D arrays batching is only necessary if there is more than one row. This is required for
-    dealing with mass constraints
+    The logic accommodates batching for scalars, 1-D arrays, and 2-D arrays.
 
     Args:
         x: Something to check
@@ -235,13 +233,8 @@ def is_arraylike_batched(x: Any) -> Literal[0, None]:
     if eqx.is_array(x):
         if x.ndim == 0:
             return None
-        elif x.ndim == 1:
+        else:
             return 0
-        elif x.ndim == 2:
-            if x.shape[0] == 1:
-                return None
-            else:
-                return 0
     else:
         return None
 
@@ -265,9 +258,9 @@ def get_batch_size(x: Any) -> int:
         x: Pytree of nested containers possibly containing arrays or scalars
 
     Returns:
-        The maximum size along axis 0 among all array-like leaves, or 0 if all leaves are scalars.
+        The maximum size along axis 0 among all array-like leaves
     """
-    max_size: int = 0
+    max_size: int = 1
     for leaf in jax.tree_util.tree_leaves(x):
         if eqx.is_array(leaf) and leaf.ndim > 0:
             max_size = max(max_size, leaf.shape[0])
