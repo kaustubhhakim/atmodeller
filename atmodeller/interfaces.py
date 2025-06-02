@@ -23,25 +23,20 @@ from jaxtyping import Array, ArrayLike
 
 @runtime_checkable
 class ActivityProtocol(Protocol):
-    def log_activity(
-        self,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-    ) -> ArrayLike: ...
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
 @runtime_checkable
 class FugacityConstraintProtocol(Protocol):
-    @property
-    def value(self) -> ArrayLike: ...
-
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
 @runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
-    log10_shift: ArrayLike
     evaluation_pressure: ArrayLike | None
+
+    @property
+    def log10_shift(self) -> Array: ...
 
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
@@ -66,9 +61,5 @@ class SolubilityProtocol(Protocol):
     ) -> ArrayLike: ...
 
     def jax_concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
+        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> Array: ...

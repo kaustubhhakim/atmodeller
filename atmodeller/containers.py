@@ -416,10 +416,6 @@ class ConstantFugacityConstraint(eqx.Module):
     fugacity: Array = eqx.field(converter=as_j64)
     """Fugacity"""
 
-    @property
-    def value(self) -> Array:
-        return self.fugacity
-
     @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature

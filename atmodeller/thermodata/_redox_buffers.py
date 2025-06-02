@@ -22,7 +22,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
-from atmodeller.utilities import ExperimentalCalibration, unit_conversion
+from atmodeller.utilities import ExperimentalCalibration, as_j64, unit_conversion
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -42,14 +42,13 @@ class RedoxBuffer(eqx.Module):
             should be used with caution.
     """
 
-    # NOTE: Don't use eqx.converter since this will break vmap, which requires int, None, or
-    # callable.
-    log10_shift: ArrayLike = 0
+    log10_shift_: Array = eqx.field(converter=as_j64, default=0)
     evaluation_pressure: ArrayLike | None = 1
 
     @property
-    def value(self) -> ArrayLike:
-        return self.log10_shift
+    def log10_shift(self) -> Array:
+        """Avoids the type checker complaining about a conflict with the implicit interface"""
+        return self.log10_shift_
 
     @abstractmethod
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
@@ -74,7 +73,6 @@ class RedoxBuffer(eqx.Module):
             Log10 fugacity at the buffer
         """
 
-    @eqx.filter_jit
     def get_scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
         """Gets the scaled pressure.
 
@@ -90,7 +88,6 @@ class RedoxBuffer(eqx.Module):
             return self.convert_pressure_units(pressure)
 
     @override
-    @eqx.filter_jit
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log10 fugacity
 
@@ -104,7 +101,6 @@ class RedoxBuffer(eqx.Module):
         return self.log10_fugacity_buffer(temperature, pressure) + self.log10_shift
 
     @override
-    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log fugacity
 
@@ -136,13 +132,11 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
         self.calibration = ExperimentalCalibration(pressure_max=27.5 * unit_conversion.GPa_to_bar)
 
     @override
-    @eqx.filter_jit
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
         """Units are bar"""
         return pressure
 
     @override
-    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log10 fugacity
 
@@ -202,12 +196,10 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         self.h = (-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0)
 
     @override
-    @eqx.filter_jit
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
         """Units are GPa"""
         return pressure * unit_conversion.bar_to_GPa
 
-    @eqx.filter_jit
     def _evaluate_m(self, pressure: ArrayLike, coefficients: tuple[float, ...]) -> Array:
         """Evaluates an m parameter
 
@@ -228,7 +220,6 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return m
 
-    @eqx.filter_jit
     def _evaluate_fO2(
         self,
         temperature: ArrayLike,
@@ -254,7 +245,6 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return log10fO2
 
-    @eqx.filter_jit
     def _fcc_bcc_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """log10fO2 for fcc and bcc iron
 
@@ -271,7 +261,6 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return log10fO2
 
-    @eqx.filter_jit
     def _hcp_iron(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """log10fO2 for hcp iron
 
@@ -288,7 +277,6 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
         return log10fO2
 
-    @eqx.filter_jit
     def _use_hcp(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Check to use hcp iron formulation for fO2
 
@@ -305,7 +293,6 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         return jnp.array(pressure) > threshold
 
     @override
-    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log10 fugacity
 
@@ -347,21 +334,21 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
 
     def __post_init__(self):
         self.low_temperature_buffer = IronWustiteBufferHirschmann08(
-            self.log10_shift, self.evaluation_pressure
+            self.log10_shift_, self.evaluation_pressure
         )
         self.high_temperature_buffer = IronWustiteBufferHirschmann21(
-            self.log10_shift, self.evaluation_pressure
+            self.log10_shift_, self.evaluation_pressure
         )
         self.calibration = ExperimentalCalibration(pressure_max=100 * unit_conversion.GPa_to_bar)
 
-    # Not used for a composite redox buffer but required by the interface
     @override
-    @eqx.filter_jit
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
-        """Units are bar"""
+        """Units are bar
+
+        Not used for a composite redox buffer but required by the interface.
+        """
         return pressure
 
-    @eqx.filter_jit
     def _use_low_temperature(self, temperature: ArrayLike) -> Array:
         """Check to use the low temperature buffer for fO2
 
@@ -374,7 +361,6 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
         return jnp.asarray(temperature) < self.high_temperature_buffer.calibration.temperature_min
 
     @override
-    @eqx.filter_jit
     def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log10 fugacity at the buffer
 
