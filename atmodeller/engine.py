@@ -226,7 +226,9 @@ def get_min_log_elemental_abundance_per_species(
 
 
 @eqx.filter_jit
-def objective_function(solution: Array, kwargs: dict) -> Array:
+def objective_function(
+    solution: Float64[Array, " sol_dim"], kwargs: dict
+) -> Float64[Array, " res_dim"]:
     """Objective function
 
     Args:
@@ -240,33 +242,33 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     tp: TracedParameters = kwargs["traced_parameters"]
     fp: FixedParameters = kwargs["fixed_parameters"]
     planet: Planet = tp.planet
-    temperature: ArrayLike = planet.temperature
+    temperature: Array = planet.temperature
 
     log_number_density, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    log_activity: Array = get_log_activity(tp, fp, log_number_density)
+    log_activity: Float64[Array, " species_dim"] = get_log_activity(tp, fp, log_number_density)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Atmosphere
-    total_pressure: Array = get_total_pressure(fp, log_number_density, temperature)
+    total_pressure: Float64[Array, ""] = get_total_pressure(fp, log_number_density, temperature)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
-    log_volume: Array = get_atmosphere_log_volume(fp, log_number_density, planet)
+    log_volume: Float64[Array, ""] = get_atmosphere_log_volume(fp, log_number_density, planet)
     # jax.debug.print("log_volume = {out}", out=log_volume)
 
     # Based on the definition of the reaction constant we need to convert gas activities
     # (fugacities) from bar to effective number density, whilst keeping condensate activities
     # unmodified.
-    log_activity_number_density: Array = get_log_number_density_from_log_pressure(
-        log_activity, temperature
+    log_activity_number_density: Float64[Array, " species_dim"] = (
+        get_log_number_density_from_log_pressure(log_activity, temperature)
     )
     log_activity_number_density = jnp.where(
         fp.gas_species_mask, log_activity_number_density, log_activity
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
-    residual: Array = jnp.array([])
+    residual: Float64[Array, " sol_dim"] = jnp.array([], dtype=jnp.float64)
 
     # Reaction network residual
     # TODO: Is it possible to remove this if statement?
@@ -293,9 +295,11 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
     # Elemental mass balance residual
     # Number density of elements in the gas or condensed phase
-    element_density: Array = get_element_density(fp.formula_matrix, log_number_density)
+    element_density: Float64[Array, " el_dim"] = get_element_density(
+        fp.formula_matrix, log_number_density
+    )
     # jax.debug.print("element_density = {out}", out=element_density)
-    element_melt_density: Array = get_element_density_in_melt(
+    element_melt_density: Float64[Array, " el_dim"] = get_element_density_in_melt(
         tp,
         fp,
         fp.formula_matrix,
@@ -306,26 +310,31 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
 
     # Relative mass error, computed in log-space for numerical stability
-    element_density_total: Array = element_density + element_melt_density
-    log_element_density_total: Array = jnp.log(element_density_total)
+    element_density_total: Float64[Array, " el_dim"] = element_density + element_melt_density
+    log_element_density_total: Float64[Array, " el_dim"] = jnp.log(element_density_total)
     # jax.debug.print("log_element_density_total = {out}", out=log_element_density_total)
     # Flattening since if only one set of abundances specified (no vmap) then the array will be
     # 2-D with only one row. Otherwise with vmap the abundances will be a 1-D array.
-    # TODO: Is this flatten correct? Something messes up with mass_constraints when batched
-    log_target_density: Array = tp.mass_constraints.log_number_density(log_volume).flatten()
+    log_target_density: Float64[Array, " el_dim"] = tp.mass_constraints.log_number_density(
+        log_volume
+    ).flatten()
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
-    mass_residual: Array = safe_exp(log_element_density_total - log_target_density) - 1
+    mass_residual: Float64[Array, " el_dim"] = (
+        safe_exp(log_element_density_total - log_target_density) - 1
+    )
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
     residual = jnp.concatenate([residual, mass_residual])
 
     # Stability residual
-    log_min_number_density: Array = (
+    log_min_number_density: Float64[Array, " species_dim"] = (
         get_min_log_elemental_abundance_per_species(fp.formula_matrix, tp.mass_constraints)
         - log_volume
         + jnp.log(fp.tau)
     )
     # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
-    stability_residual: Array = log_number_density + log_stability - log_min_number_density
+    stability_residual: Float64[Array, " species_dim"] = (
+        log_number_density + log_stability - log_min_number_density
+    )
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
     # Mask stability residuals for species that do not require stability calculations
     stability_residual = stability_residual * fp.stability_species_mask
