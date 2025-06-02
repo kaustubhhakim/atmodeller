@@ -26,7 +26,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
-from beartype import beartype
 from jaxtyping import Array, ArrayLike, Integer
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
@@ -75,7 +74,6 @@ class InteriorAtmosphere:
 
         return self._output
 
-    @beartype
     def solve(
         self,
         *,
