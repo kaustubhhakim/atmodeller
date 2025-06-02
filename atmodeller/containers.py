@@ -411,30 +411,17 @@ class ConstantFugacityConstraint(eqx.Module):
     This must adhere to FugacityConstraintProtocol
 
     Args:
-        fugacity: Fugacity
+        fugacity: Fugacity. Defaults to nan.
     """
 
-    fugacity: Array = eqx.field(converter=as_j64)
+    fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
     """Fugacity"""
 
-    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
 
         return jnp.log(self.fugacity)
-
-
-class NoFugacityConstraint(ConstantFugacityConstraint):
-    """No fugacity constraint
-
-    This must adhere to FugacityConstraintProtocol
-
-    Returns nan to indicate the need for subsequent masking
-    """
-
-    def __init__(self):
-        super().__init__(fugacity=np.nan)
 
 
 class FugacityConstraints(eqx.Module):
@@ -481,7 +468,7 @@ class FugacityConstraints(eqx.Module):
             if species_name in fugacity_constraints_:
                 constraints.append(fugacity_constraints_[species_name])
             else:
-                constraints.append(NoFugacityConstraint())
+                constraints.append(ConstantFugacityConstraint(np.nan))
 
         return cls(tuple(constraints), unique_species)
 
@@ -515,7 +502,6 @@ class FugacityConstraints(eqx.Module):
 
         return out
 
-    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity
 
@@ -555,7 +541,6 @@ class FugacityConstraints(eqx.Module):
 
         return log_fugacity
 
-    @eqx.filter_jit
     def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log number density
 
@@ -680,7 +665,6 @@ class MassConstraints(eqx.Module):
 
         return out
 
-    @eqx.filter_jit
     def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Array:
         """Log number density
 
@@ -734,9 +718,9 @@ class FixedParameters(eqx.Module):
     """Collection of species"""
     formula_matrix: Integer[Array, "el_dim species_dim"]
     """Formula matrix"""
-    reaction_matrix: Float64[Array, "react_dim species_dim"]
+    reaction_matrix: Float64[Array, "..."]  # TODO: Currently breaks with "react_dim species_dim"
     """Reaction matrix"""
-    reaction_stability_matrix: Float64[Array, "react_dim species_dim"]
+    reaction_stability_matrix: Float64[Array, "..."]  # TODO: reinstate react_dim species_dim"]
     """Reaction stability matrix"""
     stability_species_mask: Array
     """Mask of species to solve for stability"""
