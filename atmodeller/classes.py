@@ -204,19 +204,19 @@ class InteriorAtmosphere:
         Returns:
             Fixed parameters
         """
+        formula_matrix: NumpyArrayInt = self.get_formula_matrix()
         reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
         reaction_stability_matrix: NumpyArrayFloat = self.get_reaction_stability_matrix()
         gas_species_mask: Array = self.species.get_gas_species_mask()
         stability_species_mask: Array = self.species.get_stability_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
-        formula_matrix: NumpyArrayInt = self.get_formula_matrix()
 
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
-            formula_matrix=formula_matrix,
-            reaction_matrix=reaction_matrix,
-            reaction_stability_matrix=reaction_stability_matrix,
+            formula_matrix=jnp.asarray(formula_matrix),
+            reaction_matrix=jnp.asarray(reaction_matrix),
+            reaction_stability_matrix=jnp.asarray(reaction_stability_matrix),
             stability_species_mask=stability_species_mask,
             gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
@@ -289,6 +289,8 @@ class InteriorAtmosphere:
 
         return reaction_matrix
 
+    # TODO: Can possibly be removed and this calculation using stability_species_mask occurs
+    # directly in the objective function
     def get_reaction_stability_matrix(self) -> NumpyArrayFloat:
         """Gets the reaction stability matrix.
 

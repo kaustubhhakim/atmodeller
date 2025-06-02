@@ -28,7 +28,7 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 from jax import lax
-from jaxtyping import Array, ArrayLike, Float64
+from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
 from lineax import AbstractLinearSolver
 from molmass import Formula
 
@@ -45,7 +45,7 @@ from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     SolubilityProtocol,
 )
-from atmodeller.mytypes import NumpyArrayFloat, NumpyArrayInt, OptxSolver
+from atmodeller.mytypes import NumpyArrayFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
 from atmodeller.utilities import (
@@ -188,13 +188,13 @@ class SpeciesCollection(eqx.Module):
         # and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_mask(self) -> Array:
+    def get_gas_species_mask(self) -> Bool[Array, " species_dim"]:
         """Gets the gas species mask
 
         Returns:
             Mask for the gas species
         """
-        gas_species_mask: Array = jnp.array(
+        gas_species_mask: Bool[Array, " species_dim"] = jnp.array(
             [species.data.phase == "g" for species in self.data], dtype=jnp.bool_
         )
 
@@ -226,13 +226,15 @@ class SpeciesCollection(eqx.Module):
         """
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
-    def get_molar_masses(self) -> Array:
+    def get_molar_masses(self) -> Float[Array, " species_dim"]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: Array = jnp.array([species_.data.molar_mass for species_ in self.data])
+        molar_masses: Float[Array, " species_dim"] = jnp.array(
+            [species_.data.molar_mass for species_ in self.data]
+        )
         # logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
@@ -247,7 +249,7 @@ class SpeciesCollection(eqx.Module):
         """
         return tuple([species_.name for species_ in self.data])
 
-    def get_stability_species_mask(self) -> Array:
+    def get_stability_species_mask(self) -> Bool[Array, " species_dim"]:
         """Gets the stability species mask
 
         Returns:
@@ -718,8 +720,6 @@ class TracedParameters(eqx.Module):
 class FixedParameters(eqx.Module):
     """Parameters that are always fixed for a calculation
 
-    This container and all objects within it must be hashable.
-
     Args:
         species: Collection of species
         formula_matrix; Formula matrix
@@ -734,11 +734,11 @@ class FixedParameters(eqx.Module):
 
     species: SpeciesCollection
     """Collection of species"""
-    formula_matrix: NumpyArrayInt
+    formula_matrix: Integer[Array, "el_dim species_dim"]
     """Formula matrix"""
-    reaction_matrix: NumpyArrayFloat
+    reaction_matrix: Float64[Array, "react_dim species_dim"]
     """Reaction matrix"""
-    reaction_stability_matrix: NumpyArrayFloat
+    reaction_stability_matrix: Float64[Array, "react_dim species_dim"]
     """Reaction stability matrix"""
     stability_species_mask: Array
     """Mask of species to solve for stability"""

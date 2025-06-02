@@ -109,7 +109,7 @@ class Output:
     @property
     def formula_matrix(self) -> NumpyArrayInt:
         """Formula matrix"""
-        return self._fixed_parameters.formula_matrix
+        return np.asarray(self._fixed_parameters.formula_matrix)
 
     @property
     def condensed_species_mask(self) -> npt.NDArray:

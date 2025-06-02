@@ -30,7 +30,6 @@ from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
     FixedParameters,
-    FugacityConstraints,
     MassConstraints,
     Planet,
     SolverParameters,
@@ -238,34 +237,22 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         Residual
     """
     # jax.debug.print("Starting new objective_function evaluation")
-    traced_parameters: TracedParameters = kwargs["traced_parameters"]
-    fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
-    planet: Planet = traced_parameters.planet
+    tp: TracedParameters = kwargs["traced_parameters"]
+    fp: FixedParameters = kwargs["fixed_parameters"]
+    planet: Planet = tp.planet
     temperature: ArrayLike = planet.temperature
-
-    mass_constraints: MassConstraints = traced_parameters.mass_constraints
-    fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
-    gas_species_mask: Array = fixed_parameters.gas_species_mask
-    # jax.debug.print("gas_species_mask = {out}", out=gas_species_mask)
-    stability_species_mask: Array = fixed_parameters.stability_species_mask
-    # jax.debug.print("stability_species_mask = {out}", out=stability_species_mask)
-
-    reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
-    reaction_stability_matrix: Array = jnp.array(fixed_parameters.reaction_stability_matrix)
-    # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix)
-    formula_matrix: Array = jnp.array(fixed_parameters.formula_matrix)
 
     log_number_density, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
     # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, log_number_density)
+    log_activity: Array = get_log_activity(tp, fp, log_number_density)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
     # Atmosphere
-    total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
+    total_pressure: Array = get_total_pressure(fp, log_number_density, temperature)
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
-    log_volume: Array = get_atmosphere_log_volume(fixed_parameters, log_number_density, planet)
+    log_volume: Array = get_atmosphere_log_volume(fp, log_number_density, planet)
     # jax.debug.print("log_volume = {out}", out=log_volume)
 
     # Based on the definition of the reaction constant we need to convert gas activities
@@ -275,7 +262,7 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
         log_activity, temperature
     )
     log_activity_number_density = jnp.where(
-        gas_species_mask, log_activity_number_density, log_activity
+        fp.gas_species_mask, log_activity_number_density, log_activity
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
@@ -283,22 +270,22 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
     # Reaction network residual
     # TODO: Is it possible to remove this if statement?
-    if reaction_matrix.size > 0:
+    if fp.reaction_matrix.size > 0:
         log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
-            fixed_parameters, temperature
+            fp, temperature
         )
         reaction_residual: Array = (
-            reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
+            fp.reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
         )
         # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
-        reaction_residual = reaction_residual - reaction_stability_matrix.dot(
+        reaction_residual = reaction_residual - fp.reaction_stability_matrix.dot(
             safe_exp(log_stability)
         )
         # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
         residual = jnp.concatenate([residual, reaction_residual])
 
     # Fugacity constraints residual
-    fugacity_residual = log_activity_number_density - fugacity_constraints.log_number_density(
+    fugacity_residual = log_activity_number_density - tp.fugacity_constraints.log_number_density(
         temperature, total_pressure
     )
     # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
@@ -306,12 +293,12 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
     # Elemental mass balance residual
     # Number density of elements in the gas or condensed phase
-    element_density: Array = get_element_density(formula_matrix, log_number_density)
+    element_density: Array = get_element_density(fp.formula_matrix, log_number_density)
     # jax.debug.print("element_density = {out}", out=element_density)
     element_melt_density: Array = get_element_density_in_melt(
-        traced_parameters,
-        fixed_parameters,
-        formula_matrix,
+        tp,
+        fp,
+        fp.formula_matrix,
         log_number_density,
         log_activity,
         log_volume,
@@ -321,11 +308,11 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
     # Relative mass error, computed in log-space for numerical stability
     element_density_total: Array = element_density + element_melt_density
     log_element_density_total: Array = jnp.log(element_density_total)
-    jax.debug.print("log_element_density_total = {out}", out=log_element_density_total)
+    # jax.debug.print("log_element_density_total = {out}", out=log_element_density_total)
     # Flattening since if only one set of abundances specified (no vmap) then the array will be
     # 2-D with only one row. Otherwise with vmap the abundances will be a 1-D array.
     # TODO: Is this flatten correct? Something messes up with mass_constraints when batched
-    log_target_density: Array = mass_constraints.log_number_density(log_volume).flatten()
+    log_target_density: Array = tp.mass_constraints.log_number_density(log_volume).flatten()
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
     mass_residual: Array = safe_exp(log_element_density_total - log_target_density) - 1
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
@@ -333,15 +320,15 @@ def objective_function(solution: Array, kwargs: dict) -> Array:
 
     # Stability residual
     log_min_number_density: Array = (
-        get_min_log_elemental_abundance_per_species(formula_matrix, mass_constraints)
+        get_min_log_elemental_abundance_per_species(fp.formula_matrix, tp.mass_constraints)
         - log_volume
-        + jnp.log(fixed_parameters.tau)
+        + jnp.log(fp.tau)
     )
     # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
     stability_residual: Array = log_number_density + log_stability - log_min_number_density
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
     # Mask stability residuals for species that do not require stability calculations
-    stability_residual = stability_residual * stability_species_mask
+    stability_residual = stability_residual * fp.stability_species_mask
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
     residual = jnp.concatenate([residual, stability_residual])
     # jax.debug.print("residual (with nans) = {out}", out=residual)
