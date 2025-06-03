@@ -25,7 +25,6 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
 from jaxtyping import Array, ArrayLike, Integer
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
@@ -209,7 +208,6 @@ class InteriorAtmosphere:
         """
         formula_matrix: NumpyArrayInt = self.get_formula_matrix()
         reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
-        reaction_stability_matrix: NumpyArrayFloat = self.get_reaction_stability_matrix()
         gas_species_mask: Array = self.species.get_gas_species_mask()
         stability_species_mask: Array = self.species.get_stability_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
@@ -219,7 +217,6 @@ class InteriorAtmosphere:
             species=self.species,
             formula_matrix=jnp.asarray(formula_matrix),
             reaction_matrix=jnp.asarray(reaction_matrix),
-            reaction_stability_matrix=jnp.asarray(reaction_stability_matrix),
             stability_species_mask=stability_species_mask,
             gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
@@ -291,29 +288,6 @@ class InteriorAtmosphere:
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
-
-    # TODO: Can possibly be removed and this calculation using stability_species_mask occurs
-    # directly in the objective function
-    def get_reaction_stability_matrix(self) -> NumpyArrayFloat:
-        """Gets the reaction stability matrix.
-
-        Returns:
-            Reaction stability matrix
-        """
-        reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
-        mask: npt.NDArray[np.bool_] = np.zeros_like(reaction_matrix, dtype=bool)
-
-        if reaction_matrix.size > 0:
-            # Find the species to solve for stability
-            stability_bool: Array = self.species.get_stability_species_mask()
-            mask[:, stability_bool] = True
-            reaction_stability_matrix: NumpyArrayFloat = reaction_matrix * mask
-        else:
-            reaction_stability_matrix = reaction_matrix
-
-        logger.debug("reaction_stability_matrix = %s", reaction_stability_matrix)
-
-        return reaction_stability_matrix
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.

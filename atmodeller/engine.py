@@ -278,7 +278,13 @@ def objective_function(
             fp.reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
         )
         # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
-        reaction_residual = reaction_residual - fp.reaction_stability_matrix.dot(
+        reaction_stability_mask: Array = jnp.broadcast_to(
+            fp.stability_species_mask, fp.reaction_matrix.shape
+        )
+        reaction_stability_matrix: Array = fp.reaction_matrix * reaction_stability_mask
+        # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix)
+
+        reaction_residual = reaction_residual - reaction_stability_matrix.dot(
             safe_exp(log_stability)
         )
         # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)

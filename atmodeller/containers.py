@@ -706,7 +706,6 @@ class FixedParameters(eqx.Module):
         species: Collection of species
         formula_matrix; Formula matrix
         reaction_matrix: Reaction matrix
-        reaction_stability_matrix: Reaction stability matrix
         stability_species_mask: Mask of species to solve for stability
         gas_species_mask: Mask of gas species
         diatomic_oxygen_index: Index of diatomic oxygen
@@ -718,10 +717,9 @@ class FixedParameters(eqx.Module):
     """Collection of species"""
     formula_matrix: Integer[Array, "el_dim species_dim"]
     """Formula matrix"""
-    reaction_matrix: Float64[Array, "..."]  # TODO: Currently breaks with "react_dim species_dim"
+    # TODO: Currently breaks with "react_dim species_dim" because reaction_matrix might be empty.
+    reaction_matrix: Float64[Array, "..."]
     """Reaction matrix"""
-    reaction_stability_matrix: Float64[Array, "..."]  # TODO: reinstate react_dim species_dim"]
-    """Reaction stability matrix"""
     stability_species_mask: Array
     """Mask of species to solve for stability"""
     gas_species_mask: Array
