@@ -22,5 +22,7 @@ import optimistix as optx
 
 OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
 
-NumpyArrayFloat = npt.NDArray[np.float64]
-NumpyArrayInt = npt.NDArray[np.int_]
+NpArray = npt.NDArray
+NpBool = npt.NDArray[np.bool_]
+NpFloat = npt.NDArray[np.float64]
+NpInt = npt.NDArray[np.int_]

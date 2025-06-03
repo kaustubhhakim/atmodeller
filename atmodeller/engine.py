@@ -45,7 +45,7 @@ from atmodeller.utilities import (
 
 
 @eqx.filter_jit
-@eqx.debug.assert_max_traces(max_traces=3)
+# @eqx.debug.assert_max_traces(max_traces=3)
 def solve(
     solution_array: Float[Array, " sol_dim"],
     traced_parameters: TracedParameters,

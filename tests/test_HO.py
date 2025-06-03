@@ -26,14 +26,14 @@ from atmodeller import __version__, debug_logger
 from atmodeller.classes import InteriorAtmosphere
 from atmodeller.containers import ConstantFugacityConstraint, Planet, Species, SpeciesCollection
 from atmodeller.interfaces import FugacityConstraintProtocol, SolubilityProtocol
-from atmodeller.mytypes import NumpyArrayFloat
+from atmodeller.mytypes import NpFloat
 from atmodeller.output import Output
 from atmodeller.solubility import get_solubility_models
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import earth_oceans_to_hydrogen_mass
 
 logger: logging.Logger = debug_logger()
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 RTOL: float = 1.0e-6
 """Relative tolerance"""
@@ -172,7 +172,7 @@ def test_H_fO2_batch_temperature(helper) -> None:
     """Tests H2-H2O at the IW buffer with H2O solubility for a range of surface temperatures."""
 
     # Number of surface temperatures is different to number of species to test array shapes work.
-    surface_temperatures: NumpyArrayFloat = np.array([1500, 2000, 2500, 3000])
+    surface_temperatures: NpFloat = np.array([1500, 2000, 2500, 3000])
     planet: Planet = Planet(surface_temperature=surface_temperatures)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(),
@@ -226,7 +226,7 @@ def test_H_fO2_batch_fO2_shift(helper) -> None:
     planet: Planet = Planet()
     # Set up a range of fO2 shifts
     num: int = 4
-    fO2_shifts: NumpyArrayFloat = np.linspace(-10, 10, num, dtype=np.float64)
+    fO2_shifts: NpFloat = np.linspace(-10, 10, num, dtype=np.float64)
     fugacity_constraints: dict[str, FugacityConstraintProtocol] = {
         "O2_g": IronWustiteBuffer(fO2_shifts),
     }

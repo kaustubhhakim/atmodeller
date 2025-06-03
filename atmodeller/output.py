@@ -57,7 +57,7 @@ from atmodeller.engine import (
     objective_function,
 )
 from atmodeller.interfaces import RedoxBufferProtocol
-from atmodeller.mytypes import NumpyArrayInt
+from atmodeller.mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion, vmap_axes_spec
 
@@ -89,50 +89,50 @@ class Output:
     ):
         logger.debug("Creating Output")
         self._species: SpeciesCollection = species
-        self._solution: npt.NDArray = np.asarray(solution)
-        self._solver_status: npt.NDArray = np.asarray(solver_status)
-        self._solver_steps: npt.NDArray = np.asarray(solver_steps)
+        self._solution: NpFloat = np.asarray(solution)
+        self._solver_status: NpBool = np.asarray(solver_status)
+        self._solver_steps: NpInt = np.asarray(solver_steps)
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
         self._solver_parameters: SolverParameters = solver_parameters
 
         log_number_density, log_stability = np.split(self._solution, 2, axis=1)
-        self._log_number_density: npt.NDArray = log_number_density
+        self._log_number_density: NpFloat = log_number_density
         # Mask stabilities that are not solved
-        self._log_stability: npt.NDArray = np.where(
+        self._log_stability: NpFloat = np.where(
             fixed_parameters.stability_species_mask, log_stability, np.nan
         )
         # Caching output to avoid recomputation
-        self._cached_dict: dict[str, dict[str, npt.NDArray]] | None = None
+        self._cached_dict: dict[str, dict[str, NpArray]] | None = None
         self._cached_dataframes: dict[str, pd.DataFrame] | None = None
 
     @property
-    def formula_matrix(self) -> NumpyArrayInt:
+    def formula_matrix(self) -> NpInt:
         """Formula matrix"""
         return np.asarray(self._fixed_parameters.formula_matrix)
 
     @property
-    def condensed_species_mask(self) -> npt.NDArray:
+    def condensed_species_mask(self) -> NpBool:
         """Mask of condensed species"""
         return np.invert(self._fixed_parameters.gas_species_mask)
 
     @property
-    def gas_species_mask(self) -> npt.NDArray:
+    def gas_species_mask(self) -> NpBool:
         """Mask of gas species"""
         return np.asarray(self._fixed_parameters.gas_species_mask)
 
     @property
-    def log_number_density(self) -> npt.NDArray:
+    def log_number_density(self) -> NpFloat:
         """Log number density"""
         return self._log_number_density
 
     @property
-    def log_stability(self) -> npt.NDArray:
+    def log_stability(self) -> NpFloat:
         """Log stability of relevant species"""
         return self._log_stability
 
     @property
-    def molar_mass(self) -> npt.NDArray:
+    def molar_mass(self) -> NpFloat:
         """Molar mass of all species"""
         return np.asarray(self._fixed_parameters.molar_masses)
 
@@ -147,16 +147,16 @@ class Output:
         return self._traced_parameters.planet
 
     @property
-    def stability_species_mask(self) -> npt.NDArray:
+    def stability_species_mask(self) -> NpBool:
         """Stability species mask"""
         return np.asarray(self._species.get_stability_species_mask())
 
     @property
-    def temperature(self) -> npt.NDArray:
+    def temperature(self) -> NpFloat:
         """Temperature"""
         return np.asarray(self.planet.temperature)
 
-    def activity(self) -> npt.NDArray:
+    def activity(self) -> NpFloat:
         """Gets the activity of all species
 
         Returns:
@@ -164,7 +164,7 @@ class Output:
         """
         return np.exp(self.log_activity())
 
-    def activity_without_stability(self) -> npt.NDArray:
+    def activity_without_stability(self) -> NpFloat:
         """Gets the activity without stability of all species
 
         Returns:
@@ -172,7 +172,7 @@ class Output:
         """
         return np.exp(self.log_activity_without_stability())
 
-    def asdict(self) -> dict[str, dict[str, npt.NDArray]]:
+    def asdict(self) -> dict[str, dict[str, NpArray]]:
         """All output in a dictionary, with caching.
 
         Returns:
@@ -184,28 +184,28 @@ class Output:
 
         logger.info("Computing asdict output")
 
-        out: dict[str, dict[str, npt.NDArray]] = {}
+        out: dict[str, dict[str, NpArray]] = {}
 
         # These are required for condensed and gas species
-        molar_mass: npt.NDArray = self.species_molar_mass_expanded()
-        number_density: npt.NDArray = self.number_density()
-        activity: npt.NDArray = self.activity()
+        molar_mass: NpFloat = self.species_molar_mass_expanded()
+        number_density: NpFloat = self.number_density()
+        activity: NpFloat = self.activity()
 
         out |= self.gas_species_asdict(molar_mass, number_density, activity)
         out |= self.condensed_species_asdict(molar_mass, number_density, activity)
         out |= self.elements_asdict()
 
-        out["planet"] = expand_dict(self.planet.asdict(), self.number_solutions)
+        out["planet"] = broadcast_arrays_in_dict(self.planet.asdict(), self.number_solutions)
         out["atmosphere"] = self.atmosphere_asdict()
         # Temperature and pressure have already been expanded to the number of solutions
-        temperature: npt.NDArray = out["planet"]["surface_temperature"]
-        pressure: npt.NDArray = out["atmosphere"]["pressure"]
+        temperature: NpFloat = out["planet"]["surface_temperature"]
+        pressure: NpFloat = out["atmosphere"]["pressure"]
         # Convenient to also attach temperature to the atmosphere output
         out["atmosphere"]["temperature"] = temperature
         out["raw_solution"] = self.raw_solution_asdict()
 
         out["constraints"] = {}
-        out["constraints"] |= expand_dict(
+        out["constraints"] |= broadcast_arrays_in_dict(
             self._traced_parameters.mass_constraints.asdict(), self.number_solutions
         )
 
@@ -218,16 +218,16 @@ class Output:
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
-            log10_fugacity: npt.NDArray = np.log10(out["O2_g"]["fugacity"])
+            log10_fugacity: NpFloat = np.log10(out["O2_g"]["fugacity"])
             buffer: RedoxBufferProtocol = IronWustiteBuffer()
             # Shift at 1 bar
-            buffer_at_one_bar: npt.NDArray = np.asarray(buffer.log10_fugacity(temperature, 1.0))
-            log10_shift_at_one_bar: npt.NDArray = log10_fugacity - buffer_at_one_bar
+            buffer_at_one_bar: NpFloat = np.asarray(buffer.log10_fugacity(temperature, 1.0))
+            log10_shift_at_one_bar: NpFloat = log10_fugacity - buffer_at_one_bar
             logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
             out["O2_g"]["log10dIW_1_bar"] = log10_shift_at_one_bar
             # Shift at actual pressure
-            buffer_at_P: npt.NDArray = np.asarray(buffer.log10_fugacity(temperature, pressure))
-            log10_shift_at_P: npt.NDArray = log10_fugacity - buffer_at_P
+            buffer_at_P: NpFloat = np.asarray(buffer.log10_fugacity(temperature, pressure))
+            log10_shift_at_P: NpFloat = log10_fugacity - buffer_at_P
             logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
@@ -253,24 +253,24 @@ class Output:
 
         return out
 
-    def atmosphere_asdict(self) -> dict[str, npt.NDArray]:
+    def atmosphere_asdict(self) -> dict[str, NpArray]:
         """Gets the atmosphere properties
 
         Returns:
             Atmosphere properties
         """
-        out: dict[str, npt.NDArray] = {}
+        out: dict[str, NpArray] = {}
 
         log_number_density_from_log_pressure_func: Callable = eqx.filter_vmap(
             get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap_axes())
         )
-        log_number_density: npt.NDArray = log_number_density_from_log_pressure_func(
+        log_number_density: NpArray = log_number_density_from_log_pressure_func(
             np.log(self.total_pressure()), self.temperature
         )
         # Must be 2-D to align arrays for computing number-density-related quantities
-        number_density: npt.NDArray = np.exp(log_number_density)[:, np.newaxis]
-        molar_mass: npt.NDArray = self.atmosphere_molar_mass()[:, np.newaxis]
-        out: dict[str, npt.NDArray] = self._get_number_density_output(
+        number_density: NpArray = np.exp(log_number_density)[:, np.newaxis]
+        molar_mass: NpArray = self.atmosphere_molar_mass()[:, np.newaxis]
+        out: dict[str, NpArray] = self._get_number_density_output(
             number_density, molar_mass, "species_"
         )
         # Species mass is simply mass, so rename for clarity
@@ -288,7 +288,7 @@ class Output:
 
         return out
 
-    def atmosphere_log_molar_mass(self) -> npt.NDArray:
+    def atmosphere_log_molar_mass(self) -> NpFloat:
         """Gets log molar mass of the atmosphere
 
         Returns:
@@ -303,7 +303,7 @@ class Output:
 
         return np.asarray(atmosphere_log_molar_mass)
 
-    def atmosphere_molar_mass(self) -> npt.NDArray:
+    def atmosphere_molar_mass(self) -> NpArray:
         """Gets the molar mass of the atmosphere
 
         Returns:
@@ -311,7 +311,7 @@ class Output:
         """
         return np.exp(self.atmosphere_log_molar_mass())
 
-    def atmosphere_log_volume(self) -> npt.NDArray:
+    def atmosphere_log_volume(self) -> NpFloat:
         """Gets the log volume of the atmosphere
 
         Returns:
@@ -333,7 +333,7 @@ class Output:
 
         return np.asarray(atmosphere_log_volume)
 
-    def atmosphere_volume(self) -> npt.NDArray:
+    def atmosphere_volume(self) -> NpFloat:
         """Gets the volume of the atmosphere
 
         Returns:
@@ -341,7 +341,7 @@ class Output:
         """
         return np.exp(self.atmosphere_log_volume())
 
-    def total_pressure(self) -> npt.NDArray:
+    def total_pressure(self) -> NpFloat:
         """Gets total pressure
 
         Returns:
@@ -358,10 +358,10 @@ class Output:
 
     def condensed_species_asdict(
         self,
-        molar_mass: npt.NDArray,
-        number_density: npt.NDArray,
-        activity: npt.NDArray,
-    ) -> dict[str, dict[str, npt.NDArray]]:
+        molar_mass: NpArray,
+        number_density: NpArray,
+        activity: NpArray,
+    ) -> dict[str, dict[str, NpArray]]:
         """Gets the condensed species output as a dictionary
 
         Args:
@@ -378,32 +378,32 @@ class Output:
 
         condensed_species: tuple[str, ...] = self._species.get_condensed_species_names()
 
-        out: dict[str, npt.NDArray] = self._get_number_density_output(
+        out: dict[str, NpArray] = self._get_number_density_output(
             number_density, molar_mass, "total_"
         )
         out["molar_mass"] = molar_mass
         out["activity"] = activity
 
-        split_dict: list[dict[str, npt.NDArray]] = split_dict_by_columns(out)
-        species_out: dict[str, dict[str, npt.NDArray]] = {
+        split_dict: list[dict[str, NpArray]] = split_dict_by_columns(out)
+        species_out: dict[str, dict[str, NpArray]] = {
             species_name: split_dict[ii] for ii, species_name in enumerate(condensed_species)
         }
 
         return species_out
 
-    def elements_asdict(self) -> dict[str, dict[str, npt.NDArray]]:
+    def elements_asdict(self) -> dict[str, dict[str, NpArray]]:
         """Gets the element properties as a dictionary
 
         Returns:
             Element outputs as a dictionary
         """
-        molar_mass: npt.NDArray = self.element_molar_mass_expanded()
-        atmosphere: npt.NDArray = self.element_density_gas()
-        condensed: npt.NDArray = self.element_density_condensed()
-        dissolved: npt.NDArray = self.element_density_dissolved()
-        total: npt.NDArray = atmosphere + condensed + dissolved
+        molar_mass: NpArray = self.element_molar_mass_expanded()
+        atmosphere: NpArray = self.element_density_gas()
+        condensed: NpArray = self.element_density_condensed()
+        dissolved: NpArray = self.element_density_dissolved()
+        total: NpArray = atmosphere + condensed + dissolved
 
-        out: dict[str, npt.NDArray] = self._get_number_density_output(
+        out: dict[str, NpArray] = self._get_number_density_output(
             atmosphere, molar_mass, "atmosphere_"
         )
         out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
@@ -423,24 +423,24 @@ class Output:
         unique_elements: tuple[str, ...] = self._species.get_unique_elements_in_species()
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
-            H_total_moles: npt.NDArray = out["total_moles"][:, index]
+            H_total_moles: NpArray = out["total_moles"][:, index]
             out["logarithmic_abundance"] = (
                 np.log10(out["total_moles"] / H_total_moles[:, np.newaxis]) + 12
             )
 
         logger.debug("out = %s", out)
 
-        split_dict: list[dict[str, npt.NDArray]] = split_dict_by_columns(out)
+        split_dict: list[dict[str, NpArray]] = split_dict_by_columns(out)
         logger.debug("split_dict = %s", split_dict)
 
-        elements_out: dict[str, dict[str, npt.NDArray]] = {
+        elements_out: dict[str, dict[str, NpArray]] = {
             f"element_{element}": split_dict[ii] for ii, element in enumerate(unique_elements)
         }
         logger.debug("elements_out = %s", elements_out)
 
         return elements_out
 
-    def element_density_condensed(self) -> npt.NDArray:
+    def element_density_condensed(self) -> NpFloat:
         """Gets the number density of elements in the condensed phase
 
         Unlike for the objective function, we want the number density of all elements, regardless
@@ -454,7 +454,7 @@ class Output:
 
         return np.asarray(element_density)
 
-    def element_density_dissolved(self) -> npt.NDArray:
+    def element_density_dissolved(self) -> NpFloat:
         """Gets the number density of elements dissolved in melt due to species solubility
 
         Unlike for the objective function, we want the number density of all elements, regardless
@@ -478,7 +478,7 @@ class Output:
 
         return np.asarray(element_density_dissolved)
 
-    def element_density_gas(self) -> npt.NDArray:
+    def element_density_gas(self) -> NpFloat:
         """Gets the number density of elements in the gas phase
 
         Unlike for the objective function, we want the number density of all elements, regardless
@@ -492,7 +492,7 @@ class Output:
 
         return np.asarray(element_density)
 
-    def element_molar_mass_expanded(self) -> npt.NDArray:
+    def element_molar_mass_expanded(self) -> NpFloat:
         """Gets molar mass of elements
 
         Returns:
@@ -507,8 +507,8 @@ class Output:
         return np.tile(molar_mass, (self.number_solutions, 1))
 
     def _get_number_density_output(
-        self, number_density: npt.NDArray, molar_mass_expanded: npt.NDArray, prefix: str = ""
-    ) -> dict[str, npt.NDArray]:
+        self, number_density: NpArray, molar_mass_expanded: NpArray, prefix: str = ""
+    ) -> dict[str, NpArray]:
         """Gets the outputs associated with a number density
 
         Args:
@@ -519,13 +519,13 @@ class Output:
         Returns
             Dictionary of output quantities
         """
-        atmosphere_volume: npt.NDArray = self.atmosphere_volume()
+        atmosphere_volume: NpArray = self.atmosphere_volume()
         # Volume must be a column vector because it multiples all elements in the row
-        number: npt.NDArray = number_density * atmosphere_volume[:, np.newaxis]
-        moles: npt.NDArray = number / AVOGADRO
-        mass: npt.NDArray = moles * molar_mass_expanded
+        number: NpArray = number_density * atmosphere_volume[:, np.newaxis]
+        moles: NpArray = number / AVOGADRO
+        mass: NpArray = moles * molar_mass_expanded
 
-        out: dict[str, npt.NDArray] = {}
+        out: dict[str, NpArray] = {}
         out[f"{prefix}number_density"] = number_density
         out[f"{prefix}number"] = number
         out[f"{prefix}moles"] = moles
@@ -535,10 +535,10 @@ class Output:
 
     def gas_species_asdict(
         self,
-        molar_mass: npt.NDArray,
-        number_density: npt.NDArray,
-        activity: npt.NDArray,
-    ) -> dict[str, dict[str, npt.NDArray]]:
+        molar_mass: NpArray,
+        number_density: NpArray,
+        activity: NpArray,
+    ) -> dict[str, dict[str, NpArray]]:
         """Gets the gas species output as a dictionary
 
         Args:
@@ -553,15 +553,15 @@ class Output:
         molar_mass = molar_mass[:, self.gas_species_mask]
         number_density = number_density[:, self.gas_species_mask]
         activity = activity[:, self.gas_species_mask]
-        dissolved_number_density: npt.NDArray = self.species_density_in_melt()[
+        dissolved_number_density: NpArray = self.species_density_in_melt()[
             :, self.gas_species_mask
         ]
-        total_number_density: npt.NDArray = number_density + dissolved_number_density
-        pressure: npt.NDArray = self.pressure()[:, self.gas_species_mask]
+        total_number_density: NpArray = number_density + dissolved_number_density
+        pressure: NpArray = self.pressure()[:, self.gas_species_mask]
 
         gas_species: tuple[str, ...] = self._species.get_gas_species_names()
 
-        out: dict[str, npt.NDArray] = {}
+        out: dict[str, NpArray] = {}
         out |= self._get_number_density_output(number_density, molar_mass, "atmosphere_")
         out |= self._get_number_density_output(dissolved_number_density, molar_mass, "dissolved_")
         out |= self._get_number_density_output(total_number_density, molar_mass, "total_")
@@ -578,14 +578,14 @@ class Output:
         out["fugacity_coefficient"] = activity / pressure
         out["dissolved_ppmw"] = self.species_ppmw_in_melt()
 
-        split_dict: list[dict[str, npt.NDArray]] = split_dict_by_columns(out)
-        species_out: dict[str, dict[str, npt.NDArray]] = {
+        split_dict: list[dict[str, NpArray]] = split_dict_by_columns(out)
+        species_out: dict[str, dict[str, NpArray]] = {
             species_name: split_dict[ii] for ii, species_name in enumerate(gas_species)
         }
 
         return species_out
 
-    def log_activity(self) -> npt.NDArray:
+    def log_activity(self) -> NpFloat:
         """Gets log activity of all species.
 
         This is usually what the user wants when referring to activity because it includes a
@@ -594,8 +594,8 @@ class Output:
         Returns:
             Log activity of all species
         """
-        log_activity_without_stability: npt.NDArray = self.log_activity_without_stability()
-        log_activity_with_stability: npt.NDArray = log_activity_without_stability - np.exp(
+        log_activity_without_stability: NpFloat = self.log_activity_without_stability()
+        log_activity_with_stability: NpFloat = log_activity_without_stability - np.exp(
             self.log_stability
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
@@ -604,7 +604,7 @@ class Output:
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
-        log_activity: npt.NDArray = np.where(
+        log_activity: NpFloat = np.where(
             condition_broadcasted,
             log_activity_with_stability,
             log_activity_without_stability,
@@ -612,7 +612,7 @@ class Output:
 
         return log_activity
 
-    def log_activity_without_stability(self) -> npt.NDArray:
+    def log_activity_without_stability(self) -> NpFloat:
         """Gets log activity without stability of all species
 
         Args:
@@ -628,7 +628,7 @@ class Output:
 
         return np.asarray(log_activity)
 
-    def number_density(self) -> npt.NDArray:
+    def number_density(self) -> NpFloat:
         r"""Gets number density of all species
 
         Returns:
@@ -636,7 +636,7 @@ class Output:
         """
         return np.exp(self.log_number_density)
 
-    def species_molar_mass_expanded(self) -> npt.NDArray:
+    def species_molar_mass_expanded(self) -> NpFloat:
         r"""Gets molar mass of all species in an expanded array.
 
         Returns:
@@ -644,7 +644,7 @@ class Output:
         """
         return np.tile(self.molar_mass, (self.number_solutions, 1))
 
-    def pressure(self) -> npt.NDArray:
+    def pressure(self) -> NpFloat:
         """Gets pressure of species in bar
 
         This will compute pressure of all species, including condensates, for simplicity.
@@ -671,20 +671,20 @@ class Output:
         out: dict[str, ArrayLike] = {}
 
         for nn, species_ in enumerate(self._species):
-            pressure: npt.NDArray = self.pressure()[:, nn]
-            activity: npt.NDArray = self.activity()[:, nn]
+            pressure: NpArray = self.pressure()[:, nn]
+            activity: NpArray = self.activity()[:, nn]
             out[species_.name] = pressure
             out[f"{species_.name}_activity"] = activity
 
-        return collapse_single_entry_values(out)
+        return {key: np.squeeze(value) for key, value in out.items()}
 
-    def raw_solution_asdict(self) -> dict[str, npt.NDArray]:
+    def raw_solution_asdict(self) -> dict[str, NpArray]:
         """Gets the raw solution
 
         Returns:
             Dictionary of the raw solution
         """
-        raw_solution: dict[str, npt.NDArray] = {}
+        raw_solution: dict[str, NpArray] = {}
 
         species_names: tuple[str, ...] = self._species.get_species_names()
 
@@ -699,7 +699,7 @@ class Output:
 
         return raw_solution
 
-    def residual_asdict(self) -> dict[int, npt.NDArray]:
+    def residual_asdict(self) -> dict[int, NpFloat]:
         """Gets the residual
 
         Returns:
@@ -725,13 +725,13 @@ class Output:
             },
         )
 
-        out: dict[int, npt.NDArray] = {}
+        out: dict[int, NpArray] = {}
         for ii in range(residual.shape[1]):
             out[ii] = np.asarray(residual[:, ii])
 
         return out
 
-    def species_density_in_melt(self) -> npt.NDArray:
+    def species_density_in_melt(self) -> NpFloat:
         """Gets species number density in the melt
 
         Returns:
@@ -751,7 +751,7 @@ class Output:
 
         return np.asarray(species_density_in_melt)
 
-    def species_ppmw_in_melt(self) -> npt.NDArray:
+    def species_ppmw_in_melt(self) -> NpFloat:
         """Gets species ppmw in the melt
 
         Return:
@@ -769,7 +769,7 @@ class Output:
 
         return np.asarray(species_ppmw_in_melt)
 
-    def stability(self) -> npt.NDArray:
+    def stability(self) -> NpFloat:
         """Gets stability of relevant species
 
         Returns:
@@ -840,7 +840,7 @@ class Output:
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         # Get the indices where the successful_solves mask is False
-        unsuccessful_indices: npt.NDArray[np.int_] = np.where(
+        unsuccessful_indices: NpArray[np.int_] = np.where(
             np.array(self._solver_status) == False  # noqa: E712
         )[0]
 
@@ -878,54 +878,24 @@ class Output:
         logger.info("Output written to %s", output_file)
 
 
-def collapse_single_entry_values(input_dict: dict[str, ArrayLike]) -> dict[str, ArrayLike]:
-    """Collapses single entry values in a dictionary
-
-    Args:
-        input_dict: Input dictionary
-
-    Returns:
-        Dictionary with collapsed values
-    """
-    out: dict[str, ArrayLike] = {}
-    for key, value in input_dict.items():
-        try:
-            if value.size > 1:  # type: ignore because AttributeError dealt with
-                out[key] = np.squeeze(value)
-            else:
-                out[key] = value.item()  # type:ignore because AttributeError dealt with
-        except AttributeError:
-            out[key] = value
-
-    return out
-
-
-def expand_dict(some_dict: dict[str, npt.NDArray], expand_to_size: int) -> dict[str, npt.NDArray]:
-    """Gets a dictionary of the values with scalars expanded
+def broadcast_arrays_in_dict(some_dict: dict[str, NpArray], shape: int) -> dict[str, NpArray]:
+    """Gets a dictionary of broadcasted arrays
 
     Args:
         some_dict: Some dictionary
-        expand_to_size: Size to expand the arrays to
+        size: Shape (size) of the desired array
 
     Returns:
-        A dictionary with values expanded to `expand_to_size`
+        A dictionary with broadcasted arrays
     """
-    expanded_dict: dict[str, npt.NDArray] = {}
+    expanded_dict: dict[str, NpArray] = {}
     for key, value in some_dict.items():
-        if np.isscalar(value):
-            expanded_dict[key] = np.broadcast_to(value, expand_to_size)
-        else:
-            arr: npt.NDArray = np.asarray(value)
-            # If it's a 0-d array, broadcast; otherwise, leave as is
-            if arr.size == 1:
-                expanded_dict[key] = np.broadcast_to(arr, expand_to_size)
-            else:
-                expanded_dict[key] = arr
+        expanded_dict[key] = np.broadcast_to(value, shape)
 
     return expanded_dict
 
 
-def split_dict_by_columns(dict_to_split: dict[str, npt.NDArray]) -> list[dict[str, npt.NDArray]]:
+def split_dict_by_columns(dict_to_split: dict[str, NpArray]) -> list[dict[str, NpArray]]:
     """Splits a dictionary based on columns in the values.
 
     Args:

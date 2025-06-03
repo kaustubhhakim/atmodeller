@@ -24,13 +24,13 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
 from jax.tree_util import Partial, tree_map
 from jaxtyping import Array, ArrayLike, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
+from atmodeller.mytypes import NpArray
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
     return jnp.array(x, dtype=jnp.float64)
 
 
-def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
+def partial_rref(matrix: NpArray) -> NpArray:
     """Computes the partial reduced row echelon form to determine linear components
 
     Returns:
@@ -86,10 +86,10 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     """
     nrows, ncols = matrix.shape
 
-    augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
+    augmented_matrix: NpArray = np.hstack((matrix, np.eye(nrows)))
     # debug("augmented_matrix = \n%s", augmented_matrix)
     # Permutation matrix
-    # P: npt.NDArray = np.eye(nrows)
+    # P: NpArray = np.eye(nrows)
 
     # Forward elimination with partial pivoting
     for i in range(ncols):
@@ -115,8 +115,8 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
     # logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
-    # reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
-    component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
+    # reduced_matrix: NpArray = augmented_matrix[:, :ncols]
+    component_matrix: NpArray = augmented_matrix[ncols:, ncols:]
     # logger.debug("reduced_matrix = \n%s", reduced_matrix)
     # logger.debug("component_matrix = \n%s", component_matrix)
     # logger.debug("permutation_matrix = \n%s", P)

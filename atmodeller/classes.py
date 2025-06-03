@@ -39,7 +39,7 @@ from atmodeller.containers import (
 )
 from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
-from atmodeller.mytypes import NumpyArrayFloat, NumpyArrayInt
+from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
@@ -206,8 +206,8 @@ class InteriorAtmosphere:
         Returns:
             Fixed parameters
         """
-        formula_matrix: NumpyArrayInt = self.get_formula_matrix()
-        reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
+        formula_matrix: NpInt = self.get_formula_matrix()
+        reaction_matrix: NpFloat = self.get_reaction_matrix()
         gas_species_mask: Array = self.species.get_gas_species_mask()
         stability_species_mask: Array = self.species.get_stability_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
@@ -226,7 +226,7 @@ class InteriorAtmosphere:
 
         return fixed_parameters
 
-    def get_formula_matrix(self) -> NumpyArrayInt:
+    def get_formula_matrix(self) -> NpInt:
         """Gets the formula matrix.
 
         Elements are given in rows and species in columns following the convention in
@@ -236,7 +236,7 @@ class InteriorAtmosphere:
             Formula matrix
         """
         unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
-        formula_matrix: NumpyArrayInt = np.zeros(
+        formula_matrix: NpInt = np.zeros(
             (len(unique_elements), self.species.number), dtype=np.int_
         )
 
@@ -272,7 +272,7 @@ class InteriorAtmosphere:
 
         return tuple(sorted_elements)
 
-    def get_reaction_matrix(self) -> NumpyArrayFloat:
+    def get_reaction_matrix(self) -> NpFloat:
         """Gets the reaction matrix.
 
         Returns:
@@ -282,8 +282,8 @@ class InteriorAtmosphere:
             logger.debug("Only one species therefore no reactions")
             return np.array([])
 
-        transpose_formula_matrix: NumpyArrayInt = self.get_formula_matrix().T
-        reaction_matrix: NumpyArrayFloat = partial_rref(transpose_formula_matrix)
+        transpose_formula_matrix: NpInt = self.get_formula_matrix().T
+        reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
 
         logger.debug("reaction_matrix = %s", reaction_matrix)
 
@@ -295,7 +295,7 @@ class InteriorAtmosphere:
         Returns:
             Reactions as a dictionary
         """
-        reaction_matrix: NumpyArrayFloat = self.get_reaction_matrix()
+        reaction_matrix: NpFloat = self.get_reaction_matrix()
         reactions: dict[int, str] = {}
         if reaction_matrix.size != 0:
             for reaction_index in range(reaction_matrix.shape[0]):

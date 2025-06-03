@@ -25,7 +25,6 @@ import equinox as eqx
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
-import numpy.typing as npt
 import optimistix as optx
 from jax import lax
 from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
@@ -45,7 +44,7 @@ from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     SolubilityProtocol,
 )
-from atmodeller.mytypes import NumpyArrayFloat, OptxSolver
+from atmodeller.mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
 from atmodeller.utilities import (
@@ -386,7 +385,7 @@ class Planet(eqx.Module):
         """Temperature"""
         return self.surface_temperature
 
-    def asdict(self) -> dict[str, npt.NDArray]:
+    def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the values as NumPy arrays.
 
         Returns:
@@ -400,7 +399,7 @@ class Planet(eqx.Module):
         base_dict["surface_gravity"] = self.surface_gravity
 
         # Convert all values to NumPy arrays
-        base_dict_np: dict[str, npt.NDArray] = {k: np.asarray(v) for k, v in base_dict.items()}
+        base_dict_np: dict[str, NpArray] = {k: np.asarray(v) for k, v in base_dict.items()}
 
         return base_dict_np
 
@@ -473,7 +472,7 @@ class FugacityConstraints(eqx.Module):
         return cls(tuple(constraints), unique_species)
 
     # FIXME: Refresh for output
-    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, npt.NDArray]:
+    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, NpArray]:
         """Gets a dictionary of the evaluated fugacity constraints.
 
         `temperature` and `pressure` should have a size equal to the number of solutions, which
@@ -492,10 +491,10 @@ class FugacityConstraints(eqx.Module):
         # different array sizes
 
         # This contains evaluated fugacity constraints in columns
-        log_fugacity: npt.NDArray = np.atleast_2d(self.log_fugacity(temperature, pressure)).T
+        log_fugacity: NpArray = np.atleast_2d(self.log_fugacity(temperature, pressure)).T
 
         # Split the evaluated fugacity constraints by column
-        out: dict[str, npt.NDArray] = {
+        out: dict[str, NpArray] = {
             f"{key}_fugacity": np.exp(log_fugacity[:, idx])
             for idx, key in enumerate(self.constraints)
         }
@@ -629,9 +628,7 @@ class MassConstraints(eqx.Module):
         max_len: int = get_batch_size(mass_constraints_)
 
         # Initialise to all nans assuming that there are no mass constraints
-        log_abundance: NumpyArrayFloat = np.full(
-            (max_len, len(unique_elements)), np.nan, dtype=np.float64
-        )
+        log_abundance: NpFloat = np.full((max_len, len(unique_elements)), np.nan, dtype=np.float64)
 
         # Populate mass constraints
         for nn, element in enumerate(unique_elements):
@@ -650,14 +647,14 @@ class MassConstraints(eqx.Module):
 
         return cls(log_abundance, unique_elements)
 
-    def asdict(self) -> dict[str, npt.NDArray]:
+    def asdict(self) -> dict[str, NpArray]:
         """Gets a dictionary of the values
 
         Returns:
             A dictionary of the values
         """
-        abundance: npt.NDArray = np.exp(self.log_abundance)
-        out: dict[str, npt.NDArray] = {
+        abundance: NpArray = np.exp(self.log_abundance)
+        out: dict[str, NpArray] = {
             f"{element}_number": abundance[:, idx]
             for idx, element in enumerate(self.elements)
             if not np.all(np.isnan(abundance[:, idx]))
