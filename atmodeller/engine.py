@@ -432,7 +432,7 @@ def get_element_density(formula_matrix: Array, log_number_density: Array) -> Arr
     Returns:
         Number density of elements in the gas or condensed phase
     """
-    element_density: Array = formula_matrix.dot(safe_exp(log_number_density))
+    element_density: Array = formula_matrix @ safe_exp(log_number_density)
 
     return element_density
 
