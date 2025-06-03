@@ -471,13 +471,8 @@ class FugacityConstraints(eqx.Module):
 
         return cls(tuple(constraints), unique_species)
 
-    # FIXME: Refresh for output
     def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, NpArray]:
-        """Gets a dictionary of the evaluated fugacity constraints.
-
-        `temperature` and `pressure` should have a size equal to the number of solutions, which
-        will ensure that the returned dictionary also has the same size. For this reason there is
-        no need to vmap.
+        """Gets a dictionary of the evaluated fugacity constraints as NumPy Arrays
 
         Args:
             temperature: Temperature
@@ -486,17 +481,16 @@ class FugacityConstraints(eqx.Module):
         Returns:
             A dictionary of the evaluated fugacity constraints
         """
+        log_fugacity_list: list[NpFloat] = []
 
-        # FIXME: I think this actually requires vmap now because entries in log_fugacity could have
-        # different array sizes
+        for constraint in self.constraints:
+            log_fugacity: NpFloat = np.asarray(constraint.log_fugacity(temperature, pressure))
+            log_fugacity_list.append(log_fugacity)
 
-        # This contains evaluated fugacity constraints in columns
-        log_fugacity: NpArray = np.atleast_2d(self.log_fugacity(temperature, pressure)).T
-
-        # Split the evaluated fugacity constraints by column
         out: dict[str, NpArray] = {
-            f"{key}_fugacity": np.exp(log_fugacity[:, idx])
-            for idx, key in enumerate(self.constraints)
+            f"{key}_fugacity": np.exp(log_fugacity_list[idx])
+            for idx, key in enumerate(self.species)
+            if not np.all(np.isnan(log_fugacity_list[idx]))
         }
 
         return out
@@ -648,7 +642,7 @@ class MassConstraints(eqx.Module):
         return cls(log_abundance, unique_elements)
 
     def asdict(self) -> dict[str, NpArray]:
-        """Gets a dictionary of the values
+        """Gets a dictionary of the values as NumPy arrays
 
         Returns:
             A dictionary of the values

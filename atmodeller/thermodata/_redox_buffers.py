@@ -87,7 +87,6 @@ class RedoxBuffer(eqx.Module):
         else:
             return self.convert_pressure_units(pressure)
 
-    @override
     def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log10 fugacity
 
@@ -100,7 +99,6 @@ class RedoxBuffer(eqx.Module):
         """
         return self.log10_fugacity_buffer(temperature, pressure) + self.log10_shift
 
-    @override
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Gets the log fugacity
 

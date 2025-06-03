@@ -208,13 +208,12 @@ class Output:
         out["constraints"] |= broadcast_arrays_in_dict(
             self._traced_parameters.mass_constraints.asdict(), self.number_solutions
         )
+        out["constraints"] |= broadcast_arrays_in_dict(
+            self._traced_parameters.fugacity_constraints.asdict(temperature, pressure),
+            self.number_solutions,
+        )
 
-        # FIXME: Need to reinstate fugacity constraint output
-        # if fugacity_matrix.size > 0:
-        #     out["constraints"] |= self._traced_parameters.fugacity_constraints.asdict(
-        #         temperature, pressure
-        #     )
-        out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
+        out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
