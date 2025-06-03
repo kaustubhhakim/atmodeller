@@ -640,8 +640,8 @@ class MassConstraints(eqx.Module):
                 log_abundance[:, nn] = log_abundance_
 
         # Broadcast, which avoids JAX recompilation if mass constraints change since otherwise the
-        # stored shape (self.log_abundance) can vary between a 1-D and 2-D array, thereby forcing
-        # JAX recompilation
+        # shape of self.log_abundance can vary between a 1-D and 2-D array which forces
+        # recompilation of solve.
         log_abundance = np.broadcast_to(log_abundance, (batch_size, len(unique_elements)))
         # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
