@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import equinox as eqx
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -263,8 +264,8 @@ class Output:
         log_number_density_from_log_pressure_func: Callable = eqx.filter_vmap(
             get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap_axes())
         )
-        log_number_density: NpArray = log_number_density_from_log_pressure_func(
-            np.log(self.total_pressure()), self.temperature
+        log_number_density: Array = log_number_density_from_log_pressure_func(
+            jnp.log(self.total_pressure()), jnp.asarray(self.temperature)
         )
         # Must be 2-D to align arrays for computing number-density-related quantities
         number_density: NpArray = np.exp(log_number_density)[:, np.newaxis]
@@ -272,7 +273,7 @@ class Output:
         out: dict[str, NpArray] = self._get_number_density_output(
             number_density, molar_mass, "species_"
         )
-        # Species mass is simply mass, so rename for clarity
+        # Species mass is simply mass so rename for clarity
         out["mass"] = out.pop("species_mass")
 
         out["molar_mass"] = molar_mass
@@ -297,7 +298,7 @@ class Output:
             get_atmosphere_log_molar_mass, in_axes=(None, 0)
         )
         atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
-            self._fixed_parameters, self.log_number_density
+            self._fixed_parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(atmosphere_log_molar_mass)
@@ -326,7 +327,7 @@ class Output:
         )
         atmosphere_log_volume: Array = atmosphere_log_volume_func(
             self._fixed_parameters,
-            self.log_number_density,
+            jnp.asarray(self.log_number_density),
             self.planet,
         )
 
@@ -350,7 +351,9 @@ class Output:
             get_total_pressure, in_axes=(None, 0, self.temperature_vmap_axes())
         )
         total_pressure: Array = total_pressure_func(
-            self._fixed_parameters, self.log_number_density, self.temperature
+            self._fixed_parameters,
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.temperature),
         )
 
         return np.asarray(total_pressure)
@@ -449,7 +452,9 @@ class Output:
             Number density of elements in the condensed phase
         """
         element_density_func: Callable = eqx.filter_vmap(get_element_density, in_axes=(None, 0))
-        element_density: Array = element_density_func(self.formula_matrix, self.log_number_density)
+        element_density: Array = element_density_func(
+            jnp.asarray(self.formula_matrix), jnp.asarray(self.log_number_density)
+        )
 
         return np.asarray(element_density)
 
@@ -469,10 +474,10 @@ class Output:
         element_density_dissolved: Array = element_density_dissolved_func(
             self._traced_parameters,
             self._fixed_parameters,
-            self._fixed_parameters.formula_matrix,
-            self.log_number_density,
-            self.log_activity(),
-            self.atmosphere_log_volume(),
+            jnp.asarray(self._fixed_parameters.formula_matrix),
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.log_activity()),
+            jnp.asarray(self.atmosphere_log_volume()),
         )
 
         return np.asarray(element_density_dissolved)
@@ -487,7 +492,9 @@ class Output:
             Number density of elements in the gas phase
         """
         element_density_func: Callable = eqx.filter_vmap(get_element_density, in_axes=(None, 0))
-        element_density: Array = element_density_func(self.formula_matrix, self.log_number_density)
+        element_density: Array = element_density_func(
+            jnp.asarray(self.formula_matrix), jnp.asarray(self.log_number_density)
+        )
 
         return np.asarray(element_density)
 
@@ -622,7 +629,7 @@ class Output:
             in_axes=(self.traced_parameters_vmap_axes(), None, 0),
         )
         log_activity: Array = log_activity_func(
-            self._traced_parameters, self._fixed_parameters, self.log_number_density
+            self._traced_parameters, self._fixed_parameters, jnp.asarray(self.log_number_density)
         )
 
         return np.asarray(log_activity)
@@ -654,7 +661,9 @@ class Output:
         pressure_func: Callable = eqx.filter_vmap(
             get_pressure_from_log_number_density, in_axes=(0, self.temperature_vmap_axes())
         )
-        pressure: Array = pressure_func(self.log_number_density, self.temperature)
+        pressure: Array = pressure_func(
+            jnp.asarray(self.log_number_density), jnp.asarray(self.temperature)
+        )
 
         return np.asarray(pressure)
 
@@ -743,9 +752,9 @@ class Output:
         species_density_in_melt: Array = species_density_in_melt_func(
             self._traced_parameters,
             self._fixed_parameters,
-            self.log_number_density,
-            self.log_activity(),
-            self.atmosphere_log_volume(),
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.log_activity()),
+            jnp.asarray(self.atmosphere_log_volume()),
         )
 
         return np.asarray(species_density_in_melt)
@@ -762,8 +771,8 @@ class Output:
         species_ppmw_in_melt: Array = species_ppmw_in_melt_func(
             self._traced_parameters,
             self._fixed_parameters,
-            self.log_number_density,
-            self.log_activity(),
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.log_activity()),
         )
 
         return np.asarray(species_ppmw_in_melt)
