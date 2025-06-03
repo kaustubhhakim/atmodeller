@@ -63,7 +63,6 @@ class Solubility(eqx.Module):
             Concentration in ppmw
         """
 
-    @eqx.filter_jit
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> Array:
@@ -85,7 +84,6 @@ class NoSolubility(Solubility):
     """No solubility"""
 
     @override
-    @eqx.filter_jit
     def concentration(
         self,
         fugacity: ArrayLike,
@@ -116,7 +114,6 @@ class SolubilityPowerLaw(Solubility):
     """Exponent"""
 
     @override
-    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> ArrayLike:
         del args
         del kwargs
@@ -139,14 +136,12 @@ class SolubilityPowerLawLog10(Solubility):
     """Log10 exponent"""
 
     @override
-    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
         del kwargs
 
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))
 
 
-@eqx.filter_jit
 def fO2_temperature_correction(
     fO2: ArrayLike,
     *,

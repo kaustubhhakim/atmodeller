@@ -45,7 +45,7 @@ from atmodeller.utilities import (
 
 
 @eqx.filter_jit
-# @eqx.debug.assert_max_traces(max_traces=2)
+@eqx.debug.assert_max_traces(max_traces=3)
 def solve(
     solution_array: Float[Array, " sol_dim"],
     traced_parameters: TracedParameters,
@@ -188,7 +188,6 @@ def repeat_solver(
     return final_i, final_solution, final_status, final_steps
 
 
-@eqx.filter_jit
 def get_min_log_elemental_abundance_per_species(
     formula_matrix: Integer[Array, "el_dim species_dim"], mass_constraints: MassConstraints
 ) -> Float64[Array, " species_dim"]:
@@ -225,7 +224,6 @@ def get_min_log_elemental_abundance_per_species(
     return min_abundance_per_species
 
 
-@eqx.filter_jit
 def objective_function(
     solution: Float64[Array, " sol_dim"], kwargs: dict
 ) -> Float64[Array, " res_dim"]:
@@ -347,7 +345,6 @@ def objective_function(
     return residual
 
 
-@eqx.filter_jit
 def get_atmosphere_log_molar_mass(
     fixed_parameters: FixedParameters, log_number_density: Array
 ) -> Array:
@@ -372,7 +369,6 @@ def get_atmosphere_log_molar_mass(
     return molar_mass
 
 
-@eqx.filter_jit
 def get_atmosphere_log_volume(
     fixed_parameters: FixedParameters,
     log_number_density: Array,
@@ -399,7 +395,6 @@ def get_atmosphere_log_volume(
     return log_volume
 
 
-@eqx.filter_jit
 def get_total_pressure(
     fixed_parameters: FixedParameters, log_number_density: Array, temperature: ArrayLike
 ) -> Array:
@@ -421,7 +416,6 @@ def get_total_pressure(
     return jnp.sum(gas_pressure)
 
 
-@eqx.filter_jit
 def get_element_density(formula_matrix: Array, log_number_density: Array) -> Array:
     """Number density of elements in the gas or condensed phase
 
@@ -437,7 +431,6 @@ def get_element_density(formula_matrix: Array, log_number_density: Array) -> Arr
     return element_density
 
 
-@eqx.filter_jit
 def get_element_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
@@ -471,7 +464,6 @@ def get_element_density_in_melt(
     return element_melt_density
 
 
-@eqx.filter_jit
 def get_gas_species_data(fixed_parameters: FixedParameters, some_array: ArrayLike) -> Array:
     """Masks the gas species data from an array
 
@@ -487,7 +479,6 @@ def get_gas_species_data(fixed_parameters: FixedParameters, some_array: ArrayLik
     return gas_data
 
 
-@eqx.filter_jit
 def get_log_activity(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
@@ -533,7 +524,6 @@ def get_log_activity(
     return log_activity
 
 
-@eqx.filter_jit
 def get_log_activity_ideal_mixing(
     fixed_parameters: FixedParameters,
     log_number_density: Array,
@@ -564,7 +554,6 @@ def get_log_activity_ideal_mixing(
     return log_activity
 
 
-@eqx.filter_jit
 def get_log_pressure_from_log_number_density(
     log_number_density: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -584,7 +573,6 @@ def get_log_pressure_from_log_number_density(
     return log_pressure
 
 
-@eqx.filter_jit
 def get_log_Kp(
     species: SpeciesCollection, reaction_matrix: Array, temperature: ArrayLike
 ) -> Array:
@@ -609,7 +597,6 @@ def get_log_Kp(
     return log_Kp
 
 
-@eqx.filter_jit
 def get_log_reaction_equilibrium_constant(
     fixed_parameters: FixedParameters,
     temperature: ArrayLike,
@@ -635,7 +622,6 @@ def get_log_reaction_equilibrium_constant(
     return log_Kc
 
 
-@eqx.filter_jit
 def get_pressure_from_log_number_density(
     log_number_density: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -651,7 +637,6 @@ def get_pressure_from_log_number_density(
     return safe_exp(get_log_pressure_from_log_number_density(log_number_density, temperature))
 
 
-@eqx.filter_jit
 def get_species_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
@@ -690,7 +675,6 @@ def get_species_density_in_melt(
     return species_melt_density
 
 
-@eqx.filter_jit
 def get_species_ppmw_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,

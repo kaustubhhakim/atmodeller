@@ -137,7 +137,7 @@ class InteriorAtmosphere:
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
         # Initial solution must be broadcast since it is always batched
-        in_axes: Any = vmap_axes_spec(traced_parameters_)
+        in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
         # First solution attempt
