@@ -229,6 +229,14 @@ def objective_function(
 ) -> Float64[Array, " res_dim"]:
     """Objective function
 
+    The order of the residual does make a difference to the solution process. More investigations
+    are necessary, but justification for the current ordering is as follows:
+
+        1. Reaction constraints - log-linear, physics-based coupling
+        2. Fugacity constraints - fixed target, well conditioned
+        3. Mass balance constraints - stiffer, often depends on volume or melt buffers
+        4. Stability constraints - soft, conditional, easy to push last
+
     Args:
         solution: Solution array for all species i.e. log number density and log stability
         kwargs: Dictionary of pytrees required to compute the residual
@@ -266,7 +274,15 @@ def objective_function(
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
-    residual: Float64[Array, " sol_dim"] = jnp.array([], dtype=jnp.float64)
+    # NOTE: Order of entries in the residual must correlate with the final jnp.take operation
+    residual: Float64[Array, " res_dim"] = jnp.array([], dtype=jnp.float64)
+
+    # # Fugacity constraints residual
+    # fugacity_residual = log_activity_number_density - tp.fugacity_constraints.log_number_density(
+    #     temperature, total_pressure
+    # )
+    # # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+    # residual = jnp.concatenate([residual, fugacity_residual])
 
     # Reaction network residual
     # TODO: Is it possible to remove this if statement?
@@ -274,6 +290,9 @@ def objective_function(
         log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
             fp, temperature
         )
+        # jax.debug.print(
+        #     "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
+        # )
         reaction_residual: Array = (
             fp.reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
         )
@@ -344,8 +363,12 @@ def objective_function(
     residual = jnp.concatenate([residual, stability_residual])
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 
-    # nans denote unused conditions that should now be zeroed
-    residual = jnp.where(jnp.isnan(residual), 0.0, residual)
+    # nans denote unused conditions that should not be returned
+    # Note also that exact zeros should never be used for padding since this would make the
+    # Jacobian rank deficient. Something like block-augmented regularisation would be required to
+    # pad the residual array to a fixed size if required or desired.
+    # residual = jnp.where(jnp.isnan(residual), 0.0, residual)
+    residual = jnp.take(residual, indices=tp.active_indices)  # type: ignore
     # jax.debug.print("residual = {out}", out=residual)
 
     return residual

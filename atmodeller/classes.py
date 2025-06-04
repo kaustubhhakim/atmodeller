@@ -25,7 +25,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, ArrayLike, Integer
+from jaxtyping import Array, ArrayLike, Bool, Integer
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
 from atmodeller.containers import (
@@ -41,7 +41,7 @@ from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
-from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
+from atmodeller.utilities import get_batch_size, partial_rref
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -96,20 +96,32 @@ class InteriorAtmosphere:
         planet_: Planet = Planet() if planet is None else planet
 
         batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
-        # jax.debug.print("batch_size = {out}", out=batch_size)
 
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
             self.species, fugacity_constraints
         )
-        # Mass constraints are always broadcast to avoid JAX recompilation
         mass_constraints_: MassConstraints = MassConstraints.create(
             self.species, mass_constraints, batch_size
         )
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
+
+        # Determine active entries in the residual
+        active: Bool[Array, " res_dim"] = jnp.concatenate(
+            (
+                jnp.ones(fixed_parameters_.reaction_matrix.shape[0], dtype=bool),
+                fugacity_constraints_.active(),
+                mass_constraints_.active(),
+                fixed_parameters_.stability_species_mask,
+            )
+        )
+        # jax.debug.print("active = {out}", out=active)
+        active_indices: Integer[Array, "..."] = jnp.where(active)[0]
+        # jax.debug.print("active_indices = {out}", out=active_indices)
+
         traced_parameters_: TracedParameters = TracedParameters(
-            planet_, fugacity_constraints_, mass_constraints_
+            planet_, fugacity_constraints_, mass_constraints_, active_indices
         )
 
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
         solver_parameters_: SolverParameters = (
             SolverParameters() if solver_parameters is None else solver_parameters
         )
@@ -136,7 +148,8 @@ class InteriorAtmosphere:
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
         # Initial solution must be broadcast since it is always batched
-        in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
+        in_axes: TracedParameters = traced_parameters_.vmap_axes()
+
         self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
 
         # First solution attempt
@@ -261,7 +274,7 @@ class InteriorAtmosphere:
         """
         if self.species.number == 1:
             logger.debug("Only one species therefore no reactions")
-            return np.array([])
+            return np.array([], dtype=np.float64)
 
         transpose_formula_matrix: NpInt = self.get_formula_matrix().T
         reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)

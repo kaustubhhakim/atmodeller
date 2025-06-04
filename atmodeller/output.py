@@ -797,7 +797,7 @@ class Output:
 
     def traced_parameters_vmap_axes(self) -> TracedParameters:
         """Gets vmap axes for traced parameters"""
-        return vmap_axes_spec(self._traced_parameters)
+        return self._traced_parameters.vmap_axes()
 
     def _drop_unsuccessful_solves(
         self, dataframes: dict[str, pd.DataFrame]

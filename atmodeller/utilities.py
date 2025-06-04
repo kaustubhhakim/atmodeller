@@ -56,7 +56,7 @@ def get_log_number_density_from_log_pressure(
 
 def all_not_nan(x: ArrayLike) -> Bool[Array, "..."]:
     """Returns True if all entries or columns are not nan, otherwise False"""
-    return ~jnp.any(jnp.isnan(x), axis=0)
+    return ~jnp.any(jnp.isnan(jnp.atleast_1d(x)), axis=0)
 
 
 def safe_exp(x: ArrayLike) -> Array:
@@ -235,11 +235,8 @@ def is_arraylike_batched(x: Any) -> Literal[0, None]:
     Returns:
         0 (axis) if batched, else None (not batched)
     """
-    if eqx.is_array(x):
-        if x.ndim == 0:
-            return None
-        else:
-            return 0
+    if eqx.is_array(x) and x.ndim > 0:
+        return 0
     else:
         return None
 

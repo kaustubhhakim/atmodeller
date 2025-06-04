@@ -54,6 +54,7 @@ from atmodeller.utilities import (
     get_log_number_density_from_log_pressure,
     to_hashable,
     unit_conversion,
+    vmap_axes_spec,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -159,6 +160,18 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
+    def active(self) -> Bool[Array, " species_dim"]:
+        """Active species stability
+
+        Returns:
+            True for species stabilities that are to be solved for, otherwise False
+        """
+        mask: Bool[Array, " species_dim"] = jnp.array(
+            [species.solve_for_stability for species in self.data], dtype=bool
+        )
+
+        return mask
+
     def get_condensed_species_names(self) -> tuple[str, ...]:
         """Condensed species names
 
@@ -196,7 +209,7 @@ class SpeciesCollection(eqx.Module):
             Mask for the gas species
         """
         gas_species_mask: Bool[Array, " species_dim"] = jnp.array(
-            [species.data.phase == "g" for species in self.data], dtype=jnp.bool_
+            [species.data.phase == "g" for species in self.data], dtype=bool
         )
 
         return gas_species_mask
@@ -256,11 +269,7 @@ class SpeciesCollection(eqx.Module):
         Returns:
             Mask for the species to solve for the stability
         """
-        stability_bool: Array = jnp.array(
-            [species.solve_for_stability for species in self.data], dtype=jnp.bool_
-        )
-
-        return stability_bool
+        return self.active()
 
     def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements.
@@ -418,7 +427,11 @@ class ConstantFugacityConstraint(eqx.Module):
     """Fugacity"""
 
     def active(self) -> Bool[Array, ""]:
-        """True if the fugacity constraint is active, otherwise False"""
+        """Is the fugacity constraint active.
+
+        Returns:
+            True if the fugacity constraint is active, otherwise False
+        """
         return all_not_nan(self.fugacity)
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
@@ -480,7 +493,7 @@ class FugacityConstraints(eqx.Module):
         """Active fugacity constraints
 
         Returns:
-            Mask indicating whether fugacity constraints are active or not.
+            Mask indicating whether fugacity constraints are active or not
         """
         mask: list[Array] = [
             jnp.atleast_1d(constraint.active()) for constraint in self.constraints
@@ -677,7 +690,7 @@ class MassConstraints(eqx.Module):
         """Active mass constraints
 
         Returns:
-            Mask indicating whether elemental mass constraints are active or not.
+            Mask indicating whether elemental mass constraints are active or not
         """
         return all_not_nan(self.log_abundance)
 
@@ -713,6 +726,24 @@ class TracedParameters(eqx.Module):
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
+    active_indices: Integer[Array, " res_dim"] | None
+
+    def vmap_axes(self) -> "TracedParameters":
+        """Vmap axes
+
+        NOTE: `active_indices` should never be batched over, which demands this custom method for
+        dealing with vmap. It is nevertheless traced, which is why it makes sense to include
+        `active_indices` in this container.
+
+        Returns:
+            Vmap axes
+        """
+        return TracedParameters(
+            vmap_axes_spec(self.planet),
+            vmap_axes_spec(self.fugacity_constraints),
+            vmap_axes_spec(self.mass_constraints),
+            None,
+        )
 
 
 class FixedParameters(eqx.Module):
@@ -776,7 +807,7 @@ class SolverParameters(eqx.Module):
     """Linear solver"""
     norm: Callable = optx.max_norm
     """Norm""" ""
-    throw: bool = True
+    throw: bool = False
     """How to report any failures"""
     max_steps: int = 256
     """Maximum number of steps the solver can take"""
