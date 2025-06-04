@@ -235,7 +235,7 @@ class InteriorAtmosphere:
         Returns:
             Formula matrix
         """
-        unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
+        unique_elements: tuple[str, ...] = self.species.get_unique_elements_in_species()
         formula_matrix: NpInt = np.zeros(
             (len(unique_elements), self.species.number), dtype=np.int_
         )
@@ -252,25 +252,6 @@ class InteriorAtmosphere:
         # logger.debug("formula_matrix = %s", formula_matrix)
 
         return formula_matrix
-
-    def get_unique_elements_in_species(self) -> tuple[str, ...]:
-        """Gets unique elements.
-
-        Args:
-            species: A list of species
-
-        Returns:
-            Unique elements in the species ordered alphabetically
-        """
-        elements: list[str] = []
-        for species_ in self.species:
-            elements.extend(species_.data.elements)
-        unique_elements: list[str] = list(set(elements))
-        sorted_elements: list[str] = sorted(unique_elements)
-
-        logger.debug("unique_elements_in_species = %s", sorted_elements)
-
-        return tuple(sorted_elements)
 
     def get_reaction_matrix(self) -> NpFloat:
         """Gets the reaction matrix.
