@@ -99,10 +99,7 @@ class Output:
 
         log_number_density, log_stability = np.split(self._solution, 2, axis=1)
         self._log_number_density: NpFloat = log_number_density
-        # Mask stabilities that are not solved
-        self._log_stability: NpFloat = np.where(
-            fixed_parameters.stability_species_mask, log_stability, np.nan
-        )
+        self._log_stability: NpFloat = log_stability
         # Caching output to avoid recomputation
         self._cached_dict: dict[str, dict[str, NpArray]] | None = None
         self._cached_dataframes: dict[str, pd.DataFrame] | None = None
@@ -131,6 +128,15 @@ class Output:
     def log_stability(self) -> NpFloat:
         """Log stability of relevant species"""
         return self._log_stability
+
+    @property
+    def log_stability_masked(self) -> NpFloat:
+        """Log stability masked of relevant species"""
+        log_stability_masked: NpFloat = np.where(
+            self._fixed_parameters.stability_species_mask, self._log_stability, np.nan
+        )
+
+        return log_stability_masked
 
     @property
     def molar_mass(self) -> NpFloat:
@@ -602,7 +608,7 @@ class Output:
         """
         log_activity_without_stability: NpFloat = self.log_activity_without_stability()
         log_activity_with_stability: NpFloat = log_activity_without_stability - np.exp(
-            self.log_stability
+            self.log_stability_masked
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
@@ -698,7 +704,7 @@ class Output:
 
         for ii, species_name in enumerate(species_names):
             raw_solution[species_name] = self.log_number_density[:, ii]
-            raw_solution[f"{species_name}_stability"] = self.log_stability[:, ii]
+            raw_solution[f"{species_name}_stability"] = self.log_stability_masked[:, ii]
 
         # Remove keys where the array values are all nan
         for key in list(raw_solution.keys()):
@@ -783,7 +789,7 @@ class Output:
         Returns:
             Stability of relevant species
         """
-        return np.exp(self.log_stability)
+        return np.exp(self.log_stability_masked)
 
     def temperature_vmap_axes(self) -> Literal[0, None]:
         """Gets vmap axes for temperature"""
