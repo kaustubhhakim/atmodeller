@@ -25,7 +25,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.tree_util import Partial, tree_map
-from jaxtyping import Array, ArrayLike, Float64
+from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
@@ -52,6 +52,11 @@ def get_log_number_density_from_log_pressure(
     )
 
     return log_number_density
+
+
+def all_not_nan(x: ArrayLike) -> Bool[Array, "..."]:
+    """Returns True if all entries or columns are not nan, otherwise False"""
+    return ~jnp.any(jnp.isnan(x), axis=0)
 
 
 def safe_exp(x: ArrayLike) -> Array:
