@@ -20,9 +20,9 @@ from abc import abstractmethod
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike
+from jaxtyping import Array, ArrayLike, Bool
 
-from atmodeller.utilities import ExperimentalCalibration, as_j64, unit_conversion
+from atmodeller.utilities import ExperimentalCalibration, all_not_nan, as_j64, unit_conversion
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -72,6 +72,10 @@ class RedoxBuffer(eqx.Module):
         Returns:
             Log10 fugacity at the buffer
         """
+
+    def active(self) -> Bool[Array, ""]:
+        """True if the redox buffer is active, otherwise False"""
+        return all_not_nan(self.log10_shift)
 
     def get_scaled_pressure(self, pressure: ArrayLike) -> ArrayLike:
         """Gets the scaled pressure.

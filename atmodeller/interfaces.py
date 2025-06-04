@@ -18,7 +18,7 @@
 
 from typing import Protocol, runtime_checkable
 
-from jaxtyping import Array, ArrayLike
+from jaxtyping import Array, ArrayLike, Bool
 
 
 @runtime_checkable
@@ -28,6 +28,8 @@ class ActivityProtocol(Protocol):
 
 @runtime_checkable
 class FugacityConstraintProtocol(Protocol):
+    def active(self) -> Bool[Array, "..."]: ...
+
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
