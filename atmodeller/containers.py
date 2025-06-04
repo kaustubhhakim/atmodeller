@@ -771,7 +771,8 @@ class SolverParameters(eqx.Module):
     """Absolute tolerance"""
     rtol: float = 1.0e-6
     """Relative tolerance"""
-    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=False)
+    # https://docs.kidger.site/lineax/api/solvers/
+    linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
     """Linear solver"""
     norm: Callable = optx.max_norm
     """Norm""" ""
