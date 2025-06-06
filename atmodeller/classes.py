@@ -105,13 +105,14 @@ class InteriorAtmosphere:
         )
         fixed_parameters_: FixedParameters = self.get_fixed_parameters()
 
-        # Determine active entries in the residual
+        # NOTE: Determine active entries in the residual. This order must correspond to the order
+        # of entries in the residual.
         active: Bool[Array, " res_dim"] = jnp.concatenate(
             (
-                jnp.ones(fixed_parameters_.reaction_matrix.shape[0], dtype=bool),
+                fixed_parameters_.active_reactions(),
                 fugacity_constraints_.active(),
                 mass_constraints_.active(),
-                fixed_parameters_.stability_species_mask,
+                fixed_parameters_.active_stability(),
             )
         )
         # jax.debug.print("active = {out}", out=active)
@@ -222,7 +223,6 @@ class InteriorAtmosphere:
         formula_matrix: NpInt = self.get_formula_matrix()
         reaction_matrix: NpFloat = self.get_reaction_matrix()
         gas_species_mask: Array = self.species.get_gas_species_mask()
-        stability_species_mask: Array = self.species.get_stability_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
 
@@ -230,7 +230,6 @@ class InteriorAtmosphere:
             species=self.species,
             formula_matrix=jnp.asarray(formula_matrix),
             reaction_matrix=jnp.asarray(reaction_matrix),
-            stability_species_mask=stability_species_mask,
             gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,

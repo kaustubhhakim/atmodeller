@@ -160,7 +160,7 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    def active(self) -> Bool[Array, " species_dim"]:
+    def active_stability(self) -> Bool[Array, " species_dim"]:
         """Active species stability
 
         Returns:
@@ -262,14 +262,6 @@ class SpeciesCollection(eqx.Module):
             Species names
         """
         return tuple([species_.name for species_ in self.data])
-
-    def get_stability_species_mask(self) -> Bool[Array, " species_dim"]:
-        """Gets the stability species mask
-
-        Returns:
-            Mask for the species to solve for the stability
-        """
-        return self.active()
 
     def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements.
@@ -767,8 +759,6 @@ class FixedParameters(eqx.Module):
     # TODO: Currently breaks with "react_dim species_dim" because reaction_matrix might be empty.
     reaction_matrix: Float64[Array, "..."]
     """Reaction matrix"""
-    stability_species_mask: Array
-    """Mask of species to solve for stability"""
     gas_species_mask: Array
     """Mask of gas species"""
     diatomic_oxygen_index: int
@@ -777,6 +767,22 @@ class FixedParameters(eqx.Module):
     """Molar masses of all species"""
     tau: float
     """Tau factor for species"""
+
+    def active_reactions(self) -> Bool[Array, " react_dim"]:
+        """Active reactions
+
+        Returns:
+            True for all reactions
+        """
+        return jnp.ones(self.reaction_matrix.shape[0], dtype=bool)
+
+    def active_stability(self) -> Bool[Array, " species_dim"]:
+        """Active species stability
+
+        Returns:
+            True for species stabilities that are to be solved for, otherwise False
+        """
+        return self.species.active_stability()
 
 
 class SolverParameters(eqx.Module):
@@ -802,9 +808,11 @@ class SolverParameters(eqx.Module):
     """Absolute tolerance"""
     rtol: float = 1.0e-6
     """Relative tolerance"""
-    # https://docs.kidger.site/lineax/api/solvers/
     linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
-    """Linear solver"""
+    """Linear solver
+    
+    https://docs.kidger.site/lineax/api/solvers/   
+    """
     norm: Callable = optx.max_norm
     """Norm""" ""
     throw: bool = False

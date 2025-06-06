@@ -45,7 +45,8 @@ from atmodeller.utilities import (
 
 
 @eqx.filter_jit
-# @eqx.debug.assert_max_traces(max_traces=3)
+# Useful for optimising how many times JAX compiles the solve function
+# @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Float[Array, " sol_dim"],
     traced_parameters: TracedParameters,
@@ -234,7 +235,7 @@ def objective_function(
 
         1. Reaction constraints - log-linear, physics-based coupling
         2. Fugacity constraints - fixed target, well conditioned
-        3. Mass balance constraints - stiffer, often depends on volume or melt buffers
+        3. Mass balance constraints - stiffer, depends on solubility
         4. Stability constraints - soft, conditional, easy to push last
 
     Args:
@@ -274,15 +275,16 @@ def objective_function(
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
+    # Here would be where fugacity constraints could be imposed as hard constraints. Although this
+    # would reduce the degrees of freedom, previous preliminary testing identified two challenges:
+    #   1. The solver performance appears to degrade rather than improve. This could be because
+    #       soft constraints are better behaved with gradient-based solution approaches.
+    #   2. Imposing fugacity/activity would require back-computing pressure/number density, which
+    #       would involve solving non-linear real gas EOS, potentially increasing the solve
+    #       complexity and time substantially.
+
     # NOTE: Order of entries in the residual must correlate with the final jnp.take operation
     residual: Float64[Array, " res_dim"] = jnp.array([], dtype=jnp.float64)
-
-    # # Fugacity constraints residual
-    # fugacity_residual = log_activity_number_density - tp.fugacity_constraints.log_number_density(
-    #     temperature, total_pressure
-    # )
-    # # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-    # residual = jnp.concatenate([residual, fugacity_residual])
 
     # Reaction network residual
     # TODO: Is it possible to remove this if statement?
@@ -298,7 +300,7 @@ def objective_function(
         )
         # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
         reaction_stability_mask: Array = jnp.broadcast_to(
-            fp.stability_species_mask, fp.reaction_matrix.shape
+            fp.active_stability(), fp.reaction_matrix.shape
         )
         reaction_stability_matrix: Array = fp.reaction_matrix * reaction_stability_mask
         # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix)
@@ -358,7 +360,7 @@ def objective_function(
     )
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
     # Mask stability residuals for species that do not require stability calculations
-    stability_residual = stability_residual * fp.stability_species_mask
+    stability_residual = stability_residual * fp.active_stability()
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
     residual = jnp.concatenate([residual, stability_residual])
     # jax.debug.print("residual (with nans) = {out}", out=residual)

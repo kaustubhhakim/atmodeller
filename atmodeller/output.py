@@ -133,7 +133,7 @@ class Output:
     def log_stability_masked(self) -> NpFloat:
         """Log stability masked of relevant species"""
         log_stability_masked: NpFloat = np.where(
-            self._fixed_parameters.stability_species_mask, self._log_stability, np.nan
+            self._fixed_parameters.active_stability(), self._log_stability, np.nan
         )
 
         return log_stability_masked
@@ -152,11 +152,6 @@ class Output:
     def planet(self) -> Planet:
         """Planet"""
         return self._traced_parameters.planet
-
-    @property
-    def stability_species_mask(self) -> NpBool:
-        """Stability species mask"""
-        return np.asarray(self._species.get_stability_species_mask())
 
     @property
     def temperature(self) -> NpFloat:
@@ -612,7 +607,7 @@ class Output:
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
-            self.stability_species_mask, log_activity_without_stability.shape
+            self._fixed_parameters.active_stability(), log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
