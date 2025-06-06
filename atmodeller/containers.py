@@ -54,7 +54,6 @@ from atmodeller.utilities import (
     get_log_number_density_from_log_pressure,
     to_hashable,
     unit_conversion,
-    vmap_axes_spec,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -718,20 +717,6 @@ class TracedParameters(eqx.Module):
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
-
-    def vmap_axes(self) -> "TracedParameters":
-        """Vmap axes
-
-        Returns:
-            Vmap axes
-        """
-        return vmap_axes_spec(self)
-        # return TracedParameters(
-        #     vmap_axes_spec(self.planet),
-        #     vmap_axes_spec(self.fugacity_constraints),
-        #     vmap_axes_spec(self.mass_constraints),
-        #     None,
-        # )
 
 
 class FixedParameters(eqx.Module):

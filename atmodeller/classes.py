@@ -41,7 +41,7 @@ from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
-from atmodeller.utilities import get_batch_size, partial_rref
+from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -147,7 +147,7 @@ class InteriorAtmosphere:
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
         # Initial solution must be broadcast since it is always batched
-        in_axes: TracedParameters = traced_parameters_.vmap_axes()
+        in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
 
         self._solver = eqx.filter_jit(
             eqx.filter_vmap(solve_with_bindings, in_axes=(0, None, in_axes))
@@ -178,6 +178,7 @@ class InteriorAtmosphere:
         self._output = Output(
             self.species,
             solution,
+            active_indices,
             solver_status,
             solver_steps,
             fixed_parameters_,

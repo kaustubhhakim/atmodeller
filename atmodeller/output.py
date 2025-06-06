@@ -31,7 +31,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from jaxtyping import Array, ArrayLike
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
 from openpyxl.styles import PatternFill
 from scipy.constants import mega
@@ -71,6 +71,7 @@ class Output:
     Args:
         species: Species
         solution: Array output from solve
+        active_indices: Indices of the residual array that are active
         solver_status: Solver status
         solver_steps: Number of solver steps
         fixed_parameters: Fixed parameters
@@ -81,8 +82,9 @@ class Output:
     def __init__(
         self,
         species: SpeciesCollection,
-        solution: Array,
-        solver_status: Array,
+        solution: Float[Array, " batch_dim sol_dim"],
+        active_indices: Integer[Array, " res_dim"],
+        solver_status: Bool[Array, " batch_dim"],
         solver_steps: Array,
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
@@ -91,6 +93,7 @@ class Output:
         logger.debug("Creating Output")
         self._species: SpeciesCollection = species
         self._solution: NpFloat = np.asarray(solution)
+        self._active_indices: NpInt = np.asarray(active_indices)
         self._solver_status: NpBool = np.asarray(solver_status)
         self._solver_steps: NpInt = np.asarray(solver_steps)
         self._fixed_parameters: FixedParameters = fixed_parameters
@@ -103,6 +106,11 @@ class Output:
         # Caching output to avoid recomputation
         self._cached_dict: dict[str, dict[str, NpArray]] | None = None
         self._cached_dataframes: dict[str, pd.DataFrame] | None = None
+
+    @property
+    def active_indices(self) -> NpInt:
+        """Active indices"""
+        return self._active_indices
 
     @property
     def formula_matrix(self) -> NpInt:
@@ -720,6 +728,7 @@ class Output:
                 0,
                 {
                     "traced_parameters": self.traced_parameters_vmap_axes(),
+                    "active_indices": None,
                     "fixed_parameters": None,
                     "solver_parameters": None,
                 },
@@ -729,6 +738,7 @@ class Output:
             self._solution,
             {
                 "traced_parameters": self._traced_parameters,
+                "active_indices": jnp.asarray(self.active_indices),
                 "fixed_parameters": self._fixed_parameters,
                 "solver_parameters": self._solver_parameters,
             },
@@ -792,7 +802,7 @@ class Output:
 
     def traced_parameters_vmap_axes(self) -> TracedParameters:
         """Gets vmap axes for traced parameters"""
-        return self._traced_parameters.vmap_axes()
+        return vmap_axes_spec(self._traced_parameters)
 
     def _drop_unsuccessful_solves(
         self, dataframes: dict[str, pd.DataFrame]
