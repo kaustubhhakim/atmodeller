@@ -17,7 +17,7 @@
 """JAX-related functionality for solving the system of equations"""
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import equinox as eqx
 import jax
@@ -170,9 +170,11 @@ def repeat_solver(
         update_mask: Array = (~status) & new_status
 
         # Update fields only for those that just succeeded
-        updated_solution: Array = jnp.where(update_mask[:, None], new_solution, solution)
+        updated_solution: Array = cast(
+            Array, jnp.where(update_mask[:, None], new_solution, solution)
+        )
         updated_status: Array = status | new_status
-        updated_steps: Array = jnp.where(update_mask, new_steps, steps)
+        updated_steps: Array = cast(Array, jnp.where(update_mask, new_steps, steps))
         updated_success_attempt: Array = jnp.where(update_mask, i, success_attempt)
 
         return (
