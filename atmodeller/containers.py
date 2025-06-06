@@ -730,7 +730,6 @@ class FixedParameters(eqx.Module):
         gas_species_mask: Mask of gas species
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
-        tau: Tau factor for species stability
     """
 
     species: SpeciesCollection
@@ -746,8 +745,6 @@ class FixedParameters(eqx.Module):
     """Index of diatomic oxygen"""
     molar_masses: Array
     """Molar masses of all species"""
-    tau: float
-    """Tau factor for species"""
 
     def active_reactions(self) -> Bool[Array, " react_dim"]:
         """Active reactions

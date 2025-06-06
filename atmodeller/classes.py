@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Integer, PRNGKeyArray
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU_MAX, TAU_MIN
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -37,10 +37,11 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import repeat_solver, solve
+from atmodeller.engine import solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
+from atmodeller.solver import make_solve_tau_step, repeat_solver
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class InteriorAtmosphere:
     _solver: Callable | None = None
     _output: Output | None = None
 
-    def __init__(self, species: SpeciesCollection, tau: float = TAU):
+    def __init__(self, species: SpeciesCollection, tau: float = TAU_MIN):
         self.species: SpeciesCollection = species
         self.tau: float = tau
         logger.info("species = %s", [species.name for species in self.species])
@@ -130,14 +131,6 @@ class InteriorAtmosphere:
         active_indices: Integer[Array, "..."] = jnp.where(active)[0]
         # jax.debug.print("active_indices = {out}", out=active_indices)
 
-        # Pre-bind fixed configuration to avoid retracing and improve JIT efficiency
-        solve_with_bindings: Callable = eqx.Partial(
-            solve,
-            fixed_parameters=fixed_parameters_,
-            solver_parameters=solver_parameters_,
-            options=options,
-        )
-
         base_initial_solution: Array = broadcast_initial_solution(
             initial_log_number_density,
             initial_log_stability,
@@ -146,34 +139,78 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
+        # Pre-bind fixed configuration to avoid retracing and improve JIT efficiency
+        solve_with_bindings: Callable = eqx.Partial(
+            solve,
+            fixed_parameters=fixed_parameters_,
+            solver_parameters=solver_parameters_,
+            options=options,
+        )
+
         # Initial solution must be broadcast since it is always batched
         in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
 
         self._solver = eqx.filter_jit(
-            eqx.filter_vmap(solve_with_bindings, in_axes=(0, None, in_axes))
+            eqx.filter_vmap(solve_with_bindings, in_axes=(0, None, None, in_axes))
         )
 
         # First solution attempt
         solution, solver_status, solver_steps = self._solver(
             base_initial_solution,
             active_indices,
+            jnp.array(TAU_MIN, dtype=float),  # Must declare dtype to avoid recompilation
             traced_parameters_,
         )
 
-        # Use repeat solver to ensure all cases solve
-        key: PRNGKeyArray = jax.random.PRNGKey(0)
-        solution, solver_status, solver_steps, solver_attempts = repeat_solver(
-            self._solver,
-            base_initial_solution,
-            active_indices,
-            traced_parameters_,
-            solution,
-            solver_status,
-            solver_steps,
-            multistart_perturbation=solver_parameters_.multistart_perturbation,
-            max_attempts=solver_parameters_.multistart,
-            key=key,
-        )
+        if jnp.all(solver_status):
+            logger.info("Solution found with first iteration")
+            solver_attempts: Integer[Array, " batch_dim"] = jnp.ones_like(solver_status, dtype=int)
+
+        else:
+            logger.info("Initialising multistart")
+            key: PRNGKeyArray = jax.random.PRNGKey(0)
+
+            if jnp.any(fixed_parameters_.active_stability()):
+                logger.info("Multistart with species' stability")
+                # Initialize carry
+                initial_carry: tuple = (
+                    base_initial_solution,
+                    active_indices,
+                    solver_parameters_.multistart_perturbation,
+                    solver_parameters_.multistart,
+                    key,
+                    base_initial_solution,  # Ignore solution because some are meaningless
+                    solver_status,
+                    solver_steps,
+                )
+                solve_tau_step: Callable = make_solve_tau_step(self._solver, traced_parameters_)
+                # Calculate how many steps of 10x reduction are needed
+                num_steps = int(jnp.log10(TAU_MAX) - jnp.log10(TAU_MIN)) + 1  # inclusive range
+                tau_sequence = jnp.logspace(jnp.log10(TAU_MAX), jnp.log10(TAU_MIN), num=num_steps)
+                _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_sequence)
+                solution, solver_status, solver_steps, solver_attempts = results
+
+                # Just grab the last (final) tau solution
+                solution = solution[-1]
+                solver_status = solver_status[-1]
+                solver_steps = solver_steps[-1]
+                solver_attempts = solver_attempts[-1]
+
+            else:
+                logger.info("Multistart without species' stability")
+                solution, solver_status, solver_steps, solver_attempts = repeat_solver(
+                    self._solver,
+                    base_initial_solution,
+                    active_indices,
+                    jnp.array(TAU_MIN, dtype=float),
+                    traced_parameters_,
+                    solution,
+                    solver_status,
+                    solver_steps,
+                    multistart_perturbation=solver_parameters_.multistart_perturbation,
+                    max_attempts=solver_parameters_.multistart,
+                    key=key,
+                )
 
         self._output = Output(
             self.species,
@@ -212,11 +249,7 @@ class InteriorAtmosphere:
                 "which can depend on the choice of the random seed"
             )
 
-        jax.debug.print(
-            "Solver steps (max multistarts) = {out} ({out2})",
-            out=solver_steps,
-            out2=max_multistarts,
-        )
+        logger.info("Solver steps (max multistarts) = %s (%s)", solver_steps, max_multistarts)
 
         logger.debug("solution = %s", solution)
 
@@ -239,7 +272,6 @@ class InteriorAtmosphere:
             gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
-            tau=self.tau,
         )
 
         return fixed_parameters

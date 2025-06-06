@@ -84,8 +84,10 @@ LOG_STABILITY_UPPER: float = 35.0
 
 Empirically determined.
 """
-TAU: float = 1.0e-25
-"""Tau scaling factor for species stability :cite:p:`LKK16`.
+TAU_MAX: float = 1.0e-3
+"""Maximum tau scaling factor for species stability"""
+TAU_MIN: float = 1.0e-25
+"""Minimium tau scaling factor for species stability :cite:p:`LKK16`.
 
 Tau effectively controls the minimum non-zero number density of unstable species. Formally, it
 defines the number density of an unstable pure condensate with an activity of 1/e, which

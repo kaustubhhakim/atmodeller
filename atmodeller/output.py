@@ -36,6 +36,7 @@ from molmass import Formula
 from openpyxl.styles import PatternFill
 from scipy.constants import mega
 
+from atmodeller import TAU_MIN
 from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
@@ -727,6 +728,7 @@ class Output:
                 {
                     "traced_parameters": self.traced_parameters_vmap_axes(),
                     "active_indices": None,
+                    "tau": None,
                     "fixed_parameters": None,
                     "solver_parameters": None,
                 },
@@ -737,6 +739,7 @@ class Output:
             {
                 "traced_parameters": self._traced_parameters,
                 "active_indices": jnp.asarray(self.active_indices),
+                "tau": jnp.asarray(TAU_MIN),
                 "fixed_parameters": self._fixed_parameters,
                 "solver_parameters": self._solver_parameters,
             },
