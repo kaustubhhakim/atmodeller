@@ -49,6 +49,7 @@ from atmodeller.utilities import (
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Float[Array, " sol_dim"],
+    active_indices: Integer[Array, " res_dim"],
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
@@ -57,7 +58,8 @@ def solve(
     """Solves the system of non-linear equations
 
     Args:
-        solution_array: Solution array with species removed that have fugacity constraints
+        solution_array: Solution array
+        active_indices: Indices of the residual array that are active
         traced_parameters: Traced parameters
         fixed_parameters: Fixed parameters
         solver_parameters: Solver parameters
@@ -72,6 +74,7 @@ def solve(
         solution_array,
         args={
             "traced_parameters": traced_parameters,
+            "active_indices": active_indices,
             "fixed_parameters": fixed_parameters,
             "solver_parameters": solver_parameters,
         },
@@ -90,30 +93,40 @@ def solve(
 @eqx.filter_jit
 def repeat_solver(
     solver_fn: Callable,
-    base_initial_solution: Array,
-    initial_solution: Array,
-    initial_status: Array,
-    initial_steps: Array,
+    base_initial_solution: Float[Array, " batch_dim sol_dim"],
+    active_indices: Integer[Array, " res_dim"],
     traced_parameters: TracedParameters,
+    initial_solution: Float[Array, " batch_dim sol_dim"],
+    initial_status: Bool[Array, " batch_dim"],
+    initial_steps: Integer[Array, " batch_dim"],
     multistart_perturbation: float,
     max_attempts: int,
     key: Array,
-) -> tuple[Integer[Array, ""], Array, Array, Array]:
-    """Repeat solver until a solution is found
+) -> tuple[
+    Integer[Array, ""],
+    Float[Array, " batch_dim sol_dim"],
+    Bool[Array, " batch_dim"],
+    Integer[Array, " batch_dim"],
+]:
+    """Repeat solver
 
     Args:
         solver_fn: Solver function with pre-bound fixed configuration
         base_initial_solution: Base initial solution to perturb if necessary
+        active_indices: Indices of the residual array that are active
+        traced_parameters: Traced parameters
         initial_solution: Initial solution after first solve
         initial_status: Initial status after first solve
         initial_steps: Initial steps after first solve
-        traced_parameters: Traced parameters
         multistart_perturbation: Multistart perturbation
         max_attempts: Maximum attempts
         key: Random key
+
+    Returns:
+        A tuple with the state
     """
 
-    def body_fn(state: tuple) -> tuple[Integer[Array, ""], Array, Array, Array, Array, Array]:
+    def body_fn(state: tuple) -> tuple:
         """Perform one iteration of the solver retry loop
 
         Args:
@@ -122,12 +135,11 @@ def repeat_solver(
                 key: PRNG key for random number generation
                 solution: Current solution array
                 status: Boolean array indicating successful solutions
-                steps: Step count or similar solver output
+                steps: Step count
                 base_initial_solution: Unperturbed base initial solution
 
         Returns:
-            Updated state tuple with incremented attempt index, potentially perturbed
-            solutions, updated status, updated steps, and unmodified base initial solution
+            Updated state tuple
         """
         i, key, solution, status, _, base_initial_solution = state
 
@@ -150,9 +162,18 @@ def repeat_solver(
             failed_mask[:, None], base_initial_solution + perturbations, solution
         )
 
-        new_solution, new_status, new_steps = solver_fn(new_initial_solution, traced_parameters)
+        new_solution, new_status, new_steps = solver_fn(
+            new_initial_solution, active_indices, traced_parameters
+        )
 
-        return (i + 1, key, new_solution, new_status, new_steps, base_initial_solution)
+        return (
+            i + 1,
+            key,
+            new_solution,
+            new_status,
+            new_steps,
+            base_initial_solution,
+        )
 
     def cond_fn(state: tuple) -> Array:
         """Check if the solver should continue retrying
@@ -247,6 +268,7 @@ def objective_function(
     """
     # jax.debug.print("Starting new objective_function evaluation")
     tp: TracedParameters = kwargs["traced_parameters"]
+    active_indices: Integer[Array, " res_dim"] = kwargs["active_indices"]
     fp: FixedParameters = kwargs["fixed_parameters"]
     planet: Planet = tp.planet
     temperature: Array = planet.temperature
@@ -370,7 +392,7 @@ def objective_function(
     # Jacobian rank deficient. Something like block-augmented regularisation would be required to
     # pad the residual array to a fixed size if required or desired.
     # residual = jnp.where(jnp.isnan(residual), 0.0, residual)
-    residual = jnp.take(residual, indices=tp.active_indices)  # type: ignore
+    residual = jnp.take(residual, indices=active_indices)  # type: ignore
     # jax.debug.print("residual = {out}", out=residual)
 
     return residual

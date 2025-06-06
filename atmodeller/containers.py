@@ -718,24 +718,20 @@ class TracedParameters(eqx.Module):
     """Fugacity constraints"""
     mass_constraints: MassConstraints
     """Mass constraints"""
-    active_indices: Integer[Array, " res_dim"] | None
 
     def vmap_axes(self) -> "TracedParameters":
         """Vmap axes
 
-        NOTE: `active_indices` should never be batched over, which demands this custom method for
-        dealing with vmap. It is nevertheless traced, which is why it makes sense to include
-        `active_indices` in this container.
-
         Returns:
             Vmap axes
         """
-        return TracedParameters(
-            vmap_axes_spec(self.planet),
-            vmap_axes_spec(self.fugacity_constraints),
-            vmap_axes_spec(self.mass_constraints),
-            None,
-        )
+        return vmap_axes_spec(self)
+        # return TracedParameters(
+        #     vmap_axes_spec(self.planet),
+        #     vmap_axes_spec(self.fugacity_constraints),
+        #     vmap_axes_spec(self.mass_constraints),
+        #     None,
+        # )
 
 
 class FixedParameters(eqx.Module):

@@ -103,7 +103,18 @@ class InteriorAtmosphere:
         mass_constraints_: MassConstraints = MassConstraints.create(
             self.species, mass_constraints, batch_size
         )
+        traced_parameters_: TracedParameters = TracedParameters(
+            planet_, fugacity_constraints_, mass_constraints_
+        )
         fixed_parameters_: FixedParameters = self.get_fixed_parameters()
+        solver_parameters_: SolverParameters = (
+            SolverParameters() if solver_parameters is None else solver_parameters
+        )
+        options: dict[str, Any] = {
+            "lower": self.species.get_lower_bound(),
+            "upper": self.species.get_upper_bound(),
+            "jac": solver_parameters_.jac,
+        }
 
         # NOTE: Determine active entries in the residual. This order must correspond to the order
         # of entries in the residual.
@@ -118,19 +129,6 @@ class InteriorAtmosphere:
         # jax.debug.print("active = {out}", out=active)
         active_indices: Integer[Array, "..."] = jnp.where(active)[0]
         # jax.debug.print("active_indices = {out}", out=active_indices)
-
-        traced_parameters_: TracedParameters = TracedParameters(
-            planet_, fugacity_constraints_, mass_constraints_, active_indices
-        )
-
-        solver_parameters_: SolverParameters = (
-            SolverParameters() if solver_parameters is None else solver_parameters
-        )
-        options: dict[str, Any] = {
-            "lower": self.species.get_lower_bound(),
-            "upper": self.species.get_upper_bound(),
-            "jac": solver_parameters_.jac,
-        }
 
         # Pre-bind fixed configuration to avoid retracing and improve JIT efficiency
         solve_with_bindings: Callable = eqx.Partial(
@@ -151,11 +149,14 @@ class InteriorAtmosphere:
         # Initial solution must be broadcast since it is always batched
         in_axes: TracedParameters = traced_parameters_.vmap_axes()
 
-        self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
+        self._solver = eqx.filter_jit(
+            eqx.filter_vmap(solve_with_bindings, in_axes=(0, None, in_axes))
+        )
 
         # First solution attempt
         solution, solver_status, solver_steps = self._solver(
             base_initial_solution,
+            active_indices,
             traced_parameters_,
         )
 
@@ -164,10 +165,11 @@ class InteriorAtmosphere:
         final_i, solution, solver_status, solver_steps = repeat_solver(
             self._solver,
             base_initial_solution,
+            active_indices,
+            traced_parameters_,
             solution,
             solver_status,
             solver_steps,
-            traced_parameters_,
             multistart_perturbation=solver_parameters_.multistart_perturbation,
             max_attempts=solver_parameters_.multistart,
             key=key,
