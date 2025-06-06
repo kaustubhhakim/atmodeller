@@ -103,9 +103,9 @@ def repeat_solver(
     max_attempts: int,
     key: PRNGKeyArray,
 ) -> tuple[
-    Integer[Array, ""],
     Float[Array, " batch_dim sol_dim"],
     Bool[Array, " batch_dim"],
+    Integer[Array, " batch_dim"],
     Integer[Array, " batch_dim"],
 ]:
     """Repeat solver
@@ -136,11 +136,12 @@ def repeat_solver(
                 solution: Current solution array
                 status: Boolean array indicating successful solutions
                 steps: Step count
+                success_attempt: Integer array recording iteration of success for each entry
 
         Returns:
             Updated state tuple
         """
-        i, key, solution, status, _ = state
+        i, key, solution, status, steps, success_attempt = state
 
         failed_mask: Array = ~status
         key, subkey = jax.random.split(key)
@@ -165,12 +166,22 @@ def repeat_solver(
             new_initial_solution, active_indices, traced_parameters
         )
 
+        # Determine which entries to update: previously failed, now succeeded
+        update_mask: Array = (~status) & new_status
+
+        # Update fields only for those that just succeeded
+        updated_solution: Array = jnp.where(update_mask[:, None], new_solution, solution)
+        updated_status: Array = status | new_status
+        updated_steps: Array = jnp.where(update_mask, new_steps, steps)
+        updated_success_attempt: Array = jnp.where(update_mask, i, success_attempt)
+
         return (
             i + 1,
             key,
-            new_solution,
-            new_status,
-            new_steps,
+            updated_solution,
+            updated_status,
+            updated_steps,
+            updated_success_attempt,
         )
 
     def cond_fn(state: tuple[Array, ...]) -> Array:
@@ -183,12 +194,13 @@ def repeat_solver(
                 _: Unused (solution)
                 status: Boolean array indicating success of each solution
                 _: Unused (steps)
+                _: Unused (success_attempt)
 
         Returns:
             A boolean array indicating whether retries should continue (True if
             any solution failed and attempts are still available)
         """
-        i, _, _, status, _ = state
+        i, _, _, status, _, _ = state
 
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
 
@@ -198,12 +210,13 @@ def repeat_solver(
         initial_solution,
         initial_status,
         initial_steps,
+        jnp.asarray(initial_status, dtype=int),  # 1 if already solved, otherwise will be updated
     )
-    final_i, _, final_solution, final_status, final_steps = lax.while_loop(
+    _, _, final_solution, final_status, final_steps, final_success_attempt = lax.while_loop(
         cond_fn, body_fn, initial_state
     )
 
-    return final_i, final_solution, final_status, final_steps
+    return final_solution, final_status, final_steps, final_success_attempt
 
 
 def get_min_log_elemental_abundance_per_species(

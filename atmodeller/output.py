@@ -74,6 +74,7 @@ class Output:
         active_indices: Indices of the residual array that are active
         solver_status: Solver status
         solver_steps: Number of solver steps
+        solver_attempts: Number of solver attempts (multistart)
         fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
         solver_parameters: Solver parameters
@@ -85,7 +86,8 @@ class Output:
         solution: Float[Array, " batch_dim sol_dim"],
         active_indices: Integer[Array, " res_dim"],
         solver_status: Bool[Array, " batch_dim"],
-        solver_steps: Array,
+        solver_steps: Integer[Array, " batch_dim"],
+        solver_attempts: Integer[Array, " batch_dim"],
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
         solver_parameters: SolverParameters,
@@ -96,13 +98,17 @@ class Output:
         self._active_indices: NpInt = np.asarray(active_indices)
         self._solver_status: NpBool = np.asarray(solver_status)
         self._solver_steps: NpInt = np.asarray(solver_steps)
+        self._solver_attempts: NpInt = np.asarray(solver_attempts)
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
         self._solver_parameters: SolverParameters = solver_parameters
 
         log_number_density, log_stability = np.split(self._solution, 2, axis=1)
         self._log_number_density: NpFloat = log_number_density
-        self._log_stability: NpFloat = log_stability
+        # Mask stabilities that are not solved
+        self._log_stability: NpFloat = np.where(
+            fixed_parameters.active_stability(), log_stability, np.nan
+        )
         # Caching output to avoid recomputation
         self._cached_dict: dict[str, dict[str, NpArray]] | None = None
         self._cached_dataframes: dict[str, pd.DataFrame] | None = None
@@ -136,15 +142,6 @@ class Output:
     def log_stability(self) -> NpFloat:
         """Log stability of relevant species"""
         return self._log_stability
-
-    @property
-    def log_stability_masked(self) -> NpFloat:
-        """Log stability masked of relevant species"""
-        log_stability_masked: NpFloat = np.where(
-            self._fixed_parameters.active_stability(), self._log_stability, np.nan
-        )
-
-        return log_stability_masked
 
     @property
     def molar_mass(self) -> NpFloat:
@@ -241,8 +238,9 @@ class Output:
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
         out["solver"] = {
-            "status": np.asarray(self._solver_status),
-            "steps": np.asarray(self._solver_steps),
+            "status": self._solver_status,
+            "steps": self._solver_steps,
+            "attempts": self._solver_attempts,
         }
 
         # For debugging to confirm all outputs are numpy arrays
@@ -611,7 +609,7 @@ class Output:
         """
         log_activity_without_stability: NpFloat = self.log_activity_without_stability()
         log_activity_with_stability: NpFloat = log_activity_without_stability - np.exp(
-            self.log_stability_masked
+            self.log_stability
         )
         # Now select the appropriate activity for each species, depending if stability is relevant.
         condition_broadcasted = np.broadcast_to(
@@ -707,7 +705,7 @@ class Output:
 
         for ii, species_name in enumerate(species_names):
             raw_solution[species_name] = self.log_number_density[:, ii]
-            raw_solution[f"{species_name}_stability"] = self.log_stability_masked[:, ii]
+            raw_solution[f"{species_name}_stability"] = self.log_stability[:, ii]
 
         # Remove keys where the array values are all nan
         for key in list(raw_solution.keys()):
@@ -794,7 +792,7 @@ class Output:
         Returns:
             Stability of relevant species
         """
-        return np.exp(self.log_stability_masked)
+        return np.exp(self.log_stability)
 
     def temperature_vmap_axes(self) -> Literal[0, None]:
         """Gets vmap axes for temperature"""

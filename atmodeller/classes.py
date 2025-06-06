@@ -25,7 +25,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, ArrayLike, Bool, Integer
+from jaxtyping import Array, ArrayLike, Bool, Integer, PRNGKeyArray
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
 from atmodeller.containers import (
@@ -161,8 +161,8 @@ class InteriorAtmosphere:
         )
 
         # Use repeat solver to ensure all cases solve
-        key: Array = jax.random.PRNGKey(0)
-        final_i, solution, solver_status, solver_steps = repeat_solver(
+        key: PRNGKeyArray = jax.random.PRNGKey(0)
+        solution, solver_status, solver_steps, solver_attempts = repeat_solver(
             self._solver,
             base_initial_solution,
             active_indices,
@@ -181,6 +181,7 @@ class InteriorAtmosphere:
             active_indices,
             solver_status,
             solver_steps,
+            solver_attempts,
             fixed_parameters_,
             traced_parameters_,
             solver_parameters_,
@@ -189,6 +190,7 @@ class InteriorAtmosphere:
         num_total_models: int = solver_status.size
         num_successful_models: int = jnp.count_nonzero(solver_status).item()
         num_failed_models: int = jnp.count_nonzero(~solver_status).item()
+        max_multistarts: int = jnp.max(solver_attempts).item()
 
         logger.info(f"Attempted to solve {num_total_models} model(s)")
 
@@ -197,22 +199,23 @@ class InteriorAtmosphere:
                 f"Solve complete: {num_successful_models} successful model(s) and "
                 f"{num_failed_models} model(s) failed.\n"
                 "Try increasing 'multistart', for example:\n"
-                "    solver_parameters = SolverParameters(multistart=5)\n"
+                "    solver_parameters = SolverParameters(multistart=20)\n"
                 "and then pass solver_parameters to the solve method.\n"
                 "You can also adjust 'multistart_perturbation', for example:\n"
-                "    solver_parameters = SolverParameters(multistart=5, "
+                "    solver_parameters = SolverParameters(multistart=20, "
                 "multistart_perturbation=40.0)"
             )
         else:
-            required_multistarts: Integer[Array, ""] = jnp.maximum(final_i, 1)
             logger.info(
                 f"Solve complete: {num_successful_models} successful model(s)\n"
-                f"The number of multistarts required was {required_multistarts}, "
+                f"The number of multistarts required was {max_multistarts}, "
                 "which can depend on the choice of the random seed"
             )
 
         jax.debug.print(
-            "Solver steps (multistarts) = {out} ({out2})", out=solver_steps, out2=final_i
+            "Solver steps (max multistarts) = {out} ({out2})",
+            out=solver_steps,
+            out2=max_multistarts,
         )
 
         logger.debug("solution = %s", solution)
@@ -315,7 +318,7 @@ class InteriorAtmosphere:
 
 def _broadcast_component(
     component: ArrayLike | None, default_value: float, dim: int, batch_size: int, name: str
-) -> Array:
+) -> NpFloat:
     """Broadcasts a scalar, 1D, or 2D input array to shape (batch_size, dim).
 
     This function standardizes inputs that may be:
@@ -332,17 +335,17 @@ def _broadcast_component(
         name: Name of the component (used for error messages)
 
     Returns:
-        A JAX array of shape (batch_size, dim), with values broadcast as needed
+        A numpy array of shape (batch_size, dim), with values broadcast as needed
 
     Raises:
         ValueError: If the input array has an unexpected shape or inconsistent dimensions
     """
     if component is None:
-        base: Array = jnp.full((dim,), default_value, dtype=jnp.float64)
+        base: NpFloat = np.full((dim,), default_value, dtype=np.float64)
     else:
-        component = jnp.asarray(component, dtype=jnp.float64)
+        component = np.asarray(component, dtype=jnp.float64)
         if component.ndim == 0:
-            base = jnp.full((dim,), component.item(), dtype=jnp.float64)
+            base = np.full((dim,), component.item(), dtype=np.float64)
         elif component.ndim == 1:
             if component.shape[0] != dim:
                 raise ValueError(f"{name} should have shape ({dim},), got {component.shape}")
@@ -352,7 +355,8 @@ def _broadcast_component(
                 raise ValueError(
                     f"{name} should have shape ({batch_size}, {dim}), got {component.shape}"
                 )
-            # NOTE: 2-D already so return
+            # Replace NaNs with default_value
+            component = np.where(np.isnan(component), default_value, component)
             return component
         else:
             raise ValueError(
@@ -360,7 +364,7 @@ def _broadcast_component(
             )
 
     # Promote 1D base to (batch_size, dim)
-    return jnp.broadcast_to(base[None, :], (batch_size, dim))
+    return np.broadcast_to(base[None, :], (batch_size, dim))
 
 
 def broadcast_initial_solution(
@@ -382,14 +386,14 @@ def broadcast_initial_solution(
     Returns:
         Initial solution with shape (batch_size, D)
     """
-    number_density: Array = _broadcast_component(
+    number_density: NpFloat = _broadcast_component(
         initial_log_number_density,
         INITIAL_LOG_NUMBER_DENSITY,
         number_of_species,
         batch_size,
         name="initial_log_number_density",
     )
-    stability: Array = _broadcast_component(
+    stability: NpFloat = _broadcast_component(
         initial_log_stability,
         INITIAL_LOG_STABILITY,
         number_of_species,
