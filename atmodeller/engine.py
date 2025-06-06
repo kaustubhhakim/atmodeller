@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import optimistix as optx
 from jax import lax
 from jax.scipy.special import logsumexp
-from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
+from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer, PRNGKeyArray
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
@@ -101,7 +101,7 @@ def repeat_solver(
     initial_steps: Integer[Array, " batch_dim"],
     multistart_perturbation: float,
     max_attempts: int,
-    key: Array,
+    key: PRNGKeyArray,
 ) -> tuple[
     Integer[Array, ""],
     Float[Array, " batch_dim sol_dim"],
@@ -126,7 +126,7 @@ def repeat_solver(
         A tuple with the state
     """
 
-    def body_fn(state: tuple) -> tuple:
+    def body_fn(state: tuple[Array, ...]) -> tuple[Array, ...]:
         """Perform one iteration of the solver retry loop
 
         Args:
@@ -136,12 +136,11 @@ def repeat_solver(
                 solution: Current solution array
                 status: Boolean array indicating successful solutions
                 steps: Step count
-                base_initial_solution: Unperturbed base initial solution
 
         Returns:
             Updated state tuple
         """
-        i, key, solution, status, _, base_initial_solution = state
+        i, key, solution, status, _ = state
 
         failed_mask: Array = ~status
         key, subkey = jax.random.split(key)
@@ -158,7 +157,7 @@ def repeat_solver(
             multistart_perturbation * raw_perturb,
             jnp.zeros_like(solution),
         )
-        new_initial_solution = jnp.where(
+        new_initial_solution: Array = jnp.where(
             failed_mask[:, None], base_initial_solution + perturbations, solution
         )
 
@@ -172,10 +171,9 @@ def repeat_solver(
             new_solution,
             new_status,
             new_steps,
-            base_initial_solution,
         )
 
-    def cond_fn(state: tuple) -> Array:
+    def cond_fn(state: tuple[Array, ...]) -> Array:
         """Check if the solver should continue retrying
 
         Args:
@@ -185,25 +183,23 @@ def repeat_solver(
                 _: Unused (solution)
                 status: Boolean array indicating success of each solution
                 _: Unused (steps)
-                _: Unused (base initial solution)
 
         Returns:
             A boolean array indicating whether retries should continue (True if
             any solution failed and attempts are still available)
         """
-        i, _, _, status, _, _ = state
+        i, _, _, status, _ = state
 
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
 
-    initial_state: tuple = (
+    initial_state: tuple[Array, ...] = (
         jnp.array(1),  # A first solve has already been attempted before repeat_solver is called
         key,
         initial_solution,
         initial_status,
         initial_steps,
-        base_initial_solution,
     )
-    final_i, _, final_solution, final_status, final_steps, _ = lax.while_loop(
+    final_i, _, final_solution, final_status, final_steps = lax.while_loop(
         cond_fn, body_fn, initial_state
     )
 
