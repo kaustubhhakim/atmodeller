@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Solvers"""
+"""Solver wrappers"""
 
 from collections.abc import Callable
 from typing import cast
@@ -49,7 +49,7 @@ def repeat_solver(
     Integer[Array, " batch_dim"],
     Integer[Array, " batch_dim"],
 ]:
-    """Repeat solver
+    """Repeat solver with perturbed initial solution
 
     Args:
         solver_fn: Solver function with pre-bound fixed configuration
@@ -171,7 +171,7 @@ def make_solve_tau_step(solver_fn: Callable, traced_parameters: TracedParameters
         traced_parameters: Traced parameters
 
     Returns:
-        Wrapped solver
+        Wrapped solver for a single tau value
     """
 
     @eqx.filter_jit

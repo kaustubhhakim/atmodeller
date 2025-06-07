@@ -795,7 +795,7 @@ class SolverParameters(eqx.Module):
     """Norm""" ""
     throw: bool = False
     """How to report any failures"""
-    max_steps: int = 256
+    max_steps: int = 1024  # 256
     """Maximum number of steps the solver can take"""
     jac: Literal["fwd", "bwd"] = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""

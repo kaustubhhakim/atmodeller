@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Integer, PRNGKeyArray
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU_MAX, TAU_MIN
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU_MIN
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -41,7 +41,7 @@ from atmodeller.engine import solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
-from atmodeller.solver import make_solve_tau_step, repeat_solver
+from atmodeller.solver import repeat_solver
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -167,50 +167,55 @@ class InteriorAtmosphere:
             solver_attempts: Integer[Array, " batch_dim"] = jnp.ones_like(solver_status, dtype=int)
 
         else:
+            logger.info("Some failed")
+            logger.info("solver_status = %s", solver_status)
+            logger.info("solver_steps = %s", solver_steps)
+
             logger.info("Initialising multistart")
             key: PRNGKeyArray = jax.random.PRNGKey(0)
 
-            if jnp.any(fixed_parameters_.active_stability()):
-                logger.info("Multistart with species' stability")
-                # Initialize carry
-                initial_carry: tuple = (
-                    base_initial_solution,
-                    active_indices,
-                    solver_parameters_.multistart_perturbation,
-                    solver_parameters_.multistart,
-                    key,
-                    base_initial_solution,  # Ignore solution because some are meaningless
-                    solver_status,
-                    solver_steps,
-                )
-                solve_tau_step: Callable = make_solve_tau_step(self._solver, traced_parameters_)
-                # Calculate how many steps of 10x reduction are needed
-                num_steps = int(jnp.log10(TAU_MAX) - jnp.log10(TAU_MIN)) + 1  # inclusive range
-                tau_sequence = jnp.logspace(jnp.log10(TAU_MAX), jnp.log10(TAU_MIN), num=num_steps)
-                _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_sequence)
-                solution, solver_status, solver_steps, solver_attempts = results
+            # TODO: Remove. Doesn't seem to help much
+            # if jnp.any(fixed_parameters_.active_stability()):
+            #     logger.info("Multistart with species' stability")
+            #     # Initialize carry
+            #     initial_carry: tuple = (
+            #         base_initial_solution,
+            #         active_indices,
+            #         solver_parameters_.multistart_perturbation,
+            #         solver_parameters_.multistart,
+            #         key,
+            #         base_initial_solution,  # Ignore solution because some are meaningless
+            #         solver_status,
+            #         solver_steps,
+            #     )
+            #     solve_tau_step: Callable = make_solve_tau_step(self._solver, traced_parameters_)
+            #     # Calculate how many steps of 10x reduction are needed
+            #     num_steps = int(jnp.log10(TAU_MAX) - jnp.log10(TAU_MIN)) + 1  # inclusive range
+            #     tau_sequence = jnp.logspace(jnp.log10(TAU_MAX), jnp.log10(TAU_MIN), num=num_steps)
+            #     _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_sequence)
+            #     solution, solver_status, solver_steps, solver_attempts = results
 
-                # Just grab the last (final) tau solution
-                solution = solution[-1]
-                solver_status = solver_status[-1]
-                solver_steps = solver_steps[-1]
-                solver_attempts = solver_attempts[-1]
+            #     # Just grab the last (final) tau solution
+            #     solution = solution[-1]
+            #     solver_status = solver_status[-1]
+            #     solver_steps = solver_steps[-1]
+            #     solver_attempts = solver_attempts[-1]
 
-            else:
-                logger.info("Multistart without species' stability")
-                solution, solver_status, solver_steps, solver_attempts = repeat_solver(
-                    self._solver,
-                    base_initial_solution,
-                    active_indices,
-                    jnp.array(TAU_MIN, dtype=float),
-                    traced_parameters_,
-                    solution,
-                    solver_status,
-                    solver_steps,
-                    multistart_perturbation=solver_parameters_.multistart_perturbation,
-                    max_attempts=solver_parameters_.multistart,
-                    key=key,
-                )
+            # else:
+            logger.info("Multistart without species' stability")
+            solution, solver_status, solver_steps, solver_attempts = repeat_solver(
+                self._solver,
+                base_initial_solution,
+                active_indices,
+                jnp.array(TAU_MIN, dtype=float),
+                traced_parameters_,
+                solution,
+                solver_status,
+                solver_steps,
+                multistart_perturbation=solver_parameters_.multistart_perturbation,
+                max_attempts=solver_parameters_.multistart,
+                key=key,
+            )
 
         self._output = Output(
             self.species,
