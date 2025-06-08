@@ -27,6 +27,7 @@ from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 
 from atmodeller.containers import FixedParameters, SolverParameters, TracedParameters
 from atmodeller.engine import solve
+from atmodeller.utilities import vmap_axes_spec
 
 
 def make_solver_function(
@@ -52,6 +53,47 @@ def make_solver_function(
     )
 
     return partial_solve
+
+
+def make_vmapped_solver_function(
+    traced_parameters: TracedParameters,
+    fixed_parameters: FixedParameters,
+    solver_parameters: SolverParameters,
+    options: dict[str, Any],
+) -> Callable:
+    """Makes the vmapped solver function with bindings
+
+    This pre-binds fixed configuration and applies vmapping over relevant quantities.
+
+    Args:
+        traced_parameters: Traced parameters
+        fixed_parameters: Fixed parameters
+        solver_parameters: Solver parameters
+        options: Options
+
+    Returns:
+        Vmapped and jitted solver function with bindings
+    """
+    solver_fn: Callable = make_solver_function(fixed_parameters, solver_parameters, options)
+    in_axes: TracedParameters = vmap_axes_spec(traced_parameters)
+
+    # Prepare the vmapped solver function
+    # Initial solution must be broadcast since it is always batched
+    solver_vmap_fn: Callable = eqx.filter_vmap(solver_fn, in_axes=(0, None, None, in_axes))
+
+    @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
+    def wrapped_solver(
+        solution_array: Float[Array, " batch_dim sol_dim"],
+        active_indices: Integer[Array, " res_dim"],
+        tau: Float[Array, ""],
+        traced_parameters: TracedParameters,
+    ) -> tuple[
+        Float[Array, " batch_dim sol_dim"], Bool[Array, " batch_dim"], Integer[Array, " batch_dim"]
+    ]:
+        return solver_vmap_fn(solution_array, active_indices, tau, traced_parameters)
+
+    return wrapped_solver
 
 
 @eqx.filter_jit

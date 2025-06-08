@@ -21,7 +21,6 @@ import pprint
 from collections.abc import Callable, Mapping
 from typing import Any
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -40,8 +39,8 @@ from atmodeller.containers import (
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
-from atmodeller.solver import make_solver_function, repeat_solver
-from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
+from atmodeller.solver import make_vmapped_solver_function, repeat_solver
+from atmodeller.utilities import get_batch_size, partial_rref
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -138,15 +137,8 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
-        solve_with_bindings: Callable = make_solver_function(
-            fixed_parameters_, solver_parameters_, options
-        )
-
-        # Initial solution must be broadcast since it is always batched
-        in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
-
-        self._solver = eqx.filter_jit(
-            eqx.filter_vmap(solve_with_bindings, in_axes=(0, None, None, in_axes))
+        self._solver = make_vmapped_solver_function(
+            traced_parameters_, fixed_parameters_, solver_parameters_, options
         )
 
         # First solution attempt

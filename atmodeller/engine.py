@@ -43,6 +43,10 @@ from atmodeller.utilities import (
 )
 
 
+# Since this is the core driver function for the solve it remains useful for debugging to see how
+# many times recompilation is triggered
+# @eqx.filter_jit
+# @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
     solution_array: Float[Array, " sol_dim"],
     active_indices: Integer[Array, " res_dim"],
