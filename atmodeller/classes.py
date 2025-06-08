@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Integer, PRNGKeyArray
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU_MIN
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -60,7 +60,7 @@ class InteriorAtmosphere:
     _solver: Callable | None = None
     _output: Output | None = None
 
-    def __init__(self, species: SpeciesCollection, tau: float = TAU_MIN):
+    def __init__(self, species: SpeciesCollection, tau: float = TAU):
         self.species: SpeciesCollection = species
         self.tau: float = tau
         logger.info("species = %s", [species.name for species in self.species])
@@ -153,7 +153,7 @@ class InteriorAtmosphere:
         solution, solver_status, solver_steps = self._solver(
             base_initial_solution,
             active_indices,
-            jnp.array(TAU_MIN, dtype=float),  # Must declare dtype to avoid recompilation
+            jnp.array(TAU, dtype=float),  # Must declare dtype to avoid recompilation
             traced_parameters_,
         )
 
@@ -185,8 +185,8 @@ class InteriorAtmosphere:
             #     )
             #     solve_tau_step: Callable = make_solve_tau_step(self._solver, traced_parameters_)
             #     # Calculate how many steps of 10x reduction are needed
-            #     num_steps = int(jnp.log10(TAU_MAX) - jnp.log10(TAU_MIN)) + 1  # inclusive range
-            #     tau_sequence = jnp.logspace(jnp.log10(TAU_MAX), jnp.log10(TAU_MIN), num=num_steps)
+            #     num_steps = int(jnp.log10(TAU_MAX) - jnp.log10(TAU)) + 1  # inclusive range
+            #     tau_sequence = jnp.logspace(jnp.log10(TAU_MAX), jnp.log10(TAU), num=num_steps)
             #     _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_sequence)
             #     solution, solver_status, solver_steps, solver_attempts = results
 
@@ -202,7 +202,7 @@ class InteriorAtmosphere:
                 self._solver,
                 base_initial_solution,
                 active_indices,
-                jnp.array(TAU_MIN, dtype=float),
+                jnp.array(TAU, dtype=float),
                 traced_parameters_,
                 solution,
                 solver_status,
