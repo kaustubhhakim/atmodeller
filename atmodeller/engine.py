@@ -387,19 +387,21 @@ def get_element_density_in_melt(
     Returns:
         Number density of elements dissolved in melt
     """
-    species_melt_density: Array = get_species_density_in_melt(
+    species_melt_density: Float[Array, " species_dim"] = get_species_density_in_melt(
         traced_parameters,
         fixed_parameters,
         log_number_density,
         log_activity,
         log_volume,
     )
-    element_melt_density: Array = formula_matrix.dot(species_melt_density)
+    element_melt_density: Float[Array, " species_dim"] = formula_matrix.dot(species_melt_density)
 
     return element_melt_density
 
 
-def get_gas_species_data(fixed_parameters: FixedParameters, some_array: ArrayLike) -> Array:
+def get_gas_species_data(
+    fixed_parameters: FixedParameters, some_array: ArrayLike
+) -> Shaped[Array, " species_dim"]:
     """Masks the gas species data from an array
 
     Args:
