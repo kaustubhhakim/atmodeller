@@ -535,9 +535,7 @@ class FugacityConstraints(eqx.Module):
         # Temperature must be a float array to ensure branches have have identical types
         temperature = jnp.asarray(temperature, dtype=jnp.float64)
 
-        def apply_fugacity_function(
-            index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
-        ) -> Array:
+        def apply_fugacity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
             # jax.debug.print("index = {out}", out=index)
             return lax.switch(
                 index,
@@ -546,11 +544,9 @@ class FugacityConstraints(eqx.Module):
                 pressure,
             )
 
-        vmap_apply_function: Callable = eqx.filter_vmap(
-            apply_fugacity_function, in_axes=(0, None, None)
-        )
         indices: Array = jnp.arange(len(self.constraints))
-        log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
+        vmap_fugacity: Callable = eqx.filter_vmap(apply_fugacity, in_axes=(0, None, None))
+        log_fugacity: Array = vmap_fugacity(indices, temperature, pressure)
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity

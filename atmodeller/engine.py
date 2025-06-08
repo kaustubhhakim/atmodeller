@@ -445,7 +445,7 @@ def get_log_activity(
         to_hashable(species_.activity.log_activity) for species_ in species
     ]
 
-    def apply_activity_function(index: ArrayLike) -> Float[Array, ""]:
+    def apply_activity(index: ArrayLike) -> Float[Array, ""]:
         return lax.switch(
             index,
             activity_funcs,
@@ -453,9 +453,9 @@ def get_log_activity(
             total_pressure,
         )
 
-    vmap_apply_function: Callable = eqx.filter_vmap(apply_activity_function, in_axes=(0,))
     indices: Integer[Array, " species_dim"] = jnp.arange(len(species))
-    log_activity_pure_species: Float[Array, " species_dim"] = vmap_apply_function(indices)
+    vmap_activity: Callable = eqx.filter_vmap(apply_activity, in_axes=(0,))
+    log_activity_pure_species: Float[Array, " species_dim"] = vmap_activity(indices)
     # jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
     log_activity: Float[Array, " species_dim"] = get_log_activity_ideal_mixing(
         fixed_parameters, log_number_density, log_activity_pure_species
@@ -529,14 +529,19 @@ def get_log_Kp(
     Returns:
         Log of the equilibrium constant in terms of partial pressures
     """
-    gibbs_list: list[ArrayLike] = []
-    # FIXME: Not ideal for JAX compilation
-    for species_ in species:
-        gibbs: ArrayLike = species_.data.get_gibbs_over_RT(temperature)
-        gibbs_list.append(gibbs)
+    gibbs_funcs: list[Callable] = [
+        to_hashable(species_.data.get_gibbs_over_RT) for species_ in species
+    ]
 
-    gibbs_jnp: Float[Array, " react_dim"] = jnp.array(gibbs_list)
-    log_Kp: Float[Array, " react_dim"] = -1.0 * reaction_matrix.dot(gibbs_jnp)
+    def apply_gibbs(
+        index: Integer[Array, ""], temperature: Float[Array, "..."]
+    ) -> Float[Array, "..."]:
+        return lax.switch(index, gibbs_funcs, temperature)
+
+    indices: Integer[Array, " species_dim"] = jnp.arange(len(species))
+    vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
+    gibbs_values: Float[Array, " species_dim"] = vmap_gibbs(indices, temperature)
+    log_Kp: Float[Array, " react_dim"] = -1.0 * reaction_matrix @ gibbs_values
 
     return log_Kp
 
@@ -656,7 +661,9 @@ def get_species_ppmw_in_melt(
         to_hashable(species_.solubility.jax_concentration) for species_ in species
     ]
 
-    def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike) -> Float[Array, ""]:
+    def apply_solubility(
+        index: Integer[Array, ""], fugacity: Float[Array, ""]
+    ) -> Float[Array, ""]:
         return lax.switch(
             index,
             solubility_funcs,
@@ -666,9 +673,9 @@ def get_species_ppmw_in_melt(
             diatomic_oxygen_fugacity,
         )
 
-    vmap_apply_function: Callable = eqx.filter_vmap(apply_solubility_function, in_axes=(0, 0))
     indices: Integer[Array, " species_dim"] = jnp.arange(len(species))
-    species_ppmw: Float[Array, " species_dim"] = vmap_apply_function(indices, fugacity)
+    vmap_solubility: Callable = eqx.filter_vmap(apply_solubility, in_axes=(0, 0))
+    species_ppmw: Float[Array, " species_dim"] = vmap_solubility(indices, fugacity)
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
     return species_ppmw

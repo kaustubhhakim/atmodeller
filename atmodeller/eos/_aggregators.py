@@ -198,11 +198,11 @@ class CombinedRealGas(RealGas):
         indices: Array = self._get_index(pressure)
         # jax.debug.print("indices = {out}", out=indices)
 
-        def apply_volume_function(index: ArrayLike, temperature, pressure) -> Array:
+        def apply_volume(index: ArrayLike, temperature, pressure) -> Array:
             return lax.switch(index, self.volume_functions, temperature, pressure)
 
-        vmap_apply_function: Callable = eqx.filter_vmap(apply_volume_function, in_axes=(0, 0, 0))
-        volume: Array = vmap_apply_function(indices, temperature, pressure)
+        vmap_volume: Callable = eqx.filter_vmap(apply_volume, in_axes=(0, 0, 0))
+        volume: Array = vmap_volume(indices, temperature, pressure)
         # jax.debug.print("volume = {out}", out=volume)
 
         return jnp.reshape(volume, original_shape)
