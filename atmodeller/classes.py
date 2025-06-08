@@ -37,11 +37,10 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
-from atmodeller.solver import repeat_solver
+from atmodeller.solver import make_solver_function, repeat_solver
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -139,12 +138,8 @@ class InteriorAtmosphere:
         )
         # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
 
-        # Pre-bind fixed configuration to avoid retracing and improve JIT efficiency
-        solve_with_bindings: Callable = eqx.Partial(
-            solve,
-            fixed_parameters=fixed_parameters_,
-            solver_parameters=solver_parameters_,
-            options=options,
+        solve_with_bindings: Callable = make_solver_function(
+            fixed_parameters_, solver_parameters_, options
         )
 
         # Initial solution must be broadcast since it is always batched

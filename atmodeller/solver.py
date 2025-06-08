@@ -17,7 +17,7 @@
 """Solver wrappers"""
 
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
 
 import equinox as eqx
 import jax
@@ -25,7 +25,33 @@ import jax.numpy as jnp
 from jax import lax
 from jaxtyping import Array, Bool, Float, Integer, PRNGKeyArray
 
-from atmodeller.containers import TracedParameters
+from atmodeller.containers import FixedParameters, SolverParameters, TracedParameters
+from atmodeller.engine import solve
+
+
+def make_solver_function(
+    fixed_parameters: FixedParameters, solver_parameters: SolverParameters, options: dict[str, Any]
+) -> Callable:
+    """Makes the solver function with bindings.
+
+    This pre-binds fixed configuration to avoid retracing and improve JIT efficiency.
+
+    Args:
+        fixed_parameters: Fixed parameters
+        solver_parameters: Solver parameters
+        options: Options
+
+    Returns:
+        Solver function with bindings
+    """
+    partial_solve: Callable = eqx.Partial(
+        solve,
+        fixed_parameters=fixed_parameters,
+        solver_parameters=solver_parameters,
+        options=options,
+    )
+
+    return partial_solve
 
 
 @eqx.filter_jit
