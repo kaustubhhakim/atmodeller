@@ -737,7 +737,7 @@ class FixedParameters(eqx.Module):
     formula_matrix: Integer[Array, "el_dim species_dim"]
     """Formula matrix"""
     # TODO: Currently breaks with "react_dim species_dim" because reaction_matrix might be empty.
-    reaction_matrix: Float64[Array, "..."]
+    reaction_matrix: Float[Array, "..."]
     """Reaction matrix"""
     gas_species_mask: Array
     """Mask of gas species"""
