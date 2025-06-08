@@ -77,7 +77,6 @@ def make_vmapped_solver_function(
     solver_fn: Callable = make_solver_function(fixed_parameters, solver_parameters, options)
     in_axes: TracedParameters = vmap_axes_spec(traced_parameters)
 
-    # Prepare the vmapped solver function
     # Initial solution must be broadcast since it is always batched
     solver_vmap_fn: Callable = eqx.filter_vmap(solver_fn, in_axes=(0, None, None, in_axes))
 
