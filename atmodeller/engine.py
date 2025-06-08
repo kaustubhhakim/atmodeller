@@ -43,10 +43,6 @@ from atmodeller.utilities import (
 )
 
 
-# TODO: Not jitted here
-# @eqx.filter_jit
-# Useful for optimising how many times JAX compiles the solve function
-# @eqx.debug.assert_max_traces(max_traces=2)
 def solve(
     solution_array: Float[Array, " sol_dim"],
     active_indices: Integer[Array, " res_dim"],
@@ -153,7 +149,7 @@ def objective_function(
     fp: FixedParameters = kwargs["fixed_parameters"]
     tau: Float[Array, ""] = kwargs["tau"]
     planet: Planet = tp.planet
-    temperature: Array = planet.temperature
+    temperature: Float[Array, ""] = planet.temperature
 
     log_number_density, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
@@ -330,7 +326,7 @@ def get_atmosphere_log_volume(
 def get_total_pressure(
     fixed_parameters: FixedParameters,
     log_number_density: Float[Array, " species_dim"],
-    temperature: ArrayLike,
+    temperature: Float[Array, ""],
 ) -> Float[Array, ""]:
     """Gets total pressure
 
@@ -496,7 +492,7 @@ def get_log_activity_ideal_mixing(
 
 
 def get_log_pressure_from_log_number_density(
-    log_number_density: Float[Array, " species_dim"], temperature: ArrayLike
+    log_number_density: Float[Array, " species_dim"], temperature: Float[Array, ""]
 ) -> Float[Array, " species_dim"]:
     """Gets log pressure from log number density
 
@@ -517,7 +513,7 @@ def get_log_pressure_from_log_number_density(
 def get_log_Kp(
     species: SpeciesCollection,
     reaction_matrix: Float[Array, "react_dim species_dim"],
-    temperature: ArrayLike,
+    temperature: Float[Array, ""],
 ) -> Float[Array, " react_dim"]:
     """Gets log of the equilibrium constant in terms of partial pressures
 
@@ -547,7 +543,7 @@ def get_log_Kp(
 
 
 def get_log_reaction_equilibrium_constant(
-    fixed_parameters: FixedParameters, temperature: ArrayLike
+    fixed_parameters: FixedParameters, temperature: Float[Array, ""]
 ) -> Float[Array, " react_dim"]:
     """Gets the log equilibrium constant of the reactions
 
@@ -577,7 +573,7 @@ def get_log_reaction_equilibrium_constant(
 
 
 def get_pressure_from_log_number_density(
-    log_number_density: Float[Array, " species_dim"], temperature: ArrayLike
+    log_number_density: Float[Array, " species_dim"], temperature: Float[Array, ""]
 ) -> Float[Array, " species_dim"]:
     """Gets pressure from log number density
 
