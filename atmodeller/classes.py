@@ -37,11 +37,10 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import solve
+from atmodeller.engine import repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
-from atmodeller.solver import repeat_solver
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -163,12 +162,15 @@ class InteriorAtmosphere:
 
             # TODO: repeat_solver is recompiled whenever the identity of self._solver changes,
             # but it would be preferred to avoid this. Hence we only compile repeat_solver if
-            # there is a need to, i.e. some cases failed. Also, repeat_solver re-performs the first
+            # there is a need to, i.e. some cases failed.
             solution, solver_status, solver_steps, solver_attempts = repeat_solver(
                 self._solver,
                 base_solution_array,
                 active_indices,
                 jnp.array(TAU, dtype=float),
+                solution,
+                solver_status,
+                solver_steps,
                 traced_parameters_,
                 solver_parameters_.multistart_perturbation,
                 solver_parameters_.multistart,
@@ -282,11 +284,7 @@ class InteriorAtmosphere:
                 "multistart_perturbation=40.0)"
             )
         else:
-            logger.info(
-                f"Solve complete: {num_successful_models} successful model(s)\n"
-                f"The number of multistarts required was {max_multistarts}, "
-                "which can depend on the choice of the random seed"
-            )
+            logger.info(f"Solve complete: {num_successful_models} successful model(s)")
 
         logger.info("Solver steps (max multistarts) = %s (%s)", solver_steps, max_multistarts)
 

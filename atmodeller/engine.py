@@ -691,6 +691,9 @@ def repeat_solver(
     base_solution_array: Float[Array, " batch_dim sol_dim"],
     active_indices: Integer[Array, " res_dim"],
     tau: Float[Array, ""],
+    first_solution: Float[Array, " batch_dim sol_dim"],
+    first_solver_status: Bool[Array, " batch_dim"],
+    first_solver_steps: Integer[Array, " batch_dim"],
     traced_parameters: TracedParameters,
     multistart_perturbation: float,
     max_attempts: int,
@@ -701,13 +704,16 @@ def repeat_solver(
     Integer[Array, " batch_dim"],
     Integer[Array, " batch_dim"],
 ]:
-    """Repeat solver that perturbs the initial solution for cases that fail
+    """Repeat solver that perturbs the initial solution guess for cases that fail and tries again
 
     Args:
         solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
         base_solution_array: Base solution to perturb if necessary
         active_indices: Indices of the residual array that are active
         tau: Tau parameter for species' stability
+        first_solution: First solution
+        first_solver_status: First solver status
+        first_solver_steps: First solver steps
         traced_parameters: Traced parameters
         multistart_perturbation: Multistart perturbation
         max_attempts: Maximum attempts
@@ -794,12 +800,8 @@ def repeat_solver(
 
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
 
-    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
-        base_solution_array, active_indices, tau, traced_parameters
-    )
-
     initial_state: tuple[Array, ...] = (
-        jnp.array(1),  # First solution made above
+        jnp.array(1),  # First solution
         key,
         first_solution,
         first_solver_status,
