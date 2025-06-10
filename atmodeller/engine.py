@@ -17,14 +17,14 @@
 """JAX-related functionality for solving the system of equations"""
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jax import lax
+from jax import lax, random
 from jax.scipy.special import logsumexp
-from jaxtyping import Array, ArrayLike, Bool, Float, Integer, Shaped
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray, Shaped
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
@@ -681,3 +681,134 @@ def get_species_ppmw_in_melt(
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
     return species_ppmw
+
+
+@eqx.filter_jit
+# Useful for optimising how many times JAX compiles the solve function
+# @eqx.debug.assert_max_traces(max_traces=1)
+def repeat_solver(
+    solver_vmap_fn: Callable,
+    base_solution_array: Float[Array, " batch_dim sol_dim"],
+    active_indices: Integer[Array, " res_dim"],
+    tau: Float[Array, ""],
+    traced_parameters: TracedParameters,
+    multistart_perturbation: float,
+    max_attempts: int,
+    key: PRNGKeyArray,
+) -> tuple[
+    Float[Array, " batch_dim sol_dim"],
+    Bool[Array, " batch_dim"],
+    Integer[Array, " batch_dim"],
+    Integer[Array, " batch_dim"],
+]:
+    """Repeat solver that perturbs the initial solution for cases that fail
+
+    Args:
+        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
+        base_solution_array: Base solution to perturb if necessary
+        active_indices: Indices of the residual array that are active
+        tau: Tau parameter for species' stability
+        traced_parameters: Traced parameters
+        multistart_perturbation: Multistart perturbation
+        max_attempts: Maximum attempts
+        key: Random key
+
+    Returns:
+        A tuple with the state: (solution, solver_status, solver_steps, solver_attempts)
+    """
+
+    def body_fn(state: tuple[Array, ...]) -> tuple[Array, ...]:
+        """Perform one iteration of the solver retry loop
+
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                key: PRNG key for random number generation
+                solution: Current solution array
+                status: Boolean array indicating successful solutions
+                steps: Step count
+                success_attempt: Integer array recording iteration of success for each entry
+
+        Returns:
+            Updated state tuple
+        """
+        i, key, solution, status, steps, success_attempt = state
+
+        failed_mask: Array = ~status
+        key, subkey = random.split(key)
+
+        # Implements a simple perturbation of the base initial solution, but something more
+        # sophisticated could be implemented, such as training a network or using a regressor
+        # to inform the next guess of the models that failed from the ones that succeeded.
+        perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
+        raw_perturb: Array = random.uniform(subkey, shape=perturb_shape, minval=-1.0, maxval=1.0)
+        perturbations: Array = jnp.where(
+            failed_mask[:, None], multistart_perturbation * raw_perturb, jnp.zeros_like(solution)
+        )
+        new_initial_solution: Array = jnp.where(
+            failed_mask[:, None], base_solution_array + perturbations, solution
+        )
+
+        new_solution, new_status, new_steps = solver_vmap_fn(
+            new_initial_solution, active_indices, tau, traced_parameters
+        )
+
+        # Determine which entries to update: previously failed, now succeeded
+        update_mask: Array = (~status) & new_status
+
+        # Update fields only for those that just succeeded
+        updated_i: Array = i + 1
+        updated_solution: Array = cast(
+            Array, jnp.where(update_mask[:, None], new_solution, solution)
+        )
+        updated_status: Array = status | new_status
+        updated_steps: Array = cast(Array, jnp.where(update_mask, new_steps, steps))
+        updated_success_attempt: Array = jnp.where(update_mask, updated_i, success_attempt)
+
+        return (
+            updated_i,
+            key,
+            updated_solution,
+            updated_status,
+            updated_steps,
+            updated_success_attempt,
+        )
+
+    def cond_fn(state: tuple[Array, ...]) -> Array:
+        """Check if the solver should continue retrying
+
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                _: Unused (PRNG key)
+                _: Unused (solution)
+                status: Boolean array indicating success of each solution
+                _: Unused (steps)
+                _: Unused (success_attempt)
+
+        Returns:
+            A boolean array indicating whether retries should continue (True if any solution
+            failed and attempts are still available)
+        """
+        i, _, _, status, _, _ = state
+
+        return jnp.logical_and(i < max_attempts, jnp.any(~status))
+
+    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
+        base_solution_array, active_indices, tau, traced_parameters
+    )
+
+    initial_state: tuple[Array, ...] = (
+        jnp.array(1),  # First solution made above
+        key,
+        first_solution,
+        first_solver_status,
+        first_solver_steps,
+        jnp.asarray(first_solver_status, dtype=int),  # 1 for solved, otherwise 0
+    )
+
+    _, _, final_solution, final_status, final_steps, final_success_attempt = lax.while_loop(
+        cond_fn, body_fn, initial_state
+    )
+
+    return final_solution, final_status, final_steps, final_success_attempt
