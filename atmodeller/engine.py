@@ -20,6 +20,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import optimistix as optx
 from jax import lax, random
@@ -88,6 +89,9 @@ def solve(
 
     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
     solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
+
+    # TODO: sol.results contains more information about the solution process, but it's wrapped up
+    # in an enum-like object
     solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
 
     return sol.value, solver_status, solver_steps
@@ -688,32 +692,26 @@ def get_species_ppmw_in_melt(
 # @eqx.debug.assert_max_traces(max_traces=1)
 def repeat_solver(
     solver_vmap_fn: Callable,
-    base_solution_array: Float[Array, " batch_dim sol_dim"],
     active_indices: Integer[Array, " res_dim"],
-    tau: Float[Array, ""],
-    first_solution: Float[Array, " batch_dim sol_dim"],
-    first_solver_status: Bool[Array, " batch_dim"],
-    first_solver_steps: Integer[Array, " batch_dim"],
+    tau: Float[Array, "..."],
+    solution: Float[Array, "batch_dim sol_dim"],
     traced_parameters: TracedParameters,
     multistart_perturbation: float,
     max_attempts: int,
     key: PRNGKeyArray,
 ) -> tuple[
-    Float[Array, " batch_dim sol_dim"],
+    Float[Array, "batch_dim sol_dim"],
     Bool[Array, " batch_dim"],
     Integer[Array, " batch_dim"],
     Integer[Array, " batch_dim"],
 ]:
-    """Repeat solver that perturbs the initial solution guess for cases that fail and tries again
+    """Repeat solver that perturbs the initial solution for cases that fail and tries again
 
     Args:
         solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
-        base_solution_array: Base solution to perturb if necessary
         active_indices: Indices of the residual array that are active
         tau: Tau parameter for species' stability
-        first_solution: First solution
-        first_solver_status: First solver status
-        first_solver_steps: First solver steps
+        solution: Solution
         traced_parameters: Traced parameters
         multistart_perturbation: Multistart perturbation
         max_attempts: Maximum attempts
@@ -740,35 +738,36 @@ def repeat_solver(
         """
         i, key, solution, status, steps, success_attempt = state
 
-        failed_mask: Array = ~status
+        failed_mask: Bool[Array, " batch_dim"] = ~status
         key, subkey = random.split(key)
 
-        # Implements a simple perturbation of the base initial solution, but something more
-        # sophisticated could be implemented, such as training a network or using a regressor
-        # to inform the next guess of the models that failed from the ones that succeeded.
+        # Perturb the (initial) solution for cases that failed. Something more sophisticated could
+        # be implemented, such as a regressor or neural network to inform failed cases based on
+        # successful solves.
         perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
-        raw_perturb: Array = random.uniform(subkey, shape=perturb_shape, minval=-1.0, maxval=1.0)
-        perturbations: Array = jnp.where(
+        raw_perturb: Float[Array, "batch_dim sol_dim"] = random.uniform(
+            subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
+        )
+        perturbations: Float[Array, "batch_dim sol_dim"] = jnp.where(
             failed_mask[:, None], multistart_perturbation * raw_perturb, jnp.zeros_like(solution)
         )
-        new_initial_solution: Array = jnp.where(
-            failed_mask[:, None], base_solution_array + perturbations, solution
-        )
+        new_initial_solution: Float[Array, "batch_dim sol_dim"] = solution + perturbations
+        # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
 
         new_solution, new_status, new_steps = solver_vmap_fn(
             new_initial_solution, active_indices, tau, traced_parameters
         )
 
         # Determine which entries to update: previously failed, now succeeded
-        update_mask: Array = (~status) & new_status
-
-        # Update fields only for those that just succeeded
-        updated_i: Array = i + 1
-        updated_solution: Array = cast(
+        update_mask: Bool[Array, " batch_dim"] = failed_mask & new_status
+        updated_i: Integer[Array, " batch_dim"] = i + 1
+        updated_solution: Float[Array, "batch_dim sol_dim"] = cast(
             Array, jnp.where(update_mask[:, None], new_solution, solution)
         )
-        updated_status: Array = status | new_status
-        updated_steps: Array = cast(Array, jnp.where(update_mask, new_steps, steps))
+        updated_status: Bool[Array, " batch_dim"] = status | new_status
+        updated_steps: Integer[Array, " batch_dim"] = cast(
+            Array, jnp.where(update_mask, new_steps, steps)
+        )
         updated_success_attempt: Array = jnp.where(update_mask, updated_i, success_attempt)
 
         return (
@@ -780,7 +779,7 @@ def repeat_solver(
             updated_success_attempt,
         )
 
-    def cond_fn(state: tuple[Array, ...]) -> Array:
+    def cond_fn(state: tuple[Array, ...]) -> Bool[Array, " batch_dim"]:
         """Check if the solver should continue retrying
 
         Args:
@@ -800,13 +799,20 @@ def repeat_solver(
 
         return jnp.logical_and(i < max_attempts, jnp.any(~status))
 
+    # Try first solution
+    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
+        solution, active_indices, tau, traced_parameters
+    )
+    # Failback solution
+    solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, solution))
+
     initial_state: tuple[Array, ...] = (
-        jnp.array(1),  # First solution
+        jnp.array(1),  # First attempt of the repeat_solver
         key,
-        first_solution,
+        solution,
         first_solver_status,
         first_solver_steps,
-        jnp.asarray(first_solver_status, dtype=int),  # 1 for solved, otherwise 0
+        first_solver_status.astype(int),  # 1 for solved, otherwise 0
     )
 
     _, _, final_solution, final_status, final_steps, final_success_attempt = lax.while_loop(
@@ -814,3 +820,93 @@ def repeat_solver(
     )
 
     return final_solution, final_status, final_steps, final_success_attempt
+
+
+# FIXME: Needs re-integrating
+def make_solve_tau_step(solver_vmap_fn: Callable, traced_parameters: TracedParameters) -> Callable:
+    """Wraps the repeat solver to call it for different tau values
+
+    Args:
+        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
+        traced_parameters: Traced parameters
+
+    Returns:
+        Wrapped solver for a single tau value
+    """
+
+    @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
+    def solve_tau_step(carry: tuple, tau: Float[Array, "..."]):
+        (
+            active_indices,
+            multistart_perturbation,
+            max_attempts,
+            key,
+            solution,
+            status,
+            steps,
+        ) = carry
+        # jax.debug.print("tau_step: tau = {out}", out=tau)
+
+        # Update PRNG key for next iteration
+        key, subkey = jax.random.split(key)
+
+        new_solution, new_status, new_steps, success_attempt = repeat_solver(
+            solver_vmap_fn,
+            active_indices,
+            tau,
+            solution,
+            traced_parameters,
+            multistart_perturbation,
+            max_attempts,
+            subkey,
+        )
+        # jax.debug.print("solve_tau_step: new_solution = {out}", out=new_solution)
+        # jax.debug.print("solve_tau_step: new_solver_status = {out}", out=new_status)
+        # jax.debug.print("solve_tau_step: new_solver_steps = {out}", out=new_steps)
+        # jax.debug.print("solve_tau_step: success_attempt = {out}", out=success_attempt)
+
+        failed_mask: Bool[Array, " batch_dim"] = ~status
+        # Determine which entries to update: previously failed, now succeeded. This also excludes
+        # previously solved cases, for which status has always been True
+        update_mask: Bool[Array, " batch_dim"] = failed_mask & new_status
+        # jax.debug.print("update_mask = {out}", out=update_mask)
+
+        # This keeps track of the total number of steps during the tau cascade
+        updated_steps: Integer[Array, " batch_dim"] = cast(
+            Array, jnp.where(update_mask, steps + new_steps, steps)
+        )
+        # jax.debug.print("updated_steps = {out}", out=updated_steps)
+
+        # updated_status: Array = status | new_status
+        # updated_steps: Array = cast(Array, jnp.where(update_mask, new_steps, steps))
+
+        # Minus 1 because this is the first attempt at solving for this TAU value, whereas the
+        # repeat_solver assumes an attempt has already been made
+        # updated_success_attempt: Array = jnp.where(update_mask, success_attempt - 1, 1)
+        # jax.debug.print("updated_success_attempt = {out}", out=updated_success_attempt)
+
+        # jax.debug.print("initial_solution = {out}", out=initial_solution)
+        # jax.debug.print("initial_status = {out}", out=initial_status)
+        # jax.debug.print("initial_steps = {out}", out=initial_steps)
+
+        # jax.debug.print("new_solution = {out}", out=new_solution)
+        # jax.debug.print("new_status = {out}", out=new_status)
+        # jax.debug.print("new_steps = {out}", out=new_steps)
+
+        new_carry = (
+            active_indices,
+            multistart_perturbation,
+            max_attempts,
+            subkey,
+            new_solution,
+            new_status,
+            updated_steps,
+        )
+
+        # Output current solution etc for this tau step
+        out = (new_solution, new_status, updated_steps)  # , updated_success_attempt)
+
+        return new_carry, out
+
+    return solve_tau_step
