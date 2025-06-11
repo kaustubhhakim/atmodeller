@@ -85,7 +85,7 @@ LOG_STABILITY_UPPER: float = 35.0
 Empirically determined.
 """
 TAU_MAX: float = 1.0e-3
-"""Maximum tau scaling factor for species stability when using repeat solver with tau"""
+"""Maximum tau scaling factor for species stability when using the tau cascade solver"""
 TAU: float = 1.0e-25
 """Desired (i.e. final/minimium) tau scaling factor for species stability :cite:p:`LKK16`.
 
@@ -97,6 +97,12 @@ This value is typically appropriate for condensate stability only, but if you ad
 stability criteria to gas species you should reduce this value, maybe as low as 1e-60 to 1e-72 if
 you want to ensure you do not truncated O2 at low temperatures. Hence you can override this default
 using an argument to :class:`atmodeller.classes.InteriorAtmosphere`.
+"""
+TAU_NUM: int = 2
+"""Number of tau values to solve between TAU_MAX and TAU (inclusive) for the tau cascade solver
+
+Empirically determined. Basically, once a solution has been found for TAU_MAX the solver can
+immediately proceed to TAU. This usually solves within a few steps on the first attempt.
 """
 
 # Create the package logger.

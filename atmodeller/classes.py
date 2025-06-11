@@ -28,7 +28,7 @@ import jax.random as random
 import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -38,7 +38,7 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import repeat_solver, solve
+from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
 from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
@@ -169,7 +169,7 @@ class InteriorAtmosphere:
 
         if jnp.any(~solver_status):
             num_failed: int = jnp.sum(~solver_status).item()
-            logger.warning(f"{num_failed} models failed to converge on the first attempt")
+            logger.warning(f"{num_failed} model(s) failed to converge on the first attempt")
             logger.warning(
                 "But no problem just yet! Launching multistart (maximum %d attempts)",
                 solver_parameters_.multistart,
@@ -185,22 +185,77 @@ class InteriorAtmosphere:
             key: PRNGKeyArray = jax.random.PRNGKey(0)
             key, subkey = random.split(key)
 
-            solution, solver_status_, solver_steps_, solver_attempts = repeat_solver(
-                self._solver,
-                active_indices,
-                broadcasted_tau,
-                solution,
-                traced_parameters_,
-                solver_parameters_.multistart_perturbation,
-                solver_parameters_.multistart,
-                subkey,
-            )
+            if jnp.any(fixed_parameters_.active_stability()):
+                logger.info(
+                    "Multistart with tau cascade (TAU_MAX=%.2e, TAU=%.2f, TAU_NUM=%d)",
+                    TAU_MAX,
+                    TAU,
+                    TAU_NUM,
+                )
+                varying_tau_row: Float[Array, " tau_dim"] = jnp.logspace(
+                    jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
+                )
+                constant_tau_row: Float[Array, " tau_dim"] = jnp.full((TAU_NUM,), TAU)
+                tau_templates: Float[Array, "2 tau_dim"] = jnp.stack(
+                    [varying_tau_row, constant_tau_row], axis=0
+                )
+                tau_array: Float[Array, "tau_dim batch_dim"] = tau_templates[
+                    solver_status.astype(int)
+                ].T
+                # jax.debug.print("tau_array = {out}", out=tau_array)
+
+                initial_carry: tuple = (subkey, solution)
+                solve_tau_step: Callable = make_solve_tau_step(
+                    self._solver,
+                    active_indices,
+                    traced_parameters_,
+                    solver_parameters_.multistart_perturbation,
+                    solver_parameters_.multistart,
+                )
+
+                _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
+                solution, solver_status_, solver_steps_, solver_attempts = results
+
+                failed_indices = jnp.where(~solver_status)[0]
+                for i in failed_indices.tolist():
+                    logger.debug(f"--- Solve summary for failed index {i} ---")
+                    for tau_i in range(TAU_NUM):
+                        status_i = bool(solver_status_[tau_i, i])
+                        steps_i = int(solver_steps_[tau_i, i])
+                        attempt_i = int(solver_attempts[tau_i, i])
+                        logger.debug(
+                            f"Tau step {tau_i:02d}: status={status_i}, steps={steps_i}, attempt={attempt_i}"
+                        )
+
+                # Grab the last (final) tau solution
+                solution = solution[-1]
+                solver_status_ = solver_status_[-1]
+                solver_steps_ = solver_steps_[-1]
+                solver_attempts = solver_attempts[-1]
+
+                # jax.debug.print("solution = {out}", out=solution)
+                # jax.debug.print("solver_status_ = {out}", out=solver_status_)
+                # jax.debug.print("solver_steps_ = {out}", out=solver_steps_)
+                # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
+
+            else:
+                solution, solver_status_, solver_steps_, solver_attempts = repeat_solver(
+                    self._solver,
+                    active_indices,
+                    broadcasted_tau,
+                    solution,
+                    traced_parameters_,
+                    solver_parameters_.multistart_perturbation,
+                    solver_parameters_.multistart,
+                    subkey,
+                )
 
             # Restore statistics of cases that solved first time
             solver_steps: Integer[Array, " batch_dim"] = jnp.where(
                 solver_status, solver_steps, solver_steps_
             )
             solver_status: Bool[Array, " batch_dim"] = solver_status_  # Final status
+            # FIXME: Might be different for tau cascade
             # Since tau is unaltered, the first multistart just repeats the first calculation
             # that we already know has some failed cases. So we minus one for the reporting here.
             max_multistarts: int = jnp.max(solver_attempts).item() - 1
@@ -213,60 +268,7 @@ class InteriorAtmosphere:
         if num_failed_models > 0:
             logger.warning("%d models failed", num_failed_models)
 
-        logger.debug("Solver steps = %s", solver_steps)
-
-        # if jnp.any(~solver_status):
-        #     num_failed = jnp.sum(~solver_status)
-        #     logger.warning(f"{num_failed} models failed to converge after the first attempt")
-        #     logger.warning("Launching multistart ...")
-
-        #     if jnp.any(fixed_parameters_.active_stability()):
-        #         # Cascade tau
-        #         # TODO: Need to empirically calibrate these values
-        #         varying_tau_row = jnp.logspace(jnp.log10(1.0), jnp.log10(TAU), num=10)
-        #         constant_tau_row = jnp.full((10,), TAU)
-        #         tau_templates = jnp.stack([varying_tau_row, constant_tau_row], axis=0)
-        #         tau_array = tau_templates[solver_status.astype(int)].T
-        #     else:
-        #         # No need to cascade tau, just need repeat_solver
-        #         tau_array = jnp.atleast_2d(broadcasted_tau)
-
-        #     # HACK: To try and get solver to work
-        #     tau_array = jnp.atleast_2d(broadcasted_tau)
-        #     # jax.debug.print("tau_array = {out}", out=tau_array)
-
-        #     key: PRNGKeyArray = jax.random.PRNGKey(0)
-        #     key, subkey = jax.random.split(key)
-
-        #     # Restore the base solution for cases that failed since this will be perturbed
-        #     failed_mask: Bool[Array, " batch_dim"] = ~solver_status
-        #     solution = jnp.where(failed_mask[:, None], base_solution_array, solution)
-        #     # jax.debug.print("solution = {out}", out=solution)
-
-        #     initial_carry: tuple = (
-        #         active_indices,
-        #         solver_parameters_.multistart_perturbation,
-        #         solver_parameters_.multistart,
-        #         subkey,
-        #         solution,
-        #         solver_status,
-        #         # Only keep steps for cases that solved
-        #         jnp.where(solver_status, solver_steps, 0),
-        #     )
-        #     solve_tau_step: Callable = make_solve_tau_step(self._solver, traced_parameters_)
-
-        #     # jax.debug.print("solution = {out}", out=solution)
-
-        #     # jax.debug.print("tau_array = {out}", out=tau_array.T)
-
-        #     _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
-        #     solution, solver_status, solver_steps = results
-
-        #     # Just grab the last (final) tau solution
-        #     solution = solution[-1]
-        #     solver_status = solver_status[-1]
-        #     solver_steps = solver_steps[-1]
-        #     solver_attempts = solver_attempts[-1]
+        logger.info("Solver steps = %s", solver_steps)
 
         self._output = Output(
             self.species,
@@ -342,8 +344,6 @@ class InteriorAtmosphere:
 
         transpose_formula_matrix: NpInt = self.get_formula_matrix().T
         reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
-
-        logger.debug("reaction_matrix = %s", reaction_matrix)
 
         return reaction_matrix
 

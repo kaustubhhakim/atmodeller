@@ -230,12 +230,12 @@ class Output:
             # Shift at 1 bar
             buffer_at_one_bar: NpFloat = np.asarray(buffer.log10_fugacity(temperature, 1.0))
             log10_shift_at_one_bar: NpFloat = log10_fugacity - buffer_at_one_bar
-            logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
+            # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
             out["O2_g"]["log10dIW_1_bar"] = log10_shift_at_one_bar
             # Shift at actual pressure
             buffer_at_P: NpFloat = np.asarray(buffer.log10_fugacity(temperature, pressure))
             log10_shift_at_P: NpFloat = log10_fugacity - buffer_at_P
-            logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
+            # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
         out["solver"] = {
@@ -438,15 +438,15 @@ class Output:
                 np.log10(out["total_moles"] / H_total_moles[:, np.newaxis]) + 12
             )
 
-        logger.debug("out = %s", out)
+        # logger.debug("out = %s", out)
 
         split_dict: list[dict[str, NpArray]] = split_dict_by_columns(out)
-        logger.debug("split_dict = %s", split_dict)
+        # logger.debug("split_dict = %s", split_dict)
 
         elements_out: dict[str, dict[str, NpArray]] = {
             f"element_{element}": split_dict[ii] for ii, element in enumerate(unique_elements)
         }
-        logger.debug("elements_out = %s", elements_out)
+        # logger.debug("elements_out = %s", elements_out)
 
         return elements_out
 

@@ -822,13 +822,21 @@ def repeat_solver(
     return final_solution, final_status, final_steps, final_success_attempt
 
 
-# FIXME: Needs re-integrating
-def make_solve_tau_step(solver_vmap_fn: Callable, traced_parameters: TracedParameters) -> Callable:
+def make_solve_tau_step(
+    solver_vmap_fn: Callable,
+    active_indices: Integer[Array, " res_dim"],
+    traced_parameters: TracedParameters,
+    multistart_perturbation: float,
+    max_attempts: int,
+) -> Callable:
     """Wraps the repeat solver to call it for different tau values
 
     Args:
         solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
+        active_indices: Indices of the residual array that are active
         traced_parameters: Traced parameters
+        multistart_perturbation: Multistart perturbation
+        max_attempts: Maximum attempts
 
     Returns:
         Wrapped solver for a single tau value
@@ -836,19 +844,8 @@ def make_solve_tau_step(solver_vmap_fn: Callable, traced_parameters: TracedParam
 
     @eqx.filter_jit
     # @eqx.debug.assert_max_traces(max_traces=1)
-    def solve_tau_step(carry: tuple, tau: Float[Array, "..."]):
-        (
-            active_indices,
-            multistart_perturbation,
-            max_attempts,
-            key,
-            solution,
-            status,
-            steps,
-        ) = carry
-        # jax.debug.print("tau_step: tau = {out}", out=tau)
-
-        # Update PRNG key for next iteration
+    def solve_tau_step(carry: tuple, tau: Float[Array, " batch_dim"]) -> tuple[tuple, tuple]:
+        (key, solution) = carry
         key, subkey = jax.random.split(key)
 
         new_solution, new_status, new_steps, success_attempt = repeat_solver(
@@ -861,51 +858,11 @@ def make_solve_tau_step(solver_vmap_fn: Callable, traced_parameters: TracedParam
             max_attempts,
             subkey,
         )
-        # jax.debug.print("solve_tau_step: new_solution = {out}", out=new_solution)
-        # jax.debug.print("solve_tau_step: new_solver_status = {out}", out=new_status)
-        # jax.debug.print("solve_tau_step: new_solver_steps = {out}", out=new_steps)
-        # jax.debug.print("solve_tau_step: success_attempt = {out}", out=success_attempt)
 
-        failed_mask: Bool[Array, " batch_dim"] = ~status
-        # Determine which entries to update: previously failed, now succeeded. This also excludes
-        # previously solved cases, for which status has always been True
-        update_mask: Bool[Array, " batch_dim"] = failed_mask & new_status
-        # jax.debug.print("update_mask = {out}", out=update_mask)
-
-        # This keeps track of the total number of steps during the tau cascade
-        updated_steps: Integer[Array, " batch_dim"] = cast(
-            Array, jnp.where(update_mask, steps + new_steps, steps)
-        )
-        # jax.debug.print("updated_steps = {out}", out=updated_steps)
-
-        # updated_status: Array = status | new_status
-        # updated_steps: Array = cast(Array, jnp.where(update_mask, new_steps, steps))
-
-        # Minus 1 because this is the first attempt at solving for this TAU value, whereas the
-        # repeat_solver assumes an attempt has already been made
-        # updated_success_attempt: Array = jnp.where(update_mask, success_attempt - 1, 1)
-        # jax.debug.print("updated_success_attempt = {out}", out=updated_success_attempt)
-
-        # jax.debug.print("initial_solution = {out}", out=initial_solution)
-        # jax.debug.print("initial_status = {out}", out=initial_status)
-        # jax.debug.print("initial_steps = {out}", out=initial_steps)
-
-        # jax.debug.print("new_solution = {out}", out=new_solution)
-        # jax.debug.print("new_status = {out}", out=new_status)
-        # jax.debug.print("new_steps = {out}", out=new_steps)
-
-        new_carry = (
-            active_indices,
-            multistart_perturbation,
-            max_attempts,
-            subkey,
-            new_solution,
-            new_status,
-            updated_steps,
-        )
+        new_carry: tuple[PRNGKeyArray, Float[Array, "batch_dim sol_dim"]] = (key, new_solution)
 
         # Output current solution etc for this tau step
-        out = (new_solution, new_status, updated_steps)  # , updated_success_attempt)
+        out: tuple[Array, ...] = (new_solution, new_status, new_steps, success_attempt)
 
         return new_carry, out
 
