@@ -834,7 +834,7 @@ class Output:
             logger.info("Computing to_dataframes output")
             dataframes = nested_dict_to_dataframes(self.asdict())
             self._cached_dataframes = dataframes
-            logger.debug("to_dataframes = %s", self._cached_dataframes)
+            # logger.debug("to_dataframes = %s", self._cached_dataframes)
 
         if drop_unsuccessful:
             logger.info("Dropping models that did not solve")

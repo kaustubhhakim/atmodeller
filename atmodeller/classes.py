@@ -187,7 +187,7 @@ class InteriorAtmosphere:
 
             if jnp.any(fixed_parameters_.active_stability()):
                 logger.info(
-                    "Multistart with tau cascade (TAU_MAX=%.2e, TAU=%.2f, TAU_NUM=%d)",
+                    "Multistart with tau cascade (TAU_MAX=%.1e, TAU=%.1e, TAU_NUM=%d)",
                     TAU_MAX,
                     TAU,
                     TAU_NUM,
