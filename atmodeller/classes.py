@@ -157,7 +157,8 @@ class InteriorAtmosphere:
         # Initial solution and tau must be broadcast since they are always batched
         self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, None, 0, in_axes)))
 
-        # First solution attempt
+        # First solution attempt. If the initial guess is close enough we might just find solutions
+        # for all cases.
         logger.info(f"Attempting to solve {batch_size} model(s)")
         solution, solver_status, solver_steps = self._solver(
             base_solution_array, active_indices, broadcasted_tau, traced_parameters_
@@ -169,10 +170,13 @@ class InteriorAtmosphere:
 
         if jnp.any(~solver_status):
             num_failed: int = jnp.sum(~solver_status).item()
-            logger.warning(f"{num_failed} model(s) failed to converge on the first attempt")
+            logger.warning("%d model(s) failed to converge on the first attempt", num_failed)
+            logger.warning("But don't panic! This is not unexpected")
             logger.warning(
-                "But no problem just yet! Launching multistart (maximum %d attempts)",
-                solver_parameters_.multistart,
+                "Launching multistart (maximum %d attempts)", solver_parameters_.multistart
+            )
+            logger.warning(
+                "Attempting to solve the %d models(s) that initially failed", num_failed
             )
 
             # Restore the base solution for cases that failed since this will be perturbed
@@ -187,7 +191,7 @@ class InteriorAtmosphere:
 
             if jnp.any(fixed_parameters_.active_stability()):
                 logger.info(
-                    "Multistart with tau cascade (TAU_MAX=%.1e, TAU=%.1e, TAU_NUM=%d)",
+                    "Multistart with species' stability (TAU_MAX= %.1e, TAU= %.1e, TAU_NUM= %d)",
                     TAU_MAX,
                     TAU,
                     TAU_NUM,
@@ -204,7 +208,7 @@ class InteriorAtmosphere:
                 ].T
                 # jax.debug.print("tau_array = {out}", out=tau_array)
 
-                initial_carry: tuple = (subkey, solution)
+                initial_carry: tuple[Array, Array] = (subkey, solution)
                 solve_tau_step: Callable = make_solve_tau_step(
                     self._solver,
                     active_indices,
@@ -212,26 +216,39 @@ class InteriorAtmosphere:
                     solver_parameters_.multistart_perturbation,
                     solver_parameters_.multistart,
                 )
-
                 _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
                 solution, solver_status_, solver_steps_, solver_attempts = results
 
-                failed_indices = jnp.where(~solver_status)[0]
-                for i in failed_indices.tolist():
-                    logger.debug(f"--- Solve summary for failed index {i} ---")
+                # Debugging output. Requires the complete arrays as given above.
+                failed_indices: Integer[Array, "..."] = jnp.where(~solver_status)[0]
+                for ii in failed_indices.tolist():
+                    logger.debug(f"--- Solve summary for failed index {ii} ---")
                     for tau_i in range(TAU_NUM):
-                        status_i = bool(solver_status_[tau_i, i])
-                        steps_i = int(solver_steps_[tau_i, i])
-                        attempt_i = int(solver_attempts[tau_i, i])
+                        status_i: bool = bool(solver_status_[tau_i, ii])
+                        steps_i: int = int(solver_steps_[tau_i, ii])
+                        attempts_i: int = int(solver_attempts[tau_i, ii])
                         logger.debug(
-                            f"Tau step {tau_i:02d}: status={status_i}, steps={steps_i}, attempt={attempt_i}"
+                            "Tau step %1d: status= %-5s  steps= %3d  attempts= %2d",
+                            tau_i,
+                            str(status_i),
+                            steps_i,
+                            attempts_i,
                         )
 
+                # Aggregate output
+                solution = solution[-1]  # Only need solution for final TAU
+                solver_status_ = solver_status_[-1]  # Only need status for final TAU
+                solver_steps_ = jnp.sum(solver_steps_, axis=0)  # Sum steps for all tau
+                solver_attempts = jnp.max(solver_attempts, axis=0)  # Max for all tau
+
+                # Maximum attempts across all tau and all models
+                max_attempts: int = jnp.max(solver_attempts).item()
+
                 # Grab the last (final) tau solution
-                solution = solution[-1]
-                solver_status_ = solver_status_[-1]
-                solver_steps_ = solver_steps_[-1]
-                solver_attempts = solver_attempts[-1]
+                # solution = solution[-1]
+                # solver_status_ = solver_status_[-1]
+                # solver_steps_ = solver_steps_[-1]
+                # solver_attempts = solver_attempts[-1]
 
                 # jax.debug.print("solution = {out}", out=solution)
                 # jax.debug.print("solver_status_ = {out}", out=solver_status_)
@@ -249,26 +266,38 @@ class InteriorAtmosphere:
                     solver_parameters_.multistart,
                     subkey,
                 )
+                max_attempts = jnp.max(solver_attempts).item()
+                # Since tau is unaltered, the first multistart just repeats the first calculation,
+                # which we already know has some failed cases. So we minus one for the reporting.
+                max_attempts -= 1
+
+            logger.info("Multistart complete with %s attempt(s)", max_attempts)
 
             # Restore statistics of cases that solved first time
             solver_steps: Integer[Array, " batch_dim"] = jnp.where(
                 solver_status, solver_steps, solver_steps_
             )
             solver_status: Bool[Array, " batch_dim"] = solver_status_  # Final status
-            # FIXME: Might be different for tau cascade
-            # Since tau is unaltered, the first multistart just repeats the first calculation
-            # that we already know has some failed cases. So we minus one for the reporting here.
-            max_multistarts: int = jnp.max(solver_attempts).item() - 1
-            logger.info("Multistart complete with %d attempts", max_multistarts)
+
+            # Count unique values and their frequencies
+            unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
+            for val, count in zip(unique_vals.tolist(), counts.tolist()):
+                logger.info(
+                    "Max attempts: %d, count: %d (%0.2f%%)",
+                    val,
+                    count,
+                    count / batch_size,
+                )
 
         num_successful_models: int = jnp.count_nonzero(solver_status).item()
         num_failed_models: int = jnp.count_nonzero(~solver_status).item()
 
         logger.info("Solve complete: %d successful model(s)", num_successful_models)
-        if num_failed_models > 0:
-            logger.warning("%d models failed", num_failed_models)
 
-        logger.info("Solver steps = %s", solver_steps)
+        if num_failed_models > 0:
+            logger.warning("%d model(s) still failed", num_failed_models)
+
+        logger.debug("Solver steps = %s", solver_steps)
 
         self._output = Output(
             self.species,
