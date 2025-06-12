@@ -264,10 +264,10 @@ def objective_function(
     )
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
     # TODO: Previous relative error is below, but this is scale inconsistent with other residuals.
-    # mass_residual: Float[Array, " el_dim"] = (
-    #     safe_exp(log_element_density_total - log_target_density) - 1
-    # )
-    mass_residual = log_element_density_total - log_target_density
+    mass_residual: Float[Array, " el_dim"] = (
+        safe_exp(log_element_density_total - log_target_density) - 1
+    )
+    # mass_residual = log_element_density_total - log_target_density
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
     # jax.debug.print(
     #     "mass_residual min/max: {out}/{out2}",

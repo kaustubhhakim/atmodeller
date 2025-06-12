@@ -198,7 +198,7 @@ class InteriorAtmosphere:
             logger.info("Switch solver to LevenbergMarquardt")
 
             # TODO: prototyping
-            # new_solver_params = eqx.tree_at(
+            # solver_parameters_ = eqx.tree_at(
             #     lambda sp: sp.solver,
             #     solver_parameters_,  # your original instance
             #     optx.LevenbergMarquardt,  # or whatever solver you want to use
