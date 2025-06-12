@@ -799,11 +799,9 @@ class SolverParameters(eqx.Module):
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
-    solver_instance: OptxSolver = eqx.field(init=False)
-    """Solver instance"""
 
-    def __post_init__(self):
-        self.solver_instance = self.solver(
+    def get_solver_instance(self) -> OptxSolver:
+        return self.solver(
             rtol=self.rtol,
             atol=self.atol,
             norm=self.norm,

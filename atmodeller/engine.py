@@ -53,8 +53,8 @@ def solve(
     active_indices: Integer[Array, " res_dim"],
     tau: Float[Array, ""],
     traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
+    fixed_parameters: FixedParameters,
     options: dict[str, Any],
 ) -> tuple[Float[Array, " sol_dim"], Bool[Array, ""], Integer[Array, ""]]:
     """Solves the system of non-linear equations
@@ -64,8 +64,8 @@ def solve(
         active_indices: Indices of the residual array that are active
         tau: Tau parameter for species' stability
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
         solver_parameters: Solver parameters
+        fixed_parameters: Fixed parameters
         options: Options for root find
 
     Returns:
@@ -73,7 +73,7 @@ def solve(
     """
     sol: optx.Solution = optx.root_find(
         objective_function,
-        solver_parameters.solver_instance,
+        solver_parameters.get_solver_instance(),
         solution_array,
         args={
             "traced_parameters": traced_parameters,
@@ -139,10 +139,10 @@ def objective_function(
     The order of the residual does make a difference to the solution process. More investigations
     are necessary, but justification for the current ordering is as follows:
 
-        1. Reaction constraints - log-linear, physics-based coupling
-        2. Fugacity constraints - fixed target, well conditioned
+        1. Fugacity constraints - fixed target, well conditioned
+        2. Reaction constraints - log-linear, physics-based coupling
         3. Mass balance constraints - stiffer, depends on solubility
-        4. Stability constraints - soft, conditional, easy to push last
+        4. Stability constraints - stiffer still
 
     Args:
         solution: Solution array for all species i.e. log number density and log stability
@@ -191,8 +191,21 @@ def objective_function(
     #       would involve solving non-linear real gas EOS, potentially increasing the solve
     #       complexity and time substantially.
 
-    # NOTE: Order of entries in the residual must correlate with the final jnp.take operation
-    residual: Float[Array, " res_dim"] = jnp.array([], dtype=jnp.float64)
+    # Fugacity constraints residual
+    fugacity_residual = log_activity_number_density - tp.fugacity_constraints.log_number_density(
+        temperature, total_pressure
+    )
+    # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+    # jax.debug.print(
+    #     "fugacity_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(fugacity_residual),
+    #     out2=jnp.nanmax(fugacity_residual),
+    # )
+    # jax.debug.print(
+    #     "fugacity_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(fugacity_residual),
+    #     out2=jnp.nanstd(fugacity_residual),
+    # )
 
     # Reaction network residual
     # TODO: Is it possible to remove this if statement?
@@ -217,14 +230,19 @@ def objective_function(
             safe_exp(log_stability)
         )
         # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
-        residual = jnp.concatenate([residual, reaction_residual])
+        # jax.debug.print(
+        #     "reaction_residual min/max: {out}/{out2}",
+        #     out=jnp.nanmin(reaction_residual),
+        #     out2=jnp.nanmax(reaction_residual),
+        # )
+        # jax.debug.print(
+        #     "reaction_residual mean/std: {out}/{out2}",
+        #     out=jnp.nanmean(reaction_residual),
+        #     out2=jnp.nanstd(reaction_residual),
+        # )
 
-    # Fugacity constraints residual
-    fugacity_residual = log_activity_number_density - tp.fugacity_constraints.log_number_density(
-        temperature, total_pressure
-    )
-    # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-    residual = jnp.concatenate([residual, fugacity_residual])
+    else:
+        reaction_residual = jnp.atleast_1d(jnp.array([]))
 
     # Elemental mass balance residual
     # Number density of elements in the gas or condensed phase
@@ -245,11 +263,22 @@ def objective_function(
         log_volume
     )
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
-    mass_residual: Float[Array, " el_dim"] = (
-        safe_exp(log_element_density_total - log_target_density) - 1
-    )
+    # TODO: Previous relative error is below, but this is scale inconsistent with other residuals.
+    # mass_residual: Float[Array, " el_dim"] = (
+    #     safe_exp(log_element_density_total - log_target_density) - 1
+    # )
+    mass_residual = log_element_density_total - log_target_density
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
-    residual = jnp.concatenate([residual, mass_residual])
+    # jax.debug.print(
+    #     "mass_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(mass_residual),
+    #     out2=jnp.nanmax(mass_residual),
+    # )
+    # jax.debug.print(
+    #     "mass_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(mass_residual),
+    #     out2=jnp.nanstd(mass_residual),
+    # )
 
     # Stability residual
     log_min_number_density: Float[Array, " species_dim"] = (
@@ -262,17 +291,23 @@ def objective_function(
         log_number_density + log_stability - log_min_number_density
     )
     # jax.debug.print("stability_residual = {out}", out=stability_residual)
-    # Mask stability residuals for species that do not require stability calculations
-    stability_residual = stability_residual * fp.active_stability()
-    # jax.debug.print("stability_residual = {out}", out=stability_residual)
-    residual = jnp.concatenate([residual, stability_residual])
+    # jax.debug.print(
+    #     "stability_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(stability_residual),
+    #     out2=jnp.nanmax(stability_residual),
+    # )
+    # jax.debug.print(
+    #     "stability_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(stability_residual),
+    #     out2=jnp.nanstd(stability_residual),
+    # )
+
+    # NOTE: Order must be compatible with active_indices
+    residual = jnp.concatenate(
+        [fugacity_residual, reaction_residual, mass_residual, stability_residual]
+    )
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 
-    # nans denote unused conditions that should not be returned
-    # Exact zeros should never be used for padding since this would make the Jacobian rank
-    # deficient. Something like block-augmented regularisation would be required to pad the
-    # residual array to a fixed size if required or desired.
-    # residual = jnp.where(jnp.isnan(residual), 0.0, residual)
     residual = jnp.take(residual, indices=active_indices)  # type: ignore
     # jax.debug.print("residual = {out}", out=residual)
 
@@ -696,8 +731,7 @@ def repeat_solver(
     tau: Float[Array, "..."],
     solution: Float[Array, "batch_dim sol_dim"],
     traced_parameters: TracedParameters,
-    multistart_perturbation: float,
-    max_attempts: int,
+    solver_parameters: SolverParameters,
     key: PRNGKeyArray,
 ) -> tuple[
     Float[Array, "batch_dim sol_dim"],
@@ -713,8 +747,7 @@ def repeat_solver(
         tau: Tau parameter for species' stability
         solution: Solution
         traced_parameters: Traced parameters
-        multistart_perturbation: Multistart perturbation
-        max_attempts: Maximum attempts
+        solver_paramters: Solver parameters
         key: Random key
 
     Returns:
@@ -749,18 +782,20 @@ def repeat_solver(
             subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
         )
         perturbations: Float[Array, "batch_dim sol_dim"] = jnp.where(
-            failed_mask[:, None], multistart_perturbation * raw_perturb, jnp.zeros_like(solution)
+            failed_mask[:, None],
+            solver_parameters.multistart_perturbation * raw_perturb,
+            jnp.zeros_like(solution),
         )
         new_initial_solution: Float[Array, "batch_dim sol_dim"] = solution + perturbations
         # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
 
         new_solution, new_status, new_steps = solver_vmap_fn(
-            new_initial_solution, active_indices, tau, traced_parameters
+            new_initial_solution, active_indices, tau, traced_parameters, solver_parameters
         )
 
         # Determine which entries to update: previously failed, now succeeded
         update_mask: Bool[Array, " batch_dim"] = failed_mask & new_status
-        updated_i: Integer[Array, " batch_dim"] = i + 1
+        updated_i: Integer[Array, "..."] = i + 1
         updated_solution: Float[Array, "batch_dim sol_dim"] = cast(
             Array, jnp.where(update_mask[:, None], new_solution, solution)
         )
@@ -779,7 +814,7 @@ def repeat_solver(
             updated_success_attempt,
         )
 
-    def cond_fn(state: tuple[Array, ...]) -> Bool[Array, " batch_dim"]:
+    def cond_fn(state: tuple[Array, ...]) -> Bool[Array, "..."]:
         """Check if the solver should continue retrying
 
         Args:
@@ -797,11 +832,11 @@ def repeat_solver(
         """
         i, _, _, status, _, _ = state
 
-        return jnp.logical_and(i < max_attempts, jnp.any(~status))
+        return jnp.logical_and(i < solver_parameters.multistart, jnp.any(~status))
 
     # Try first solution
     first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
-        solution, active_indices, tau, traced_parameters
+        solution, active_indices, tau, traced_parameters, solver_parameters
     )
     # Failback solution
     solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, solution))
@@ -826,8 +861,7 @@ def make_solve_tau_step(
     solver_vmap_fn: Callable,
     active_indices: Integer[Array, " res_dim"],
     traced_parameters: TracedParameters,
-    multistart_perturbation: float,
-    max_attempts: int,
+    solver_parameters: SolverParameters,
 ) -> Callable:
     """Wraps the repeat solver to call it for different tau values
 
@@ -835,8 +869,7 @@ def make_solve_tau_step(
         solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
         active_indices: Indices of the residual array that are active
         traced_parameters: Traced parameters
-        multistart_perturbation: Multistart perturbation
-        max_attempts: Maximum attempts
+        solver_parameters: Solver parameters
 
     Returns:
         Wrapped solver for a single tau value
@@ -854,8 +887,7 @@ def make_solve_tau_step(
             tau,
             solution,
             traced_parameters,
-            multistart_perturbation,
-            max_attempts,
+            solver_parameters,
             subkey,
         )
 

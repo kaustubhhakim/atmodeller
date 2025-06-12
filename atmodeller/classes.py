@@ -126,8 +126,8 @@ class InteriorAtmosphere:
         # of entries in the residual.
         active: Bool[Array, " res_dim"] = jnp.concatenate(
             (
-                fixed_parameters_.active_reactions(),
                 fugacity_constraints_.active(),
+                fixed_parameters_.active_reactions(),
                 mass_constraints_.active(),
                 fixed_parameters_.active_stability(),
             )
@@ -147,21 +147,27 @@ class InteriorAtmosphere:
         # Pre-bind fixed configurations
         solver_fn: Callable = eqx.Partial(
             solve,
+            # solver_parameters=solver_parameters_,
             fixed_parameters=fixed_parameters_,
-            solver_parameters=solver_parameters_,
             options=options,
         )
         in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
 
         # Compile the solver, and this is re-used unless recompilation is triggered
         # Initial solution and tau must be broadcast since they are always batched
-        self._solver = eqx.filter_jit(eqx.filter_vmap(solver_fn, in_axes=(0, None, 0, in_axes)))
+        self._solver = eqx.filter_jit(
+            eqx.filter_vmap(solver_fn, in_axes=(0, None, 0, in_axes, None))
+        )
 
         # First solution attempt. If the initial guess is close enough we might just find solutions
         # for all cases.
         logger.info(f"Attempting to solve {batch_size} model(s)")
         solution, solver_status, solver_steps = self._solver(
-            base_solution_array, active_indices, broadcasted_tau, traced_parameters_
+            base_solution_array,
+            active_indices,
+            broadcasted_tau,
+            traced_parameters_,
+            solver_parameters_,
         )
         # jax.debug.print("solver_status = {out}", out=solver_status)
         # jax.debug.print("solver_steps = {out}", out=solver_steps)
@@ -189,6 +195,16 @@ class InteriorAtmosphere:
             key: PRNGKeyArray = jax.random.PRNGKey(0)
             key, subkey = random.split(key)
 
+            logger.info("Switch solver to LevenbergMarquardt")
+
+            # TODO: prototyping
+            # new_solver_params = eqx.tree_at(
+            #     lambda sp: sp.solver,
+            #     solver_parameters_,  # your original instance
+            #     optx.LevenbergMarquardt,  # or whatever solver you want to use
+            # )
+            # print(new_solver_params)
+
             if jnp.any(fixed_parameters_.active_stability()):
                 logger.info(
                     "Multistart with species' stability (TAU_MAX= %.1e, TAU= %.1e, TAU_NUM= %d)",
@@ -210,11 +226,7 @@ class InteriorAtmosphere:
 
                 initial_carry: tuple[Array, Array] = (subkey, solution)
                 solve_tau_step: Callable = make_solve_tau_step(
-                    self._solver,
-                    active_indices,
-                    traced_parameters_,
-                    solver_parameters_.multistart_perturbation,
-                    solver_parameters_.multistart,
+                    self._solver, active_indices, traced_parameters_, solver_parameters_
                 )
                 _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
                 solution, solver_status_, solver_steps_, solver_attempts = results
@@ -256,8 +268,7 @@ class InteriorAtmosphere:
                     broadcasted_tau,
                     solution,
                     traced_parameters_,
-                    solver_parameters_.multistart_perturbation,
-                    solver_parameters_.multistart,
+                    solver_parameters_,
                     subkey,
                 )
                 max_attempts = jnp.max(solver_attempts).item()
