@@ -271,7 +271,7 @@ class InteriorAtmosphere:
                 # which we already know has some failed cases. So we minus one for the reporting.
                 max_attempts -= 1
 
-            logger.info("Multistart complete with %s attempt(s)", max_attempts)
+            logger.info("Multistart complete with %s total attempt(s)", max_attempts)
 
             # Restore statistics of cases that solved first time
             solver_steps: Integer[Array, " batch_dim"] = jnp.where(
@@ -283,19 +283,27 @@ class InteriorAtmosphere:
             unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
             for val, count in zip(unique_vals.tolist(), counts.tolist()):
                 logger.info(
-                    "Max attempts: %d, count: %d (%0.2f%%)",
+                    "Multistart, max attempts: %d, model count: %d (%0.2f%%)",
                     val,
                     count,
-                    count / batch_size,
+                    count * 100 / batch_size,
                 )
 
         num_successful_models: int = jnp.count_nonzero(solver_status).item()
         num_failed_models: int = jnp.count_nonzero(~solver_status).item()
 
-        logger.info("Solve complete: %d successful model(s)", num_successful_models)
+        logger.info(
+            "Solve complete: %d (%0.2f%%) successful model(s)",
+            num_successful_models,
+            num_successful_models * 100 / batch_size,
+        )
 
         if num_failed_models > 0:
-            logger.warning("%d model(s) still failed", num_failed_models)
+            logger.warning(
+                "%d (%0.2f%%) model(s) still failed",
+                num_failed_models,
+                num_failed_models * 100 / batch_size,
+            )
 
         logger.debug("Solver steps = %s", solver_steps)
 
