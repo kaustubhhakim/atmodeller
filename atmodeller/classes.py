@@ -200,12 +200,12 @@ class InteriorAtmosphere:
                     jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
                 )
                 constant_tau_row: Float[Array, " tau_dim"] = jnp.full((TAU_NUM,), TAU)
-                tau_templates: Float[Array, "2 tau_dim"] = jnp.stack(
-                    [varying_tau_row, constant_tau_row], axis=0
+                tau_templates: Float[Array, "tau_dim 2"] = jnp.stack(
+                    [varying_tau_row, constant_tau_row], axis=1
                 )
                 tau_array: Float[Array, "tau_dim batch_dim"] = tau_templates[
-                    solver_status.astype(int)
-                ].T
+                    :, solver_status.astype(int)
+                ]
                 # jax.debug.print("tau_array = {out}", out=tau_array)
 
                 initial_carry: tuple[Array, Array] = (subkey, solution)
