@@ -241,19 +241,13 @@ class InteriorAtmosphere:
                 solver_steps_ = jnp.sum(solver_steps_, axis=0)  # Sum steps for all tau
                 solver_attempts = jnp.max(solver_attempts, axis=0)  # Max for all tau
 
-                # Maximum attempts across all tau and all models
-                max_attempts: int = jnp.max(solver_attempts).item()
-
-                # Grab the last (final) tau solution
-                # solution = solution[-1]
-                # solver_status_ = solver_status_[-1]
-                # solver_steps_ = solver_steps_[-1]
-                # solver_attempts = solver_attempts[-1]
-
                 # jax.debug.print("solution = {out}", out=solution)
                 # jax.debug.print("solver_status_ = {out}", out=solver_status_)
                 # jax.debug.print("solver_steps_ = {out}", out=solver_steps_)
                 # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
+
+                # Maximum attempts across all tau and all models
+                max_attempts: int = jnp.max(solver_attempts).item()
 
             else:
                 solution, solver_status_, solver_steps_, solver_attempts = repeat_solver(
