@@ -54,6 +54,14 @@ atmodeller.interfaces module
    :undoc-members:
    :show-inheritance:
 
+atmodeller.mytypes module
+-------------------------
+
+.. automodule:: atmodeller.mytypes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 atmodeller.output module
 ------------------------
 
