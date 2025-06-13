@@ -186,12 +186,12 @@ def objective_function(
     # Here would be where fugacity constraints could be imposed as hard constraints. Although this
     # would reduce the degrees of freedom, previous preliminary testing identified two challenges:
     #   1. The solver performance appears to degrade rather than improve. This could be because
-    #       soft constraints are better behaved with gradient-based solution approaches.
+    #       soft constraints are better behaved with gradient-based solution approaches(?)
     #   2. Imposing fugacity/activity would require back-computing pressure/number density, which
     #       would involve solving non-linear real gas EOS, potentially increasing the solve
-    #       complexity and time substantially.
+    #       complexity and time.
 
-    # Fugacity constraints residual
+    # Fugacity constraints residual (dimensionless, log-ratio of number densities)
     fugacity_residual = log_activity_number_density - tp.fugacity_constraints.log_number_density(
         temperature, total_pressure
     )
@@ -226,6 +226,7 @@ def objective_function(
         reaction_stability_matrix: Array = fp.reaction_matrix * reaction_stability_mask
         # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix)
 
+        # Dimensionless (log K residual)
         reaction_residual = reaction_residual - reaction_stability_matrix.dot(
             safe_exp(log_stability)
         )
@@ -263,10 +264,12 @@ def objective_function(
         log_volume
     )
     # jax.debug.print("log_target_density = {out}", out=log_target_density)
-    # TODO: Previous relative error is below, but this is scale inconsistent with other residuals.
+
+    # Dimensionless (ratio error - 1)
     mass_residual: Float[Array, " el_dim"] = (
         safe_exp(log_element_density_total - log_target_density) - 1
     )
+    # Log-space residual can perform better when close to the solution
     # mass_residual = log_element_density_total - log_target_density
     # jax.debug.print("mass_residual = {out}", out=mass_residual)
     # jax.debug.print(
@@ -287,6 +290,7 @@ def objective_function(
         + jnp.log(tau)
     )
     # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
+    # Dimensionless (log-ratio)
     stability_residual: Float[Array, " species_dim"] = (
         log_number_density + log_stability - log_min_number_density
     )

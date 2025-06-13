@@ -195,9 +195,7 @@ class InteriorAtmosphere:
             key: PRNGKeyArray = jax.random.PRNGKey(0)
             key, subkey = random.split(key)
 
-            logger.info("Switch solver to LevenbergMarquardt")
-
-            # TODO: prototyping
+            # Prototyping switching the solver for
             # solver_parameters_ = eqx.tree_at(
             #     lambda sp: sp.solver,
             #     solver_parameters_,  # your original instance
