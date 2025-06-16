@@ -18,7 +18,7 @@
 
 import logging
 
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 from pytest import approx
 
 from atmodeller import debug_logger

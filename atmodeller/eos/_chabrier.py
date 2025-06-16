@@ -18,16 +18,16 @@
 
 import importlib.resources
 import logging
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Callable, ClassVar
+from typing import ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
 import pandas as pd
-from jax import Array
 from jax.scipy.interpolate import RegularGridInterpolator
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
@@ -63,8 +63,8 @@ class Chabrier(RealGas):
     """Directory of the Chabrier data within :obj:`~atmodeller.eos.data`"""
     He_fraction_map: ClassVar[ImmutableMap[str, float]] = ImmutableMap(
         {
-            "TABLE_H_TP_v1": 0,
-            "TABLE_HE_TP_v1": 1,
+            "TABLE_H_TP_v1": 0.0,
+            "TABLE_HE_TP_v1": 1.0,
             "TABLEEOS_2021_TP_Y0275_v1": 0.275,
             "TABLEEOS_2021_TP_Y0292_v1": 0.292,
             "TABLEEOS_2021_TP_Y0297_v1": 0.297,

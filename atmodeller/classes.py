@@ -16,22 +16,19 @@
 #
 """Classes"""
 
-from __future__ import annotations
-
 import logging
 import pprint
-from collections.abc import Mapping
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import jax.random as random
 import numpy as np
-import numpy.typing as npt
-from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
-from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU
+from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -41,8 +38,9 @@ from atmodeller.containers import (
     SpeciesCollection,
     TracedParameters,
 )
-from atmodeller.engine import repeat_solver, solve
+from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
+from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
@@ -96,176 +94,260 @@ class InteriorAtmosphere:
             mass_constraints: Mass constraints. Defaults to None.
             solver_parameters: Solver parameters. Defaults to None.
         """
-        if planet is None:
-            planet_: Planet = Planet()
-        else:
-            planet_ = planet
+        planet_: Planet = Planet() if planet is None else planet
+
+        batch_size: int = get_batch_size((planet, fugacity_constraints, mass_constraints))
 
         fugacity_constraints_: FugacityConstraints = FugacityConstraints.create(
-            fugacity_constraints
+            self.species, fugacity_constraints
         )
-        mass_constraints_: MassConstraints = MassConstraints.create(mass_constraints)
+        mass_constraints_: MassConstraints = MassConstraints.create(
+            self.species, mass_constraints, batch_size
+        )
 
-        fixed_parameters_: FixedParameters = self.get_fixed_parameters(
-            fugacity_constraints_, mass_constraints_
-        )
+        # Always broadcast tau because the repeat_solver is triggered if some cases fail
+        broadcasted_tau: Float[Array, " batch_dim"] = jnp.full((batch_size,), TAU)
+        # jax.debug.print("broadcasted_tau = {out}", out=broadcasted_tau)
 
         traced_parameters_: TracedParameters = TracedParameters(
             planet_, fugacity_constraints_, mass_constraints_
         )
-
-        if solver_parameters is None:
-            solver_parameters_: SolverParameters = SolverParameters()
-        else:
-            solver_parameters_ = solver_parameters
-
+        fixed_parameters_: FixedParameters = self.get_fixed_parameters()
+        solver_parameters_: SolverParameters = (
+            SolverParameters() if solver_parameters is None else solver_parameters
+        )
         options: dict[str, Any] = {
             "lower": self.species.get_lower_bound(),
             "upper": self.species.get_upper_bound(),
             "jac": solver_parameters_.jac,
         }
 
-        # Pre-bind fixed configuration to avoid retracing and improve JIT efficiency
-        solve_with_bindings: Callable = eqx.Partial(
-            solve,
-            fixed_parameters=fixed_parameters_,
-            solver_parameters=solver_parameters_,
-            options=options,
+        # NOTE: Determine active entries in the residual. This order must correspond to the order
+        # of entries in the residual.
+        active: Bool[Array, " res_dim"] = jnp.concatenate(
+            (
+                fugacity_constraints_.active(),
+                fixed_parameters_.active_reactions(),
+                mass_constraints_.active(),
+                fixed_parameters_.active_stability(),
+            )
         )
+        # jax.debug.print("active = {out}", out=active)
+        active_indices: Integer[Array, "..."] = jnp.where(active)[0]
+        # jax.debug.print("active_indices = {out}", out=active_indices)
 
-        # Always batch over the initial solution, meaning the initial solution must be broadcast
-        # appropriately.
-        in_axes: Any = vmap_axes_spec(traced_parameters_)
-        self._solver = eqx.filter_jit(eqx.filter_vmap(solve_with_bindings, in_axes=(0, in_axes)))
-
-        batch_size: int = max(get_batch_size(traced_parameters_), 1)
-        base_initial_solution: Array = broadcast_initial_solution(
+        base_solution_array: Array = broadcast_initial_solution(
             initial_log_number_density,
             initial_log_stability,
             self.species.number,
-            self.species.number_of_stability(),
             batch_size,
         )
-        # jax.debug.print("base_initial_solution = {out}", out=base_initial_solution)
+        # jax.debug.print("base_solution_array = {out}", out=base_solution_array)
 
-        # First solution attempt
+        # Pre-bind fixed configurations
+        solver_fn: Callable = eqx.Partial(
+            solve,
+            # solver_parameters=solver_parameters_,
+            fixed_parameters=fixed_parameters_,
+            options=options,
+        )
+        in_axes: TracedParameters = vmap_axes_spec(traced_parameters_)
+
+        # Compile the solver, and this is re-used unless recompilation is triggered
+        # Initial solution and tau must be broadcast since they are always batched
+        self._solver = eqx.filter_jit(
+            eqx.filter_vmap(solver_fn, in_axes=(0, None, 0, in_axes, None))
+        )
+
+        # First solution attempt. If the initial guess is close enough we might just find solutions
+        # for all cases.
+        logger.info(f"Attempting to solve {batch_size} model(s)")
         solution, solver_status, solver_steps = self._solver(
-            base_initial_solution,
+            base_solution_array,
+            active_indices,
+            broadcasted_tau,
             traced_parameters_,
+            solver_parameters_,
+        )
+        # jax.debug.print("solver_status = {out}", out=solver_status)
+        # jax.debug.print("solver_steps = {out}", out=solver_steps)
+        solver_attempts: Integer[Array, " batch_dim"] = solver_status.astype(int)
+        # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
+
+        if jnp.any(~solver_status):
+            num_failed: int = jnp.sum(~solver_status).item()
+            logger.warning("%d model(s) failed to converge on the first attempt", num_failed)
+            logger.warning(
+                "But don't panic! This is not unexpected when starting from a poor initial guess."
+            )
+            logger.warning(
+                "Launching multistart (maximum %d attempts)", solver_parameters_.multistart
+            )
+            logger.warning(
+                "Attempting to solve the %d models(s) that initially failed", num_failed
+            )
+
+            # Restore the base solution for cases that failed since this will be perturbed
+            solution: Float[Array, "batch_dim sol_dim"] = cast(
+                Array, jnp.where(solver_status[:, None], solution, base_solution_array)
+            )
+            # jax.debug.print("solution = {out}", out=solution)
+
+            # Use repeat solver to ensure all cases solve
+            key: PRNGKeyArray = jax.random.PRNGKey(0)
+            key, subkey = random.split(key)
+
+            # Prototyping switching the solver for
+            # solver_parameters_ = eqx.tree_at(
+            #     lambda sp: sp.solver,
+            #     solver_parameters_,  # your original instance
+            #     optx.LevenbergMarquardt,  # or whatever solver you want to use
+            # )
+            # print(new_solver_params)
+
+            if jnp.any(fixed_parameters_.active_stability()):
+                logger.info(
+                    "Multistart with species' stability (TAU_MAX= %.1e, TAU= %.1e, TAU_NUM= %d)",
+                    TAU_MAX,
+                    TAU,
+                    TAU_NUM,
+                )
+                varying_tau_row: Float[Array, " tau_dim"] = jnp.logspace(
+                    jnp.log10(TAU_MAX), jnp.log10(TAU), num=TAU_NUM
+                )
+                constant_tau_row: Float[Array, " tau_dim"] = jnp.full((TAU_NUM,), TAU)
+                tau_templates: Float[Array, "tau_dim 2"] = jnp.stack(
+                    [varying_tau_row, constant_tau_row], axis=1
+                )
+                tau_array: Float[Array, "tau_dim batch_dim"] = tau_templates[
+                    :, solver_status.astype(int)
+                ]
+                # jax.debug.print("tau_array = {out}", out=tau_array)
+
+                initial_carry: tuple[Array, Array] = (subkey, solution)
+                solve_tau_step: Callable = make_solve_tau_step(
+                    self._solver, active_indices, traced_parameters_, solver_parameters_
+                )
+                _, results = jax.lax.scan(solve_tau_step, initial_carry, tau_array)
+                solution, solver_status_, solver_steps_, solver_attempts = results
+
+                # Debugging output. Requires the complete arrays as given above.
+                failed_indices: Integer[Array, "..."] = jnp.where(~solver_status)[0]
+                for ii in failed_indices.tolist():
+                    logger.debug(f"--- Solve summary for failed index {ii} ---")
+                    for tau_i in range(TAU_NUM):
+                        status_i: bool = bool(solver_status_[tau_i, ii])
+                        steps_i: int = int(solver_steps_[tau_i, ii])
+                        attempts_i: int = int(solver_attempts[tau_i, ii])
+                        logger.debug(
+                            "Tau step %1d: status= %-5s  steps= %3d  attempts= %2d",
+                            tau_i,
+                            str(status_i),
+                            steps_i,
+                            attempts_i,
+                        )
+
+                # Aggregate output
+                solution = solution[-1]  # Only need solution for final TAU
+                solver_status_ = solver_status_[-1]  # Only need status for final TAU
+                solver_steps_ = jnp.sum(solver_steps_, axis=0)  # Sum steps for all tau
+                solver_attempts = jnp.max(solver_attempts, axis=0)  # Max for all tau
+
+                # jax.debug.print("solution = {out}", out=solution)
+                # jax.debug.print("solver_status_ = {out}", out=solver_status_)
+                # jax.debug.print("solver_steps_ = {out}", out=solver_steps_)
+                # jax.debug.print("solver_attempts = {out}", out=solver_attempts)
+
+                # Maximum attempts across all tau and all models
+                max_attempts: int = jnp.max(solver_attempts).item()
+
+            else:
+                solution, solver_status_, solver_steps_, solver_attempts = repeat_solver(
+                    self._solver,
+                    active_indices,
+                    broadcasted_tau,
+                    solution,
+                    traced_parameters_,
+                    solver_parameters_,
+                    subkey,
+                )
+                max_attempts = jnp.max(solver_attempts).item()
+                # Since tau is unaltered, the first multistart just repeats the first calculation,
+                # which we already know has some failed cases. So we minus one for the reporting.
+                max_attempts -= 1
+
+            logger.info("Multistart complete with %s total attempt(s)", max_attempts)
+
+            # Restore statistics of cases that solved first time
+            solver_steps: Integer[Array, " batch_dim"] = jnp.where(
+                solver_status, solver_steps, solver_steps_
+            )
+            solver_status: Bool[Array, " batch_dim"] = solver_status_  # Final status
+
+            # Count unique values and their frequencies
+            unique_vals, counts = jnp.unique(solver_attempts, return_counts=True)
+            for val, count in zip(unique_vals.tolist(), counts.tolist()):
+                logger.info(
+                    "Multistart, max attempts: %d, model count: %d (%0.2f%%)",
+                    val,
+                    count,
+                    count * 100 / batch_size,
+                )
+
+        num_successful_models: int = jnp.count_nonzero(solver_status).item()
+        num_failed_models: int = jnp.count_nonzero(~solver_status).item()
+
+        logger.info(
+            "Solve complete: %d (%0.2f%%) successful model(s)",
+            num_successful_models,
+            num_successful_models * 100 / batch_size,
         )
 
-        # Use repeat solver to ensure all cases solve
-        key: Array = jax.random.PRNGKey(0)
-        final_i, solution, solver_status, solver_steps = repeat_solver(
-            self._solver,
-            base_initial_solution,
-            solution,
-            solver_status,
-            solver_steps,
-            traced_parameters_,
-            multistart_perturbation=solver_parameters_.multistart_perturbation,
-            max_attempts=solver_parameters_.multistart,
-            key=key,
-        )
+        if num_failed_models > 0:
+            logger.warning(
+                "%d (%0.2f%%) model(s) still failed",
+                num_failed_models,
+                num_failed_models * 100 / batch_size,
+            )
+
+        logger.debug("Solver steps = %s", solver_steps)
 
         self._output = Output(
             self.species,
             solution,
+            active_indices,
             solver_status,
             solver_steps,
+            solver_attempts,
             fixed_parameters_,
             traced_parameters_,
+            solver_parameters_,
         )
 
-        num_total_models: int = solver_status.size
-        num_successful_models: int = jnp.count_nonzero(solver_status).item()
-        num_failed_models: int = jnp.count_nonzero(~solver_status).item()
-
-        logger.info(f"Attempted to solve {num_total_models} model(s)")
-
-        if num_failed_models > 0:
-            logger.warning(
-                f"Solve complete: {num_successful_models} successful model(s) and "
-                f"{num_failed_models} model(s) failed.\n"
-                "Try increasing 'multistart', for example:\n"
-                "    solver_parameters = SolverParameters(multistart=5)\n"
-                "and then pass solver_parameters to the solve method.\n"
-                "You can also adjust 'multistart_perturbation', for example:\n"
-                "    solver_parameters = SolverParameters(multistart=5, "
-                "multistart_perturbation=40.0)"
-            )
-        else:
-            required_multistarts: int = max(final_i, 1)
-            logger.info(
-                f"Solve complete: {num_successful_models} successful model(s)\n"
-                f"The number of multistarts required was {required_multistarts}, "
-                "which can depend on the choice of the random seed"
-            )
-
-        logger.debug("solution = %s", solution)
-
-    def get_fixed_parameters(
-        self, fugacity_constraints: FugacityConstraints, mass_constraints: MassConstraints
-    ) -> FixedParameters:
+    def get_fixed_parameters(self) -> FixedParameters:
         """Gets fixed parameters.
-
-        Args:
-            fugacity_constraints: Fugacity constraints
-            mass_constraints: Mass constraints
 
         Returns:
             Fixed parameters
         """
-        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
-        reaction_stability_matrix: npt.NDArray[np.float64] = self.get_reaction_stability_matrix()
-        gas_species_indices: Array = self.species.get_gas_species_indices()
-        condensed_species_indices: Array = self.species.get_condensed_species_indices()
-        stability_species_indices: Array = self.species.get_stability_species_indices()
+        formula_matrix: NpInt = self.get_formula_matrix()
+        reaction_matrix: NpFloat = self.get_reaction_matrix()
+        gas_species_mask: Array = self.species.get_gas_species_mask()
         molar_masses: Array = self.species.get_molar_masses()
         diatomic_oxygen_index: int = self.species.get_diatomic_oxygen_index()
 
-        # The complete formula matrix is not required for the calculation but it is used for
-        # computing output quantities. So calculate and store it.
-        formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix()
-
-        # Formula matrix for elements that are constrained by mass constraints
-        unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
-        indices: list[int] = []
-        for element in mass_constraints.log_abundance.keys():
-            index: int = unique_elements.index(element)
-            indices.append(index)
-        formula_matrix_constraints: npt.NDArray[np.int_] = formula_matrix.copy()
-        formula_matrix_constraints = formula_matrix_constraints[indices, :]
-
-        # Fugacity constraint matrix and indices
-        number_fugacity_constraints: int = len(fugacity_constraints.constraints)
-        fugacity_species_indices_list: list[int] = []
-        species_names: tuple[str, ...] = self.species.get_species_names()
-        for species_name in fugacity_constraints.constraints.keys():
-            index: int = species_names.index(species_name)
-            fugacity_species_indices_list.append(index)
-        fugacity_species_indices: Array = jnp.array(fugacity_species_indices_list, dtype=jnp.int_)
-        fugacity_matrix: Array = jnp.identity(number_fugacity_constraints)
-
         fixed_parameters: FixedParameters = FixedParameters(
             species=self.species,
-            formula_matrix=formula_matrix,
-            formula_matrix_constraints=formula_matrix_constraints,
-            reaction_matrix=reaction_matrix,
-            reaction_stability_matrix=reaction_stability_matrix,
-            stability_species_indices=stability_species_indices,
-            fugacity_matrix=fugacity_matrix,
-            gas_species_indices=gas_species_indices,
-            condensed_species_indices=condensed_species_indices,
-            fugacity_species_indices=fugacity_species_indices,
+            formula_matrix=jnp.asarray(formula_matrix),
+            reaction_matrix=jnp.asarray(reaction_matrix),
+            gas_species_mask=gas_species_mask,
             diatomic_oxygen_index=diatomic_oxygen_index,
             molar_masses=molar_masses,
-            tau=self.tau,
         )
 
         return fixed_parameters
 
-    def get_formula_matrix(self) -> npt.NDArray[np.int_]:
+    def get_formula_matrix(self) -> NpInt:
         """Gets the formula matrix.
 
         Elements are given in rows and species in columns following the convention in
@@ -274,9 +356,9 @@ class InteriorAtmosphere:
         Returns:
             Formula matrix
         """
-        unique_elements: tuple[str, ...] = self.get_unique_elements_in_species()
-        formula_matrix: npt.NDArray[np.int_] = np.zeros(
-            (len(unique_elements), self.species.number), dtype=jnp.int_
+        unique_elements: tuple[str, ...] = self.species.get_unique_elements_in_species()
+        formula_matrix: NpInt = np.zeros(
+            (len(unique_elements), self.species.number), dtype=np.int_
         )
 
         for element_index, element in enumerate(unique_elements):
@@ -288,30 +370,11 @@ class InteriorAtmosphere:
                     count = 0
                 formula_matrix[element_index, species_index] = count
 
-        logger.debug("formula_matrix = %s", formula_matrix)
+        # logger.debug("formula_matrix = %s", formula_matrix)
 
         return formula_matrix
 
-    def get_unique_elements_in_species(self) -> tuple[str, ...]:
-        """Gets unique elements.
-
-        Args:
-            species: A list of species
-
-        Returns:
-            Unique elements in the species ordered alphabetically
-        """
-        elements: list[str] = []
-        for species_ in self.species:
-            elements.extend(species_.data.elements)
-        unique_elements: list[str] = list(set(elements))
-        sorted_elements: list[str] = sorted(unique_elements)
-
-        logger.debug("unique_elements_in_species = %s", sorted_elements)
-
-        return tuple(sorted_elements)
-
-    def get_reaction_matrix(self) -> npt.NDArray[np.float64]:
+    def get_reaction_matrix(self) -> NpFloat:
         """Gets the reaction matrix.
 
         Returns:
@@ -319,35 +382,12 @@ class InteriorAtmosphere:
         """
         if self.species.number == 1:
             logger.debug("Only one species therefore no reactions")
-            return np.array([])
+            return np.array([], dtype=np.float64)
 
-        transpose_formula_matrix: npt.NDArray[np.int_] = self.get_formula_matrix().T
-        reaction_matrix: npt.NDArray[np.float64] = partial_rref(transpose_formula_matrix)
-
-        logger.debug("reaction_matrix = %s", reaction_matrix)
+        transpose_formula_matrix: NpInt = self.get_formula_matrix().T
+        reaction_matrix: NpFloat = partial_rref(transpose_formula_matrix)
 
         return reaction_matrix
-
-    def get_reaction_stability_matrix(self) -> npt.NDArray[np.float64]:
-        """Gets the reaction stability matrix.
-
-        Returns:
-            Reaction stability matrix
-        """
-        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
-        mask: npt.NDArray[np.bool_] = np.zeros_like(reaction_matrix, dtype=bool)
-
-        if reaction_matrix.size > 0:
-            # Find the species to solve for stability
-            stability_bool: Array = self.species.get_stability_species_mask()
-            mask[:, stability_bool] = True
-            reaction_stability_matrix: npt.NDArray[np.float64] = reaction_matrix * mask
-        else:
-            reaction_stability_matrix = reaction_matrix
-
-        logger.debug("reaction_stability_matrix = %s", reaction_stability_matrix)
-
-        return reaction_stability_matrix
 
     def get_reaction_dictionary(self) -> dict[int, str]:
         """Gets reactions as a dictionary.
@@ -355,7 +395,7 @@ class InteriorAtmosphere:
         Returns:
             Reactions as a dictionary
         """
-        reaction_matrix: npt.NDArray[np.float64] = self.get_reaction_matrix()
+        reaction_matrix: NpFloat = self.get_reaction_matrix()
         reactions: dict[int, str] = {}
         if reaction_matrix.size != 0:
             for reaction_index in range(reaction_matrix.shape[0]):
@@ -379,7 +419,7 @@ class InteriorAtmosphere:
 
 def _broadcast_component(
     component: ArrayLike | None, default_value: float, dim: int, batch_size: int, name: str
-) -> Array:
+) -> NpFloat:
     """Broadcasts a scalar, 1D, or 2D input array to shape (batch_size, dim).
 
     This function standardizes inputs that may be:
@@ -396,17 +436,17 @@ def _broadcast_component(
         name: Name of the component (used for error messages)
 
     Returns:
-        A JAX array of shape (batch_size, dim), with values broadcast as needed
+        A numpy array of shape (batch_size, dim), with values broadcast as needed
 
     Raises:
         ValueError: If the input array has an unexpected shape or inconsistent dimensions
     """
     if component is None:
-        base: Array = jnp.full((dim,), default_value, dtype=jnp.float64)
+        base: NpFloat = np.full((dim,), default_value, dtype=np.float64)
     else:
-        component = jnp.asarray(component, dtype=jnp.float64)
+        component = np.asarray(component, dtype=jnp.float64)
         if component.ndim == 0:
-            base = jnp.full((dim,), component.item(), dtype=jnp.float64)
+            base = np.full((dim,), component.item(), dtype=np.float64)
         elif component.ndim == 1:
             if component.shape[0] != dim:
                 raise ValueError(f"{name} should have shape ({dim},), got {component.shape}")
@@ -416,7 +456,8 @@ def _broadcast_component(
                 raise ValueError(
                     f"{name} should have shape ({batch_size}, {dim}), got {component.shape}"
                 )
-            # NOTE: 2-D already so return
+            # Replace NaNs with default_value
+            component = np.where(np.isnan(component), default_value, component)
             return component
         else:
             raise ValueError(
@@ -424,14 +465,13 @@ def _broadcast_component(
             )
 
     # Promote 1D base to (batch_size, dim)
-    return jnp.broadcast_to(base[None, :], (batch_size, dim))
+    return np.broadcast_to(base[None, :], (batch_size, dim))
 
 
 def broadcast_initial_solution(
     initial_log_number_density: ArrayLike | None,
     initial_log_stability: ArrayLike | None,
     number_of_species: int,
-    number_of_stability: int,
     batch_size: int,
 ) -> Array:
     """Creates and broadcasts the initial solution to shape (batch_size, D)
@@ -439,26 +479,25 @@ def broadcast_initial_solution(
     D = number_of_species + number_of_stability, i.e. the total number of solution quantities
 
     Args:
-        initial_log_number_density: Initial log number density
-        initial_log_stability: Initial log stability
+        initial_log_number_density: Initial log number density. Defaults to None.
+        initial_log_stability: Initial log stability. Defaults to None.
         number_of_species: Number of species
-        number_of_stability: Number of species stability
         batch_size: Batch size
 
     Returns:
         Initial solution with shape (batch_size, D)
     """
-    number_density: Array = _broadcast_component(
+    number_density: NpFloat = _broadcast_component(
         initial_log_number_density,
         INITIAL_LOG_NUMBER_DENSITY,
         number_of_species,
         batch_size,
         name="initial_log_number_density",
     )
-    stability: Array = _broadcast_component(
+    stability: NpFloat = _broadcast_component(
         initial_log_stability,
         INITIAL_LOG_STABILITY,
-        number_of_stability,
+        number_of_species,
         batch_size,
         name="initial_log_stability",
     )

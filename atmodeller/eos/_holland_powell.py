@@ -16,16 +16,14 @@
 #
 """Real gas EOS from :cite:t:`HP91,HP98,HP11`"""
 
-from __future__ import annotations
-
 import logging
 from abc import abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, lax
-from jax.typing import ArrayLike
+from jax import lax
+from jaxtyping import Array, ArrayLike
 from scipy.constants import kilo
 
 from atmodeller.constants import GAS_CONSTANT_BAR
@@ -62,7 +60,7 @@ class CorrespondingStatesUnitConverter:
     """
 
     @staticmethod
-    def convert_a_coefficients(a_coefficients: tuple[float, ...]) -> tuple[float, ...]:
+    def convert_a_coefficients(a_coefficients: tuple[int | float, ...]) -> tuple[float, ...]:
         r"""Converts the a coefficients for corresponding states.
 
         The a coefficients (a0 and a1) have units :cite:p:`HP91{Equation 9}`:
@@ -86,7 +84,7 @@ class CorrespondingStatesUnitConverter:
         return tuple(map(lambda a_coefficient: factor * a_coefficient, a_coefficients))
 
     @staticmethod
-    def convert_b_coefficient(b_coefficient: float) -> float:
+    def convert_b_coefficient(b_coefficient: int | float) -> float:
         r"""Converts the b coefficient for corresponding states.
 
         The b coefficient (b0) has units :cite:p:`HP91{Equation 9}`:
@@ -111,7 +109,9 @@ class CorrespondingStatesUnitConverter:
         return b_coefficient * factor
 
     @staticmethod
-    def convert_virial_coefficients(virial_coefficients: tuple[float, ...]) -> tuple[float, ...]:
+    def convert_virial_coefficients(
+        virial_coefficients: tuple[int | float, ...],
+    ) -> tuple[float, ...]:
         r"""Converts the virial coefficients for corresponding states
 
         The virial coefficients, for example associated with coefficients c and d in
@@ -151,7 +151,7 @@ class FullUnitConverter:
     """
 
     @staticmethod
-    def convert_a_coefficients(a_coefficients: tuple[float, ...]) -> tuple[float, ...]:
+    def convert_a_coefficients(a_coefficients: tuple[int | float, ...]) -> tuple[float, ...]:
         r"""Converts the a coefficients for the full CORK models
 
         The a parameter has units :cite:p:`HP91{Table 1}`
@@ -177,7 +177,7 @@ class FullUnitConverter:
         return tuple(map(lambda a_coefficient: factor * a_coefficient, a_coefficients))
 
     @staticmethod
-    def convert_b_coefficient(b_coefficient: float) -> float:
+    def convert_b_coefficient(b_coefficient: int | float) -> float:
         r"""Converts the b coefficient for the full CORK models
 
         The b parameter has units :cite:p:`HP91{Table 1}`
@@ -202,7 +202,7 @@ class FullUnitConverter:
 
     @staticmethod
     def convert_virial_coefficients(
-        virial_coefficients: tuple[float, ...], pressure_exponent
+        virial_coefficients: tuple[int | float, ...], pressure_exponent
     ) -> tuple[float, ...]:
         r"""Converts the virial coefficients for the full CORK models
 
@@ -240,11 +240,11 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
 
     critical_data: CriticalData
     _a_coefficients: tuple[float, ...] = eqx.field(init=False)
-    _b: float = eqx.field(init=False)
+    _b: float = eqx.field(init=False, converter=float)
 
     def __post_init__(self):
         self._a_coefficients = CorrespondingStatesUnitConverter.convert_a_coefficients(
-            (5.45963e-5, -8.63920e-6, 0)
+            (5.45963e-5, -8.63920e-6, 0.0)
         )
         self._b = CorrespondingStatesUnitConverter.convert_b_coefficient(9.18301e-4)
 
@@ -259,7 +259,7 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         return self.critical_data.temperature
 
     @classmethod
-    def get_species(cls, species: str) -> MRKCorrespondingStatesHP91:
+    def get_species(cls, species: str) -> "MRKCorrespondingStatesHP91":
         """Gets an MRK corresponding states model for a given species.
 
         Args:
@@ -382,9 +382,9 @@ class MRKImplicitGasHP91(MRKImplicitHP91ABCMixin, RedlichKwongImplicitGasABC):
         return self._Ta - temperature
 
 
-Tc_H2O: float = 695
+Tc_H2O: float = 695.0
 """Critical temperature of H2O in K for the MRK/CORK model :cite:p:`HP91`"""
-Ta_H2O: float = 673  # K
+Ta_H2O: float = 673.0  # K
 r"""Temperature at which :math:`a_{\mathrm gas} = a` for H2O by fitting :cite:p:`HP91`"""
 b0_H2O: float = FullUnitConverter.convert_b_coefficient(1.465)
 """b parameter value which is the same across all H2O phases :cite:p:`HP91`"""
@@ -475,9 +475,9 @@ H2OMrkFluidHolland91: MRKImplicitFluidHP91 = MRKImplicitFluidHP91(
 CO2_critical_data: CriticalData = select_critical_data("CO2_g")
 """Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar"""
 CO2MrkHolland91: MRKImplicitFluidHP91 = MRKImplicitFluidHP91(
-    FullUnitConverter.convert_a_coefficients((741.2, -0.10891, -3.4203e-4, 0)),
+    FullUnitConverter.convert_a_coefficients((741.2, -0.10891, -3.4203e-4, 0.0)),
     FullUnitConverter.convert_b_coefficient(3.057),
-    0,
+    0.0,
     CO2_critical_data.temperature,
 )
 """CO2 MRK :cite:p:`HP91{Above Equation 7}`
@@ -836,7 +836,7 @@ coefficients_sqrtP: tuple[float, ...] = (
     CorrespondingStatesUnitConverter.convert_virial_coefficients((-3.30558e-5, 2.30524e-6))
 )
 virial_compensation_corresponding_states: VirialCompensation = VirialCompensation(
-    coefficients_P, coefficients_sqrtP, (0, 0), 0
+    coefficients_P, coefficients_sqrtP, (0.0, 0.0), 0.0
 )
 """Virial compensation for corresponding states :cite:p:`HP91{Table 2}`
 
@@ -930,8 +930,8 @@ unity.
 CO2_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((1.33790e-2, -1.01740e-5), 1.0),
     FullUnitConverter.convert_virial_coefficients((-2.26924e-1, 7.73793e-5), 0.5),
-    (0, 0),
-    5000,
+    (0.0, 0.0),
+    5000.0,
 )
 """CO2 virial compensation :cite:p:`HP91`"""
 CO2_cork_holland91: RealGas = CORK(
@@ -946,8 +946,8 @@ CO2_cork_holland91_bounded: RealGas = CombinedRealGas.create(
 H2O_virial_compensation_holland91: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((-3.2297554e-3, 2.2215221e-6), 1.0),
     FullUnitConverter.convert_virial_coefficients((-3.025650e-2, -5.343144e-6), 0.5),
-    (0, 0),
-    2000,
+    (0.0, 0.0),
+    2000.0,
 )
 """H2O virial compensation :cite:p:`HP91`"""
 H2O_cork_holland91: RealGas = CORK(
@@ -970,8 +970,8 @@ H2O_cork_gas_fluid_holland91_bounded: RealGas = CombinedRealGas.create(
 CO2_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((5.40776e-3, -1.59046e-6), 1.0),
     FullUnitConverter.convert_virial_coefficients((-1.78198e-1, 2.45317e-5), 0.5),
-    (0, 0),
-    5000,
+    (0.0, 0.0),
+    5000.0,
 )
 """CO2 virial compensation :cite:p:`HP98`"""
 CO2_cork_holland98: RealGas = CORK(
@@ -987,7 +987,7 @@ H2O_virial_compensation_holland98: VirialCompensation = VirialCompensation(
     FullUnitConverter.convert_virial_coefficients((1.9853e-3, 0), 1.0),
     FullUnitConverter.convert_virial_coefficients((-8.9090e-2, 0), 0.5),
     FullUnitConverter.convert_virial_coefficients((8.0331e-2, 0), 0.25),
-    2000,
+    2000.0,
 )
 """H2O virial compensation :cite:p:`HP98`"""
 H2O_cork_holland98: RealGas = CORK(

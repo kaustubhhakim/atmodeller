@@ -16,22 +16,20 @@
 #
 """JAX-related functionality for solving the system of equations"""
 
-from __future__ import annotations
-
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array, lax
+from jax import lax, random
 from jax.scipy.special import logsumexp
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray, Shaped
 
 from atmodeller.constants import AVOGADRO, BOLTZMANN_CONSTANT_BAR, GAS_CONSTANT
 from atmodeller.containers import (
     FixedParameters,
-    FugacityConstraints,
     MassConstraints,
     Planet,
     SolverParameters,
@@ -46,34 +44,43 @@ from atmodeller.utilities import (
 )
 
 
-@eqx.filter_jit
+# Since this is the core driver function for the solve it remains useful for debugging to see how
+# many times recompilation is triggered
+# @eqx.filter_jit
 # @eqx.debug.assert_max_traces(max_traces=1)
 def solve(
-    solution_array: Array,
+    solution_array: Float[Array, " sol_dim"],
+    active_indices: Integer[Array, " res_dim"],
+    tau: Float[Array, ""],
     traced_parameters: TracedParameters,
-    fixed_parameters: FixedParameters,
     solver_parameters: SolverParameters,
+    fixed_parameters: FixedParameters,
     options: dict[str, Any],
-) -> tuple[Array, Array, Array]:
+) -> tuple[Float[Array, " sol_dim"], Bool[Array, ""], Integer[Array, ""]]:
     """Solves the system of non-linear equations
 
     Args:
         solution_array: Solution array
+        active_indices: Indices of the residual array that are active
+        tau: Tau parameter for species' stability
         traced_parameters: Traced parameters
-        fixed_parameters: Fixed parameters
         solver_parameters: Solver parameters
+        fixed_parameters: Fixed parameters
         options: Options for root find
 
     Returns:
-        The solution array, the status of the solver
+        The solution array, the status of the solver, number of steps
     """
     sol: optx.Solution = optx.root_find(
         objective_function,
-        solver_parameters.solver_instance,
+        solver_parameters.get_solver_instance(),
         solution_array,
         args={
             "traced_parameters": traced_parameters,
+            "active_indices": active_indices,
+            "tau": tau,
             "fixed_parameters": fixed_parameters,
+            "solver_parameters": solver_parameters,
         },
         throw=solver_parameters.throw,
         max_steps=solver_parameters.max_steps,
@@ -81,127 +88,19 @@ def solve(
     )
 
     # jax.debug.print("Optimistix success. Number of steps = {out}", out=sol.stats["num_steps"])
-    solver_steps: Array = sol.stats["num_steps"]
-    solver_status: Array = sol.result == optx.RESULTS.successful
+    solver_steps: Integer[Array, ""] = sol.stats["num_steps"]
+
+    # TODO: sol.results contains more information about the solution process, but it's wrapped up
+    # in an enum-like object
+    solver_status: Bool[Array, ""] = sol.result == optx.RESULTS.successful
 
     return sol.value, solver_status, solver_steps
 
 
-@eqx.filter_jit
-def repeat_solver(
-    solver_fn: Callable,
-    base_initial_solution: Array,
-    initial_solution: Array,
-    initial_status: Array,
-    initial_steps: Array,
-    traced_parameters: TracedParameters,
-    multistart_perturbation: float,
-    max_attempts: int,
-    key: Array,
-) -> tuple[int, Array, Array, Array]:
-    """Repeat solver until a solution is found
-
-    Args:
-        solver_fn: Solver function with pre-bound fixed configuration
-        base_initial_solution: Base initial solution to perturb if necessary
-        initial_solution: Initial solution after first solve
-        initial_status: Initial status after first solve
-        initial_steps: Initial steps after first solve
-        traced_parameters: Traced parameters
-        multistart_perturbation: Multistart perturbation
-        max_attempts: Maximum attempts
-        key: Random key
-    """
-
-    def body_fn(state: tuple) -> tuple[int, Array, Array, Array, Array, Array]:
-        """Perform one iteration of the solver retry loop
-
-        Args:
-            state: Tuple containing:
-                i: Current attempt index
-                key: PRNG key for random number generation
-                solution: Current solution array
-                status: Boolean array indicating successful solutions
-                steps: Step count or similar solver output
-                base_initial_solution: Unperturbed base initial solution
-
-        Returns:
-            Updated state tuple with incremented attempt index, potentially perturbed
-            solutions, updated status, updated steps, and unmodified base initial solution
-        """
-        i, key, solution, status, _, base_initial_solution = state
-
-        failed_mask: Array = ~status
-        key, subkey = jax.random.split(key)
-
-        # Implements a simple perturbation of the base initial solution, but something more
-        # sophisticated could be implemented, such as training a network or using a regressor
-        # to inform the next guess of the models that failed from the ones that succeeded.
-        perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
-        raw_perturb: Array = jax.random.uniform(
-            subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
-        )
-        perturbations: Array = jnp.where(
-            failed_mask[:, None],
-            multistart_perturbation * raw_perturb,
-            jnp.zeros_like(solution),
-        )
-        new_initial_solution = jnp.where(
-            failed_mask[:, None], base_initial_solution + perturbations, solution
-        )
-
-        new_solution, new_status, new_steps = solver_fn(new_initial_solution, traced_parameters)
-
-        return (i + 1, key, new_solution, new_status, new_steps, base_initial_solution)
-
-    def cond_fn(state: tuple) -> Array:
-        """Check if the solver should continue retrying
-
-        Args:
-            state: Tuple containing:
-                i: Current attempt index
-                _: Unused (PRNG key)
-                _: Unused (solution)
-                status: Boolean array indicating success of each solution
-                _: Unused (steps)
-                _: Unused (base initial solution)
-
-        Returns:
-            A boolean array indicating whether retries should continue (True if
-            any solution failed and attempts are still available)
-        """
-        i, _, _, status, _, _ = state
-
-        return jnp.logical_and(i < max_attempts, jnp.any(~status))
-
-    initial_state: tuple = (
-        1,  # A first solve has already been attempted before repeat_solver is called
-        key,
-        initial_solution,
-        initial_status,
-        initial_steps,
-        base_initial_solution,
-    )
-    final_i, _, final_solution, final_status, final_steps, _ = lax.while_loop(
-        cond_fn, body_fn, initial_state
-    )
-
-    return final_i, final_solution, final_status, final_steps
-
-
-@eqx.filter_jit
 def get_min_log_elemental_abundance_per_species(
-    formula_matrix: Array, mass_constraints: MassConstraints
-) -> Array:
+    formula_matrix: Integer[Array, "el_dim species_dim"], mass_constraints: MassConstraints
+) -> Float[Array, " species_dim"]:
     """For each species, find the elemental mass constraint with the lowest abundance.
-
-    If species are present for which there are no elemental mass constraints (for example,
-    oxygen if a fugacity constraint is applied instead) the maximum of all elements will be
-    returned for that particular species. However, the return array from this function is
-    subsequently filtered depending on whether a stability calculation is required for each
-    species.
-
-    # TODO: This could be precomputed rather than calculated within the residual calculation.
 
     Args:
         formula_matrix: Formula matrix
@@ -211,199 +110,217 @@ def get_min_log_elemental_abundance_per_species(
         A vector of the minimum log elemental abundance for each species
     """
     # Create the binary mask where formula_matrix != 0 (1 where element is present in species)
-    mask: Array = (formula_matrix != 0).astype(jnp.int_)
+    mask: Integer[Array, "el_dim species_dim"] = (formula_matrix != 0).astype(jnp.int_)
     # jax.debug.print("formula_matrix = {out}", out=formula_matrix)
     # jax.debug.print("mask = {out}", out=mask)
 
-    # Convert to column vector to align for element-wise multiplication
-    log_abundance: Array = jnp.expand_dims(
-        jnp.array(list(mass_constraints.log_abundance.values())), axis=1
-    )
+    # log_abundance is a 1-D array, which cannot be transposed, so make a 2-D array
+    log_abundance: Float[Array, "el_dim 1"] = jnp.atleast_2d(mass_constraints.log_abundance).T
     # jax.debug.print("log_abundance = {out}", out=log_abundance)
 
-    # Element-wise multiplication (broadcasted correctly)
-    masked_abundance: Array = mask * log_abundance  # Shape: (n_elements, n_species)
+    # Element-wise multiplication with broadcasting
+    masked_abundance: Float[Array, "el_dim species_dim"] = mask * log_abundance
     # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
-
-    # Replace zeros (or masked-out values) with the max value before taking the min
-    masked_abundance = jnp.where(mask != 0, masked_abundance, jnp.max(log_abundance))
+    masked_abundance = jnp.where(mask != 0, masked_abundance, jnp.nan)
     # jax.debug.print("masked_abundance = {out}", out=masked_abundance)
 
     # Find the minimum log abundance per species
-    min_abundance_per_species: Array = jnp.min(masked_abundance, axis=0)
+    min_abundance_per_species: Float[Array, " species_dim"] = jnp.nanmin(masked_abundance, axis=0)
     # jax.debug.print("min_abundance_per_species = {out}", out=min_abundance_per_species)
 
     return min_abundance_per_species
 
 
-@eqx.filter_jit
-def objective_function(solution: Array, kwargs: dict) -> Array:
-    """Residual of the reaction network and mass balance
+def objective_function(
+    solution: Float[Array, " sol_dim"], kwargs: dict
+) -> Float[Array, " res_dim"]:
+    """Objective function
+
+    The order of the residual does make a difference to the solution process. More investigations
+    are necessary, but justification for the current ordering is as follows:
+
+        1. Fugacity constraints - fixed target, well conditioned
+        2. Reaction constraints - log-linear, physics-based coupling
+        3. Mass balance constraints - stiffer, depends on solubility
+        4. Stability constraints - stiffer still
 
     Args:
-        solution: Solution array
+        solution: Solution array for all species i.e. log number density and log stability
         kwargs: Dictionary of pytrees required to compute the residual
 
     Returns:
         Residual
     """
-    traced_parameters: TracedParameters = kwargs["traced_parameters"]
-    fixed_parameters: FixedParameters = kwargs["fixed_parameters"]
-    planet: Planet = traced_parameters.planet
-    temperature: ArrayLike = planet.temperature
-    fugacity_constraints: FugacityConstraints = traced_parameters.fugacity_constraints
-    mass_constraints: MassConstraints = traced_parameters.mass_constraints
-    gas_species_indices: Array = fixed_parameters.gas_species_indices
+    # jax.debug.print("Starting new objective_function evaluation")
+    tp: TracedParameters = kwargs["traced_parameters"]
+    active_indices: Integer[Array, " res_dim"] = kwargs["active_indices"]
+    fp: FixedParameters = kwargs["fixed_parameters"]
+    tau: Float[Array, ""] = kwargs["tau"]
+    planet: Planet = tp.planet
+    temperature: Float[Array, ""] = planet.temperature
 
-    reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
-    reaction_stability_matrix: Array = jnp.array(fixed_parameters.reaction_stability_matrix)
-    stability_species_indices: Array = fixed_parameters.stability_species_indices
-    fugacity_matrix: Array = fixed_parameters.fugacity_matrix
-    # We only need the formula matrix for elements with mass constraints
-    formula_matrix_constraints: Array = jnp.array(fixed_parameters.formula_matrix_constraints)
-    # jax.debug.print("Starting new residual evaluation")
-
-    # Species
-    if stability_species_indices.size > 0:
-        split_idx: int = -len(stability_species_indices)
-        log_number_density: Array = solution[:split_idx]
-        log_stability: Array = solution[split_idx:]
-        # jax.debug.print("log_stability = {out}", out=log_stability)
-    else:
-        log_number_density = solution
-
+    log_number_density, log_stability = jnp.split(solution, 2)
     # jax.debug.print("log_number_density = {out}", out=log_number_density)
+    # jax.debug.print("log_stability = {out}", out=log_stability)
 
-    # Stability
-    # The reaction_stability_matrix has zero entries so its OK to pad with any value for
-    # species without stability since the result is always zero
-    log_stability_padded: Array = jnp.zeros_like(log_number_density)
-    if stability_species_indices.size > 0:
-        log_stability_padded = log_stability_padded.at[stability_species_indices].set(
-            log_stability  # type: ignore since log_stability is known
-        )
-    # jax.debug.print("log_stability_padded = {out}", out=log_stability_padded)
-
-    log_activity: Array = get_log_activity(traced_parameters, fixed_parameters, log_number_density)
+    log_activity: Float[Array, " species_dim"] = get_log_activity(tp, fp, log_number_density)
     # jax.debug.print("log_activity = {out}", out=log_activity)
 
-    # Based on the definition of the reaction constant we need to convert gas activities
-    # (fugacities) from bar to effective number density
-    gas_species_mask: Array = jnp.zeros_like(log_activity, dtype=bool)
-    gas_species_mask = gas_species_mask.at[gas_species_indices].set(True)
-    # jax.debug.print("gas_species_mask = {out}", out=gas_species_mask)
+    # Atmosphere
+    total_pressure: Float[Array, ""] = get_total_pressure(fp, log_number_density, temperature)
+    # jax.debug.print("total_pressure = {out}", out=total_pressure)
+    log_volume: Float[Array, ""] = get_atmosphere_log_volume(fp, log_number_density, planet)
+    # jax.debug.print("log_volume = {out}", out=log_volume)
 
-    log_activity_number_density: Array = get_log_number_density_from_log_pressure(
-        log_activity, temperature
+    # Based on the definition of the reaction constant we need to convert gas activities
+    # (fugacities) from bar to effective number density, whilst keeping condensate activities
+    # unmodified.
+    log_activity_number_density: Float[Array, " species_dim"] = (
+        get_log_number_density_from_log_pressure(log_activity, temperature)
     )
     log_activity_number_density = jnp.where(
-        gas_species_mask, log_activity_number_density, log_activity
+        fp.gas_species_mask, log_activity_number_density, log_activity
     )
     # jax.debug.print("log_activity_number_density = {out}", out=log_activity_number_density)
 
-    # Bulk atmosphere
-    log_volume: Array = get_atmosphere_log_volume(fixed_parameters, log_number_density, planet)
+    # Here would be where fugacity constraints could be imposed as hard constraints. Although this
+    # would reduce the degrees of freedom, previous preliminary testing identified two challenges:
+    #   1. The solver performance appears to degrade rather than improve. This could be because
+    #       soft constraints are better behaved with gradient-based solution approaches(?)
+    #   2. Imposing fugacity/activity would require back-computing pressure/number density, which
+    #       would involve solving non-linear real gas EOS, potentially increasing the solve
+    #       complexity and time.
 
-    residual: Array = jnp.array([])
+    # Fugacity constraints residual (dimensionless, log-ratio of number densities)
+    fugacity_residual = log_activity_number_density - tp.fugacity_constraints.log_number_density(
+        temperature, total_pressure
+    )
+    # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
+    # jax.debug.print(
+    #     "fugacity_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(fugacity_residual),
+    #     out2=jnp.nanmax(fugacity_residual),
+    # )
+    # jax.debug.print(
+    #     "fugacity_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(fugacity_residual),
+    #     out2=jnp.nanstd(fugacity_residual),
+    # )
 
     # Reaction network residual
-    if reaction_matrix.size > 0:
+    # TODO: Is it possible to remove this if statement?
+    if fp.reaction_matrix.size > 0:
         log_reaction_equilibrium_constant: Array = get_log_reaction_equilibrium_constant(
-            fixed_parameters, temperature
-        )
-        reaction_residual: Array = (
-            reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
-        )
-        # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
-
-        reaction_residual = reaction_residual - reaction_stability_matrix.dot(
-            safe_exp(log_stability_padded)
-        )
-        # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
-
-        residual = jnp.concatenate([residual, reaction_residual])
-
-    # Fugacity constraints residual
-    if fugacity_matrix.size > 0:
-        fugacity_species_indices: Array = jnp.array(fixed_parameters.fugacity_species_indices)
-        # jax.debug.print("fugacity_species_indices = {out}", out=fugacity_species_indices)
-        fugacity_log_activity_number_density: Array = jnp.take(
-            log_activity_number_density, fugacity_species_indices
+            fp, temperature
         )
         # jax.debug.print(
-        #    "fugacity_log_activity_number_density = {out}",
-        #    out=fugacity_log_activity_number_density,
+        #     "log_reaction_equilibrium_constant = {out}", out=log_reaction_equilibrium_constant
         # )
-        # jax.debug.print("fugacity_matrix = {out}", out=fugacity_matrix)
-        # TODO: Check if there is a need to consider the stability of the species for which the
-        # fugacity constraint is being applied.
-        fugacity_residual: Array = fugacity_matrix.dot(fugacity_log_activity_number_density)
-        # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-        total_pressure: Array = get_total_pressure(
-            fixed_parameters, log_number_density, temperature
+        reaction_residual: Array = (
+            fp.reaction_matrix.dot(log_activity_number_density) - log_reaction_equilibrium_constant
         )
-        fugacity_residual = fugacity_residual - fugacity_constraints.log_number_density(
-            temperature, total_pressure
+        # jax.debug.print("reaction_residual before stability = {out}", out=reaction_residual)
+        reaction_stability_mask: Array = jnp.broadcast_to(
+            fp.active_stability(), fp.reaction_matrix.shape
         )
-        # jax.debug.print("fugacity_residual = {out}", out=fugacity_residual)
-        residual = jnp.concatenate([residual, fugacity_residual])
+        reaction_stability_matrix: Array = fp.reaction_matrix * reaction_stability_mask
+        # jax.debug.print("reaction_stability_matrix = {out}", out=reaction_stability_matrix)
+
+        # Dimensionless (log K residual)
+        reaction_residual = reaction_residual - reaction_stability_matrix.dot(
+            safe_exp(log_stability)
+        )
+        # jax.debug.print("reaction_residual after stability = {out}", out=reaction_residual)
+        # jax.debug.print(
+        #     "reaction_residual min/max: {out}/{out2}",
+        #     out=jnp.nanmin(reaction_residual),
+        #     out2=jnp.nanmax(reaction_residual),
+        # )
+        # jax.debug.print(
+        #     "reaction_residual mean/std: {out}/{out2}",
+        #     out=jnp.nanmean(reaction_residual),
+        #     out2=jnp.nanstd(reaction_residual),
+        # )
+
+    else:
+        reaction_residual = jnp.atleast_1d(jnp.array([]))
 
     # Elemental mass balance residual
-    if formula_matrix_constraints.size > 0:
-        # Number density of elements in the gas or condensed phase
-        element_density: Array = get_element_density(
-            formula_matrix_constraints, log_number_density
-        )
-        # jax.debug.print("element_density = {out}", out=element_density)
-        element_melt_density: Array = get_element_density_in_melt(
-            traced_parameters,
-            fixed_parameters,
-            formula_matrix_constraints,
-            log_number_density,
-            log_activity,
-            log_volume,
-        )
-        # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
+    # Number density of elements in the gas or condensed phase
+    element_density: Float[Array, " el_dim"] = get_element_density(
+        fp.formula_matrix, log_number_density
+    )
+    # jax.debug.print("element_density = {out}", out=element_density)
+    element_melt_density: Float[Array, " el_dim"] = get_element_density_in_melt(
+        tp, fp, fp.formula_matrix, log_number_density, log_activity, log_volume
+    )
+    # jax.debug.print("element_melt_density = {out}", out=element_melt_density)
 
-        # Relative mass error, computed in log-space for numerical stability
-        element_density_total: Array = element_density + element_melt_density
-        log_element_density_total: Array = jnp.log(element_density_total)
-        log_target_density: Array = mass_constraints.log_number_density(log_volume)
-        mass_residual: Array = safe_exp(log_element_density_total - log_target_density) - 1
-        # jax.debug.print("element_density = {out}", out=mass_residual)
+    # Relative mass error, computed in log-space for numerical stability
+    element_density_total: Float[Array, " el_dim"] = element_density + element_melt_density
+    log_element_density_total: Float[Array, " el_dim"] = jnp.log(element_density_total)
+    # jax.debug.print("log_element_density_total = {out}", out=log_element_density_total)
+    log_target_density: Float[Array, " el_dim"] = tp.mass_constraints.log_number_density(
+        log_volume
+    )
+    # jax.debug.print("log_target_density = {out}", out=log_target_density)
 
-        residual = jnp.concatenate([residual, mass_residual])
+    # Dimensionless (ratio error - 1)
+    mass_residual: Float[Array, " el_dim"] = (
+        safe_exp(log_element_density_total - log_target_density) - 1
+    )
+    # Log-space residual can perform better when close to the solution
+    # mass_residual = log_element_density_total - log_target_density
+    # jax.debug.print("mass_residual = {out}", out=mass_residual)
+    # jax.debug.print(
+    #     "mass_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(mass_residual),
+    #     out2=jnp.nanmax(mass_residual),
+    # )
+    # jax.debug.print(
+    #     "mass_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(mass_residual),
+    #     out2=jnp.nanstd(mass_residual),
+    # )
 
-        # Stability residual
-        if stability_species_indices.size > 0:
-            log_min_number_density: Array = (
-                get_min_log_elemental_abundance_per_species(
-                    formula_matrix_constraints, mass_constraints
-                )
-                - log_volume
-                + jnp.log(fixed_parameters.tau)
-            )
-            log_min_number_density = jnp.take(log_min_number_density, stability_species_indices)
+    # Stability residual
+    log_min_number_density: Float[Array, " species_dim"] = (
+        get_min_log_elemental_abundance_per_species(fp.formula_matrix, tp.mass_constraints)
+        - log_volume
+        + jnp.log(tau)
+    )
+    # jax.debug.print("log_min_number_density = {out}", out=log_min_number_density)
+    # Dimensionless (log-ratio)
+    stability_residual: Float[Array, " species_dim"] = (
+        log_number_density + log_stability - log_min_number_density
+    )
+    # jax.debug.print("stability_residual = {out}", out=stability_residual)
+    # jax.debug.print(
+    #     "stability_residual min/max: {out}/{out2}",
+    #     out=jnp.nanmin(stability_residual),
+    #     out2=jnp.nanmax(stability_residual),
+    # )
+    # jax.debug.print(
+    #     "stability_residual mean/std: {out}/{out2}",
+    #     out=jnp.nanmean(stability_residual),
+    #     out2=jnp.nanstd(stability_residual),
+    # )
 
-            log_number_density_stability: Array = jnp.take(
-                log_number_density, stability_species_indices
-            )
-            stability_residual: Array = (
-                log_number_density_stability + log_stability - log_min_number_density  # type: ignore
-            )
-            # jax.debug.print("stability_residual = {out}", out=stability_residual)
+    # NOTE: Order must be compatible with active_indices
+    residual = jnp.concatenate(
+        [fugacity_residual, reaction_residual, mass_residual, stability_residual]
+    )
+    # jax.debug.print("residual (with nans) = {out}", out=residual)
 
-            residual = jnp.concatenate([residual, stability_residual])
-
+    residual = jnp.take(residual, indices=active_indices)  # type: ignore
     # jax.debug.print("residual = {out}", out=residual)
 
     return residual
 
 
-@eqx.filter_jit
 def get_atmosphere_log_molar_mass(
-    fixed_parameters: FixedParameters, log_number_density: Array
-) -> Array:
+    fixed_parameters: FixedParameters, log_number_density: Float[Array, " species_dim"]
+) -> Float[Array, ""]:
     """Gets log molar mass of the atmosphere
 
     Args:
@@ -413,23 +330,25 @@ def get_atmosphere_log_molar_mass(
     Returns:
         Log molar mass of the atmosphere
     """
-    gas_log_number_density: Array = get_gas_species_data(fixed_parameters, log_number_density)
-    gas_molar_mass: Array = get_gas_species_data(
+    gas_log_number_density: Float[Array, " species_dim"] = get_gas_species_data(
+        fixed_parameters, log_number_density
+    )
+    gas_molar_mass: Float[Array, " species_dim"] = get_gas_species_data(
         fixed_parameters, jnp.array(fixed_parameters.molar_masses)
     )
-    molar_mass: Array = logsumexp(gas_log_number_density, b=gas_molar_mass) - logsumexp(
-        gas_log_number_density
+    molar_mass: Float[Array, ""] = logsumexp(gas_log_number_density, b=gas_molar_mass) - logsumexp(
+        gas_log_number_density, b=fixed_parameters.gas_species_mask
     )
+    # jax.debug.print("molar_mass = {out}", out=molar_mass)
 
     return molar_mass
 
 
-@eqx.filter_jit
 def get_atmosphere_log_volume(
     fixed_parameters: FixedParameters,
-    log_number_density: Array,
+    log_number_density: Float[Array, " species_dim"],
     planet: Planet,
-) -> Array:
+) -> Float[Array, ""]:
     """Gets log volume of the atmosphere
 
     Args:
@@ -440,7 +359,7 @@ def get_atmosphere_log_volume(
     Returns:
         Log volume of the atmosphere
     """
-    log_volume: Array = (
+    log_volume: Float[Array, ""] = (
         jnp.log(GAS_CONSTANT)
         + jnp.log(planet.temperature)
         - get_atmosphere_log_molar_mass(fixed_parameters, log_number_density)
@@ -451,10 +370,11 @@ def get_atmosphere_log_volume(
     return log_volume
 
 
-@eqx.filter_jit
 def get_total_pressure(
-    fixed_parameters: FixedParameters, log_number_density: Array, temperature: ArrayLike
-) -> Array:
+    fixed_parameters: FixedParameters,
+    log_number_density: Float[Array, " species_dim"],
+    temperature: Float[Array, ""],
+) -> Float[Array, ""]:
     """Gets total pressure
 
     Args:
@@ -465,16 +385,20 @@ def get_total_pressure(
     Returns:
         Total pressure
     """
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-    pressure: Array = get_pressure_from_log_number_density(log_number_density, temperature)
-    gas_pressure: Array = jnp.take(pressure, gas_species_indices)
+    gas_species_mask: Bool[Array, " species_dim"] = fixed_parameters.gas_species_mask
+    pressure: Float[Array, " species_dim"] = get_pressure_from_log_number_density(
+        log_number_density, temperature
+    )
+    gas_pressure: Float[Array, " species_dim"] = pressure * gas_species_mask
     # jax.debug.print("gas_pressure = {out}", out=gas_pressure)
 
     return jnp.sum(gas_pressure)
 
 
-@eqx.filter_jit
-def get_element_density(formula_matrix: Array, log_number_density: Array) -> Array:
+def get_element_density(
+    formula_matrix: Integer[Array, "el_dim species_dim"],
+    log_number_density: Float[Array, " species_dim"],
+) -> Array:
     """Number density of elements in the gas or condensed phase
 
     Args:
@@ -484,20 +408,19 @@ def get_element_density(formula_matrix: Array, log_number_density: Array) -> Arr
     Returns:
         Number density of elements in the gas or condensed phase
     """
-    element_density: Array = formula_matrix.dot(safe_exp(log_number_density))
+    element_density: Float[Array, " el_dim"] = formula_matrix @ safe_exp(log_number_density)
 
     return element_density
 
 
-@eqx.filter_jit
 def get_element_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    formula_matrix: Array,
-    log_number_density: Array,
-    log_activity: Array,
-    log_volume: Array,
-) -> Array:
+    formula_matrix: Integer[Array, "el_dim species_dim"],
+    log_number_density: Float[Array, " species_dim"],
+    log_activity: Float[Array, " species_dim"],
+    log_volume: Float[Array, ""],
+) -> Float[Array, " species_dim"]:
     """Gets the number density of elements dissolved in melt due to species solubility
 
     Args:
@@ -511,37 +434,40 @@ def get_element_density_in_melt(
     Returns:
         Number density of elements dissolved in melt
     """
-    species_melt_density: Array = get_species_density_in_melt(
-        traced_parameters, fixed_parameters, log_number_density, log_activity, log_volume
+    species_melt_density: Float[Array, " species_dim"] = get_species_density_in_melt(
+        traced_parameters,
+        fixed_parameters,
+        log_number_density,
+        log_activity,
+        log_volume,
     )
-    element_melt_density: Array = formula_matrix.dot(species_melt_density)
+    element_melt_density: Float[Array, " species_dim"] = formula_matrix.dot(species_melt_density)
 
     return element_melt_density
 
 
-@eqx.filter_jit
-def get_gas_species_data(fixed_parameters: FixedParameters, some_array: ArrayLike) -> Array:
-    """Gets the gas species data from an array
+def get_gas_species_data(
+    fixed_parameters: FixedParameters, some_array: ArrayLike
+) -> Shaped[Array, " species_dim"]:
+    """Masks the gas species data from an array
 
     Args:
         fixed_parameters: Fixed parameters
-        some_array: Some array to extract gas species data from
+        some_array: Some array to mask the gas species data from
 
     Returns:
-        An array with just the gas species data from `some_array`
+        An array with gas species data from `some_array` and condensate entries zeroed
     """
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-    gas_data: Array = jnp.take(some_array, gas_species_indices)
+    gas_data: Shaped[Array, " species_dim"] = fixed_parameters.gas_species_mask * some_array
 
     return gas_data
 
 
-@eqx.filter_jit
 def get_log_activity(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    log_number_density: Array,
-) -> Array:
+    log_number_density: Float[Array, " species_dim"],
+) -> Float[Array, " species_dim"]:
     """Gets the log activity
 
     Args:
@@ -553,16 +479,18 @@ def get_log_activity(
         Log activity
     """
     planet: Planet = traced_parameters.planet
-    temperature: ArrayLike = planet.temperature
+    temperature: Float[Array, ""] = planet.temperature
     species: SpeciesCollection = fixed_parameters.species
-    total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
+    total_pressure: Float[Array, ""] = get_total_pressure(
+        fixed_parameters, log_number_density, temperature
+    )
     # jax.debug.print("total_pressure = {out}", out=total_pressure)
 
     activity_funcs: list[Callable] = [
         to_hashable(species_.activity.log_activity) for species_ in species
     ]
 
-    def apply_activity_function(index: ArrayLike) -> Array:
+    def apply_activity(index: ArrayLike) -> Float[Array, ""]:
         return lax.switch(
             index,
             activity_funcs,
@@ -570,11 +498,11 @@ def get_log_activity(
             total_pressure,
         )
 
-    vmap_apply_function: Callable = eqx.filter_vmap(apply_activity_function, in_axes=(0,))
-    indices: Array = jnp.arange(len(species))
-    log_activity_pure_species: Array = vmap_apply_function(indices)
+    indices: Integer[Array, " species_dim"] = jnp.arange(len(species))
+    vmap_activity: Callable = eqx.filter_vmap(apply_activity, in_axes=(0,))
+    log_activity_pure_species: Float[Array, " species_dim"] = vmap_activity(indices)
     # jax.debug.print("log_activity_pure_species = {out}", out=log_activity_pure_species)
-    log_activity = get_log_activity_ideal_mixing(
+    log_activity: Float[Array, " species_dim"] = get_log_activity_ideal_mixing(
         fixed_parameters, log_number_density, log_activity_pure_species
     )
     # jax.debug.print("log_activity = {out}", out=log_activity)
@@ -582,10 +510,11 @@ def get_log_activity(
     return log_activity
 
 
-@eqx.filter_jit
 def get_log_activity_ideal_mixing(
-    fixed_parameters: FixedParameters, log_number_density: Array, log_activity_pure_species: Array
-) -> Array:
+    fixed_parameters: FixedParameters,
+    log_number_density: Float[Array, " species_dim"],
+    log_activity_pure_species: Float[Array, " species_dim"],
+) -> Float[Array, " species_dim"]:
     """Gets the log activity of species in the atmosphere assuming an ideal mixture
 
     Args:
@@ -596,28 +525,24 @@ def get_log_activity_ideal_mixing(
     Returns:
         Log activity of the species assuming ideal mixing in the atmosphere
     """
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-    gas_species_mask: Array = jnp.zeros_like(log_activity_pure_species, dtype=bool)
-    gas_species_mask = gas_species_mask.at[gas_species_indices].set(True)
+    gas_species_mask: Bool[Array, " species_dim"] = fixed_parameters.gas_species_mask
+    number_density: Float[Array, " species_dim"] = safe_exp(log_number_density)
+    gas_species_number_density: Float[Array, " species_dim"] = gas_species_mask * number_density
+    atmosphere_log_number_density: Float[Array, ""] = jnp.log(jnp.sum(gas_species_number_density))
 
-    number_density: Array = safe_exp(log_number_density)
-    gas_species_number_density: Array = jnp.where(gas_species_mask, number_density, 0)
-    atmosphere_log_number_density: Array = jnp.log(jnp.sum(gas_species_number_density))
-
-    log_activity_gas_species: Array = (
+    log_activity_gas_species: Float[Array, " species_dim"] = (
         log_activity_pure_species + log_number_density - atmosphere_log_number_density
     )
-    log_activity: Array = jnp.where(
+    log_activity: Float[Array, " species_dim"] = jnp.where(
         gas_species_mask, log_activity_gas_species, log_activity_pure_species
     )
 
     return log_activity
 
 
-@eqx.filter_jit
 def get_log_pressure_from_log_number_density(
-    log_number_density: ArrayLike, temperature: ArrayLike
-) -> Array:
+    log_number_density: Float[Array, " species_dim"], temperature: Float[Array, ""]
+) -> Float[Array, " species_dim"]:
     """Gets log pressure from log number density
 
     Args:
@@ -627,17 +552,18 @@ def get_log_pressure_from_log_number_density(
     Returns:
         Log pressure
     """
-    log_pressure: Array = (
+    log_pressure: Float[Array, " species_dim"] = (
         jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature) + log_number_density
     )
 
     return log_pressure
 
 
-@eqx.filter_jit
 def get_log_Kp(
-    species: SpeciesCollection, reaction_matrix: Array, temperature: ArrayLike
-) -> Array:
+    species: SpeciesCollection,
+    reaction_matrix: Float[Array, "react_dim species_dim"],
+    temperature: Float[Array, ""],
+) -> Float[Array, " react_dim"]:
     """Gets log of the equilibrium constant in terms of partial pressures
 
     Args:
@@ -648,22 +574,26 @@ def get_log_Kp(
     Returns:
         Log of the equilibrium constant in terms of partial pressures
     """
-    gibbs_list: list[ArrayLike] = []
-    for species_ in species:
-        gibbs: ArrayLike = species_.data.get_gibbs_over_RT(temperature)
-        gibbs_list.append(gibbs)
+    gibbs_funcs: list[Callable] = [
+        to_hashable(species_.data.get_gibbs_over_RT) for species_ in species
+    ]
 
-    gibbs_jnp: Array = jnp.array(gibbs_list)
-    log_Kp: Array = -1.0 * reaction_matrix.dot(gibbs_jnp)
+    def apply_gibbs(
+        index: Integer[Array, ""], temperature: Float[Array, "..."]
+    ) -> Float[Array, "..."]:
+        return lax.switch(index, gibbs_funcs, temperature)
+
+    indices: Integer[Array, " species_dim"] = jnp.arange(len(species))
+    vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
+    gibbs_values: Float[Array, " species_dim"] = vmap_gibbs(indices, temperature)
+    log_Kp: Float[Array, " react_dim"] = -1.0 * reaction_matrix @ gibbs_values
 
     return log_Kp
 
 
-@eqx.filter_jit
 def get_log_reaction_equilibrium_constant(
-    fixed_parameters: FixedParameters,
-    temperature: ArrayLike,
-) -> Array:
+    fixed_parameters: FixedParameters, temperature: Float[Array, ""]
+) -> Float[Array, " react_dim"]:
     """Gets the log equilibrium constant of the reactions
 
     Args:
@@ -674,23 +604,26 @@ def get_log_reaction_equilibrium_constant(
         Log equilibrium constant of the reactions
     """
     species: SpeciesCollection = fixed_parameters.species
-    reaction_matrix: Array = jnp.array(fixed_parameters.reaction_matrix)
-    gas_species_indices: Array = jnp.array(fixed_parameters.gas_species_indices)
-
-    log_Kp: Array = get_log_Kp(species, reaction_matrix, temperature)
+    reaction_matrix: Float[Array, "react_dim species_dim"] = jnp.array(
+        fixed_parameters.reaction_matrix
+    )
+    log_Kp: Float[Array, " react_dim"] = get_log_Kp(species, reaction_matrix, temperature)
     # jax.debug.print("lnKp = {out}", out=lnKp)
-    delta_n: Array = jnp.sum(jnp.take(reaction_matrix, gas_species_indices, axis=1), axis=1)
+    delta_n: Float[Array, " react_dim"] = jnp.sum(
+        reaction_matrix * fixed_parameters.gas_species_mask, axis=1
+    )
     # jax.debug.print("delta_n = {out}", out=delta_n)
-    log_Kc: Array = log_Kp - delta_n * (jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature))
+    log_Kc: Float[Array, " react_dim"] = log_Kp - delta_n * (
+        jnp.log(BOLTZMANN_CONSTANT_BAR) + jnp.log(temperature)
+    )
     # jax.debug.print("log10Kc = {out}", out=log_Kc)
 
     return log_Kc
 
 
-@eqx.filter_jit
 def get_pressure_from_log_number_density(
-    log_number_density: ArrayLike, temperature: ArrayLike
-) -> Array:
+    log_number_density: Float[Array, " species_dim"], temperature: Float[Array, ""]
+) -> Float[Array, " species_dim"]:
     """Gets pressure from log number density
 
     Args:
@@ -703,14 +636,13 @@ def get_pressure_from_log_number_density(
     return safe_exp(get_log_pressure_from_log_number_density(log_number_density, temperature))
 
 
-@eqx.filter_jit
 def get_species_density_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    log_number_density: Array,
-    log_activity: Array,
-    log_volume: Array,
-) -> Array:
+    log_number_density: Float[Array, " species_dim"],
+    log_activity: Float[Array, " species_dim"],
+    log_volume: Float[Array, ""],
+) -> Float[Array, " species_dim"]:
     """Gets the number density of species dissolved in melt due to species solubility
 
     Args:
@@ -723,18 +655,18 @@ def get_species_density_in_melt(
     Returns:
         Number density of species dissolved in melt
     """
-    molar_masses: Array = jnp.array(fixed_parameters.molar_masses)
-    planet: Planet = traced_parameters.planet
+    molar_masses: Float[Array, " species_dim"] = jnp.array(fixed_parameters.molar_masses)
+    melt_mass: Float[Array, ""] = traced_parameters.planet.melt_mass
 
-    ppmw: Array = get_species_ppmw_in_melt(
+    ppmw: Float[Array, " species_dim"] = get_species_ppmw_in_melt(
         traced_parameters, fixed_parameters, log_number_density, log_activity
     )
 
-    species_melt_density: Array = (
+    species_melt_density: Float[Array, " species_dim"] = (
         ppmw
         * unit_conversion.ppm_to_fraction
         * AVOGADRO
-        * planet.melt_mass
+        * melt_mass
         / (molar_masses * safe_exp(log_volume))
     )
     # jax.debug.print("species_melt_density = {out}", out=species_melt_density)
@@ -742,13 +674,12 @@ def get_species_density_in_melt(
     return species_melt_density
 
 
-@eqx.filter_jit
 def get_species_ppmw_in_melt(
     traced_parameters: TracedParameters,
     fixed_parameters: FixedParameters,
-    log_number_density: Array,
-    log_activity: Array,
-) -> Array:
+    log_number_density: Float[Array, " species_dim"],
+    log_activity: Float[Array, " species_dim"],
+) -> Float[Array, " species_dim"]:
     """Gets the ppmw of species dissolved in melt due to species solubility
 
     Args:
@@ -761,20 +692,23 @@ def get_species_ppmw_in_melt(
         ppmw of species dissolved in melt
     """
     species: SpeciesCollection = fixed_parameters.species
-    diatomic_oxygen_index: Array = jnp.array(fixed_parameters.diatomic_oxygen_index)
-    planet: Planet = traced_parameters.planet
-    temperature: ArrayLike = planet.temperature
+    diatomic_oxygen_index: Integer[Array, ""] = jnp.array(fixed_parameters.diatomic_oxygen_index)
+    temperature: Float[Array, ""] = traced_parameters.planet.temperature
 
-    fugacity: Array = safe_exp(log_activity)
-    total_pressure: Array = get_total_pressure(fixed_parameters, log_number_density, temperature)
-    diatomic_oxygen_fugacity: Array = jnp.take(fugacity, diatomic_oxygen_index)
+    fugacity: Float[Array, " species_dim"] = safe_exp(log_activity)
+    total_pressure: Float[Array, ""] = get_total_pressure(
+        fixed_parameters, log_number_density, temperature
+    )
+    diatomic_oxygen_fugacity: Float[Array, ""] = jnp.take(fugacity, diatomic_oxygen_index)
 
-    # NOTE: All solubility formulations must return a JAX array to allow vmapping
+    # NOTE: All solubility formulations must return a JAX array to allow vmap
     solubility_funcs: list[Callable] = [
         to_hashable(species_.solubility.jax_concentration) for species_ in species
     ]
 
-    def apply_solubility_function(index: ArrayLike, fugacity: ArrayLike):
+    def apply_solubility(
+        index: Integer[Array, ""], fugacity: Float[Array, ""]
+    ) -> Float[Array, ""]:
         return lax.switch(
             index,
             solubility_funcs,
@@ -784,9 +718,188 @@ def get_species_ppmw_in_melt(
             diatomic_oxygen_fugacity,
         )
 
-    vmap_apply_function: Callable = eqx.filter_vmap(apply_solubility_function, in_axes=(0, 0))
-    indices: ArrayLike = jnp.arange(len(species))
-    species_ppmw: Array = vmap_apply_function(indices, fugacity)
+    indices: Integer[Array, " species_dim"] = jnp.arange(len(species))
+    vmap_solubility: Callable = eqx.filter_vmap(apply_solubility, in_axes=(0, 0))
+    species_ppmw: Float[Array, " species_dim"] = vmap_solubility(indices, fugacity)
     # jax.debug.print("ppmw = {out}", out=ppmw)
 
     return species_ppmw
+
+
+@eqx.filter_jit
+# Useful for optimising how many times JAX compiles the solve function
+# @eqx.debug.assert_max_traces(max_traces=1)
+def repeat_solver(
+    solver_vmap_fn: Callable,
+    active_indices: Integer[Array, " res_dim"],
+    tau: Float[Array, "..."],
+    solution: Float[Array, "batch_dim sol_dim"],
+    traced_parameters: TracedParameters,
+    solver_parameters: SolverParameters,
+    key: PRNGKeyArray,
+) -> tuple[
+    Float[Array, "batch_dim sol_dim"],
+    Bool[Array, " batch_dim"],
+    Integer[Array, " batch_dim"],
+    Integer[Array, " batch_dim"],
+]:
+    """Repeat solver that perturbs the initial solution for cases that fail and tries again
+
+    Args:
+        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
+        active_indices: Indices of the residual array that are active
+        tau: Tau parameter for species' stability
+        solution: Solution
+        traced_parameters: Traced parameters
+        solver_paramters: Solver parameters
+        key: Random key
+
+    Returns:
+        A tuple with the state: (solution, solver_status, solver_steps, solver_attempts)
+    """
+
+    def body_fn(state: tuple[Array, ...]) -> tuple[Array, ...]:
+        """Perform one iteration of the solver retry loop
+
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                key: PRNG key for random number generation
+                solution: Current solution array
+                status: Boolean array indicating successful solutions
+                steps: Step count
+                success_attempt: Integer array recording iteration of success for each entry
+
+        Returns:
+            Updated state tuple
+        """
+        i, key, solution, status, steps, success_attempt = state
+
+        failed_mask: Bool[Array, " batch_dim"] = ~status
+        key, subkey = random.split(key)
+
+        # Perturb the (initial) solution for cases that failed. Something more sophisticated could
+        # be implemented, such as a regressor or neural network to inform failed cases based on
+        # successful solves.
+        perturb_shape: tuple[int, int] = (solution.shape[0], solution.shape[1])
+        raw_perturb: Float[Array, "batch_dim sol_dim"] = random.uniform(
+            subkey, shape=perturb_shape, minval=-1.0, maxval=1.0
+        )
+        perturbations: Float[Array, "batch_dim sol_dim"] = jnp.where(
+            failed_mask[:, None],
+            solver_parameters.multistart_perturbation * raw_perturb,
+            jnp.zeros_like(solution),
+        )
+        new_initial_solution: Float[Array, "batch_dim sol_dim"] = solution + perturbations
+        # jax.debug.print("new_initial_solution = {out}", out=new_initial_solution)
+
+        new_solution, new_status, new_steps = solver_vmap_fn(
+            new_initial_solution, active_indices, tau, traced_parameters, solver_parameters
+        )
+
+        # Determine which entries to update: previously failed, now succeeded
+        update_mask: Bool[Array, " batch_dim"] = failed_mask & new_status
+        updated_i: Integer[Array, "..."] = i + 1
+        updated_solution: Float[Array, "batch_dim sol_dim"] = cast(
+            Array, jnp.where(update_mask[:, None], new_solution, solution)
+        )
+        updated_status: Bool[Array, " batch_dim"] = status | new_status
+        updated_steps: Integer[Array, " batch_dim"] = cast(
+            Array, jnp.where(update_mask, new_steps, steps)
+        )
+        updated_success_attempt: Array = jnp.where(update_mask, updated_i, success_attempt)
+
+        return (
+            updated_i,
+            key,
+            updated_solution,
+            updated_status,
+            updated_steps,
+            updated_success_attempt,
+        )
+
+    def cond_fn(state: tuple[Array, ...]) -> Bool[Array, "..."]:
+        """Check if the solver should continue retrying
+
+        Args:
+            state: Tuple containing:
+                i: Current attempt index
+                _: Unused (PRNG key)
+                _: Unused (solution)
+                status: Boolean array indicating success of each solution
+                _: Unused (steps)
+                _: Unused (success_attempt)
+
+        Returns:
+            A boolean array indicating whether retries should continue (True if any solution
+            failed and attempts are still available)
+        """
+        i, _, _, status, _, _ = state
+
+        return jnp.logical_and(i < solver_parameters.multistart, jnp.any(~status))
+
+    # Try first solution
+    first_solution, first_solver_status, first_solver_steps = solver_vmap_fn(
+        solution, active_indices, tau, traced_parameters, solver_parameters
+    )
+    # Failback solution
+    solution = cast(Array, jnp.where(first_solver_status[:, None], first_solution, solution))
+
+    initial_state: tuple[Array, ...] = (
+        jnp.array(1),  # First attempt of the repeat_solver
+        key,
+        solution,
+        first_solver_status,
+        first_solver_steps,
+        first_solver_status.astype(int),  # 1 for solved, otherwise 0
+    )
+
+    _, _, final_solution, final_status, final_steps, final_success_attempt = lax.while_loop(
+        cond_fn, body_fn, initial_state
+    )
+
+    return final_solution, final_status, final_steps, final_success_attempt
+
+
+def make_solve_tau_step(
+    solver_vmap_fn: Callable,
+    active_indices: Integer[Array, " res_dim"],
+    traced_parameters: TracedParameters,
+    solver_parameters: SolverParameters,
+) -> Callable:
+    """Wraps the repeat solver to call it for different tau values
+
+    Args:
+        solver_vmap_fn: Vmapped solver function with pre-bound fixed configuration
+        active_indices: Indices of the residual array that are active
+        traced_parameters: Traced parameters
+        solver_parameters: Solver parameters
+
+    Returns:
+        Wrapped solver for a single tau value
+    """
+
+    @eqx.filter_jit
+    # @eqx.debug.assert_max_traces(max_traces=1)
+    def solve_tau_step(carry: tuple, tau: Float[Array, " batch_dim"]) -> tuple[tuple, tuple]:
+        (key, solution) = carry
+        key, subkey = jax.random.split(key)
+
+        new_solution, new_status, new_steps, success_attempt = repeat_solver(
+            solver_vmap_fn,
+            active_indices,
+            tau,
+            solution,
+            traced_parameters,
+            solver_parameters,
+            subkey,
+        )
+
+        new_carry: tuple[PRNGKeyArray, Float[Array, "batch_dim sol_dim"]] = (key, new_solution)
+
+        # Output current solution etc for this tau step
+        out: tuple[Array, ...] = (new_solution, new_status, new_steps, success_attempt)
+
+        return new_carry, out
+
+    return solve_tau_step

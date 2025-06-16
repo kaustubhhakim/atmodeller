@@ -16,15 +16,17 @@
 #
 """Package level variables and initialises the package logger"""
 
-from __future__ import annotations
-
 __version__: str = "0.5.0"
 
 import logging
+import sys
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+
+# from beartype.claw import beartype_this_package
+# beartype_this_package()
 
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
@@ -32,9 +34,16 @@ print("Atmodeller initialized with double precision (float64)")
 
 # For debugging
 # jax.config.update("jax_debug_nans", True)
-# jax.config.update("jax_debug_infs", False)
+# jax.config.update("jax_debug_infs", True)
 # jax.config.update("jax_disable_jit", True)
 # jax.config.update("jax_log_compiles", True)
+# os.environ["EQX_ON_ERROR"] = "breakpoint"
+
+# Suppress warnings (notably from Equinox about static JAX arrays)
+if not sys.warnoptions:
+    import warnings
+
+    warnings.simplefilter("ignore")
 
 # Thermodynamic standard state
 ENTHALPY_REFERENCE: float = 298.15
@@ -48,11 +57,10 @@ INITIAL_LOG_NUMBER_DENSITY: float = 50.0
 
 Empiricially determined. This value is mid-range for Earth-like planets.
 """
-INITIAL_LOG_STABILITY: float = -140.0
-"""Initial log stability
+INITIAL_LOG_STABILITY: float = -30.0
+"""Initial log stability.
 
-Empirically determined. Preliminary testing seems to reveal that starting from a large negative 
-value improves the performance of the solver. This asserts that all species are stable.
+Empirically determined.
 """
 
 # Maximum x for which exp(x) is finite in 64-bit precision (to prevent overflow)
@@ -64,18 +72,14 @@ min_exp_input = np.log(jnp.finfo(np.float64).tiny)
 LOG_NUMBER_DENSITY_LOWER: float = -170.0
 """Lower log number density for a species
 
-At 3000 K this corresponds to 3.17E-77 bar and at 298 K this corresponds to 3.16E-78 bar.
+For a gas species this corresponds to 3.17E-77 bar and 3.16E-78 bar at 3000 K and 298 K,
+respectively.
 """
 LOG_NUMBER_DENSITY_UPPER: float = 80.0
 """Upper log number density for a species
 
-TODO: The summary values below are for a value of 70.0, but it has been increased to 80 since this
-cut-off also affects condensates, which can extend to large values. The hypercube specification
-can take a pytree structurs, so a more sophisticated approach can be implemented where gas species
-and condensate are treated differently.
-
-At 3000 K this corresponds to 1041881 bar (104 GPa) and at 298 K this corresponds to 103494 bar
-(10.3 GPa).
+For a gas species this corresponds to 2294896 GPa and 227960 GPa at 3000 K and 298 K,
+respectively. However, the choice of this upper limit is actually motivated by condensed species.
 """
 LOG_STABILITY_LOWER: float = -700.0  # basically the same as min_exp_input
 """Lower stability for a species
@@ -87,8 +91,10 @@ LOG_STABILITY_UPPER: float = 35.0
 
 Empirically determined.
 """
+TAU_MAX: float = 1.0e-3
+"""Maximum tau scaling factor for species stability when using the tau cascade solver"""
 TAU: float = 1.0e-25
-"""Tau scaling factor for species stability :cite:p:`LKK16`.
+"""Desired (i.e. final/minimium) tau scaling factor for species stability :cite:p:`LKK16`.
 
 Tau effectively controls the minimum non-zero number density of unstable species. Formally, it
 defines the number density of an unstable pure condensate with an activity of 1/e, which
@@ -98,6 +104,12 @@ This value is typically appropriate for condensate stability only, but if you ad
 stability criteria to gas species you should reduce this value, maybe as low as 1e-60 to 1e-72 if
 you want to ensure you do not truncated O2 at low temperatures. Hence you can override this default
 using an argument to :class:`atmodeller.classes.InteriorAtmosphere`.
+"""
+TAU_NUM: int = 2
+"""Number of tau values to solve between TAU_MAX and TAU (inclusive) for the tau cascade solver
+
+Empirically determined. Basically, once a solution has been found for TAU_MAX the solver can
+immediately proceed to TAU. This usually solves within a few steps on the first attempt.
 """
 
 # Create the package logger.

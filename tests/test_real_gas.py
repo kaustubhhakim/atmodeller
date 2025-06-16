@@ -21,7 +21,7 @@ from typing import Mapping
 
 import numpy as np
 import pytest
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 from atmodeller import debug_logger
 from atmodeller.classes import InteriorAtmosphere, SolverParameters
@@ -52,6 +52,15 @@ ATOL: float = 1.0e-6
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 eos_models: Mapping[str, ActivityProtocol] = get_eos_models()
+
+H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
+H2O_g: Species = Species.create_gas("H2O_g")
+O2_g: Species = Species.create_gas("O2_g")
+SiO_g: Species = Species.create_gas("OSi_g")
+H4Si_g: Species = Species.create_gas("H4Si_g")
+O2Si_l: Species = Species.create_condensed("O2Si_l")
+species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
+subneptune_system: InteriorAtmosphere = InteriorAtmosphere(species)
 
 
 def test_fO2_holley(helper) -> None:
@@ -94,24 +103,14 @@ def test_fO2_holley(helper) -> None:
 def test_chabrier_earth(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21`"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
-    H2O_g: Species = Species.create_gas("H2O_g")
-    O2_g: Species = Species.create_gas("O2_g")
-    SiO_g: Species = Species.create_gas("OSi_g")
-    H4Si_g: Species = Species.create_gas("H4Si_g")
-    O2Si_l: Species = Species.create_condensed("O2Si_l")
-
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
     planet: Planet = Planet(surface_temperature=3400)
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
-
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
     o_kg: ArrayLike = h_kg * 10
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    interior_atmosphere.solve(planet=planet, mass_constraints=mass_constraints)
-    output: Output = interior_atmosphere.output
+    subneptune_system.solve(planet=planet, mass_constraints=mass_constraints)
+    output: Output = subneptune_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -141,15 +140,6 @@ def test_chabrier_subNeptune(helper) -> None:
     ignored, which would greatly lower the pressure and hence the number density.
     """
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
-    H2O_g: Species = Species.create_gas("H2O_g")
-    O2_g: Species = Species.create_gas("O2_g")
-    OSi_g: Species = Species.create_gas("OSi_g")
-    H4Si_g: Species = Species.create_gas("H4Si_g")
-    O2Si_l: Species = Species.create_condensed("O2Si_l")
-
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, OSi_g, O2Si_l))
-
     surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
     surface_radius = 1.5 * 6371000  # m
@@ -158,8 +148,6 @@ def test_chabrier_subNeptune(helper) -> None:
         planet_mass=planet_mass,
         surface_radius=surface_radius,
     )
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
-
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
     o_kg: ArrayLike = 6.74717e24
@@ -170,11 +158,8 @@ def test_chabrier_subNeptune(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    interior_atmosphere.solve(
-        planet=planet,
-        mass_constraints=mass_constraints,
-    )
-    output: Output = interior_atmosphere.output
+    subneptune_system.solve(planet=planet, mass_constraints=mass_constraints)
+    output: Output = subneptune_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, float] = {
@@ -198,21 +183,9 @@ def test_chabrier_subNeptune(helper) -> None:
 def test_chabrier_subNeptune_batch(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`CD21` for a sub-Neptune for several O masses
 
-    H2O solubility is also included.
-
     As above, this test has questionable physical relevance without the inclusion of more species'
     solubility, but it serves its purpose as a test.
     """
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
-    H2O_g: Species = Species.create_gas(
-        "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
-    )
-    O2_g: Species = Species.create_gas("O2_g")
-    OSi_g: Species = Species.create_gas("OSi_g")
-    H4Si_g: Species = Species.create_gas("H4Si_g")
-    O2Si_l: Species = Species.create_condensed("O2Si_l")
-
-    species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, OSi_g, O2Si_l))
 
     surface_temperature = 3400  # K
     planet_mass = 4.6 * 5.97224e24  # kg
@@ -222,8 +195,6 @@ def test_chabrier_subNeptune_batch(helper) -> None:
         planet_mass=planet_mass,
         surface_radius=surface_radius,
     )
-    interior_atmosphere: InteriorAtmosphere = InteriorAtmosphere(species)
-
     h_kg: ArrayLike = 0.01 * planet.planet_mass
     si_kg: ArrayLike = 0.1459 * planet.planet_mass  # Si = 14.59 wt% Kargel & Lewis (1993)
     # Batch solve for three oxygen masses
@@ -235,17 +206,17 @@ def test_chabrier_subNeptune_batch(helper) -> None:
 
     mass_constraints: dict[str, ArrayLike] = {"H": h_kg, "Si": si_kg, "O": o_kg}
 
-    interior_atmosphere.solve(planet=planet, mass_constraints=mass_constraints)
-    output: Output = interior_atmosphere.output
+    subneptune_system.solve(planet=planet, mass_constraints=mass_constraints)
+    output: Output = subneptune_system.output
     solution: dict[str, ArrayLike] = output.quick_look()
 
     target: dict[str, ArrayLike] = {
-        "H2O_g": np.array([3.415377850792279e04, 3.464713381927368e04, 3.477346411670301e04]),
-        "H2_g": np.array([1.953887558935978e00, 1.649313472441684e-01, 2.675210310320718e-02]),
+        "H2O_g": np.array([4.477789711513712e05, 4.785890592398898e05, 5.039107471956282e05]),
+        "H2_g": np.array([3.463824822645956e-02, 7.208115634579626e-03, 2.129125602157067e-03]),
         "H2_g_activity": np.array(
-            [2.695007407667841e01, 1.476984016623652e01, 1.127184619297398e01]
+            [4.081150539627139e02, 2.445386584856476e02, 1.945159917637966e02]
         ),
-        "O2_g": np.array([3.464758174266921e04, 1.187130259426918e05, 2.053152202141989e05]),
+        "O2_g": np.array([2.597033179470946e04, 8.263153509596182e04, 1.447811285078976e05]),
     }
 
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
@@ -290,7 +261,7 @@ def test_pH2_fO2_real_gas(helper) -> None:
     assert helper.isclose(solution, target, rtol=RTOL, atol=ATOL)
 
 
-@pytest.mark.skip(reason="Can fail if multistart is not large enough")
+@pytest.mark.skip(reason="Complicated test that can fail if multistart is not large enough")
 def test_H_and_C_real_gas(helper) -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 

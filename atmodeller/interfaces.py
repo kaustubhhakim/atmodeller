@@ -16,39 +16,36 @@
 #
 """Interfaces"""
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
-from jax import Array
-from jax.typing import ArrayLike
-
-from atmodeller.utilities import ExperimentalCalibration
+from jaxtyping import Array, ArrayLike, Bool
 
 
+@runtime_checkable
 class ActivityProtocol(Protocol):
-    def log_activity(
-        self,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-    ) -> ArrayLike: ...
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
+@runtime_checkable
 class FugacityConstraintProtocol(Protocol):
-    @property
-    def value(self) -> ArrayLike: ...
+    def active(self) -> Bool[Array, "..."]: ...
 
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
 
 
+@runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
-    log10_shift: ArrayLike
     evaluation_pressure: ArrayLike | None
-    calibration: ExperimentalCalibration
 
-    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+    @property
+    def log10_shift(self) -> Array: ...
 
-    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike: ...
+    def log10_fugacity_buffer(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
+
+    def log10_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array: ...
 
 
+@runtime_checkable
 class SolubilityProtocol(Protocol):
     """Solubility protocol
 
@@ -66,9 +63,5 @@ class SolubilityProtocol(Protocol):
     ) -> ArrayLike: ...
 
     def jax_concentration(
-        self,
-        fugacity: ArrayLike,
-        temperature: ArrayLike,
-        pressure: ArrayLike,
-        fO2: ArrayLike,
+        self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
     ) -> Array: ...

@@ -14,26 +14,22 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Pytree containers that can be use by JAX"""
-
-from __future__ import annotations
+"""Containers"""
 
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import asdict
-from typing import Callable, Iterator, Literal, Type
+from typing import Literal
 
 import equinox as eqx
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
-import numpy.typing as npt
 import optimistix as optx
-from jax import Array, lax
-from jax.typing import ArrayLike
+from jax import lax
+from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
 from lineax import AbstractLinearSolver
 from molmass import Formula
-from xmmutablemap import ImmutableMap
 
 from atmodeller import (
     LOG_NUMBER_DENSITY_LOWER,
@@ -48,25 +44,84 @@ from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     SolubilityProtocol,
 )
+from atmodeller.mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
 from atmodeller.utilities import (
-    OptxSolver,
+    all_not_nan,
     as_j64,
+    get_batch_size,
     get_log_number_density_from_log_pressure,
     to_hashable,
     unit_conversion,
 )
 
-try:
-    from typing import Self  # type: ignore
-except ImportError:
-    from typing_extensions import Self
-
 logger: logging.Logger = logging.getLogger(__name__)
 
-# Required for multistart and helpful for reproducibility and debugging
-np.random.seed(0)
+
+class Species(eqx.Module):
+    """Species
+
+    Args:
+        data: Species data
+        activity: Activity
+        solubility: Solubility
+        solve_for_stability: Solve for stability
+    """
+
+    data: SpeciesData
+    activity: ActivityProtocol
+    solubility: SolubilityProtocol
+    solve_for_stability: bool
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and phase"""
+        return self.data.name
+
+    @classmethod
+    def create_condensed(
+        cls,
+        species_name: str,
+        activity: ActivityProtocol = CondensateActivity(),
+        solve_for_stability: bool = True,
+    ) -> "Species":
+        """Creates a condensate
+
+        Args:
+            species_name: Species name, as it appears in the species dictionary
+            activity: Activity. Defaults to unity activity.
+            solve_for_stability. Solve for stability. Defaults to True.
+
+        Returns:
+            A condensed species
+        """
+        species_data: SpeciesData = select_thermodata(species_name)
+
+        return cls(species_data, activity, NoSolubility(), solve_for_stability)
+
+    @classmethod
+    def create_gas(
+        cls,
+        species_name: str,
+        activity: ActivityProtocol = IdealGas(),
+        solubility: SolubilityProtocol = NoSolubility(),
+        solve_for_stability: bool = False,
+    ) -> "Species":
+        """Creates a gas species
+
+        Args:
+            species_name: Species name, as it appears in the species dictionary
+            activity: Activity. Defaults to an ideal gas.
+            solubility: Solubility. Defaults to no solubility.
+            solve_for_stability. Solve for stability. Defaults to False.
+
+        Returns:
+            A gas species
+        """
+        species_data: SpeciesData = select_thermodata(species_name)
+
+        return cls(species_data, activity, solubility, solve_for_stability)
 
 
 class SpeciesCollection(eqx.Module):
@@ -79,7 +134,7 @@ class SpeciesCollection(eqx.Module):
     data: tuple[Species, ...] = eqx.field(converter=tuple)
 
     @classmethod
-    def create(cls, species_names: Iterable[str]) -> Self:
+    def create(cls, species_names: Iterable[str]) -> "SpeciesCollection":
         """Creates an instance
 
         Args:
@@ -104,18 +159,29 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    def get_condensed_species_indices(self) -> Array:
-        """Gets the indices of condensed species
+    def active_stability(self) -> Bool[Array, " species_dim"]:
+        """Active species stability
 
         Returns:
-            Indices of the condensed species
+            True for species stabilities that are to be solved for, otherwise False
         """
-        indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
-            if species_.data.phase != "g":
-                indices.append(nn)
+        mask: Bool[Array, " species_dim"] = jnp.array(
+            [species.solve_for_stability for species in self.data], dtype=bool
+        )
 
-        return jnp.array(indices, dtype=jnp.int_)
+        return mask
+
+    def get_condensed_species_names(self) -> tuple[str, ...]:
+        """Condensed species names
+
+        Returns:
+            Condensed species names
+        """
+        condensed_names: list[str] = [
+            species.name for species in self.data if species.data.phase != "g"
+        ]
+
+        return tuple(condensed_names)
 
     def get_diatomic_oxygen_index(self) -> int:
         """Gets the species index corresponding to diatomic oxygen.
@@ -135,70 +201,66 @@ class SpeciesCollection(eqx.Module):
         # and fO2 is not included in the model, an error is raised.
         return 0
 
-    def get_gas_species_indices(self) -> Array:
-        """Gets the indices of gas species
+    def get_gas_species_mask(self) -> Bool[Array, " species_dim"]:
+        """Gets the gas species mask
 
         Returns:
-            Indices of the gas species
+            Mask for the gas species
         """
-        indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
-            if species_.data.phase == "g":
-                indices.append(nn)
+        gas_species_mask: Bool[Array, " species_dim"] = jnp.array(
+            [species.data.phase == "g" for species in self.data], dtype=bool
+        )
 
-        return jnp.array(indices, dtype=jnp.int_)
+        return gas_species_mask
 
-    def get_lower_bound(self: SpeciesCollection) -> Array:
-        """Gets the lower bound for truncating the solution during the solve"""
+    def get_gas_species_names(self) -> tuple[str, ...]:
+        """Gas species names
+
+        Returns:
+            Gas species names
+        """
+        gas_names: list[str] = [species.name for species in self.data if species.data.phase == "g"]
+
+        return tuple(gas_names)
+
+    def get_lower_bound(self) -> Array:
+        """Gets the lower bound for truncating the solution during the solve
+
+        Returns:
+            Lower bound for truncating the solution during the solve
+        """
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_LOWER, LOG_STABILITY_LOWER)
 
-    def get_upper_bound(self: SpeciesCollection) -> Array:
-        """Gets the upper bound for truncating the solution during the solve"""
+    def get_upper_bound(self) -> Array:
+        """Gets the upper bound for truncating the solution during the solve
+
+        Returns:
+            Upper bound for truncating the solution during the solve
+        """
         return self._get_hypercube_bound(LOG_NUMBER_DENSITY_UPPER, LOG_STABILITY_UPPER)
 
-    def get_molar_masses(self) -> Array:
+    def get_molar_masses(self) -> Float[Array, " species_dim"]:
         """Gets the molar masses of all species.
 
         Returns:
             Molar masses of all species
         """
-        molar_masses: Array = jnp.array([species_.data.molar_mass for species_ in self.data])
+        molar_masses: Float[Array, " species_dim"] = jnp.array(
+            [species_.data.molar_mass for species_ in self.data]
+        )
         # logger.debug("molar_masses = %s", molar_masses)
 
         return molar_masses
 
     def get_species_names(self) -> tuple[str, ...]:
-        """Gets the names of all species.
+        """Gets the unique names of all species.
+
+        Unique names by combining Hill notation and phase
 
         Returns:
             Species names
         """
         return tuple([species_.name for species_ in self.data])
-
-    def get_stability_species_indices(self) -> Array:
-        """Gets the indices of species to solve for stability
-
-        Returns:
-            Indices of the species to solve for stability
-        """
-        indices: list[int] = []
-        for nn, species_ in enumerate(self.data):
-            if species_.solve_for_stability:
-                indices.append(nn)
-
-        return jnp.array(indices, dtype=jnp.int_)
-
-    def get_stability_species_mask(self) -> Array:
-        """Gets the stability species mask
-
-        Returns:
-            Mask for the species to solve for the stability
-        """
-        stability_bool: Array = jnp.array(
-            [species.solve_for_stability for species in self.data], dtype=jnp.bool_
-        )
-
-        return stability_bool
 
     def get_unique_elements_in_species(self) -> tuple[str, ...]:
         """Gets unique elements.
@@ -214,17 +276,12 @@ class SpeciesCollection(eqx.Module):
             elements.extend(species_.data.elements)
         unique_elements: list[str] = list(set(elements))
         sorted_elements: list[str] = sorted(unique_elements)
-
         # logger.debug("unique_elements_in_species = %s", sorted_elements)
 
         return tuple(sorted_elements)
 
-    def number_of_stability(self: SpeciesCollection) -> int:
-        """Number of stability solutions"""
-        return len(self.get_stability_species_indices())
-
     def _get_hypercube_bound(
-        self: SpeciesCollection, log_number_density_bound: float, stability_bound: float
+        self, log_number_density_bound: float, stability_bound: float
     ) -> Array:
         """Gets the bound on the hypercube
 
@@ -235,12 +292,10 @@ class SpeciesCollection(eqx.Module):
         Returns:
             Bound on the hypercube which contains the root
         """
-        log_number_density: ArrayLike = log_number_density_bound * np.ones(self.number)
-
         bound: ArrayLike = np.concatenate(
             (
-                log_number_density,
-                stability_bound * np.ones(self.number_of_stability()),
+                log_number_density_bound * np.ones(self.number),
+                stability_bound * np.ones(self.number),
             )
         )
 
@@ -256,37 +311,17 @@ class SpeciesCollection(eqx.Module):
         return len(self.data)
 
 
-class TracedParameters(eqx.Module):
-    """Traced parameters
-
-    These are parameters that should be traced, inasmuch as they may be updated by the user for
-    repeat calculations.
-
-    Args:
-        planet: Planet
-        fugacity_constraints: Fugacity constraints
-        mass_constraints: Mass constraints
-    """
-
-    planet: Planet
-    """Planet"""
-    fugacity_constraints: FugacityConstraints
-    """Fugacity constraints"""
-    mass_constraints: MassConstraints
-    """Mass constraints"""
-
-
 class Planet(eqx.Module):
     """Planet properties
 
     Default values are for a fully molten Earth.
 
     Args:
-        planet_mass: Mass of the planet in kg. Defaults to Earth.
+        planet_mass: Mass of the planet in kg. Defaults to Earth (5.972e24 kg).
         core_mass_fraction: Mass fraction of the iron core relative to the planetary mass. Defaults
-            to Earth.
-        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1.
-        surface_radius: Radius of the planetary surface in m. Defaults to Earth.
+            to Earth (0.3 kg/kg).
+        mantle_melt_fraction: Mass fraction of the mantle that is molten. Defaults to 1 kg/kg.
+        surface_radius: Radius of the planetary surface in m. Defaults to Earth (6371 km).
         surface_temperature: Temperature of the planetary surface. Defaults to 2000 K.
     """
 
@@ -339,63 +374,35 @@ class Planet(eqx.Module):
     @property
     def surface_area(self) -> Array:
         """Surface area"""
-        return 4.0 * jnp.pi * self.surface_radius**2
+        return 4.0 * jnp.pi * jnp.square(self.surface_radius)
 
     @property
     def surface_gravity(self) -> Array:
         """Surface gravity"""
-        return GRAVITATIONAL_CONSTANT * self.planet_mass / self.surface_radius**2
+        return GRAVITATIONAL_CONSTANT * self.planet_mass / jnp.square(self.surface_radius)
 
     @property
     def temperature(self) -> Array:
         """Temperature"""
         return self.surface_temperature
 
-    def asdict(self) -> dict[str, Array]:
-        """Gets a dictionary of the values
+    def asdict(self) -> dict[str, NpArray]:
+        """Gets a dictionary of the values as NumPy arrays.
 
         Returns:
             A dictionary of the values
         """
-        base_dict: dict[str, Array] = asdict(self)
+        base_dict: dict[str, ArrayLike] = asdict(self)
         base_dict["mantle_mass"] = self.mass
         base_dict["mantle_melt_mass"] = self.melt_mass
         base_dict["mantle_solid_mass"] = self.solid_mass
         base_dict["surface_area"] = self.surface_area
         base_dict["surface_gravity"] = self.surface_gravity
 
-        return base_dict
+        # Convert all values to NumPy arrays
+        base_dict_np: dict[str, NpArray] = {k: np.asarray(v) for k, v in base_dict.items()}
 
-
-class NormalisedMass(eqx.Module):
-    """Normalised mass for conventional outgassing
-
-    This is not currently used, but it is a placeholder for future development.
-
-    Default values are for a unit mass (1 kg) system.
-
-    Args:
-        melt_fraction: Melt fraction. Defaults to 0.3 for 30%.
-        temperature: Temperature. Defaults to 1400 K.
-        mass: Total mass. Defaults to 1 kg for a unit mass system.
-    """
-
-    melt_fraction: ArrayLike = 0.3
-    """Mass fraction of melt in kg/kg"""
-    temperature: ArrayLike = 1400
-    """Temperature in K"""
-    mass: ArrayLike = 1.0
-    """Total mass"""
-
-    @property
-    def melt_mass(self) -> ArrayLike:
-        """Mass of the melt"""
-        return self.mass * self.melt_fraction
-
-    @property
-    def solid_mass(self) -> ArrayLike:
-        """Mass of the solid"""
-        return self.mass * (1 - self.melt_fraction)
+        return base_dict_np
 
 
 class ConstantFugacityConstraint(eqx.Module):
@@ -404,22 +411,25 @@ class ConstantFugacityConstraint(eqx.Module):
     This must adhere to FugacityConstraintProtocol
 
     Args:
-        fugacity: Fugacity
+        fugacity: Fugacity. Defaults to nan.
     """
 
-    fugacity: Array = eqx.field(converter=as_j64)
+    fugacity: Array = eqx.field(converter=as_j64, default=np.nan)
+    """Fugacity"""
 
-    @property
-    def value(self) -> Array:
-        return self.fugacity
+    def active(self) -> Bool[Array, ""]:
+        """Is the fugacity constraint active.
 
-    @eqx.filter_jit
+        Returns:
+            True if the fugacity constraint is active, otherwise False
+        """
+        return all_not_nan(self.fugacity)
+
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
-        log_fugacity_value: ArrayLike = jnp.log(self.fugacity)
 
-        return log_fugacity_value
+        return jnp.log(self.fugacity)
 
 
 class FugacityConstraints(eqx.Module):
@@ -429,40 +439,61 @@ class FugacityConstraints(eqx.Module):
 
     Args:
         constraints: Fugacity constraints
+        species: Species corresponding to the columns of `constraints`
     """
 
-    constraints: ImmutableMap[str, FugacityConstraintProtocol]
+    constraints: tuple[FugacityConstraintProtocol, ...]
     """Fugacity constraints"""
+    species: tuple[str, ...]
+    """Species corresponding to the entries of constraints"""
 
     @classmethod
     def create(
         cls,
+        species: SpeciesCollection,
         fugacity_constraints: Mapping[str, FugacityConstraintProtocol] | None = None,
-    ) -> Self:
+    ) -> "FugacityConstraints":
         """Creates an instance
 
         Args:
+            species: Species
             fugacity_constraints: Mapping of a species name and a fugacity constraint. Defaults to
                 None.
 
         Returns:
             An instance
         """
-        if fugacity_constraints is None:
-            init_dict: dict[str, FugacityConstraintProtocol] = {}
-        else:
-            init_dict = dict(fugacity_constraints)
+        fugacity_constraints_: Mapping[str, FugacityConstraintProtocol] = (
+            fugacity_constraints if fugacity_constraints is not None else {}
+        )
 
-        init_map: ImmutableMap[str, FugacityConstraintProtocol] = ImmutableMap(init_dict)
+        # All unique species
+        unique_species: tuple[str, ...] = species.get_species_names()
 
-        return cls(init_map)
+        constraints: list[FugacityConstraintProtocol] = []
 
-    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, Array]:
-        """Gets a dictionary of the evaluated fugacity constraints.
+        for species_name in unique_species:
+            if species_name in fugacity_constraints_:
+                constraints.append(fugacity_constraints_[species_name])
+            else:
+                constraints.append(ConstantFugacityConstraint(np.nan))
 
-        `temperature` and `pressure` should have a size equal to the number of solutions, which
-        will ensure that the returned dictionary also has the same size. For this reason there is
-        no need to vmap.
+        return cls(tuple(constraints), unique_species)
+
+    def active(self) -> Bool[Array, " species_dim"]:
+        """Active fugacity constraints
+
+        Returns:
+            Mask indicating whether fugacity constraints are active or not
+        """
+        mask: list[Array] = [
+            jnp.atleast_1d(constraint.active()) for constraint in self.constraints
+        ]
+
+        return jnp.concatenate(mask)
+
+    def asdict(self, temperature: ArrayLike, pressure: ArrayLike) -> dict[str, NpArray]:
+        """Gets a dictionary of the evaluated fugacity constraints as NumPy Arrays
 
         Args:
             temperature: Temperature
@@ -471,18 +502,20 @@ class FugacityConstraints(eqx.Module):
         Returns:
             A dictionary of the evaluated fugacity constraints
         """
-        # This contains evaluated fugacity constraints in columns
-        log_fugacity: Array = jnp.atleast_2d(self.log_fugacity(temperature, pressure)).T
+        log_fugacity_list: list[NpFloat] = []
 
-        # Split the evaluated fugacity constraints by column
-        out: dict[str, Array] = {
-            f"{key}_fugacity": jnp.exp(log_fugacity[:, ii])
-            for ii, key in enumerate(self.constraints)
+        for constraint in self.constraints:
+            log_fugacity: NpFloat = np.asarray(constraint.log_fugacity(temperature, pressure))
+            log_fugacity_list.append(log_fugacity)
+
+        out: dict[str, NpArray] = {
+            f"{key}_fugacity": np.exp(log_fugacity_list[idx])
+            for idx, key in enumerate(self.species)
+            if not np.all(np.isnan(log_fugacity_list[idx]))
         }
 
         return out
 
-    @eqx.filter_jit
     def log_fugacity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log fugacity
 
@@ -495,16 +528,14 @@ class FugacityConstraints(eqx.Module):
         """
         # NOTE: Must avoid the late-binding closure issue
         fugacity_funcs: list[Callable] = [
-            to_hashable(constraint.log_fugacity) for constraint in self.constraints.values()
+            to_hashable(constraint.log_fugacity) for constraint in self.constraints
         ]
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
         # Temperature must be a float array to ensure branches have have identical types
         temperature = jnp.asarray(temperature, dtype=jnp.float64)
 
-        def apply_fugacity_function(
-            index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike
-        ) -> Array:
+        def apply_fugacity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
             # jax.debug.print("index = {out}", out=index)
             return lax.switch(
                 index,
@@ -513,16 +544,13 @@ class FugacityConstraints(eqx.Module):
                 pressure,
             )
 
-        vmap_apply_function: Callable = eqx.filter_vmap(
-            apply_fugacity_function, in_axes=(0, None, None)
-        )
         indices: Array = jnp.arange(len(self.constraints))
-        log_fugacity: Array = vmap_apply_function(indices, temperature, pressure)
+        vmap_fugacity: Callable = eqx.filter_vmap(apply_fugacity, in_axes=(0, None, None))
+        log_fugacity: Array = vmap_fugacity(indices, temperature, pressure)
         # jax.debug.print("log_fugacity = {out}", out=log_fugacity)
 
         return log_fugacity
 
-    @eqx.filter_jit
     def log_number_density(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log number density
 
@@ -540,63 +568,119 @@ class FugacityConstraints(eqx.Module):
 
         return log_number_density
 
-    def __bool__(self) -> bool:
-        return bool(self.constraints)
+
+class NormalisedMass(eqx.Module):
+    """Normalised mass for conventional outgassing
+
+    This is not currently used, but it is a placeholder for future development.
+
+    Default values are for a unit mass (1 kg) system.
+
+    Args:
+        melt_fraction: Melt fraction. Defaults to 0.3 for 30%.
+        temperature: Temperature. Defaults to 1400 K.
+        mass: Total mass. Defaults to 1 kg for a unit mass system.
+    """
+
+    melt_fraction: Array = eqx.field(converter=as_j64, default=0.3)
+    """Mass fraction of melt in kg/kg"""
+    temperature: Array = eqx.field(converter=as_j64, default=1400)
+    """Temperature in K"""
+    mass: Array = eqx.field(converter=as_j64, default=1.0)
+    """Total mass"""
+
+    @property
+    def melt_mass(self) -> Array:
+        """Mass of the melt"""
+        return self.mass * self.melt_fraction
+
+    @property
+    def solid_mass(self) -> Array:
+        """Mass of the solid"""
+        return self.mass * (1 - self.melt_fraction)
 
 
 class MassConstraints(eqx.Module):
     """Mass constraints of elements
 
     Args:
-        log_abundance: Log number of atoms of elements
+        log_abundance: Log number of atoms
+        elements: Elements corresponding to the columns of `log_abundance`
     """
 
-    log_abundance: ImmutableMap[str, ArrayLike]
-    """Log number of atoms of elements"""
+    log_abundance: Float64[Array, "batch_dim el_dim"] = eqx.field(converter=as_j64)
+    elements: tuple[str, ...]
 
     @classmethod
-    def create(cls, mass_constraints: Mapping[str, ArrayLike] | None = None) -> Self:
+    def create(
+        cls,
+        species: SpeciesCollection,
+        mass_constraints: Mapping[str, ArrayLike] | None = None,
+        batch_size: int = 1,
+    ) -> "MassConstraints":
         """Creates an instance
 
         Args:
+            species: Species
             mass_constraints: Mapping of element name and mass constraint in kg. Defaults to None.
+            batch_size: Total batch size, which is required for broadcasting
 
         Returns:
             An instance
         """
-        if mass_constraints is None:
-            init_dict: dict[str, ArrayLike] = {}
-        else:
-            init_dict = dict(mass_constraints)
+        mass_constraints_: Mapping[str, ArrayLike] = (
+            mass_constraints if mass_constraints is not None else {}
+        )
 
-        sorted_mass: dict[str, ArrayLike] = {k: init_dict[k] for k in sorted(init_dict)}
-        log_abundance: dict[str, ArrayLike] = {}
+        # All unique elements in alphabetical order
+        unique_elements: tuple[str, ...] = species.get_unique_elements_in_species()
 
-        for element, mass_constraint in sorted_mass.items():
-            molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
-            log_abundance_: ArrayLike = (
-                np.log(mass_constraint) + np.log(AVOGADRO) - np.log(molar_mass)
-            )
-            log_abundance[element] = log_abundance_
+        # Determine the maximum length of any array in mass_constraints_
+        max_len: int = get_batch_size(mass_constraints_)
 
-        init_map: ImmutableMap[str, ArrayLike] = ImmutableMap(log_abundance)
+        # Initialise to all nans assuming that there are no mass constraints
+        log_abundance: NpFloat = np.full((max_len, len(unique_elements)), np.nan, dtype=np.float64)
 
-        return cls(init_map)
+        # Populate mass constraints
+        for nn, element in enumerate(unique_elements):
+            if element in mass_constraints_.keys():
+                molar_mass: ArrayLike = Formula(element).mass * unit_conversion.g_to_kg
+                log_abundance_: ArrayLike = (
+                    np.log(mass_constraints_[element]) + np.log(AVOGADRO) - np.log(molar_mass)
+                )
+                log_abundance[:, nn] = log_abundance_
 
-    def asdict(self) -> dict[str, ArrayLike]:
-        """Gets a dictionary of the values
+        # Broadcast, which avoids JAX recompilation if mass constraints change since otherwise the
+        # shape of self.log_abundance can vary between a 1-D and 2-D array which forces
+        # recompilation of solve.
+        log_abundance = np.broadcast_to(log_abundance, (batch_size, len(unique_elements)))
+        # jax.debug.print("log_abundance = {out}", out=log_abundance)
+
+        return cls(log_abundance, unique_elements)
+
+    def asdict(self) -> dict[str, NpArray]:
+        """Gets a dictionary of the values as NumPy arrays
 
         Returns:
             A dictionary of the values
         """
-        out: dict[str, ArrayLike] = {
-            f"{key}_number": jnp.exp(jnp.asarray(value))
-            for key, value in self.log_abundance.items()
+        abundance: NpArray = np.exp(self.log_abundance)
+        out: dict[str, NpArray] = {
+            f"{element}_number": abundance[:, idx]
+            for idx, element in enumerate(self.elements)
+            if not np.all(np.isnan(abundance[:, idx]))
         }
 
         return out
 
-    @eqx.filter_jit
+    def active(self) -> Bool[Array, " el_dim"]:
+        """Active mass constraints
+
+        Returns:
+            Mask indicating whether elemental mass constraints are active or not
+        """
+        return all_not_nan(self.log_abundance)
+
     def log_number_density(self, log_atmosphere_volume: ArrayLike) -> Array:
         """Log number density
 
@@ -606,138 +690,73 @@ class MassConstraints(eqx.Module):
         Returns:
             Log number density
         """
-        log_abundance: Array = jnp.array(list(self.log_abundance.values()))
-        log_number_density: Array = log_abundance - log_atmosphere_volume
+        log_number_density: Array = self.log_abundance - log_atmosphere_volume
 
         return log_number_density
 
-    @eqx.filter_jit
-    def log_maximum_number(self) -> Array:
-        """Log of the maximum abundance
 
-        Returns:
-            Log of the maximum abundance
-        """
-        log_abundance: Array = jnp.array(list(self.log_abundance.values()))
+class TracedParameters(eqx.Module):
+    """Traced parameters
 
-        return jnp.max(log_abundance)
+    These are parameters that should be traced, inasmuch as they may be updated by the user for
+    repeat calculations.
 
-    def __bool__(self) -> bool:
-        return bool(self.log_abundance)
+    Args:
+        planet: Planet
+        fugacity_constraints: Fugacity constraints
+        mass_constraints: Mass constraints
+    """
+
+    planet: Planet
+    """Planet"""
+    fugacity_constraints: FugacityConstraints
+    """Fugacity constraints"""
+    mass_constraints: MassConstraints
+    """Mass constraints"""
 
 
 class FixedParameters(eqx.Module):
     """Parameters that are always fixed for a calculation
 
-    This container and all objects within it must be hashable.
-
     Args:
         species: Collection of species
         formula_matrix; Formula matrix
-        formula_matrix_constraints: Formula matrix for applying mass constraints
         reaction_matrix: Reaction matrix
-        reaction_stability_matrix: Reaction stability matrix
-        stability_species_indices: Indices of species to solve for stability
-        fugacity_matrix: Fugacity constraint matrix
-        gas_species_indices: Indices of gas species
-        condensed_specie_indices: Indices of condensed species
-        fugacity_species_indices: Indices of species to constrain the fugacity
+        stability_species_mask: Mask of species to solve for stability
+        gas_species_mask: Mask of gas species
         diatomic_oxygen_index: Index of diatomic oxygen
         molar_masses: Molar masses of all species
-        tau: Tau factor for species stability
     """
 
     species: SpeciesCollection
     """Collection of species"""
-    formula_matrix: npt.NDArray[np.int_]
+    formula_matrix: Integer[Array, "el_dim species_dim"]
     """Formula matrix"""
-    formula_matrix_constraints: npt.NDArray[np.int_]
-    """Formula matrix for applying mass constraints"""
-    reaction_matrix: npt.NDArray[np.float64]
+    # TODO: Currently breaks with "react_dim species_dim" because reaction_matrix might be empty.
+    reaction_matrix: Float[Array, "..."]
     """Reaction matrix"""
-    reaction_stability_matrix: npt.NDArray[np.float64]
-    """Reaction stability matrix"""
-    stability_species_indices: Array
-    """Indices of species to solve for stability"""
-    fugacity_matrix: Array
-    """Fugacity constraint matrix"""
-    gas_species_indices: Array
-    """Indices of gas species"""
-    condensed_species_indices: Array
-    """Indices of condensed species"""
-    fugacity_species_indices: Array
-    """Indices of species to constrain the fugacity"""
+    gas_species_mask: Array
+    """Mask of gas species"""
     diatomic_oxygen_index: int
     """Index of diatomic oxygen"""
     molar_masses: Array
     """Molar masses of all species"""
-    tau: float
-    """Tau factor for species"""
 
-
-class Species(eqx.Module):
-    """Species
-
-    Args:
-        data: Species data
-        activity: Activity
-        solubility: Solubility
-        solve_for_stability: Solve for stability
-    """
-
-    data: SpeciesData
-    activity: ActivityProtocol
-    solubility: SolubilityProtocol
-    solve_for_stability: bool
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return self.data.name
-
-    @classmethod
-    def create_condensed(
-        cls,
-        species_name: str,
-        activity: ActivityProtocol = CondensateActivity(),
-        solve_for_stability: bool = True,
-    ) -> Self:
-        """Creates a condensate
-
-        Args:
-            species_name: Species name, as it appears in the species dictionary
-            activity: Activity. Defaults to unity activity.
-            solve_for_stability. Solve for stability. Defaults to True.
+    def active_reactions(self) -> Bool[Array, " react_dim"]:
+        """Active reactions
 
         Returns:
-            A condensed species
+            True for all reactions
         """
-        species_data: SpeciesData = select_thermodata(species_name)
+        return jnp.ones(self.reaction_matrix.shape[0], dtype=bool)
 
-        return cls(species_data, activity, NoSolubility(), solve_for_stability)
-
-    @classmethod
-    def create_gas(
-        cls,
-        species_name: str,
-        activity: ActivityProtocol = IdealGas(),
-        solubility: SolubilityProtocol = NoSolubility(),
-        solve_for_stability: bool = False,
-    ) -> Self:
-        """Creates a gas species
-
-        Args:
-            species_name: Species name, as it appears in the species dictionary
-            activity: Activity. Defaults to an ideal gas.
-            solubility: Solubility. Defaults to no solubility.
-            solve_for_stability. Solve for stability. Defaults to False.
+    def active_stability(self) -> Bool[Array, " species_dim"]:
+        """Active species stability
 
         Returns:
-            A gas species
+            True for species stabilities that are to be solved for, otherwise False
         """
-        species_data: SpeciesData = select_thermodata(species_name)
-
-        return cls(species_data, activity, solubility, solve_for_stability)
+        return self.species.active_stability()
 
 
 class SolverParameters(eqx.Module):
@@ -747,7 +766,7 @@ class SolverParameters(eqx.Module):
         solver: Solver. Defaults to optx.Newton
         atol: Absolute tolerance. Defaults to 1.0e-6.
         rtol: Relative tolerance. Defaults to 1.0e-6.
-        linear_solver: Linear solver. Defaults to AutoLinearSolver(well_posed=None).
+        linear_solver: Linear solver. Defaults to AutoLinearSolver(well_posed=False).
         norm: Norm. Defaults to optx.rms_norm.
         throw: How to report any failures. Defaults to False.
         max_steps: The maximum number of steps the solver can take. Defaults to 256
@@ -757,19 +776,22 @@ class SolverParameters(eqx.Module):
         multistart_perturbation: Perturbation for multistart. Defaults to 30.
     """
 
-    solver: Type[OptxSolver] = optx.Newton
+    solver: type[OptxSolver] = optx.Newton
     """Solver"""
     atol: float = 1.0e-6
     """Absolute tolerance"""
     rtol: float = 1.0e-6
     """Relative tolerance"""
     linear_solver: AbstractLinearSolver = lx.AutoLinearSolver(well_posed=None)
-    """Linear solver"""
+    """Linear solver
+    
+    https://docs.kidger.site/lineax/api/solvers/   
+    """
     norm: Callable = optx.max_norm
     """Norm""" ""
     throw: bool = False
     """How to report any failures"""
-    max_steps: int = 256
+    max_steps: int = 512
     """Maximum number of steps the solver can take"""
     jac: Literal["fwd", "bwd"] = "fwd"
     """Whether to use forward- or reverse-mode autodifferentiation to compute the Jacobian"""
@@ -777,11 +799,9 @@ class SolverParameters(eqx.Module):
     """Number of multistarts"""
     multistart_perturbation: float = 30.0
     """Perturbation for multistart"""
-    solver_instance: OptxSolver = eqx.field(init=False)
-    """Solver instance"""
 
-    def __post_init__(self):
-        self.solver_instance = self.solver(
+    def get_solver_instance(self) -> OptxSolver:
+        return self.solver(
             rtol=self.rtol,
             atol=self.atol,
             norm=self.norm,

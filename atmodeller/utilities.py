@@ -17,28 +17,24 @@
 """Utilities"""
 
 import logging
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
-import optimistix as optx
-from jax import Array
 from jax.tree_util import Partial, tree_map
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
+from atmodeller.mytypes import NpArray
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
 
-
-@eqx.filter_jit
 def get_log_number_density_from_log_pressure(
     log_pressure: ArrayLike, temperature: ArrayLike
 ) -> Array:
@@ -58,7 +54,11 @@ def get_log_number_density_from_log_pressure(
     return log_number_density
 
 
-@eqx.filter_jit
+def all_not_nan(x: ArrayLike) -> Bool[Array, "..."]:
+    """Returns True if all entries or columns are not nan, otherwise False"""
+    return ~jnp.any(jnp.isnan(jnp.atleast_1d(x)), axis=0)
+
+
 def safe_exp(x: ArrayLike) -> Array:
     return jnp.exp(jnp.clip(x, max=max_exp_input))
 
@@ -69,7 +69,7 @@ def to_hashable(x: Any) -> Callable:
     return Partial(x)
 
 
-def as_j64(x: ArrayLike) -> Array:
+def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
     """Converts input to a JAX array of dtype float64.
 
     This function is used to minimise the number of times jitted functions need to be compiled.
@@ -83,7 +83,7 @@ def as_j64(x: ArrayLike) -> Array:
     return jnp.array(x, dtype=jnp.float64)
 
 
-def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
+def partial_rref(matrix: NpArray) -> NpArray:
     """Computes the partial reduced row echelon form to determine linear components
 
     Returns:
@@ -91,21 +91,21 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
     """
     nrows, ncols = matrix.shape
 
-    augmented_matrix: npt.NDArray = np.hstack((matrix, np.eye(nrows)))
+    augmented_matrix: NpArray = np.hstack((matrix, np.eye(nrows)))
     # debug("augmented_matrix = \n%s", augmented_matrix)
     # Permutation matrix
-    # P: npt.NDArray = np.eye(nrows)
+    # P: NpArray = np.eye(nrows)
 
     # Forward elimination with partial pivoting
     for i in range(ncols):
         # Check if the pivot element is zero and swap rows to get a non-zero pivot element.
         if augmented_matrix[i, i] == 0:
-            nonzero_row: int = np.nonzero(augmented_matrix[i:, i])[0][0] + i
+            nonzero_row: np.int64 = np.nonzero(augmented_matrix[i:, i])[0][0] + i
             augmented_matrix[[i, nonzero_row], :] = augmented_matrix[[nonzero_row, i], :]
             # P[[i, nonzero_row], :] = P[[nonzero_row, i], :]
         # Perform row operations to eliminate values below the pivot.
         for j in range(i + 1, nrows):
-            ratio: float = augmented_matrix[j, i] / augmented_matrix[i, i]
+            ratio: np.float64 = augmented_matrix[j, i] / augmented_matrix[i, i]
             augmented_matrix[j] -= ratio * augmented_matrix[i]
     # logger.debug("augmented_matrix after forward elimination = \n%s", augmented_matrix)
 
@@ -120,8 +120,8 @@ def partial_rref(matrix: npt.NDArray) -> npt.NDArray:
                 augmented_matrix[j] -= ratio * augmented_matrix[i]
     # logger.debug("augmented_matrix after backward substitution = \n%s", augmented_matrix)
 
-    # reduced_matrix: npt.NDArray = augmented_matrix[:, :ncols]
-    component_matrix: npt.NDArray = augmented_matrix[ncols:, ncols:]
+    # reduced_matrix: NpArray = augmented_matrix[:, :ncols]
+    component_matrix: NpArray = augmented_matrix[ncols:, ncols:]
     # logger.debug("reduced_matrix = \n%s", reduced_matrix)
     # logger.debug("component_matrix = \n%s", component_matrix)
     # logger.debug("permutation_matrix = \n%s", P)
@@ -194,12 +194,12 @@ class ExperimentalCalibration(eqx.Module):
     """Experimental calibration
 
     Args:
-        temperature_min: Minimum calibrated temperature. Defaults to None.
-        temperature_max: Maximum calibrated temperature. Defaults to None.
-        pressure_min: Minimum calibrated pressure. Defaults to None.
-        pressure_max: Maximum calibrated pressure. Defaults to None.
-        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to None.
-        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
+        temperature_min: Minimum calibrated temperature. Defaults to nan.
+        temperature_max: Maximum calibrated temperature. Defaults to nan.
+        pressure_min: Minimum calibrated pressure. Defaults to nan.
+        pressure_max: Maximum calibrated pressure. Defaults to nan.
+        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to nan.
+        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to nan.
     """
 
     temperature_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
@@ -224,16 +224,21 @@ def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Ar
     return jnp.power(values, exponent) * constant
 
 
-def is_arraylike_batched(x: ArrayLike) -> Literal[0, None]:
+def is_arraylike_batched(x: Any) -> Literal[0, None]:
     """Checks if x is batched.
 
+    The logic accommodates batching for scalars, 1-D arrays, and 2-D arrays.
+
     Args:
-        x: Something arraylike
+        x: Something to check
 
     Returns:
         0 (axis) if batched, else None (not batched)
     """
-    return 0 if eqx.is_array(x) and x.ndim > 0 else None  # type: ignore
+    if eqx.is_array(x) and x.ndim > 0:
+        return 0
+    else:
+        return None
 
 
 def vmap_axes_spec(x: Any) -> Any:
@@ -255,9 +260,9 @@ def get_batch_size(x: Any) -> int:
         x: Pytree of nested containers possibly containing arrays or scalars
 
     Returns:
-        The maximum size along axis 0 among all array-like leaves, or 0 if all leaves are scalars.
+        The maximum size along axis 0 among all array-like leaves
     """
-    max_size: int = 0
+    max_size: int = 1
     for leaf in jax.tree_util.tree_leaves(x):
         if eqx.is_array(leaf) and leaf.ndim > 0:
             max_size = max(max_size, leaf.shape[0])

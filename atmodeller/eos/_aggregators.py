@@ -20,12 +20,12 @@ Units for temperature and pressure are K and bar, respectively.
 """
 
 import logging
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, lax
-from jax.typing import ArrayLike
+from jax import lax
+from jaxtyping import Array, ArrayLike, Float
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import IdealGas, RealGas
@@ -108,7 +108,7 @@ class CombinedRealGas(RealGas):
             calibrations: Experimental calibrations that correspond to `real_gases`
         """
         real_gases.insert(0, IdealGas())
-        pressure_max: float = calibrations[0].pressure_min  # type: ignore check done before
+        pressure_max: Float[Array, ""] = calibrations[0].pressure_min
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_max=pressure_max)
         calibrations.insert(0, calibration)
 
@@ -124,7 +124,7 @@ class CombinedRealGas(RealGas):
             real_gases: Real gases to combine
             calibrations: Experimental calibrations that correspond to `real_gases`
         """
-        pressure_min: float = calibrations[-1].pressure_max  # type: ignore check done before
+        pressure_min: Float[Array, ""] = calibrations[-1].pressure_max
         real_gas: RealGas = UpperBoundRealGas(real_gases[-1], pressure_min)
         real_gases.append(real_gas)
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=pressure_min)
@@ -191,18 +191,18 @@ class CombinedRealGas(RealGas):
         # jax.debug.print("temperature = {out}", out=temperature)
         # jax.debug.print("pressure = {out}", out=pressure)
 
-        # Flatten for vmapping
+        # Flatten for vmap
         temperature = temperature.ravel()
         pressure = pressure.ravel()
 
         indices: Array = self._get_index(pressure)
         # jax.debug.print("indices = {out}", out=indices)
 
-        def apply_volume_function(index: ArrayLike, temperature, pressure) -> Array:
+        def apply_volume(index: ArrayLike, temperature, pressure) -> Array:
             return lax.switch(index, self.volume_functions, temperature, pressure)
 
-        vmap_apply_function: Callable = eqx.filter_vmap(apply_volume_function, in_axes=(0, 0, 0))
-        volume: Array = vmap_apply_function(indices, temperature, pressure)
+        vmap_volume: Callable = eqx.filter_vmap(apply_volume, in_axes=(0, 0, 0))
+        volume: Array = vmap_volume(indices, temperature, pressure)
         # jax.debug.print("volume = {out}", out=volume)
 
         return jnp.reshape(volume, original_shape)
@@ -328,7 +328,7 @@ class UpperBoundRealGas(RealGas):
 
     real_gas: RealGas
     """Real gas to evaluate the compressibility factor at `p_eval`"""
-    p_eval: Array = eqx.field(converter=as_j64, default=1, static=True)
+    p_eval: Float[Array, ""] = eqx.field(converter=as_j64, default=1.0, static=True)
     """Evaluation pressure in bar. Defaults to 1 bar."""
 
     @eqx.filter_jit

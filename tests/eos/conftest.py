@@ -16,21 +16,18 @@
 #
 """Utilities for tests"""
 
-import logging
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import numpy.testing as nptest
 import pytest
-from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike
 
-from atmodeller import debug_logger
 from atmodeller.eos import RealGas, get_eos_models
 from atmodeller.utilities import as_j64
 
-logger: logging.Logger = debug_logger()
-logger.setLevel(logging.INFO)
+# logger: logging.Logger = debug_logger()
+# logger.setLevel(logging.INFO)
 
 # Tolerances to compare the test results with target output.
 RTOL: float = 1.0e-8

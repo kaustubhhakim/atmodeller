@@ -18,10 +18,12 @@
 
 import logging
 
+# NOTE: Don't import anything from Atmodeller otherwise beartype can't wrap the tests for runtime
+# type checking
 import numpy as np
 import numpy.typing as npt
 import pytest
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 
 logger: logging.Logger = logging.getLogger("atmodeller.tests")
 

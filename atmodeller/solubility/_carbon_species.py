@@ -19,10 +19,8 @@
 For every law there should be a test in the test suite.
 """
 
-import equinox as eqx
 import jax.numpy as jnp
-from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.solubility.core import Solubility
 from atmodeller.utilities import safe_exp, unit_conversion
@@ -41,7 +39,6 @@ class _CH4_basalt_ardia13(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
         pressure_gpa: ArrayLike = pressure * unit_conversion.bar_to_GPa
@@ -70,7 +67,6 @@ class _CO_basalt_armstrong15(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, *, pressure: ArrayLike, **kwargs) -> Array:
         del kwargs
         logco_ppm: Array = -0.738 + (0.876 * jnp.log10(fugacity)) - (5.44e-5 * pressure)
@@ -98,7 +94,6 @@ class _CO_basalt_yoshioka19(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         co_wtp: Array = jnp.power(10, (-5.20 + (0.8 * jnp.log10(fugacity))))
@@ -125,7 +120,6 @@ class _CO_rhyolite_yoshioka19(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
         co_wtp: Array = jnp.power(10, (-4.08 + (0.52 * jnp.log10(fugacity))))
@@ -152,7 +146,6 @@ class _CO2_basalt_dixon95(Solubility):
     """
 
     @override
-    @eqx.filter_jit
     def concentration(
         self, fugacity: ArrayLike, *, temperature: ArrayLike, pressure: ArrayLike, **kwargs
     ) -> Array:

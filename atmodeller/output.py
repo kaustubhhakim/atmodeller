@@ -20,31 +20,28 @@ This uses existing functions as much as possible to calculate desired output qua
 must be vmapped to compute the output.
 """
 
-from __future__ import annotations
-
 import logging
 import pickle
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Literal
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from jax import Array
-from jax.tree_util import tree_map
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
 from openpyxl.styles import PatternFill
 from scipy.constants import mega
 
+from atmodeller import TAU
 from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
     Planet,
-    Species,
+    SolverParameters,
     SpeciesCollection,
     TracedParameters,
 )
@@ -62,6 +59,7 @@ from atmodeller.engine import (
     objective_function,
 )
 from atmodeller.interfaces import RedoxBufferProtocol
+from atmodeller.mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion, vmap_axes_spec
 
@@ -74,64 +72,82 @@ class Output:
     Args:
         species: Species
         solution: Array output from solve
+        active_indices: Indices of the residual array that are active
         solver_status: Solver status
         solver_steps: Number of solver steps
+        solver_attempts: Number of solver attempts (multistart)
         fixed_parameters: Fixed parameters
         traced_parameters: Traced parameters
+        solver_parameters: Solver parameters
     """
 
     def __init__(
         self,
         species: SpeciesCollection,
-        solution: Array,
-        solver_status: Array,
-        solver_steps: Array,
+        solution: Float[Array, " batch_dim sol_dim"],
+        active_indices: Integer[Array, " res_dim"],
+        solver_status: Bool[Array, " batch_dim"],
+        solver_steps: Integer[Array, " batch_dim"],
+        solver_attempts: Integer[Array, " batch_dim"],
         fixed_parameters: FixedParameters,
         traced_parameters: TracedParameters,
+        solver_parameters: SolverParameters,
     ):
         logger.debug("Creating Output")
         self._species: SpeciesCollection = species
-        self._solution: Array = solution
-        self._solver_status: Array = solver_status
-        self._solver_steps: Array = solver_steps
+        self._solution: NpFloat = np.asarray(solution)
+        self._active_indices: NpInt = np.asarray(active_indices)
+        self._solver_status: NpBool = np.asarray(solver_status)
+        self._solver_steps: NpInt = np.asarray(solver_steps)
+        self._solver_attempts: NpInt = np.asarray(solver_attempts)
         self._fixed_parameters: FixedParameters = fixed_parameters
         self._traced_parameters: TracedParameters = traced_parameters
+        self._solver_parameters: SolverParameters = solver_parameters
 
-        # Calculate the index at which to split the array
-        split_index: int = self._solution.shape[1] - self._species.number_of_stability()
-        log_number_density, log_stability = jnp.split(self._solution, [split_index], axis=1)
-        # Number of entries in log_number_density is always the total number of species
-        self._log_number_density: Array = log_number_density
-        # Number of entries in log_stability could be between 0 and the total number of species
-        self._log_stability: Array = log_stability
+        log_number_density, log_stability = np.split(self._solution, 2, axis=1)
+        self._log_number_density: NpFloat = log_number_density
+        # Mask stabilities that are not solved
+        self._log_stability: NpFloat = np.where(
+            fixed_parameters.active_stability(), log_stability, np.nan
+        )
         # Caching output to avoid recomputation
-        self._cached_dict: dict[str, dict[str, Array]] | None = None
+        self._cached_dict: dict[str, dict[str, NpArray]] | None = None
         self._cached_dataframes: dict[str, pd.DataFrame] | None = None
 
     @property
-    def condensed_species_indices(self) -> Array:
-        """Condensed species indices"""
-        return self._species.get_condensed_species_indices()
+    def active_indices(self) -> NpInt:
+        """Active indices"""
+        return self._active_indices
 
     @property
-    def gas_species_indices(self) -> Array:
-        """Gas species indices"""
-        return self._fixed_parameters.gas_species_indices
+    def formula_matrix(self) -> NpInt:
+        """Formula matrix"""
+        return np.asarray(self._fixed_parameters.formula_matrix)
 
     @property
-    def log_number_density(self) -> Array:
+    def condensed_species_mask(self) -> NpBool:
+        """Mask of condensed species"""
+        return np.invert(self._fixed_parameters.gas_species_mask)
+
+    @property
+    def gas_species_mask(self) -> NpBool:
+        """Mask of gas species"""
+        return np.asarray(self._fixed_parameters.gas_species_mask)
+
+    @property
+    def log_number_density(self) -> NpFloat:
         """Log number density"""
         return self._log_number_density
 
     @property
-    def log_stability(self) -> Array:
+    def log_stability(self) -> NpFloat:
         """Log stability of relevant species"""
         return self._log_stability
 
     @property
-    def molar_mass(self) -> Array:
+    def molar_mass(self) -> NpFloat:
         """Molar mass of all species"""
-        return self._fixed_parameters.molar_masses
+        return np.asarray(self._fixed_parameters.molar_masses)
 
     @property
     def number_solutions(self) -> int:
@@ -144,45 +160,28 @@ class Output:
         return self._traced_parameters.planet
 
     @property
-    def stability_species_mask(self) -> Array:
-        """Stability species mask"""
-        return self._species.get_stability_species_mask()
-
-    @property
-    def temperature(self) -> Array:
+    def temperature(self) -> NpFloat:
         """Temperature"""
-        return jnp.asarray(self.planet.temperature)
+        return np.asarray(self.planet.temperature)
 
-    @property
-    def temperature_vmap(self) -> int | None:
-        """Axis for temperature vmap"""
-        return vmap_axes_spec(self._traced_parameters.planet).temperature
-
-    @property
-    def traced_parameters_vmap(self) -> TracedParameters:
-        """Axis for traced parameters vmap"""
-        return vmap_axes_spec(self._traced_parameters)
-
-    def activity(self) -> Array:
+    def activity(self) -> NpFloat:
         """Gets the activity of all species
 
         Returns:
             Activity of all species
         """
-        return jnp.exp(self.log_activity())
+        return np.exp(self.log_activity())
 
-    def activity_without_stability(self) -> Array:
+    def activity_without_stability(self) -> NpFloat:
         """Gets the activity without stability of all species
 
         Returns:
             Activity without stability of all species
         """
-        return jnp.exp(self.log_activity_without_stability())
+        return np.exp(self.log_activity_without_stability())
 
-    def asdict(self) -> dict[str, dict[str, Array]]:
+    def asdict(self) -> dict[str, dict[str, NpArray]]:
         """All output in a dictionary, with caching.
-
-        TODO: This function is slow and is an obvious candidate for speeding up.
 
         Returns:
             Dictionary of all output
@@ -192,101 +191,97 @@ class Output:
             return self._cached_dict  # Return cached result
 
         logger.info("Computing asdict output")
-        fugacity_matrix: Array = jnp.array(self._fixed_parameters.fugacity_matrix)
-        formula_matrix_constraints: Array = jnp.array(
-            self._fixed_parameters.formula_matrix_constraints
-        )
 
-        out: dict[str, dict[str, Array]] = {}
-        out |= self.condensed_species_asdict()
-        out |= self.gas_species_asdict()
+        out: dict[str, dict[str, NpArray]] = {}
+
+        # These are required for condensed and gas species
+        molar_mass: NpFloat = self.species_molar_mass_expanded()
+        number_density: NpFloat = self.number_density()
+        activity: NpFloat = self.activity()
+
+        out |= self.gas_species_asdict(molar_mass, number_density, activity)
+        out |= self.condensed_species_asdict(molar_mass, number_density, activity)
         out |= self.elements_asdict()
 
-        # FIXME: Address type: ignore below
-        out["planet"] = expand_dict(self.planet.asdict(), self.number_solutions)  # type: ignore
+        out["planet"] = broadcast_arrays_in_dict(self.planet.asdict(), self.number_solutions)
         out["atmosphere"] = self.atmosphere_asdict()
-        # temperature and pressure have already been expanded to the number of solutions
-        temperature: Array = out["planet"]["surface_temperature"]
-        pressure: Array = out["atmosphere"]["pressure"]
+        # Temperature and pressure have already been expanded to the number of solutions
+        temperature: NpFloat = out["planet"]["surface_temperature"]
+        pressure: NpFloat = out["atmosphere"]["pressure"]
         # Convenient to also attach temperature to the atmosphere output
         out["atmosphere"]["temperature"] = temperature
         out["raw_solution"] = self.raw_solution_asdict()
 
         out["constraints"] = {}
-        if formula_matrix_constraints.size > 0:
-            out["constraints"] |= expand_dict(
-                self._traced_parameters.mass_constraints.asdict(), self.number_solutions
-            )
-        if fugacity_matrix.size > 0:
-            out["constraints"] |= self._traced_parameters.fugacity_constraints.asdict(
-                temperature, pressure
-            )
-        out["residual"] = self.residual_asdict()  # type: ignore since uses int for keys
+        out["constraints"] |= broadcast_arrays_in_dict(
+            self._traced_parameters.mass_constraints.asdict(), self.number_solutions
+        )
+        out["constraints"] |= broadcast_arrays_in_dict(
+            self._traced_parameters.fugacity_constraints.asdict(temperature, pressure),
+            self.number_solutions,
+        )
+
+        out["residual"] = self.residual_asdict()  # type: ignore since keys are int
 
         if "O2_g" in out:
             logger.debug("Found O2_g so back-computing log10 shift for fO2")
-            log10_fugacity: Array = jnp.log10(out["O2_g"]["fugacity"])
-            temperature: Array = out["planet"]["surface_temperature"]
-            pressure: Array = out["atmosphere"]["pressure"]
+            log10_fugacity: NpFloat = np.log10(out["O2_g"]["fugacity"])
             buffer: RedoxBufferProtocol = IronWustiteBuffer()
             # Shift at 1 bar
-            buffer_at_one_bar: ArrayLike = buffer.log10_fugacity(temperature, 1.0)
-            log10_shift_at_one_bar: Array = log10_fugacity - buffer_at_one_bar
-            logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
+            buffer_at_one_bar: NpFloat = np.asarray(buffer.log10_fugacity(temperature, 1.0))
+            log10_shift_at_one_bar: NpFloat = log10_fugacity - buffer_at_one_bar
+            # logger.debug("log10_shift_at_1bar = %s", log10_shift_at_one_bar)
             out["O2_g"]["log10dIW_1_bar"] = log10_shift_at_one_bar
             # Shift at actual pressure
-            buffer_at_P: ArrayLike = buffer.log10_fugacity(temperature, pressure)
-            log10_shift_at_P: Array = log10_fugacity - buffer_at_P
-            logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
+            buffer_at_P: NpFloat = np.asarray(buffer.log10_fugacity(temperature, pressure))
+            log10_shift_at_P: NpFloat = log10_fugacity - buffer_at_P
+            # logger.debug("log10_shift_at_P = %s", log10_shift_at_P)
             out["O2_g"]["log10dIW_P"] = log10_shift_at_P
 
-        out["solver"] = {"status": self._solver_status, "steps": self._solver_steps}
+        out["solver"] = {
+            "status": self._solver_status,
+            "steps": self._solver_steps,
+            "attempts": self._solver_attempts,
+        }
 
-        # Convert all arrays in the dictionary to numpy arrays. Using the same functions that the
-        # engine uses makes sense to avoid duplication and ensure consistency, but for the output
-        # we can convert all arrays to numpy. Then the output will only consistent of dictionaries
-        # and numpy arrays, which might simplify the pickling/unpickling process for end-users who
-        # only care about the results and do not necessary want to use JAX types to process
-        # the output. To this point the arrays are of type
-        # <class 'jaxlib.xla_extension.ArrayImpl'>.
-        # TODO: could maybe use numpy method?
-        def convert_to_numpy(d) -> None:
-            for key, value in d.items():
-                if isinstance(value, dict):
-                    convert_to_numpy(value)
-                else:
-                    logger.debug("Array type before conversion = %s", type(d[key]))
-                    d[key] = np.array(value)
-                    logger.debug("Array type after conversion = %s", type(d[key]))
+        # For debugging to confirm all outputs are numpy arrays
+        # def find_non_numpy(d) -> None:
+        #     for key, value in d.items():
+        #         if isinstance(value, dict):
+        #             find_non_numpy(value)
+        #         else:
+        #             if not isinstance(value, np.ndarray):
+        #                 logger.warning("Non numpy array type found")
+        #                 logger.warning("key = %s, value = %s", key, value)
+        #                 logger.warning("type = %s", type(value))
 
-        logger.debug("Convert all arrays to numpy")
-        convert_to_numpy(out)
+        # find_non_numpy(out)
 
-        self._cached_dict = out  # Cache result
+        self._cached_dict = out  # Cache result for faster re-accessing
 
         return out
 
-    def atmosphere_asdict(self) -> dict[str, Array]:
+    def atmosphere_asdict(self) -> dict[str, NpArray]:
         """Gets the atmosphere properties
 
         Returns:
             Atmosphere properties
         """
-        out: dict[str, Array] = {}
+        out: dict[str, NpArray] = {}
 
         log_number_density_from_log_pressure_func: Callable = eqx.filter_vmap(
-            get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap)
+            get_log_number_density_from_log_pressure, in_axes=(0, self.temperature_vmap_axes())
         )
-        log_number_density = log_number_density_from_log_pressure_func(
-            jnp.log(self.total_pressure()), self.temperature
+        log_number_density: Array = log_number_density_from_log_pressure_func(
+            jnp.log(self.total_pressure()), jnp.asarray(self.temperature)
         )
         # Must be 2-D to align arrays for computing number-density-related quantities
-        number_density: Array = jnp.exp(log_number_density)[:, jnp.newaxis]
-        molar_mass: Array = self.atmosphere_molar_mass()[:, jnp.newaxis]
-        out: dict[str, Array] = self._get_number_density_output(
+        number_density: NpArray = np.exp(log_number_density)[:, np.newaxis]
+        molar_mass: NpArray = self.atmosphere_molar_mass()[:, np.newaxis]
+        out: dict[str, NpArray] = self._get_number_density_output(
             number_density, molar_mass, "species_"
         )
-        # Species mass is simply mass, so rename for clarity
+        # Species mass is simply mass so rename for clarity
         out["mass"] = out.pop("species_mass")
 
         out["molar_mass"] = molar_mass
@@ -295,13 +290,13 @@ class Output:
 
         out["pressure"] = self.total_pressure()
         out["volume"] = self.atmosphere_volume()
-        out["element_number_density"] = jnp.sum(self.element_density_gas(), axis=1)
+        out["element_number_density"] = np.sum(self.element_density_gas(), axis=1)
         out["element_number"] = out["element_number_density"] * out["volume"]
         out["element_moles"] = out["element_number"] / AVOGADRO
 
         return out
 
-    def atmosphere_log_molar_mass(self) -> Array:
+    def atmosphere_log_molar_mass(self) -> NpFloat:
         """Gets log molar mass of the atmosphere
 
         Returns:
@@ -311,20 +306,20 @@ class Output:
             get_atmosphere_log_molar_mass, in_axes=(None, 0)
         )
         atmosphere_log_molar_mass: Array = atmosphere_log_molar_mass_func(
-            self._fixed_parameters, self.log_number_density
+            self._fixed_parameters, jnp.asarray(self.log_number_density)
         )
 
-        return atmosphere_log_molar_mass
+        return np.asarray(atmosphere_log_molar_mass)
 
-    def atmosphere_molar_mass(self) -> Array:
+    def atmosphere_molar_mass(self) -> NpArray:
         """Gets the molar mass of the atmosphere
 
         Returns:
             Molar mass of the atmosphere
         """
-        return jnp.exp(self.atmosphere_log_molar_mass())
+        return np.exp(self.atmosphere_log_molar_mass())
 
-    def atmosphere_log_volume(self) -> Array:
+    def atmosphere_log_volume(self) -> NpFloat:
         """Gets the log volume of the atmosphere
 
         Returns:
@@ -340,78 +335,85 @@ class Output:
         )
         atmosphere_log_volume: Array = atmosphere_log_volume_func(
             self._fixed_parameters,
-            self.log_number_density,
+            jnp.asarray(self.log_number_density),
             self.planet,
         )
 
-        return atmosphere_log_volume
+        return np.asarray(atmosphere_log_volume)
 
-    def atmosphere_volume(self) -> Array:
+    def atmosphere_volume(self) -> NpFloat:
         """Gets the volume of the atmosphere
 
         Returns:
             Volume of the atmosphere
         """
-        return jnp.exp(self.atmosphere_log_volume())
+        return np.exp(self.atmosphere_log_volume())
 
-    def total_pressure(self) -> Array:
+    def total_pressure(self) -> NpFloat:
         """Gets total pressure
 
         Returns:
             Total pressure
         """
         total_pressure_func: Callable = eqx.filter_vmap(
-            get_total_pressure, in_axes=(None, 0, self.temperature_vmap)
+            get_total_pressure, in_axes=(None, 0, self.temperature_vmap_axes())
         )
         total_pressure: Array = total_pressure_func(
-            self._fixed_parameters, self.log_number_density, self.temperature
+            self._fixed_parameters,
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.temperature),
         )
 
-        return total_pressure
+        return np.asarray(total_pressure)
 
-    def condensed_species_asdict(self) -> dict[str, dict[str, Array]]:
+    def condensed_species_asdict(
+        self,
+        molar_mass: NpArray,
+        number_density: NpArray,
+        activity: NpArray,
+    ) -> dict[str, dict[str, NpArray]]:
         """Gets the condensed species output as a dictionary
+
+        Args:
+            molar_mass: Molar mass of all species
+            number_density: Number density of all species
+            activity: Activity of all species
 
         Returns:
             Condensed species output as a dictionary
         """
-        molar_mass: Array = self.species_molar_mass_expanded()
-        number_density_condensed: Array = jnp.take(
-            self.number_density(), self.condensed_species_indices, axis=1
-        )
-        activity_condensed: Array = jnp.take(
-            self.activity(), self.condensed_species_indices, axis=1
-        )
-        molar_mass_condensed: Array = jnp.take(molar_mass, self.condensed_species_indices, axis=1)
-        condensed_species: tuple[Species, ...] = tuple(
-            self._species[ii] for ii in self.condensed_species_indices
-        )
-        out: dict[str, Array] = self._get_number_density_output(
-            number_density_condensed, molar_mass_condensed, "total_"
-        )
-        out["molar_mass"] = molar_mass_condensed
-        out["activity"] = activity_condensed
+        molar_mass = molar_mass[:, self.condensed_species_mask]
+        number_density = number_density[:, self.condensed_species_mask]
+        activity = activity[:, self.condensed_species_mask]
 
-        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        species_out: dict[str, dict[str, Array]] = {
-            species.name: split_dict[ii] for ii, species in enumerate(condensed_species)
+        condensed_species: tuple[str, ...] = self._species.get_condensed_species_names()
+
+        out: dict[str, NpArray] = self._get_number_density_output(
+            number_density, molar_mass, "total_"
+        )
+        out["molar_mass"] = molar_mass
+        out["activity"] = activity
+
+        split_dict: list[dict[str, NpArray]] = split_dict_by_columns(out)
+        species_out: dict[str, dict[str, NpArray]] = {
+            species_name: split_dict[ii] for ii, species_name in enumerate(condensed_species)
         }
 
         return species_out
 
-    def elements_asdict(self) -> dict[str, dict[str, Array]]:
+    def elements_asdict(self) -> dict[str, dict[str, NpArray]]:
         """Gets the element properties as a dictionary
 
         Returns:
             Element outputs as a dictionary
         """
-        molar_mass: Array = self.element_molar_mass_expanded()
-        atmosphere: Array = self.element_density_gas()
-        condensed: Array = self.element_density_condensed()
-        dissolved: Array = self.element_density_dissolved()
-        total: Array = atmosphere + condensed + dissolved
+        molar_mass: NpArray = self.element_molar_mass_expanded()
+        atmosphere: NpArray = self.element_density_gas()
+        condensed: NpArray = self.element_density_condensed()
+        dissolved: NpArray = self.element_density_dissolved()
+        total: NpArray = atmosphere + condensed + dissolved
 
-        out: dict[str, Array] = self._get_number_density_output(
+        out: dict[str, NpArray] = self._get_number_density_output(
             atmosphere, molar_mass, "atmosphere_"
         )
         out |= self._get_number_density_output(condensed, molar_mass, "condensed_")
@@ -420,35 +422,35 @@ class Output:
 
         out["molar_mass"] = molar_mass
         out["degree_of_condensation"] = out["condensed_number"] / out["total_number"]
-        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(
+        out["volume_mixing_ratio"] = out["atmosphere_number"] / np.sum(
             out["atmosphere_number"], axis=1, keepdims=True
         )
         out["atmosphere_ppm"] = out["volume_mixing_ratio"] * mega
         out["atmosphere_ppmw"] = (
-            out["atmosphere_mass"] / jnp.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
+            out["atmosphere_mass"] / np.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
         )
 
         unique_elements: tuple[str, ...] = self._species.get_unique_elements_in_species()
         if "H" in unique_elements:
             index: int = unique_elements.index("H")
-            H_total_moles: Array = out["total_moles"][:, index]
+            H_total_moles: NpArray = out["total_moles"][:, index]
             out["logarithmic_abundance"] = (
-                jnp.log10(out["total_moles"] / H_total_moles[:, jnp.newaxis]) + 12
+                np.log10(out["total_moles"] / H_total_moles[:, np.newaxis]) + 12
             )
 
-        logger.debug("out = %s", out)
+        # logger.debug("out = %s", out)
 
-        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        logger.debug("split_dict = %s", split_dict)
+        split_dict: list[dict[str, NpArray]] = split_dict_by_columns(out)
+        # logger.debug("split_dict = %s", split_dict)
 
-        elements_out: dict[str, dict[str, Array]] = {
+        elements_out: dict[str, dict[str, NpArray]] = {
             f"element_{element}": split_dict[ii] for ii, element in enumerate(unique_elements)
         }
-        logger.debug("elements_out = %s", elements_out)
+        # logger.debug("elements_out = %s", elements_out)
 
         return elements_out
 
-    def element_density_condensed(self) -> Array:
+    def element_density_condensed(self) -> NpFloat:
         """Gets the number density of elements in the condensed phase
 
         Unlike for the objective function, we want the number density of all elements, regardless
@@ -459,12 +461,12 @@ class Output:
         """
         element_density_func: Callable = eqx.filter_vmap(get_element_density, in_axes=(None, 0))
         element_density: Array = element_density_func(
-            self.formula_matrix_condensed(), self.log_number_density
+            jnp.asarray(self.formula_matrix), jnp.asarray(self.log_number_density)
         )
 
-        return element_density
+        return np.asarray(element_density)
 
-    def element_density_dissolved(self) -> Array:
+    def element_density_dissolved(self) -> NpFloat:
         """Gets the number density of elements dissolved in melt due to species solubility
 
         Unlike for the objective function, we want the number density of all elements, regardless
@@ -475,20 +477,20 @@ class Output:
         """
         element_density_dissolved_func: Callable = eqx.filter_vmap(
             get_element_density_in_melt,
-            in_axes=(self.traced_parameters_vmap, None, None, 0, 0, 0),
+            in_axes=(self.traced_parameters_vmap_axes(), None, None, 0, 0, 0),
         )
         element_density_dissolved: Array = element_density_dissolved_func(
             self._traced_parameters,
             self._fixed_parameters,
-            jnp.array(self._fixed_parameters.formula_matrix),
-            self.log_number_density,
-            self.log_activity(),
-            self.atmosphere_log_volume(),
+            jnp.asarray(self._fixed_parameters.formula_matrix),
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.log_activity()),
+            jnp.asarray(self.atmosphere_log_volume()),
         )
 
-        return element_density_dissolved
+        return np.asarray(element_density_dissolved)
 
-    def element_density_gas(self) -> Array:
+    def element_density_gas(self) -> NpFloat:
         """Gets the number density of elements in the gas phase
 
         Unlike for the objective function, we want the number density of all elements, regardless
@@ -499,63 +501,28 @@ class Output:
         """
         element_density_func: Callable = eqx.filter_vmap(get_element_density, in_axes=(None, 0))
         element_density: Array = element_density_func(
-            self.formula_matrix_gas(), self.log_number_density
+            jnp.asarray(self.formula_matrix), jnp.asarray(self.log_number_density)
         )
 
-        return element_density
+        return np.asarray(element_density)
 
-    def element_molar_mass_expanded(self) -> Array:
+    def element_molar_mass_expanded(self) -> NpFloat:
         """Gets molar mass of elements
 
         Returns:
             Molar mass of elements
         """
         unique_elements: tuple[str, ...] = self._species.get_unique_elements_in_species()
-        molar_mass: Array = jnp.array([Formula(element).mass for element in unique_elements])
+        molar_mass: npt.ArrayLike = np.array(
+            [Formula(element).mass for element in unique_elements]
+        )
         molar_mass = unit_conversion.g_to_kg * molar_mass
 
-        return jnp.tile(molar_mass, (self.number_solutions, 1))
-
-    def _get_modified_formula_matrix(self, indices: Array) -> Array:
-        """Gets a modified formula matrix with columns not in indices set to zero.
-
-        Args:
-            indices: Indices of columns to keep, where others are set to zero.
-
-        Returns:
-            Modified formula matrix
-        """
-        formula_matrix: Array = jnp.array(self._fixed_parameters.formula_matrix)
-        mask: Array = jnp.zeros_like(formula_matrix, dtype=bool)
-        mask = mask.at[:, indices].set(True)
-        logger.debug("modified_formula_matrix = %s", mask)
-        modified_formula_matrix: Array = formula_matrix * mask
-
-        return modified_formula_matrix
-
-    def formula_matrix_condensed(self) -> Array:
-        """Formula matrix for condensed species
-
-        Only columns in the formula matrix referring to condensed species have non-zero values.
-
-        Returns:
-            Formula matrix for condensed species
-        """
-        return self._get_modified_formula_matrix(self.condensed_species_indices)
-
-    def formula_matrix_gas(self) -> Array:
-        """Formula matrix for gas species
-
-        Only columns in the formula matrix referring to gas species have non-zero values.
-
-        Returns:
-            Formula matrix for gas species
-        """
-        return self._get_modified_formula_matrix(self.gas_species_indices)
+        return np.tile(molar_mass, (self.number_solutions, 1))
 
     def _get_number_density_output(
-        self, number_density: Array, molar_mass_expanded: Array, prefix: str = ""
-    ) -> dict[str, Array]:
+        self, number_density: NpArray, molar_mass_expanded: NpArray, prefix: str = ""
+    ) -> dict[str, NpArray]:
         """Gets the outputs associated with a number density
 
         Args:
@@ -566,13 +533,13 @@ class Output:
         Returns
             Dictionary of output quantities
         """
-        atmosphere_volume: Array = self.atmosphere_volume()
+        atmosphere_volume: NpArray = self.atmosphere_volume()
         # Volume must be a column vector because it multiples all elements in the row
-        number: Array = number_density * atmosphere_volume[:, jnp.newaxis]
-        moles: Array = number / AVOGADRO
-        mass: Array = moles * molar_mass_expanded
+        number: NpArray = number_density * atmosphere_volume[:, np.newaxis]
+        moles: NpArray = number / AVOGADRO
+        mass: NpArray = moles * molar_mass_expanded
 
-        out: dict[str, Array] = {}
+        out: dict[str, NpArray] = {}
         out[f"{prefix}number_density"] = number_density
         out[f"{prefix}number"] = number
         out[f"{prefix}moles"] = moles
@@ -580,52 +547,59 @@ class Output:
 
         return out
 
-    def gas_species_asdict(self) -> dict[str, dict[str, Array]]:
+    def gas_species_asdict(
+        self,
+        molar_mass: NpArray,
+        number_density: NpArray,
+        activity: NpArray,
+    ) -> dict[str, dict[str, NpArray]]:
         """Gets the gas species output as a dictionary
+
+        Args:
+            molar_mass: Molar mass of all species
+            number_density: Number density of all species
+            activity: Activity of all species
 
         Returns:
             Gas species output as a dictionary
         """
-        molar_mass: Array = self.species_molar_mass_expanded()
-        number_density_gas: Array = jnp.take(
-            self.number_density(), self.gas_species_indices, axis=1
-        )
-        dissolved_gas: Array = jnp.take(
-            self.species_density_in_melt(), self.gas_species_indices, axis=1
-        )
-        total_gas: Array = number_density_gas + dissolved_gas
-        activity_gas: Array = jnp.take(self.activity(), self.gas_species_indices, axis=1)
-        pressure_gas: Array = jnp.take(self.pressure(), self.gas_species_indices, axis=1)
-        molar_mass_gas: Array = jnp.take(molar_mass, self.gas_species_indices, axis=1)
-        gas_species: tuple[Species, ...] = tuple(
-            self._species[ii] for ii in self.gas_species_indices
-        )
+        # Below are all filtered to only include the data (columns) of gas species
+        molar_mass = molar_mass[:, self.gas_species_mask]
+        number_density = number_density[:, self.gas_species_mask]
+        activity = activity[:, self.gas_species_mask]
+        dissolved_number_density: NpArray = self.species_density_in_melt()[
+            :, self.gas_species_mask
+        ]
+        total_number_density: NpArray = number_density + dissolved_number_density
+        pressure: NpArray = self.pressure()[:, self.gas_species_mask]
 
-        out: dict[str, Array] = {}
-        out |= self._get_number_density_output(number_density_gas, molar_mass_gas, "atmosphere_")
-        out |= self._get_number_density_output(dissolved_gas, molar_mass_gas, "dissolved_")
-        out |= self._get_number_density_output(total_gas, molar_mass_gas, "total_")
+        gas_species: tuple[str, ...] = self._species.get_gas_species_names()
+
+        out: dict[str, NpArray] = {}
+        out |= self._get_number_density_output(number_density, molar_mass, "atmosphere_")
+        out |= self._get_number_density_output(dissolved_number_density, molar_mass, "dissolved_")
+        out |= self._get_number_density_output(total_number_density, molar_mass, "total_")
         out["molar_mass"] = molar_mass
-        out["volume_mixing_ratio"] = out["atmosphere_number"] / jnp.sum(
+        out["volume_mixing_ratio"] = out["atmosphere_number"] / np.sum(
             out["atmosphere_number"], axis=1, keepdims=True
         )
         out["atmosphere_ppm"] = out["volume_mixing_ratio"] * mega
         out["atmosphere_ppmw"] = (
-            out["atmosphere_mass"] / jnp.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
+            out["atmosphere_mass"] / np.sum(out["atmosphere_mass"], axis=1, keepdims=True) * mega
         )
-        out["pressure"] = pressure_gas
-        out["fugacity"] = activity_gas
-        out["fugacity_coefficient"] = activity_gas / pressure_gas
+        out["pressure"] = pressure
+        out["fugacity"] = activity
+        out["fugacity_coefficient"] = activity / pressure
         out["dissolved_ppmw"] = self.species_ppmw_in_melt()
 
-        split_dict: list[dict[str, Array]] = split_dict_by_columns(out)
-        species_out: dict[str, dict[str, Array]] = {
-            species.name: split_dict[ii] for ii, species in enumerate(gas_species)
+        split_dict: list[dict[str, NpArray]] = split_dict_by_columns(out)
+        species_out: dict[str, dict[str, NpArray]] = {
+            species_name: split_dict[ii] for ii, species_name in enumerate(gas_species)
         }
 
         return species_out
 
-    def log_activity(self) -> Array:
+    def log_activity(self) -> NpFloat:
         """Gets log activity of all species.
 
         This is usually what the user wants when referring to activity because it includes a
@@ -634,26 +608,17 @@ class Output:
         Returns:
             Log activity of all species
         """
-        log_activity_without_stability: Array = self.log_activity_without_stability()
-        # We select the relevant log_activity at the end of this method depending which species
-        # also have stability, so its OK to build a padded array here to keep the size the same.
-        log_stability_padded: Array = jnp.zeros_like(log_activity_without_stability)
-        log_stability_padded = log_stability_padded.at[
-            :, self._species.get_stability_species_indices()
-        ].set(self.log_stability)
-        # Note that the below array contains incorrect entries for species without stability since
-        # exp(0)=1. But these are filtered out further below.
-        log_activity_with_stability: Array = log_activity_without_stability - jnp.exp(
-            log_stability_padded
+        log_activity_without_stability: NpFloat = self.log_activity_without_stability()
+        log_activity_with_stability: NpFloat = log_activity_without_stability - np.exp(
+            self.log_stability
         )
-
         # Now select the appropriate activity for each species, depending if stability is relevant.
-        condition_broadcasted = jnp.broadcast_to(
-            self.stability_species_mask, log_activity_without_stability.shape
+        condition_broadcasted = np.broadcast_to(
+            self._fixed_parameters.active_stability(), log_activity_without_stability.shape
         )
         # logger.debug("condition_broadcasted = %s", condition_broadcasted)
 
-        log_activity: Array = jnp.where(
+        log_activity: NpFloat = np.where(
             condition_broadcasted,
             log_activity_with_stability,
             log_activity_without_stability,
@@ -661,7 +626,7 @@ class Output:
 
         return log_activity
 
-    def log_activity_without_stability(self) -> Array:
+    def log_activity_without_stability(self) -> NpFloat:
         """Gets log activity without stability of all species
 
         Args:
@@ -669,31 +634,31 @@ class Output:
         """
         log_activity_func: Callable = eqx.filter_vmap(
             get_log_activity,
-            in_axes=(vmap_axes_spec(self._traced_parameters), None, 0),
+            in_axes=(self.traced_parameters_vmap_axes(), None, 0),
         )
         log_activity: Array = log_activity_func(
-            self._traced_parameters, self._fixed_parameters, self.log_number_density
+            self._traced_parameters, self._fixed_parameters, jnp.asarray(self.log_number_density)
         )
 
-        return log_activity
+        return np.asarray(log_activity)
 
-    def number_density(self) -> Array:
+    def number_density(self) -> NpFloat:
         r"""Gets number density of all species
 
         Returns:
             Number density in :math:`\mathrm{molecules}\, \mathrm{m}^{-3}`
         """
-        return jnp.exp(self.log_number_density)
+        return np.exp(self.log_number_density)
 
-    def species_molar_mass_expanded(self) -> Array:
+    def species_molar_mass_expanded(self) -> NpFloat:
         r"""Gets molar mass of all species in an expanded array.
 
         Returns:
             Molar mass of all species in an expanded array.
         """
-        return jnp.tile(self.molar_mass, (self.number_solutions, 1))
+        return np.tile(self.molar_mass, (self.number_solutions, 1))
 
-    def pressure(self) -> Array:
+    def pressure(self) -> NpFloat:
         """Gets pressure of species in bar
 
         This will compute pressure of all species, including condensates, for simplicity.
@@ -702,11 +667,13 @@ class Output:
             Pressure of species in bar
         """
         pressure_func: Callable = eqx.filter_vmap(
-            get_pressure_from_log_number_density, in_axes=(0, self.temperature_vmap)
+            get_pressure_from_log_number_density, in_axes=(0, self.temperature_vmap_axes())
         )
-        pressure: Array = pressure_func(self.log_number_density, self.temperature)
+        pressure: Array = pressure_func(
+            jnp.asarray(self.log_number_density), jnp.asarray(self.temperature)
+        )
 
-        return pressure
+        return np.asarray(pressure)
 
     def quick_look(self) -> dict[str, ArrayLike]:
         """Quick look at the solution
@@ -720,33 +687,35 @@ class Output:
         out: dict[str, ArrayLike] = {}
 
         for nn, species_ in enumerate(self._species):
-            pressure: Array = self.pressure()[:, nn]
-            activity: Array = self.activity()[:, nn]
+            pressure: NpArray = self.pressure()[:, nn]
+            activity: NpArray = self.activity()[:, nn]
             out[species_.name] = pressure
             out[f"{species_.name}_activity"] = activity
 
-        return collapse_single_entry_values(out)
+        return {key: np.squeeze(value) for key, value in out.items()}
 
-    def raw_solution_asdict(self) -> dict[str, Array]:
+    def raw_solution_asdict(self) -> dict[str, NpArray]:
         """Gets the raw solution
 
         Returns:
             Dictionary of the raw solution
         """
-        raw_solution: dict[str, Array] = {}
+        raw_solution: dict[str, NpArray] = {}
 
         species_names: tuple[str, ...] = self._species.get_species_names()
 
         for ii, species_name in enumerate(species_names):
             raw_solution[species_name] = self.log_number_density[:, ii]
-
-        for ii, index in enumerate(self._species.get_stability_species_indices()):
-            species_name = species_names[index]
             raw_solution[f"{species_name}_stability"] = self.log_stability[:, ii]
+
+        # Remove keys where the array values are all nan
+        for key in list(raw_solution.keys()):
+            if np.all(np.isnan(raw_solution[key])):
+                raw_solution.pop(key)
 
         return raw_solution
 
-    def residual_asdict(self) -> dict[int, Array]:
+    def residual_asdict(self) -> dict[int, NpFloat]:
         """Gets the residual
 
         Returns:
@@ -757,8 +726,11 @@ class Output:
             in_axes=(
                 0,
                 {
-                    "traced_parameters": self.traced_parameters_vmap,
+                    "traced_parameters": self.traced_parameters_vmap_axes(),
+                    "active_indices": None,
+                    "tau": None,
                     "fixed_parameters": None,
+                    "solver_parameters": None,
                 },
             ),
         )
@@ -766,17 +738,20 @@ class Output:
             self._solution,
             {
                 "traced_parameters": self._traced_parameters,
+                "active_indices": jnp.asarray(self.active_indices),
+                "tau": jnp.asarray(TAU),
                 "fixed_parameters": self._fixed_parameters,
+                "solver_parameters": self._solver_parameters,
             },
         )
 
-        out: dict[int, Array] = {}
+        out: dict[int, NpArray] = {}
         for ii in range(residual.shape[1]):
-            out[ii] = residual[:, ii]
+            out[ii] = np.asarray(residual[:, ii])
 
         return out
 
-    def species_density_in_melt(self) -> Array:
+    def species_density_in_melt(self) -> NpFloat:
         """Gets species number density in the melt
 
         Returns:
@@ -784,43 +759,51 @@ class Output:
         """
         species_density_in_melt_func: Callable = eqx.filter_vmap(
             get_species_density_in_melt,
-            in_axes=(self.traced_parameters_vmap, None, 0, 0, 0),
+            in_axes=(self.traced_parameters_vmap_axes(), None, 0, 0, 0),
         )
         species_density_in_melt: Array = species_density_in_melt_func(
             self._traced_parameters,
             self._fixed_parameters,
-            self.log_number_density,
-            self.log_activity(),
-            self.atmosphere_log_volume(),
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.log_activity()),
+            jnp.asarray(self.atmosphere_log_volume()),
         )
 
-        return species_density_in_melt
+        return np.asarray(species_density_in_melt)
 
-    def species_ppmw_in_melt(self) -> Array:
+    def species_ppmw_in_melt(self) -> NpFloat:
         """Gets species ppmw in the melt
 
         Return:
             Species ppmw in the melt
         """
         species_ppmw_in_melt_func: Callable = eqx.filter_vmap(
-            get_species_ppmw_in_melt, in_axes=(self.traced_parameters_vmap, None, 0, 0)
+            get_species_ppmw_in_melt, in_axes=(self.traced_parameters_vmap_axes(), None, 0, 0)
         )
         species_ppmw_in_melt: Array = species_ppmw_in_melt_func(
             self._traced_parameters,
             self._fixed_parameters,
-            self.log_number_density,
-            self.log_activity(),
+            jnp.asarray(self.log_number_density),
+            jnp.asarray(self.log_activity()),
         )
 
-        return species_ppmw_in_melt
+        return np.asarray(species_ppmw_in_melt)
 
-    def stability(self) -> Array:
+    def stability(self) -> NpFloat:
         """Gets stability of relevant species
 
         Returns:
             Stability of relevant species
         """
-        return jnp.exp(self.log_stability)
+        return np.exp(self.log_stability)
+
+    def temperature_vmap_axes(self) -> Literal[0, None]:
+        """Gets vmap axes for temperature"""
+        return vmap_axes_spec(self._traced_parameters.planet.temperature)
+
+    def traced_parameters_vmap_axes(self) -> TracedParameters:
+        """Gets vmap axes for traced parameters"""
+        return vmap_axes_spec(self._traced_parameters)
 
     def _drop_unsuccessful_solves(
         self, dataframes: dict[str, pd.DataFrame]
@@ -833,7 +816,7 @@ class Output:
         Returns:
             Dictionary of dataframes without unsuccessful models
         """
-        return {key: df.loc[np.array(self._solver_status)] for key, df in dataframes.items()}
+        return {key: df.loc[self._solver_status] for key, df in dataframes.items()}
 
     def to_dataframes(self, drop_unsuccessful: bool = False) -> dict[str, pd.DataFrame]:
         """Gets the output in a dictionary of dataframes.
@@ -851,7 +834,7 @@ class Output:
             logger.info("Computing to_dataframes output")
             dataframes = nested_dict_to_dataframes(self.asdict())
             self._cached_dataframes = dataframes
-            logger.debug("to_dataframes = %s", self._cached_dataframes)
+            # logger.debug("to_dataframes = %s", self._cached_dataframes)
 
         if drop_unsuccessful:
             logger.info("Dropping models that did not solve")
@@ -873,12 +856,11 @@ class Output:
         output_file: Path = Path(f"{file_prefix}.xlsx")
 
         # Convenient to highlight rows where the solver failed to find a solution for follow-up
-        # analysis
-        # Define a fill color for highlighting rows (e.g., yellow)
+        # analysis. Define a fill color for highlighting rows (e.g., yellow)
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         # Get the indices where the successful_solves mask is False
-        unsuccessful_indices: npt.NDArray[np.int_] = np.where(
+        unsuccessful_indices: NpArray[np.int_] = np.where(
             np.array(self._solver_status) == False  # noqa: E712
         )[0]
 
@@ -916,64 +898,24 @@ class Output:
         logger.info("Output written to %s", output_file)
 
 
-def collapse_single_entry_values(
-    input_dict: dict[str, ArrayLike],
-) -> dict[str, ArrayLike]:
-    """Collapses single entry values in a dictionary
-
-    Args:
-        input_dict: Input dictionary
-
-    Returns:
-        Dictionary with collapsed values
-    """
-    out: dict[str, ArrayLike] = {}
-    for key, value in input_dict.items():
-        try:
-            if value.size > 1:  # type: ignore because AttributeError dealt with
-                out[key] = jnp.squeeze(value)
-            else:
-                out[key] = value.item()  # type:ignore because AttributeError dealt with
-        except AttributeError:
-            out[key] = value
-
-    return out
-
-
-def expand_dict(some_dict: dict[str, ArrayLike], expand_to_size: int) -> dict[str, Array]:
-    """Gets a dictionary of the values with scalars expanded
+def broadcast_arrays_in_dict(some_dict: dict[str, NpArray], shape: int) -> dict[str, NpArray]:
+    """Gets a dictionary of broadcasted arrays
 
     Args:
         some_dict: Some dictionary
-        expand_to_size: Size to expand the arrays to
+        size: Shape (size) of the desired array
 
     Returns:
-        A dictionary with values expanded to `expand_to_size`
+        A dictionary with broadcasted arrays
     """
-
-    def expand_to_match_size(x: ArrayLike, size: int) -> ArrayLike:
-        """Expands an array
-
-        Args:
-            x: Value to possibly expand
-            size: Size to expand to
-
-        Returns:
-            Expanded value
-        """
-        if jnp.isscalar(x):
-            return jnp.broadcast_to(x, size)
-
-        return x
-
-    expanded_dict: dict[str, Array] = tree_map(
-        lambda x: jnp.asarray(expand_to_match_size(x, expand_to_size)), some_dict
-    )
+    expanded_dict: dict[str, NpArray] = {}
+    for key, value in some_dict.items():
+        expanded_dict[key] = np.broadcast_to(value, shape)
 
     return expanded_dict
 
 
-def split_dict_by_columns(dict_to_split: dict[str, Array]) -> list[dict[str, Array]]:
+def split_dict_by_columns(dict_to_split: dict[str, NpArray]) -> list[dict[str, NpArray]]:
     """Splits a dictionary based on columns in the values.
 
     Args:
@@ -982,32 +924,21 @@ def split_dict_by_columns(dict_to_split: dict[str, Array]) -> list[dict[str, Arr
     Returns:
         A list of dictionaries split by column
     """
-    # Get the number of columns from the first array in the dictionary
+    # Assume all arrays have the same number of columns
     first_key: str = next(iter(dict_to_split))
-    logger.debug("first_key = %s", first_key)
     num_columns: int = dict_to_split[first_key].shape[1]
 
-    # Function to split an array into a list of its columns
-    def split_columns(array: Array) -> list[Array]:
-        return [array[:, i] for i in range(num_columns)]
-
-    # Apply the splitting function to each array in the dictionary
-    split_values: dict[str, list[Array]] = jax.tree_util.tree_map(split_columns, dict_to_split)
-
-    # Initialize a list of dictionaries, one for each column
+    # Preallocate list of dicts
     split_dicts: list[dict] = [{} for _ in range(num_columns)]
 
-    # Fill the dictionaries with the corresponding columns
-    for key, columns in split_values.items():
-        for i, column in enumerate(columns):
-            split_dicts[i][key] = column
+    for key, array in dict_to_split.items():
+        for i in range(num_columns):
+            split_dicts[i][key] = array[:, i]
 
     return split_dicts
 
 
-def nested_dict_to_dataframes(
-    nested_dict: dict[str, dict[str, Any]],
-) -> dict[str, pd.DataFrame]:
+def nested_dict_to_dataframes(nested_dict: dict[str, dict[str, Any]]) -> dict[str, pd.DataFrame]:
     """Creates a dictionary of dataframes from a nested dictionary
 
     Args:

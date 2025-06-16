@@ -21,18 +21,19 @@ Units for temperature and pressure are K and bar, respectively.
 
 import logging
 from abc import abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array, jacfwd
-from jax.typing import ArrayLike
+from jax import jacfwd
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
+from atmodeller.mytypes import OptxSolver
 from atmodeller.thermodata import CriticalData
-from atmodeller.utilities import OptxSolver, safe_exp
+from atmodeller.utilities import safe_exp
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -94,6 +95,45 @@ class RealGas(eqx.Module):
         )
 
         return log_fugacity
+
+    @eqx.filter_jit
+    def pressure_from_fugacity(self, temperature: ArrayLike, fugacity: ArrayLike) -> Array:
+        """Calculate pressure from fugacity
+
+        Args:
+            temperature: Temperature in K
+            fugacity: Fugacity in bar
+
+        Returns:
+            Pressure in bar
+        """
+
+        def objective_function(pressure: ArrayLike, kwargs: dict[str, ArrayLike]) -> Array:
+            """Objective function to solve for pressure
+
+            Args:
+                pressure: Pressure in bar
+                kwargs: Dictionary with other required parameters
+
+            Returns:
+                Residual of the objective function
+            """
+            temperature: ArrayLike = kwargs["temperature"]
+            target_fugacity: ArrayLike = kwargs["target_fugacity"]
+            fugacity: Array = self.fugacity(temperature, pressure)
+
+            return fugacity - target_fugacity
+
+        initial_pressure: ArrayLike = jnp.asarray(100.0)  # Initial guess for pressure
+        kwargs: dict[str, ArrayLike] = {"temperature": temperature, "target_fugacity": fugacity}
+
+        solver: OptxSolver = optx.Newton(rtol=RELATIVE_TOLERANCE, atol=ABSOLUTE_TOLERANCE)
+        sol = optx.root_find(
+            objective_function, solver, initial_pressure, args=kwargs, throw=THROW
+        )
+        pressure: ArrayLike = sol.value
+
+        return pressure
 
     @eqx.filter_jit
     def volume_integral_J(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:

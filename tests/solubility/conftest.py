@@ -19,7 +19,7 @@
 import logging
 
 import pytest
-from jax.typing import ArrayLike
+from jaxtyping import ArrayLike
 from pytest import approx
 
 from atmodeller.interfaces import SolubilityProtocol

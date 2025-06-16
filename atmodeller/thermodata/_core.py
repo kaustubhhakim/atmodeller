@@ -18,8 +18,7 @@
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
@@ -31,7 +30,6 @@ class CondensateActivity(eqx.Module):
 
     activity: Array = eqx.field(converter=as_j64, default=1.0)
 
-    @eqx.filter_jit
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         del temperature
         del pressure
@@ -65,7 +63,6 @@ class ThermoCoefficients(eqx.Module):
     T_min: tuple[float, ...]
     T_max: tuple[float, ...]
 
-    @eqx.filter_jit
     def _cp_over_R(self, cp_coefficients: ArrayLike, temperature: ArrayLike) -> Array:
         """Heat capacity relative to the gas constant (R)
 
@@ -93,7 +90,6 @@ class ThermoCoefficients(eqx.Module):
 
         return heat_capacity
 
-    @eqx.filter_jit
     def _S_over_R(
         self, cp_coefficients: ArrayLike, b2: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -124,7 +120,6 @@ class ThermoCoefficients(eqx.Module):
 
         return entropy
 
-    @eqx.filter_jit
     def _H_over_RT(
         self, cp_coefficients: ArrayLike, b1: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -155,7 +150,6 @@ class ThermoCoefficients(eqx.Module):
 
         return enthalpy
 
-    @eqx.filter_jit
     def _G_over_RT(
         self, cp_coefficients: ArrayLike, b1: ArrayLike, b2: ArrayLike, temperature: ArrayLike
     ) -> Array:
@@ -177,7 +171,6 @@ class ThermoCoefficients(eqx.Module):
 
         return gibbs
 
-    @eqx.filter_jit
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
 
@@ -271,7 +264,7 @@ class CriticalData(eqx.Module):
         pressure: Critical pressure in bar
     """
 
-    temperature: float = 1
+    temperature: float = 1.0
     """Critical temperature in K"""
-    pressure: float = 1
+    pressure: float = 1.0
     """Critical pressure in bar"""

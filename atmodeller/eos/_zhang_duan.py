@@ -17,21 +17,19 @@
 #
 """Real gas EOS from :cite:t:`ZD09`"""
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
 import optimistix as optx
-from jax import Array
-from jax.typing import ArrayLike
+from jaxtyping import Array, ArrayLike
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.utilities import ExperimentalCalibration, OptxSolver, safe_exp, unit_conversion
+from atmodeller.mytypes import OptxSolver
+from atmodeller.utilities import ExperimentalCalibration, safe_exp, unit_conversion
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
