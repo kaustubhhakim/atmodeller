@@ -51,7 +51,7 @@ jobs:
         run: poetry install --no-interaction --no-root
         
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --extras "dev" --no-interaction
 
       - name: Checks with pre-commit
         run: poetry run pre-commit run --all-files
