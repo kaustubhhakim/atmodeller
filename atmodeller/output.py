@@ -463,8 +463,9 @@ class Output:
         element_density: Array = element_density_func(
             jnp.asarray(self.formula_matrix), jnp.asarray(self.log_number_density)
         )
+        element_density_np: NpFloat = np.asarray(element_density) * self.condensed_species_mask
 
-        return np.asarray(element_density)
+        return element_density_np
 
     def element_density_dissolved(self) -> NpFloat:
         """Gets the number density of elements dissolved in melt due to species solubility
@@ -503,8 +504,9 @@ class Output:
         element_density: Array = element_density_func(
             jnp.asarray(self.formula_matrix), jnp.asarray(self.log_number_density)
         )
+        element_density_np: NpFloat = np.asarray(element_density) * self.gas_species_mask
 
-        return np.asarray(element_density)
+        return element_density_np
 
     def element_molar_mass_expanded(self) -> NpFloat:
         """Gets molar mass of elements
