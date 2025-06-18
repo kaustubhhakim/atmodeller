@@ -16,7 +16,7 @@
 #
 """Package level variables and initialises the package logger"""
 
-__version__: str = "0.6.0"
+__version__: str = "0.6.1"
 
 import logging
 import sys
