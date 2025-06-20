@@ -19,6 +19,7 @@
 __version__: str = "0.6.1"
 
 import logging
+import os
 import sys
 
 import jax
@@ -37,7 +38,11 @@ print("Atmodeller initialized with double precision (float64)")
 # jax.config.update("jax_debug_infs", True)
 # jax.config.update("jax_disable_jit", True)
 # jax.config.update("jax_log_compiles", True)
-# os.environ["EQX_ON_ERROR"] = "breakpoint"
+
+# This prevents error_if from throwing an error when encountering NaN or Inf values. To actually
+# find the root cause of NaN or Inf values, you should set this to "raise" or "breakpoint" as per
+# https://docs.kidger.site/equinox/api/errors/
+os.environ["EQX_ON_ERROR"] = "nan"
 
 # Suppress warnings (notably from Equinox about static JAX arrays)
 if not sys.warnoptions:
