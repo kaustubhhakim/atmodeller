@@ -19,6 +19,8 @@
 https://ntrs.nasa.gov/citations/20020085330
 """
 
+import numpy as np
+
 from atmodeller.thermodata import SpeciesData, ThermoCoefficients
 
 _C_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
@@ -53,8 +55,8 @@ _C_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
             3.335435980e-16,
         ),
     ),
-    (200.0, 600.0, 2000.0),
-    (600.0, 2000.0, 6000.0),
+    np.array([200, 600, 2000]),
+    np.array([600, 2000, 6000]),
 )
 C_cr: SpeciesData = SpeciesData("C", "cr", _C_cr_coeffs)
 "Species data for C_cr"
@@ -73,8 +75,8 @@ _H2O_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
             9.694495970e-9,
         ),
     ),
-    (200.0,),
-    (273.1507,),
+    np.array([200]),
+    np.array([273.1507]),
 )
 H2O_cr: SpeciesData = SpeciesData("H2O", "cr", _H2O_cr_coeffs)
 "Species data for H2O_cr"
@@ -102,8 +104,8 @@ _H2O_l_coeffs: ThermoCoefficients = ThermoCoefficients(
             1.425743266e-7,
         ),
     ),
-    (273.150, 373.150),
-    (373.150, 600.0),
+    np.array([273.150, 373.150]),
+    np.array([373.150, 600]),
 )
 H2O_l: SpeciesData = SpeciesData(
     "H2O",
@@ -126,8 +128,8 @@ _H2O4S_l_coeffs: ThermoCoefficients = ThermoCoefficients(
             -3.170091690e-12,
         ),
     ),
-    (283.456,),
-    (1000.0,),
+    np.array([283.456]),
+    np.array([1000]),
 )
 H2O4S_l: SpeciesData = SpeciesData(
     "H2O4S",
@@ -160,8 +162,8 @@ _ClH4N_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
             0.0,
         ),
     ),
-    (298.15, 457.7, 1000.0),
-    (457.7, 1000.0, 1500.0),
+    np.array([298.15, 457.7, 1000]),
+    np.array([457.7, 1000, 1500]),
 )
 ClH4N_cr: SpeciesData = SpeciesData(
     "ClH4N",
@@ -180,8 +182,8 @@ _S_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
         (-1.035710779e4, 0.0, 1.866766938, 4.256140250e-3, -3.265252270e-06, 0.0, 0.0),
         (0.0, 0.0, 2.080514131, 2.440879557e-3, 0.0, 0.0, 0.0),
     ),
-    (200.0, 368.3),
-    (368.3, 388.36),
+    np.array([200, 368.3]),
+    np.array([368.3, 388.36]),
 )
 S_cr: SpeciesData = SpeciesData("S", "cr", _S_cr_coeffs)
 "Species data for S_alpha and S_beta"
@@ -196,8 +198,8 @@ _S_l_coeffs: ThermoCoefficients = ThermoCoefficients(
         (1.972984578e6, 0.0, -2.441009753e1, 6.090352889e-2, -3.744069103e-5, 0.0, 0.0),
         (0.0, 0.0, 3.848693429, 0.0, 0.0, 0.0, 0.0),
     ),
-    (388.36, 428.15, 432.25, 453.15, 717.0),
-    (428.15, 432.25, 453.15, 717.0, 6000.0),
+    np.array([388.36, 428.15, 432.25, 453.15, 717]),
+    np.array([428.15, 432.25, 453.15, 717, 6000]),
 )
 S_l: SpeciesData = SpeciesData(
     "S",
@@ -213,8 +215,8 @@ _Si_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
         (-2.323538208e4, 0.0, 2.102021680, 1.809220552e-3, 0.0, 0.0, 0.0),
         (-5.232559740e4, 0.0, 2.850169415, 3.975166970e-4, 0.0, 0.0, 0.0),
     ),
-    (200.0, 298.15),
-    (298.15, 1690.0),
+    np.array([200, 298.15]),
+    np.array([298.15, 1690]),
 )
 Si_cr: SpeciesData = SpeciesData(
     "Si",
@@ -227,8 +229,8 @@ _Si_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (4.882667110e3,),
     (-1.326611073e1,),
     ((0.0, 0.0, 3.271389414, 0.0, 0.0, 0.0, 0.0),),
-    (1690.0,),
-    (6000.0,),
+    np.array([1690]),
+    np.array([6000]),
 )
 Si_l: SpeciesData = SpeciesData(
     "Si",
@@ -241,8 +243,8 @@ _O2Si_l_coeffs: ThermoCoefficients = ThermoCoefficients(
     (-1.140002976e5,),
     (-5.554279592e1,),
     ((0.0, 0.0, 1.004268442e1, 0.0, 0.0, 0.0, 0.0),),
-    (1996.0,),
-    (6000.0,),
+    np.array([1996]),
+    np.array([6000]),
 )
 O2Si_l: SpeciesData = SpeciesData(
     "O2Si",

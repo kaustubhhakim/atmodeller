@@ -51,8 +51,8 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 # Thermodynamic standard state
-ENTHALPY_REFERENCE: float = 298.15
-"""Enthalpy reference temperature in K"""
+TEMPERATURE_REFERENCE: float = 298.15
+"""Enthalpy reference temperature in K (:math:`T_r` in the JANAF tables) :cite:p:`MZG02,Cha98`"""
 PRESSURE_REFERENCE: float = 1.0
 """Standard state pressure in bar"""
 
