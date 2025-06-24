@@ -172,7 +172,9 @@ _ClH4N_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
         ),
     ),
     np.array([100, 298.15, 457.7, 1000]),
-    # Must be just less than 298.15 so reference enthalpy is computed using the second entry
+    # First entry must be just less than 298.15 so reference enthalpy is computed using the
+    # coefficients associated with the second entry to ensure consistency with McBride et al.
+    # (2002).
     np.array([298.1499, 457.7, 1000, 1500]),
 )
 """Lowermost bound was fit to JANAF data to extend the range below 298.15 K, and is reasonably
