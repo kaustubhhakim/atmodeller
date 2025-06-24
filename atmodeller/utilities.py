@@ -80,7 +80,7 @@ def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
     Returns:
         JAX array of dtype float64
     """
-    return jnp.array(x, dtype=jnp.float64)
+    return jnp.asarray(x, dtype=jnp.float64)
 
 
 def partial_rref(matrix: NpArray) -> NpArray:
