@@ -178,7 +178,7 @@ class InteriorAtmosphere:
             num_failed: int = jnp.sum(~solver_status).item()
             logger.warning("%d model(s) failed to converge on the first attempt", num_failed)
             logger.warning(
-                "But don't panic! This is not unexpected when starting from a poor initial guess."
+                "But don't panic! This can happen when starting from a poor initial guess."
             )
             logger.warning(
                 "Launching multistart (maximum %d attempts)", solver_parameters_.multistart

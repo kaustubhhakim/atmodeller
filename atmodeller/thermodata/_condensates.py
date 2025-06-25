@@ -139,10 +139,19 @@ H2O4S_l: SpeciesData = SpeciesData(
 "Species data for H2O4S_l"
 
 _ClH4N_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
-    (-3.792881500e4, -8.787975900e5, 2.063363145e7),
-    (2.933013040e1, 3.897936900e3, -3.765976360e4),
+    (-3.800615346677232e04, -3.792881500e4, -8.787975900e5, 2.063363145e7),
+    (-4.372885943063882e01, 2.933013040e1, 3.897936900e3, -3.765976360e4),
     (
-        (1.593389657e5, 0.0, -5.965854940, 6.494193170e-2, -5.391456890e-5, 0.0, 0.0),
+        (
+            0,
+            -5.172495931126793e02,
+            8.781198882486828e00,
+            1.129216705734911e-02,
+            0,
+            0,
+            0,
+        ),
+        (1.593389657e5, 0, -5.965854940, 6.494193170e-2, -5.391456890e-5, 0, 0),
         (
             -1.641820157e7,
             1.639262758e5,
@@ -159,12 +168,17 @@ _ClH4N_cr_coeffs: ThermoCoefficients = ThermoCoefficients(
             -4.435674300,
             1.772486202e-3,
             -2.817160120e-7,
-            0.0,
+            0,
         ),
     ),
-    np.array([298.15, 457.7, 1000]),
-    np.array([457.7, 1000, 1500]),
+    np.array([100, 298.15, 457.7, 1000]),
+    # First entry must be just less than 298.15 so reference enthalpy is computed using the
+    # coefficients associated with the second entry to ensure consistency with McBride et al.
+    # (2002).
+    np.array([298.1499, 457.7, 1000, 1500]),
 )
+"""Lowermost bound was fit to JANAF data to extend the range below 298.15 K, and is reasonably
+continuous across the 298.15 K join temperature."""
 ClH4N_cr: SpeciesData = SpeciesData(
     "ClH4N",
     "cr",

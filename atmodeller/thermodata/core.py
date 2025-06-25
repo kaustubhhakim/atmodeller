@@ -17,6 +17,7 @@
 """Core classes and functions for thermochemical data"""
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
@@ -56,14 +57,14 @@ class ThermoCoefficients(eqx.Module):
     """Enthalpy constant(s) of integration"""
     b2: tuple[float, ...]
     """Entropy constant(s) of integration"""
-    cp_coeffs: tuple[tuple[float, float, float, float, float, float, float], ...]
+    cp_coeffs: tuple[tuple[float | int, ...], ...]
     """Heat capacity coefficients"""
     T_min: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
     """Minimum temperature(s) in K in the range"""
     T_max: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
     """Maximum temperature(s) in K in the range"""
 
-    def _get_index(self, temperature: ArrayLike) -> Integer[Array, ""]:
+    def _get_index(self, temperature: ArrayLike) -> Integer[Array, " T"]:
         """Gets the index of the temperature range for the given temperature
 
         This assumes the temperature is within one of the ranges and will produce unexpected output
@@ -75,26 +76,30 @@ class ThermoCoefficients(eqx.Module):
         Returns:
             Index of the temperature range
         """
-        # Temperature must be a float array since JAX cannot raise integers to negative powers.
-        temperature = jnp.asarray(temperature, dtype=jnp.float64)
-        bool_mask: Bool[Array, " N"] = (self.T_min <= temperature) & (temperature <= self.T_max)
-        index: Integer[Array, ""] = jnp.argmax(bool_mask)
+        temperature = jnp.atleast_1d(as_j64(temperature))
+
+        # Reshape for broadcasting
+        bool_mask: Bool[Array, "N T"] = (self.T_min[:, None] <= temperature[None, :]) & (
+            temperature[None, :] <= self.T_max[:, None]
+        )
+        index: Integer[Array, " T"] = jnp.argmax(bool_mask, axis=0)
 
         return index
 
     def _cp_over_R(
-        self, cp_coefficients: Float[Array, "7"], temperature: ArrayLike
+        self, cp_coefficients: Float[Array, "T 7"], temperature: ArrayLike
     ) -> Float[Array, ""]:
         """Heat capacity relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
-            cp_coefficients: Heat capacity coefficients as an array
-            temperature: Temperature
+            cp_coefficients: Heat capacity coefficients
+            temperature: Temperature in K
 
         Returns:
             Heat capacity relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         """
-        temperature_terms: Float[Array, "7"] = jnp.stack(
+        temperature = jnp.atleast_1d(as_j64(temperature))
+        temperature_terms: Float[Array, "T 7"] = jnp.stack(
             [
                 jnp.power(temperature, -2),
                 jnp.power(temperature, -1),
@@ -103,28 +108,31 @@ class ThermoCoefficients(eqx.Module):
                 jnp.power(temperature, 2),
                 jnp.power(temperature, 3),
                 jnp.power(temperature, 4),
-            ]
+            ],
+            axis=-1,
         )
 
-        heat_capacity: Float[Array, ""] = jnp.dot(cp_coefficients, temperature_terms)
-        # jax.debug.print("heat_capacity = {out}", out=heat_capacity)
+        heat_capacity: Float[Array, " T"] = jnp.einsum(
+            "ti,ti->t", cp_coefficients, temperature_terms
+        )
 
         return heat_capacity
 
     def _S_over_R(
-        self, cp_coefficients: Float[Array, "7"], b2: ArrayLike, temperature: ArrayLike
+        self, cp_coefficients: Float[Array, "T 7"], b2: ArrayLike, temperature: ArrayLike
     ) -> Float[Array, ""]:
         """Entropy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
-            cp_coefficients: Heat capacity coefficients as an array
+            cp_coefficients: Heat capacity coefficients
             b2: Entropy integration constant
             temperature: Temperature in K
 
         Returns:
             Entropy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         """
-        temperature_terms: Float[Array, "7"] = jnp.stack(
+        temperature = jnp.atleast_1d(as_j64(temperature))
+        temperature_terms: Float[Array, "T 7"] = jnp.stack(
             [
                 -jnp.power(temperature, -2) / 2,
                 -jnp.power(temperature, -1),
@@ -133,16 +141,18 @@ class ThermoCoefficients(eqx.Module):
                 jnp.power(temperature, 2) / 2,
                 jnp.power(temperature, 3) / 3,
                 jnp.power(temperature, 4) / 4,
-            ]
+            ],
+            axis=-1,
         )
 
-        entropy: Float[Array, ""] = jnp.dot(cp_coefficients, temperature_terms) + b2
-        # jax.debug.print("entropy = {out}", out=entropy)
+        entropy: Float[Array, " T"] = (
+            jnp.einsum("ti,ti->t", cp_coefficients, temperature_terms) + b2
+        )
 
         return entropy
 
     def _H_over_RT(
-        self, cp_coefficients: Float[Array, "7"], b1: ArrayLike, temperature: ArrayLike
+        self, cp_coefficients: Float[Array, "T 7"], b1: ArrayLike, temperature: ArrayLike
     ) -> Float[Array, ""]:
         r"""Enthalpy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         :math:`\times T`
@@ -156,7 +166,8 @@ class ThermoCoefficients(eqx.Module):
             Enthalpy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
             :math:`\times T`
         """
-        temperature_terms: Float[Array, "7"] = jnp.stack(
+        temperature = jnp.atleast_1d(as_j64(temperature))
+        temperature_terms: Float[Array, "T 7"] = jnp.stack(
             [
                 -jnp.power(temperature, -2),
                 jnp.log(temperature) / temperature,
@@ -165,21 +176,23 @@ class ThermoCoefficients(eqx.Module):
                 jnp.power(temperature, 2) / 3,
                 jnp.power(temperature, 3) / 4,
                 jnp.power(temperature, 4) / 5,
-            ]
+            ],
+            axis=-1,
         )
 
-        enthalpy: Float[Array, ""] = jnp.dot(cp_coefficients, temperature_terms) + b1 / temperature
-        # jax.debug.print("enthalpy = {out}", out=enthalpy)
+        enthalpy: Float[Array, " T"] = (
+            jnp.einsum("ti,ti->t", cp_coefficients, temperature_terms) + b1 / temperature
+        )
 
         return enthalpy
 
     def _G_over_RT(
         self,
-        cp_coefficients: Float[Array, "7"],
+        cp_coefficients: Float[Array, "T 7"],
         b1: ArrayLike,
         b2: ArrayLike,
         temperature: ArrayLike,
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         r"""Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         :math:`\times T`
 
@@ -193,14 +206,16 @@ class ThermoCoefficients(eqx.Module):
             Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
             :math:`\times T`
         """
-        enthalpy: Float[Array, ""] = self._H_over_RT(cp_coefficients, b1, temperature)
-        entropy: Float[Array, ""] = self._S_over_R(cp_coefficients, b2, temperature)
+        enthalpy: Float[Array, " T"] = self._H_over_RT(cp_coefficients, b1, temperature)
+        # jax.debug.print("enthalpy = {out}", out=enthalpy)
+        entropy: Float[Array, " T"] = self._S_over_R(cp_coefficients, b2, temperature)
+        # jax.debug.print("entropy = {out}", out=entropy)
         # No temperature multiplication is correct since the return is Gibbs energy relative to RT
-        gibbs: Float[Array, ""] = enthalpy - entropy
+        gibbs: Float[Array, " T"] = enthalpy - entropy
 
         return gibbs
 
-    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Float[Array, ""]:
+    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets Gibbs energy to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         :math:`\times T`
 
@@ -211,21 +226,23 @@ class ThermoCoefficients(eqx.Module):
             Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
             :math:`\times T`
         """
-        index: Integer[Array, ""] = self._get_index(temperature)
+        index: Integer[Array, " T"] = self._get_index(temperature)
         # jax.debug.print("index = {out}", out=index)
-        cp_coeffs_for_index: Float[Array, "7"] = jnp.take(jnp.array(self.cp_coeffs), index, axis=0)
+        cp_coeffs_for_index: Float[Array, "T 7"] = jnp.take(
+            jnp.array(self.cp_coeffs), index, axis=0
+        )
         # jax.debug.print("cp_coeffs_for_index = {out}", out=cp_coeffs_for_index)
-        b1_for_index: Float[Array, ""] = jnp.take(jnp.array(self.b1), index)
+        b1_for_index: Float[Array, " T"] = jnp.take(jnp.array(self.b1), index)
         # jax.debug.print("b1_for_index = {out}", out=b1_for_index)
-        b2_for_index: Float[Array, ""] = jnp.take(jnp.array(self.b2), index)
+        b2_for_index: Float[Array, " T"] = jnp.take(jnp.array(self.b2), index)
         # jax.debug.print("b2_for_index = {out}", out=b2_for_index)
-        gibbs_for_index: Float[Array, ""] = self._G_over_RT(
+        gibbs_for_index: Float[Array, " T"] = self._G_over_RT(
             cp_coeffs_for_index, b1_for_index, b2_for_index, temperature
         )
 
         return gibbs_for_index
 
-    def cp(self, temperature: ArrayLike) -> Float[Array, ""]:
+    def cp(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets heat capacity.
 
         This is :math:`C_p^\circ` in the JANAF tables.
@@ -236,13 +253,16 @@ class ThermoCoefficients(eqx.Module):
         Returns:
             Heat capacity in :math:`\mathrm{J}\ \mathrm{K}^{-1} \mathrm{mol}^{-1}`
         """
-        index: Integer[Array, ""] = self._get_index(temperature)
-        cp_coeffs_for_index: Float[Array, "7"] = jnp.take(jnp.array(self.cp_coeffs), index, axis=0)
-        cp: Float[Array, ""] = self._cp_over_R(cp_coeffs_for_index, temperature) * GAS_CONSTANT
+        index: Integer[Array, " T"] = self._get_index(temperature)
+        cp_coeffs_for_index: Float[Array, "T 7"] = jnp.take(
+            jnp.array(self.cp_coeffs), index, axis=0
+        )
+        # jax.debug.print("cp_coeffs_for_index = {out}", out=cp_coeffs_for_index.shape)
+        cp: Float[Array, " T"] = self._cp_over_R(cp_coeffs_for_index, temperature) * GAS_CONSTANT
 
         return cp
 
-    def enthalpy(self, temperature: ArrayLike) -> Float[Array, ""]:
+    def enthalpy(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets enthalpy.
 
         This is :math:`H` in the JANAF tables.
@@ -253,10 +273,12 @@ class ThermoCoefficients(eqx.Module):
         Returns:
             Enthalpy in :math:`\mathrm{J}\ \mathrm{mol}^{-1}`
         """
-        index: Integer[Array, ""] = self._get_index(temperature)
-        cp_coeffs_for_index: Float[Array, "7"] = jnp.take(jnp.array(self.cp_coeffs), index, axis=0)
-        b1_for_index: Float[Array, ""] = jnp.take(jnp.array(self.b1), index)
-        enthalpy: Float[Array, ""] = (
+        index: Integer[Array, " T"] = self._get_index(temperature)
+        cp_coeffs_for_index: Float[Array, "T 7"] = jnp.take(
+            jnp.array(self.cp_coeffs), index, axis=0
+        )
+        b1_for_index: Float[Array, " T"] = jnp.take(jnp.array(self.b1), index)
+        enthalpy: Float[Array, " T"] = (
             self._H_over_RT(cp_coeffs_for_index, b1_for_index, temperature)
             * GAS_CONSTANT
             * temperature
@@ -276,8 +298,10 @@ class ThermoCoefficients(eqx.Module):
             Reference enthalpy in :math:`\mathrm{J}\ \mathrm{mol}^{-1}`
         """
         index: Integer[Array, ""] = self._get_index(TEMPERATURE_REFERENCE)
+        jax.debug.print("index = {out}", out=index)
         cp_coeffs_for_index: Float[Array, "7"] = jnp.take(jnp.array(self.cp_coeffs), index, axis=0)
         b1_for_index: Float[Array, ""] = jnp.take(jnp.array(self.b1), index)
+        jax.debug.print("b1_for_index = {out}", out=b1_for_index)
         reference_enthalpy: Float[Array, ""] = (
             self._H_over_RT(cp_coeffs_for_index, b1_for_index, TEMPERATURE_REFERENCE)
             * GAS_CONSTANT
@@ -286,7 +310,7 @@ class ThermoCoefficients(eqx.Module):
 
         return reference_enthalpy
 
-    def enthalpy_function(self, temperature: ArrayLike) -> Float[Array, ""]:
+    def enthalpy_function(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets enthalpy function/increment.
 
         This is :math:`H-H^{\circ}(T_r)` in the JANAF tables.
@@ -297,12 +321,12 @@ class ThermoCoefficients(eqx.Module):
         Returns:
             Enthalpy increment in :math:`\mathrm{J}\ \mathrm{mol}^{-1}`
         """
-        enthalpy: Float[Array, ""] = self.enthalpy(temperature)
+        enthalpy: Float[Array, " T"] = self.enthalpy(temperature)
         reference_enthalpy: Float[Array, ""] = self.reference_enthalpy()
 
         return enthalpy - reference_enthalpy
 
-    def entropy(self, temperature: ArrayLike) -> Float[Array, ""]:
+    def entropy(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets entropy
 
         This is :math:`S^\circ` in the JANAF tables.
@@ -313,16 +337,18 @@ class ThermoCoefficients(eqx.Module):
         Returns:
             Entropy in :math:`\mathrm{J}\ \mathrm{K}^{-1} \mathrm{mol}^{-1}`
         """
-        index: Integer[Array, ""] = self._get_index(temperature)
-        cp_coeffs_for_index: Float[Array, "7"] = jnp.take(jnp.array(self.cp_coeffs), index, axis=0)
-        b2_for_index: Float[Array, ""] = jnp.take(jnp.array(self.b2), index)
-        entropy: Float[Array, ""] = (
+        index: Integer[Array, " T"] = self._get_index(temperature)
+        cp_coeffs_for_index: Float[Array, "T 7"] = jnp.take(
+            jnp.array(self.cp_coeffs), index, axis=0
+        )
+        b2_for_index: Float[Array, " T"] = jnp.take(jnp.array(self.b2), index)
+        entropy: Float[Array, " T"] = (
             self._S_over_R(cp_coeffs_for_index, b2_for_index, temperature) * GAS_CONSTANT
         )
 
         return entropy
 
-    def gibbs_function(self, temperature: ArrayLike) -> Float[Array, ""]:
+    def gibbs_function(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets Gibbs energy function.
 
         This is :math:`-[G^\circ-H^{\circ}(Tr)]/T` in the JANAF tables.
@@ -333,8 +359,10 @@ class ThermoCoefficients(eqx.Module):
         Returns:
             Gibbs energy function in :math:`\mathrm{J}\ \mathrm{K}^{-1} \mathrm{mol}^{-1}`
         """
-        gibbs: Float[Array, ""] = self.get_gibbs_over_RT(temperature) * GAS_CONSTANT * temperature
-        gibbs_function: Float[Array, ""] = -(gibbs - self.reference_enthalpy()) / temperature
+        gibbs: Float[Array, " T"] = (
+            self.get_gibbs_over_RT(temperature) * GAS_CONSTANT * temperature
+        )
+        gibbs_function: Float[Array, " T"] = -(gibbs - self.reference_enthalpy()) / temperature
 
         return gibbs_function
 

@@ -585,10 +585,11 @@ def get_log_Kp(
 
     indices: Integer[Array, " species_dim"] = jnp.arange(len(species))
     vmap_gibbs: Callable = eqx.filter_vmap(apply_gibbs, in_axes=(0, None))
-    gibbs_values: Float[Array, " species_dim"] = vmap_gibbs(indices, temperature)
-    log_Kp: Float[Array, " react_dim"] = -1.0 * reaction_matrix @ gibbs_values
+    gibbs_values: Float[Array, "species_dim 1"] = vmap_gibbs(indices, temperature)
+    # jax.debug.print("gibbs_values = {out}", out=gibbs_values)
+    log_Kp: Float[Array, "react_dim 1"] = -1.0 * reaction_matrix @ gibbs_values
 
-    return log_Kp
+    return jnp.ravel(log_Kp)
 
 
 def get_log_reaction_equilibrium_constant(
