@@ -56,7 +56,7 @@ gas_HO_system: InteriorAtmosphere = InteriorAtmosphere(species)
 
 def test_version():
     """Test version."""
-    assert __version__ == "0.6.1"
+    assert __version__ == "0.7.0"
 
 
 def test_H2O(helper) -> None:
