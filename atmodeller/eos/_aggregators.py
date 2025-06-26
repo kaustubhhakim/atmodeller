@@ -349,7 +349,7 @@ class UpperBoundRealGas(RealGas):
         Args:
             temperature: Temperature in K
         """
-        return self.real_gas.dzdp(temperature, self.p_eval)
+        return 0.0  # self.real_gas.dzdp(temperature, self.p_eval)
 
     @override
     @eqx.filter_jit
