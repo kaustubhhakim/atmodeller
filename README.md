@@ -4,7 +4,7 @@
 
 # Atmodeller
 
-[![Release 0.7.0](https://img.shields.io/badge/Release-0.7.0-blue.svg)](https://github.com/ExPlanetology/atmodeller/releases/tag/v0.7.0)
+[![Release 0.7.1](https://img.shields.io/badge/Release-0.7.1-blue.svg)](https://github.com/ExPlanetology/atmodeller/releases/tag/v0.7.1)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python package](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml/badge.svg)](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml)

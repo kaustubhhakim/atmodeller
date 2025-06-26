@@ -349,6 +349,13 @@ class UpperBoundRealGas(RealGas):
         Args:
             temperature: Temperature in K
         """
+        del temperature
+
+        # TODO: In theory it should be possible to use dz/dp, but this is causing the solver to
+        # crash for certain parameter ranges due to nans/infs being passed to the linear solver.
+        # More investigations are required to understand the root cause. This only affects the
+        # behaviour outside of the EOS calibration range.
+
         return 0.0  # self.real_gas.dzdp(temperature, self.p_eval)
 
     @override
