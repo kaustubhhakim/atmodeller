@@ -42,7 +42,7 @@ print("Atmodeller initialized with double precision (float64)")
 # This prevents error_if from throwing an error when encountering NaN or Inf values. To actually
 # find the root cause of NaN or Inf values, you should set this to "raise" or "breakpoint" as per
 # https://docs.kidger.site/equinox/api/errors/
-os.environ["EQX_ON_ERROR"] = "nan"
+os.environ["EQX_ON_ERROR"] = "raise"
 
 # Suppress warnings (notably from Equinox about static JAX arrays)
 if not sys.warnoptions:
