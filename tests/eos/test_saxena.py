@@ -145,7 +145,8 @@ def test_upper_extrapolation(check_values) -> None:
     expected: float = 4.472116811082408
     check_values.compressibility(temperature, pressure, model, expected)
     # The upper bound extrapolation should maintain the same compressibility for higher pressures
-    expected: float = 8.098866090720415
+    # for dz/dp if reinstated at some point
+    # expected: float = 8.098866090720415
     check_values.compressibility(temperature, pressure_above_max, model, expected)
 
 
@@ -183,7 +184,9 @@ def test_volume_integral_index2(check_values) -> None:
     model: RealGas = check_values.get_eos_model("H2S", "shi92")
     temperature: float = 1073
     pressure: float = 20000
-    expected: float = 1.4644445135917623
+    # for dz/dp if reinstated at some point
+    # expected: float = 1.4644445135917623
+    expected: float = 1.365159989472265
     check_values.volume_integral(temperature, pressure, model, expected)
 
 
