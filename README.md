@@ -31,7 +31,7 @@ Downloading the source code is also recommended if you'd like access to the exam
 
 If you use Atmodeller, or data from Atmodeller, please cite:
 
-- Bower, D. J., Thompson, M. A., Hakim, K., Tian, M., and Sossi P. A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, non-ideality and condensation: Application to TRAPPIST-1e and sub-Neptunes, The Astrophysical Journal, submitted.
+- Bower, D. J., Thompson, M. A., Hakim, K., Tian, M., and Sossi, P. A. (2025), Diversity of rocky planet atmospheres in the C-H-O-N-S-Cl system with interior dissolution, non-ideality and condensation: Application to TRAPPIST-1e and sub-Neptunes, The Astrophysical Journal, submitted.
 
 The data from the above study are also available for download at https://doi.org/10.17605/OSF.IO/PC5TD.
 
