@@ -19,10 +19,10 @@
 https://ntrs.nasa.gov/citations/20020085330
 """
 
-import numpy as np
+from atmodeller.thermodata import CriticalData, SpeciesData
 
-from atmodeller.thermodata import CriticalData, SpeciesData, ThermoCoefficients
-
+Ar_g: SpeciesData = SpeciesData("Ar", "g")
+"Species data for Ar_g"
 C_g: SpeciesData = SpeciesData("C", "g")
 "Species data for C_g"
 C2H2_g: SpeciesData = SpeciesData("C2H2", "g")
@@ -35,10 +35,16 @@ CO_g: SpeciesData = SpeciesData("CO", "g")
 "Species data for CO_g"
 CO2_g: SpeciesData = SpeciesData("CO2", "g")
 "Species data for CO2_g"
+COS_g: SpeciesData = SpeciesData("COS", "g")
+"Species data for COS_g"
 Cl2_g: SpeciesData = SpeciesData("Cl2", "g")
 "Species data for Cl2_g"
 ClH_g: SpeciesData = SpeciesData("ClH", "g")
 "Species data for ClH_g"
+Fe_g: SpeciesData = SpeciesData("Fe", "g")
+"Species data for Fe_g"
+FeO_g: SpeciesData = SpeciesData("FeO", "g")
+"Species data for FeO_g"
 H2_g: SpeciesData = SpeciesData("H2", "g")
 "Species data for H2_g"
 He_g: SpeciesData = SpeciesData("He", "g")
@@ -57,12 +63,18 @@ H2S_g: SpeciesData = SpeciesData("H2S", "g")
 "Species data for H2S_g"
 H4Si_g: SpeciesData = SpeciesData("H4Si", "g")
 "Species data for H4Si_g"
+Kr_g: SpeciesData = SpeciesData("Kr", "g")
+"Species data for Kr_g"
 Mg_g: SpeciesData = SpeciesData("Mg", "g")
 "Species data for Mg_g"
 MgO_g: SpeciesData = SpeciesData("MgO", "g")
 "Species data for MgO_g"
 N2_g: SpeciesData = SpeciesData("N2", "g")
 "Species data for N2_g"
+NO_g: SpeciesData = SpeciesData("NO", "g")
+"Species data for NO_g"
+Ne_g: SpeciesData = SpeciesData("Ne", "g")
+"Species data for Ne_g"
 O2_g: SpeciesData = SpeciesData("O2", "g")
 "Species data for O2_g"
 OS_g: SpeciesData = SpeciesData("OS", "g")
@@ -79,122 +91,6 @@ S2_g: SpeciesData = SpeciesData("S2", "g")
 "Species data for S2_g"
 Si_g: SpeciesData = SpeciesData("Si", "g")
 "Species data for Si_g"
-
-
-FeO_g: SpeciesData = SpeciesData("FeO", "g")
-"Species data for FeO_g"
-
-_Fe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(5.466995940e04, 7.137370060e03, 4.847648290e06),
-    b2=(-3.383946260e01, 6.504979860e01, -8.697289770e02),
-    cp_coeffs=(
-        (
-            6.790822660e04,
-            -1.197218407e03,
-            9.843393310e00,
-            -1.652324828e-02,
-            1.917939959e-05,
-            -1.149825371e-08,
-            2.832773807e-12,
-        ),
-        (
-            -1.954923682e06,
-            6.737161100e03,
-            -5.486410970e00,
-            4.378803450e-03,
-            -1.116286672e-06,
-            1.544348856e-10,
-            -8.023578182e-15,
-        ),
-        (
-            1.216352511e09,
-            -5.828563930e05,
-            9.789634510e01,
-            -5.370704430e-03,
-            3.192037920e-08,
-            6.267671430e-12,
-            -1.480574914e-16,
-        ),
-    ),
-    T_min=np.array([200, 1000]),
-    T_max=np.array([1000, 6000]),
-)
-Fe_g: SpeciesData = SpeciesData("Fe", "g", _Fe_g_coeffs)
-"Species data for Fe_g"
-
-_NO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(9.098214410e03, 1.750317656e04, -4.677501240e06),
-    b2=(6.728725490e00, -8.501669090e00, 1.242081216e03),
-    cp_coeffs=(
-        (
-            -1.143916503e04,
-            1.536467592e02,
-            3.431468730e00,
-            -2.668592368e-03,
-            8.481399120e-06,
-            -7.685111050e-09,
-            2.386797655e-12,
-        ),
-        (
-            2.239018716e05,
-            -1.289651623e03,
-            5.433936030e00,
-            -3.656034900e-04,
-            9.880966450e-08,
-            -1.416076856e-11,
-            9.380184620e-16,
-        ),
-        (
-            -9.575303540e08,
-            5.912434480e05,
-            -1.384566826e02,
-            1.694339403e-02,
-            -1.007351096e-06,
-            2.912584076e-11,
-            -3.295109350e-16,
-        ),
-    ),
-    T_min=np.array([200, 1000]),
-    T_max=np.array([1000, 6000]),
-)
-NO_g: SpeciesData = SpeciesData("NO", "g", _NO_g_coeffs)
-"Species data for NO_g"
-
-_COS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(-1.191657685e04, -8.927096690e03),
-    b2=(-2.991988593e01, -2.636328016e01),
-    cp_coeffs=(
-        (
-            8.547876430e04,
-            -1.319464821e03,
-            9.735257240e00,
-            -6.870830960e-03,
-            1.082331416e-05,
-            -7.705597340e-09,
-            2.078570344e-12,
-        ),
-        (
-            1.959098567e05,
-            -1.756167688e03,
-            8.710430340e00,
-            -4.139424960e-04,
-            1.015243648e-07,
-            -1.159609663e-11,
-            5.691053860e-16,
-        ),
-    ),
-    T_min=np.array([200, 1000]),
-    T_max=np.array([1000, 6000]),
-)
-COS_g: SpeciesData = SpeciesData("COS", "g", _COS_g_coeffs)
-"Species data for COS_g"
-
-Ar_g: SpeciesData = SpeciesData("Ar", "g")
-"Species data for Ar_g"
-Ne_g: SpeciesData = SpeciesData("Ne", "g")
-"Species data for Ne_g"
-Kr_g: SpeciesData = SpeciesData("Kr", "g")
-"Species data for Kr_g"
 Xe_g: SpeciesData = SpeciesData("Xe", "g")
 "Species data for Xe_g"
 
