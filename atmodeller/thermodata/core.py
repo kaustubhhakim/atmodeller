@@ -78,7 +78,7 @@ class ThermoCoefficients(eqx.Module):
         )
         with data as datapath:
             dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
-        df = dataframe[(dataframe["Formula"] == hill_formula) & (dataframe["state"] == state)]
+        df = dataframe[(dataframe["Formula"] == hill_formula) & (dataframe["State"] == state)]
         if df.empty:
             raise ValueError(f"No data found for species '{hill_formula}' in {file}")
 
@@ -88,7 +88,7 @@ class ThermoCoefficients(eqx.Module):
         b2 = tuple(df["b2"].astype(float))
         cp_coeffs = tuple(
             tuple(float(x) for x in row)
-            for row in df[["Cp0", "Cp1", "Cp2", "Cp3", "Cp4", "Cp5", "Cp6"]].values
+            for row in df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].values
         )
 
         return cls(
@@ -426,10 +426,10 @@ class SpeciesData(eqx.Module):
 
     def __post_init__(self):
         mformula: Formula = Formula(self.formula)
-        self.thermodata = ThermoCoefficients.create(f"{self.formula}_{self.phase}")
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula
         self.molar_mass = mformula.mass * unit_conversion.g_to_kg
+        self.thermodata = ThermoCoefficients.create(self.hill_formula, self.phase)
 
     @property
     def elements(self) -> tuple[str, ...]:
