@@ -16,15 +16,21 @@
 #
 """Core classes and functions for thermochemical data"""
 
+import importlib.resources
+from contextlib import AbstractContextManager
+from pathlib import Path
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import pandas as pd
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
 from xmmutablemap import ImmutableMap
 
 from atmodeller import TEMPERATURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT
+from atmodeller.thermodata import DATA_DIRECTORY
 from atmodeller.utilities import as_j64, unit_conversion
 
 
@@ -63,6 +69,35 @@ class ThermoCoefficients(eqx.Module):
     """Minimum temperature(s) in K in the range"""
     T_max: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
     """Maximum temperature(s) in K in the range"""
+
+    @classmethod
+    def create(cls, hill_formula: str, state: str) -> "ThermoCoefficients":
+        file = "thermodata.txt"
+        data: AbstractContextManager[Path] = importlib.resources.as_file(
+            DATA_DIRECTORY.joinpath(file)
+        )
+        with data as datapath:
+            dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
+        df = dataframe[(dataframe["Formula"] == hill_formula) & (dataframe["state"] == state)]
+        if df.empty:
+            raise ValueError(f"No data found for species '{hill_formula}' in {file}")
+
+        T_min = df["T_min"].astype(float).to_numpy()
+        T_max = df["T_max"].astype(float).to_numpy()
+        b1 = tuple(df["b1"].astype(float))
+        b2 = tuple(df["b2"].astype(float))
+        cp_coeffs = tuple(
+            tuple(float(x) for x in row)
+            for row in df[["Cp0", "Cp1", "Cp2", "Cp3", "Cp4", "Cp5", "Cp6"]].values
+        )
+
+        return cls(
+            b1=b1,
+            b2=b2,
+            cp_coeffs=cp_coeffs,
+            T_min=T_min,
+            T_max=T_max,
+        )
 
     def _get_index(self, temperature: ArrayLike) -> Integer[Array, " T"]:
         """Gets the index of the temperature range for the given temperature
@@ -380,7 +415,7 @@ class SpeciesData(eqx.Module):
     """Formula"""
     phase: str
     """Phase"""
-    thermodata: ThermoCoefficients
+    thermodata: ThermoCoefficients = eqx.field(init=False)
     """Thermodynamic data"""
     composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
     """Composition"""
@@ -391,6 +426,7 @@ class SpeciesData(eqx.Module):
 
     def __post_init__(self):
         mformula: Formula = Formula(self.formula)
+        self.thermodata = ThermoCoefficients.create(f"{self.formula}_{self.phase}")
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula
         self.molar_mass = mformula.mass * unit_conversion.g_to_kg

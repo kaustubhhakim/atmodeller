@@ -16,15 +16,20 @@
 #
 """Thermodata package level variables"""
 
+import importlib.resources
+from importlib.abc import Traversable
+
+DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
+
 # Expose public API
-from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: F401
-from atmodeller.thermodata.core import (  # noqa: F401
+from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: E402, F401
+from atmodeller.thermodata.core import (  # noqa: E402, F401
     CondensateActivity,
     CriticalData,
     SpeciesData,
     ThermoCoefficients,
 )
-from atmodeller.thermodata.library import (  # noqa: F401
+from atmodeller.thermodata.library import (  # noqa: E402, F401
     get_thermodata,
     select_critical_data,
     select_thermodata,
