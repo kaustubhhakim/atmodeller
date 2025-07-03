@@ -479,100 +479,28 @@ class CriticalData(eqx.Module):
     pressure: float = 1.0
     """Critical pressure in bar"""
 
+    @classmethod
+    def create(cls, hill_formula: str, suffix="") -> "CriticalData":
+        """Creates an instance
 
-_critical_data_H2O_g: CriticalData = CriticalData(647.25, 221.1925)
-"""Critical parameters for H2O_g :cite:p:`SS92{Table 2}`"""
-_critical_data_CO2_g: CriticalData = CriticalData(304.15, 73.8659)
-"""Critical parameters for CO2_g :cite:p:`SS92{Table 2}`
+        Args:
+            hill_formula: Hill formula
+            suffix: Suffix. Defaults to an empty string.
 
-Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar
-"""
-_critical_data_CH4_g: CriticalData = CriticalData(191.05, 46.4069)
-"""Critical parameters for CH4_g :cite:p:`SS92{Table 2}`
+        Returns:
+            An instance
+        """
+        file: Path = Path("critical_data.txt")
+        data: AbstractContextManager[Path] = importlib.resources.as_file(
+            DATA_DIRECTORY.joinpath(file)  # type: ignore
+        )
+        with data as datapath:
+            dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
+        df: pd.DataFrame = dataframe[dataframe["Name"] == f"{hill_formula}{suffix}"]
+        if df.empty:
+            raise ValueError(
+                f"No data found for formula '{hill_formula}' and suffix '{suffix}' in {file}"
+            )
+        row = df.iloc[0]
 
-Alternative values from :cite:t:`HP91` are 190.6 K and 46 bar
-"""
-_critical_data_CO_g: CriticalData = CriticalData(133.15, 34.9571)
-"""Critical parameters for CO :cite:p:`SS92{Table 2}`
-
-Alternative values from :cite:t:`HP91` are 132.9 K and 35 bar
-"""
-_critical_data_O2_g: CriticalData = CriticalData(154.75, 50.7638)
-"""Critical parameters for O2 :cite:p:`SS92{Table 2}`"""
-_critical_data_H2_g: CriticalData = CriticalData(33.25, 12.9696)
-"""Critical parameters for H2 :cite:p:`SS92{Table 2}`"""
-_critical_data_H2_g_holland: CriticalData = CriticalData(41.2, 21.1)
-"""Critical parameters for H2 :cite:p:`HP91`"""
-_critical_data_S2_g: CriticalData = CriticalData(208.15, 72.954)
-"""Critical parameters for S2 :cite:p:`SS92{Table 2}`
-
-http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
-
-:cite:p:`HP11` state that the critical parameters are from :cite:t:`RPS77`. However, in the fifth
-edition of this book (:cite:t:`PPO00`) S2 is not given (only S is).
-"""
-_critical_data_SO2_g: CriticalData = CriticalData(430.95, 78.7295)
-"""Critical parameters for SO2 :cite:p:`SS92{Table 2}`"""
-_critical_data_COS_g: CriticalData = CriticalData(377.55, 65.8612)
-"""Critical parameters for COS :cite:p:`SS92{Table 2}`"""
-_critical_data_H2S_g: CriticalData = CriticalData(373.55, 90.0779)
-"""Critical parameters for H2S :cite:p:`SS92{Table 2}`
-
-Alternative values from :cite:t:`HP91` are 373.4 K and 0.08963 bar
-"""
-_critical_data_N2_g: CriticalData = CriticalData(126.2, 33.9)
-"""Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
-_critical_data_Ar_g: CriticalData = CriticalData(151.0, 48.6)
-"""Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
-_critical_data_He_g: CriticalData = CriticalData(5.2, 2.274)
-"""Critical parameters for He :cite:p:`ADM77`"""
-_critical_data_Ne_g: CriticalData = CriticalData(44.49, 26.8)
-"""Critical paramters for Ne :cite:p:`KJS86{Table 4}`"""
-_critical_data_Kr_g: CriticalData = CriticalData(209.46, 55.2019)
-"""Critical parameters for Kr :cite:p:`TB70`"""
-_critical_data_Xe_g: CriticalData = CriticalData(289.765, 5.8415)
-"""Critical parameters for Xe :cite:p:`SK94`"""
-
-critical_data: dict[str, CriticalData] = {
-    "Ar_g": _critical_data_Ar_g,
-    "CH4_g": _critical_data_CH4_g,
-    "CO_g": _critical_data_CO_g,
-    "CO2_g": _critical_data_CO2_g,
-    "COS_g": _critical_data_COS_g,
-    "H2_g": _critical_data_H2_g,
-    "H2_g_Holland": _critical_data_H2_g_holland,
-    "H2O_g": _critical_data_H2O_g,
-    "H2S_g": _critical_data_H2S_g,
-    "N2_g": _critical_data_N2_g,
-    "O2_g": _critical_data_O2_g,
-    "S2_g": _critical_data_S2_g,
-    "SO2_g": _critical_data_SO2_g,
-    "He_g": _critical_data_He_g,
-    "Ne_g": _critical_data_Ne_g,
-    "Kr_g": _critical_data_Kr_g,
-    "Xe_g": _critical_data_Xe_g,
-}
-"""Critical parameters for gases
-
-These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
-"""
-
-
-def select_critical_data(species_name: str) -> CriticalData:
-    """Selects critical data for species
-
-    Args:
-        species_name: Name of the species
-
-    Returns:
-        Critical data for species
-    """
-    try:
-        data: CriticalData = critical_data[species_name]
-    except KeyError as exc:
-        msg: str = f"Critical data for '{species_name}' is not available"
-        logger.warning(msg)
-        logger.warning("Available options are: %s", list(critical_data.keys()))
-        raise ValueError(msg) from exc
-
-    return data
+        return cls(temperature=float(row["Tc"]), pressure=float(row["Pc"]))

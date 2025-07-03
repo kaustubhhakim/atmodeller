@@ -16,9 +16,13 @@
 #
 """Containers"""
 
+import importlib
+import importlib.resources
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager
 from dataclasses import asdict
+from pathlib import Path
 from typing import Literal
 
 import equinox as eqx
@@ -26,6 +30,7 @@ import jax.numpy as jnp
 import lineax as lx
 import numpy as np
 import optimistix as optx
+import pandas as pd
 from jax import lax
 from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
 from lineax import AbstractLinearSolver
@@ -46,7 +51,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
-from atmodeller.thermodata import CondensateActivity, SpeciesData
+from atmodeller.thermodata import DATA_DIRECTORY, CondensateActivity, SpeciesData
 from atmodeller.utilities import (
     all_not_nan,
     as_j64,
@@ -161,6 +166,19 @@ class SpeciesCollection(eqx.Module):
     def number(self) -> int:
         """Number of species"""
         return len(self.data)
+
+    @classmethod
+    def available_species(cls):
+        file: Path = Path("nasa_glenn_coefficients.txt")
+        data: AbstractContextManager[Path] = importlib.resources.as_file(
+            DATA_DIRECTORY.joinpath(file)  # type: ignore
+        )
+        with data as datapath:
+            dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
+        # Drop duplicates to get unique (Formula, State) pairs
+        unique = dataframe.drop_duplicates(subset=["Formula", "State"])
+        # Return as a list of tuples
+        return list(zip(unique["Formula"], unique["State"]))
 
     def active_stability(self) -> Bool[Array, " species_dim"]:
         """Active species stability
