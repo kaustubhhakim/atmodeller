@@ -25,6 +25,8 @@ from atmodeller.thermodata import CriticalData, SpeciesData, ThermoCoefficients
 
 C_g: SpeciesData = SpeciesData("C", "g")
 "Species data for C_g"
+C2H2_g: SpeciesData = SpeciesData("C2H2", "g")
+"Species data for C2H2_g"
 CH4_g: SpeciesData = SpeciesData("CH4", "g")
 "Species data for CH4_g"
 CO_g: SpeciesData = SpeciesData("CO", "g")
@@ -45,6 +47,8 @@ HO_g: SpeciesData = SpeciesData("HO", "g")
 "Species data for HO_g"
 H2O_g: SpeciesData = SpeciesData("H2O", "g")
 "Species data for H2O_g"
+HS_g: SpeciesData = SpeciesData("HS", "g")
+"Species data for HS_g"
 H2S_g: SpeciesData = SpeciesData("H2S", "g")
 "Species data for H2S_g"
 H4Si_g: SpeciesData = SpeciesData("H4Si", "g")
@@ -70,64 +74,6 @@ S2_g: SpeciesData = SpeciesData("S2", "g")
 Si_g: SpeciesData = SpeciesData("Si", "g")
 "Species data for Si_g"
 
-
-_HS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(1.742902395e04, 4.899214490e04),
-    b2=(-1.760761843e01, -3.770400275e01),
-    cp_coeffs=(
-        (
-            6.389434680e03,
-            -3.747960920e02,
-            7.548145770e00,
-            -1.288875477e-02,
-            1.907786343e-05,
-            -1.265033728e-08,
-            3.235158690e-12,
-        ),
-        (
-            1.682631601e06,
-            -5.177152210e03,
-            9.198168520e00,
-            -2.323550224e-03,
-            6.543914780e-07,
-            -8.468470420e-11,
-            3.864741550e-15,
-        ),
-    ),
-    T_min=np.array([200, 1000, 6000]),
-    T_max=np.array([1000, 6000, 20000]),
-)
-HS_g: SpeciesData = SpeciesData("HS", "g", _HS_g_coeffs)
-"Species data for HS_g"
-
-_C2H2_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(3.712619060e04, 6.266578970e04),
-    b2=(-5.244338900e01, -5.818960590e01),
-    cp_coeffs=(
-        (
-            1.598112089e05,
-            -2.216644118e03,
-            1.265707813e01,
-            -7.979651080e-03,
-            8.054992750e-06,
-            -2.433307673e-09,
-            -7.529233180e-14,
-        ),
-        (
-            1.713847410e06,
-            -5.929106660e03,
-            1.236127943e01,
-            1.314186993e-04,
-            -1.362764431e-07,
-            2.712655786e-11,
-            -1.302066204e-15,
-        ),
-    ),
-    T_min=np.array([200, 1000]),
-    T_max=np.array([1000, 6000]),
-)
-C2H2_g: SpeciesData = SpeciesData("C2H2", "g", _C2H2_g_coeffs)
-"Species data for C2H2_g"
 
 _CHN_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     b1=(2.098915450e04, 4.221513770e04),
