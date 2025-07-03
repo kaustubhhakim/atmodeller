@@ -81,33 +81,7 @@ Si_g: SpeciesData = SpeciesData("Si", "g")
 "Species data for Si_g"
 
 
-_FeO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(2.964572665e04, 3.037985806e04),
-    b2=(1.326115545e01, -3.633655420e00),
-    cp_coeffs=(
-        (
-            1.569282213e04,
-            -6.460188880e01,
-            2.458925470e00,
-            7.016047360e-03,
-            -1.021405947e-05,
-            7.179297870e-09,
-            -1.978966365e-12,
-        ),
-        (
-            -1.195971480e05,
-            -3.624864780e02,
-            5.518880750e00,
-            -9.978856890e-04,
-            4.376913830e-07,
-            -6.790629460e-11,
-            3.639292680e-15,
-        ),
-    ),
-    T_min=np.array([200, 1000]),
-    T_max=np.array([1000, 6000]),
-)
-FeO_g: SpeciesData = SpeciesData("FeO", "g", _FeO_g_coeffs)
+FeO_g: SpeciesData = SpeciesData("FeO", "g")
 "Species data for FeO_g"
 
 _Fe_g_coeffs: ThermoCoefficients = ThermoCoefficients(
