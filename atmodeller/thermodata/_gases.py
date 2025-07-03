@@ -49,6 +49,8 @@ HO_g: SpeciesData = SpeciesData("HO", "g")
 "Species data for HO_g"
 H2O_g: SpeciesData = SpeciesData("H2O", "g")
 "Species data for H2O_g"
+H2O4S_g: SpeciesData = SpeciesData("H2O4S", "g")
+"Species data for H2O4S_g"
 HS_g: SpeciesData = SpeciesData("HS", "g")
 "Species data for HS_g"
 H2S_g: SpeciesData = SpeciesData("H2S", "g")
@@ -78,35 +80,6 @@ S2_g: SpeciesData = SpeciesData("S2", "g")
 Si_g: SpeciesData = SpeciesData("Si", "g")
 "Species data for Si_g"
 
-
-_H2O4S_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(-9.315660120e4, -5.259092950e4),
-    b2=(3.961096201e1, -1.023603724e2),
-    cp_coeffs=(
-        (
-            -4.129150050e4,
-            6.681589890e2,
-            -2.632753507,
-            5.415382480e-2,
-            -7.067502230e-5,
-            4.684611420e-8,
-            -1.236791238e-11,
-        ),
-        (
-            1.437877914e6,
-            -6.614902530e3,
-            2.157662058e1,
-            -4.806255970e-4,
-            3.010775121e-8,
-            2.334842469e-12,
-            -2.946330375e-16,
-        ),
-    ),
-    T_min=np.array([200, 1000]),
-    T_max=np.array([1000, 6000]),
-)
-H2O4S_g: SpeciesData = SpeciesData("H2O4S", "g", _H2O4S_g_coeffs)
-"Species data for H2O4S_g"
 
 _FeO_g_coeffs: ThermoCoefficients = ThermoCoefficients(
     b1=(2.964572665e04, 3.037985806e04),
@@ -242,123 +215,12 @@ _COS_g_coeffs: ThermoCoefficients = ThermoCoefficients(
 COS_g: SpeciesData = SpeciesData("COS", "g", _COS_g_coeffs)
 "Species data for COS_g"
 
-_Ar_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(-7.453750000e02, -7.449939610e02, -5.078300340e06),
-    b2=(4.379674910e00, 4.379180110e00, 1.465298484e03),
-    cp_coeffs=(
-        (
-            0.0,
-            0.0,
-            2.5,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ),
-        (
-            2.010538475e01,
-            -5.992661070e-02,
-            2.500069401e00,
-            -3.992141160e-08,
-            1.205272140e-11,
-            -1.819015576e-15,
-            1.078576636e-19,
-        ),
-        (
-            -9.951265080e08,
-            6.458887260e05,
-            -1.675894697e02,
-            2.319933363e-02,
-            -1.721080911e-06,
-            6.531938460e-11,
-            -9.740147729e-16,
-        ),
-    ),
-    T_min=np.array([200, 1000, 6000]),
-    T_max=np.array([1000, 6000, 20000]),
-)
-Ar_g: SpeciesData = SpeciesData("Ar", "g", _Ar_g_coeffs)
+Ar_g: SpeciesData = SpeciesData("Ar", "g")
 "Species data for Ar_g"
-
-_He_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(-7.453750000e02, -7.453750000e02, 1.650518960e04),
-    b2=(9.287239740e-01, 9.287239740e-01, -4.048814390e00),
-    cp_coeffs=(
-        (
-            0.0,
-            0.0,
-            2.5,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ),
-        (
-            0.0,
-            0.0,
-            2.5,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ),
-        (
-            3.396845420e06,
-            -2.194037652e03,
-            3.080231878e00,
-            -8.068957550e-05,
-            6.252784910e-09,
-            -2.574990067e-13,
-            4.429960218e-18,
-        ),
-    ),
-    T_min=np.array([200, 1000, 6000]),
-    T_max=np.array([1000, 6000, 20000]),
-)
-He_g: SpeciesData = SpeciesData("He", "g", _He_g_coeffs)
-"Species data for He_g"
-
-_Ne_g_coeffs: ThermoCoefficients = ThermoCoefficients(
-    b1=(-7.453750000e02, -7.453750000e02, -5.663933630e04),
-    b2=(3.355322720e00, 3.355322720e00, 1.648438697e01),
-    cp_coeffs=(
-        (
-            0.0,
-            0.0,
-            2.5,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ),
-        (
-            0.0,
-            0.0,
-            2.5,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ),
-        (
-            -1.238252746e07,
-            6.958579580e03,
-            1.016709287e00,
-            1.424664555e-04,
-            -4.803933930e-09,
-            -1.170213183e-13,
-            8.415153652e-18,
-        ),
-    ),
-    T_min=np.array([200, 1000, 6000]),
-    T_max=np.array([1000, 6000, 20000]),
-)
-Ne_g: SpeciesData = SpeciesData("Ne", "g", _Ne_g_coeffs)
+Ne_g: SpeciesData = SpeciesData("Ne", "g")
 "Species data for Ne_g"
-
 Kr_g: SpeciesData = SpeciesData("Kr", "g")
 "Species data for Kr_g"
-
 Xe_g: SpeciesData = SpeciesData("Xe", "g")
 "Species data for Xe_g"
 
