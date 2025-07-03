@@ -44,11 +44,9 @@ TOLERANCE: float = 5.0e-2
 
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 
-H2O_g: Species = Species.create_gas(
-    "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
-)
-H2_g: Species = Species.create_gas("H2_g")
-O2_g: Species = Species.create_gas("O2_g")
+H2O_g: Species = Species.create_gas("H2O", solubility=solubility_models["H2O_peridotite_sossi23"])
+H2_g: Species = Species.create_gas("H2")
+O2_g: Species = Species.create_gas("O2")
 species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
 
 gas_HO_system: InteriorAtmosphere = InteriorAtmosphere(species)
@@ -63,7 +61,7 @@ def test_H2O(helper) -> None:
     """Tests a single species (H2O)."""
 
     H2O_g: Species = Species.create_gas(
-        "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
+        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
     )
     species: SpeciesCollection = SpeciesCollection((H2O_g,))
     planet: Planet = Planet()

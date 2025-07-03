@@ -17,12 +17,16 @@
 """Core classes and functions for thermochemical data"""
 
 import importlib.resources
+import logging
 from contextlib import AbstractContextManager
+from importlib.abc import Traversable
 from pathlib import Path
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
@@ -30,8 +34,11 @@ from xmmutablemap import ImmutableMap
 
 from atmodeller import TEMPERATURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT
-from atmodeller.thermodata import DATA_DIRECTORY
 from atmodeller.utilities import as_j64, unit_conversion
+
+logger: logging.Logger = logging.getLogger(__name__)
+
+DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 
 
 class CondensateActivity(eqx.Module):
@@ -47,7 +54,7 @@ class CondensateActivity(eqx.Module):
 
 
 class ThermoCoefficients(eqx.Module):
-    """Coefficients for thermochemical data
+    """NASA Glenn coefficients for thermochemical data
 
     Coefficients are available at https://ntrs.nasa.gov/citations/20020085330
 
@@ -63,7 +70,7 @@ class ThermoCoefficients(eqx.Module):
     """Enthalpy constant(s) of integration"""
     b2: tuple[float, ...]
     """Entropy constant(s) of integration"""
-    cp_coeffs: tuple[tuple[float | int, ...], ...]
+    cp_coeffs: tuple[tuple[float, ...], ...]
     """Heat capacity coefficients"""
     T_min: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
     """Minimum temperature(s) in K in the range"""
@@ -72,32 +79,38 @@ class ThermoCoefficients(eqx.Module):
 
     @classmethod
     def create(cls, hill_formula: str, state: str) -> "ThermoCoefficients":
-        file = "thermodata.txt"
+        """Creates an instance
+
+        Args:
+            hill_formula: Hill formula
+            state: State of aggregation following the JANAF convention
+
+        Returns:
+            An instance
+        """
+        file: Path = Path("nasa_glenn_coefficients.txt")
         data: AbstractContextManager[Path] = importlib.resources.as_file(
-            DATA_DIRECTORY.joinpath(file)
+            DATA_DIRECTORY.joinpath(file)  # type: ignore
         )
         with data as datapath:
             dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
-        df = dataframe[(dataframe["Formula"] == hill_formula) & (dataframe["State"] == state)]
+        df: pd.DataFrame = dataframe[
+            (dataframe["Formula"] == hill_formula) & (dataframe["State"] == state)
+        ]
         if df.empty:
-            raise ValueError(f"No data found for species '{hill_formula}' in {file}")
+            raise ValueError(
+                f"No data found for formula '{hill_formula}' and state '{state}' in {file}"
+            )
 
-        T_min = df["T_min"].astype(float).to_numpy()
-        T_max = df["T_max"].astype(float).to_numpy()
-        b1 = tuple(df["b1"].astype(float))
-        b2 = tuple(df["b2"].astype(float))
-        cp_coeffs = tuple(
-            tuple(float(x) for x in row)
-            for row in df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].values
+        T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
+        T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
+        b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
+        b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
+        cp_coeffs: tuple[tuple[float, ...], ...] = tuple(
+            map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
         )
 
-        return cls(
-            b1=b1,
-            b2=b2,
-            cp_coeffs=cp_coeffs,
-            T_min=T_min,
-            T_max=T_max,
-        )
+        return cls(b1, b2, cp_coeffs, T_min, T_max)
 
     def _get_index(self, temperature: ArrayLike) -> Integer[Array, " T"]:
         """Gets the index of the temperature range for the given temperature
@@ -407,14 +420,14 @@ class SpeciesData(eqx.Module):
 
     Args:
         formula: Formula
-        phase: Phase
+        state: State of aggregation as defined by JANAF
         thermodata: Thermodynamic data
     """
 
     formula: str
     """Formula"""
-    phase: str
-    """Phase"""
+    state: str
+    """State of aggregation"""
     thermodata: ThermoCoefficients = eqx.field(init=False)
     """Thermodynamic data"""
     composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
@@ -429,7 +442,7 @@ class SpeciesData(eqx.Module):
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula
         self.molar_mass = mformula.mass * unit_conversion.g_to_kg
-        self.thermodata = ThermoCoefficients.create(self.hill_formula, self.phase)
+        self.thermodata = ThermoCoefficients.create(self.hill_formula, self.state)
 
     @property
     def elements(self) -> tuple[str, ...]:
@@ -438,8 +451,8 @@ class SpeciesData(eqx.Module):
 
     @property
     def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return f"{self.hill_formula}_{self.phase}"
+        """Unique name by combining Hill notation and state of aggregation"""
+        return f"{self.hill_formula}_{self.state}"
 
     def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
         """Gets Gibbs energy over RT
@@ -465,3 +478,101 @@ class CriticalData(eqx.Module):
     """Critical temperature in K"""
     pressure: float = 1.0
     """Critical pressure in bar"""
+
+
+_critical_data_H2O_g: CriticalData = CriticalData(647.25, 221.1925)
+"""Critical parameters for H2O_g :cite:p:`SS92{Table 2}`"""
+_critical_data_CO2_g: CriticalData = CriticalData(304.15, 73.8659)
+"""Critical parameters for CO2_g :cite:p:`SS92{Table 2}`
+
+Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar
+"""
+_critical_data_CH4_g: CriticalData = CriticalData(191.05, 46.4069)
+"""Critical parameters for CH4_g :cite:p:`SS92{Table 2}`
+
+Alternative values from :cite:t:`HP91` are 190.6 K and 46 bar
+"""
+_critical_data_CO_g: CriticalData = CriticalData(133.15, 34.9571)
+"""Critical parameters for CO :cite:p:`SS92{Table 2}`
+
+Alternative values from :cite:t:`HP91` are 132.9 K and 35 bar
+"""
+_critical_data_O2_g: CriticalData = CriticalData(154.75, 50.7638)
+"""Critical parameters for O2 :cite:p:`SS92{Table 2}`"""
+_critical_data_H2_g: CriticalData = CriticalData(33.25, 12.9696)
+"""Critical parameters for H2 :cite:p:`SS92{Table 2}`"""
+_critical_data_H2_g_holland: CriticalData = CriticalData(41.2, 21.1)
+"""Critical parameters for H2 :cite:p:`HP91`"""
+_critical_data_S2_g: CriticalData = CriticalData(208.15, 72.954)
+"""Critical parameters for S2 :cite:p:`SS92{Table 2}`
+
+http://www.minsocam.org/ammin/AM77/AM77_1038.pdf
+
+:cite:p:`HP11` state that the critical parameters are from :cite:t:`RPS77`. However, in the fifth
+edition of this book (:cite:t:`PPO00`) S2 is not given (only S is).
+"""
+_critical_data_SO2_g: CriticalData = CriticalData(430.95, 78.7295)
+"""Critical parameters for SO2 :cite:p:`SS92{Table 2}`"""
+_critical_data_COS_g: CriticalData = CriticalData(377.55, 65.8612)
+"""Critical parameters for COS :cite:p:`SS92{Table 2}`"""
+_critical_data_H2S_g: CriticalData = CriticalData(373.55, 90.0779)
+"""Critical parameters for H2S :cite:p:`SS92{Table 2}`
+
+Alternative values from :cite:t:`HP91` are 373.4 K and 0.08963 bar
+"""
+_critical_data_N2_g: CriticalData = CriticalData(126.2, 33.9)
+"""Critical parameters for N2 :cite:p:`SF87{Table 1}`"""
+_critical_data_Ar_g: CriticalData = CriticalData(151.0, 48.6)
+"""Critical parameters for Ar :cite:p:`SF87{Table 1}`"""
+_critical_data_He_g: CriticalData = CriticalData(5.2, 2.274)
+"""Critical parameters for He :cite:p:`ADM77`"""
+_critical_data_Ne_g: CriticalData = CriticalData(44.49, 26.8)
+"""Critical paramters for Ne :cite:p:`KJS86{Table 4}`"""
+_critical_data_Kr_g: CriticalData = CriticalData(209.46, 55.2019)
+"""Critical parameters for Kr :cite:p:`TB70`"""
+_critical_data_Xe_g: CriticalData = CriticalData(289.765, 5.8415)
+"""Critical parameters for Xe :cite:p:`SK94`"""
+
+critical_data: dict[str, CriticalData] = {
+    "Ar_g": _critical_data_Ar_g,
+    "CH4_g": _critical_data_CH4_g,
+    "CO_g": _critical_data_CO_g,
+    "CO2_g": _critical_data_CO2_g,
+    "COS_g": _critical_data_COS_g,
+    "H2_g": _critical_data_H2_g,
+    "H2_g_Holland": _critical_data_H2_g_holland,
+    "H2O_g": _critical_data_H2O_g,
+    "H2S_g": _critical_data_H2S_g,
+    "N2_g": _critical_data_N2_g,
+    "O2_g": _critical_data_O2_g,
+    "S2_g": _critical_data_S2_g,
+    "SO2_g": _critical_data_SO2_g,
+    "He_g": _critical_data_He_g,
+    "Ne_g": _critical_data_Ne_g,
+    "Kr_g": _critical_data_Kr_g,
+    "Xe_g": _critical_data_Xe_g,
+}
+"""Critical parameters for gases
+
+These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
+"""
+
+
+def select_critical_data(species_name: str) -> CriticalData:
+    """Selects critical data for species
+
+    Args:
+        species_name: Name of the species
+
+    Returns:
+        Critical data for species
+    """
+    try:
+        data: CriticalData = critical_data[species_name]
+    except KeyError as exc:
+        msg: str = f"Critical data for '{species_name}' is not available"
+        logger.warning(msg)
+        logger.warning("Available options are: %s", list(critical_data.keys()))
+        raise ValueError(msg) from exc
+
+    return data

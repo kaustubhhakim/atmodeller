@@ -46,7 +46,7 @@ from atmodeller.interfaces import (
 )
 from atmodeller.mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
-from atmodeller.thermodata import CondensateActivity, SpeciesData, select_thermodata
+from atmodeller.thermodata import CondensateActivity, SpeciesData
 from atmodeller.utilities import (
     all_not_nan,
     as_j64,
@@ -76,34 +76,36 @@ class Species(eqx.Module):
 
     @property
     def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
+        """Unique name by combining Hill notation and state"""
         return self.data.name
 
     @classmethod
     def create_condensed(
         cls,
-        species_name: str,
+        formula: str,
+        state: str = "cr",
         activity: ActivityProtocol = CondensateActivity(),
         solve_for_stability: bool = True,
     ) -> "Species":
         """Creates a condensate
 
         Args:
-            species_name: Species name, as it appears in the species dictionary
+            formula: Formula
+            state: State of aggregation as defined by JANAF. Defaults to cr.
             activity: Activity. Defaults to unity activity.
             solve_for_stability. Solve for stability. Defaults to True.
 
         Returns:
             A condensed species
         """
-        species_data: SpeciesData = select_thermodata(species_name)
+        species_data: SpeciesData = SpeciesData(formula, state)
 
         return cls(species_data, activity, NoSolubility(), solve_for_stability)
 
     @classmethod
     def create_gas(
         cls,
-        species_name: str,
+        formula: str,
         activity: ActivityProtocol = IdealGas(),
         solubility: SolubilityProtocol = NoSolubility(),
         solve_for_stability: bool = False,
@@ -111,7 +113,7 @@ class Species(eqx.Module):
         """Creates a gas species
 
         Args:
-            species_name: Species name, as it appears in the species dictionary
+            formula: Formula
             activity: Activity. Defaults to an ideal gas.
             solubility: Solubility. Defaults to no solubility.
             solve_for_stability. Solve for stability. Defaults to False.
@@ -119,7 +121,7 @@ class Species(eqx.Module):
         Returns:
             A gas species
         """
-        species_data: SpeciesData = select_thermodata(species_name)
+        species_data: SpeciesData = SpeciesData(formula, "g")
 
         return cls(species_data, activity, solubility, solve_for_stability)
 
@@ -146,10 +148,11 @@ class SpeciesCollection(eqx.Module):
         """
         species_list: list[Species] = []
         for species_ in species_names:
-            if species_[-1] == "g":
-                species_to_add: Species = Species.create_gas(species_)
+            formula, state = species_.split("_")
+            if state == "g":
+                species_to_add: Species = Species.create_gas(formula)
             else:
-                species_to_add: Species = Species.create_condensed(species_)
+                species_to_add: Species = Species.create_condensed(formula, state)
             species_list.append(species_to_add)
 
         return cls(species_list)
@@ -178,7 +181,7 @@ class SpeciesCollection(eqx.Module):
             Condensed species names
         """
         condensed_names: list[str] = [
-            species.name for species in self.data if species.data.phase != "g"
+            species.name for species in self.data if species.data.state != "g"
         ]
 
         return tuple(condensed_names)
@@ -208,7 +211,7 @@ class SpeciesCollection(eqx.Module):
             Mask for the gas species
         """
         gas_species_mask: Bool[Array, " species_dim"] = jnp.array(
-            [species.data.phase == "g" for species in self.data], dtype=bool
+            [species.data.state == "g" for species in self.data], dtype=bool
         )
 
         return gas_species_mask
@@ -219,7 +222,7 @@ class SpeciesCollection(eqx.Module):
         Returns:
             Gas species names
         """
-        gas_names: list[str] = [species.name for species in self.data if species.data.phase == "g"]
+        gas_names: list[str] = [species.name for species in self.data if species.data.state == "g"]
 
         return tuple(gas_names)
 
@@ -255,7 +258,7 @@ class SpeciesCollection(eqx.Module):
     def get_species_names(self) -> tuple[str, ...]:
         """Gets the unique names of all species.
 
-        Unique names by combining Hill notation and phase
+        Unique names by combining Hill notation and state
 
         Returns:
             Species names
