@@ -58,7 +58,7 @@ H2O_g: Species = Species.create_gas("H2O")
 O2_g: Species = Species.create_gas("O2")
 SiO_g: Species = Species.create_gas("OSi")
 H4Si_g: Species = Species.create_gas("H4Si")
-O2Si_l: Species = Species.create_condensed("O2Si", "l")
+O2Si_l: Species = Species.create_condensed("O2Si", state="l")
 species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
 subneptune_system: InteriorAtmosphere = InteriorAtmosphere(species)
 
