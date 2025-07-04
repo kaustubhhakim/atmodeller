@@ -406,6 +406,9 @@ class IndividualSpeciesData(eqx.Module):
     """Molar mass"""
 
     def __post_init__(self):
+        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
+        # though the arguments would allow it. Previous tests resulted in an infinite compilation
+        # loop for JAX.
         mformula: Formula = Formula(self.formula)
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula
@@ -515,6 +518,10 @@ class ThermodynamicDataSource:
         return ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
 
 
+# Although it might be tempting to create species on-the-fly when required, this might not play
+# nice with JAX, which requires purely functional programming (and no side effects). So instead
+# we create a dictionary of instantiated data (JAX-compliant Pytrees) that we can use as a lookup.
+# It should also be net faster to create these data once and then access potentially many times.
 thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
 """Thermodynamic data source"""
 thermodynamic_data: dict[str, ThermodynamicCoefficients] = (
@@ -536,6 +543,7 @@ class CriticalData(eqx.Module):
     pressure: float = 1.0
     """Critical pressure in bar"""
 
+    # TODO: Avoid creating the lookup dataframe every time. Move elsewhere to a separate class.
     @classmethod
     def create(cls, hill_formula: str, suffix="") -> "CriticalData":
         """Creates an instance

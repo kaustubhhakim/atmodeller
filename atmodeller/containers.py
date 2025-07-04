@@ -102,6 +102,8 @@ class Species(eqx.Module):
             A condensed species
         """
         hill_formula: str = Formula(formula).formula
+        # Get thermodynamic coefficients from a dictionary, which plays nice with JAX. Nested
+        # classmethods/__post_init__ to instantiate objects has previously caused problems.
         thermocoeffs: ThermodynamicCoefficients = thermodynamic_data[f"{hill_formula}_{state}"]
         species_data: IndividualSpeciesData = IndividualSpeciesData(
             hill_formula, state, thermocoeffs
@@ -133,6 +135,8 @@ class Species(eqx.Module):
             A gas species
         """
         hill_formula: str = Formula(formula).formula
+        # Get thermodynamic coefficients from a dictionary, which plays nice with JAX. Nested
+        # classmethods/__post_init__ to instantiate objects has previously caused problems.
         thermocoeffs: ThermodynamicCoefficients = thermodynamic_data[f"{hill_formula}_{state}"]
         species_data: IndividualSpeciesData = IndividualSpeciesData(formula, state, thermocoeffs)
 
