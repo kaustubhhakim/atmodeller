@@ -55,6 +55,8 @@ TEMPERATURE_REFERENCE: float = 298.15
 """Enthalpy reference temperature in K (:math:`T_r` in the JANAF tables) :cite:p:`MZG02,Cha98`"""
 PRESSURE_REFERENCE: float = 1.0
 """Standard state pressure in bar"""
+GAS_STATE: str = "g"
+"""Suffix to identify gases as per JANAF convention for the state of aggregation"""
 
 # Initial solution guess
 INITIAL_LOG_NUMBER_DENSITY: float = 50.0
