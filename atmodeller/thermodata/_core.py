@@ -383,59 +383,6 @@ class ThermodynamicCoefficients(eqx.Module):
         return gibbs_function
 
 
-class IndividualSpeciesData(eqx.Module):
-    """Individual species data
-
-    Args:
-        formula: Formula
-        state: State of aggregation as defined by JANAF
-        thermocoeff: Thermodynamic coefficients
-    """
-
-    formula: str
-    """Formula"""
-    state: str
-    """State of aggregation"""
-    thermodynamic_coefficients: ThermodynamicCoefficients
-    """Thermodynamic coefficients"""
-    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
-    """Composition"""
-    hill_formula: str = eqx.field(init=False)
-    """Hill formula"""
-    molar_mass: float = eqx.field(init=False)
-    """Molar mass"""
-
-    def __post_init__(self):
-        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
-        # though the arguments would allow it. Previous tests resulted in an infinite compilation
-        # loop for JAX.
-        mformula: Formula = Formula(self.formula)
-        self.composition = ImmutableMap(mformula.composition().asdict())
-        self.hill_formula = mformula.formula
-        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
-
-    @property
-    def elements(self) -> tuple[str, ...]:
-        """Elements"""
-        return tuple(self.composition.keys())
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and state of aggregation"""
-        return f"{self.hill_formula}_{self.state}"
-
-    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
-        """Gets Gibbs energy over RT
-
-        Args:
-            temperature: Temperature in K
-
-        Returns:
-            Gibbs energy over RT
-        """
-        return self.thermodynamic_coefficients.get_gibbs_over_RT(temperature)
-
-
 @dataclass
 class ThermodynamicDataSource:
     """Thermodynamic data source for all species
@@ -524,10 +471,65 @@ class ThermodynamicDataSource:
 # It should also be net faster to create these data once and then access potentially many times.
 thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
 """Thermodynamic data source"""
-thermodynamic_data: dict[str, ThermodynamicCoefficients] = (
+thermodynamic_coefficients: dict[str, ThermodynamicCoefficients] = (
     thermodynamic_data_source.thermodynamic_coefficients()
 )
 """Thermodynamic coefficients"""
+
+
+class IndividualSpeciesData(eqx.Module):
+    """Individual species data
+
+    Args:
+        formula: Formula
+        state: State of aggregation as defined by JANAF
+    """
+
+    formula: str
+    """Formula"""
+    state: str
+    """State of aggregation"""
+    thermodynamic_coefficients: ThermodynamicCoefficients = eqx.field(init=False)
+    """Thermodynamic coefficients"""
+    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    """Composition"""
+    hill_formula: str = eqx.field(init=False)
+    """Hill formula"""
+    molar_mass: float = eqx.field(init=False)
+    """Molar mass"""
+
+    def __post_init__(self):
+        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
+        # though the arguments would allow it. Previous tests resulted in an infinite compilation
+        # loop for JAX. Instead, we get thermodynamic coefficients from a dictionary.
+        mformula: Formula = Formula(self.formula)
+        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.hill_formula = mformula.formula
+        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
+        self.thermodynamic_coefficients = thermodynamic_coefficients[
+            f"{self.hill_formula}_{self.state}"
+        ]
+
+    @property
+    def elements(self) -> tuple[str, ...]:
+        """Elements"""
+        return tuple(self.composition.keys())
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and state of aggregation"""
+        return f"{self.hill_formula}_{self.state}"
+
+    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
+        """Gets Gibbs energy over RT
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Gibbs energy over RT
+        """
+        return self.thermodynamic_coefficients.get_gibbs_over_RT(temperature)
 
 
 class CriticalData(eqx.Module):

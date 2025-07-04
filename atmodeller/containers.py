@@ -48,7 +48,6 @@ from atmodeller.interfaces import (
 from atmodeller.mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, IndividualSpeciesData
-from atmodeller.thermodata._core import ThermodynamicCoefficients, thermodynamic_data
 from atmodeller.utilities import (
     all_not_nan,
     as_j64,
@@ -101,13 +100,7 @@ class Species(eqx.Module):
         Returns:
             A condensed species
         """
-        hill_formula: str = Formula(formula).formula
-        # Get thermodynamic coefficients from a dictionary, which plays nice with JAX. Nested
-        # classmethods/__post_init__ to instantiate objects has previously caused problems.
-        thermocoeffs: ThermodynamicCoefficients = thermodynamic_data[f"{hill_formula}_{state}"]
-        species_data: IndividualSpeciesData = IndividualSpeciesData(
-            hill_formula, state, thermocoeffs
-        )
+        species_data: IndividualSpeciesData = IndividualSpeciesData(formula, state)
 
         return cls(species_data, activity, NoSolubility(), solve_for_stability)
 
@@ -134,11 +127,7 @@ class Species(eqx.Module):
         Returns:
             A gas species
         """
-        hill_formula: str = Formula(formula).formula
-        # Get thermodynamic coefficients from a dictionary, which plays nice with JAX. Nested
-        # classmethods/__post_init__ to instantiate objects has previously caused problems.
-        thermocoeffs: ThermodynamicCoefficients = thermodynamic_data[f"{hill_formula}_{state}"]
-        species_data: IndividualSpeciesData = IndividualSpeciesData(formula, state, thermocoeffs)
+        species_data: IndividualSpeciesData = IndividualSpeciesData(formula, state)
 
         return cls(species_data, activity, solubility, solve_for_stability)
 
