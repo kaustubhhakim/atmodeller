@@ -515,10 +515,12 @@ class ThermodynamicDataSource:
         return ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
 
 
+thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
+"""Thermodynamic data source"""
 thermodynamic_data: dict[str, ThermodynamicCoefficients] = (
-    ThermodynamicDataSource().thermodynamic_coefficients()
+    thermodynamic_data_source.thermodynamic_coefficients()
 )
-"""Thermodynamic data"""
+"""Thermodynamic coefficients"""
 
 
 class CriticalData(eqx.Module):
