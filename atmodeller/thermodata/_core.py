@@ -19,6 +19,7 @@
 import importlib.resources
 import logging
 from contextlib import AbstractContextManager
+from dataclasses import dataclass, field
 from importlib.abc import Traversable
 from pathlib import Path
 
@@ -53,6 +54,57 @@ class CondensateActivity(eqx.Module):
         return jnp.log(self.activity)
 
 
+@dataclass
+class ThermoData:
+    """Thermodynamic data
+
+    Args:
+        filename: Filename containing the NASA Glenn coefficients. Defaults to
+            nasa_glenn_coefficients.txt.
+    """
+
+    filename: Path = Path("nasa_glenn_coefficients.txt")
+    data: pd.DataFrame = field(init=False)
+
+    def __post_init__(self):
+        data: AbstractContextManager[Path] = importlib.resources.as_file(
+            DATA_DIRECTORY.joinpath(self.filename)  # type: ignore
+        )
+        with data as datapath:
+            self.data = pd.read_csv(datapath, sep=" ", comment="#")
+
+    def get_thermo_coefficients(self, hill_formula: str, state: str) -> "ThermoCoefficients":
+        """Gets thermodynamic coefficients for a species
+
+        Args:
+            hill_formula: Hill formula
+            state: State of aggregation following the JANAF convention
+
+        Returns:
+            An instance of ThermoCoefficients
+        """
+        df: pd.DataFrame = self.data[
+            (self.data["Formula"] == hill_formula) & (self.data["State"] == state)
+        ]
+        if df.empty:
+            raise ValueError(
+                f"No data found for formula '{hill_formula}' and state '{state}' in {self.filename}"
+            )
+
+        T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
+        T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
+        b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
+        b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
+        cp_coeffs: tuple[tuple[float, ...], ...] = tuple(
+            map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
+        )
+
+        return ThermoCoefficients(b1, b2, cp_coeffs, T_min, T_max)
+
+
+thermodata: ThermoData = ThermoData()
+
+
 class ThermoCoefficients(eqx.Module):
     """NASA Glenn coefficients for thermochemical data
 
@@ -76,41 +128,6 @@ class ThermoCoefficients(eqx.Module):
     """Minimum temperature(s) in K in the range"""
     T_max: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
     """Maximum temperature(s) in K in the range"""
-
-    @classmethod
-    def create(cls, hill_formula: str, state: str) -> "ThermoCoefficients":
-        """Creates an instance
-
-        Args:
-            hill_formula: Hill formula
-            state: State of aggregation following the JANAF convention
-
-        Returns:
-            An instance
-        """
-        file: Path = Path("nasa_glenn_coefficients.txt")
-        data: AbstractContextManager[Path] = importlib.resources.as_file(
-            DATA_DIRECTORY.joinpath(file)  # type: ignore
-        )
-        with data as datapath:
-            dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
-        df: pd.DataFrame = dataframe[
-            (dataframe["Formula"] == hill_formula) & (dataframe["State"] == state)
-        ]
-        if df.empty:
-            raise ValueError(
-                f"No data found for formula '{hill_formula}' and state '{state}' in {file}"
-            )
-
-        T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
-        T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
-        b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
-        b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
-        cp_coeffs: tuple[tuple[float, ...], ...] = tuple(
-            map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
-        )
-
-        return cls(b1, b2, cp_coeffs, T_min, T_max)
 
     def _get_index(self, temperature: ArrayLike) -> Integer[Array, " T"]:
         """Gets the index of the temperature range for the given temperature
@@ -421,15 +438,15 @@ class SpeciesData(eqx.Module):
     Args:
         formula: Formula
         state: State of aggregation as defined by JANAF
-        thermodata: Thermodynamic data
+        thermocoeff: Thermodynamic coefficients
     """
 
     formula: str
     """Formula"""
     state: str
     """State of aggregation"""
-    thermodata: ThermoCoefficients = eqx.field(init=False)
-    """Thermodynamic data"""
+    thermocoeffs: ThermoCoefficients = eqx.field(init=False)
+    """Thermodynamic coefficients"""
     composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
     """Composition"""
     hill_formula: str = eqx.field(init=False)
@@ -442,7 +459,7 @@ class SpeciesData(eqx.Module):
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula
         self.molar_mass = mformula.mass * unit_conversion.g_to_kg
-        self.thermodata = ThermoCoefficients.create(self.hill_formula, self.state)
+        self.thermocoeffs = thermodata.get_thermo_coefficients(self.hill_formula, self.state)
 
     @property
     def elements(self) -> tuple[str, ...]:
@@ -463,7 +480,7 @@ class SpeciesData(eqx.Module):
         Returns:
             Gibbs energy over RT
         """
-        return self.thermodata.get_gibbs_over_RT(temperature)
+        return self.thermocoeffs.get_gibbs_over_RT(temperature)
 
 
 class CriticalData(eqx.Module):
