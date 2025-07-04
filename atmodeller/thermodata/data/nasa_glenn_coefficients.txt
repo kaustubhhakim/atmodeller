@@ -1,8 +1,9 @@
 # Data from McBride et al. (2002), NASA Glenn Coefficients for Calculating Thermodynamic Properties of Individual Species, No. 2002-211556 NASA
 # https://ntrs.nasa.gov/citations/20020085330
 # The Hill system is adopted
-# Header line is below
-Formula State T_min T_max a1 a2 a3 a4 a5 a6 a7 b1 b2
+# Gases appear in the top section and condensed phases appear further down.
+# Header line is below with column names
+hill_formula state T_min T_max a1 a2 a3 a4 a5 a6 a7 b1 b2
 # --- Gases ---
 Ar g 200 1000 0.0 0.0 2.5 0.0 0.0 0.0 0.0 -7.453750000e02 4.379674910e00
 Ar g 1000 6000 2.010538475e01 -5.992661070e-02 2.500069401e00 -3.992141160e-08 1.205272140e-11 -1.819015576e-15 1.078576636e-19 -7.449939610e02 4.379180110e00
