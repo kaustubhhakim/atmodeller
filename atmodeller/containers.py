@@ -16,13 +16,9 @@
 #
 """Containers"""
 
-import importlib
-import importlib.resources
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from contextlib import AbstractContextManager
 from dataclasses import asdict
-from pathlib import Path
 from typing import Literal
 
 import equinox as eqx
@@ -30,13 +26,13 @@ import jax.numpy as jnp
 import lineax as lx
 import numpy as np
 import optimistix as optx
-import pandas as pd
 from jax import lax
 from jaxtyping import Array, ArrayLike, Bool, Float, Float64, Integer
 from lineax import AbstractLinearSolver
 from molmass import Formula
 
 from atmodeller import (
+    GAS_STATE,
     LOG_NUMBER_DENSITY_LOWER,
     LOG_NUMBER_DENSITY_UPPER,
     LOG_STABILITY_LOWER,
@@ -51,7 +47,8 @@ from atmodeller.interfaces import (
 )
 from atmodeller.mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
-from atmodeller.thermodata import DATA_DIRECTORY, CondensateActivity, SpeciesData
+from atmodeller.thermodata import CondensateActivity, IndividualSpeciesData
+from atmodeller.thermodata._core import ThermodynamicCoefficients, thermodynamic_data
 from atmodeller.utilities import (
     all_not_nan,
     as_j64,
@@ -68,13 +65,13 @@ class Species(eqx.Module):
     """Species
 
     Args:
-        data: Species data
+        data: Individual species data
         activity: Activity
         solubility: Solubility
         solve_for_stability: Solve for stability
     """
 
-    data: SpeciesData
+    data: IndividualSpeciesData
     activity: ActivityProtocol
     solubility: SolubilityProtocol
     solve_for_stability: bool
@@ -88,6 +85,7 @@ class Species(eqx.Module):
     def create_condensed(
         cls,
         formula: str,
+        *,
         state: str = "cr",
         activity: ActivityProtocol = CondensateActivity(),
         solve_for_stability: bool = True,
@@ -103,7 +101,11 @@ class Species(eqx.Module):
         Returns:
             A condensed species
         """
-        species_data: SpeciesData = SpeciesData(formula, state)
+        hill_formula: str = Formula(formula).formula
+        thermocoeffs: ThermodynamicCoefficients = thermodynamic_data[f"{hill_formula}_{state}"]
+        species_data: IndividualSpeciesData = IndividualSpeciesData(
+            hill_formula, state, thermocoeffs
+        )
 
         return cls(species_data, activity, NoSolubility(), solve_for_stability)
 
@@ -111,6 +113,8 @@ class Species(eqx.Module):
     def create_gas(
         cls,
         formula: str,
+        *,
+        state: str = GAS_STATE,
         activity: ActivityProtocol = IdealGas(),
         solubility: SolubilityProtocol = NoSolubility(),
         solve_for_stability: bool = False,
@@ -119,6 +123,8 @@ class Species(eqx.Module):
 
         Args:
             formula: Formula
+            state: State of aggregation as defined by JANAF. Defaults to
+                :data:`GAS_STATE <atmodeller.GAS_STATE>`
             activity: Activity. Defaults to an ideal gas.
             solubility: Solubility. Defaults to no solubility.
             solve_for_stability. Solve for stability. Defaults to False.
@@ -126,7 +132,9 @@ class Species(eqx.Module):
         Returns:
             A gas species
         """
-        species_data: SpeciesData = SpeciesData(formula, "g")
+        hill_formula: str = Formula(formula).formula
+        thermocoeffs: ThermodynamicCoefficients = thermodynamic_data[f"{hill_formula}_{state}"]
+        species_data: IndividualSpeciesData = IndividualSpeciesData(formula, state, thermocoeffs)
 
         return cls(species_data, activity, solubility, solve_for_stability)
 
@@ -154,10 +162,11 @@ class SpeciesCollection(eqx.Module):
         species_list: list[Species] = []
         for species_ in species_names:
             formula, state = species_.split("_")
-            if state == "g":
-                species_to_add: Species = Species.create_gas(formula)
+            hill_formula = Formula(formula).formula
+            if state == GAS_STATE:
+                species_to_add: Species = Species.create_gas(hill_formula, state=state)
             else:
-                species_to_add: Species = Species.create_condensed(formula, state)
+                species_to_add: Species = Species.create_condensed(hill_formula, state=state)
             species_list.append(species_to_add)
 
         return cls(species_list)
@@ -167,18 +176,19 @@ class SpeciesCollection(eqx.Module):
         """Number of species"""
         return len(self.data)
 
-    @classmethod
-    def available_species(cls):
-        file: Path = Path("nasa_glenn_coefficients.txt")
-        data: AbstractContextManager[Path] = importlib.resources.as_file(
-            DATA_DIRECTORY.joinpath(file)  # type: ignore
-        )
-        with data as datapath:
-            dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
-        # Drop duplicates to get unique (Formula, State) pairs
-        unique = dataframe.drop_duplicates(subset=["Formula", "State"])
-        # Return as a list of tuples
-        return list(zip(unique["Formula"], unique["State"]))
+    # TODO: Doesn't make sense to be here.
+    # @classmethod
+    # def available_species(cls):
+    #     file: Path = Path("nasa_glenn_coefficients.txt")
+    #     data: AbstractContextManager[Path] = importlib.resources.as_file(
+    #         DATA_DIRECTORY.joinpath(file)  # type: ignore
+    #     )
+    #     with data as datapath:
+    #         dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
+    #     # Drop duplicates to get unique (Formula, State) pairs
+    #     unique = dataframe.drop_duplicates(subset=["Formula", "State"])
+    #     # Return as a list of tuples
+    #     return list(zip(unique["Formula"], unique["State"]))
 
     def active_stability(self) -> Bool[Array, " species_dim"]:
         """Active species stability
@@ -199,7 +209,7 @@ class SpeciesCollection(eqx.Module):
             Condensed species names
         """
         condensed_names: list[str] = [
-            species.name for species in self.data if species.data.state != "g"
+            species.name for species in self.data if species.data.state != GAS_STATE
         ]
 
         return tuple(condensed_names)
@@ -229,7 +239,7 @@ class SpeciesCollection(eqx.Module):
             Mask for the gas species
         """
         gas_species_mask: Bool[Array, " species_dim"] = jnp.array(
-            [species.data.state == "g" for species in self.data], dtype=bool
+            [species.data.state == GAS_STATE for species in self.data], dtype=bool
         )
 
         return gas_species_mask
@@ -240,7 +250,9 @@ class SpeciesCollection(eqx.Module):
         Returns:
             Gas species names
         """
-        gas_names: list[str] = [species.name for species in self.data if species.data.state == "g"]
+        gas_names: list[str] = [
+            species.name for species in self.data if species.data.state == GAS_STATE
+        ]
 
         return tuple(gas_names)
 

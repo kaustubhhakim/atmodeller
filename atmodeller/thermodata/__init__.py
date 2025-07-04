@@ -18,9 +18,8 @@
 
 # Expose public API
 from atmodeller.thermodata._core import (  # noqa: E402, F401
-    DATA_DIRECTORY,
     CondensateActivity,
     CriticalData,
-    SpeciesData,
+    IndividualSpeciesData,
 )
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: E402, F401
