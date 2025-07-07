@@ -29,9 +29,9 @@ import optimistix as optx
 from jax import jacfwd
 from jaxtyping import Array, ArrayLike
 
+from atmodeller._mytypes import OptxSolver
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW
-from atmodeller.mytypes import OptxSolver
 from atmodeller.thermodata import CriticalData
 from atmodeller.utilities import safe_exp
 

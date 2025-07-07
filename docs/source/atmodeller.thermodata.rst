@@ -12,14 +12,6 @@ atmodeller.thermodata.core module
    :undoc-members:
    :show-inheritance:
 
-atmodeller.thermodata.library module
-------------------------------------
-
-.. automodule:: atmodeller.thermodata.library
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

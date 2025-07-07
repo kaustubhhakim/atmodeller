@@ -29,6 +29,7 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
+from atmodeller._mytypes import NpFloat, NpInt
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -40,7 +41,6 @@ from atmodeller.containers import (
 )
 from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
-from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 
@@ -64,7 +64,7 @@ class InteriorAtmosphere:
     def __init__(self, species: SpeciesCollection, tau: float = TAU):
         self.species: SpeciesCollection = species
         self.tau: float = tau
-        logger.info("species = %s", [species.name for species in self.species])
+        logger.info("species = %s", str(self.species))
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property

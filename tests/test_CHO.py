@@ -54,14 +54,12 @@ def test_H_and_C(helper) -> None:
     """Tests H2-H2O and CO-CO2 with H2O and CO2 solubility."""
 
     H2O_g: Species = Species.create_gas(
-        "H2O_g", solubility=solubility_models["H2O_peridotite_sossi23"]
+        "H2O", solubility=solubility_models["H2O_peridotite_sossi23"]
     )
-    H2_g: Species = Species.create_gas("H2_g")
-    O2_g: Species = Species.create_gas("O2_g")
-    CO_g: Species = Species.create_gas("CO_g")
-    CO2_g: Species = Species.create_gas(
-        "CO2_g", solubility=solubility_models["CO2_basalt_dixon95"]
-    )
+    H2_g: Species = Species.create_gas("H2")
+    O2_g: Species = Species.create_gas("O2")
+    CO_g: Species = Species.create_gas("CO")
+    CO2_g: Species = Species.create_gas("CO2", solubility=solubility_models["CO2_basalt_dixon95"])
 
     species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g, CO_g, CO2_g))
     planet: Planet = Planet()

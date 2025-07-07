@@ -14,11 +14,20 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core classes and functions for thermochemical data"""
+"""Core classes and functions for thermochemical and critical data"""
+
+import importlib.resources
+from contextlib import AbstractContextManager
+from dataclasses import dataclass, field
+from importlib.abc import Traversable
+from pathlib import Path
+from typing import cast
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
+import numpy as np
+import numpy.typing as npt
+import pandas as pd
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
 from xmmutablemap import ImmutableMap
@@ -27,21 +36,42 @@ from atmodeller import TEMPERATURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT
 from atmodeller.utilities import as_j64, unit_conversion
 
+DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
+"""Data directory"""
+THERMODYNAMIC_DATA_SOURCE: Path = Path("nasa_glenn_coefficients.txt")
+"""Source of the thermodynamic data"""
+CRITICAL_DATA_SOURCE: Path = Path("critical_data.txt")
+"""Source of the critical data"""
+
 
 class CondensateActivity(eqx.Module):
-    """Activity of a stable condensate"""
+    """Activity of a stable condensate
+
+    Args:
+        activity: Activity. Defaults to 1.
+    """
 
     activity: Array = eqx.field(converter=as_j64, default=1.0)
+    """Activity"""
 
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, ""]:
+        """Log activity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log activity, which is dimensionless
+        """
         del temperature
         del pressure
 
         return jnp.log(self.activity)
 
 
-class ThermoCoefficients(eqx.Module):
-    """Coefficients for thermochemical data
+class ThermodynamicCoefficients(eqx.Module):
+    """NASA Glenn coefficients for the thermodynamic properties of an individual species
 
     Coefficients are available at https://ntrs.nasa.gov/citations/20020085330
 
@@ -57,7 +87,7 @@ class ThermoCoefficients(eqx.Module):
     """Enthalpy constant(s) of integration"""
     b2: tuple[float, ...]
     """Entropy constant(s) of integration"""
-    cp_coeffs: tuple[tuple[float | int, ...], ...]
+    cp_coeffs: tuple[tuple[float, ...], ...]
     """Heat capacity coefficients"""
     T_min: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
     """Minimum temperature(s) in K in the range"""
@@ -298,10 +328,10 @@ class ThermoCoefficients(eqx.Module):
             Reference enthalpy in :math:`\mathrm{J}\ \mathrm{mol}^{-1}`
         """
         index: Integer[Array, ""] = self._get_index(TEMPERATURE_REFERENCE)
-        jax.debug.print("index = {out}", out=index)
+        # jax.debug.print("index = {out}", out=index)
         cp_coeffs_for_index: Float[Array, "7"] = jnp.take(jnp.array(self.cp_coeffs), index, axis=0)
         b1_for_index: Float[Array, ""] = jnp.take(jnp.array(self.b1), index)
-        jax.debug.print("b1_for_index = {out}", out=b1_for_index)
+        # jax.debug.print("b1_for_index = {out}", out=b1_for_index)
         reference_enthalpy: Float[Array, ""] = (
             self._H_over_RT(cp_coeffs_for_index, b1_for_index, TEMPERATURE_REFERENCE)
             * GAS_CONSTANT
@@ -351,7 +381,7 @@ class ThermoCoefficients(eqx.Module):
     def gibbs_function(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets Gibbs energy function.
 
-        This is :math:`-[G^\circ-H^{\circ}(Tr)]/T` in the JANAF tables.
+        This is :math:`-[G^\circ-H^{\circ}(T_r)]/T` in the JANAF tables.
 
         Args:
             temperature: Temperature in K
@@ -367,54 +397,82 @@ class ThermoCoefficients(eqx.Module):
         return gibbs_function
 
 
-class SpeciesData(eqx.Module):
-    """Species data
+@dataclass
+class ThermodynamicDataSource:
+    """Thermodynamic data source for all species"""
 
-    Args:
-        formula: Formula
-        phase: Phase
-        thermodata: Thermodynamic data
-    """
-
-    formula: str
-    """Formula"""
-    phase: str
-    """Phase"""
-    thermodata: ThermoCoefficients
-    """Thermodynamic data"""
-    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
-    """Composition"""
-    hill_formula: str = eqx.field(init=False)
-    """Hill formula"""
-    molar_mass: float = eqx.field(init=False)
-    """Molar mass"""
+    data: pd.DataFrame = field(init=False)
+    """Thermodynamic data for all species"""
 
     def __post_init__(self):
-        mformula: Formula = Formula(self.formula)
-        self.composition = ImmutableMap(mformula.composition().asdict())
-        self.hill_formula = mformula.formula
-        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
+        data: AbstractContextManager[Path] = importlib.resources.as_file(
+            DATA_DIRECTORY.joinpath(THERMODYNAMIC_DATA_SOURCE)  # type: ignore
+        )
+        with data as datapath:
+            self.data = pd.read_csv(datapath, sep=" ", comment="#")
 
     @property
-    def elements(self) -> tuple[str, ...]:
-        """Elements"""
-        return tuple(self.composition.keys())
+    def formula_column(self) -> str:
+        """Name of the column that refers to the hill formula"""
+        return "hill_formula"
 
     @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and phase"""
-        return f"{self.hill_formula}_{self.phase}"
+    def state_column(self) -> str:
+        """Name of the column that refers to the state of aggregation"""
+        return "state"
 
-    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
-        """Gets Gibbs energy over RT
-
-        Args:
-            temperature: Temperature
+    def available_species(self) -> tuple[str, ...]:
+        """Available species
 
         Returns:
-            Gibbs energy over RT
+            Available species
         """
-        return self.thermodata.get_gibbs_over_RT(temperature)
+        df: pd.DataFrame = cast(
+            pd.DataFrame, self.data[[self.formula_column, self.state_column]].drop_duplicates()
+        )
+        available_species: tuple[str, ...] = tuple(
+            f"{getattr(row, self.formula_column)}_{getattr(row, self.state_column)}"
+            for row in df.itertuples(index=False)
+        )
+
+        return available_species
+
+    def create_dictionary(self) -> dict[str, ThermodynamicCoefficients]:
+        """Dictionary of thermodynamic coefficients for all species
+
+        Returns:
+            Dictionary of thermodynamic coefficients for all species
+        """
+        unique_combinations: pd.DataFrame = cast(
+            pd.DataFrame, self.data[[self.formula_column, self.state_column]].drop_duplicates()
+        )
+        coefficient_dict: dict[str, ThermodynamicCoefficients] = {}
+
+        for row in unique_combinations.itertuples(index=False):
+            hill_formula: str = str(getattr(row, self.formula_column))
+            state: str = str(getattr(row, self.state_column))
+            name: str = f"{hill_formula}_{state}"
+
+            # Find all data across all temperature ranges
+            df: pd.DataFrame = cast(
+                pd.DataFrame,
+                self.data[
+                    (self.data[self.formula_column] == hill_formula)
+                    & (self.data[self.state_column] == state)
+                ],
+            )
+
+            # Process and store the thermodynamic coefficients
+            T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
+            T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
+            b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
+            b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
+            cp_coeffs: tuple[tuple[np.float64, ...], ...] = tuple(
+                map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
+            )
+            coefficient_dict[name] = ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
+
+        return coefficient_dict
 
 
 class CriticalData(eqx.Module):
@@ -429,3 +487,138 @@ class CriticalData(eqx.Module):
     """Critical temperature in K"""
     pressure: float = 1.0
     """Critical pressure in bar"""
+
+
+@dataclass
+class CriticalDataSource:
+    """Critical data source for all species"""
+
+    data: pd.DataFrame = field(init=False)
+    """Critical data for all species"""
+
+    def __post_init__(self):
+        data: AbstractContextManager[Path] = importlib.resources.as_file(
+            DATA_DIRECTORY.joinpath(CRITICAL_DATA_SOURCE)  # type: ignore
+        )
+        with data as datapath:
+            self.data = pd.read_csv(datapath, sep=" ", comment="#")
+
+    @property
+    def name_column(self) -> str:
+        """Name of the column that refers to the hill formula and an optional suffix"""
+        return "name"
+
+    @property
+    def critical_temperature_column(self) -> str:
+        """Name of the column that refers to the critical temperature in K"""
+        return "Tc"
+
+    @property
+    def critical_pressure_column(self) -> str:
+        """Name of the column that refers to the critical pressure"""
+        return "Pc"
+
+    def create_dictionary(self) -> dict[str, CriticalData]:
+        """Dictionary of critical data for all species
+
+        Returns:
+            Dictionary of critical data for all species
+        """
+        critical_dict: dict[str, CriticalData] = {}
+
+        for row in self.data.itertuples(index=False):
+            name: str = str(getattr(row, self.name_column))
+            critical_dict[name] = CriticalData(
+                temperature=float(getattr(row, self.critical_temperature_column)),
+                pressure=float(getattr(row, self.critical_pressure_column)),
+            )
+
+        return critical_dict
+
+
+# Although it might be tempting to create objects on-the-fly when required, this might not play
+# nice with JAX, which requires purely functional programming (and no side effects). So instead
+# we create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
+# It should also be net faster to create these data once and then access (potentially many times).
+# These are also set to private to avoid sphinx (autodoc) from printing long strings.
+thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
+"""Thermodynamic data source
+
+:meta private:
+"""
+thermodynamic_coefficients_dictionary: dict[str, ThermodynamicCoefficients] = (
+    thermodynamic_data_source.create_dictionary()
+)
+"""Thermodynamic coefficients dictionary
+
+:meta private:
+"""
+critical_data_source: CriticalDataSource = CriticalDataSource()
+"""Critical data source
+
+:meta private:
+"""
+critical_data_dictionary: dict[str, CriticalData] = critical_data_source.create_dictionary()
+"""Critical data dictionary
+
+:meta private:
+"""
+
+
+class IndividualSpeciesData(eqx.Module):
+    """Individual species data
+
+    Args:
+        formula: Formula
+        state: State of aggregation as defined by JANAF
+    """
+
+    formula: str
+    """Formula"""
+    state: str
+    """State of aggregation"""
+    thermo: ThermodynamicCoefficients = eqx.field(init=False)
+    """Thermodynamic coefficient and methods"""
+    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    """Composition"""
+    hill_formula: str = eqx.field(init=False)
+    """Hill formula"""
+    molar_mass: float = eqx.field(init=False)
+    """Molar mass"""
+
+    def __post_init__(self):
+        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
+        # though the arguments would allow it. Previous tests resulted in an infinite compilation
+        # loop for JAX. Instead, we get thermodynamic coefficients from a dictionary.
+        mformula: Formula = Formula(self.formula)
+        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.hill_formula = mformula.formula
+        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
+        try:
+            self.thermo = thermodynamic_coefficients_dictionary[self.name]
+        except KeyError:
+            raise KeyError(
+                f"{self.name} not available. "
+                f"Available species are {thermodynamic_data_source.available_species()}"
+            )
+
+    @property
+    def elements(self) -> tuple[str, ...]:
+        """Elements"""
+        return tuple(self.composition.keys())
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and state of aggregation"""
+        return f"{self.hill_formula}_{self.state}"
+
+    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
+        """Gets Gibbs energy over RT
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Gibbs energy over RT
+        """
+        return self.thermo.get_gibbs_over_RT(temperature)

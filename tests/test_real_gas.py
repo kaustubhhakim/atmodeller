@@ -53,12 +53,12 @@ ATOL: float = 1.0e-6
 solubility_models: Mapping[str, SolubilityProtocol] = get_solubility_models()
 eos_models: Mapping[str, ActivityProtocol] = get_eos_models()
 
-H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_chabrier21"])
-H2O_g: Species = Species.create_gas("H2O_g")
-O2_g: Species = Species.create_gas("O2_g")
-SiO_g: Species = Species.create_gas("OSi_g")
-H4Si_g: Species = Species.create_gas("H4Si_g")
-O2Si_l: Species = Species.create_condensed("O2Si_l")
+H2_g: Species = Species.create_gas("H2", activity=eos_models["H2_chabrier21"])
+H2O_g: Species = Species.create_gas("H2O")
+O2_g: Species = Species.create_gas("O2")
+SiO_g: Species = Species.create_gas("OSi")
+H4Si_g: Species = Species.create_gas("H4Si")
+O2Si_l: Species = Species.create_condensed("O2Si", state="l")
 species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, H4Si_g, SiO_g, O2Si_l))
 subneptune_system: InteriorAtmosphere = InteriorAtmosphere(species)
 
@@ -66,9 +66,9 @@ subneptune_system: InteriorAtmosphere = InteriorAtmosphere(species)
 def test_fO2_holley(helper) -> None:
     """Tests a system with the H2 EOS from :cite:t:`HWZ58`"""
 
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_beattie_holley58"])
-    H2O_g: Species = Species.create_gas("H2O_g")
-    O2_g: Species = Species.create_gas("O2_g")
+    H2_g: Species = Species.create_gas("H2", activity=eos_models["H2_beattie_holley58"])
+    H2O_g: Species = Species.create_gas("H2O")
+    O2_g: Species = Species.create_gas("O2")
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g))
     # Temperature is within the range of the Holley model
@@ -228,12 +228,12 @@ def test_pH2_fO2_real_gas(helper) -> None:
     Applies a constraint to the fugacity of H2.
     """
     H2O_g: Species = Species.create_gas(
-        "H2O_g",
+        "H2O",
         solubility=solubility_models["H2O_peridotite_sossi23"],
         activity=eos_models["H2O_cork_holland98"],
     )
-    H2_g: Species = Species.create_gas("H2_g", activity=eos_models["H2_cork_cs_holland91"])
-    O2_g: Species = Species.create_gas("O2_g")
+    H2_g: Species = Species.create_gas("H2", activity=eos_models["H2_cork_cs_holland91"])
+    O2_g: Species = Species.create_gas("O2")
 
     species: SpeciesCollection = SpeciesCollection((H2O_g, H2_g, O2_g))
     planet: Planet = Planet()
@@ -266,23 +266,23 @@ def test_H_and_C_real_gas(helper) -> None:
     """Tests H2-H2O-O2-CO-CO2-CH4 at the IW buffer using real gas EOS from :cite:t:`HP91,HP98`."""
 
     H2_g: Species = Species.create_gas(
-        "H2_g",
+        "H2",
         solubility=solubility_models["H2_basalt_hirschmann12"],
         activity=eos_models["H2_cork_cs_holland91"],
     )
     H2O_g: Species = Species.create_gas(
-        "H2O_g",
+        "H2O",
         solubility=solubility_models["H2O_peridotite_sossi23"],
         activity=eos_models["H2O_cork_holland98"],
     )
-    O2_g: Species = Species.create_gas("O2_g")
-    CO_g: Species = Species.create_gas("CO_g", activity=eos_models["CO_cork_cs_holland91"])
+    O2_g: Species = Species.create_gas("O2")
+    CO_g: Species = Species.create_gas("CO", activity=eos_models["CO_cork_cs_holland91"])
     CO2_g: Species = Species.create_gas(
-        "CO2_g",
+        "CO2",
         solubility=solubility_models["CO2_basalt_dixon95"],
         activity=eos_models["CO2_cork_holland98"],
     )
-    CH4_g: Species = Species.create_gas("CH4_g", activity=eos_models["CH4_cork_cs_holland91"])
+    CH4_g: Species = Species.create_gas("CH4", activity=eos_models["CH4_cork_cs_holland91"])
 
     species: SpeciesCollection = SpeciesCollection((H2_g, H2O_g, O2_g, CO_g, CO2_g, CH4_g))
     planet: Planet = Planet()

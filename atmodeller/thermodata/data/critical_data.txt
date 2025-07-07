@@ -1,0 +1,39 @@
+# Critical data
+# Tc is in K and Pc in bar.
+# References can be found in docs/refs.bib
+# These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
+name Tc Pc
+# :cite:t:`SF87{Table 1}`
+Ar 151 48.6
+# :cite:t:`SS92{Table 2}`
+CH4 191.05 46.4069
+# :cite:t:`SS92{Table 2}`
+CO 133.15 34.9571
+# :cite:t:`SS92{Table 2}`
+CO2 304.15 73.8659
+# :cite:t:`SS92{Table 2}`
+COS 377.55 65.8612
+# :cite:t:`SS92{Table 2}`
+H2S 373.55 90.0779
+# :cite:t:`SS92{Table 2}`
+H2 33.25 12.9696
+# :cite:t:`HP91` adjusted the critical parameters to improve the data fit.
+H2_Holland 41.2 21.1
+# :cite:t:`SS92{Table 2}`
+H2O 647.25 221.1925
+# :cite:t:`ADM77`
+He 5.2 2.274
+# :cite:t:`SF87{Table 1}`
+N2 126.2 33.9
+# :cite:t:`KJS86{Table 4}`
+Ne 44.49 26.8
+# :cite:t:`SS92{Table 2}`
+O2 154.75 50.7638
+# :cite:t:`SS92{Table 2}`
+O2S 430.95 78.7295
+# :cite:t:`TB70`
+Kr 209.46 55.2019
+# :cite:t:`SS92{Table 2}`
+S2 208.15 72.954
+# :cite:t:`SK94`
+Xe 289.765 5.8415
