@@ -17,7 +17,7 @@ COS 377.55 65.8612
 H2S 373.55 90.0779
 # :cite:t:`SS92{Table 2}`
 H2 33.25 12.9696
-# :cite:t:`HP91`
+# :cite:t:`HP91` adjusted the critical parameters to improve the data fit.
 H2_Holland 41.2 21.1
 # :cite:t:`SS92{Table 2}`
 H2O 647.25 221.1925
