@@ -21,6 +21,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from importlib.abc import Traversable
 from pathlib import Path
+from typing import cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -426,14 +427,12 @@ class ThermodynamicDataSource:
         Returns:
             Dictionary of thermodynamic coefficients for all species
         """
-        unique_combinations: pd.DataFrame = self.data[
-            [self.formula_column, self.state_column]
-        ].drop_duplicates()
+        unique_combinations = self.data[[self.formula_column, self.state_column]].drop_duplicates()
         coefficient_dict: dict[str, ThermodynamicCoefficients] = {}
 
         for _, row in unique_combinations.iterrows():
-            hill_formula: str = row[self.formula_column]
-            state: str = row[self.state_column]
+            hill_formula: str = str(row[self.formula_column])
+            state: str = str(row[self.state_column])
             key: str = f"{hill_formula}_{state}"
             coefficient_dict[key] = self._get_individual_thermodynamic_coefficients(
                 hill_formula, state
@@ -453,13 +452,17 @@ class ThermodynamicDataSource:
         Returns:
             An instance of ThermodynamicCoefficients
         """
-        df: pd.DataFrame = self.data[
-            (self.data[self.formula_column] == hill_formula)
-            & (self.data[self.state_column] == state)
-        ]
+        df: pd.DataFrame = cast(
+            pd.DataFrame,
+            self.data[
+                (self.data[self.formula_column] == hill_formula)
+                & (self.data[self.state_column] == state)
+            ],
+        )
         if df.empty:
             raise ValueError(
-                f"No data found for formula (state) '{hill_formula} ({state})' in {THERMODYNAMIC_DATA_SOURCE}"
+                f"No data found for formula (state) '{hill_formula} ({state})' in "
+                f"{THERMODYNAMIC_DATA_SOURCE}"
             )
 
         T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
@@ -580,7 +583,7 @@ class CriticalDataSource:
         critical_dict: dict[str, CriticalData] = {}
 
         for _, row in self.data.iterrows():
-            name: str = row[self.name_column]
+            name: str = str(row[self.name_column])
             critical_dict[name] = CriticalData(
                 temperature=float(row[self.critical_temperature_column]),
                 pressure=float(row[self.critical_pressure_column]),

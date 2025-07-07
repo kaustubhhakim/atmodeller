@@ -151,7 +151,7 @@ class UnitConversion(eqx.Module):
     litre_to_m3: float = 1.0e-3
 
 
-unit_conversion = UnitConversion()
+unit_conversion: UnitConversion = UnitConversion()
 
 
 def bulk_silicate_earth_abundances() -> dict[str, dict[str, float]]:
