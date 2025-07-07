@@ -11,7 +11,7 @@ In some cases, :cite:t:`MZG02` may not list the species you wish you add, or alt
 Add a solubility law
 --------------------
 
-Guidance coming soon.
+Solubility laws are encapsulated in the `solubility` sub-package, with the base class ``Solubility`` located in ``solubility.core``. To define a custom solubility model, inherit from the base class and implement the ``concentration`` method. Private modules (indicated by a leading underscore) separate the solubility laws based on speciation, which is determined by the elemental composition. The ``core`` module also includes concrete classes for commonly used solubility laws, such as the power law, which can be used directly without the need to implement a custom class. Once a new solubility law is added, it should be imported into the ``library`` and referenced in the dictionary returned by ``get_solubility_models``. After that, the solubility law can be accessed and used.
 
 Add a real gas EOS
 ------------------
