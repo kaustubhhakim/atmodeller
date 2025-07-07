@@ -32,7 +32,7 @@ from atmodeller import PRESSURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.thermodata import CriticalData
+from atmodeller.thermodata import CriticalData, critical_data_dictionary
 from atmodeller.utilities import ExperimentalCalibration
 
 if sys.version_info < (3, 12):
@@ -327,7 +327,7 @@ _H2_low_pressure_SS92: RealGas = SaxenaFiveCoefficients(
     # Saxena and Fei (1987a), Eq. 23, C final coefficient = 0.1472e-1 (not 0.1427e-1)
     c_coefficients=(0.0, 0.0, -0.1030e-2, 0.0, 0.1472e-1),
     d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0),
-    critical_data=CriticalData.create("H2"),
+    critical_data=critical_data_dictionary["H2"],
 )
 """H2 low pressure (<1000 bar) :cite:p:`SS92{Table 1b}`
 
@@ -382,7 +382,7 @@ _H2_high_pressure_SS92_refit: RealGas = SaxenaEightCoefficients(
         -3.64843213e-07,
     ),
     d_coefficients=(2.28281107e-11, 0.0, -1.07138603e-08, 0.0, 3.67720815e-07, 0.0, 0.0, 0.0),
-    critical_data=CriticalData.create("H2"),
+    critical_data=critical_data_dictionary["H2"],
 )
 """H2 high pressure (>1000 bar)
 
@@ -407,7 +407,7 @@ _H2_high_pressure_SF88: RealGas = SaxenaEightCoefficients(
     b_coefficients=(-2.0410e-3, 0.0, 7.9230e-2, 0.0, 5.4295e-2, 0.0, 0.0, 4.0887e-4),
     c_coefficients=(-2.1693e-7, 0.0, 1.7406e-6, 0.0, -2.1885e-4, 0.0, 0.0, 5.0897e-5),
     d_coefficients=(-7.1635e-12, 0.0, 1.6197e-10, 0.0, -4.8181e-9, 0.0, 0.0, 0.0),
-    critical_data=CriticalData.create("H2"),
+    critical_data=critical_data_dictionary["H2"],
 )
 """H2 high pressure :cite:p:`SF88{Table on page 1196}`
 
@@ -440,7 +440,7 @@ SO2_SS92: RealGas = SaxenaEightCoefficients(
         0.55542e-4,
     ),
     d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    critical_data=CriticalData.create("O2S"),
+    critical_data=critical_data_dictionary["O2S"],
 )
 """SO2 EOS :cite:p:`SS92{Table 1c}` from 1 to 10e3 bar"""
 SO2_SS92_bounded: RealGas = CombinedRealGas.create(
@@ -453,7 +453,7 @@ _H2S_low_pressure_SS92: RealGas = SaxenaEightCoefficients(
     b_coefficients=(0.16066, 0.10887, 0.29014, 0.0, -0.99593, 0.0, -0.18627, -0.45515),
     c_coefficients=(-0.28933, -0.70522e-1, 0.39828, 0.0, -0.50533e-1, 0.0, 0.11760, 0.33972),
     d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    critical_data=CriticalData.create("H2S"),
+    critical_data=critical_data_dictionary["H2S"],
 )
 """H2S low pressure (1-500 bar) :cite:p:`SS92{Table 1d}`"""
 
@@ -480,7 +480,7 @@ _H2S_high_pressure_SS92: RealGas = SaxenaEightCoefficients(
         -0.27985e-3,
     ),
     d_coefficients=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    critical_data=CriticalData.create("H2S"),
+    critical_data=critical_data_dictionary["H2S"],
 )
 """H2S high pressure (500-10000 bar) :cite:p:`SS92{Table 1d}`"""
 
@@ -509,7 +509,7 @@ def get_corresponding_states_SS92(species: str) -> RealGas:
     Returns:
         A corresponding states model for the species
     """
-    critical_data: CriticalData = CriticalData.create(species)
+    critical_data: CriticalData = critical_data_dictionary[species]
 
     # Table 1a, <1000 bar
     low_pressure: RealGas = SaxenaFiveCoefficients(

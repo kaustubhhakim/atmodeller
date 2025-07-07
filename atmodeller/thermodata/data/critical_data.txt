@@ -2,7 +2,7 @@
 # Tc is in K and Pc in bar.
 # References can be found in docs/refs.bib
 # These critical data could be extended to more species using :cite:t:`PPO00{Appendix A.19}`
-Name Tc Pc
+name Tc Pc
 # :cite:t:`SF87{Table 1}`
 Ar 151 48.6
 # :cite:t:`SS92{Table 2}`

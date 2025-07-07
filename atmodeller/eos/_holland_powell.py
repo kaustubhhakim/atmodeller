@@ -36,7 +36,7 @@ from atmodeller.eos.core import (
     RedlichKwongImplicitGasABC,
     VirialCompensation,
 )
-from atmodeller.thermodata import CriticalData
+from atmodeller.thermodata import CriticalData, critical_data_dictionary
 from atmodeller.utilities import ExperimentalCalibration
 
 try:
@@ -269,7 +269,7 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
         Returns:
             An MRK corresponding states model for the species
         """
-        critical_data: CriticalData = CriticalData.create(hill_formula, suffix)
+        critical_data: CriticalData = critical_data_dictionary[f"{hill_formula}{suffix}"]
 
         return cls(critical_data)
 
@@ -473,7 +473,7 @@ H2OMrkFluidHolland91: MRKImplicitFluidHP91 = MRKImplicitFluidHP91(
 )
 """H2O MRK for fluid phase :cite:p`HP91`"""
 
-CO2_critical_data: CriticalData = CriticalData.create("CO2")
+CO2_critical_data: CriticalData = critical_data_dictionary["CO2"]
 """Alternative values from :cite:t:`HP91` are 304.2 K and 73.8 bar"""
 CO2MrkHolland91: MRKImplicitFluidHP91 = MRKImplicitFluidHP91(
     FullUnitConverter.convert_a_coefficients((741.2, -0.10891, -3.4203e-4, 0.0)),
@@ -863,7 +863,7 @@ experimental_calibration_holland98: ExperimentalCalibration = ExperimentalCalibr
 """Experimental calibration for :cite:`HP98` models"""
 
 CH4_cork_cs_holland91: RealGas = CORK(
-    CH4_mrk_cs_holland91, virial_compensation_corresponding_states, CriticalData.create("CH4")
+    CH4_mrk_cs_holland91, virial_compensation_corresponding_states, critical_data_dictionary["CH4"]
 )
 """CH4 CORK corresponding states :cite:p:`HP91`"""
 CH4_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
@@ -871,7 +871,7 @@ CH4_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
 )
 """CH4 CORK corresponding states bounded :cite:p:`HP91`"""
 CO_cork_cs_holland91: RealGas = CORK(
-    CO_mrk_cs_holland91, virial_compensation_corresponding_states, CriticalData.create("CO")
+    CO_mrk_cs_holland91, virial_compensation_corresponding_states, critical_data_dictionary["CO"]
 )
 """CO CORK corresponding states :cite:p:`HP91`"""
 CO_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
@@ -879,7 +879,7 @@ CO_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
 )
 """CO CORK corresponding states bounded :cite:p:`HP91`"""
 CO2_cork_cs_holland91: RealGas = CORK(
-    CO2_mrk_cs_holland91, virial_compensation_corresponding_states, CriticalData.create("CO2")
+    CO2_mrk_cs_holland91, virial_compensation_corresponding_states, critical_data_dictionary["CO2"]
 )
 """CO2 CORK corresponding states :cite:p:`HP91`"""
 CO2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
@@ -889,7 +889,7 @@ CO2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
 H2_cork_cs_holland91: RealGas = CORK(
     H2_mrk_cs_holland91,
     virial_compensation_corresponding_states,
-    CriticalData.create("H2", suffix="_Holland"),
+    critical_data_dictionary["H2_Holland"],
 )
 """H2 CORK corresponding states :cite:p:`HP91`"""
 H2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
@@ -897,7 +897,7 @@ H2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
 )
 """H2 CORK corresponding states bounded :cite:p:`HP91`"""
 H2S_cork_cs_holland11: RealGas = CORK(
-    H2S_mrk_cs_holland11, virial_compensation_corresponding_states, CriticalData.create("H2S")
+    H2S_mrk_cs_holland11, virial_compensation_corresponding_states, critical_data_dictionary["H2S"]
 )
 """H2S CORK corresponding states :cite:p:`HP91`"""
 H2S_cork_cs_holland11_bounded: RealGas = CombinedRealGas.create(
@@ -905,7 +905,7 @@ H2S_cork_cs_holland11_bounded: RealGas = CombinedRealGas.create(
 )
 """H2S CORK corresponding states bounded :cite:p:`HP91`"""
 N2_cork_cs_holland91: RealGas = CORK(
-    N2_mrk_cs_holland91, virial_compensation_corresponding_states, CriticalData.create("N2")
+    N2_mrk_cs_holland91, virial_compensation_corresponding_states, critical_data_dictionary["N2"]
 )
 """N2 CORK corresponding states :cite:p:`HP91`"""
 N2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
@@ -913,7 +913,7 @@ N2_cork_cs_holland91_bounded: RealGas = CombinedRealGas.create(
 )
 """N2 CORK corresponding states bounded :cite:p:`HP91`"""
 S2_cork_cs_holland11: RealGas = CORK(
-    S2_mrk_cs_holland11, virial_compensation_corresponding_states, CriticalData.create("S2")
+    S2_mrk_cs_holland11, virial_compensation_corresponding_states, critical_data_dictionary["S2"]
 )
 """S2 CORK corresponding states :cite:p:`HP91`"""
 S2_cork_cs_holland11_bounded: RealGas = CombinedRealGas.create(

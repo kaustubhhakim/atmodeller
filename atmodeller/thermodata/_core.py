@@ -17,7 +17,6 @@
 """Core classes and functions for thermochemical data"""
 
 import importlib.resources
-import logging
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from importlib.abc import Traversable
@@ -36,12 +35,12 @@ from atmodeller import TEMPERATURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT
 from atmodeller.utilities import as_j64, unit_conversion
 
-logger: logging.Logger = logging.getLogger(__name__)
-
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory"""
-DATA_SOURCE: Path = Path("nasa_glenn_coefficients.txt")
+THERMODYNAMIC_DATA_SOURCE: Path = Path("nasa_glenn_coefficients.txt")
 """Source of the thermodynamic data"""
+CRITICAL_DATA_SOURCE: Path = Path("critical_data.txt")
+"""Source of the critical data"""
 
 
 class CondensateActivity(eqx.Module):
@@ -385,19 +384,14 @@ class ThermodynamicCoefficients(eqx.Module):
 
 @dataclass
 class ThermodynamicDataSource:
-    """Thermodynamic data source for all species
-
-    Args:
-        filename: Filename containing the NASA Glenn coefficients. Defaults to
-            nasa_glenn_coefficients.txt.
-    """
+    """Thermodynamic data source for all species"""
 
     data: pd.DataFrame = field(init=False)
     """Thermodynamic data for all species"""
 
     def __post_init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
-            DATA_DIRECTORY.joinpath(DATA_SOURCE)  # type: ignore
+            DATA_DIRECTORY.joinpath(THERMODYNAMIC_DATA_SOURCE)  # type: ignore
         )
         with data as datapath:
             self.data = pd.read_csv(datapath, sep=" ", comment="#")
@@ -412,7 +406,7 @@ class ThermodynamicDataSource:
         """Name of the column that refers to the state of aggregation"""
         return "state"
 
-    def thermodynamic_coefficients(self) -> dict[str, ThermodynamicCoefficients]:
+    def create_dict(self) -> dict[str, ThermodynamicCoefficients]:
         """Dictionary of thermodynamic coefficients for all species
 
         Returns:
@@ -424,8 +418,8 @@ class ThermodynamicDataSource:
         coefficient_dict: dict[str, ThermodynamicCoefficients] = {}
 
         for _, row in unique_combinations.iterrows():
-            hill_formula = row[self.formula_column]
-            state = row[self.state_column]
+            hill_formula: str = row[self.formula_column]
+            state: str = row[self.state_column]
             key: str = f"{hill_formula}_{state}"
             coefficient_dict[key] = self._get_individual_thermodynamic_coefficients(
                 hill_formula, state
@@ -435,7 +429,7 @@ class ThermodynamicDataSource:
 
     def _get_individual_thermodynamic_coefficients(
         self, hill_formula: str, state: str
-    ) -> "ThermodynamicCoefficients":
+    ) -> ThermodynamicCoefficients:
         """Gets thermodynamic coefficients for an individual species
 
         Args:
@@ -451,7 +445,7 @@ class ThermodynamicDataSource:
         ]
         if df.empty:
             raise ValueError(
-                f"No data found for formula (state) '{hill_formula} ({state})' in {DATA_SOURCE}"
+                f"No data found for formula (state) '{hill_formula} ({state})' in {THERMODYNAMIC_DATA_SOURCE}"
             )
 
         T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
@@ -463,18 +457,6 @@ class ThermodynamicDataSource:
         )
 
         return ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
-
-
-# Although it might be tempting to create species on-the-fly when required, this might not play
-# nice with JAX, which requires purely functional programming (and no side effects). So instead
-# we create a dictionary of instantiated data (JAX-compliant Pytrees) that we can use as a lookup.
-# It should also be net faster to create these data once and then access potentially many times.
-thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
-"""Thermodynamic data source"""
-thermodynamic_coefficients: dict[str, ThermodynamicCoefficients] = (
-    thermodynamic_data_source.thermodynamic_coefficients()
-)
-"""Thermodynamic coefficients"""
 
 
 class IndividualSpeciesData(eqx.Module):
@@ -506,7 +488,7 @@ class IndividualSpeciesData(eqx.Module):
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula
         self.molar_mass = mformula.mass * unit_conversion.g_to_kg
-        self.thermodynamic_coefficients = thermodynamic_coefficients[
+        self.thermodynamic_coefficients = thermodynamic_coefficients_dictionary[
             f"{self.hill_formula}_{self.state}"
         ]
 
@@ -545,29 +527,65 @@ class CriticalData(eqx.Module):
     pressure: float = 1.0
     """Critical pressure in bar"""
 
-    # TODO: Avoid creating the lookup dataframe every time. Move elsewhere to a separate class.
-    @classmethod
-    def create(cls, hill_formula: str, suffix="") -> "CriticalData":
-        """Creates an instance
 
-        Args:
-            hill_formula: Hill formula
-            suffix: Suffix. Defaults to an empty string.
+@dataclass
+class CriticalDataSource:
+    """Critical data source for all species"""
 
-        Returns:
-            An instance
-        """
-        file: Path = Path("critical_data.txt")
+    data: pd.DataFrame = field(init=False)
+    """Critical data for all species"""
+
+    def __post_init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
-            DATA_DIRECTORY.joinpath(file)  # type: ignore
+            DATA_DIRECTORY.joinpath(CRITICAL_DATA_SOURCE)  # type: ignore
         )
         with data as datapath:
-            dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
-        df: pd.DataFrame = dataframe[dataframe["Name"] == f"{hill_formula}{suffix}"]
-        if df.empty:
-            raise ValueError(
-                f"No data found for formula '{hill_formula}' and suffix '{suffix}' in {file}"
-            )
-        row = df.iloc[0]
+            self.data = pd.read_csv(datapath, sep=" ", comment="#")
 
-        return cls(temperature=float(row["Tc"]), pressure=float(row["Pc"]))
+    @property
+    def name_column(self) -> str:
+        """Name of the column that refers to the hill formula and an optional suffix"""
+        return "name"
+
+    @property
+    def critical_temperature_column(self) -> str:
+        """Name of the column that refers to the critical temperature"""
+        return "Tc"
+
+    @property
+    def critical_pressure_column(self) -> str:
+        """Name of the column that refers to the critical pressure"""
+        return "Pc"
+
+    def create_dict(self) -> dict[str, CriticalData]:
+        """Dictionary of critical data for all species
+
+        Returns:
+            Dictionary of critical data for all species
+        """
+        critical_dict: dict[str, CriticalData] = {}
+
+        for _, row in self.data.iterrows():
+            name: str = row[self.name_column]
+            critical_dict[name] = CriticalData(
+                temperature=float(row[self.critical_temperature_column]),
+                pressure=float(row[self.critical_pressure_column]),
+            )
+
+        return critical_dict
+
+
+# Although it might be tempting to create objects on-the-fly when required, this might not play
+# nice with JAX, which requires purely functional programming (and no side effects). So instead
+# we create a dictionary of instantiated data (JAX-compliant Pytrees) that we can use as a lookup.
+# It should also be net faster to create these data once and then access potentially many times.
+thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
+"""Thermodynamic data source"""
+thermodynamic_coefficients_dictionary: dict[str, ThermodynamicCoefficients] = (
+    thermodynamic_data_source.create_dict()
+)
+"""Thermodynamic coefficients dictionary"""
+critical_data_source: CriticalDataSource = CriticalDataSource()
+"""Critical data source"""
+critical_data_dictionary: dict[str, CriticalData] = critical_data_source.create_dict()
+"""Critical data dictionary"""
