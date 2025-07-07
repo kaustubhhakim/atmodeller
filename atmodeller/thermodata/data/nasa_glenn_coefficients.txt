@@ -1,8 +1,9 @@
 # Data from McBride et al. (2002), NASA Glenn Coefficients for Calculating Thermodynamic Properties of Individual Species, No. 2002-211556 NASA
 # https://ntrs.nasa.gov/citations/20020085330
-# The Hill system is adopted
+# The Hill system is adopted and state refers to the JANAF convention for the state of aggregation
+# Temperature ranges should be in ascending order
 # Gases appear in the top section and condensed phases appear further down.
-# Header line is below with column names
+# Column names are as follows:
 hill_formula state T_min T_max a1 a2 a3 a4 a5 a6 a7 b1 b2
 # --- Gases ---
 Ar g 200 1000 0.0 0.0 2.5 0.0 0.0 0.0 0.0 -7.453750000e02 4.379674910e00
