@@ -64,7 +64,7 @@ class InteriorAtmosphere:
     def __init__(self, species: SpeciesCollection, tau: float = TAU):
         self.species: SpeciesCollection = species
         self.tau: float = tau
-        logger.info("species = %s", [species.name for species in self.species])
+        logger.info("species = %s", str(self.species))
         logger.info("reactions = %s", pprint.pformat(self.get_reaction_dictionary()))
 
     @property

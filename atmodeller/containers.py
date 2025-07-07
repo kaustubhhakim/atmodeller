@@ -47,7 +47,11 @@ from atmodeller.interfaces import (
     SolubilityProtocol,
 )
 from atmodeller.solubility.library import NoSolubility
-from atmodeller.thermodata import CondensateActivity, IndividualSpeciesData
+from atmodeller.thermodata import (
+    CondensateActivity,
+    IndividualSpeciesData,
+    thermodynamic_data_source,
+)
 from atmodeller.utilities import (
     all_not_nan,
     as_j64,
@@ -131,6 +135,9 @@ class Species(eqx.Module):
 
         return cls(species_data, activity, solubility, solve_for_stability)
 
+    def __str__(self) -> str:
+        return f"{self.name}: {self.activity.__class__.__name__}, {self.solubility.__class__.__name__}"
+
 
 class SpeciesCollection(eqx.Module):
     """A collection of species
@@ -146,8 +153,7 @@ class SpeciesCollection(eqx.Module):
         """Creates an instance
 
         Args:
-            species_names: A list or tuple of species names. This must match the available species
-                in Atmodeller, but a complete list is returned if any of the entries are incorrect.
+            species_names: A list or tuple of species names
 
         Returns
             An instance
@@ -164,24 +170,14 @@ class SpeciesCollection(eqx.Module):
 
         return cls(species_list)
 
+    @classmethod
+    def available_species(cls) -> tuple[str, ...]:
+        return thermodynamic_data_source.available_species()
+
     @property
     def number(self) -> int:
         """Number of species"""
         return len(self.data)
-
-    # TODO: Doesn't make sense to be here.
-    # @classmethod
-    # def available_species(cls):
-    #     file: Path = Path("nasa_glenn_coefficients.txt")
-    #     data: AbstractContextManager[Path] = importlib.resources.as_file(
-    #         DATA_DIRECTORY.joinpath(file)  # type: ignore
-    #     )
-    #     with data as datapath:
-    #         dataframe: pd.DataFrame = pd.read_csv(datapath, sep=" ", comment="#")
-    #     # Drop duplicates to get unique (Formula, State) pairs
-    #     unique = dataframe.drop_duplicates(subset=["Formula", "State"])
-    #     # Return as a list of tuples
-    #     return list(zip(unique["Formula"], unique["State"]))
 
     def active_stability(self) -> Bool[Array, " species_dim"]:
         """Active species stability
@@ -335,6 +331,9 @@ class SpeciesCollection(eqx.Module):
 
     def __len__(self) -> int:
         return len(self.data)
+
+    def __str__(self) -> str:
+        return str(tuple(str(species) for species in self.data))
 
 
 class Planet(eqx.Module):

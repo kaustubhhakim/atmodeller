@@ -421,114 +421,58 @@ class ThermodynamicDataSource:
         """Name of the column that refers to the state of aggregation"""
         return "state"
 
+    def available_species(self) -> tuple[str, ...]:
+        """Available species
+
+        Returns:
+            Available species
+        """
+        df: pd.DataFrame = cast(
+            pd.DataFrame, self.data[[self.formula_column, self.state_column]].drop_duplicates()
+        )
+        available_species: tuple[str, ...] = tuple(
+            f"{getattr(row, self.formula_column)}_{getattr(row, self.state_column)}"
+            for row in df.itertuples(index=False)
+        )
+
+        return available_species
+
     def create_dictionary(self) -> dict[str, ThermodynamicCoefficients]:
         """Dictionary of thermodynamic coefficients for all species
 
         Returns:
             Dictionary of thermodynamic coefficients for all species
         """
-        unique_combinations = self.data[[self.formula_column, self.state_column]].drop_duplicates()
+        unique_combinations: pd.DataFrame = self.data[
+            [self.formula_column, self.state_column]
+        ].drop_duplicates()
         coefficient_dict: dict[str, ThermodynamicCoefficients] = {}
 
-        for _, row in unique_combinations.iterrows():
-            hill_formula: str = str(row[self.formula_column])
-            state: str = str(row[self.state_column])
-            key: str = f"{hill_formula}_{state}"
-            coefficient_dict[key] = self._get_individual_thermodynamic_coefficients(
-                hill_formula, state
+        for row in unique_combinations.itertuples(index=False):
+            hill_formula: str = str(getattr(row, self.formula_column))
+            state: str = str(getattr(row, self.state_column))
+            name: str = f"{hill_formula}_{state}"
+
+            # Find all data across all temperature ranges
+            df: pd.DataFrame = cast(
+                pd.DataFrame,
+                self.data[
+                    (self.data[self.formula_column] == hill_formula)
+                    & (self.data[self.state_column] == state)
+                ],
             )
+
+            # Process and store the thermodynamic coefficients
+            T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
+            T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
+            b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
+            b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
+            cp_coeffs: tuple[tuple[np.float64, ...], ...] = tuple(
+                map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
+            )
+            coefficient_dict[name] = ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
 
         return coefficient_dict
-
-    def _get_individual_thermodynamic_coefficients(
-        self, hill_formula: str, state: str
-    ) -> ThermodynamicCoefficients:
-        """Gets thermodynamic coefficients for an individual species
-
-        Args:
-            hill_formula: Hill formula
-            state: State of aggregation following the JANAF convention
-
-        Returns:
-            An instance of ThermodynamicCoefficients
-        """
-        df: pd.DataFrame = cast(
-            pd.DataFrame,
-            self.data[
-                (self.data[self.formula_column] == hill_formula)
-                & (self.data[self.state_column] == state)
-            ],
-        )
-        if df.empty:
-            raise ValueError(
-                f"No data found for formula (state) '{hill_formula} ({state})' in "
-                f"{THERMODYNAMIC_DATA_SOURCE}"
-            )
-
-        T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
-        T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
-        b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
-        b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
-        cp_coeffs: tuple[tuple[np.float64, ...], ...] = tuple(
-            map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
-        )
-
-        return ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
-
-
-class IndividualSpeciesData(eqx.Module):
-    """Individual species data
-
-    Args:
-        formula: Formula
-        state: State of aggregation as defined by JANAF
-    """
-
-    formula: str
-    """Formula"""
-    state: str
-    """State of aggregation"""
-    thermodynamic_coefficients: ThermodynamicCoefficients = eqx.field(init=False)
-    """Thermodynamic coefficients"""
-    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
-    """Composition"""
-    hill_formula: str = eqx.field(init=False)
-    """Hill formula"""
-    molar_mass: float = eqx.field(init=False)
-    """Molar mass"""
-
-    def __post_init__(self):
-        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
-        # though the arguments would allow it. Previous tests resulted in an infinite compilation
-        # loop for JAX. Instead, we get thermodynamic coefficients from a dictionary.
-        mformula: Formula = Formula(self.formula)
-        self.composition = ImmutableMap(mformula.composition().asdict())
-        self.hill_formula = mformula.formula
-        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
-        self.thermodynamic_coefficients = thermodynamic_coefficients_dictionary[
-            f"{self.hill_formula}_{self.state}"
-        ]
-
-    @property
-    def elements(self) -> tuple[str, ...]:
-        """Elements"""
-        return tuple(self.composition.keys())
-
-    @property
-    def name(self) -> str:
-        """Unique name by combining Hill notation and state of aggregation"""
-        return f"{self.hill_formula}_{self.state}"
-
-    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
-        """Gets Gibbs energy over RT
-
-        Args:
-            temperature: Temperature in K
-
-        Returns:
-            Gibbs energy over RT
-        """
-        return self.thermodynamic_coefficients.get_gibbs_over_RT(temperature)
 
 
 class CriticalData(eqx.Module):
@@ -582,11 +526,11 @@ class CriticalDataSource:
         """
         critical_dict: dict[str, CriticalData] = {}
 
-        for _, row in self.data.iterrows():
-            name: str = str(row[self.name_column])
+        for row in self.data.itertuples(index=False):
+            name: str = str(getattr(row, self.name_column))
             critical_dict[name] = CriticalData(
-                temperature=float(row[self.critical_temperature_column]),
-                pressure=float(row[self.critical_pressure_column]),
+                temperature=float(getattr(row, self.critical_temperature_column)),
+                pressure=float(getattr(row, self.critical_pressure_column)),
             )
 
         return critical_dict
@@ -619,3 +563,62 @@ critical_data_dictionary: dict[str, CriticalData] = critical_data_source.create_
 
 :meta private:
 """
+
+
+class IndividualSpeciesData(eqx.Module):
+    """Individual species data
+
+    Args:
+        formula: Formula
+        state: State of aggregation as defined by JANAF
+    """
+
+    formula: str
+    """Formula"""
+    state: str
+    """State of aggregation"""
+    thermo: ThermodynamicCoefficients = eqx.field(init=False)
+    """Thermodynamic coefficient and methods"""
+    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    """Composition"""
+    hill_formula: str = eqx.field(init=False)
+    """Hill formula"""
+    molar_mass: float = eqx.field(init=False)
+    """Molar mass"""
+
+    def __post_init__(self):
+        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
+        # though the arguments would allow it. Previous tests resulted in an infinite compilation
+        # loop for JAX. Instead, we get thermodynamic coefficients from a dictionary.
+        mformula: Formula = Formula(self.formula)
+        self.composition = ImmutableMap(mformula.composition().asdict())
+        self.hill_formula = mformula.formula
+        self.molar_mass = mformula.mass * unit_conversion.g_to_kg
+        try:
+            self.thermo = thermodynamic_coefficients_dictionary[self.name]
+        except KeyError:
+            raise KeyError(
+                f"{self.name} not available. "
+                f"Available species are {thermodynamic_data_source.available_species()}"
+            )
+
+    @property
+    def elements(self) -> tuple[str, ...]:
+        """Elements"""
+        return tuple(self.composition.keys())
+
+    @property
+    def name(self) -> str:
+        """Unique name by combining Hill notation and state of aggregation"""
+        return f"{self.hill_formula}_{self.state}"
+
+    def get_gibbs_over_RT(self, temperature: ArrayLike) -> Array:
+        """Gets Gibbs energy over RT
+
+        Args:
+            temperature: Temperature in K
+
+        Returns:
+            Gibbs energy over RT
+        """
+        return self.thermo.get_gibbs_over_RT(temperature)

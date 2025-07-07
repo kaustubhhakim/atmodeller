@@ -24,4 +24,5 @@ from atmodeller.thermodata.core import (  # noqa: E402, F401
     IndividualSpeciesData,
     critical_data_dictionary,
     thermodynamic_coefficients_dictionary,
+    thermodynamic_data_source,
 )
