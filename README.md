@@ -57,7 +57,7 @@ H2_g = Species.create_gas("H2")
 H2O_g = Species.create_gas("H2O", solubility=solubility_models["H2O_peridotite_sossi23"])
 O2_g = Species.create_gas("O2")
 
-species = SpeciesCollection((H2_g, H2O_, O2_g))
+species = SpeciesCollection((H2_g, H2O_g, O2_g))
 planet = Planet()
 interior_atmosphere = InteriorAtmosphere(species)
 
