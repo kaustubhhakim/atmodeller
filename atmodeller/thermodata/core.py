@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License along with Atmodeller. If not,
 # see <https://www.gnu.org/licenses/>.
 #
-"""Core classes and functions for thermochemical data"""
+"""Core classes and functions for thermochemical and critical data"""
 
 import importlib.resources
 from contextlib import AbstractContextManager
@@ -44,11 +44,25 @@ CRITICAL_DATA_SOURCE: Path = Path("critical_data.txt")
 
 
 class CondensateActivity(eqx.Module):
-    """Activity of a stable condensate"""
+    """Activity of a stable condensate
+
+    Args:
+        activity: Activity. Defaults to 1.
+    """
 
     activity: Array = eqx.field(converter=as_j64, default=1.0)
+    """Activity"""
 
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, ""]:
+        """Log activity
+
+        Args:
+            temperature: Temperature in K
+            pressure: Pressure in bar
+
+        Returns:
+            Log activity, which is dimensionless
+        """
         del temperature
         del pressure
 
@@ -366,7 +380,7 @@ class ThermodynamicCoefficients(eqx.Module):
     def gibbs_function(self, temperature: ArrayLike) -> Float[Array, " T"]:
         r"""Gets Gibbs energy function.
 
-        This is :math:`-[G^\circ-H^{\circ}(Tr)]/T` in the JANAF tables.
+        This is :math:`-[G^\circ-H^{\circ}(T_r)]/T` in the JANAF tables.
 
         Args:
             temperature: Temperature in K
@@ -406,7 +420,7 @@ class ThermodynamicDataSource:
         """Name of the column that refers to the state of aggregation"""
         return "state"
 
-    def create_dict(self) -> dict[str, ThermodynamicCoefficients]:
+    def create_dictionary(self) -> dict[str, ThermodynamicCoefficients]:
         """Dictionary of thermodynamic coefficients for all species
 
         Returns:
@@ -549,7 +563,7 @@ class CriticalDataSource:
 
     @property
     def critical_temperature_column(self) -> str:
-        """Name of the column that refers to the critical temperature"""
+        """Name of the column that refers to the critical temperature in K"""
         return "Tc"
 
     @property
@@ -557,7 +571,7 @@ class CriticalDataSource:
         """Name of the column that refers to the critical pressure"""
         return "Pc"
 
-    def create_dict(self) -> dict[str, CriticalData]:
+    def create_dictionary(self) -> dict[str, CriticalData]:
         """Dictionary of critical data for all species
 
         Returns:
@@ -577,15 +591,28 @@ class CriticalDataSource:
 
 # Although it might be tempting to create objects on-the-fly when required, this might not play
 # nice with JAX, which requires purely functional programming (and no side effects). So instead
-# we create a dictionary of instantiated data (JAX-compliant Pytrees) that we can use as a lookup.
-# It should also be net faster to create these data once and then access potentially many times.
+# we create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
+# It should also be net faster to create these data once and then access (potentially many times).
+# These are also set to private to avoid sphinx (autodoc) from printing long strings.
 thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
-"""Thermodynamic data source"""
+"""Thermodynamic data source
+
+:meta private:
+"""
 thermodynamic_coefficients_dictionary: dict[str, ThermodynamicCoefficients] = (
-    thermodynamic_data_source.create_dict()
+    thermodynamic_data_source.create_dictionary()
 )
-"""Thermodynamic coefficients dictionary"""
+"""Thermodynamic coefficients dictionary
+
+:meta private:
+"""
 critical_data_source: CriticalDataSource = CriticalDataSource()
-"""Critical data source"""
-critical_data_dictionary: dict[str, CriticalData] = critical_data_source.create_dict()
-"""Critical data dictionary"""
+"""Critical data source
+
+:meta private:
+"""
+critical_data_dictionary: dict[str, CriticalData] = critical_data_source.create_dictionary()
+"""Critical data dictionary
+
+:meta private:
+"""

@@ -17,10 +17,11 @@
 """Thermodata package level variables"""
 
 # Expose public API
-from atmodeller.thermodata._core import (  # noqa: E402, F401
+from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: E402, F401
+from atmodeller.thermodata.core import (  # noqa: E402, F401
     CondensateActivity,
     CriticalData,
     IndividualSpeciesData,
     critical_data_dictionary,
+    thermodynamic_coefficients_dictionary,
 )
-from atmodeller.thermodata._redox_buffers import IronWustiteBuffer  # noqa: E402, F401

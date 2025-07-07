@@ -29,8 +29,8 @@ from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
+from atmodeller._mytypes import NpArray
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
-from atmodeller.mytypes import NpArray
 
 logger: logging.Logger = logging.getLogger(__name__)
 

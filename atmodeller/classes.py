@@ -29,6 +29,7 @@ import numpy as np
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer, PRNGKeyArray
 
 from atmodeller import INITIAL_LOG_NUMBER_DENSITY, INITIAL_LOG_STABILITY, TAU, TAU_MAX, TAU_NUM
+from atmodeller._mytypes import NpFloat, NpInt
 from atmodeller.containers import (
     FixedParameters,
     FugacityConstraints,
@@ -40,7 +41,6 @@ from atmodeller.containers import (
 )
 from atmodeller.engine import make_solve_tau_step, repeat_solver, solve
 from atmodeller.interfaces import FugacityConstraintProtocol
-from atmodeller.mytypes import NpFloat, NpInt
 from atmodeller.output import Output
 from atmodeller.utilities import get_batch_size, partial_rref, vmap_axes_spec
 

@@ -38,6 +38,7 @@ from atmodeller import (
     LOG_STABILITY_LOWER,
     LOG_STABILITY_UPPER,
 )
+from atmodeller._mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.constants import AVOGADRO, GRAVITATIONAL_CONSTANT
 from atmodeller.eos.core import IdealGas
 from atmodeller.interfaces import (
@@ -45,7 +46,6 @@ from atmodeller.interfaces import (
     FugacityConstraintProtocol,
     SolubilityProtocol,
 )
-from atmodeller.mytypes import NpArray, NpFloat, OptxSolver
 from atmodeller.solubility.library import NoSolubility
 from atmodeller.thermodata import CondensateActivity, IndividualSpeciesData
 from atmodeller.utilities import (

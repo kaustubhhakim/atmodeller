@@ -24,11 +24,11 @@ import jax.numpy as jnp
 import optimistix as optx
 from jaxtyping import Array, ArrayLike
 
+from atmodeller._mytypes import OptxSolver
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.mytypes import OptxSolver
 from atmodeller.utilities import ExperimentalCalibration, safe_exp, unit_conversion
 
 try:

@@ -37,6 +37,7 @@ from openpyxl.styles import PatternFill
 from scipy.constants import mega
 
 from atmodeller import TAU
+from atmodeller._mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.constants import AVOGADRO
 from atmodeller.containers import (
     FixedParameters,
@@ -59,7 +60,6 @@ from atmodeller.engine import (
     objective_function,
 )
 from atmodeller.interfaces import RedoxBufferProtocol
-from atmodeller.mytypes import NpArray, NpBool, NpFloat, NpInt
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import unit_conversion, vmap_axes_spec
 
