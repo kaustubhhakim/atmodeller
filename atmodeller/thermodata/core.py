@@ -443,9 +443,9 @@ class ThermodynamicDataSource:
         Returns:
             Dictionary of thermodynamic coefficients for all species
         """
-        unique_combinations: pd.DataFrame = self.data[
-            [self.formula_column, self.state_column]
-        ].drop_duplicates()
+        unique_combinations: pd.DataFrame = cast(
+            pd.DataFrame, self.data[[self.formula_column, self.state_column]].drop_duplicates()
+        )
         coefficient_dict: dict[str, ThermodynamicCoefficients] = {}
 
         for row in unique_combinations.itertuples(index=False):
