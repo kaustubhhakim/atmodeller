@@ -17,6 +17,7 @@ If you use *Atmodeller* please cite :cite:t:`BTT25`
    installation.rst
    examples
    output.rst
+   common_tasks.rst
    development.rst
    troubleshooting.rst
 
