@@ -90,3 +90,6 @@ print("solution_asdict =", solution_asdict)
 # Write the complete solution to Excel
 output.to_excel("example_single")
 ```
+
+## Funding
+Atmodeller was created as part of a SERI-funded ERC Starting grant '2ATMO' granted to P. Sossi (Contract no. MB22.00033), with additional funding provided through a Swiss National Science Foundation (SNSF) Eccellenza Professorship (#203668).
