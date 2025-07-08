@@ -1,19 +1,31 @@
 Common Tasks
 ============
 
+If you extend the capabilities of *Atmodeller*, you are encouraged to contribute your modifications to the main repository. For more information, see the :ref:`Developer's Guide <DevelopersGuideFile>`.
+
+.. note::
+    *Atmodeller* is built on `JAX <https://docs.jax.dev/en/latest/>`_, so all code must be compatible with JAX throughout the codebase. While JAX code closely resembles NumPy, there are important differences. The easiest way to get started is to explore the relevant sub-package, review the structure and examples, and adapt the existing code for your needs. Numerous tutorials and resources explaining JAX are also available online. Remember that *Atmodeller* is designed to be highly modular, allowing each sub-package to be developed and tested independently. This modular structure makes it easier to focus on specific functionality without needing to modify or run the entire codebase.
+
 Add thermodynamic data
 ----------------------
 
-Thermodynamic data are contained in the file `nasa_glenn_coefficients.txt`, which is within the `thermodata` sub-package in the `data` directory. These data follow the formulation of :cite:t:`MZG02` (https://ntrs.nasa.gov/citations/20020085330), in which functions for heat capacity, enthalpy, and entropy are encoded using coefficients. You can extend the thermodynamic data (and hence available species in *Atmodeller*) by adding species' data from :cite:t:`MZG02`. For consistency *Atmodeller* uses Hill notation for chemical formulae.
+Thermodynamic data are stored in the file `nasa_glenn_coefficients.txt`, located within the `thermodata` sub-package under the `data` directory. These data follow the formulation of :cite:t:`MZG02` (https://ntrs.nasa.gov/citations/20020085330), in which thermodynamic properties---heat capacity, enthalpy, and entropy---are expressed using polynomial coefficients. You can extend the range of available species in *Atmodeller* by adding data from :cite:t:`MZG02`. For consistency, *Atmodeller* adopts Hill notation when representing chemical formulae.
 
-In some cases, :cite:t:`MZG02` may not list the species you wish you add, or alternatively coefficients are not provided for the desired temperature range. In these scenarios you must appropriately fit the thermodynamic data for the species and/or temperature range of interest, whilst ensuring consistency with the standard state (1 bar), the reference temperature (273.15 K) and the definition of reference enthalpy :cite:p:`{See Introduction in }MZG02`. Furthermore, the methods and docstrings associated with the classes in the ``thermodata.core`` module provide guidance for relating thermodynamic data to the JANAF tables :cite:p:`Cha98`.
+In some cases, :cite:t:`MZG02` may not include the species of interest, or it may lack coefficients for the required temperature range. In such situations, you must fit the thermodynamic data yourself for the species and temperature range in question, ensuring consistency with the standard state (1 bar), the reference temperature (273.15 K) and the definition of reference enthalpy, as discussed in the introduction of :cite:t:`MZG02`. Additional guidance is provided through the methods and docstrings in the ``thermodata.core`` module, including how to relate these data to JANAF tables :cite:p:`Cha98`.
 
-Add a solubility law
---------------------
+Add solubility laws
+-------------------
 
 Solubility laws are encapsulated in the `solubility` sub-package, with the base class ``Solubility`` located in ``solubility.core``. To define a custom solubility model, inherit from the base class and implement the ``concentration`` method. Private modules (indicated by a leading underscore) separate the solubility laws based on speciation, which is determined by the elemental composition. The ``core`` module also includes concrete classes for commonly used solubility laws, such as the power law, which can be used directly without the need to implement a custom class. Once a new solubility law is added, it should be imported into the ``library`` and referenced in the dictionary returned by ``get_solubility_models``. After that, the solubility law can be accessed and used.
 
-Add a real gas EOS
-------------------
 
-Guidance coming soon.
+Each solubility module in the main codebase is mirrored by a corresponding module in the *tests* suite, ensuring that implemented solubility laws produce the expected results. When you add a new solubility law, you should also add a corresponding test. Ideally, the test should be anchored to values reported in the original source, such as those found in a table or figure. If such reference values are unavailable, a well-defined anchor value may be used instead.
+
+Add real gas EOS
+----------------
+
+Real gas equations of state (EOS) are organised within the `eos` sub-package. The base class, ``RealGas``, is defined in ``eos.core``. To implement a custom EOS, create a subclass and override the ``volume`` and ``volume_integral`` methods. Private modules (indicated by a leading underscore) group EOS formulations by source or study. The ``core`` module also includes utility classes that can serve as components or base classes when building new EOS implementations.
+
+Some EOS formulations require solving a root-finding problem to determine the molar volume---for example, see ``eos._zhang_duan``. After defining a new EOS class, it should be added to the local EOS dictionary within its module. That dictionary is then imported into ``library`` and merged into a master EOS dictionary, which can be accessed via ``get_eos_models``.
+
+Each EOS module in the main codebase is mirrored by a corresponding module in the *tests* suite, ensuring that implemented EOS produce the expected results. When you add a new EOS, you should also add a corresponding test. Ideally, the test should be anchored to values reported in the original source, such as those found in a table or figure. If such reference values are unavailable, a well-defined anchor value may be used instead.

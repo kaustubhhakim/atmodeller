@@ -1,3 +1,5 @@
+.. _DevelopersGuideFile:
+
 Developer's Guide
 =================
 
