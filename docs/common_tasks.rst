@@ -4,7 +4,11 @@ Common Tasks
 If you extend the capabilities of *Atmodeller*, you are encouraged to contribute your modifications to the main repository. For more information, see the :ref:`Developer's Guide <DevelopersGuideFile>`.
 
 .. note::
-    *Atmodeller* is built on `JAX <https://docs.jax.dev/en/latest/>`_, so all code must be compatible with JAX throughout the codebase. While JAX code closely resembles NumPy, there are important differences. The easiest way to get started is to explore the relevant sub-package, review the structure and examples, and adapt the existing code for your needs. Numerous tutorials and resources explaining JAX are also available online. Remember that *Atmodeller* is designed to be highly modular, allowing each sub-package to be developed and tested independently. This modular structure makes it easier to focus on specific functionality without needing to modify or run the entire codebase.
+    *Atmodeller* is built on `JAX <https://docs.jax.dev/en/latest/>`_, so most code must be compatible with JAX throughout the codebase. The main exceptions are components related to pre-processing (e.g., assembly of matrices and vectors) and output generation. However, any data structures or containers that are passed into the JAX-based numerical engine must be JAX-compliant.
+    
+    While JAX code closely resembles NumPy, there are important differences---particularly around functional programming, immutability, and tracing. The easiest way to get started is to explore the relevant sub-package, review its structure and examples, and adapt the existing code to your needs. Numerous tutorials and resources explaining JAX are also available online.
+    
+    *Atmodeller* is designed to be highly modular, enabling each sub-package to be developed and tested independently. This modular architecture makes it easier to focus on specific functionality without needing to modify or execute the entire codebase.
 
 Add thermodynamic data
 ----------------------

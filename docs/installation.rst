@@ -1,3 +1,5 @@
+.. _InstallationFile:
+
 Installation
 ============
 
@@ -24,33 +26,35 @@ Downloading the source code is also recommended if you'd like access to the exam
 2a. Fork and clone the repository
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you plan to contribute to *Atmodeller* or want to work independently, it's recommended to first fork the repository to your own GitHub account. This gives you full control over your changes without affecting the original repository.
+If you plan to contribute to *Atmodeller* or want to work independently, it's recommended to first fork the repository to your own GitHub account. This gives you full control over your changes and the ability to manage your own private branches.
 
 Follow these steps:
 
 - Visit the main repository on GitHub: https://github.com/ExPlanetology/atmodeller
-- Click the **Fork** button (usually in the top-right corner).
-- Choose whether to fork to your personal account or an organization you belong to.
+- Click the **Fork** button (typically located in the top-right corner of the page).
+- Choose whether to fork the repository to your personal account or to an organization you belong to.
 
-Once you have forked the repository, you can then proceed to clone **your forked copy** instead of the original.
+After forking the repository, you should clone **your forked copy** (not the original) to begin development.
 
-When cloning your fork:
+Cloning your fork:
 
-- If using SSH::
+- Using SSH::
 
     git clone git@github.com:<your-username>/atmodeller.git
     cd atmodeller
 
-- If using HTTPS::
+- Using HTTPS::
 
     git clone https://github.com/<your-username>/atmodeller.git
     cd atmodeller
 
-Replace ``<your-username>`` with your actual GitHub username. You can now work on your fork independently, create branches, and later submit a pull request to the main repository if desired.
+Replace ``<your-username>`` with your actual GitHub username. You can now work on your fork independently, create branches, and make changes as needed.
+
+To keep your fork in sync with the original repository---or to submit changes via pull requests---you can follow the instructions in the `GitHub documentation <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/configuring-a-remote-repository-for-a-fork>`_ on configuring a remote upstream. This setup allows you to fetch updates from the main repository and integrate them into your fork.
 
 .. note::
 
-    It is also possible to simply clone the main repository directly, without forking, if you do not intend to make contributions or want to keep things simple.
+    You can also clone the main repository directly without forking, but this approach provides less flexibility and does not allow you to submit pull requests unless you have write access to the main repository.
 
 2b. Install *Atmodeller*
 ^^^^^^^^^^^^^^^^^^^^^^^^
