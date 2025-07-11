@@ -28,7 +28,7 @@ Downloading the source code is also recommended if you'd like access to the exam
 2a. Fork and clone the repository
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you plan to contribute to *Atmodeller* or want to work independently, it's recommended to first fork the repository to your personal account or to an organisation you belong to. This gives you full control over your changes and the ability to manage your own private branches.
+If you plan to contribute to *Atmodeller* or want to work independently, it's recommended to first fork the repository to your personal account or to an organisation you belong to. This gives you full control over your changes and the ability to manage your own branches.
 
 Follow these steps:
 
@@ -61,15 +61,15 @@ To keep your fork in sync with the original repository---or to submit changes vi
 2b. Install *Atmodeller*
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-To install the package, you may use a Python project/package manager such as `uv <https://astral.sh/uv/>`_, `Poetry <https://python-poetry.org>`_, or the standard `pip <https://pip.pypa.io/en/stable/getting-started/>`_ tool. These tools manage dependencies using the project's ``pyproject.toml`` file.
+To install the package, you may use a Python project/package manager such as `uv <https://docs.astral.sh/uv>`_, `poetry <https://python-poetry.org>`_, or the standard `pip <https://pip.pypa.io/en/stable/getting-started/>`_ tool. These tools manage dependencies using the project's ``pyproject.toml`` file.
 
-Recommended: use `uv` or `Poetry` for reproducible and locked environments.  
-Alternatively, `pip` can be used for simpler workflows.
+Recommended: use ``uv`` or ``poetry`` or similar for reproducible and locked environments.  
+Alternatively, ``pip`` can be used for simpler workflows.
 
 Option 1: uv (recommended)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This requires `uv <https://docs.astral.sh/uv/>`_ to be installed.
+This requires ``uv`` to be installed.
 
 Create a virtual environment (if you haven't already), typically at the uppermost level of the source code repository::
 
