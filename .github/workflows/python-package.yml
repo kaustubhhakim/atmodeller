@@ -2,11 +2,11 @@ name: Python package
 
 on:
   push:
-    branches: [ "main", "djbower/uv" ]
+    branches: [ "main" ]
     paths-ignore:
       - 'docs/**'
   pull_request:
-    branches: [ "main", "djbower/uv" ]
+    branches: [ "main" ]
     paths-ignore:
       - 'docs/**'
 jobs:
