@@ -2,16 +2,15 @@ name: Python package
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "djbower/uv" ]
     paths-ignore:
       - 'docs/**'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "djbower/uv" ]
     paths-ignore:
       - 'docs/**'
 jobs:
   build:
-
     strategy:
       matrix:
         python-version: [ "3.10" ] #, "3.11", "3.12" ]
@@ -28,36 +27,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Load cached Poetry installation
-        id: cached-poetry
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          path: ~/.local  # the path depends on the OS
-          key: poetry-1  # increment to reset cache
+          # Install a specific version of uv.
+          version: "0.7.20"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: Install Poetry
-        if: steps.cached-poetry.outputs.cache-hit != 'true'
-        uses: snok/install-poetry@v1
-        with:
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-v2-${{ hashFiles('**/poetry.lock') }}
-
-      - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-        
-      - name: Install project
-        run: poetry install --extras "dev" --no-interaction
+      - name: Install the project
+        run: uv sync --all-extras --dev
 
       - name: Checks with pre-commit
-        run: poetry run pre-commit run --all-files
+        run: uv run pre-commit run --all-files
 
       - name: Run tests
-        run: poetry run pytest
+        run: uv run pytest
