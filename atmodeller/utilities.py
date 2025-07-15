@@ -184,8 +184,7 @@ def earth_oceans_to_hydrogen_mass(number_of_earth_oceans: ArrayLike = 1) -> Arra
     Returns:
         Hydrogen mass
     """
-    h_grams: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
-    h_kg: ArrayLike = h_grams * unit_conversion.g_to_kg
+    h_kg: ArrayLike = number_of_earth_oceans * OCEAN_MASS_H2
 
     return h_kg
 
