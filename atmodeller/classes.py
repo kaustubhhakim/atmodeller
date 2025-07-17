@@ -147,7 +147,6 @@ class InteriorAtmosphere:
         # Pre-bind fixed configurations
         solver_fn: Callable = eqx.Partial(
             solve,
-            # solver_parameters=solver_parameters_,
             fixed_parameters=fixed_parameters_,
             options=options,
         )
@@ -310,7 +309,7 @@ class InteriorAtmosphere:
                 num_failed_models * 100 / batch_size,
             )
 
-        logger.debug("Solver steps = %s", solver_steps)
+        logger.info("Solver steps (max) = %s", jnp.max(solver_steps).item())
 
         self._output = Output(
             self.species,
