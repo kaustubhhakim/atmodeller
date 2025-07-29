@@ -7,8 +7,9 @@
 [![Release 0.8.2](https://img.shields.io/badge/Release-0.8.2-blue.svg)](https://github.com/ExPlanetology/atmodeller/releases/tag/v0.8.2)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python package](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml/badge.svg)](https://github.com/ExPlanetology/atmodeller/actions/workflows/python-package.yml)
-[![Test coverage](https://img.shields.io/badge/Coverage-88%25-brightgreen)](https://github.com/ExPlanetology/atmodeller)
+[![CI](https://github.com/ExPlanetology/atmodeller/actions/workflows/ci.yml/badge.svg)](https://github.com/ExPlanetology/atmodeller/actions/workflows/ci.yml)
+[![Checked with pyright](https://microsoft.github.io/pyright/img/pyright_badge.svg)](https://microsoft.github.io/pyright/)
+[![Test coverage](https://img.shields.io/badge/Coverage-87%25-brightgreen)](https://github.com/ExPlanetology/atmodeller)
 
 ## About
 Atmodeller is a Python package that uses [JAX](https://jax.readthedocs.io/en/latest/index.html) to compute the partitioning of volatiles between a planetary atmosphere and its rocky interior. It is released under [The GNU General Public License v3.0 or later](https://www.gnu.org/licenses/gpl-3.0.en.html).
