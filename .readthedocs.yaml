@@ -5,7 +5,7 @@
 version: 2
 
 build:
-  os: "ubuntu-22.04"
+  os: "ubuntu-24.04"
   tools:
     python: "3.10"
 
@@ -13,13 +13,19 @@ build:
 sphinx:
   configuration: docs/conf.py
 
-# Explicitly set the version of Python and its requirements
-python:
-  install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
+build:
+   os: ubuntu-24.04
+   tools:
+      python: "3.13"
+   jobs:
+      pre_create_environment:
+         - asdf plugin add uv
+         - asdf install uv latest
+         - asdf global uv latest
+      create_environment:
+         - uv venv "${READTHEDOCS_VIRTUALENV_PATH}"
+      install:
+         - UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv sync --extra docs
 
 formats:
   - epub
