@@ -91,7 +91,7 @@ class NoSolubility(Solubility):
         temperature: ArrayLike | None = None,
         pressure: ArrayLike | None = None,
         fO2: ArrayLike | None = None,
-    ) -> ArrayLike:
+    ) -> Array:
         del fugacity
         del temperature
         del pressure

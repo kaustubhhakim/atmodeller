@@ -60,7 +60,7 @@ class SolubilityProtocol(Protocol):
         temperature: ArrayLike | None = None,
         pressure: ArrayLike | None = None,
         fO2: ArrayLike | None = None,
-    ) -> ArrayLike: ...
+    ) -> Array: ...
 
     def jax_concentration(
         self, fugacity: ArrayLike, temperature: ArrayLike, pressure: ArrayLike, fO2: ArrayLike
