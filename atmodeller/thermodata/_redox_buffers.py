@@ -128,10 +128,9 @@ class IronWustiteBufferHirschmann08(RedoxBuffer):
             should be used with caution.
     """
 
-    calibration: ExperimentalCalibration = eqx.field(init=False)
-
-    def __post_init__(self):
-        self.calibration = ExperimentalCalibration(pressure_max=27.5 * unit_conversion.GPa_to_bar)
+    @property
+    def calibration(self) -> ExperimentalCalibration:
+        return ExperimentalCalibration(pressure_max=27.5 * unit_conversion.GPa_to_bar)
 
     @override
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
@@ -174,28 +173,20 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
             should be used with caution.
     """
 
-    calibration: ExperimentalCalibration = eqx.field(init=False)
-    a: tuple[float, ...] = eqx.field(init=False)
-    b: tuple[float, ...] = eqx.field(init=False)
-    c: tuple[float, ...] = eqx.field(init=False)
-    d: tuple[float, ...] = eqx.field(init=False)
-    e: tuple[float, ...] = eqx.field(init=False)
-    f: tuple[float, ...] = eqx.field(init=False)
-    g: tuple[float, ...] = eqx.field(init=False)
-    h: tuple[float, ...] = eqx.field(init=False)
+    a: tuple[float, ...] = (6.844864, 1.175691e-1, 1.143873e-3, 0.0, 0.0)
+    b: tuple[float, ...] = (5.791364e-4, -2.891434e-4, -2.737171e-7, 0.0, 0.0)
+    c: tuple[float, ...] = (-7.971469e-5, 3.198005e-5, 0.0, 1.059554e-10, 2.014461e-7)
+    d: tuple[float, ...] = (-2.769002e4, 5.285977e2, -2.919275, 0.0, 0.0)
+    e: tuple[float, ...] = (8.463095, -3.000307e-3, 7.213445e-5, 0.0, 0.0)
+    f: tuple[float, ...] = (1.148738e-3, -9.352312e-5, 5.161592e-7, 0.0, 0.0)
+    g: tuple[float, ...] = (-7.448624e-4, -6.329325e-6, 0.0, -1.407339e-10, 1.830014e-4)
+    h: tuple[float, ...] = (-2.782082e4, 5.285977e2, -8.473231e-1, 0.0, 0.0)
 
-    def __post_init__(self):
-        self.calibration = ExperimentalCalibration(
+    @property
+    def calibration(self) -> ExperimentalCalibration:
+        return ExperimentalCalibration(
             temperature_min=1000, pressure_max=100 * unit_conversion.GPa_to_bar
         )
-        self.a = (6.844864, 1.175691e-1, 1.143873e-3, 0, 0)
-        self.b = (5.791364e-4, -2.891434e-4, -2.737171e-7, 0.0, 0.0)
-        self.c = (-7.971469e-5, 3.198005e-5, 0, 1.059554e-10, 2.014461e-7)
-        self.d = (-2.769002e4, 5.285977e2, -2.919275, 0, 0)
-        self.e = (8.463095, -3.000307e-3, 7.213445e-5, 0, 0)
-        self.f = (1.148738e-3, -9.352312e-5, 5.161592e-7, 0, 0)
-        self.g = (-7.448624e-4, -6.329325e-6, 0, -1.407339e-10, 1.830014e-4)
-        self.h = (-2.782082e4, 5.285977e2, -8.473231e-1, 0, 0)
 
     @override
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
@@ -330,18 +321,17 @@ class IronWustiteBufferHirschmann(RedoxBuffer):
             should be used with caution.
     """
 
-    low_temperature_buffer: IronWustiteBufferHirschmann08 = eqx.field(init=False)
-    high_temperature_buffer: IronWustiteBufferHirschmann21 = eqx.field(init=False)
-    calibration: ExperimentalCalibration = eqx.field(init=False)
+    @property
+    def calibration(self) -> ExperimentalCalibration:
+        return ExperimentalCalibration(pressure_max=100 * unit_conversion.GPa_to_bar)
 
-    def __post_init__(self):
-        self.low_temperature_buffer = IronWustiteBufferHirschmann08(
-            self.log10_shift_, self.evaluation_pressure
-        )
-        self.high_temperature_buffer = IronWustiteBufferHirschmann21(
-            self.log10_shift_, self.evaluation_pressure
-        )
-        self.calibration = ExperimentalCalibration(pressure_max=100 * unit_conversion.GPa_to_bar)
+    @property
+    def low_temperature_buffer(self) -> IronWustiteBufferHirschmann08:
+        return IronWustiteBufferHirschmann08(self.log10_shift_, self.evaluation_pressure)
+
+    @property
+    def high_temperature_buffer(self) -> IronWustiteBufferHirschmann21:
+        return IronWustiteBufferHirschmann21(self.log10_shift_, self.evaluation_pressure)
 
     @override
     def convert_pressure_units(self, pressure: ArrayLike) -> ArrayLike:
