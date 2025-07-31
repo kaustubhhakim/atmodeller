@@ -3,7 +3,7 @@ name = "atmodeller"
 version = "0.8.3"
 description = "Volatile partitioning between a rocky interior and atmosphere"
 readme = "README.md"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.11,<4.0"
 license = "GPL-3.0-or-later"
 authors = [
     {name = "Dan J Bower", email = "dbower@eaps.ethz.ch"},
@@ -53,8 +53,8 @@ dependencies = [
     "optax>=0.2.5",
     "xmmutablemap>=0.1",
     "optimistix==0.0.10",
-    "jax==0.6.2",
-    "equinox==0.12.2",
+    "jax==0.7.0",
+    "equinox==0.13.0",
 ]
 
 [project.urls]
