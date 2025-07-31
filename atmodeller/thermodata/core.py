@@ -118,7 +118,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _cp_over_R(
         self, cp_coefficients: Float[Array, "T 7"], temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         """Heat capacity relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
@@ -150,7 +150,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _S_over_R(
         self, cp_coefficients: Float[Array, "T 7"], b2: ArrayLike, temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         """Entropy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
@@ -183,7 +183,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _H_over_RT(
         self, cp_coefficients: Float[Array, "T 7"], b1: ArrayLike, temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         r"""Enthalpy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         :math:`\times T`
 
