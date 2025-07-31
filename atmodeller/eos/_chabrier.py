@@ -29,7 +29,6 @@ import pandas as pd
 from jax.scipy.interpolate import RegularGridInterpolator
 from jaxtyping import Array, ArrayLike
 from molmass import Formula
-from xmmutablemap import ImmutableMap
 
 from atmodeller import PRESSURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT_BAR
@@ -61,19 +60,6 @@ class Chabrier(RealGas):
 
     CHABRIER_DIRECTORY: ClassVar[Path] = Path("chabrier")
     """Directory of the Chabrier data within :obj:`~atmodeller.eos.data`"""
-    He_fraction_map: ClassVar[ImmutableMap[str, float]] = ImmutableMap(
-        {
-            "TABLE_H_TP_v1": 0.0,
-            "TABLE_HE_TP_v1": 1.0,
-            "TABLEEOS_2021_TP_Y0275_v1": 0.275,
-            "TABLEEOS_2021_TP_Y0292_v1": 0.292,
-            "TABLEEOS_2021_TP_Y0297_v1": 0.297,
-        }
-    )
-    """Mole fraction of He in the gas mixture, the other component being H2.
-    
-    Dictionary keys should correspond to the name of the Chabrier file.
-    """
     log10_density_func: Callable
     """Spline lookup for density from :cite:t:`CD21` T-P-rho tables"""
     He_fraction: float
@@ -101,7 +87,7 @@ class Chabrier(RealGas):
             Instance
         """
         log10_density_func: Callable = cls._get_interpolator(filename)
-        He_fraction: float = cls.He_fraction_map[filename.name]
+        He_fraction: float = cls.get_He_fraction_map()[filename.name]
         H2_molar_mass_g_mol: float = Formula("H2").mass
         He_molar_mass_g_mol: float = Formula("He").mass
 
@@ -180,6 +166,22 @@ class Chabrier(RealGas):
         molar_density = molar_density / composition_factor
 
         return molar_density
+
+    @staticmethod
+    def get_He_fraction_map() -> dict[str, float]:
+        """Mole fraction of He in the gas mixture, the other component being H2.
+
+        Dictionary keys should correspond to the name of the Chabrier file.
+        """
+        He_fraction_map: dict[str, float] = {
+            "TABLE_H_TP_v1": 0.0,
+            "TABLE_HE_TP_v1": 1.0,
+            "TABLEEOS_2021_TP_Y0275_v1": 0.275,
+            "TABLEEOS_2021_TP_Y0292_v1": 0.292,
+            "TABLEEOS_2021_TP_Y0297_v1": 0.297,
+        }
+
+        return He_fraction_map
 
     @override
     @eqx.filter_jit
