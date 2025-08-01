@@ -29,7 +29,7 @@ from jaxtyping import Array, ArrayLike, Float
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import IdealGas, RealGas
-from atmodeller.utilities import ExperimentalCalibration, as_j64
+from atmodeller.utilities import ExperimentalCalibration, as_j64, to_hashable
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -137,7 +137,7 @@ class CombinedRealGas(RealGas):
     @property
     def volume_functions(self) -> tuple[Callable, ...]:
         """Volume functions"""
-        return tuple(eos.volume for eos in self.real_gases)
+        return tuple(to_hashable(eos.volume) for eos in self.real_gases)
 
     @property
     def upper_pressure_bounds(self) -> Array:
@@ -146,7 +146,7 @@ class CombinedRealGas(RealGas):
     @property
     def volume_integral_functions(self) -> tuple[Callable, ...]:
         """Volume integral functions"""
-        return tuple(eos.volume_integral for eos in self.real_gases)
+        return tuple(to_hashable(eos.volume_integral) for eos in self.real_gases)
 
     @staticmethod
     def _get_upper_pressure_bounds(
