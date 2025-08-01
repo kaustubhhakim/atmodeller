@@ -18,7 +18,7 @@
 
 import importlib.resources
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from importlib.abc import Traversable
 from pathlib import Path
 from typing import cast
@@ -401,10 +401,10 @@ class ThermodynamicCoefficients(eqx.Module):
 class ThermodynamicDataSource:
     """Thermodynamic data source for all species"""
 
-    data: pd.DataFrame = field(init=False)
+    data: pd.DataFrame
     """Thermodynamic data for all species"""
 
-    def __post_init__(self):
+    def __init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
             DATA_DIRECTORY.joinpath(THERMODYNAMIC_DATA_SOURCE)  # type: ignore
         )
@@ -493,10 +493,10 @@ class CriticalData(eqx.Module):
 class CriticalDataSource:
     """Critical data source for all species"""
 
-    data: pd.DataFrame = field(init=False)
+    data: pd.DataFrame
     """Critical data for all species"""
 
-    def __post_init__(self):
+    def __init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
             DATA_DIRECTORY.joinpath(CRITICAL_DATA_SOURCE)  # type: ignore
         )
@@ -577,19 +577,18 @@ class IndividualSpeciesData(eqx.Module):
     """Formula"""
     state: str
     """State of aggregation"""
-    thermo: ThermodynamicCoefficients = eqx.field(init=False)
+    thermo: ThermodynamicCoefficients
     """Thermodynamic coefficient and methods"""
-    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    composition: ImmutableMap[str, tuple[int, float, float]]
     """Composition"""
-    hill_formula: str = eqx.field(init=False)
+    hill_formula: str
     """Hill formula"""
-    molar_mass: float = eqx.field(init=False)
+    molar_mass: float
     """Molar mass"""
 
-    def __post_init__(self):
-        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
-        # though the arguments would allow it. Previous tests resulted in an infinite compilation
-        # loop for JAX. Instead, we get thermodynamic coefficients from a dictionary.
+    def __init__(self, formula: str, state: str):
+        self.formula = formula
+        self.state = state
         mformula: Formula = Formula(self.formula)
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula
