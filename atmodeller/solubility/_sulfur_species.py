@@ -21,7 +21,6 @@ For every law there should be a test in the test suite.
 
 import logging
 
-import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
@@ -102,10 +101,10 @@ controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit bel
 class _S2_andesite_boulliung23(Solubility):
     """S2 in andesite accounting for both sulfide and sulfate :cite:p:`BW22,BW23corr,BW23`"""
 
-    _sulfide: Solubility = eqx.field(init=False)
-    _sulfate: Solubility = eqx.field(init=False)
+    _sulfide: Solubility
+    _sulfate: Solubility
 
-    def __post_init__(self):
+    def __init__(self):
         self._sulfide = S2_sulfide_andesite_boulliung23
         self._sulfate = S2_sulfate_andesite_boulliung23
 
@@ -195,10 +194,10 @@ unit below FMQ.
 class _S2_basalt_boulliung23(Solubility):
     """Sulfur in basalt due to sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
-    _sulfide: Solubility = eqx.field(init=False)
-    _sulfate: Solubility = eqx.field(init=False)
+    _sulfide: Solubility
+    _sulfate: Solubility
 
-    def __post_init__(self):
+    def __init__(self):
         self._sulfide = S2_sulfide_basalt_boulliung23
         self._sulfate = S2_sulfate_basalt_boulliung23
 
@@ -286,10 +285,10 @@ controlled CO-CO2-SO2 atmosphere fO2 conditions were greater than 1 log unit bel
 class _S2_trachybasalt_boulliung23(Solubility):
     """Sulfur in trachybasalt by sulfide and sulfate dissolution :cite:p:`BW22,BW23corr,BW23`"""
 
-    _sulfide: Solubility = eqx.field(init=False)
-    _sulfate: Solubility = eqx.field(init=False)
+    _sulfide: Solubility
+    _sulfate: Solubility
 
-    def __post_init__(self):
+    def __init__(self):
         self._sulfide = S2_sulfide_trachybasalt_boulliung23
         self._sulfate = S2_sulfate_trachybasalt_boulliung23
 
