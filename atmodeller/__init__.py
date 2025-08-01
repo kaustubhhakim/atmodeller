@@ -36,7 +36,7 @@ print("Atmodeller initialized with double precision (float64)")
 # For debugging
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_debug_infs", True)
-jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_disable_jit", True)
 # jax.config.update("jax_log_compiles", True)
 
 # This prevents error_if from throwing an error when encountering NaN or Inf values. To actually
