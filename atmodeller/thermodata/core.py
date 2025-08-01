@@ -536,9 +536,7 @@ class CriticalDataSource:
         return critical_dict
 
 
-# Although it might be tempting to create objects on-the-fly when required, this might not play
-# nice with JAX, which requires purely functional programming (and no side effects). So instead
-# we create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
+# Create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
 # It should also be net faster to create these data once and then access (potentially many times).
 # These are also set to private to avoid sphinx (autodoc) from printing long strings.
 thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
