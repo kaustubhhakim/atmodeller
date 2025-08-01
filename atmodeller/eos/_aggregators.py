@@ -54,10 +54,14 @@ class CombinedRealGas(RealGas):
     """Real gases to combine"""
     calibrations: tuple[ExperimentalCalibration, ...]
     """Experimental calibrations"""
-    _upper_pressure_bounds: tuple[Array, ...] = eqx.field(init=False)
+    _upper_pressure_bounds: tuple[Array, ...]
 
-    def __post_init__(self):
-        self._upper_pressure_bounds = self._get_upper_pressure_bounds()
+    def __init__(
+        self, real_gases: tuple[RealGas, ...], calibrations: tuple[ExperimentalCalibration, ...]
+    ):
+        self.real_gases = real_gases
+        self.calibrations = calibrations
+        self._upper_pressure_bounds = self._get_upper_pressure_bounds(calibrations)
 
     @classmethod
     def create(
@@ -144,7 +148,10 @@ class CombinedRealGas(RealGas):
         """Volume integral functions"""
         return tuple(eos.volume_integral for eos in self.real_gases)
 
-    def _get_upper_pressure_bounds(self) -> tuple[Array, ...]:
+    @staticmethod
+    def _get_upper_pressure_bounds(
+        calibrations: tuple[ExperimentalCalibration, ...],
+    ) -> tuple[Array, ...]:
         """Gets the upper pressure bounds based on each experimental calibration.
 
         Returns:
@@ -152,11 +159,11 @@ class CombinedRealGas(RealGas):
         """
         upper_pressure_bounds: list[Array] = []
 
-        for ii, calibration in enumerate(self.calibrations):
+        for ii, calibration in enumerate(calibrations):
             try:
                 assert not jnp.isnan(calibration.pressure_max)
             except AssertionError:
-                if ii == len(self.calibrations) - 1:
+                if ii == len(calibrations) - 1:
                     continue
                 else:
                     msg: str = "Maximum pressure cannot be None"
