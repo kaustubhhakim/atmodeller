@@ -39,7 +39,7 @@ The data from the above study are also available for download at https://doi.org
 
 ## Basic usage
 
-Jupyter notebooks in the `notebooks/` directory demonstrate how to perform single and batch calculations, and how to integrate Atmodeller into time-dependent simulations. A simple example of how to use Atmodeller is provided below:
+Jupyter notebooks in the `notebooks/` directory demonstrate how to perform single and batch calculations, and how to perform iterative updates with changing constraints. A simple example of how to use Atmodeller is provided below:
 
 ```
 from atmodeller import (
