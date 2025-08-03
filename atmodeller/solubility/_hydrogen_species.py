@@ -19,6 +19,7 @@
 For every law there should be a test in the test suite.
 """
 
+import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
@@ -113,7 +114,7 @@ class _H2_chachan18(Solubility):
     """Mass fraction at calibration conditions"""
     T0: float
     """Arrhenius temperature factor in K"""
-    A: Array
+    A: Array = eqx.field(static=True)
     """Constant factor"""
 
     def __init__(

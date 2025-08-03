@@ -174,6 +174,8 @@ class _N2_basalt_dasgupta22(Solubility):
     fO2 from ~IW-3 to IW-4. Combined this high pressure data with lower pressure studies to derive
     their N solubility law.
 
+    Note that the IW redox buffer is evaluated at the pressure of interest.
+
     Args:
         xsio2: Mole fraction of SiO2. Defaults to 0.56.
         xal2o3: Mole fraction of Al2O3. Defaults to 0.11.
@@ -186,7 +188,6 @@ class _N2_basalt_dasgupta22(Solubility):
     """Mole fraction of Al2O3"""
     xtio2: float
     """Mole fraction of TiO2"""
-    # The buffer is evaluated at the pressure of interest, not the default of 1 bar
     _buffer: RedoxBufferProtocol
 
     def __init__(self, xsio2: float = 0.56, xal2o3: float = 0.11, xtio2: float = 0.01):
