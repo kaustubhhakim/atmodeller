@@ -29,7 +29,7 @@ from jaxtyping import Array, ArrayLike, Float
 
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos.core import IdealGas, RealGas
-from atmodeller.utilities import ExperimentalCalibration, as_j64
+from atmodeller.utilities import ExperimentalCalibration, as_j64, to_hashable
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -54,10 +54,21 @@ class CombinedRealGas(RealGas):
     """Real gases to combine"""
     calibrations: tuple[ExperimentalCalibration, ...]
     """Experimental calibrations"""
-    _upper_pressure_bounds: tuple[Array, ...] = eqx.field(init=False)
+    upper_pressure_bounds: Array = eqx.field(static=True)
+    """Upper pressure bounds"""
+    _volume_functions: tuple[Callable, ...]
+    _volume_integral_functions: tuple[Callable, ...]
 
-    def __post_init__(self):
-        self._upper_pressure_bounds = self._get_upper_pressure_bounds()
+    def __init__(
+        self, real_gases: tuple[RealGas, ...], calibrations: tuple[ExperimentalCalibration, ...]
+    ):
+        self.real_gases = real_gases
+        self.calibrations = calibrations
+        self.upper_pressure_bounds = jnp.array(self._get_upper_pressure_bounds(calibrations))
+        self._volume_functions = tuple(to_hashable(eos.volume) for eos in self.real_gases)
+        self._volume_integral_functions = tuple(
+            to_hashable(eos.volume_integral) for eos in self.real_gases
+        )
 
     @classmethod
     def create(
@@ -130,21 +141,10 @@ class CombinedRealGas(RealGas):
         calibration: ExperimentalCalibration = ExperimentalCalibration(pressure_min=pressure_min)
         calibrations.append(calibration)
 
-    @property
-    def volume_functions(self) -> tuple[Callable, ...]:
-        """Volume functions"""
-        return tuple(eos.volume for eos in self.real_gases)
-
-    @property
-    def upper_pressure_bounds(self) -> Array:
-        return jnp.array(self._upper_pressure_bounds)
-
-    @property
-    def volume_integral_functions(self) -> tuple[Callable, ...]:
-        """Volume integral functions"""
-        return tuple(eos.volume_integral for eos in self.real_gases)
-
-    def _get_upper_pressure_bounds(self) -> tuple[Array, ...]:
+    @staticmethod
+    def _get_upper_pressure_bounds(
+        calibrations: tuple[ExperimentalCalibration, ...],
+    ) -> tuple[Array, ...]:
         """Gets the upper pressure bounds based on each experimental calibration.
 
         Returns:
@@ -152,11 +152,11 @@ class CombinedRealGas(RealGas):
         """
         upper_pressure_bounds: list[Array] = []
 
-        for ii, calibration in enumerate(self.calibrations):
+        for ii, calibration in enumerate(calibrations):
             try:
                 assert not jnp.isnan(calibration.pressure_max)
             except AssertionError:
-                if ii == len(self.calibrations) - 1:
+                if ii == len(calibrations) - 1:
                     continue
                 else:
                     msg: str = "Maximum pressure cannot be None"
@@ -199,7 +199,7 @@ class CombinedRealGas(RealGas):
         # jax.debug.print("indices = {out}", out=indices)
 
         def apply_volume(index: ArrayLike, temperature, pressure) -> Array:
-            return lax.switch(index, self.volume_functions, temperature, pressure)
+            return lax.switch(index, self._volume_functions, temperature, pressure)
 
         vmap_volume: Callable = eqx.filter_vmap(apply_volume, in_axes=(0, 0, 0))
         volume: Array = vmap_volume(indices, temperature, pressure)
@@ -224,13 +224,13 @@ class CombinedRealGas(RealGas):
             Returns:
                 Volume integral"""
             volume_integral_high: Array = lax.switch(
-                i, self.volume_integral_functions, temperature, pressure_high
+                i, self._volume_integral_functions, temperature, pressure_high
             )
             # jax.debug.print(
             #    "compute_integral: volume_integral_high = {out}", out=volume_integral_high
             # )
             volume_integral_low: Array = lax.switch(
-                i, self.volume_integral_functions, temperature, pressure_low
+                i, self._volume_integral_functions, temperature, pressure_low
             )
             # jax.debug.print(
             #    "compute_integral: volume_integral_low = {out}", out=volume_integral_low
@@ -285,13 +285,13 @@ class CombinedRealGas(RealGas):
                 Total integral with the first integral contribution added
             """
             # If the index is 0, then the first integral is the only one that is added.
-            integral: Array = lax.switch(0, self.volume_integral_functions, temperature, pressure)
+            integral: Array = lax.switch(0, self._volume_integral_functions, temperature, pressure)
             # Otherwise, the first integral is added to the total integral.
             pressure_max: Array = lax.dynamic_index_in_dim(
                 self.upper_pressure_bounds, 0, keepdims=False
             )
             integral2: Array = lax.switch(
-                0, self.volume_integral_functions, temperature, pressure_max
+                0, self._volume_integral_functions, temperature, pressure_max
             )
 
             # jax.debug.print("add_only_first_integral: integral = {out}", out=integral)

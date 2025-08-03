@@ -112,11 +112,22 @@ class _H2_chachan18(Solubility):
     """Calibration temperature"""
     X_calibration: ArrayLike
     """Mass fraction at calibration conditions"""
-    T0: float = 4000
+    T0: float
     """Arrhenius temperature factor in K"""
-    A: Array = eqx.field(init=False)
+    A: Array = eqx.field(static=True)
+    """Constant factor"""
 
-    def __post_init__(self):
+    def __init__(
+        self,
+        f_calibration: ArrayLike,
+        T_calibration: ArrayLike,
+        X_calibration: ArrayLike,
+        T0: float = 4000,
+    ):
+        self.f_calibration = f_calibration
+        self.T_calibration = T_calibration
+        self.X_calibration = X_calibration
+        self.T0 = T0
         self.A = jnp.exp(
             (self.T0 / self.T_calibration) + jnp.log(self.X_calibration / self.f_calibration)
         )

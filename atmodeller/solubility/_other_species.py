@@ -19,7 +19,6 @@
 For every law there should be a test in the test suite.
 """
 
-import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
@@ -175,24 +174,26 @@ class _N2_basalt_dasgupta22(Solubility):
     fO2 from ~IW-3 to IW-4. Combined this high pressure data with lower pressure studies to derive
     their N solubility law.
 
+    Note that the IW redox buffer is evaluated at the pressure of interest.
+
     Args:
         xsio2: Mole fraction of SiO2. Defaults to 0.56.
         xal2o3: Mole fraction of Al2O3. Defaults to 0.11.
         xtio2: Mole fraction of TiO2. Defaults to 0.01.
-
-    Attributes:
-        xsio2: Mole fraction of SiO2
-        xal2o3: Mole fraction of Al2O3
-        xtio2: Mole fraction of TiO2
     """
 
-    xsio2: float = 0.56
-    xal2o3: float = 0.11
-    xtio2: float = 0.01
-    # The buffer is evaluated at the pressure of interest, not the default of 1 bar
-    _buffer: RedoxBufferProtocol = eqx.field(init=False)
+    xsio2: float
+    """Mole fraction of SiO2"""
+    xal2o3: float
+    """Mole fraction of Al2O3"""
+    xtio2: float
+    """Mole fraction of TiO2"""
+    _buffer: RedoxBufferProtocol
 
-    def __post_init__(self):
+    def __init__(self, xsio2: float = 0.56, xal2o3: float = 0.11, xtio2: float = 0.01):
+        self.xsio2 = xsio2
+        self.xal2o3 = xal2o3
+        self.xtio2 = xtio2
         self._buffer = IronWustiteBuffer(evaluation_pressure=None)
 
     @override

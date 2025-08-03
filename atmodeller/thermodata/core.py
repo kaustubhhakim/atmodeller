@@ -18,7 +18,7 @@
 
 import importlib.resources
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from importlib.abc import Traversable
 from pathlib import Path
 from typing import cast
@@ -118,7 +118,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _cp_over_R(
         self, cp_coefficients: Float[Array, "T 7"], temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         """Heat capacity relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
@@ -150,7 +150,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _S_over_R(
         self, cp_coefficients: Float[Array, "T 7"], b2: ArrayLike, temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         """Entropy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
 
         Args:
@@ -183,7 +183,7 @@ class ThermodynamicCoefficients(eqx.Module):
 
     def _H_over_RT(
         self, cp_coefficients: Float[Array, "T 7"], b1: ArrayLike, temperature: ArrayLike
-    ) -> Float[Array, ""]:
+    ) -> Float[Array, " T"]:
         r"""Enthalpy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
         :math:`\times T`
 
@@ -401,10 +401,10 @@ class ThermodynamicCoefficients(eqx.Module):
 class ThermodynamicDataSource:
     """Thermodynamic data source for all species"""
 
-    data: pd.DataFrame = field(init=False)
+    data: pd.DataFrame
     """Thermodynamic data for all species"""
 
-    def __post_init__(self):
+    def __init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
             DATA_DIRECTORY.joinpath(THERMODYNAMIC_DATA_SOURCE)  # type: ignore
         )
@@ -493,10 +493,10 @@ class CriticalData(eqx.Module):
 class CriticalDataSource:
     """Critical data source for all species"""
 
-    data: pd.DataFrame = field(init=False)
+    data: pd.DataFrame
     """Critical data for all species"""
 
-    def __post_init__(self):
+    def __init__(self):
         data: AbstractContextManager[Path] = importlib.resources.as_file(
             DATA_DIRECTORY.joinpath(CRITICAL_DATA_SOURCE)  # type: ignore
         )
@@ -536,9 +536,7 @@ class CriticalDataSource:
         return critical_dict
 
 
-# Although it might be tempting to create objects on-the-fly when required, this might not play
-# nice with JAX, which requires purely functional programming (and no side effects). So instead
-# we create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
+# Create dictionaries of instantiated data (JAX-compliant Pytrees) that we can use for lookup.
 # It should also be net faster to create these data once and then access (potentially many times).
 # These are also set to private to avoid sphinx (autodoc) from printing long strings.
 thermodynamic_data_source: ThermodynamicDataSource = ThermodynamicDataSource()
@@ -577,19 +575,18 @@ class IndividualSpeciesData(eqx.Module):
     """Formula"""
     state: str
     """State of aggregation"""
-    thermo: ThermodynamicCoefficients = eqx.field(init=False)
+    thermo: ThermodynamicCoefficients
     """Thermodynamic coefficient and methods"""
-    composition: ImmutableMap[str, tuple[int, float, float]] = eqx.field(init=False)
+    composition: ImmutableMap[str, tuple[int, float, float]]
     """Composition"""
-    hill_formula: str = eqx.field(init=False)
+    hill_formula: str
     """Hill formula"""
-    molar_mass: float = eqx.field(init=False)
+    molar_mass: float
     """Molar mass"""
 
-    def __post_init__(self):
-        # NOTE: Here, it is intentionally avoided to instantiate ThermodynamicCoefficients, even
-        # though the arguments would allow it. Previous tests resulted in an infinite compilation
-        # loop for JAX. Instead, we get thermodynamic coefficients from a dictionary.
+    def __init__(self, formula: str, state: str):
+        self.formula = formula
+        self.state = state
         mformula: Formula = Formula(self.formula)
         self.composition = ImmutableMap(mformula.composition().asdict())
         self.hill_formula = mformula.formula

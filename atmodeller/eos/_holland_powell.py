@@ -239,10 +239,11 @@ class MRKCorrespondingStatesHP91(RedlichKwongABC):
     """
 
     critical_data: CriticalData
-    _a_coefficients: tuple[float, ...] = eqx.field(init=False)
-    _b: float = eqx.field(init=False, converter=float)
+    _a_coefficients: tuple[float, ...]
+    _b: float
 
-    def __post_init__(self):
+    def __init__(self, critical_data: CriticalData):
+        self.critical_data = critical_data
         self._a_coefficients = CorrespondingStatesUnitConverter.convert_a_coefficients(
             (5.45963e-5, -8.63920e-6, 0.0)
         )

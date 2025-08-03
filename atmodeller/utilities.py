@@ -64,7 +64,10 @@ def safe_exp(x: ArrayLike) -> Array:
 
 
 def to_hashable(x: Any) -> Callable:
-    """Converts input to a hashable type"""
+    """Converts input to a hashable type
+
+    For reasoning and use cases see: https://github.com/patrick-kidger/equinox/issues/1011
+    """
 
     return Partial(x)
 
