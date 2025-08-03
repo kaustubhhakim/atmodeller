@@ -22,8 +22,9 @@ For every law there should be a test in the test suite.
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
+from atmodeller.eos._chabrier import H2_chabrier21_bounded
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import as_j64, unit_conversion
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -140,21 +141,21 @@ class _H2_chachan18(Solubility):
         return ppmw
 
 
-# H2_chachan18: Solubility = _H2_chachan18(
-#     f_calibration=1500, T_calibration=1673, X_calibration=0.001
-# )
-# """H2 by combining theory and experiment :cite:p:`CS18`"""
+H2_chachan18: Solubility = _H2_chachan18(
+    f_calibration=1500, T_calibration=1673, X_calibration=0.001
+)
+"""H2 by combining theory and experiment :cite:p:`CS18`"""
 
-# # At 1 GPa in the presence of pure H2, the molecular H2 concentration is 0.19 wt.%"
-# # Need to convert pressure to H2 fugacity
-# # With Chabrier EOS, f_calibration = 23986.034649111516
-# # With Zhang and Duan EOS, f_calibration2 = 28421.194323648964
-# T_calibration: ArrayLike = as_j64(1673)
-# P_calibration: ArrayLike = as_j64(1 * unit_conversion.GPa_to_bar)
-# f_calibration: ArrayLike = H2_chabrier21_bounded.fugacity(T_calibration, P_calibration)
-# X_calibration: ArrayLike = 0.0019
+# At 1 GPa in the presence of pure H2, the molecular H2 concentration is 0.19 wt.%"
+# Need to convert pressure to H2 fugacity
+# With Chabrier EOS, f_calibration = 23986.034649111516
+# With Zhang and Duan EOS, f_calibration2 = 28421.194323648964
+T_calibration: ArrayLike = as_j64(1673)
+P_calibration: ArrayLike = as_j64(1 * unit_conversion.GPa_to_bar)
+f_calibration: ArrayLike = H2_chabrier21_bounded.fugacity(T_calibration, P_calibration)
+X_calibration: ArrayLike = 0.0019
 
-# H2_kite19: Solubility = _H2_chachan18(
-#     f_calibration=f_calibration, T_calibration=T_calibration, X_calibration=X_calibration
-# )
-# """H2 by combining theory and experiment :cite:p:`KFS19`."""
+H2_kite19: Solubility = _H2_chachan18(
+    f_calibration=f_calibration, T_calibration=T_calibration, X_calibration=X_calibration
+)
+"""H2 by combining theory and experiment :cite:p:`KFS19`."""
