@@ -11,6 +11,9 @@ It is recommended to install *Atmodeller* in a virtual environment, whether you 
 
 For more information, see the `Python documentation on venv <https://docs.python.org/3/library/venv.html>`_.
 
+We recommend using a modern dependency manager such as `uv <https://docs.astral.sh/uv>`_, which offers fast installs and reproducible environments by default (See section '2b. Install *Atmodeller*' below).
+
+
 1. Quick install
 ----------------
 
@@ -92,6 +95,13 @@ Optional extras:
 - To install everything (core + dev + docs)::
 
       uv sync --extra docs
+
+.. note::
+
+    If you're using VS Code, you may need to restart the editor for the virtual environment to be detected automatically. In some cases, additional configuration may be required---see the official guidance here:
+    https://code.visualstudio.com/docs/python/environments
+
+    As a fallback, prefixing any command with ``uv`` will ensure it runs in the local (uv-created) environment, even if the virtual environment is not activated manually.
 
 Option 2: pip
 ^^^^^^^^^^^^^
