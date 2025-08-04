@@ -19,8 +19,8 @@
 For every law there should be a test in the test suite.
 """
 
-import equinox as eqx
 import jax.numpy as jnp
+import numpy as np
 from jaxtyping import Array, ArrayLike
 
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
@@ -106,30 +106,32 @@ class _H2_chachan18(Solubility):
             explore (from 3000 K to 5000 K).
     """
 
-    f_calibration: ArrayLike
+    f_calibration: float
     """Calibration fugacity"""
-    T_calibration: ArrayLike
+    T_calibration: float
     """Calibration temperature"""
-    X_calibration: ArrayLike
+    X_calibration: float
     """Mass fraction at calibration conditions"""
     T0: float
     """Arrhenius temperature factor in K"""
-    A: Array = eqx.field(static=True)
+    A: float
     """Constant factor"""
 
     def __init__(
         self,
-        f_calibration: ArrayLike,
-        T_calibration: ArrayLike,
-        X_calibration: ArrayLike,
+        f_calibration: float,
+        T_calibration: float,
+        X_calibration: float,
         T0: float = 4000,
     ):
         self.f_calibration = f_calibration
         self.T_calibration = T_calibration
         self.X_calibration = X_calibration
         self.T0 = T0
-        self.A = jnp.exp(
-            (self.T0 / self.T_calibration) + jnp.log(self.X_calibration / self.f_calibration)
+        self.A = float(
+            np.exp(
+                (self.T0 / self.T_calibration) + np.log(self.X_calibration / self.f_calibration)
+            )
         )
         # jax.debug.print("A = ", self.A)
 
@@ -151,12 +153,14 @@ H2_chachan18: Solubility = _H2_chachan18(
 # Need to convert pressure to H2 fugacity
 # With Chabrier EOS, f_calibration = 23986.034649111516
 # With Zhang and Duan EOS, f_calibration2 = 28421.194323648964
-T_calibration: ArrayLike = as_j64(1673)
-P_calibration: ArrayLike = as_j64(1 * unit_conversion.GPa_to_bar)
-f_calibration: ArrayLike = H2_chabrier21_bounded.fugacity(T_calibration, P_calibration)
-X_calibration: ArrayLike = 0.0019
+T_calibration: Array = as_j64(1673)
+P_calibration: Array = as_j64(1 * unit_conversion.GPa_to_bar)
+f_calibration: Array = H2_chabrier21_bounded.fugacity(T_calibration, P_calibration)
+X_calibration: float = 0.0019
 
 H2_kite19: Solubility = _H2_chachan18(
-    f_calibration=f_calibration, T_calibration=T_calibration, X_calibration=X_calibration
+    f_calibration=float(f_calibration),
+    T_calibration=float(T_calibration),
+    X_calibration=X_calibration,
 )
 """H2 by combining theory and experiment :cite:p:`KFS19`."""
