@@ -64,18 +64,42 @@ def safe_exp(x: ArrayLike) -> Array:
 
 
 def to_hashable(x: Any) -> Callable:
-    """Converts input to a hashable type
+    """Wraps a callable in `equinox.Partial` to make it hashable for JAX transformations.
 
-    For reasoning and use cases see: https://github.com/patrick-kidger/equinox/issues/1011
+    This is useful when passing callables with fixed arguments to JAX transformations
+    (e.g., `jax.vmap`, `jax.grad`, `jax.jit`) that require all static arguments
+    (including function references) to be hashable.
+
+    See discussion: https://github.com/patrick-kidger/equinox/issues/1011
+
+    Args:
+        x: A callable to wrap
+
+    Returns:
+        An `equinox.Partial` object wrapping the input callable, making it hashable
     """
-
     return Partial(x)
 
 
-def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
-    """Converts input to a JAX array of dtype float64.
+def is_hashable(something: Any) -> None:
+    """Checks whether an object is hashable and print the result.
 
-    This function is used to minimise the number of times jitted functions need to be compiled.
+    Args:
+        something: Any Python object to test.
+
+    Prints:
+        A message indicating whether the object is hashable.
+    """
+    try:
+        hash(something)
+        print("%s is hashable" % something.__class__.__name__)
+
+    except TypeError:
+        print("%s is not hashable" % something.__class__.__name__)
+
+
+def as_j64(x: ArrayLike | tuple) -> Float64[Array, "..."]:
+    """Converts input to a JAX array of dtype float64.
 
     Args:
         x: Input to convert
@@ -84,6 +108,34 @@ def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
         JAX array of dtype float64
     """
     return jnp.asarray(x, dtype=jnp.float64)
+
+
+def to_native_floats(value: Any, force_tuple: bool = False) -> Any:
+    """Converts scalar, 1D, and 2D arrays to native floats, tuples of floats, or nested tuples.
+
+    Args:
+        value: Value to convert
+        force_tuple: If True, a scalar is returned as a tuple with one float. Defaults to False.
+
+    Returns:
+        Floats, tuples of floats, or nested tuples
+    """
+    try:
+        val: float = float(value)  # scalar input
+        return (val,) if force_tuple else val
+    except TypeError:
+        pass
+    if hasattr(value, "ndim"):
+        if value.ndim == 0:
+            return float(value)
+        elif value.ndim == 1:
+            return tuple(float(v) for v in value)
+        elif value.ndim == 2:
+            return tuple(tuple(float(x) for x in row) for row in value)
+        else:
+            raise ValueError("Only scalars, 1D, or 2D arrays are supported.")
+    else:
+        raise TypeError("Input must be a scalar, or 1-D or 2-D NumPy/JAX array.")
 
 
 def partial_rref(matrix: NpArray) -> NpArray:
