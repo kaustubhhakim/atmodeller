@@ -34,7 +34,7 @@ from xmmutablemap import ImmutableMap
 
 from atmodeller import TEMPERATURE_REFERENCE
 from atmodeller.constants import GAS_CONSTANT
-from atmodeller.utilities import as_j64, unit_conversion
+from atmodeller.utilities import as_j64, to_native_floats, unit_conversion
 
 DATA_DIRECTORY: Traversable = importlib.resources.files(f"{__package__}.data")
 """Data directory"""
@@ -51,7 +51,7 @@ class CondensateActivity(eqx.Module):
         activity: Activity. Defaults to 1.
     """
 
-    activity: Array = eqx.field(converter=as_j64, default=1.0)
+    activity: float = 1
     """Activity"""
 
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, ""]:
@@ -89,9 +89,9 @@ class ThermodynamicCoefficients(eqx.Module):
     """Entropy constant(s) of integration"""
     cp_coeffs: tuple[tuple[float, ...], ...]
     """Heat capacity coefficients"""
-    T_min: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
+    T_min: tuple[float, ...]
     """Minimum temperature(s) in K in the range"""
-    T_max: Float[Array, " N"] = eqx.field(converter=as_j64, static=True)
+    T_max: tuple[float, ...]
     """Maximum temperature(s) in K in the range"""
 
     def _get_index(self, temperature: ArrayLike) -> Integer[Array, " T"]:
@@ -107,10 +107,12 @@ class ThermodynamicCoefficients(eqx.Module):
             Index of the temperature range
         """
         temperature = jnp.atleast_1d(as_j64(temperature))
+        T_max: Array = as_j64(self.T_max)
+        T_min: Array = as_j64(self.T_min)
 
         # Reshape for broadcasting
-        bool_mask: Bool[Array, "N T"] = (self.T_min[:, None] <= temperature[None, :]) & (
-            temperature[None, :] <= self.T_max[:, None]
+        bool_mask: Bool[Array, "N T"] = (T_min[:, None] <= temperature[None, :]) & (
+            temperature[None, :] <= T_max[:, None]
         )
         index: Integer[Array, " T"] = jnp.argmax(bool_mask, axis=0)
 
@@ -230,7 +232,7 @@ class ThermodynamicCoefficients(eqx.Module):
             cp_coefficients: Heat capacity coefficients as an array
             b1: Enthalpy integration constant
             b2: Entropy integration constant
-            temperature: Temperature
+            temperature: Temperature in K
 
         Returns:
             Gibbs energy relative to :data:`GAS_CONSTANT <atmodeller.constants.GAS_CONSTANT>`
@@ -463,12 +465,23 @@ class ThermodynamicDataSource:
             )
 
             # Process and store the thermodynamic coefficients
-            T_min: npt.NDArray[np.float64] = df["T_min"].to_numpy(dtype=float)
-            T_max: npt.NDArray[np.float64] = df["T_max"].to_numpy(dtype=float)
-            b1: tuple[float, ...] = tuple(df["b1"].astype(dtype=float))
-            b2: tuple[float, ...] = tuple(df["b2"].astype(dtype=float))
-            cp_coeffs: tuple[tuple[np.float64, ...], ...] = tuple(
-                map(tuple, df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]].to_numpy(dtype=float))
+            T_min: tuple[float, ...] = to_native_floats(
+                df["T_min"].to_numpy(dtype=float), force_tuple=True
+            )
+            T_max: tuple[float, ...] = to_native_floats(
+                df["T_max"].to_numpy(dtype=float), force_tuple=True
+            )
+            b1: tuple[float, ...] = to_native_floats(
+                df["b1"].astype(dtype=float), force_tuple=True
+            )
+            b2: tuple[float, ...] = to_native_floats(
+                df["b2"].astype(dtype=float), force_tuple=True
+            )
+            a_coefficients: npt.NDArray[np.float64] = df[
+                ["a1", "a2", "a3", "a4", "a5", "a6", "a7"]
+            ].to_numpy(dtype=float)
+            cp_coeffs: tuple[tuple[float, ...], ...] = to_native_floats(
+                a_coefficients, force_tuple=True
             )
             coefficient_dict[name] = ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
 
