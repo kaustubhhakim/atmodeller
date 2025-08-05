@@ -248,20 +248,42 @@ class ExperimentalCalibration(eqx.Module):
     """Experimental calibration
 
     Args:
-        temperature_min: Minimum calibrated temperature. Defaults to nan.
-        temperature_max: Maximum calibrated temperature. Defaults to nan.
-        pressure_min: Minimum calibrated pressure. Defaults to nan.
-        pressure_max: Maximum calibrated pressure. Defaults to nan.
-        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to nan.
-        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to nan.
+        temperature_min: Minimum calibrated temperature. Defaults to None.
+        temperature_max: Maximum calibrated temperature. Defaults to None.
+        pressure_min: Minimum calibrated pressure. Defaults to None.
+        pressure_max: Maximum calibrated pressure. Defaults to None.
+        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to None.
+        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
     """
 
-    temperature_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    temperature_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    pressure_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    pressure_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    log10_fO2_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    log10_fO2_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    temperature_min: float | None = None
+    temperature_max: float | None = None
+    pressure_min: float | None = None
+    pressure_max: float | None = None
+    log10_fO2_min: float | None = None
+    log10_fO2_max: float | None = None
+
+    def __init__(
+        self,
+        temperature_min: int | float | None = None,
+        temperature_max: int | float | None = None,
+        pressure_min: int | float | None = None,
+        pressure_max: int | float | None = None,
+        log10_fO2_min: int | float | None = None,
+        log10_fO2_max: int | float | None = None,
+    ):
+        if temperature_min is not None:
+            self.temperature_min = float(temperature_min)
+        if temperature_max is not None:
+            self.temperature_max = float(temperature_max)
+        if pressure_min is not None:
+            self.pressure_min = float(pressure_min)
+        if pressure_max is not None:
+            self.pressure_max = float(pressure_max)
+        if log10_fO2_min is not None:
+            self.log10_fO2_min = float(log10_fO2_min)
+        if log10_fO2_max is not None:
+            self.log10_fO2_max = float(log10_fO2_max)
 
 
 def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:

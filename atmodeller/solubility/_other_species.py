@@ -19,9 +19,11 @@
 For every law there should be a test in the test suite.
 """
 
+import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
+from atmodeller._mytypes import Scalar
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.solubility.core import (
@@ -57,7 +59,7 @@ and Cl fugacity for Icelandic basalt at 1400 C and 1.5 GPa. Experiments from 0.5
 1200-1500 C.
 """
 
-_He_henry_sol_constant_jambon86: float = 56e-5  # cm3*STP/g*bar
+_He_henry_sol_constant_jambon86: Scalar = 56e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert He conc from mol/g to g He/g total and then to ppmw
 _He_henry_sol_constant_jambon86 = (
@@ -71,7 +73,7 @@ Experiments determined Henry's law solubility constant in tholetiitic basalt mel
 units to mol/g*bar.
 """
 
-_Ar_henry_sol_constant_jambon86: float = 5.9e-5  # cm3*STP/g*bar
+_Ar_henry_sol_constant_jambon86: Scalar = 5.9e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert Ar conc from mol/g to g Ar/g total and then to ppmw
 _Ar_henry_sol_constant_jambon86 = (
@@ -85,7 +87,7 @@ Experiments determined Henry's law solubility constant in tholetiitic basalt mel
 units to mol/g*bar.
 """
 
-_Ne_henry_sol_constant_jambon86: float = 25e-5  # cm3*STP/g*bar
+_Ne_henry_sol_constant_jambon86: Scalar = 25e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert Ne conc from mol/g to g Ne/g total and then to ppmw
 _Ne_henry_sol_constant_jambon86 = (
@@ -99,7 +101,7 @@ Experiments determined Henry's law solubility constant in tholetiitic basalt mel
 units to mol/g*bar.
 """
 
-_Kr_henry_sol_constant_jambon86: float = 3.0e-5  # cm3*STP/g*bar
+_Kr_henry_sol_constant_jambon86: Scalar = 3.0e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert Kr conc from mol/g to g Kr/g total and then to ppmw
 _Kr_henry_sol_constant_jambon86 = (
@@ -113,7 +115,7 @@ Experiments determined Henry's law solubility constant in tholetiitic basalt mel
 units to mol/g*bar.
 """
 
-_Xe_henry_sol_constant_jambon86: float = 1.7e-5  # cm3*STP/g*bar
+_Xe_henry_sol_constant_jambon86: Scalar = 1.7e-5  # cm3*STP/g*bar
 # Convert Henry solubility constant to mol/g*bar, 2.24e4 cm^3/mol at STP
 # Convert Xe conc from mol/g to g Xe/g total and then to ppmw
 _Xe_henry_sol_constant_jambon86 = (
@@ -182,15 +184,15 @@ class _N2_basalt_dasgupta22(Solubility):
         xtio2: Mole fraction of TiO2. Defaults to 0.01.
     """
 
-    xsio2: float
+    xsio2: float = eqx.field(converter=float)
     """Mole fraction of SiO2"""
-    xal2o3: float
+    xal2o3: float = eqx.field(converter=float)
     """Mole fraction of Al2O3"""
-    xtio2: float
+    xtio2: float = eqx.field(converter=float)
     """Mole fraction of TiO2"""
     _buffer: RedoxBufferProtocol
 
-    def __init__(self, xsio2: float = 0.56, xal2o3: float = 0.11, xtio2: float = 0.01):
+    def __init__(self, xsio2: Scalar = 0.56, xal2o3: Scalar = 0.11, xtio2: Scalar = 0.01):
         self.xsio2 = xsio2
         self.xal2o3 = xal2o3
         self.xtio2 = xtio2

@@ -108,9 +108,9 @@ class SolubilityPowerLaw(Solubility):
         exponent: Exponent
     """
 
-    constant: float
+    constant: float = eqx.field(converter=float)
     """Constant"""
-    exponent: float
+    exponent: float = eqx.field(converter=float)
     """Exponent"""
 
     @override
@@ -130,9 +130,9 @@ class SolubilityPowerLawLog10(Solubility):
 
     """
 
-    log10_constant: float
+    log10_constant: float = eqx.field(converter=float)
     """Log10 constant"""
-    log10_exponent: float
+    log10_exponent: float = eqx.field(converter=float)
     """Log10 exponent"""
 
     @override
