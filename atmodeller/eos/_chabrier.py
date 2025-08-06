@@ -119,10 +119,10 @@ class Chabrier(RealGas):
         )
         with data as datapath:
             df: pd.DataFrame = pd.read_csv(
-                datapath,  # type: ignore
+                datapath,
                 sep=r"\s+",
                 comment="#",
-                usecols=[0, 1, 2],  # type: ignore
+                usecols=[0, 1, 2],
                 names=column_names,
                 skiprows=2,
             )

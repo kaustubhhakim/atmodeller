@@ -312,7 +312,7 @@ def objective_function(
     )
     # jax.debug.print("residual (with nans) = {out}", out=residual)
 
-    residual = jnp.take(residual, indices=active_indices)  # type: ignore
+    residual = jnp.take(residual, indices=active_indices)
     # jax.debug.print("residual = {out}", out=residual)
 
     return residual

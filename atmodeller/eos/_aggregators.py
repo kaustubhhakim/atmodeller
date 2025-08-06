@@ -386,7 +386,7 @@ class UpperBoundRealGas(RealGas):
     # @eqx.debug.assert_max_traces(max_traces=1)
     def compressibility_factor(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
         compressibility_factor: ArrayLike = self._z0(temperature) + self._dzdp0(temperature) * (
-            pressure - self.p_eval  # type: ignore
+            pressure - self.p_eval
         )
 
         return compressibility_factor

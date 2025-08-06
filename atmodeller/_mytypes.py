@@ -22,7 +22,9 @@ import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 
-OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
+OptxSolver: TypeAlias = (
+    optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
+)
 
 NpArray: TypeAlias = npt.NDArray
 NpBool: TypeAlias = npt.NDArray[np.bool_]
