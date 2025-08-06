@@ -25,7 +25,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
 from atmodeller.solubility.core import Solubility
-from atmodeller.utilities import unit_conversion
+from atmodeller.utilities import as_j64, unit_conversion
 
 try:
     from typing import override  # type: ignore valid for Python 3.12+
@@ -49,7 +49,7 @@ class _S2_sulfate_andesite_boulliung23(Solubility):
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
         del kwargs
-        logcs: Array = -12.948 + (31586.2393 / jnp.asarray(temperature))
+        logcs: Array = -12.948 + (31586.2393 / as_j64(temperature))
         logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
         so4_wtp: Array = jnp.power(10, logso4_wtp)
         s_wtp: Array = so4_wtp * (32.065 / 96.06)
@@ -81,7 +81,7 @@ class _S2_sulfide_andesite_boulliung23(Solubility):
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
         del kwargs
-        logcs: Array = 0.225 - (8921.0927 / jnp.asarray(temperature))
+        logcs: Array = 0.225 - (8921.0927 / as_j64(temperature))
         logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
         s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
@@ -140,7 +140,7 @@ class _S2_sulfate_basalt_boulliung23(Solubility):
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
         del kwargs
-        logcs: Array = -12.948 + (32333.5635 / jnp.asarray(temperature))
+        logcs: Array = -12.948 + (32333.5635 / as_j64(temperature))
         logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
         so4_wtp: Array = jnp.power(10, logso4_wtp)
         s_wtp: Array = so4_wtp * (32.065 / 96.06)
@@ -173,7 +173,7 @@ class _S2_sulfide_basalt_boulliung23(Solubility):
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
         del kwargs
-        logcs: Array = 0.225 - (8045.7465 / jnp.asarray(temperature))
+        logcs: Array = 0.225 - (8045.7465 / as_j64(temperature))
         logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
         s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
@@ -233,7 +233,7 @@ class _S2_sulfate_trachybasalt_boulliung23(Solubility):
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
         del kwargs
-        logcs: Array = -12.948 + (32446.366 / jnp.asarray(temperature))
+        logcs: Array = -12.948 + (32446.366 / as_j64(temperature))
         logso4_wtp: Array = logcs + (0.5 * jnp.log10(fugacity)) + (1.5 * jnp.log10(fO2))
         so4_wtp: Array = jnp.power(10, logso4_wtp)
         s_wtp: Array = so4_wtp * (32.065 / 96.06)
@@ -265,7 +265,7 @@ class _S2_sulfide_trachybasalt_boulliung23(Solubility):
         self, fugacity: ArrayLike, *, temperature: ArrayLike, fO2: ArrayLike, **kwargs
     ) -> Array:
         del kwargs
-        logcs: Array = 0.225 - (7842.5 / jnp.asarray(temperature))
+        logcs: Array = 0.225 - (7842.5 / as_j64(temperature))
         logs_wtp: Array = logcs - (0.5 * (jnp.log10(fO2) - jnp.log10(fugacity)))
         s_wtp: Array = jnp.power(10, logs_wtp)
         ppmw: Array = s_wtp * unit_conversion.percent_to_ppm
