@@ -558,7 +558,7 @@ class FugacityConstraints(eqx.Module):
         # jax.debug.print("fugacity_funcs = {out}", out=fugacity_funcs)
 
         # Temperature must be a float array to ensure branches have have identical types
-        temperature = jnp.asarray(temperature, dtype=jnp.float64)
+        temperature = as_j64(temperature)
 
         def apply_fugacity(index: ArrayLike, temperature: ArrayLike, pressure: ArrayLike) -> Array:
             # jax.debug.print("index = {out}", out=index)
