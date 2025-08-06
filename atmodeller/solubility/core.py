@@ -114,7 +114,7 @@ class SolubilityPowerLaw(Solubility):
     """Exponent"""
 
     @override
-    def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> ArrayLike:
+    def concentration(self, fugacity: ArrayLike, *args, **kwargs) -> Array:
         del args
         del kwargs
 
@@ -136,7 +136,7 @@ class SolubilityPowerLawLog10(Solubility):
     """Log10 exponent"""
 
     @override
-    def concentration(self, fugacity: ArrayLike, **kwargs) -> ArrayLike:
+    def concentration(self, fugacity: ArrayLike, **kwargs) -> Array:
         del kwargs
 
         return jnp.power(10, (self.log10_constant + self.log10_exponent * jnp.log10(fugacity)))

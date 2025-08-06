@@ -133,7 +133,6 @@ class _H2_chachan18(Solubility):
         self.A = np.exp(
             (self.T0 / self.T_calibration) + np.log(self.X_calibration / self.f_calibration)
         )
-
         # jax.debug.print("A = ", self.A)
 
     @override
