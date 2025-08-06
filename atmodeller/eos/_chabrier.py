@@ -30,17 +30,12 @@ from jax.scipy.interpolate import RegularGridInterpolator
 from jaxtyping import Array, ArrayLike
 from molmass import Formula
 
-from atmodeller import PRESSURE_REFERENCE
+from atmodeller import PRESSURE_REFERENCE, override
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.eos import DATA_DIRECTORY
 from atmodeller.eos._aggregators import CombinedRealGas
 from atmodeller.eos.core import RealGas
-from atmodeller.utilities import ExperimentalCalibration, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
+from atmodeller.utilities import ExperimentalCalibration, as_j64, unit_conversion
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -62,11 +57,11 @@ class Chabrier(RealGas):
     """Directory of the Chabrier data within :obj:`~atmodeller.eos.data`"""
     log10_density_func: Callable
     """Spline lookup for density from :cite:t:`CD21` T-P-rho tables"""
-    He_fraction: float
+    He_fraction: float = eqx.field(converter=float)
     """He fraction"""
-    H2_molar_mass_g_mol: float
+    H2_molar_mass_g_mol: float = eqx.field(converter=float)
     """Molar mass of H2"""
-    He_molar_mass_g_mol: float
+    He_molar_mass_g_mol: float = eqx.field(converter=float)
     """Molar mass of He"""
     integration_steps: int
     """Number of integration steps"""
@@ -199,7 +194,7 @@ class Chabrier(RealGas):
         Returns:
             Log fugacity in bar
         """
-        temperature = jnp.asarray(temperature)
+        temperature = as_j64(temperature)
         log10_pressure: Array = jnp.log10(pressure)
         temperature, log10_pressure = jnp.broadcast_arrays(temperature, log10_pressure)
 
