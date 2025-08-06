@@ -179,7 +179,7 @@ class RealGas(eqx.Module):
         return dvdp_fn(temperature, pressure)
 
     @eqx.filter_jit
-    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> ArrayLike:
+    def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Array:
         """Log activity
 
         Args:
