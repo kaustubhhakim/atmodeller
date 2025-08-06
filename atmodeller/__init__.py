@@ -20,7 +20,6 @@ __version__: str = "0.9.1"
 
 import logging
 import os
-import sys
 
 import jax
 import jax.numpy as jnp
@@ -53,10 +52,10 @@ print("Atmodeller initialized with double precision (float64)")
 os.environ["EQX_ON_ERROR"] = "raise"
 
 # Suppress warnings (notably from Equinox about static JAX arrays)
-if not sys.warnoptions:
-    import warnings
+# if not sys.warnoptions:
+#     import warnings
 
-    warnings.simplefilter("ignore")
+#     warnings.simplefilter("ignore")
 
 # Thermodynamic standard state
 TEMPERATURE_REFERENCE: float = 298.15
