@@ -17,13 +17,14 @@
 """Utilities"""
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, Literal
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pandas as pd
 from jax.tree_util import Partial, tree_map
 from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
@@ -110,32 +111,32 @@ def as_j64(x: ArrayLike | tuple) -> Float64[Array, "..."]:
     return jnp.asarray(x, dtype=jnp.float64)
 
 
-def to_native_floats(value: Any, force_tuple: bool = False) -> Any:
-    """Converts scalar, 1D, and 2D arrays to native floats, tuples of floats, or nested tuples.
+def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
+    """Recursively converts any structure to nested tuples of native floats.
 
     Args:
-        value: Value to convert
-        force_tuple: If True, a scalar is returned as a tuple with one float. Defaults to False.
+        value: A scalar, list/tuple/array of floats, or nested thereof.
+        force_tuple: If True, scalars are returned as (float,). Defaults to True.
 
     Returns:
-        Floats, tuples of floats, or nested tuples
+        A float or nested tuple of floats.
     """
     try:
-        val: float = float(value)  # scalar input
+        val = float(value)
         return (val,) if force_tuple else val
-    except TypeError:
+    except (TypeError, ValueError):
         pass
-    if hasattr(value, "ndim"):
-        if value.ndim == 0:
-            return float(value)
-        elif value.ndim == 1:
-            return tuple(float(v) for v in value)
-        elif value.ndim == 2:
-            return tuple(tuple(float(x) for x in row) for row in value)
-        else:
-            raise ValueError("Only scalars, 1D, or 2D arrays are supported.")
+
+    # Special case for DataFrame: convert to list of rows
+    if isinstance(value, pd.DataFrame):
+        iterable: Iterable = value.itertuples(index=False, name=None)
     else:
-        raise TypeError("Input must be a scalar, or 1-D or 2-D NumPy/JAX array.")
+        try:
+            iterable = list(value)
+        except Exception:
+            raise TypeError(f"Cannot convert to float or iterate over type {type(value)}")
+
+    return tuple(to_native_floats(item, force_tuple=False) for item in iterable)
 
 
 def partial_rref(matrix: NpArray) -> NpArray:
