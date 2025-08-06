@@ -18,7 +18,7 @@
 
 import logging
 from collections.abc import Callable, Iterable
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import equinox as eqx
 import jax
@@ -257,27 +257,27 @@ class ExperimentalCalibration(eqx.Module):
         log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
     """
 
-    temperature_min: float | None = None
+    temperature_min: Optional[float] = None
     """Minimum calibrated temperature"""
-    temperature_max: float | None = None
+    temperature_max: Optional[float] = None
     """Maximum calibrated temperature"""
-    pressure_min: float | None = None
+    pressure_min: Optional[float] = None
     """Minimum calibrated pressure"""
-    pressure_max: float | None = None
+    pressure_max: Optional[float] = None
     """Maximum calibrated pressure"""
-    log10_fO2_min: float | None = None
+    log10_fO2_min: Optional[float] = None
     """Minimum calibrated log10 fO2"""
-    log10_fO2_max: float | None = None
+    log10_fO2_max: Optional[float] = None
     """Maximum calibrated log10 fO2"""
 
     def __init__(
         self,
-        temperature_min: Scalar | None = None,
-        temperature_max: Scalar | None = None,
-        pressure_min: Scalar | None = None,
-        pressure_max: Scalar | None = None,
-        log10_fO2_min: Scalar | None = None,
-        log10_fO2_max: Scalar | None = None,
+        temperature_min: Optional[Scalar] = None,
+        temperature_max: Optional[Scalar] = None,
+        pressure_min: Optional[Scalar] = None,
+        pressure_max: Optional[Scalar] = None,
+        log10_fO2_min: Optional[Scalar] = None,
+        log10_fO2_max: Optional[Scalar] = None,
     ):
         if temperature_min is not None:
             self.temperature_min = float(temperature_min)
