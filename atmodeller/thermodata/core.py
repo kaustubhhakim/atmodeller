@@ -496,9 +496,9 @@ class CriticalData(eqx.Module):
         pressure: Critical pressure in bar
     """
 
-    temperature: float = 1.0
+    temperature: float = eqx.field(converter=float, default=1)
     """Critical temperature in K"""
-    pressure: float = 1.0
+    pressure: float = eqx.field(converter=float, default=1)
     """Critical pressure in bar"""
 
 
