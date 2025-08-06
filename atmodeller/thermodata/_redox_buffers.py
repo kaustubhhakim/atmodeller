@@ -23,8 +23,13 @@ import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Bool
 
 from atmodeller import override
-from atmodeller._mytypes import Scalar
-from atmodeller.utilities import ExperimentalCalibration, all_not_nan, as_j64, unit_conversion
+from atmodeller.utilities import (
+    ExperimentalCalibration,
+    all_not_nan,
+    as_j64,
+    to_native_floats,
+    unit_conversion,
+)
 
 
 class RedoxBuffer(eqx.Module):
@@ -176,23 +181,23 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
 
     calibration: ExperimentalCalibration
     """Experimental calibration"""
-    a: tuple[Scalar, ...]
+    a: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """a coefficients"""
-    b: tuple[Scalar, ...]
+    b: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """b coefficients"""
-    c: tuple[Scalar, ...]
+    c: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """c coefficients"""
-    d: tuple[Scalar, ...]
+    d: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """d coefficients"""
-    e: tuple[Scalar, ...]
+    e: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """e coefficients"""
-    f: tuple[Scalar, ...]
+    f: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """f coefficients"""
-    g: tuple[Scalar, ...]
+    g: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """g coefficients"""
-    h: tuple[Scalar, ...]
+    h: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """h coefficients"""
-    x: tuple[Scalar, ...]
+    x: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Coefficients to define the threshold to use the hcp iron formulation"""
 
     def __init__(self, log10_shift: ArrayLike = 0, evaluation_pressure: ArrayLike | None = 1):
@@ -215,7 +220,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         """Units are GPa"""
         return pressure * unit_conversion.bar_to_GPa
 
-    def _evaluate_m(self, pressure: ArrayLike, coefficients: tuple[Scalar, ...]) -> Array:
+    def _evaluate_m(self, pressure: ArrayLike, coefficients: tuple[float, ...]) -> Array:
         """Evaluates an m parameter
 
         Args:
@@ -239,7 +244,7 @@ class IronWustiteBufferHirschmann21(RedoxBuffer):
         self,
         temperature: ArrayLike,
         pressure: ArrayLike,
-        coefficients: tuple[tuple[Scalar, ...], ...],
+        coefficients: tuple[tuple[float, ...], ...],
     ) -> Array:
         """Evaluates the fO2
 

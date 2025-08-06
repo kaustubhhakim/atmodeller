@@ -25,8 +25,6 @@ from typing import cast
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
-import numpy.typing as npt
 import pandas as pd
 from jaxtyping import Array, ArrayLike, Bool, Float, Integer
 from molmass import Formula
@@ -51,7 +49,7 @@ class CondensateActivity(eqx.Module):
         activity: Activity. Defaults to 1.
     """
 
-    activity: float = 1
+    activity: float = eqx.field(converter=float, default=1)
     """Activity"""
 
     def log_activity(self, temperature: ArrayLike, pressure: ArrayLike) -> Float[Array, ""]:
@@ -83,15 +81,15 @@ class ThermodynamicCoefficients(eqx.Module):
         T_max: Maximum temperature(s) in K in the range
     """
 
-    b1: tuple[float, ...]
+    b1: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Enthalpy constant(s) of integration"""
-    b2: tuple[float, ...]
+    b2: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Entropy constant(s) of integration"""
-    cp_coeffs: tuple[tuple[float, ...], ...]
+    cp_coeffs: tuple[tuple[float, ...], ...] = eqx.field(converter=to_native_floats)
     """Heat capacity coefficients"""
-    T_min: tuple[float, ...]
+    T_min: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Minimum temperature(s) in K in the range"""
-    T_max: tuple[float, ...]
+    T_max: tuple[float, ...] = eqx.field(converter=to_native_floats)
     """Maximum temperature(s) in K in the range"""
 
     def _get_index(self, temperature: ArrayLike) -> Integer[Array, " T"]:
@@ -463,27 +461,10 @@ class ThermodynamicDataSource:
                     & (self.data[self.state_column] == state)
                 ],
             )
-
-            # Process and store the thermodynamic coefficients
-            T_min: tuple[float, ...] = to_native_floats(
-                df["T_min"].to_numpy(dtype=float), force_tuple=True
+            cp_coeffs: pd.DataFrame = df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]]
+            coefficient_dict[name] = ThermodynamicCoefficients(
+                df["b1"], df["b2"], cp_coeffs, df["T_min"], df["T_max"]
             )
-            T_max: tuple[float, ...] = to_native_floats(
-                df["T_max"].to_numpy(dtype=float), force_tuple=True
-            )
-            b1: tuple[float, ...] = to_native_floats(
-                df["b1"].astype(dtype=float), force_tuple=True
-            )
-            b2: tuple[float, ...] = to_native_floats(
-                df["b2"].astype(dtype=float), force_tuple=True
-            )
-            a_coefficients: npt.NDArray[np.float64] = df[
-                ["a1", "a2", "a3", "a4", "a5", "a6", "a7"]
-            ].to_numpy(dtype=float)
-            cp_coeffs: tuple[tuple[float, ...], ...] = to_native_floats(
-                a_coefficients, force_tuple=True
-            )
-            coefficient_dict[name] = ThermodynamicCoefficients(b1, b2, cp_coeffs, T_min, T_max)
 
         return coefficient_dict
 
@@ -594,7 +575,7 @@ class IndividualSpeciesData(eqx.Module):
     """Composition"""
     hill_formula: str
     """Hill formula"""
-    molar_mass: float
+    molar_mass: float = eqx.field(converter=float)
     """Molar mass"""
 
     def __init__(self, formula: str, state: str):
