@@ -25,14 +25,10 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller.interfaces import RedoxBufferProtocol
 from atmodeller.thermodata._redox_buffers import IronWustiteBuffer
 from atmodeller.utilities import power_law
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
 
 
 class Solubility(eqx.Module):

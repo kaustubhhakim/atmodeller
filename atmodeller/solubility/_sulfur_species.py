@@ -24,13 +24,9 @@ import logging
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller.solubility.core import Solubility
 from atmodeller.utilities import as_j64, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
 
 logger: logging.Logger = logging.getLogger(__name__)
 

@@ -23,6 +23,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller._mytypes import Scalar
 from atmodeller.constants import GAS_CONSTANT_BAR
 from atmodeller.interfaces import RedoxBufferProtocol
@@ -34,12 +35,6 @@ from atmodeller.solubility.core import (
 )
 from atmodeller.thermodata import IronWustiteBuffer
 from atmodeller.utilities import safe_exp, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
-
 
 Cl2_ano_dio_for_thomas21: Solubility = SolubilityPowerLaw(
     140.52 * unit_conversion.percent_to_ppm, 0.5

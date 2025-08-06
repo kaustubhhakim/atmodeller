@@ -22,13 +22,9 @@ For every law there should be a test in the test suite.
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller.solubility.core import Solubility
 from atmodeller.utilities import safe_exp, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
 
 
 class _CH4_basalt_ardia13(Solubility):

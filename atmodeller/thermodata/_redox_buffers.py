@@ -22,13 +22,9 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Bool
 
+from atmodeller import override
 from atmodeller._mytypes import Scalar
 from atmodeller.utilities import ExperimentalCalibration, all_not_nan, as_j64, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
 
 
 class RedoxBuffer(eqx.Module):

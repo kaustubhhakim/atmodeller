@@ -29,6 +29,14 @@ import numpy as np
 # from beartype.claw import beartype_this_package
 # beartype_this_package()
 
+try:
+    from typing import override as _override  # type: ignore valid for Python 3.12+
+except ImportError:
+    from typing_extensions import override as _override  # Python 3.11 and earlier
+
+override = _override
+
+
 jax.config.update("jax_enable_x64", True)
 jnp.set_printoptions(precision=15)  # For better clarity in printed output
 print("Atmodeller initialized with double precision (float64)")

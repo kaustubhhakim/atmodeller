@@ -24,16 +24,11 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike
 
+from atmodeller import override
 from atmodeller._mytypes import Scalar
 from atmodeller.eos._chabrier import H2_chabrier21_bounded
 from atmodeller.solubility.core import Solubility, SolubilityPowerLaw, SolubilityPowerLawLog10
 from atmodeller.utilities import as_j64, unit_conversion
-
-try:
-    from typing import override  # type: ignore valid for Python 3.12+
-except ImportError:
-    from typing_extensions import override  # Python 3.11 and earlier
-
 
 H2_andesite_hirschmann12: Solubility = SolubilityPowerLawLog10(1.01058631, 0.60128868)
 """H2 in synthetic andesite :cite:p:`HWA12`
