@@ -29,7 +29,7 @@ from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
-from atmodeller._mytypes import NpArray
+from atmodeller._mytypes import NpArray, Scalar
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -257,20 +257,26 @@ class ExperimentalCalibration(eqx.Module):
     """
 
     temperature_min: float | None = None
+    """Minimum calibrated temperature"""
     temperature_max: float | None = None
+    """Maximum calibrated temperature"""
     pressure_min: float | None = None
+    """Minimum calibrated pressure"""
     pressure_max: float | None = None
+    """Maximum calibrated pressure"""
     log10_fO2_min: float | None = None
+    """Minimum calibrated log10 fO2"""
     log10_fO2_max: float | None = None
+    """Maximum calibrated log10 fO2"""
 
     def __init__(
         self,
-        temperature_min: int | float | None = None,
-        temperature_max: int | float | None = None,
-        pressure_min: int | float | None = None,
-        pressure_max: int | float | None = None,
-        log10_fO2_min: int | float | None = None,
-        log10_fO2_max: int | float | None = None,
+        temperature_min: Scalar | None = None,
+        temperature_max: Scalar | None = None,
+        pressure_min: Scalar | None = None,
+        pressure_max: Scalar | None = None,
+        log10_fO2_min: Scalar | None = None,
+        log10_fO2_max: Scalar | None = None,
     ):
         if temperature_min is not None:
             self.temperature_min = float(temperature_min)
