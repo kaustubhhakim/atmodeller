@@ -24,7 +24,7 @@ import optimistix as optx
 from jaxtyping import Array, ArrayLike
 
 from atmodeller import override
-from atmodeller._mytypes import OptxSolver
+from atmodeller._mytypes import OptxSolver, Scalar
 from atmodeller.constants import ATMOSPHERE, GAS_CONSTANT_BAR
 from atmodeller.eos import ABSOLUTE_TOLERANCE, RELATIVE_TOLERANCE, THROW, VOLUME_EPSILON
 from atmodeller.eos._aggregators import CombinedRealGas
@@ -37,17 +37,17 @@ logger: logging.Logger = logging.getLogger(__name__)
 # in bar). Using the original values in the paper also facilitates visual comparison and checking.
 
 
-def volume_conversion(x: float) -> float:
+def volume_conversion(x: Scalar) -> float:
     """Volume conversion for :cite:t:`HWZ58` units"""
     return x * unit_conversion.litre_to_m3
 
 
-def A0_conversion(x: float) -> float:
+def A0_conversion(x: Scalar) -> float:
     """:math:`PV^2` conversion for :cite:t:`HWZ58` units"""
     return x * ATMOSPHERE * unit_conversion.litre_to_m3**2
 
 
-def atm2bar(x: float) -> float:
+def atm2bar(x: Scalar) -> float:
     """Atmosphere to bar conversion"""
     return unit_conversion.atmosphere_to_bar * x
 
