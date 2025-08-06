@@ -16,13 +16,18 @@
 #
 """My types"""
 
+from typing import TypeAlias
+
 import numpy as np
 import numpy.typing as npt
 import optimistix as optx
 
-OptxSolver = optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
+OptxSolver: TypeAlias = (
+    optx.AbstractRootFinder | optx.AbstractLeastSquaresSolver | optx.AbstractMinimiser
+)
 
-NpArray = npt.NDArray
-NpBool = npt.NDArray[np.bool_]
-NpFloat = npt.NDArray[np.float64]
-NpInt = npt.NDArray[np.int_]
+NpArray: TypeAlias = npt.NDArray
+NpBool: TypeAlias = npt.NDArray[np.bool_]
+NpFloat: TypeAlias = npt.NDArray[np.float64]
+NpInt: TypeAlias = npt.NDArray[np.int_]
+Scalar: TypeAlias = int | float

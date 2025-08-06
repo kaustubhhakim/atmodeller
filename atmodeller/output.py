@@ -862,7 +862,7 @@ class Output:
         highlight_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         # Get the indices where the successful_solves mask is False
-        unsuccessful_indices: NpArray[np.int_] = np.where(
+        unsuccessful_indices: NpArray = np.where(
             np.array(self._solver_status) == False  # noqa: E712
         )[0]
 

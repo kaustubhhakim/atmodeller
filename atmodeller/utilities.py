@@ -17,19 +17,20 @@
 """Utilities"""
 
 import logging
-from collections.abc import Callable
-from typing import Any, Literal
+from collections.abc import Callable, Iterable
+from typing import Any, Literal, Optional
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pandas as pd
 from jax.tree_util import Partial, tree_map
 from jaxtyping import Array, ArrayLike, Bool, Float64
 from scipy.constants import kilo, mega
 
 from atmodeller import max_exp_input
-from atmodeller._mytypes import NpArray
+from atmodeller._mytypes import NpArray, Scalar
 from atmodeller.constants import ATMOSPHERE, BOLTZMANN_CONSTANT_BAR, OCEAN_MASS_H2
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -64,18 +65,42 @@ def safe_exp(x: ArrayLike) -> Array:
 
 
 def to_hashable(x: Any) -> Callable:
-    """Converts input to a hashable type
+    """Wraps a callable in `equinox.Partial` to make it hashable for JAX transformations.
 
-    For reasoning and use cases see: https://github.com/patrick-kidger/equinox/issues/1011
+    This is useful when passing callables with fixed arguments to JAX transformations
+    (e.g., `jax.vmap`, `jax.grad`, `jax.jit`) that require all static arguments
+    (including function references) to be hashable.
+
+    See discussion: https://github.com/patrick-kidger/equinox/issues/1011
+
+    Args:
+        x: A callable to wrap
+
+    Returns:
+        An `equinox.Partial` object wrapping the input callable, making it hashable
     """
-
     return Partial(x)
 
 
-def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
-    """Converts input to a JAX array of dtype float64.
+def is_hashable(something: Any) -> None:
+    """Checks whether an object is hashable and print the result.
 
-    This function is used to minimise the number of times jitted functions need to be compiled.
+    Args:
+        something: Any Python object to test.
+
+    Prints:
+        A message indicating whether the object is hashable.
+    """
+    try:
+        hash(something)
+        print("%s is hashable" % something.__class__.__name__)
+
+    except TypeError:
+        print("%s is not hashable" % something.__class__.__name__)
+
+
+def as_j64(x: ArrayLike | tuple) -> Float64[Array, "..."]:
+    """Converts input to a JAX array of dtype float64.
 
     Args:
         x: Input to convert
@@ -84,6 +109,34 @@ def as_j64(x: ArrayLike) -> Float64[Array, "..."]:
         JAX array of dtype float64
     """
     return jnp.asarray(x, dtype=jnp.float64)
+
+
+def to_native_floats(value: Any, force_tuple: bool = True) -> Any:
+    """Recursively converts any structure to nested tuples of native floats.
+
+    Args:
+        value: A scalar, list/tuple/array of floats, or nested thereof.
+        force_tuple: If True, scalars are returned as (float,). Defaults to True.
+
+    Returns:
+        A float or nested tuple of floats.
+    """
+    try:
+        val = float(value)
+        return (val,) if force_tuple else val
+    except (TypeError, ValueError):
+        pass
+
+    # Special case for DataFrame: convert to list of rows
+    if isinstance(value, pd.DataFrame):
+        iterable: Iterable = value.itertuples(index=False, name=None)
+    else:
+        try:
+            iterable = list(value)
+        except Exception:
+            raise TypeError(f"Cannot convert to float or iterate over type {type(value)}")
+
+    return tuple(to_native_floats(item, force_tuple=False) for item in iterable)
 
 
 def partial_rref(matrix: NpArray) -> NpArray:
@@ -196,20 +249,48 @@ class ExperimentalCalibration(eqx.Module):
     """Experimental calibration
 
     Args:
-        temperature_min: Minimum calibrated temperature. Defaults to nan.
-        temperature_max: Maximum calibrated temperature. Defaults to nan.
-        pressure_min: Minimum calibrated pressure. Defaults to nan.
-        pressure_max: Maximum calibrated pressure. Defaults to nan.
-        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to nan.
-        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to nan.
+        temperature_min: Minimum calibrated temperature. Defaults to None.
+        temperature_max: Maximum calibrated temperature. Defaults to None.
+        pressure_min: Minimum calibrated pressure. Defaults to None.
+        pressure_max: Maximum calibrated pressure. Defaults to None.
+        log10_fO2_min: Minimum calibrated log10 fO2. Defaults to None.
+        log10_fO2_max: Maximum calibrated log10 fO2. Defaults to None.
     """
 
-    temperature_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    temperature_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    pressure_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    pressure_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    log10_fO2_min: Array = eqx.field(converter=as_j64, default=jnp.nan)
-    log10_fO2_max: Array = eqx.field(converter=as_j64, default=jnp.nan)
+    temperature_min: Optional[float] = None
+    """Minimum calibrated temperature"""
+    temperature_max: Optional[float] = None
+    """Maximum calibrated temperature"""
+    pressure_min: Optional[float] = None
+    """Minimum calibrated pressure"""
+    pressure_max: Optional[float] = None
+    """Maximum calibrated pressure"""
+    log10_fO2_min: Optional[float] = None
+    """Minimum calibrated log10 fO2"""
+    log10_fO2_max: Optional[float] = None
+    """Maximum calibrated log10 fO2"""
+
+    def __init__(
+        self,
+        temperature_min: Optional[Scalar] = None,
+        temperature_max: Optional[Scalar] = None,
+        pressure_min: Optional[Scalar] = None,
+        pressure_max: Optional[Scalar] = None,
+        log10_fO2_min: Optional[Scalar] = None,
+        log10_fO2_max: Optional[Scalar] = None,
+    ):
+        if temperature_min is not None:
+            self.temperature_min = float(temperature_min)
+        if temperature_max is not None:
+            self.temperature_max = float(temperature_max)
+        if pressure_min is not None:
+            self.pressure_min = float(pressure_min)
+        if pressure_max is not None:
+            self.pressure_max = float(pressure_max)
+        if log10_fO2_min is not None:
+            self.log10_fO2_min = float(log10_fO2_min)
+        if log10_fO2_max is not None:
+            self.log10_fO2_max = float(log10_fO2_max)
 
 
 def power_law(values: ArrayLike, constant: ArrayLike, exponent: ArrayLike) -> Array:
