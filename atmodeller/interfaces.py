@@ -16,7 +16,7 @@
 #
 """Interfaces"""
 
-from typing import Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 from jaxtyping import Array, ArrayLike, Bool
 
@@ -35,7 +35,7 @@ class FugacityConstraintProtocol(Protocol):
 
 @runtime_checkable
 class RedoxBufferProtocol(FugacityConstraintProtocol, Protocol):
-    evaluation_pressure: ArrayLike | None
+    evaluation_pressure: Optional[ArrayLike]
 
     @property
     def log10_shift(self) -> Array: ...
@@ -57,9 +57,9 @@ class SolubilityProtocol(Protocol):
         self,
         fugacity: ArrayLike,
         *,
-        temperature: ArrayLike | None = None,
-        pressure: ArrayLike | None = None,
-        fO2: ArrayLike | None = None,
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+        fO2: Optional[ArrayLike] = None,
     ) -> Array: ...
 
     def jax_concentration(

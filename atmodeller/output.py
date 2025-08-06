@@ -24,7 +24,7 @@ import logging
 import pickle
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -111,8 +111,8 @@ class Output:
             fixed_parameters.active_stability(), log_stability, np.nan
         )
         # Caching output to avoid recomputation
-        self._cached_dict: dict[str, dict[str, NpArray]] | None = None
-        self._cached_dataframes: dict[str, pd.DataFrame] | None = None
+        self._cached_dict: Optional[dict[str, dict[str, NpArray]]] = None
+        self._cached_dataframes: Optional[dict[str, pd.DataFrame]] = None
 
     @property
     def active_indices(self) -> NpInt:

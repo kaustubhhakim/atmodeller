@@ -20,6 +20,7 @@ Units for temperature and pressure are K and bar, respectively.
 """
 
 from abc import abstractmethod
+from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -43,9 +44,9 @@ class Solubility(eqx.Module):
         self,
         fugacity: ArrayLike,
         *,
-        temperature: ArrayLike | None = None,
-        pressure: ArrayLike | None = None,
-        fO2: ArrayLike | None = None,
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+        fO2: Optional[ArrayLike] = None,
     ) -> Array:
         """Concentration in ppmw
 
@@ -84,9 +85,9 @@ class NoSolubility(Solubility):
         self,
         fugacity: ArrayLike,
         *,
-        temperature: ArrayLike | None = None,
-        pressure: ArrayLike | None = None,
-        fO2: ArrayLike | None = None,
+        temperature: Optional[ArrayLike] = None,
+        pressure: Optional[ArrayLike] = None,
+        fO2: Optional[ArrayLike] = None,
     ) -> Array:
         del fugacity
         del temperature
