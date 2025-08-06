@@ -122,7 +122,7 @@ class Chabrier(RealGas):
                 datapath,
                 sep=r"\s+",
                 comment="#",
-                usecols=[0, 1, 2],
+                usecols=[0, 1, 2],  # type: ignore
                 names=column_names,
                 skiprows=2,
             )

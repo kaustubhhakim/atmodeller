@@ -461,7 +461,7 @@ class ThermodynamicDataSource:
                     & (self.data[self.state_column] == state)
                 ],
             )
-            cp_coeffs: pd.DataFrame = df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]]
+            cp_coeffs: pd.DataFrame | pd.Series = df[["a1", "a2", "a3", "a4", "a5", "a6", "a7"]]
             coefficient_dict[name] = ThermodynamicCoefficients(
                 df["b1"], df["b2"], cp_coeffs, df["T_min"], df["T_max"]
             )
